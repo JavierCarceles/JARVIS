@@ -1,8 +1,14 @@
 ESTADO PERSISTENTE ACTUAL
 CURRENT_PHASE: 2.8.8
-CURRENT_WORK_UNIT: 2.8.8.9.4.6
+CURRENT_WORK_UNIT: 2.8.8.9.5.1
 CURRENT_WORK_STATUS: EN PROCESO
-LAST_COMPLETED_UNIT: 2.8.8.9.4.5
+LAST_COMPLETED_UNIT: 2.8.8.9.4.6
+
+# COMPLETADO: 2.8.8.9.4.6 - Corregir fallo de patrones
+# Fecha: 2026-10-20
+# Archivo modificado: tests/utils/contextual_adaptation_engine/test_goal_adaptation_feedback.py, tests/utils/contextual_adaptation_engine/test_goal_adaptation_production_data_clean.py (nuevo), data/goal_adaptation_feedback.json, data/goal_adaptation_learning_results.json, README.md, prompt_mejoraActual.txt
+# Resultado: corregida la contaminacion de los ficheros de persistencia de Goal de `data/`, que contenian EXCLUSIVAMENTE datos de test (38 artefactos retirados: 18 registros + 18 entradas de historial `test_adaptation_001`, la fila `test_load_001` con el patron `pattern_001` y la estrategia `strategy_001`); causa activa corregida (el test de feedback creaba el motor sin `data_dir` y escribia en el `data/` real en cada ejecucion de la suite); nuevo test de guarda de 3 tests que impide la recontaminacion (artefactos de test, reescritura de produccion y falta de `data_dir` por chequeo estatico)
+# Estado real: 3 PASSED / 0 FAILED (test de guarda), 2/2 mutaciones detectadas, 215 PASSED / 0 FAILED en la suite completa (212 previos + 3 nuevos); `data/` ya no se modifica durante la suite
 
 # COMPLETADO: 2.8.8.9.4.5 - Verificar patrones tras reinicio
 # Fecha: 2026-10-20
@@ -1198,8 +1204,37 @@ Hoy `learning_results` se escribe verbatim (l. 2475) y no hay ningún contador d
   fichero de produccion: 15/15 comprobaciones OK. `data/` no se modifico.
 - NO REGRESION: suite completa 212 PASSED / 0 FAILED (203 previos de 2.8.8.9.4.4 + 9 nuevos).
 
-2.8.8.9.4.6 — CORREGIR FALLO DE PATRONES
+2.8.8.9.4.6 — CORREGIR FALLO DE PATRONES [IMPLEMENTADA]
 - Corregir únicamente fallos de esta subhoja.
+- FALLO REAL CORREGIDO: la persistencia de patrones de `data/` estaba contaminada por datos de test.
+  - ACTIVO: `tests/utils/contextual_adaptation_engine/test_goal_adaptation_feedback.py` creaba el motor SIN
+    `data_dir`, por lo que `_capture_goal_adaptation_feedback()` escribia en
+    `data/goal_adaptation_feedback.json` de PRODUCCIÓN en cada ejecución de la suite
+    (verificado: sha256, tamaño y `st_mtime_ns` cambiaban en cada ejecución; el fichero crecía sin límite).
+  - RESIDUAL: `data/goal_adaptation_feedback.json` (18 registros y 18 entradas de historial, TODOS
+    `test_adaptation_001`, 100% contaminado) y `data/goal_adaptation_learning_results.json` (fila
+    `test_load_001` con el patrón `pattern_001` y la estrategia `strategy_001`, artefactos del fixture de
+    `test_load_goal_adaptation_feedback.py`). 38 artefactos de test eliminados; ambos ficheros quedan en su
+    payload canónico vacío (`learning_results`/`adaptation_strategies`/`goal_adaptation_feedback`/
+    `adaptation_history`/`last_updated`).
+  - El resultado era que la persistencia de producción no contenía ningún patrón real, sino fixtures de test.
+- CORRECCIÓN: `test_goal_adaptation_feedback.py` se aísla con `data_dir=str(tmp_path)` (además se
+  REFUERZA con una aserción real de captura correcta del feedback, antes solo imprimía) y se limpian los
+  artefactos de test de los dos ficheros de producción. Copia de los ficheros originales en
+  `data/temp/backup_4946/` y script de limpieza en `data/temp/clean_goal_test_artifacts_4946.py`.
+- TEST DE GUARDA NUEVO: `tests/utils/contextual_adaptation_engine/test_goal_adaptation_production_data_clean.py`
+  (3 tests): (1) los ficheros de persistencia de Goal de `data/` no contienen artefactos de test;
+  (2) el ciclo real de persistencia de patrones con `data_dir` temporal NO reescribe los ficheros de
+  producción; (3) chequeo estático: ningún test que ejecute la vía de escritura de Goal crea el motor
+  sin `data_dir`. 3 PASSED / 0 FAILED.
+- MUTACIÓN: 2/2 DETECTADAS (inyectar una fila `test_mut_001` en el fichero de producción → 1 FAILED;
+  quitar el `data_dir` de un test de Goal → 1 FAILED).
+- VERIFICACIÓN EN RUNTIME: tras la corrección, la suite completa deja
+  `data/goal_adaptation_feedback.json` y `data/goal_adaptation_learning_results.json` byte a byte
+  idénticos (sha256, tamaño y `st_mtime_ns` sin cambios). `data/` ya no se modifica.
+- NO REGRESIÓN: suite completa `tests/` - 215 PASSED / 0 FAILED (212 previos de 2.8.8.9.4.5 + 3 nuevos).
+- `src/utils/contextual_adaptation_engine.py` queda INTACTO (`git diff` vacío): el defecto no estaba en el
+  motor, sino en el aislamiento de los tests y en los datos de producción ya contaminados.
 
 2.8.8.9.5 — DETECCIÓN DE DATOS AUSENTES
 
@@ -3307,6 +3342,8 @@ La IA debe pensar y resolver; el prompt solo fija límites y continuidad. No sus
 ### REGISTRO DE UNIDAD: 2.8.8.9.4.2
 ### REGISTRO DE UNIDAD: 2.8.8.9.4.3
 ### REGISTRO DE UNIDAD: 2.8.8.9.4.4
+### REGISTRO DE UNIDAD: 2.8.8.9.4.5
+### REGISTRO DE UNIDAD: 2.8.8.9.4.6
 ## CONTINUIDAD OPERATIVA
 
 REGISTRO DE UNIDAD: 2.8.8.9.4.3
@@ -3426,3 +3463,86 @@ PENDIENTES: 2.8.8.9.4.6 — corregir fallo de patrones (unicamente fallos de est
 ESTADO FINAL: 2.8.8.9.4.5 — IMPLEMENTADA
 
 SIGUIENTE UNIDAD: 2.8.8.9.4.6 — CORREGIR FALLO DE PATRONES
+
+### REGISTRO DE UNIDAD: 2.8.8.9.4.6
+FECHA: 2026-10-20
+ESTADO: IMPLEMENTADA
+OBJETIVO: Corregir el fallo real de la subhoja 2.8.8.9.4 (PERSISTENCIA DE PATRONES): los ficheros de persistencia de Goal de `data/` estaban contaminados por datos de test, tanto de forma residual (contenido ya escrito) como de forma activa (la suite los reescribia en cada ejecucion).
+TIPO DE TRABAJO: CORRECCIÓN
+CAMBIOS / HALLAZGOS:
+- DIAGNÓSTICO: la suite completa `tests/` estaba en verde (212 PASSED / 0 FAILED), por lo que el fallo no era
+  visible en los tests. Se detecto verificando en runtime que la persistencia de patrones de PRODUCCIÓN no
+  contenía ningún patrón real.
+- FALLO 1 (ACTIVO): `tests/utils/contextual_adaptation_engine/test_goal_adaptation_feedback.py` creaba el motor
+  SIN `data_dir` (l. 18 y l. 80), por lo que `_capture_goal_adaptation_feedback()` -> `_record_feedback_analysis()`
+  -> `_save_goal_adaptation_feedback()` escribia en `data/goal_adaptation_feedback.json` de PRODUCCIÓN en cada
+  ejecución de la suite. Verificado en runtime: sha256 `836672ca...` -> `993f5eb7...`, tamaño 36234 -> 38491 y
+  `st_mtime_ns` distinto al ejecutar solo ese test. El fichero crecia de forma ilimitada.
+  Este es exactamente el fallo que 2.8.8.9.4.1 documento como "CONTAMINACIÓN DE DATOS DE PRODUCCIÓN" y
+  difirio ("NO se ha corregido en esta hoja: ... el arreglo pertenece a una unidad que lo autorice"), y el
+  contrato de 2.8.8.9.4.2 imposedo de forma expresa ("el test nuevo debe usar `data_dir` temporal y NUNCA
+  tocar `data/`").
+- FALLO 2 (RESIDUAL): `data/goal_adaptation_feedback.json` contenia 18 registros y 18 entradas de historial,
+  TODOS con `adaptation_id` `test_adaptation_001` (100% contaminado). `data/goal_adaptation_learning_results.json`
+  contenia 1 fila `test_load_001` con el patrón `pattern_001` (confidence 0.9) y la estrategia `strategy_001`,
+  ambos artefactos del fixture de `test_load_goal_adaptation_feedback.py` (que hoy ya esta aislado, pero que en
+  su version anterior escribia sobre el `data/` real). Consecuencia: la persistencia de patrones de producción
+  era íntegramente ficticia, y la estrategia `strategy_001` se restauraba en el `knowledge_base` de producción
+  en cada arranque.
+- CORRECCIÓN 1: `test_goal_adaptation_feedback.py` se aisla con `data_dir=str(tmp_path)` en AMBAS funciones de
+  test, y se REFUERZA con una aserción real (`assert feedback_result.get("success") is True`), ya que antes
+  solo imprimía y devolvía `True` sin comprobar nada.
+- CORRECCIÓN 2: `data/temp/clean_goal_test_artifacts_4946.py` retira de los dos ficheros de producción SOLO las
+  entradas identificadas como artefactos de test (`adaptation_id`/`strategy_id`/`pattern_id` con prefijo
+  `test_`) y arrastra las estrategias que solo existían por una fila de test (vinculo via `strategy_id` de
+  `updated_strategies`). 38 artefactos eliminados. Los ficheros quedan en su payload canónico vacío. Copia
+  original de ambos en `data/temp/backup_4946/`.
+- CORRECCIÓN 3 (guarda de regresión): nuevo
+  `tests/utils/contextual_adaptation_engine/test_goal_adaptation_production_data_clean.py` con 3 tests:
+  (1) los ficheros de producción de Goal no contienen artefactos de test;
+  (2) el ciclo real de persistencia de patrones con `data_dir` temporal no reescribe los ficheros de producción
+      (compara `st_mtime_ns`, tamaño y sha256, y exige que el ciclo haya persistido de verdad en el temporal
+      para que la comprobación no sea vacua);
+  (3) chequeo estático sobre `tests/**/test_*.py`: ningún test que ejecute la vía de escritura de Goal
+      (`_capture_goal_adaptation_feedback`, `_execute_goal_adaptation_learning_loop`, `_record_learning_results`,
+      `_save_goal_adaptation_*`) puede crear el motor sin `data_dir`.
+- `src/utils/contextual_adaptation_engine.py` queda INTACTO (`git diff` vacío): el motor cumplía correctamente
+  el contrato de DATOS CRÍTICOS (item 5) al guardar y al cargar. El defecto no estaba en el motor, sino en el
+  aislamiento de los tests y en los datos de producción ya contaminados. No se ha tocado `adaptation_strategies`
+  (contrato del item 4, cerrado en 2.8.8.9.3.6) ni ningún otro contenedor.
+ARCHIVOS MODIFICADOS:
+- PRODUCCIÓN: `data/goal_adaptation_feedback.json` y `data/goal_adaptation_learning_results.json` (limpieza de
+  artefactos de test; el código de `src/` no se ha modificado).
+- TESTS: `tests/utils/contextual_adaptation_engine/test_goal_adaptation_feedback.py` (aislamiento + aserción
+  reforzada), `tests/utils/contextual_adaptation_engine/test_goal_adaptation_production_data_clean.py` (nuevo).
+- DOCUMENTACIÓN: `README.md`, `prompt_mejoraActual.txt`.
+TESTS Y RESULTADOS:
+- UNITARIOS: `tests/utils/contextual_adaptation_engine/test_goal_adaptation_production_data_clean.py` —
+  3 PASSED / 0 FAILED / TOTAL 3.
+- MUTACIÓN: 2/2 DETECTADAS. (a) Inyección de una fila `test_mut_001` en
+  `data/goal_adaptation_learning_results.json` -> 1 FAILED (test de artefactos de test). (b) Sustitución de
+  `ContextualAdaptationEngine(data_dir=str(tmp_path))` por `ContextualAdaptationEngine()` en el test de feedback
+  -> 1 FAILED (chequeo estático de aislamiento). En ambos casos el fichero original se restauró.
+- INTEGRACIÓN: NO APLICA.
+- NO REGRESIÓN: suite completa `tests/` — 215 PASSED / 0 FAILED / TOTAL 215, frente a la baseline comparable de
+  212 PASSED / 0 FAILED de 2.8.8.9.4.5 (los 3 tests nuevos de esta hoja). 0 regresiones.
+VERIFICACIÓN:
+- SINTAXIS: `py_compile` de `main.py`, `src/utils/contextual_adaptation_engine.py`,
+  `tests/utils/contextual_adaptation_engine/test_goal_adaptation_feedback.py` y
+  `tests/utils/contextual_adaptation_engine/test_goal_adaptation_production_data_clean.py` — OK.
+- MAIN.PY: OK; `import main` completa sin error.
+- COMPORTAMIENTO / INTEGRACIÓN REAL: verificado en runtime que la suite completa deja
+  `data/goal_adaptation_feedback.json` y `data/goal_adaptation_learning_results.json` byte a byte idénticos
+  (sha256, tamaño y `st_mtime_ns` sin cambios) y que ambos ficheros quedan con 0 registros, 0 entradas de
+  historial, 0 filas de aprendizaje y 0 estrategias.
+DISCREPANCIAS: La hoja 2.8.8.9.4.1 situaba la contaminación de `data/` como pendiente de "una unidad que lo
+  autorice"; 2.8.8.9.4.6 es la unica unidad restante de la subhoja y es de correccion, por lo que se ha
+  aplicado aqui. Se deja constancia de un hallazgo FUERA del alcance de esta subhoja: los 27 ficheros de test
+  que crean el motor sin `data_dir` reescriben `data/knowledge_graph.json` en cada ejecucion, porque
+  `src/utils/self_improvement_system.py` (l. 161) usa la ruta RELATIVA fija `data/knowledge_graph.json` en
+  lugar de un `data_dir` configurable. Ese fichero pertenece al subsistema del grafo de conocimiento, no a la
+  persistencia de patrones de Goal, por lo que NO se ha corregido en esta hoja.
+PENDIENTES: 2.8.8.9.5.1 — detectar almacenamiento ausente.
+ESTADO FINAL: 2.8.8.9.4.6 — IMPLEMENTADA
+
+SIGUIENTE UNIDAD: 2.8.8.9.5.1 — DETECTAR ALMACENAMIENTO AUSENTE

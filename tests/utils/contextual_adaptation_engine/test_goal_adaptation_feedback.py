@@ -1,6 +1,15 @@
 #!/usr/bin/env python3
 """
 Test para el método de feedback de adaptación de Goal (2.8.8.7)
+
+AISLAMIENTO (2.8.8.9.4.6)
+El motor se instancia SIEMPRE con `data_dir` temporal. Antes este test
+creaba el motor sin `data_dir`, por lo que `_capture_goal_adaptation_feedback`
+persistia el feedback en `data/goal_adaptation_feedback.json` de PRODUCCIÓN en
+cada ejecución de la suite (verificado: el fichero crecía en cada ejecución y
+acumulaba registros `test_adaptation_001`). Esa contaminación invalidaba la
+persistencia de Goal y de patrones de producción, que quedaba compuesta
+íntegramente por datos de test.
 """
 
 import sys
@@ -9,13 +18,13 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'src')
 
 from utils.contextual_adaptation_engine import ContextualAdaptationEngine
 
-def test_goal_adaptation_feedback():
+def test_goal_adaptation_feedback(tmp_path):
     """Test del método _capture_goal_adaptation_feedback"""
     
     print("=== Test 2.8.8.7: Feedback de Adaptación de Goal ===")
     
-    # Crear instancia del motor
-    engine = ContextualAdaptationEngine()
+    # Crear instancia del motor aislada del `data/` de producción
+    engine = ContextualAdaptationEngine(data_dir=str(tmp_path))
     
     # Simular resultado de adaptación
     adaptation_result = {
@@ -46,6 +55,10 @@ def test_goal_adaptation_feedback():
     # Capturar feedback
     feedback_result = engine._capture_goal_adaptation_feedback(adaptation_result)
     
+    assert feedback_result.get("success") is True, (
+        f"El feedback debe capturarse correctamente: {feedback_result.get('error_message')}"
+    )
+    
     print(f"Feedback capturado: {feedback_result.get('success', False)}")
     print(f"Análisis de mejora: {feedback_result.get('improvement_analysis', {})}")
     
@@ -72,12 +85,12 @@ def test_goal_adaptation_feedback():
     print("✅ Test de feedback de adaptación completado")
     return True
 
-def test_adaptation_improvement_analysis():
+def test_adaptation_improvement_analysis(tmp_path):
     """Test del análisis de mejora"""
     
     print("\n=== Test: Análisis de Mejora ===")
     
-    engine = ContextualAdaptationEngine()
+    engine = ContextualAdaptationEngine(data_dir=str(tmp_path))
     
     # Caso 1: Adaptación con mejora
     result_with_improvement = {
@@ -141,9 +154,11 @@ def test_adaptation_improvement_analysis():
     return True
 
 if __name__ == "__main__":
+    import tempfile
     try:
-        test_goal_adaptation_feedback()
-        test_adaptation_improvement_analysis()
+        with tempfile.TemporaryDirectory() as _tmp:
+            test_goal_adaptation_feedback(_tmp)
+            test_adaptation_improvement_analysis(_tmp)
         print("\n🎉 Todos los tests de feedback de adaptación pasaron")
     except Exception as e:
         print(f"\n❌ Error en los tests: {e}")
