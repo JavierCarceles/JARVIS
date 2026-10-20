@@ -1,8 +1,14 @@
 ESTADO PERSISTENTE ACTUAL
 CURRENT_PHASE: 2.8.8
-CURRENT_WORK_UNIT: 2.8.8.9.5.1
+CURRENT_WORK_UNIT: 2.8.8.9.5.2
 CURRENT_WORK_STATUS: EN PROCESO
-LAST_COMPLETED_UNIT: 2.8.8.9.4.6
+LAST_COMPLETED_UNIT: 2.8.8.9.5.1
+
+# COMPLETADO: 2.8.8.9.5.1 - Detectar almacenamiento ausente
+# Fecha: 2026-10-21
+# Archivo modificado: src/utils/contextual_adaptation_engine.py, tests/utils/contextual_adaptation_engine/detect_absent_storage_real.py (nuevo), README.md, prompt_mejoraActual.txt
+# Resultado: implementado el rastreo del almacenamiento de persistencia AUSENTE del motor de adaptacion contextual: `expected_storage_paths()` devuelve las 4 rutas que el motor espera encontrar (`goal_adaptation_feedback.json`, `goal_adaptation_learning_results.json`, `contextual_adaptation_rules.json`, `contextual_knowledge_base.json`, cada una con su origen real en el motor) y `detect_absent_storage()` las compara con el disco en modo SOLO LECTURA, distinguendo `file_not_found` de `not_a_file`; `get_engine_status()` expone el resultado en la clave nueva `storage` sin alterar ninguna clave previa
+# Estado real: 27/27 comprobaciones OK (sonda de runtime), 215 PASSED / 0 FAILED en la suite completa (baseline comparable de 215 de 2.8.8.9.4.6, 0 tests nuevos y 0 regresiones); el `data/` de produccion NO se modifica por la sonda
 
 # COMPLETADO: 2.8.8.9.4.6 - Corregir fallo de patrones
 # Fecha: 2026-10-20
@@ -1238,8 +1244,36 @@ Hoy `learning_results` se escribe verbatim (l. 2475) y no hay ningún contador d
 
 2.8.8.9.5 — DETECCIÓN DE DATOS AUSENTES
 
-2.8.8.9.5.1 — DETECTAR ALMACENAMIENTO AUSENTE
+2.8.8.9.5.1 — DETECTAR ALMACENAMIENTO AUSENTE [IMPLEMENTADA]
 - Detectar exclusivamente ausencia del almacenamiento esperado.
+- ALMACENAMIENTO ESPERADO: cuatro ficheros, cada uno con su origen real en el motor:
+  `goal_adaptation_feedback.json` (`_save_goal_adaptation_feedback` / `_load_goal_adaptation_feedback`),
+  `goal_adaptation_learning_results.json` (`_save_goal_adaptation_learning_results` /
+  `_load_goal_adaptation_learning_results`), `contextual_adaptation_rules.json` (`_save_adaptation_rules`) y
+  `contextual_knowledge_base.json` (`save_knowledge_base`).
+- IMPLEMENTACIÓN: `expected_storage_paths()` devuelve el mapa `nombre -> ruta` de ese almacenamiento
+  (las de reglas y base de conocimiento se resuelven con `_resolve_path()`, que respeta
+  `adaptation_rules_file` y `knowledge_base_file` de la configuración; las de Goal se resuelven contra
+  `self.data_dir`). `detect_absent_storage()` compara esas rutas con el disco en modo SOLO LECTURA y
+  devuelve `expected`, `present`, `absent`, `absent_count` y `has_absent`; cada ausencia informa su
+  `path` y su `reason`, que distingue `file_not_found` (no existe) de `not_a_file` (la ruta existe pero
+  no es un fichero). `get_engine_status()` expone el resultado en la clave nueva `storage` (`absent` y
+  `absent_count`), de forma aditiva: no altera ninguna clave previa.
+- ALCANCE: esta hoja detecta la ausencia de FICHEROS. La ausencia de una SECCIÓN dentro de un fichero
+  existente se detecta aparte, en 2.8.8.9.5.2. El test pytest de ausencia corresponde a 2.8.8.9.5.4.
+- RUNTIME: `tests/utils/contextual_adaptation_engine/detect_absent_storage_real.py` — 27/27 comprobaciones
+  OK. Inventaría el almacenamiento esperado y su origen, comprueba el comportamiento del motor con el
+  almacenamiento ausente y valida la API de detección (ausencia total, total, parcial y ruta que no es un
+  fichero). Es independiente de la suite pytest, solo LEE el `data/` de producción mediante rutas
+  absolutas y mueve su CWD a un temporal ANTES de construir cualquier motor, sin restaurarlo, porque
+  `SelfImprovementSystem` escribe `data/knowledge_graph.json` con ruta RELATIVA desde un hilo asíncrono.
+- COMPORTAMIENTO CON ALMACENAMIENTO AUSENTE (verificado): el motor arranca sin fallar,
+  `load_adaptation_rules()` y `load_knowledge_base()` devuelven `True` sin fichero, se conservan las 5
+  reglas por defecto, `goal_adaptation_feedback` y `learning_results` quedan como listas vacías,
+  `adaptation_strategies` conserva la forma normalizada por contexto y la CARGA NO crea los ficheros
+  ausentes.
+- HALLAZGO DE PRODUCCIÓN: en `data/` faltan `contextual_adaptation_rules.json` y
+  `contextual_knowledge_base.json`; los dos ficheros de Goal sí están presentes.
 
 2.8.8.9.5.2 — DETECTAR SECCIÓN AUSENTE
 - Detectar únicamente ausencia de una sección esperada.
@@ -3344,6 +3378,7 @@ La IA debe pensar y resolver; el prompt solo fija límites y continuidad. No sus
 ### REGISTRO DE UNIDAD: 2.8.8.9.4.4
 ### REGISTRO DE UNIDAD: 2.8.8.9.4.5
 ### REGISTRO DE UNIDAD: 2.8.8.9.4.6
+### REGISTRO DE UNIDAD: 2.8.8.9.5.1
 ## CONTINUIDAD OPERATIVA
 
 REGISTRO DE UNIDAD: 2.8.8.9.4.3
@@ -3546,3 +3581,79 @@ PENDIENTES: 2.8.8.9.5.1 — detectar almacenamiento ausente.
 ESTADO FINAL: 2.8.8.9.4.6 — IMPLEMENTADA
 
 SIGUIENTE UNIDAD: 2.8.8.9.5.1 — DETECTAR ALMACENAMIENTO AUSENTE
+
+### REGISTRO DE UNIDAD: 2.8.8.9.5.1
+FECHA: 2026-10-21
+ESTADO: IMPLEMENTADA
+OBJETIVO: Detectar exclusivamente la ausencia del almacenamiento de persistencia esperado por el motor de adaptación contextual.
+TIPO DE TRABAJO: IMPLEMENTACIÓN
+CAMBIOS / HALLAZGOS:
+- ALMACENAMIENTO ESPERADO: cuatro ficheros, cada uno con su origen real en el motor:
+  `goal_adaptation_feedback.json` (`_save_goal_adaptation_feedback` / `_load_goal_adaptation_feedback`),
+  `goal_adaptation_learning_results.json` (`_save_goal_adaptation_learning_results` /
+  `_load_goal_adaptation_learning_results`), `contextual_adaptation_rules.json` (`_save_adaptation_rules`) y
+  `contextual_knowledge_base.json` (`save_knowledge_base`). No existe ningún otro almacenamiento esperado:
+  `save_all_data()` y `backup_data()` operan sobre estas mismas rutas.
+- IMPLEMENTACIÓN: dos métodos nuevos en `src/utils/contextual_adaptation_engine.py`.
+  `expected_storage_paths()` devuelve el mapa `nombre -> ruta` del almacenamiento esperado (las rutas de
+  reglas y base de conocimiento se resuelven con `_resolve_path()`, que respeta `adaptation_rules_file` y
+  `knowledge_base_file` de la configuración; las de Goal se resuelven contra `self.data_dir`).
+  `detect_absent_storage()` compara esas rutas con el disco en modo SOLO LECTURA y devuelve `expected`,
+  `present`, `absent`, `absent_count` y `has_absent`, con `path` y `reason` por ausencia, distinguiendo
+  `file_not_found` (no existe) de `not_a_file` (la ruta existe pero no es un fichero).
+- EXPOSICIÓN: `get_engine_status()` incorpora la clave nueva `storage` (`absent` y `absent_count`). Es
+  aditivo: no altera ninguna clave previa, y no hay ningún consumidor externo del método en `src/` ni en
+  `main.py` (0 llamadores), por lo que no existe riesgo de ruptura de esquema.
+- ALCANCE RESPETADO: la hoja pide detectar "exclusivamente" la ausencia del almacenamiento esperado, por
+  lo que se implementa la ausencia de FICHEROS. La ausencia de una SECCIÓN dentro de un fichero existente
+  se deja para 2.8.8.9.5.2, y el test pytest de ausencia a 2.8.8.9.5.4 ("Crear y ejecutar únicamente
+  tests de almacenamiento/sección ausente"), que NO se adelanta aquí.
+- COMPORTAMIENTO REAL CON ALMACENAMIENTO AUSENTE (verificado en runtime, no inferido): el motor arranca sin
+  fallar; `load_adaptation_rules()` y `load_knowledge_base()` devuelven `True` sin fichero; se conservan las
+  5 reglas por defecto; `goal_adaptation_feedback` y `learning_results` quedan como listas vacías;
+  `adaptation_strategies` conserva la forma normalizada por contexto (9 contextos); `adaptation_history`
+  queda vacío; la CARGA NO crea los ficheros ausentes; y un `data_dir` inexistente se crea sin error.
+- AISLAMIENTO DE LA VERIFICACIÓN: la sonda mueve su CWD a un temporal ANTES de construir cualquier motor y
+  NO lo restaura, porque `src/utils/self_improvement_system.py` usa la ruta RELATIVA fija
+  `data/knowledge_graph.json` y su hilo de aprendizaje la escribe de forma asíncrona: restaurar el CWD antes
+  de que ese hilo terminase haría que la escritura cayese sobre el `data/` real de producción. El `data/`
+  de producción solo se LEE, mediante rutas absolutas.
+- HALLAZGO DE PRODUCCIÓN: en `data/` faltan `contextual_adaptation_rules.json` y
+  `contextual_knowledge_base.json`; los dos ficheros de Goal sí están presentes. La ausencia es inocua para
+  el arranque (comportamiento verificado arriba).
+ARCHIVOS MODIFICADOS:
+- PRODUCCIÓN: `src/utils/contextual_adaptation_engine.py`.
+- TESTS: `tests/utils/contextual_adaptation_engine/detect_absent_storage_real.py` (nuevo; sonda de runtime,
+  independiente de la suite pytest).
+- DOCUMENTACIÓN: `README.md`, `prompt_mejoraActual.txt`.
+TESTS Y RESULTADOS:
+- UNITARIOS: NO EJECUTADOS. La creación y ejecución del test pytest de almacenamiento ausente corresponde a
+  la hoja 2.8.8.9.5.4 ("Crear y ejecutar únicamente tests de almacenamiento/sección ausente"); esta hoja no
+  lo adelanta.
+- INTEGRACIÓN: `tests/utils/contextual_adaptation_engine/detect_absent_storage_real.py` — 27 comprobaciones
+  OK / 0 FALLIDAS / TOTAL 27. Cubre el inventario del almacenamiento esperado, el comportamiento del motor
+  con el almacenamiento ausente y la API de detección (ausencia total, total, parcial y ruta que no es un
+  fichero).
+- NO REGRESIÓN: suite completa `tests/` — 215 PASSED / 0 FAILED / TOTAL 215, frente a la baseline comparable
+  de 215 PASSED / 0 FAILED de 2.8.8.9.4.6 (esta hoja no añade tests a la suite pytest). 0 regresiones.
+VERIFICACIÓN:
+- SINTAXIS: `py_compile` de `src/utils/contextual_adaptation_engine.py` y
+  `tests/utils/contextual_adaptation_engine/detect_absent_storage_real.py` — OK.
+- MAIN.PY: OK; `import main` completa sin error.
+- COMPORTAMIENTO / INTEGRACIÓN REAL: verificado en runtime que la detección NO crea ficheros (el `data_dir`
+  sigue vacío tras `detect_absent_storage()`), que distingue almacenamiento total, parcial y presente, y que
+  el `data/` de producción NO se modifica al ejecutar la sonda (`git status` de `data/` sin cambios antes y
+  después). Verificado también que la suite completa deja `data/knowledge_graph.json` modificado, con y sin
+  el cambio de `src/`, lo que confirma que ese efecto es preexistente y ajeno a esta hoja.
+DISCREPANCIAS: Se mantiene el antecedente de 2.8.8.9.4.6: los 27 ficheros de test que crean el motor sin
+  `data_dir` reescriben `data/knowledge_graph.json` en cada ejecucion, porque
+  `src/utils/self_improvement_system.py` (l. 161) usa la ruta RELATIVA fija `data/knowledge_graph.json` en
+  lugar de un `data_dir` configurable. Ese fichero pertenece al subsistema del grafo de conocimiento, no a la
+  persistencia de patrones de Goal, por lo que NO se ha corregido en esta hoja. RESOLUCIÓN DE ESTA HOJA: se
+  ha VERIFICADO que el efecto es preexistente y NO lo introduce este cambio (la suite se ejecutó con y sin la
+  modificación de `src/` y en ambos casos el fichero queda modificado), de modo que la implementación de la
+  detección no agrava la discrepancia.
+PENDIENTES: 2.8.8.9.5.2 — detectar sección ausente.
+ESTADO FINAL: 2.8.8.9.5.1 — IMPLEMENTADA
+
+SIGUIENTE UNIDAD: 2.8.8.9.5.2 — DETECTAR SECCIÓN AUSENTE

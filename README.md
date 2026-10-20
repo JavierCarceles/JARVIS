@@ -3253,6 +3253,8 @@
   - `get_adaptation_summary`: Obtener resumen de adaptaciones realizadas
   - `get_context_insights`: Obtener insights sobre los contextos detectados
   - `get_engine_status`: Obtener estado completo del motor de adaptación contextual
+  - `expected_storage_paths`: Devolver las rutas del almacenamiento de persistencia que el motor espera encontrar (ficheros)
+  - `detect_absent_storage`: Detectar qué parte del almacenamiento esperado falta en disco; es de solo lectura y no crea ficheros
   - `_save_adaptation_rules`: Guardar reglas de adaptación en archivo JSON
   - `_load_adaptation_rules`: Cargar reglas de adaptación desde archivo JSON
   - `save_all_data`: Guardar todos los datos persistentes (reglas y knowledge base)
@@ -3308,6 +3310,15 @@
   - Contaminacion residual retirada: `data/goal_adaptation_feedback.json` (18 registros y 18 entradas de historial, todos `test_adaptation_001`) y `data/goal_adaptation_learning_results.json` (fila `test_load_001` con el patron `pattern_001` y la estrategia `strategy_001`, ambos artefactos del fixture de `test_load_goal_adaptation_feedback.py`); 38 artefactos de test eliminados y ambos ficheros quedaron en su payload canonico vacio
   - Test de guarda: `tests/utils/contextual_adaptation_engine/test_goal_adaptation_production_data_clean.py` (3 tests) comprueba que los ficheros de produccion de Goal no contienen artefactos de test, que el ciclo real de persistencia de patrones con `data_dir` temporal no reescribe los ficheros de produccion y, por chequeo estatico, que ningun test que ejecute la via de escritura de Goal crea el motor sin `data_dir`
   - Verificado en runtime: tras la correccion la suite completa deja `data/goal_adaptation_feedback.json` y `data/goal_adaptation_learning_results.json` byte a byte identicos (sha256, tamano y `st_mtime_ns`)
+- **Deteccion del almacenamiento ausente (2.8.8.9.5.1)**:
+  - Almacenamiento esperado: cuatro ficheros, con su origen real en el motor: `goal_adaptation_feedback.json` y `goal_adaptation_learning_results.json` (persistencia de Goal, escritos por `_save_goal_adaptation_feedback` / `_save_goal_adaptation_learning_results`), `contextual_adaptation_rules.json` (`_save_adaptation_rules`) y `contextual_knowledge_base.json` (`save_knowledge_base`)
+  - `expected_storage_paths()`: devuelve el mapa `nombre -> ruta` del almacenamiento que el motor espera encontrar. Las rutas de reglas y base de conocimiento se resuelven con `_resolve_path()`, que respeta `adaptation_rules_file` y `knowledge_base_file` de la configuracion; las de Goal se resuelven contra `self.data_dir`
+  - `detect_absent_storage()`: detecta que parte del almacenamiento esperado falta en disco. Es de SOLO LECTURA: no crea ficheros, no altera el estado del motor y no escribe nunca en `data/`. Devuelve `expected`, `present`, `absent`, `absent_count` y `has_absent`; cada ausencia informa su `path` y su `reason`, que distingue `file_not_found` (no existe) de `not_a_file` (la ruta existe pero no es un fichero)
+  - `get_engine_status()` expone el resultado en la clave `storage` (`absent` y `absent_count`), de forma aditiva: no altera ninguna clave previa
+  - Alcance: esta unidad detecta la ausencia de FICHEROS. La ausencia de una SECCION dentro de un fichero existente se detecta aparte, en 2.8.8.9.5.2
+  - Comportamiento verificado en runtime con el almacenamiento ausente: el motor arranca sin fallar, `load_adaptation_rules()` y `load_knowledge_base()` devuelven `True` sin fichero, se conservan las 5 reglas por defecto, `goal_adaptation_feedback` / `learning_results` quedan como listas vacias, `adaptation_strategies` conserva la forma normalizada por contexto y la CARGA NO crea los ficheros ausentes
+  - Sonda de verificacion: `tests/utils/contextual_adaptation_engine/detect_absent_storage_real.py` (27 comprobaciones, 0 fallos) inventaria el almacenamiento esperado y su origen, comprueba el comportamiento en runtime sin almacenamiento y valida la API de deteccion (ausencia total, total, parcial y ruta que no es un fichero). Es independiente de la suite pytest, solo LEE el `data/` de produccion mediante rutas absolutas y mueve su CWD a un temporal ANTES de construir cualquier motor, sin restaurarlo, porque `SelfImprovementSystem` escribe `data/knowledge_graph.json` con ruta RELATIVA desde un hilo asincrono
+  - Hallazgo de produccion: en `data/` faltan `contextual_adaptation_rules.json` y `contextual_knowledge_base.json`; los dos ficheros de Goal si estan presentes
 - **Métodos de feedback y confianza**:
   - `get_transfer_confidence`: Obtener confianza existente para una transferencia específica (0.0-1.0)
   - `register_transfer_feedback`: Registrar feedback de una transferencia completada con éxito, puntuación y comentarios

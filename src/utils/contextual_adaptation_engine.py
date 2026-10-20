@@ -2629,6 +2629,32 @@ class ContextualAdaptationEngine:
         os.makedirs(self.data_dir, exist_ok=True); self._load_goal_adaptation_feedback(); self._load_goal_adaptation_learning_results()
         self.knowledge_base.setdefault("goal_adaptation_feedback", []); self.knowledge_base.setdefault("learning_results", []); self.knowledge_base.setdefault("adaptation_strategies", {})
 
+    # Detección de almacenamiento ausente (2.8.8.9.5.1)
+    def expected_storage_paths(self) -> Dict[str, str]:
+        """Rutas del almacenamiento de persistencia que el motor espera encontrar.
+
+        Solo cubre FICHEROS. La ausencia de una SECCIÓN dentro de un fichero
+        existente se detecta aparte, en 2.8.8.9.5.2.
+        """
+        return {"goal_adaptation_feedback": os.path.join(self.data_dir, "goal_adaptation_feedback.json"),
+                "goal_adaptation_learning_results": os.path.join(self.data_dir, "goal_adaptation_learning_results.json"),
+                "adaptation_rules": self._resolve_path(self.config.get("adaptation_rules_file"), "contextual_adaptation_rules.json"),
+                "knowledge_base": self._resolve_path(self.config.get("knowledge_base_file"), "contextual_knowledge_base.json")}
+
+    def detect_absent_storage(self) -> Dict[str, Any]:
+        """Detecta que parte del almacenamiento esperado falta en disco.
+
+        Operacion de SOLO LECTURA: no crea ficheros ni altera el estado del
+        motor. Devuelve, por cada almacen ausente, su ruta y el motivo, para
+        que el consumidor pueda distinguir entre fichero inexistente y ruta
+        que no es un fichero.
+        """
+        paths = self.expected_storage_paths(); present = []; absent = {}
+        for name, path in paths.items():
+            if os.path.isfile(path): present.append(name); continue
+            absent[name] = {"path": path, "reason": "not_a_file" if os.path.exists(path) else "file_not_found"}
+        return {"expected": paths, "present": present, "absent": absent, "absent_count": len(absent), "has_absent": bool(absent)}
+
     # Integración de evolución arquitectónica
     def set_architecture_manager(self, architecture_manager) -> None:
         self.architecture_manager = architecture_manager
@@ -2694,12 +2720,14 @@ class ContextualAdaptationEngine:
                 "most_common_context": max(counts, key=counts.get), "adaptation_readiness": average_confidence > self.config.get("confidence_threshold", .7)}
 
     def get_engine_status(self) -> Dict[str, Any]:
+        storage = self.detect_absent_storage()
         return {"adaptation_enabled": self.config.get("adaptation_enabled", True), "is_adapting": self.is_adapting,
             "current_context": self.current_context.context_type.value if self.current_context else None, "adaptation_level": self.adaptation_level.value,
             "total_snapshots": len(self.context_snapshots), "total_rules": len(self.adaptation_rules),
             "total_adaptations": len(self.adaptation_history), "total_knowledge_transfers": len(self.knowledge_transfers),
             "active_modes": {"lightweight": self._lightweight_mode, "offline": self._offline_mode, "performance": self._performance_mode, "recovery": self._recovery_mode, "safe": self._safe_mode},
-            "knowledge_base_stats": {"context_patterns": len(self.knowledge_base.get("context_patterns", {})), "adaptation_strategies": len(self.knowledge_base.get("adaptation_strategies", {})), "transfer_efficiency": len(self.knowledge_base.get("transfer_efficiency", {}))}}
+            "knowledge_base_stats": {"context_patterns": len(self.knowledge_base.get("context_patterns", {})), "adaptation_strategies": len(self.knowledge_base.get("adaptation_strategies", {})), "transfer_efficiency": len(self.knowledge_base.get("transfer_efficiency", {}))},
+            "storage": {"absent": storage["absent"], "absent_count": storage["absent_count"]}}
 
     # Persistencia adicional y helpers
     @staticmethod
