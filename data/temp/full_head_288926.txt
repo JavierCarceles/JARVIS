@@ -1,0 +1,5 @@
+﻿ERROR tests/ear/test__init__.py
+ERROR tests/eyes/test__init__.py
+ERROR tests/hands/test__init__.py
+ERROR tests/utils/test_cross_context_knowledge_transfer.py
+ERROR tests/utils/test_evolutionary_strategy_optimizer.py

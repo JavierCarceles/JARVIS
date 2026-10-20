@@ -166,10 +166,14 @@ def test_carga_estrategias(persisted_data):
     """Las estrategias aprendidas deben cargarse completas."""
     engine = ContextualAdaptationEngine(data_dir=persisted_data)
 
+    # El mapa `adaptation_strategies` conserva el contrato `contexto -> lista` del
+    # motor (2.8.5/2.8.6); la estrategia persistida se proyecta sobre él.
     strategies = engine.knowledge_base["adaptation_strategies"]
-    assert len(strategies) == 1, "Debe cargarse la estrategia persistida"
+    loaded = [row for rows in strategies.values() if isinstance(rows, list) for row in rows]
+    assert len(loaded) == 1, "Debe cargarse la estrategia persistida"
 
-    strategy = strategies["strategy_001"]
+    strategy = loaded[0]
+    assert strategy["strategy_id"] == "strategy_001"
     for key in ("confidence", "success_rate", "last_updated", "failure_count"):
         assert key in strategy, f"Falta la clave '{key}' en la estrategia cargada"
     assert strategy["confidence"] == 0.85
@@ -198,7 +202,10 @@ def test_inicializacion_conserva_datos_persistidos(persisted_data):
 
     assert len(engine.knowledge_base["goal_adaptation_feedback"]) == 2
     assert len(engine.knowledge_base["learning_results"]) == 1
-    assert len(engine.knowledge_base["adaptation_strategies"]) == 1
+    loaded = [row for rows in engine.knowledge_base["adaptation_strategies"].values()
+              if isinstance(rows, list) for row in rows]
+    assert len(loaded) == 1, "Debe conservarse la estrategia persistida"
+    assert loaded[0]["strategy_id"] == "strategy_001"
 
 
 def test_carga_adaptacion_history(persisted_data):

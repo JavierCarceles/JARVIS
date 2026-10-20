@@ -3265,6 +3265,15 @@
   - `_apply_performance_baselines`: Aplicar líneas base de rendimiento transferidas
   - `_evaluate_knowledge_application`: Evaluar el resultado de la aplicación de conocimiento transferido
   - `_get_available_knowledge_types`: Obtener tipos de conocimiento disponibles en un contexto
+- **Persistencia de feedback de Goal (2.8.8.9.2)**:
+  - `_initialize_goal_adaptation_persistence`: Inicializar la persistencia de feedback y aprendizaje de Goal
+  - `_save_goal_adaptation_feedback`: Guardar el feedback acumulado y el historial de adaptación en `goal_adaptation_feedback.json`
+  - `_load_goal_adaptation_feedback`: Recuperar el feedback acumulado y el historial de adaptación desde disco
+  - `_save_goal_adaptation_learning_results`: Guardar resultados de aprendizaje y estrategias en `goal_adaptation_learning_results.json`
+  - `_load_goal_adaptation_learning_results`: Recuperar resultados de aprendizaje y estrategias desde disco
+  - `_flatten_strategy_map`: Normalizar el mapa de estrategias al índice plano `strategy_id -> entrada` usado en disco
+  - `_project_strategies_by_context`: Proyectar el índice plano de estrategias sobre el mapa `contexto -> lista` del motor
+  - `_merge_strategies_by_context`: Restaurar el contexto exacto de cada estrategia aprendida desde `updated_strategies`
 - **Métodos de feedback y confianza (2.8.5.6)**:
   - `get_transfer_confidence`: Obtener confianza existente para una transferencia específica (0.0-1.0)
   - `register_transfer_feedback`: Registrar feedback de una transferencia completada con éxito, puntuación y comentarios

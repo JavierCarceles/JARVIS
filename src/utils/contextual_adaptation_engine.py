@@ -2132,9 +2132,11 @@ class ContextualAdaptationEngine:
             for key, value in current_strategies.items():
                 if isinstance(value, list):
                     updated[str(key)] = copy.deepcopy([x for x in value if isinstance(x, dict)])
-                elif isinstance(value, dict) and value.get("strategy_id"):
+                elif isinstance(value, dict):
                     # Migrar entradas planas antiguas al contexto indicado en la entrada.
+                    # Sin ``strategy_id`` la estrategia se descarta al reiniciar el motor.
                     strategy = copy.deepcopy(value)
+                    strategy.setdefault("strategy_id", str(key))
                     context_info = strategy.get("context", {})
                     ctx = context_info.get("context_type") if isinstance(context_info, dict) else None
                     ctx = self._coerce_context(ctx)
@@ -2244,6 +2246,80 @@ class ContextualAdaptationEngine:
             f"precisión={self._safe_float(metrics.get('accuracy', 0.)):.2f}"
         )
 
+    # --- Persistencia de estrategias aprendidas (2.8.8.9.2.6) ---
+    def _flatten_strategy_map(self, strategies: Any) -> Dict[str, Dict[str, Any]]:
+        """Normalizar el mapa de estrategias al índice plano ``strategy_id -> entrada``.
+
+        Acepta el mapa por contexto (``contexto -> lista``) que el motor mantiene en
+        memoria y el índice plano que se persiste en disco, de modo que ambos
+        formatos produzcan la misma representación plana.
+        """
+        flat: Dict[str, Dict[str, Any]] = {}
+        if not isinstance(strategies, dict): return flat
+        for key, value in strategies.items():
+            if isinstance(value, dict):
+                if not value: continue
+                entry = copy.deepcopy(value)
+                flat.setdefault(str(entry.get("strategy_id") or key), entry)
+                continue
+            if not isinstance(value, list): continue
+            for position, entry in enumerate(value):
+                if not isinstance(entry, dict): continue
+                normalized = copy.deepcopy(entry)
+                sid = str(normalized.get("strategy_id") or f"strategy_{key}_{position}")
+                normalized.setdefault("strategy_id", sid)
+                flat.setdefault(sid, normalized)
+        return flat
+
+    def _known_strategy_ids(self) -> set:
+        """Identificadores de estrategias ya presentes en el mapa ``contexto -> lista``."""
+        target = self.knowledge_base.get("adaptation_strategies", {})
+        if not isinstance(target, dict): return set()
+        return {str(x.get("strategy_id")) for rows in target.values() if isinstance(rows, list)
+                for x in rows if isinstance(x, dict) and x.get("strategy_id")}
+
+    def _project_strategies_by_context(self, flat: Dict[str, Dict[str, Any]]) -> None:
+        """Proyectar el índice plano de estrategias sobre el mapa ``contexto -> lista`` del motor.
+
+        El mapa ``adaptation_strategies`` sigue el contrato ``contexto -> lista``
+        (2.8.5/2.8.6); el índice plano es solo la forma de persistencia. La
+        proyección evita duplicar entradas ya presentes en el motor.
+        """
+        if not flat: return
+        target = self.knowledge_base.setdefault("adaptation_strategies", {})
+        if not isinstance(target, dict): return
+        known = self._known_strategy_ids()
+        for sid, entry in flat.items():
+            if not isinstance(entry, dict): continue
+            if str(sid) in known: continue
+            context_info = entry.get("context") if isinstance(entry.get("context"), dict) else {}
+            ctx = self._coerce_context(context_info.get("context_type")) or ContextType.IDLE
+            rows = target.get(ctx.value)
+            if not isinstance(rows, list): rows = []; target[ctx.value] = rows
+            normalized = copy.deepcopy(entry); normalized.setdefault("strategy_id", str(sid))
+            rows.append(normalized); known.add(str(sid))
+
+    def _merge_strategies_by_context(self, source: Any) -> None:
+        """Integrar un mapa ``contexto -> lista`` de estrategias en el mapa del motor.
+
+        Se usa al cargar para restaurar el contexto exacto con el que se aprendió
+        cada estrategia, que el índice plano no puede expresar por sí solo.
+        """
+        if not isinstance(source, dict): return
+        target = self.knowledge_base.setdefault("adaptation_strategies", {})
+        if not isinstance(target, dict): return
+        for ctx, rows in source.items():
+            if not isinstance(rows, list): continue
+            bucket = target.get(str(ctx))
+            if not isinstance(bucket, list): bucket = []; target[str(ctx)] = bucket
+            known = {str(x.get("strategy_id")) for x in bucket if isinstance(x, dict) and x.get("strategy_id")}
+            for entry in rows:
+                if not isinstance(entry, dict): continue
+                sid = str(entry.get("strategy_id") or "")
+                if sid and sid in known: continue
+                if sid: known.add(sid)
+                bucket.append(copy.deepcopy(entry))
+
     def _save_goal_adaptation_feedback(self) -> None:
         try:
             path = os.path.join(self.data_dir, "goal_adaptation_feedback.json"); os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -2255,7 +2331,9 @@ class ContextualAdaptationEngine:
     def _save_goal_adaptation_learning_results(self) -> None:
         try:
             path = os.path.join(self.data_dir, "goal_adaptation_learning_results.json"); os.makedirs(os.path.dirname(path), exist_ok=True)
-            payload = {"learning_results": self.knowledge_base.get("learning_results", []), "adaptation_strategies": self.knowledge_base.get("adaptation_strategies", {}), "last_updated": datetime.now().isoformat()}
+            payload = {"learning_results": self.knowledge_base.get("learning_results", []),
+                       "adaptation_strategies": self._flatten_strategy_map(self.knowledge_base.get("adaptation_strategies", {})),
+                       "last_updated": datetime.now().isoformat()}
             with open(path, "w", encoding="utf-8") as handle: json.dump(payload, handle, indent=2, ensure_ascii=False, default=self._json_default)
         except Exception as exc: self.logger.error("Error guardando resultados de aprendizaje: %s", exc)
 
@@ -2274,9 +2352,16 @@ class ContextualAdaptationEngine:
         if not os.path.isfile(path): return
         try:
             with open(path, "r", encoding="utf-8") as handle: payload = json.load(handle)
+            if not isinstance(payload, dict): return
             self.knowledge_base["learning_results"] = payload.get("learning_results", self.knowledge_base.get("learning_results", []))
+            # El contexto exacto con el que se aprendieron las estrategias solo
+            # consta en `updated_strategies` de cada resultado de aprendizaje, así
+            # que se restaura primero; el índice plano completa las que falten.
+            for record in self.knowledge_base.get("learning_results", []) or []:
+                if isinstance(record, dict): self._merge_strategies_by_context(record.get("updated_strategies"))
             strategies = payload.get("adaptation_strategies", {})
-            if isinstance(strategies, dict): self.knowledge_base["adaptation_strategies"].update(strategies)
+            flat = self._flatten_strategy_map(strategies)
+            if flat: self._project_strategies_by_context(flat)
         except Exception as exc: self.logger.error("Error cargando aprendizaje Goal: %s", exc)
 
     def _initialize_goal_adaptation_persistence(self) -> None:

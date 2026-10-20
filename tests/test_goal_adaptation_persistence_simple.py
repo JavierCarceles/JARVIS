@@ -32,7 +32,11 @@ def test_estructuras_base_inicializadas(engine):
         )
     assert engine.knowledge_base["goal_adaptation_feedback"] == []
     assert engine.knowledge_base["learning_results"] == []
-    assert engine.knowledge_base["adaptation_strategies"] == {}
+    # `adaptation_strategies` mantiene el contrato `contexto -> lista` del motor
+    # (2.8.5/2.8.6): el motor precrea una entrada por contexto, pero sin
+    # estrategias aprendidas.
+    assert isinstance(engine.knowledge_base["adaptation_strategies"], dict)
+    assert all(not rows for rows in engine.knowledge_base["adaptation_strategies"].values())
 
 
 def test_guardar_feedback_crea_archivo(engine, tmp_path):
@@ -89,11 +93,12 @@ def test_guardar_aprendizaje_crea_archivo(engine, tmp_path):
         }
     ]
     engine.knowledge_base["adaptation_strategies"] = {
-        "strategy_001": {
+        "production": [{
+            "strategy_id": "strategy_001",
             "confidence": 0.85,
             "success_rate": 0.9,
             "last_updated": "2026-10-14T00:00:00"
-        }
+        }]
     }
     engine._save_goal_adaptation_learning_results()
 
@@ -105,6 +110,8 @@ def test_guardar_aprendizaje_crea_archivo(engine, tmp_path):
 
     assert len(data["learning_results"]) == 1
     assert data["adaptation_strategies"], "Las estrategias deben persistirse"
+    # El archivo persiste el índice plano `strategy_id -> entrada`.
+    assert data["adaptation_strategies"]["strategy_001"]["confidence"] == 0.85
 
 
 def test_cargar_datos_persistidos(engine, tmp_path):
@@ -118,8 +125,8 @@ def test_cargar_datos_persistidos(engine, tmp_path):
          "convergence_metrics": {}, "timestamp": "2026-10-14T00:00:00", "status": "completed"}
     ]
     engine.knowledge_base["adaptation_strategies"] = {
-        "strategy_001": {"confidence": 0.85, "success_rate": 0.9,
-                         "last_updated": "2026-10-14T00:00:00"}
+        "production": [{"strategy_id": "strategy_001", "confidence": 0.85, "success_rate": 0.9,
+                        "last_updated": "2026-10-14T00:00:00"}]
     }
     engine._save_goal_adaptation_feedback()
     engine._save_goal_adaptation_learning_results()
@@ -137,7 +144,12 @@ def test_cargar_datos_persistidos(engine, tmp_path):
 
     assert len(target.knowledge_base["goal_adaptation_feedback"]) == 1
     assert len(target.knowledge_base["learning_results"]) == 1
-    assert len(target.knowledge_base["adaptation_strategies"]) == 1
+    # La estrategia recuperada debe quedar disponible en el mapa por contexto.
+    projected = [row for rows in target.knowledge_base["adaptation_strategies"].values()
+                  if isinstance(rows, list) for row in rows]
+    assert len(projected) == 1
+    assert projected[0].get("strategy_id") == "strategy_001"
+    assert projected[0].get("confidence") == 0.85
 
 
 def test_inicializacion_persistencia_estructuras(engine):
@@ -162,8 +174,8 @@ def test_integridad_serializacion(engine, tmp_path):
          "convergence_metrics": {}, "timestamp": "2026-10-14T00:00:00", "status": "completed"}
     ]
     engine.knowledge_base["adaptation_strategies"] = {
-        "strategy_001": {"confidence": 0.85, "success_rate": 0.9,
-                         "last_updated": "2026-10-14T00:00:00"}
+        "production": [{"strategy_id": "strategy_001", "confidence": 0.85, "success_rate": 0.9,
+                        "last_updated": "2026-10-14T00:00:00"}]
     }
     engine._save_goal_adaptation_feedback()
     engine._save_goal_adaptation_learning_results()
