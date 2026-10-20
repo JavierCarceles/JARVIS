@@ -1,0 +1,21 @@
+{
+  "version": "1.0",
+  "created_at": 1727451050.0,
+  "preferred_app": {},
+  "preferred_entities": [],
+  "interaction_settings": {
+    "suggestion_enabled": true,
+    "auto_correction": true,
+    "confidence_threshold": 0.7
+  },
+  "ui_preferences": {
+    "default_application": null,
+    "preferred_browser": "chrome",
+    "auto_maximize": false
+  },
+  "learning_settings": {
+    "enable_adaptive_learning": true,
+    "max_interaction_history": 1000,
+    "update_frequency": "daily"
+  }
+}

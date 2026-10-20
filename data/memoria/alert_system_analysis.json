@@ -1,0 +1,79 @@
+{
+  "file_analyzed": "src/utils/alert_system.py",
+  "analysis_date": "2025-06-18",
+  "total_lines": 620,
+  "analysis_complete": true,
+  "status": "COMPROBADO",
+  "components_documented": {
+    "AlertSeverity": {
+      "type": "Enum",
+      "values": ["INFO", "WARNING", "CRITICAL", "EMERGENCY"],
+      "documented": true
+    },
+    "AlertStatus": {
+      "type": "Enum", 
+      "values": ["OPEN", "ACKNOWLEDGED", "RESOLVED", "SUPPRESSED"],
+      "documented": true
+    },
+    "AlertRule": {
+      "type": "dataclass",
+      "properties": ["name", "condition", "severity", "enabled", "cooldown_minutes", "actions"],
+      "methods": ["to_dict"],
+      "documented": true
+    },
+    "AlertAction": {
+      "type": "dataclass",
+      "properties": ["name", "type", "config"],
+      "methods": ["to_dict"],
+      "documented": true
+    },
+    "Alert": {
+      "type": "dataclass",
+      "properties": ["id", "timestamp", "title", "message", "severity", "source", "status", "details", "actions_triggered", "acknowledged_by", "acknowledged_at", "resolved_at"],
+      "methods": ["to_dict"],
+      "documented": true
+    },
+    "AlertSystem": {
+      "type": "class",
+      "main_methods": [
+        "__init__", "start_monitoring", "stop_monitoring", "_monitoring_loop",
+        "_evaluate_alert_rules", "_evaluate_condition", "_process_alert",
+        "_get_action", "_execute_action", "_execute_log_action",
+        "_execute_email_action", "_execute_webhook_action", "_execute_command_action",
+        "_cleanup_old_alerts", "acknowledge_alert", "resolve_alert", "get_alerts",
+        "get_alert_statistics", "add_alert_callback", "add_acknowledgement_callback",
+        "add_resolution_callback", "add_alert_rule", "add_alert_action", "export_alerts",
+        "clear_resolved_alerts", "__enter__", "__exit__"
+      ],
+      "documented": true
+    }
+  },
+  "global_functions": [
+    "get_alert_system",
+    "start_alert_monitoring", 
+    "stop_alert_monitoring"
+  ],
+  "documentation_status": {
+    "exists_in_readme": true,
+    "location": "Line 2949-2990",
+    "completeness": "COMPLETE",
+    "accuracy": "ACCURATE"
+  },
+  "key_features": [
+    "Unified alert system with multiple severity levels",
+    "Rule-based alert evaluation with cooldown periods",
+    "Multiple action types (email, webhook, log, command)",
+    "Thread-safe monitoring with background processing",
+    "Alert lifecycle management (open, acknowledged, resolved)",
+    "Export functionality to JSON format",
+    "Context manager support",
+    "Global instance management"
+  ],
+  "integration_points": [
+    "src.utils.logger for logging alerts",
+    "Email notifications via smtplib",
+    "Webhook notifications via requests",
+    "Command execution via subprocess",
+    "Threading for concurrent monitoring"
+  ]
+}

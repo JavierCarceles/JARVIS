@@ -1,0 +1,76 @@
+{
+  "file_path": "src/hands/mouse.py",
+  "file_size": 129,
+  "analysis_date": "2025-06-17",
+  "status": "COMPROBADO",
+  "main_functions": [
+    {
+      "name": "move_to_position",
+      "description": "Mueve el ratón a una posición específica",
+      "parameters": ["x: float", "y: float", "duration: float = 0.1"],
+      "return_type": "bool",
+      "purpose": "Control de posición del ratón con movimiento suave"
+    },
+    {
+      "name": "click_element", 
+      "description": "Realiza un clic con el ratón",
+      "parameters": ["button: str = 'left'", "wait_after: float = 0.1"],
+      "return_type": "bool",
+      "purpose": "Interacción mediante clic con botón específico"
+    },
+    {
+      "name": "scroll_at_position",
+      "description": "Realiza scroll en una posición específica", 
+      "parameters": ["x: float", "y: float", "clicks: int", "wait_after: float = 0.1"],
+      "return_type": "bool",
+      "purpose": "Control de scroll en posición específica"
+    },
+    {
+      "name": "register_mouse_capabilities",
+      "description": "Registra las capacidades del ratón en el sistema",
+      "parameters": [],
+      "return_type": "None",
+      "purpose": "Integración con ActionRegistry"
+    }
+  ],
+  "action_registry_integrations": [
+    {
+      "action_name": "move_mouse",
+      "action_type": "INTERACTION",
+      "description": "Mover ratón a posición"
+    },
+    {
+      "action_name": "click_mouse", 
+      "action_type": "INTERACTION",
+      "description": "Hacer clic con el ratón"
+    },
+    {
+      "action_name": "scroll_mouse",
+      "action_type": "INTERACTION", 
+      "description": "Hacer scroll con el ratón"
+    }
+  ],
+  "dependencies": [
+    "pyautogui",
+    "utils.logger",
+    "src.hands.action_registry"
+  ],
+  "error_handling": {
+    "validation": "Validación de parámetros (coordenadas, botones, clicks)",
+    "logging": "Manejo robusto de errores con logging detallado",
+    "exceptions": "Try-catch blocks para capturar excepciones de pyautogui"
+  },
+  "key_features": [
+    "Movimiento suave con duración configurable",
+    "Soporte para múltiples botones (left, right, middle)",
+    "Scroll controlado en posición específica",
+    "Validación completa de parámetros",
+    "Integración automática con sistema de acciones",
+    "Registro automático al importar el módulo"
+  ],
+  "integration_points": [
+    "ActionRegistry para registro de acciones",
+    "utils.logger para logging sistemático",
+    "Sistema de planificación jerárquica"
+  ]
+}

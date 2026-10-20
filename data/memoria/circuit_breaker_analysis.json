@@ -1,0 +1,53 @@
+{
+  "file_analyzed": "src/utils/circuit_breaker.py",
+  "analysis_date": "2025-06-20",
+  "total_lines": 197,
+  "status": "COMPLETO",
+  "classes_found": [
+    "CircuitState",
+    "CircuitBreakerConfig", 
+    "CircuitBreaker",
+    "CircuitBreakerOpenError",
+    "CircuitBreakerManager"
+  ],
+  "main_methods": [
+    "CircuitBreaker.__init__",
+    "CircuitBreaker.call",
+    "CircuitBreaker._should_attempt_reset",
+    "CircuitBreaker._on_success",
+    "CircuitBreaker._on_failure",
+    "CircuitBreaker._open_circuit",
+    "CircuitBreaker._reset_circuit",
+    "CircuitBreaker.force_open",
+    "CircuitBreaker.force_close",
+    "CircuitBreaker.get_state",
+    "CircuitBreaker.get_stats",
+    "CircuitBreakerManager.__init__",
+    "CircuitBreakerManager.get_breaker",
+    "CircuitBreakerManager.get_all_stats",
+    "CircuitBreakerManager.reset_all",
+    "CircuitBreakerManager.cleanup_stale",
+    "circuit_breaker"
+  ],
+  "key_features": [
+    "Patrón circuit breaker para resiliencia",
+    "Tres estados: CLOSED, OPEN, HALF_OPEN",
+    "Configuración configurable de umbral de fallos",
+    "Manejo de timeouts con concurrent.futures",
+    "Manejo de threading.Lock para concurrencia",
+    "Estadísticas detalladas del circuit breaker",
+    "Decorador para uso fácil",
+    "Gestor de múltiples circuit breakers",
+    "Limpieza automática de circuit breakers obsoletos"
+  ],
+  "dependencies": [
+    "time",
+    "logging", 
+    "threading",
+    "concurrent.futures",
+    "enum",
+    "typing",
+    "dataclasses",
+    "datetime"
+  ]
+}

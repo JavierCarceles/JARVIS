@@ -1,0 +1,63 @@
+{
+  "file": "src/tools/registry.py",
+  "analysis_date": "2025-06-18",
+  "line_count": 1072,
+  "status": "COMPLETED",
+  "main_components": {
+    "ActionType": {
+      "type": "Enum",
+      "description": "Tipos de acciones disponibles en el sistema",
+      "values": ["APPLICATION", "SYSTEM", "NAVIGATION", "INTERACTION", "CALIBRATION"]
+    },
+    "ActionInfo": {
+      "type": "dataclass",
+      "description": "Metadatos completos de una acción ejecutable y planificable",
+      "fields": ["name", "description", "action_type", "function", "parameters", "module", "category", "tags", "confidence_threshold", "preconditions", "effects", "cost", "dependencies", "capability", "application", "required_resources", "requires_ui_element", "success_checker", "planner_enabled"]
+    },
+    "ActionRegistry": {
+      "type": "class",
+      "description": "Registro unificado de acciones para Jarvis",
+      "methods": {
+        "register_action": "Registra una nueva acción con metadatos avanzados",
+        "get_action": "Obtiene información de una acción por nombre",
+        "get_available_actions": "Obtiene acciones disponibles en formato para el LLM",
+        "get_actions_for_planner": "Genera metadatos serializables de las acciones para el planificador",
+        "validate_action": "Valida si una acción y sus parámetros son válidos",
+        "can_execute": "Comprueba si una acción puede ejecutarse según parámetros y estado",
+        "execute_action": "Ejecuta una acción registrada con parámetros nombrados",
+        "execute_action_legacy": "Ejecuta una acción por su nombre (compatibilidad legacy)"
+      }
+    }
+  },
+  "key_features": {
+    "unified_registration": "Sistema de registro mediante decoradores que combina registro básico con metadatos avanzados para planificación",
+    "legacy_compatibility": "Mantiene compatibilidad con el sistema legacy existente",
+    "planning_support": "Soporte completo para el sistema de planificación jerárquica con precondiciones, efectos y costes",
+    "validation_system": "Validación avanzada de tipos de parámetros y estructura de acciones",
+    "state_management": "Sistema de gestión de estado con precondiciones y efectos",
+    "error_handling": "Manejo robusto de errores con logging detallado",
+    "prediction_integration": "Integración con PredictionMemory para registro de ejecuciones"
+  },
+  "architecture": {
+    "layered": "Separación clara entre registro, validación y ejecución",
+    "metadata_driven": "Todas las acciones tienen metadatos estructurados",
+    "extensible": "Diseñado para ser extendido con nuevos tipos de acciones",
+    "thread_safe": "Implementación segura para ejecución concurrente"
+  },
+  "global_functions": [
+    "register_action",
+    "register_action_legacy", 
+    "get_available_actions",
+    "get_action"
+  ],
+  "global_functions_descriptions": {
+    "register_action": "Atajo global para registrar acciones usando la instancia global",
+    "register_action_legacy": "Atajo global para registrar acciones con versión legacy simplificada",
+    "get_available_actions": "Atajo global para obtener acciones disponibles",
+    "get_action": "Atajo global para obtener una acción específica"
+  },
+  "dependencies": {
+    "external": ["importlib", "inspect", "dataclasses", "enum", "typing"],
+    "internal": ["src.utils.logger", "src.memory.prediction"]
+  }
+}

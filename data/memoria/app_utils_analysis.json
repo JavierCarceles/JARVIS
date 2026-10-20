@@ -1,0 +1,89 @@
+{
+  "file": "src/utils/app_utils.py",
+  "lines": 805,
+  "analysis_complete": true,
+  "components": {
+    "AppManager": {
+      "description": "Gestor general de aplicaciones",
+      "responsibilities": [
+        "Gestión de aplicaciones (apertura, cierre, movimiento, centrado)",
+        "Integración con ScreenManager para monitorización",
+        "Detección de ventanas por aplicación",
+        "Verificación de aplicaciones abiertas"
+      ],
+      "methods": {
+        "open_app": "Abre aplicaciones y las coloca en monitor solicitado",
+        "close_app": "Cierra ventanas de aplicaciones",
+        "move_window_to_screen": "Mueve ventanas entre monitores",
+        "center_window": "Centra ventanas en su monitor actual",
+        "verify_app_open": "Comprueba si una aplicación está visible"
+      }
+    },
+    "VisualAnalysis": {
+      "description": "Detección visual de elementos mediante Vision/Qwen3-VL",
+      "responsibilities": [
+        "Análisis de capturas de pantalla",
+        "Detección de elementos interactivos",
+        "Normalización de coordenadas",
+        "Extracción de JSON robusta"
+      ],
+      "functions": {
+        "analyze_elements_in_screenshot": "Analiza capturas para detectar elementos interactivos",
+        "_extract_json": "Extrae JSON de respuestas Vision incluso con Markdown",
+        "_normalize_bbox": "Valida y normaliza coordenadas bbox",
+        "_safe_confidence": "Normaliza valores de confianza"
+      }
+    },
+    "WindowManagement": {
+      "description": "Gestión avanzada de ventanas",
+      "responsibilities": [
+        "Búsqueda de ventanas por aplicación",
+        "Detección del monitor asociado a una ventana",
+        "Compatibilidad con múltiples nombres/patrones"
+      ],
+      "functions": {
+        "_find_application_windows": "Busca ventanas mediante varios nombres/patrones",
+        "_find_monitor_for_window": "Determina el monitor de una ventana"
+      }
+    },
+    "CompatibilityLayer": {
+      "description": "Funciones de compatibilidad y accesibilidad",
+      "responsibilities": [
+        "Interfaz simplificada para operaciones comunes",
+        "Abstracción de AppManager"
+      ],
+      "functions": {
+        "open_app_on_screen": "Abre aplicación en monitor específico",
+        "close_app": "Cierra aplicación",
+        "move_window_to_screen": "Mueve ventana a monitor",
+        "center_window": "Centra ventana"
+      }
+    }
+  },
+  "dependencies": [
+    "src.eyes.vision.Vision",
+    "src.utils.logger.get_logger",
+    "src.utils.screen_manager.get_screen_manager",
+    "pyautogui",
+    "pygetwindow",
+    "json",
+    "os",
+    "subprocess",
+    "time",
+    "webbrowser",
+    "pathlib"
+  ],
+  "key_features": [
+    "Gestión multi-monitor con ScreenManager",
+    "Detección visual avanzada con Qwen3-VL",
+    "Búsqueda robusta de ventanas con aliases",
+    "Manejo de errores y logging extensivo",
+    "Coordenadas normalizadas 0-1000",
+    "Extracción JSON robusta de respuestas Vision"
+  ],
+  "architecture_notes": {
+    "geometry_source": "La geometría de monitores procede exclusivamente de ScreenManager",
+    "vision_integration": "La detección visual de elementos se realiza mediante Vision/Qwen3-VL",
+    "no_fictional_coords": "Este módulo no genera coordenadas ficticias"
+  }
+}

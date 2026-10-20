@@ -1,0 +1,26 @@
+{
+  "file": "src/eyes/screen.py",
+  "lines": 973,
+  "analysis": "Captura de pantalla y análisis para JARVIS con arquitectura de planificación",
+  "main_classes": [
+    "ApplicationState",
+    "ApplicationInfo", 
+    "WorldState",
+    "ScreenAnalyzer",
+    "ScreenCapture"
+  ],
+  "main_methods": [
+    "ScreenAnalyzer.analyze_application_state",
+    "ScreenAnalyzer.build_world_state",
+    "ScreenCapture.capture_monitor",
+    "ScreenCapture.capture_region",
+    "ScreenCapture.capture_element",
+    "ScreenCapture.capture_active_window",
+    "ScreenCapture.capture_desktop",
+    "get_world_state",
+    "get_application_state"
+  ],
+  "compatibility_functions": ["capture_screen", "capture_captcha_area", "get_screen_capture"],
+  "status": "verified",
+  "last_updated": "2025-06-17"
+}

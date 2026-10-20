@@ -1,0 +1,75 @@
+"""
+Módulo específico para Google Chrome con sistema de acciones registrado.
+"""
+
+# Importar y registrar acciones de Chrome
+from .chrome import (
+    abrir_chrome,
+    abrir_chrome_pantalla,
+    _abrir_chrome_desde_ruta,
+    _verificar_chrome_abierto,
+    _verificar_chrome_instalado,
+    _capturar_chrome,
+    get_chrome_commands
+)
+
+# Importar calibrador de Chrome
+from .chrome_calibrator import ChromeCalibrator, calibrar_chrome
+
+# Registrar el módulo completo en el sistema de acciones
+from src.hands.action_registry import register_module, register_action
+from src.hands.action_registry import ActionType
+
+# Registrar acciones individuales con el nuevo sistema
+@register_action(
+    name="abrir_chrome",
+    description="Abre Google Chrome en el navegador",
+    action_type= ActionType.APPLICATION,
+    category="navegacion",
+    tags=["chrome", "web", "navegador"]
+)
+def abrir_chrome_action():
+    """Acción wrapper para abrir Chrome."""
+    return abrir_chrome()
+
+@register_action(
+    name="abrir_chrome_pantalla",
+    description="Abre Google Chrome en una pantalla específica",
+    action_type=ActionType.APPLICATION,
+    category="navegacion",
+    tags=["chrome", "multi-monitor", "pantalla"]
+)
+def abrir_chrome_pantalla_action(pantalla: int = 1):
+    """Acción wrapper para abrir Chrome en pantalla específica."""
+    return abrir_chrome_pantalla(pantalla)
+
+@register_action(
+    name="calibrar_chrome",
+    description="Calibra Google Chrome con sistema mejorado y nombres semánticos",
+    action_type=ActionType.APPLICATION,
+    category="calibracion",
+    tags=["chrome", "calibracion", "qwen3vl", "multi-monitor"]
+)
+def calibrar_chrome_action():
+    """Acción wrapper para calibrar Chrome."""
+    return calibrar_chrome()
+
+# Registrar el módulo completo
+register_module("src.hands.chrome")
+
+# Exportar componentes principales
+__all__ = [
+    # Chrome básico
+    'abrir_chrome',
+    'abrir_chrome_pantalla', 
+    'get_chrome_commands',
+    
+    # Calibradores
+    'ChromeCalibrator',
+    'calibrar_chrome',
+    
+    # Acciones registradas
+    'abrir_chrome_action',
+    'abrir_chrome_pantalla_action',
+    'calibrar_chrome_action'
+]

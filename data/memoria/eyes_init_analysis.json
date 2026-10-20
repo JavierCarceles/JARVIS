@@ -1,0 +1,9 @@
+{
+  "file": "src/eyes/__init__.py",
+  "lines": 5,
+  "analysis": "Módulo de visión de JARVIS que exporta las clases principales para el sistema de visión y captura de pantalla",
+  "exports": ["Vision", "ScreenCapture", "get_screen_capture"],
+  "imports": ["from .vision_only import Vision", "from .screen_capture import ScreenCapture, get_screen_capture"],
+  "status": "verified",
+  "last_updated": "2025-06-17"
+}

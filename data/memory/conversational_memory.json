@@ -1,0 +1,52 @@
+[
+  {
+    "id": "conv_1790589308.616109",
+    "message": "¡Suscríbete al canal!",
+    "response": "Objetivo creado: Suscribirse al canal de Nissaxter",
+    "timestamp": "2026-09-28T11:55:08.616115",
+    "context": null,
+    "intent": "navigate_stream",
+    "entities": [],
+    "confidence": 1.0,
+    "execution_time": 0.0,
+    "success": null
+  },
+  {
+    "id": "conv_1790589711.695145",
+    "message": "Jarvis Calavera, Chrome.",
+    "response": "Objetivo creado: Abrir Google Chrome",
+    "timestamp": "2026-09-28T12:01:51.695153",
+    "context": null,
+    "intent": "open_application",
+    "entities": [],
+    "confidence": 1.0,
+    "execution_time": 0.0,
+    "success": null
+  },
+  {
+    "id": "conv_1790631981.978156",
+    "message": "¡Suscríbete!",
+    "response": "Objetivo creado: Suscribirse al streamer Nissaxter en Twitch",
+    "timestamp": "2026-09-28T23:46:21.978161",
+    "context": null,
+    "intent": "open_application",
+    "entities": [],
+    "confidence": 1.0,
+    "execution_time": 0.0,
+    "success": null
+  },
+  {
+    "id": "conv_1790631981.979784",
+    "message": "¡Suscríbete!",
+    "response": "Objetivo creado: Suscribirse al streamer Nissaxter en Twitch",
+    "timestamp": "2026-09-28T23:46:21.979788",
+    "context": null,
+    "intent": "open_application",
+    "entities": [
+      "Nissaxter"
+    ],
+    "confidence": 1.0,
+    "execution_time": 0.0,
+    "success": null
+  }
+]

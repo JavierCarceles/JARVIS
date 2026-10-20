@@ -1,0 +1,35 @@
+{
+  "file_path": "src/eyes/vision_only.py",
+  "total_lines": 438,
+  "analysis_completed": true,
+  "main_classes": [
+    "VisionNodeType": "Enum con tipos de nodos de visión (SCREEN_ANALYSIS, UI_DETECTON, ELEMENT_VERIFICATION, STATE_VERIFICATION, CALIBRATION_ANALYSIS, APPLICATION_DETECTION)",
+    "UIElement": "Dataclass para elementos UI detectados con propiedades de nombre, tipo, texto, bounding box, centro, interactividad y confianza",
+    "VisionResponse": "BaseModel para respuestas estructuradas del modelo de visión",
+    "Vision": "Clase principal del sistema de visión integrado con arquitectura de planificación jerárquica"
+  ],
+  "main_methods": [
+    "Vision.__init__": "Inicializa sistema de visión con modelo, captura de pantalla y memoria",
+    "_create_vision_nodes": "Crea nodos de visión estándar para el planificador",
+    "analyze_image": "Analiza imágenes usando Qwen3-VL con prompts personalizados",
+    "verify_action_result": "Verifica resultados de acciones visualmente con tolerancia configurable",
+    "detect_application_state": "Detecta estado de aplicaciones visualmente (active/open/minimized/maximized/closed)",
+    "get_vision_capabilities": "Devuelve capacidades de visión disponibles",
+    "get_total_vision_cost": "Calcula costo total de capacidades de visión"
+  ],
+  "key_features": [
+    "Visión por computadora usando Qwen3-VL mediante Ollama",
+    "Versión simplificada sin dependencias circulares",
+    "Integrado con arquitectura de planificación jerárquica",
+    "Capacidades: análisis de pantalla, detección UI, verificación de acciones, análisis de calibración, detección de aplicaciones",
+    "Salida orientada al calibrador universal con datos estructurados"
+  ],
+  "dependencies": [
+    "ollama",
+    "pydantic",
+    "src.eyes.screen_capture",
+    "src.utils.logger",
+    "src.eyes.screen"
+  ],
+  "status": "COMPROBADO"
+}

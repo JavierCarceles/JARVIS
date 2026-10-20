@@ -1,0 +1,173 @@
+{
+    "system": {
+        "open_application": {
+            "description": "Abrir una aplicación",
+            "required_state": [],
+            "effects": ["application_open"],
+            "cost": 5.0,
+            "applications": ["chrome", "spotify", "vscode", "obs_studio"]
+        },
+        "close_application": {
+            "description": "Cerrar una aplicación",
+            "required_state": ["application_open"],
+            "effects": ["application_closed"],
+            "cost": 3.0,
+            "applications": ["chrome", "spotify", "vscode", "obs_studio"]
+        },
+        "activate_window": {
+            "description": "Activar ventana de aplicación",
+            "required_state": ["application_open"],
+            "effects": ["window_active"],
+            "cost": 1.0,
+            "applications": ["chrome", "spotify", "vscode", "obs_studio"]
+        }
+    },
+    "browser": {
+        "navigate": {
+            "description": "Navegar a una URL",
+            "required_state": ["chrome_open", "chrome_active"],
+            "effects": ["url_changed"],
+            "cost": 2.0,
+            "applications": ["chrome"]
+        },
+        "new_tab": {
+            "description": "Abrir nueva pestaña",
+            "required_state": ["chrome_open", "chrome_active"],
+            "effects": ["new_tab_opened"],
+            "cost": 1.0,
+            "applications": ["chrome"]
+        },
+        "close_tab": {
+            "description": "Cerrar pestaña actual",
+            "required_state": ["chrome_open", "chrome_active"],
+            "effects": ["tab_closed"],
+            "cost": 1.0,
+            "applications": ["chrome"]
+        },
+        "refresh_page": {
+            "description": "Actualizar página actual",
+            "required_state": ["chrome_open", "chrome_active"],
+            "effects": ["page_refreshed"],
+            "cost": 1.0,
+            "applications": ["chrome"]
+        },
+        "address_bar_focus": {
+            "description": "Enfocar barra de direcciones",
+            "required_state": ["chrome_open", "chrome_active"],
+            "effects": ["address_bar_focused"],
+            "cost": 1.0,
+            "applications": ["chrome"]
+        },
+        "type_url": {
+            "description": "Escribir URL en la barra de direcciones",
+            "required_state": ["address_bar_focused"],
+            "effects": ["url_typed"],
+            "cost": 1.0,
+            "applications": ["chrome"]
+        },
+        "press_enter": {
+            "description": "Presionar Enter",
+            "required_state": ["url_typed"],
+            "effects": ["navigation_initiated"],
+            "cost": 0.5,
+            "applications": ["chrome"]
+        }
+    },
+    "media": {
+        "play": {
+            "description": "Reproducir media",
+            "required_state": ["spotify_open", "spotify_active"],
+            "effects": ["media_playing"],
+            "cost": 1.0,
+            "applications": ["spotify"]
+        },
+        "pause": {
+            "description": "Pausar media",
+            "required_state": ["spotify_open", "spotify_active", "media_playing"],
+            "effects": ["media_paused"],
+            "cost": 1.0,
+            "applications": ["spotify"]
+        },
+        "next_track": {
+            "description": "Siguiente canción",
+            "required_state": ["spotify_open", "spotify_active", "media_playing"],
+            "effects": ["track_changed"],
+            "cost": 1.0,
+            "applications": ["spotify"]
+        },
+        "previous_track": {
+            "description": "Canción anterior",
+            "required_state": ["spotify_open", "spotify_active", "media_playing"],
+            "effects": ["track_changed"],
+            "cost": 1.0,
+            "applications": ["spotify"]
+        },
+        "search_music": {
+            "description": "Buscar música",
+            "required_state": ["spotify_open", "spotify_active", "search_bar_focused"],
+            "effects": ["search_results_displayed"],
+            "cost": 2.0,
+            "applications": ["spotify"]
+        }
+    },
+    "development": {
+        "open_file": {
+            "description": "Abrir archivo en editor",
+            "required_state": ["vscode_open", "vscode_active"],
+            "effects": ["file_opened"],
+            "cost": 2.0,
+            "applications": ["vscode"]
+        },
+        "save_file": {
+            "description": "Guardar archivo",
+            "required_state": ["file_opened"],
+            "effects": ["file_saved"],
+            "cost": 1.0,
+            "applications": ["vscode"]
+        },
+        "run_code": {
+            "description": "Ejecutar código",
+            "required_state": ["file_opened", "terminal_open"],
+            "effects": ["code_executed"],
+            "cost": 3.0,
+            "applications": ["vscode"]
+        },
+        "open_terminal": {
+            "description": "Abrir terminal",
+            "required_state": ["vscode_open", "vscode_active"],
+            "effects": ["terminal_opened"],
+            "cost": 2.0,
+            "applications": ["vscode"]
+        }
+    },
+    "streaming": {
+        "start_stream": {
+            "description": "Iniciar streaming",
+            "required_state": ["obs_open", "obs_active"],
+            "effects": ["stream_started"],
+            "cost": 3.0,
+            "applications": ["obs_studio"]
+        },
+        "stop_stream": {
+            "description": "Detener streaming",
+            "required_state": ["obs_open", "obs_active", "stream_started"],
+            "effects": ["stream_stopped"],
+            "cost": 2.0,
+            "applications": ["obs_studio"]
+        },
+        "start_recording": {
+            "description": "Iniciar grabación",
+            "required_state": ["obs_open", "obs_active"],
+            "effects": ["recording_started"],
+            "cost": 2.0,
+            "applications": ["obs_studio"]
+        },
+        "stop_recording": {
+            "description": "Detener grabación",
+            "required_state": ["obs_open", "obs_active", "recording_started"],
+            "effects": ["recording_stopped"],
+            "cost": 2.0,
+            "applications": ["obs_studio"]
+        }
+    }
+}

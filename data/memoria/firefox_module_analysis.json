@@ -1,0 +1,49 @@
+{
+  "module": "src/hands/firefox",
+  "analysis_date": "2025-06-18",
+  "files_analyzed": [
+    "src/hands/firefox/__init__.py",
+    "src/hands/firefox/firefox.py", 
+    "src/hands/firefox/calibrator_firefox.py"
+  ],
+  "total_lines": 867,
+  "status": "COMPLETED",
+  "summary": "Módulo completo para Mozilla Firefox con soporte multi-monitor, calibración universal y funciones legacy para compatibilidad. El módulo sigue el patrón arquitectónico del sistema JARVIS con delegación hacia CalibrationManager y ScreenManager.",
+  "key_features": [
+    "Soporte multi-monitor con validación de números de pantalla",
+    "Integración con ScreenManager para detección y manejo de ventanas", 
+    "Múltiples métodos de apertura con fallback (subprocess, búsqueda de rutas)",
+    "Selección inteligente de ventanas (priorizar ventana en primer plano)",
+    "Manejo robusto de errores con logging detallado",
+    "Funciones legacy para compatibilidad con sistemas antiguos",
+    "Calibración universal mediante Qwen3-VL y UniversalVisualCalibrator",
+    "Acciones registradas en el sistema de planificación jerárquica"
+  ],
+  "integrations": [
+    "CalibrationManager para calibración real",
+    "UniversalVisualCalibrator para análisis visual", 
+    "Qwen3-VL para detección de elementos",
+    "ScreenManager para información de monitores",
+    "pyautogui para captura de pantalla",
+    "pygetwindow para detección de ventanas",
+    "utils.logger para logging detallado"
+  ],
+  "legacy_functions": [
+    "_calibrar_firefox": "Función legacy desactivada, utiliza calibrador universal",
+    "_generar_coordenadas_firefox": "No genera coordenadas artificiales por diseño",
+    "_capturar_firefox": "Compatibilidad con captura legacy"
+  ],
+  "registered_actions": [
+    "abrir_firefox_pantalla": "Abre Mozilla Firefox en pantalla específica (APPLICATION)",
+    "abrir_firefox_pestana": "Abre nueva pestaña de Firefox en pantalla específica (APPLICATION)"
+  ],
+  "dependencies": [
+    "pyautogui",
+    "pygetwindow", 
+    "subprocess",
+    "os",
+    "pathlib",
+    "time",
+    "typing"
+  ]
+}

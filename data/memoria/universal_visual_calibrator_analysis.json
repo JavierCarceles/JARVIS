@@ -1,0 +1,87 @@
+{
+  "file": "src/hands/universal_visual_calibrator.py",
+  "lines": 916,
+  "analysis_date": "2025-06-18",
+  "status": "verified",
+  "classes": [
+    {
+      "name": "CalibrationPolicy",
+      "description": "Política centralizada de seguridad, no una allowlist de aplicaciones",
+      "constants": {
+        "BLOCKED_APPLICATIONS": 93,
+        "ALLOWED_APPLICATIONS": 34,
+        "BLOCKED_ELEMENT_TYPES": 13,
+        "MIN_ELEMENT_CONFIDENCE": 0.30
+      },
+      "methods": [
+        "can_calibrate_application",
+        "can_calibrate_element",
+        "_normalize_name"
+      ]
+    },
+    {
+      "name": "UICapability",
+      "description": "Representa un elemento UI calibrado y consumible por acciones",
+      "methods": ["to_dict"]
+    },
+    {
+      "name": "CalibrationState",
+      "description": "Estado en memoria de los elementos calibrados",
+      "methods": [
+        "get_element",
+        "get_application_elements",
+        "add_element",
+        "is_element_calibrated",
+        "get_calibration_age"
+      ]
+    },
+    {
+      "name": "UniversalVisualCalibrator",
+      "description": "Calibrador visual universal integrado con las capas superiores",
+      "constants": {
+        "MODEL": "qwen3-vl:8b-instruct",
+        "NORMALIZED_MAX": 1000,
+        "MAX_ELEMENTS": 80,
+        "MIN_CONFIDENCE": 0.20
+      },
+      "methods": [
+        "__init__",
+        "get_ui_capability",
+        "calibrate_application_elements",
+        "calibrate",
+        "_calibrate_element",
+        "_build_prompt",
+        "_parse_response",
+        "_normalize_elements",
+        "_normalize_single_element",
+        "_extract_image_bbox",
+        "_bbox_to_image_pixels",
+        "_image_bbox_to_monitor_bbox",
+        "_normalize_element_name",
+        "_normalize_confidence",
+        "_deduplicate_elements"
+      ]
+    }
+  ],
+  "global_functions": [
+    "get_calibrator",
+    "get_ui_capability"
+  ],
+  "features": {
+    "model": "Qwen3-VL 8B Instruct",
+    "coordinate_system": "absolute_desktop_native_pixels",
+    "max_elements": 80,
+    "min_confidence": 0.20,
+    "min_element_confidence": 0.30,
+    "normalized_max": 1000,
+    "multiponitor_support": true,
+    "memory_persistence": true,
+    "security_policy": true
+  },
+  "integrations": [
+    "Vision (src.eyes.vision)",
+    "ConversationMemory (src.memory.conversation)",
+    "Logger (src.utils.logger)",
+    "ScreenManager (src.utils.screen_manager)"
+  ]
+}

@@ -1,0 +1,147 @@
+{
+  "ui_knowledge": {
+    "chrome": {
+      "address_bar": {
+        "type": "input",
+        "description": "Barra de direcciones de Chrome",
+        "calibration_strategy": "visual_detection",
+        "alternatives": ["chrome.hotkey_ctrl_l"],
+        "screens": {
+          "s1": [3582, 339],
+          "s2": [7447, 335]
+        },
+        "confidence": 0.9
+      },
+      "new_tab_button": {
+        "type": "button",
+        "description": "Botón para nueva pestaña",
+        "calibration_strategy": "visual_detection",
+        "alternatives": ["chrome.hotkey_ctrl_t"],
+        "screens": {
+          "s1": [389, 28],
+          "s2": [3254, 25]
+        },
+        "confidence": 0.85
+      },
+      "search_button": {
+        "type": "button",
+        "description": "Botón de búsqueda",
+        "calibration_strategy": "visual_detection",
+        "alternatives": [],
+        "screens": {
+          "s1": [2278, 1016],
+          "s2": [6115, 1014]
+        },
+        "confidence": 0.8
+      }
+    },
+    "spotify": {
+      "play_button": {
+        "type": "button",
+        "description": "Botón de reproducción",
+        "calibration_strategy": "visual_detection",
+        "alternatives": ["spotify.hotkey_space"],
+        "screens": {
+          "s1": [950, 1025],
+          "s2": [5015, 1020]
+        },
+        "confidence": 0.9
+      },
+      "next_button": {
+        "type": "button",
+        "description": "Botón siguiente",
+        "calibration_strategy": "visual_detection",
+        "alternatives": ["spotify.hotkey_next"],
+        "screens": {
+          "s1": [1100, 1025],
+          "s2": [5165, 1020]
+        },
+        "confidence": 0.85
+      }
+    },
+    "riot_api": {
+      "login": {
+        "type": "button",
+        "description": "Botón de login",
+        "calibration_strategy": "visual_detection",
+        "alternatives": [],
+        "screens": {
+          "s1": [3582, 339],
+          "s2": [7447, 335]
+        },
+        "confidence": 0.8
+      },
+      "captcha": {
+        "type": "region",
+        "description": "Área de captcha",
+        "calibration_strategy": "screen_capture",
+        "alternatives": [],
+        "screens": {
+          "s1": [1361, 1584, 100, 50],
+          "s2": [5207, 1565, 100, 50]
+        },
+        "confidence": 0.7
+      }
+    }
+  },
+  "calibration_policies": {
+    "blocked_applications": [
+      "game", "juego", "steam", "origin", "epic", "vscode", "visual studio", 
+      "league of legends", "valorant", "minecraft", "roblox"
+    ],
+    "allowed_strategies": [
+      "visual_detection",
+      "window_detection", 
+      "screen_capture",
+      "keyboard_shortcut"
+    ],
+    "auto_calibration_rules": {
+      "chrome": true,
+      "spotify": true,
+      "edge": true,
+      "firefox": true,
+      "notepad": true,
+      "calculator": true
+    }
+  },
+  "legacy_data": {
+    "macros": {
+      "riot_api": {
+        "login": {
+          "s1": [3582, 339],
+          "s2": [7447, 335]
+        },
+        "captcha": {
+          "s1": [1361, 1584],
+          "s2": [5207, 1565]
+        },
+        "generate": {
+          "s1": [1527, 1743],
+          "s2": [5351, 1751]
+        },
+        "copy": {
+          "s1": [2278, 1016],
+          "s2": [6115, 1014]
+        },
+        "accept_captcha": {
+          "s1": [2221, 1957],
+          "s2": [6743, 2234]
+        },
+        "capture_regions": {
+          "s1": [1424, 726, 900, 1303],
+          "s2": [5267, 731, 893, 1295]
+        }
+      },
+      "supercomplete": {
+        "sc_button": {
+          "s1": [40, 699],
+          "s2": [3879, 699]
+        },
+        "chat": {
+          "s1": [202, 1862],
+          "s2": [4048, 1862]
+        }
+      }
+    }
+  }
+}

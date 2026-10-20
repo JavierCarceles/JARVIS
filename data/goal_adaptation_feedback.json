@@ -1,0 +1,827 @@
+{
+  "goal_adaptation_feedback": [
+    {
+      "adaptation_id": "test_load_001",
+      "analysis": {
+        "performance_improvement": 15.0,
+        "pattern_recognition": [
+          {
+            "pattern_type": "goal_adaptation_success",
+            "context": {
+              "goal_type": "navigate"
+            },
+            "metrics": {
+              "response_time": 1.5,
+              "accuracy": 0.98
+            },
+            "timestamp": "2026-10-14T00:33:40.112233",
+            "confidence": 0.9
+          }
+        ],
+        "strategic_insights": []
+      },
+      "timestamp": "2026-10-14T00:33:40.112233",
+      "status": "processed"
+    },
+    {
+      "adaptation_id": "test_load_002",
+      "analysis": {
+        "performance_improvement": 8.0,
+        "pattern_recognition": [
+          {
+            "pattern_type": "goal_adaptation_success",
+            "context": {
+              "goal_type": "search"
+            },
+            "metrics": {
+              "response_time": 1.2,
+              "accuracy": 0.95
+            },
+            "timestamp": "2026-10-14T00:33:40.112233",
+            "confidence": 0.85
+          }
+        ],
+        "strategic_insights": [
+          {
+            "strategy_type": "adaptation_strategy",
+            "context": {
+              "goal_type": "search"
+            },
+            "metrics": {
+              "response_time": 1.2,
+              "accuracy": 0.95
+            },
+            "timestamp": "2026-10-14T00:33:40.112233",
+            "confidence": 0.8
+          }
+        ]
+      },
+      "timestamp": "2026-10-14T00:33:40.112233",
+      "status": "processed"
+    },
+    {
+      "adaptation_id": "test_restart_adaptation",
+      "analysis": {
+        "performance_improvement": 0.0,
+        "resource_efficiency": 0.0,
+        "pattern_recognition": [
+          {
+            "pattern_type": "goal_adaptation_success",
+            "context": {
+              "goal_type": "navigation",
+              "context_type": "browser",
+              "system_resources": {
+                "cpu": 0.5,
+                "memory": 0.3
+              }
+            },
+            "metrics": {
+              "response_time": 1.2,
+              "accuracy": 0.95,
+              "success": true,
+              "verified": true,
+              "impact_score": 0.8
+            },
+            "timestamp": "2026-10-14T13:09:41.744101",
+            "confidence": 0.9
+          }
+        ],
+        "strategic_insights": [
+          {
+            "strategy_type": "adaptation_strategy",
+            "context": {
+              "goal_type": "navigation",
+              "context_type": "browser",
+              "system_resources": {
+                "cpu": 0.5,
+                "memory": 0.3
+              }
+            },
+            "metrics": {
+              "response_time": 1.2,
+              "accuracy": 0.95,
+              "success": true,
+              "verified": true,
+              "impact_score": 0.8
+            },
+            "timestamp": "2026-10-14T13:09:41.744104",
+            "confidence": 0.85
+          }
+        ]
+      },
+      "timestamp": "2026-10-14T13:09:41.744106",
+      "status": "processed"
+    },
+    {
+      "adaptation_id": "test_restart_adaptation",
+      "analysis": {
+        "performance_improvement": 0.0,
+        "resource_efficiency": 0.0,
+        "pattern_recognition": [
+          {
+            "pattern_type": "goal_adaptation_success",
+            "context": {
+              "goal_type": "navigation",
+              "context_type": "browser",
+              "system_resources": {
+                "cpu": 0.5,
+                "memory": 0.3
+              }
+            },
+            "metrics": {
+              "response_time": 1.2,
+              "accuracy": 0.95,
+              "success": true,
+              "verified": true,
+              "impact_score": 0.8
+            },
+            "timestamp": "2026-10-14T13:15:14.494202",
+            "confidence": 0.9
+          }
+        ],
+        "strategic_insights": [
+          {
+            "strategy_type": "adaptation_strategy",
+            "context": {
+              "goal_type": "navigation",
+              "context_type": "browser",
+              "system_resources": {
+                "cpu": 0.5,
+                "memory": 0.3
+              }
+            },
+            "metrics": {
+              "response_time": 1.2,
+              "accuracy": 0.95,
+              "success": true,
+              "verified": true,
+              "impact_score": 0.8
+            },
+            "timestamp": "2026-10-14T13:15:14.494207",
+            "confidence": 0.85
+          }
+        ]
+      },
+      "timestamp": "2026-10-14T13:15:14.494209",
+      "status": "processed"
+    },
+    {
+      "adaptation_id": "test_restart_adaptation",
+      "analysis": {
+        "performance_improvement": 0.0,
+        "resource_efficiency": 0.0,
+        "pattern_recognition": [
+          {
+            "pattern_type": "goal_adaptation_success",
+            "context": {
+              "goal_type": "navigation",
+              "context_type": "browser",
+              "system_resources": {
+                "cpu": 0.5,
+                "memory": 0.3
+              }
+            },
+            "metrics": {
+              "response_time": 1.2,
+              "accuracy": 0.95,
+              "success": true,
+              "verified": true,
+              "impact_score": 0.8
+            },
+            "timestamp": "2026-10-14T13:18:17.580522",
+            "confidence": 0.9
+          }
+        ],
+        "strategic_insights": [
+          {
+            "strategy_type": "adaptation_strategy",
+            "context": {
+              "goal_type": "navigation",
+              "context_type": "browser",
+              "system_resources": {
+                "cpu": 0.5,
+                "memory": 0.3
+              }
+            },
+            "metrics": {
+              "response_time": 1.2,
+              "accuracy": 0.95,
+              "success": true,
+              "verified": true,
+              "impact_score": 0.8
+            },
+            "timestamp": "2026-10-14T13:18:17.580526",
+            "confidence": 0.85
+          }
+        ]
+      },
+      "timestamp": "2026-10-14T13:18:17.580527",
+      "status": "processed"
+    },
+    {
+      "adaptation_id": "test_restart_adaptation",
+      "analysis": {
+        "performance_improvement": 0.0,
+        "resource_efficiency": 0.0,
+        "pattern_recognition": [
+          {
+            "pattern_type": "goal_adaptation_success",
+            "context": {
+              "goal_type": "navigation",
+              "context_type": "browser",
+              "system_resources": {
+                "cpu": 0.5,
+                "memory": 0.3
+              }
+            },
+            "metrics": {
+              "response_time": 1.2,
+              "accuracy": 0.95,
+              "success": true,
+              "verified": true,
+              "impact_score": 0.8
+            },
+            "timestamp": "2026-10-14T13:18:36.161325",
+            "confidence": 0.9
+          }
+        ],
+        "strategic_insights": [
+          {
+            "strategy_type": "adaptation_strategy",
+            "context": {
+              "goal_type": "navigation",
+              "context_type": "browser",
+              "system_resources": {
+                "cpu": 0.5,
+                "memory": 0.3
+              }
+            },
+            "metrics": {
+              "response_time": 1.2,
+              "accuracy": 0.95,
+              "success": true,
+              "verified": true,
+              "impact_score": 0.8
+            },
+            "timestamp": "2026-10-14T13:18:36.161329",
+            "confidence": 0.85
+          }
+        ]
+      },
+      "timestamp": "2026-10-14T13:18:36.161331",
+      "status": "processed"
+    },
+    {
+      "adaptation_id": "diag_001",
+      "analysis": {
+        "performance_improvement": 0.0,
+        "resource_efficiency": 0.0,
+        "pattern_recognition": [
+          {
+            "pattern_type": "goal_adaptation_success",
+            "context": {
+              "goal_type": "navigate",
+              "context_type": "dev"
+            },
+            "metrics": {
+              "response_time": 1.5,
+              "accuracy": 0.98,
+              "success": true,
+              "verified": true,
+              "impact_score": 0.8
+            },
+            "timestamp": "2026-10-20T01:04:36.772192",
+            "confidence": 0.9
+          }
+        ],
+        "strategic_insights": [
+          {
+            "strategy_type": "adaptation_strategy",
+            "context": {
+              "goal_type": "navigate",
+              "context_type": "dev"
+            },
+            "metrics": {
+              "response_time": 1.5,
+              "accuracy": 0.98,
+              "success": true,
+              "verified": true,
+              "impact_score": 0.8
+            },
+            "timestamp": "2026-10-20T01:04:36.772196",
+            "confidence": 0.85
+          }
+        ]
+      },
+      "timestamp": "2026-10-20T01:04:36.772197",
+      "status": "processed"
+    },
+    {
+      "adaptation_id": "test_adaptation_001",
+      "analysis": {
+        "performance_improvement": 14.078947368421055,
+        "resource_efficiency": 0.0,
+        "response_time_improvement": 25.0,
+        "accuracy_improvement": 3.157894736842108,
+        "pattern_recognition": [
+          {
+            "pattern_type": "goal_adaptation_success",
+            "context": {
+              "goal_type": "navigate",
+              "context_type": "development",
+              "expected_metrics": {
+                "response_time": 2.0,
+                "accuracy": 0.95
+              }
+            },
+            "metrics": {
+              "response_time": 1.5,
+              "accuracy": 0.98,
+              "success": true,
+              "verified": true,
+              "impact_score": 0.8
+            },
+            "timestamp": "2026-10-20T01:14:46.363707",
+            "confidence": 0.9
+          }
+        ],
+        "strategic_insights": [
+          {
+            "strategy_type": "adaptation_strategy",
+            "context": {
+              "goal_type": "navigate",
+              "context_type": "development",
+              "expected_metrics": {
+                "response_time": 2.0,
+                "accuracy": 0.95
+              }
+            },
+            "metrics": {
+              "response_time": 1.5,
+              "accuracy": 0.98,
+              "success": true,
+              "verified": true,
+              "impact_score": 0.8
+            },
+            "timestamp": "2026-10-20T01:14:46.363711",
+            "confidence": 0.85
+          }
+        ]
+      },
+      "timestamp": "2026-10-20T01:14:46.363713",
+      "status": "processed"
+    },
+    {
+      "adaptation_id": "test_adaptation_001",
+      "analysis": {
+        "performance_improvement": 14.078947368421055,
+        "resource_efficiency": 0.0,
+        "response_time_improvement": 25.0,
+        "accuracy_improvement": 3.157894736842108,
+        "pattern_recognition": [
+          {
+            "pattern_type": "goal_adaptation_success",
+            "context": {
+              "goal_type": "navigate",
+              "context_type": "development",
+              "expected_metrics": {
+                "response_time": 2.0,
+                "accuracy": 0.95
+              }
+            },
+            "metrics": {
+              "response_time": 1.5,
+              "accuracy": 0.98,
+              "success": true,
+              "verified": true,
+              "impact_score": 0.8
+            },
+            "timestamp": "2026-10-20T01:51:56.295991",
+            "confidence": 0.9
+          }
+        ],
+        "strategic_insights": [
+          {
+            "strategy_type": "adaptation_strategy",
+            "context": {
+              "goal_type": "navigate",
+              "context_type": "development",
+              "expected_metrics": {
+                "response_time": 2.0,
+                "accuracy": 0.95
+              }
+            },
+            "metrics": {
+              "response_time": 1.5,
+              "accuracy": 0.98,
+              "success": true,
+              "verified": true,
+              "impact_score": 0.8
+            },
+            "timestamp": "2026-10-20T01:51:56.295994",
+            "confidence": 0.85
+          }
+        ]
+      },
+      "timestamp": "2026-10-20T01:51:56.295997",
+      "status": "processed"
+    },
+    {
+      "adaptation_id": "test_adaptation_001",
+      "analysis": {
+        "performance_improvement": 14.078947368421055,
+        "resource_efficiency": 0.0,
+        "response_time_improvement": 25.0,
+        "accuracy_improvement": 3.157894736842108,
+        "pattern_recognition": [
+          {
+            "pattern_type": "goal_adaptation_success",
+            "context": {
+              "goal_type": "navigate",
+              "context_type": "development",
+              "expected_metrics": {
+                "response_time": 2.0,
+                "accuracy": 0.95
+              }
+            },
+            "metrics": {
+              "response_time": 1.5,
+              "accuracy": 0.98,
+              "success": true,
+              "verified": true,
+              "impact_score": 0.8
+            },
+            "timestamp": "2026-10-20T02:05:31.407355",
+            "confidence": 0.9
+          }
+        ],
+        "strategic_insights": [
+          {
+            "strategy_type": "adaptation_strategy",
+            "context": {
+              "goal_type": "navigate",
+              "context_type": "development",
+              "expected_metrics": {
+                "response_time": 2.0,
+                "accuracy": 0.95
+              }
+            },
+            "metrics": {
+              "response_time": 1.5,
+              "accuracy": 0.98,
+              "success": true,
+              "verified": true,
+              "impact_score": 0.8
+            },
+            "timestamp": "2026-10-20T02:05:31.407357",
+            "confidence": 0.85
+          }
+        ]
+      },
+      "timestamp": "2026-10-20T02:05:31.407359",
+      "status": "processed"
+    },
+    {
+      "adaptation_id": "test_adaptation_001",
+      "analysis": {
+        "performance_improvement": 14.078947368421055,
+        "resource_efficiency": 0.0,
+        "response_time_improvement": 25.0,
+        "accuracy_improvement": 3.157894736842108,
+        "pattern_recognition": [
+          {
+            "pattern_type": "goal_adaptation_success",
+            "context": {
+              "goal_type": "navigate",
+              "context_type": "development",
+              "expected_metrics": {
+                "response_time": 2.0,
+                "accuracy": 0.95
+              }
+            },
+            "metrics": {
+              "response_time": 1.5,
+              "accuracy": 0.98,
+              "success": true,
+              "verified": true,
+              "impact_score": 0.8
+            },
+            "timestamp": "2026-10-20T02:07:23.669022",
+            "confidence": 0.9
+          }
+        ],
+        "strategic_insights": [
+          {
+            "strategy_type": "adaptation_strategy",
+            "context": {
+              "goal_type": "navigate",
+              "context_type": "development",
+              "expected_metrics": {
+                "response_time": 2.0,
+                "accuracy": 0.95
+              }
+            },
+            "metrics": {
+              "response_time": 1.5,
+              "accuracy": 0.98,
+              "success": true,
+              "verified": true,
+              "impact_score": 0.8
+            },
+            "timestamp": "2026-10-20T02:07:23.669024",
+            "confidence": 0.85
+          }
+        ]
+      },
+      "timestamp": "2026-10-20T02:07:23.669026",
+      "status": "processed"
+    },
+    {
+      "adaptation_id": "test_adaptation_001",
+      "analysis": {
+        "performance_improvement": 14.078947368421055,
+        "resource_efficiency": 0.0,
+        "response_time_improvement": 25.0,
+        "accuracy_improvement": 3.157894736842108,
+        "pattern_recognition": [
+          {
+            "pattern_type": "goal_adaptation_success",
+            "context": {
+              "goal_type": "navigate",
+              "context_type": "development",
+              "expected_metrics": {
+                "response_time": 2.0,
+                "accuracy": 0.95
+              }
+            },
+            "metrics": {
+              "response_time": 1.5,
+              "accuracy": 0.98,
+              "success": true,
+              "verified": true,
+              "impact_score": 0.8
+            },
+            "timestamp": "2026-10-20T02:08:55.970008",
+            "confidence": 0.9
+          }
+        ],
+        "strategic_insights": [
+          {
+            "strategy_type": "adaptation_strategies",
+            "context": {
+              "goal_type": "navigate",
+              "context_type": "development",
+              "expected_metrics": {
+                "response_time": 2.0,
+                "accuracy": 0.95
+              }
+            },
+            "metrics": {
+              "response_time": 1.5,
+              "accuracy": 0.98,
+              "success": true,
+              "verified": true,
+              "impact_score": 0.8
+            },
+            "timestamp": "2026-10-20T02:08:55.970012",
+            "confidence": 0.85
+          }
+        ]
+      },
+      "timestamp": "2026-10-20T02:08:55.970015",
+      "status": "processed"
+    },
+    {
+      "adaptation_id": "test_adaptation_001",
+      "analysis": {
+        "performance_improvement": 14.078947368421055,
+        "resource_efficiency": 0.0,
+        "response_time_improvement": 25.0,
+        "accuracy_improvement": 3.157894736842108,
+        "pattern_recognition": [
+          {
+            "pattern_type": "goal_adaptation_success",
+            "context": {
+              "goal_type": "navigate",
+              "context_type": "development",
+              "expected_metrics": {
+                "response_time": 2.0,
+                "accuracy": 0.95
+              }
+            },
+            "metrics": {
+              "response_time": 1.5,
+              "accuracy": 0.98,
+              "success": true,
+              "verified": true,
+              "impact_score": 0.8
+            },
+            "timestamp": "2026-10-20T02:11:21.297009",
+            "confidence": 0.9
+          }
+        ],
+        "strategic_insights": [
+          {
+            "strategy_type": "adaptation_strategies",
+            "context": {
+              "goal_type": "navigate",
+              "context_type": "development",
+              "expected_metrics": {
+                "response_time": 2.0,
+                "accuracy": 0.95
+              }
+            },
+            "metrics": {
+              "response_time": 1.5,
+              "accuracy": 0.98,
+              "success": true,
+              "verified": true,
+              "impact_score": 0.8
+            },
+            "timestamp": "2026-10-20T02:11:21.297011",
+            "confidence": 0.85
+          }
+        ]
+      },
+      "timestamp": "2026-10-20T02:11:21.297013",
+      "status": "processed"
+    },
+    {
+      "adaptation_id": "test_adaptation_001",
+      "analysis": {
+        "performance_improvement": 14.078947368421055,
+        "resource_efficiency": 0.0,
+        "response_time_improvement": 25.0,
+        "accuracy_improvement": 3.157894736842108,
+        "pattern_recognition": [
+          {
+            "pattern_type": "goal_adaptation_success",
+            "context": {
+              "goal_type": "navigate",
+              "context_type": "development",
+              "expected_metrics": {
+                "response_time": 2.0,
+                "accuracy": 0.95
+              }
+            },
+            "metrics": {
+              "response_time": 1.5,
+              "accuracy": 0.98,
+              "success": true,
+              "verified": true,
+              "impact_score": 0.8
+            },
+            "timestamp": "2026-10-20T02:21:31.449535",
+            "confidence": 0.9
+          }
+        ],
+        "strategic_insights": [
+          {
+            "strategy_type": "adaptation_strategies",
+            "context": {
+              "goal_type": "navigate",
+              "context_type": "development",
+              "expected_metrics": {
+                "response_time": 2.0,
+                "accuracy": 0.95
+              }
+            },
+            "metrics": {
+              "response_time": 1.5,
+              "accuracy": 0.98,
+              "success": true,
+              "verified": true,
+              "impact_score": 0.8
+            },
+            "timestamp": "2026-10-20T02:21:31.449539",
+            "confidence": 0.85
+          }
+        ]
+      },
+      "timestamp": "2026-10-20T02:21:31.449541",
+      "status": "processed"
+    }
+  ],
+  "adaptation_history": [
+    {
+      "adaptation_id": "test_adaptation_001",
+      "performance_impact": {
+        "performance_improvement": 14.078947368421055,
+        "response_time_improvement": 25.0,
+        "accuracy_improvement": 3.157894736842108
+      },
+      "context": {
+        "goal_type": "navigate",
+        "context_type": "development",
+        "expected_metrics": {
+          "response_time": 2.0,
+          "accuracy": 0.95
+        }
+      },
+      "timestamp": "2026-10-20T01:14:46.364362"
+    },
+    {
+      "adaptation_id": "test_adaptation_001",
+      "performance_impact": {
+        "performance_improvement": 14.078947368421055,
+        "response_time_improvement": 25.0,
+        "accuracy_improvement": 3.157894736842108
+      },
+      "context": {
+        "goal_type": "navigate",
+        "context_type": "development",
+        "expected_metrics": {
+          "response_time": 2.0,
+          "accuracy": 0.95
+        }
+      },
+      "timestamp": "2026-10-20T01:51:56.297604"
+    },
+    {
+      "adaptation_id": "test_adaptation_001",
+      "performance_impact": {
+        "performance_improvement": 14.078947368421055,
+        "response_time_improvement": 25.0,
+        "accuracy_improvement": 3.157894736842108
+      },
+      "context": {
+        "goal_type": "navigate",
+        "context_type": "development",
+        "expected_metrics": {
+          "response_time": 2.0,
+          "accuracy": 0.95
+        }
+      },
+      "timestamp": "2026-10-20T02:05:31.408514"
+    },
+    {
+      "adaptation_id": "test_adaptation_001",
+      "performance_impact": {
+        "performance_improvement": 14.078947368421055,
+        "response_time_improvement": 25.0,
+        "accuracy_improvement": 3.157894736842108
+      },
+      "context": {
+        "goal_type": "navigate",
+        "context_type": "development",
+        "expected_metrics": {
+          "response_time": 2.0,
+          "accuracy": 0.95
+        }
+      },
+      "timestamp": "2026-10-20T02:07:23.670021"
+    },
+    {
+      "adaptation_id": "test_adaptation_001",
+      "performance_impact": {
+        "performance_improvement": 14.078947368421055,
+        "response_time_improvement": 25.0,
+        "accuracy_improvement": 3.157894736842108
+      },
+      "context": {
+        "goal_type": "navigate",
+        "context_type": "development",
+        "expected_metrics": {
+          "response_time": 2.0,
+          "accuracy": 0.95
+        }
+      },
+      "timestamp": "2026-10-20T02:08:55.971897"
+    },
+    {
+      "adaptation_id": "test_adaptation_001",
+      "performance_impact": {
+        "performance_improvement": 14.078947368421055,
+        "response_time_improvement": 25.0,
+        "accuracy_improvement": 3.157894736842108
+      },
+      "context": {
+        "goal_type": "navigate",
+        "context_type": "development",
+        "expected_metrics": {
+          "response_time": 2.0,
+          "accuracy": 0.95
+        }
+      },
+      "timestamp": "2026-10-20T02:11:21.298108"
+    },
+    {
+      "adaptation_id": "test_adaptation_001",
+      "performance_impact": {
+        "performance_improvement": 14.078947368421055,
+        "response_time_improvement": 25.0,
+        "accuracy_improvement": 3.157894736842108
+      },
+      "context": {
+        "goal_type": "navigate",
+        "context_type": "development",
+        "expected_metrics": {
+          "response_time": 2.0,
+          "accuracy": 0.95
+        }
+      },
+      "timestamp": "2026-10-20T02:21:31.450782"
+    }
+  ],
+  "last_updated": "2026-10-20T02:21:31.450936"
+}

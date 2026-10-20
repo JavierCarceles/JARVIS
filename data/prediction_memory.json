@@ -1,0 +1,32 @@
+{
+    "command_usage_stats": {
+        "calibrar_aplicaciones": 1,
+        "abrir_youtube": 1
+    },
+    "time_patterns": {
+        "calibrar_aplicaciones": [
+            5
+        ],
+        "abrir_youtube": [
+            8
+        ]
+    },
+    "context_patterns": {
+        "comando_calibrar_aplicaciones": [
+            1790305714.9348192
+        ],
+        "ejecutado_calibrar_aplicaciones": [
+            1790305714.9348192
+        ],
+        "jarvis_abrir_youtube": [
+            1790405530.9281933
+        ],
+        "abrir_abrir_youtube": [
+            1790405530.9281933
+        ],
+        "youtube_abrir_youtube": [
+            1790405530.9281933
+        ]
+    },
+    "last_updated": 1790405530.9282832
+}

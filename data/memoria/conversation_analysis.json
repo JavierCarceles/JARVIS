@@ -1,0 +1,49 @@
+{
+  "file_analyzed": "src/memory/conversation.py",
+  "lines_count": 1129,
+  "analysis_date": "2025-06-18",
+  "status": "COMPROBADO",
+  "key_features": {
+    "architecture": "Hierarchical planning system with intention→goal→plan→execution transformation",
+    "phases_supported": [
+      "FASE 1: Modelo de nodos",
+      "FASE 2: Nodos jerárquicos", 
+      "FASE 5: Memoria de dominio",
+      "FASE 15: Comandos de alto nivel",
+      "FASE 16: Compatibilidad"
+    ],
+    "main_classes": [
+      "NodeType (Enum)",
+      "TaskStatus (Enum)", 
+      "Node",
+      "Goal",
+      "Task",
+      "DomainMemory",
+      "ConversationMemory"
+    ],
+    "core_functionality": {
+      "intention_extraction": "Transforms user input into structured intentions",
+      "goal_creation": "Creates goals from extracted intentions with entity resolution",
+      "planning": "Generates hierarchical plans from goals",
+      "domain_memory": "Manages persistent knowledge of entities, applications, and user preferences",
+      "conversation_tracking": "Maintains conversation history with planning metadata",
+      "compatibility": "Maintains backward compatibility with legacy alias system"
+    },
+    "persistence": {
+      "domain_knowledge": "Separates conversational memory from permanent knowledge",
+      "user_preferences": "Tracks and learns from user interactions",
+      "execution_events": "Records command usage for predictive analysis"
+    }
+  },
+  "integration_points": {
+    "brain": "HTN integration for goal execution",
+    "storage": "JSON-based persistent storage system",
+    "entity_resolver": "Advanced entity resolution with context awareness",
+    "planning_system": "Hierarchical task network support"
+  },
+  "compatibility_features": {
+    "legacy_aliases": "Maintains command alias system from previous versions",
+    "command_usage_tracking": "Records execution patterns for learning",
+    "conversation_history": "Preserves legacy conversation format when needed"
+  }
+}

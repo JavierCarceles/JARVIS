@@ -1,0 +1,109 @@
+{
+  "file": "src/hands/planner/planner.py",
+  "analysis_date": "2025-06-20",
+  "total_lines": 2182,
+  "status": "COMPROBANDO",
+  "key_components": {
+    "classes": [
+      "PlannerStatus",
+      "PlanQuality", 
+      "PlanningResult",
+      "Planner"
+    ],
+    "descriptions": {
+      "PlannerStatus": "Enum con estados del planificador (IDLE, PLANNING, EXECUTING, COMPLETED, FAILED, REPLANNING)",
+      "PlanQuality": "Enum con niveles de calidad de planes (OPTIMAL, SUBOPTIMAL, MINIMAL, UNCERTAIN)",
+      "PlanningResult": "Dataclass estructurado con resultado de planificación incluyendo estado, plan, metadatos, etc.",
+      "Planner": "Clase principal del planificador central de JARVIS"
+    },
+    "core_methods": [
+      "plan",
+      "plan_with_htn_integration",
+      "create_astar_plan",
+      "create_plan",
+      "replan",
+      "validate_ui_resources_for_plan",
+      "resolve_ui_conflicts",
+      "get_optimal_ui_strategy",
+      "build_application_aware_plan"
+    ],
+    "htn_integration": {
+      "initialize_htn_manager": "Inicializa el gestor HTN",
+      "set_htn_manager": "Establece gestor HTN externo",
+      "plan_with_htn_traditional": "Planificación tradicional con HTN",
+      "plan_complex_htn_graph": "Planificación compleja integrando HTN con grafo",
+      "convert_htn_result_to_plan": "Convierte resultado HTN a formato de plan"
+    },
+    "graph_integration": {
+      "set_state_graph": "Establece grafo de estados",
+      "get_state_graph": "Obtiene grafo de estados actual",
+      "create_graph_from_nodes": "Crea grafo a partir de nodos disponibles",
+      "build_graph_edges": "Construye aristas del grafo",
+      "validate_graph_integration": "Valida integración del grafo",
+      "get_graph_integration_status": "Obtiene estado de integración del grafo"
+    },
+    "ui_coordinates": {
+      "validate_ui_resources_for_plan": "Valida recursos UI para plan",
+      "resolve_ui_conflicts": "Resuelve conflictos UI",
+      "check_ui_readiness": "Verifica preparación UI para objetivo",
+      "get_optimal_ui_strategy": "Obtiene estrategia UI óptima"
+    },
+    "optimization": {
+      "get_optimization_stats": "Obtiene estadísticas de optimización",
+      "enable_optimization": "Habilita tipos de optimización",
+      "export_optimization_data": "Exporta datos de optimización",
+      "import_optimization_data": "Importa datos de optimización",
+      "get_optimization_recommendations": "Obtiene recomendaciones de optimización"
+    },
+    "learning_system": {
+      "get_learning_insights": "Obtiene insights del sistema de aprendizaje",
+      "get_action_learning_insights": "Obtiene insights específicos de acciones",
+      "get_cost_adjustments": "Obtiene ajustes de coste aprendidos",
+      "export_learning_data": "Exporta datos de aprendizaje",
+      "import_learning_data": "Importa datos de aprendizaje",
+      "clear_learning_data": "Limpia datos de aprendizaje",
+      "enable_learning": "Habilita/deshabilita aprendizaje"
+    },
+    "applications": {
+      "load_application_knowledge": "Carga conocimiento de aplicaciones",
+      "get_applications_by_capability": "Obtiene aplicaciones por capacidad",
+      "get_application_capabilities": "Obtiene capacidades de aplicación",
+      "find_application_for_goal": "Encuentra aplicación para objetivo",
+      "is_application_available": "Verifica disponibilidad de aplicación",
+      "get_application_ui_requirements": "Obtiene requisitos UI de aplicación"
+    },
+    "alternatives": {
+      "find_alternative_plans_astar": "Encuentra planes alternativos usando A*",
+      "find_alternatives_for_node": "Encuentra alternativas para nodo específico",
+      "select_best_alternative": "Selecciona mejor alternativa",
+      "calculate_plan_similarity": "Calcula similitud entre planes",
+      "calculate_state_compatibility": "Calcula compatibilidad de estados"
+    },
+    "utilities": {
+      "get_planning_stats": "Obtiene estadísticas de planificación",
+      "execute_plan": "Ejecución de planes (compatibilidad)",
+      "record_execution_result": "Registra resultados de ejecución",
+      "clear_optimization_cache": "Limpia caché de optimización"
+    }
+  },
+  "features": {
+    "multi_algorithm_support": "Soporte para múltiples algoritmos de planificación (A*, determinista, HTN)",
+    "graph_based_planning": "Planificación basada en grafos de estados con búsqueda de rutas",
+    "htn_integration": "Integración jerárquica de tareas para objetivos complejos",
+    "ui_resource_management": "Gestión avanzada de recursos UI con calibración y estrategias alternativas",
+    "application_aware_planning": "Planificación consciente de aplicaciones y capacidades",
+    "learning_optimization": "Sistema de aprendizaje adaptativo para optimización de planes",
+    "alternative_plans": "Generación y selección de planes alternativos",
+    "replanning": "Replanificación dinámica después de fallos",
+    "execution_monitoring": "Monitoreo y registro de ejecución de planes",
+    "compatibility_layer": "Capa de compatibilidad con sistemas legacy"
+  },
+  "dependencies": [
+    "src.hands.planner.node",
+    "src.hands.planner.graph",
+    "src.hands.planner.heuristic",
+    "src.hands.planner.application_integration",
+    "src.hands.coordinate_manager",
+    "src.utils.logger"
+  ]
+}

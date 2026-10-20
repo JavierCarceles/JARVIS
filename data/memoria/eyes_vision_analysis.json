@@ -1,0 +1,31 @@
+{
+  "file": "src/eyes/vision.py",
+  "lines": 923,
+  "analysis": "Visión por computadora usando Qwen3-VL mediante Ollama",
+  "main_classes": [
+    "VisionNodeType",
+    "VisionNode",
+    "UIElement", 
+    "VisionResponse",
+    "Vision"
+  ],
+  "main_methods": [
+    "analyze_screen_for_world_state",
+    "detect_ui_elements",
+    "analyze_image",
+    "verify_element_visibility", 
+    "verify_action_result",
+    "detect_application_state",
+    "_chat_json"
+  ],
+  "vision_capabilities": [
+    "SCREEN_ANALYSIS",
+    "UI_DETECTION", 
+    "ELEMENT_VERIFICATION",
+    "STATE_VERIFICATION",
+    "CALIBRATION_ANALYSIS",
+    "APPLICATION_DETECTION"
+  ],
+  "status": "verified",
+  "last_updated": "2025-06-17"
+}

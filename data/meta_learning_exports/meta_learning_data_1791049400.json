@@ -1,0 +1,143 @@
+{
+  "experiences": [
+    {
+      "experience_id": "exp_good_0",
+      "timestamp": "2026-10-03T19:43:20.881089",
+      "learning_system": "adaptive_learning",
+      "task_type": "hyperparameter_optimization",
+      "context": {
+        "resource_usage": {
+          "cpu_usage": 60,
+          "memory_usage": 70
+        }
+      },
+      "strategy_used": "grid_search",
+      "parameters": {
+        "learning_rate": 0.1,
+        "batch_size": 32
+      },
+      "outcome": {
+        "success": true,
+        "improvement": 0.15
+      },
+      "success_metrics": {
+        "success_rate": 0.85,
+        "efficiency_gain": 0.12
+      },
+      "confidence_score": 0.9,
+      "metadata": {}
+    },
+    {
+      "experience_id": "exp_good_1",
+      "timestamp": "2026-10-03T19:38:20.881089",
+      "learning_system": "adaptive_learning",
+      "task_type": "hyperparameter_optimization",
+      "context": {
+        "resource_usage": {
+          "cpu_usage": 60,
+          "memory_usage": 70
+        }
+      },
+      "strategy_used": "grid_search",
+      "parameters": {
+        "learning_rate": 0.1,
+        "batch_size": 32
+      },
+      "outcome": {
+        "success": true,
+        "improvement": 0.15
+      },
+      "success_metrics": {
+        "success_rate": 0.85,
+        "efficiency_gain": 0.12
+      },
+      "confidence_score": 0.9,
+      "metadata": {}
+    },
+    {
+      "experience_id": "exp_good_2",
+      "timestamp": "2026-10-03T19:33:20.881089",
+      "learning_system": "adaptive_learning",
+      "task_type": "hyperparameter_optimization",
+      "context": {
+        "resource_usage": {
+          "cpu_usage": 60,
+          "memory_usage": 70
+        }
+      },
+      "strategy_used": "grid_search",
+      "parameters": {
+        "learning_rate": 0.1,
+        "batch_size": 32
+      },
+      "outcome": {
+        "success": true,
+        "improvement": 0.15
+      },
+      "success_metrics": {
+        "success_rate": 0.85,
+        "efficiency_gain": 0.12
+      },
+      "confidence_score": 0.9,
+      "metadata": {}
+    }
+  ],
+  "insights": [
+    {
+      "insight_id": "test_save_insight",
+      "timestamp": "2026-10-03T19:43:20.881130",
+      "level": "strategy_selection",
+      "description": "Test save insight",
+      "confidence": 0.8,
+      "evidence_count": 1,
+      "recommendation": "Test save recommendation",
+      "impact_score": 0.7,
+      "validation_required": false,
+      "applied": false
+    }
+  ],
+  "metrics": {
+    "total_experiences": 0,
+    "active_insights": 1,
+    "applied_insights": 0,
+    "success_rate": 0.0,
+    "confidence_distribution": {
+      "low": 0.0,
+      "medium": 0.0,
+      "high": 1.0
+    },
+    "system_coverage": {
+      "adaptive_learning": 3
+    },
+    "learning_progress": {
+      "adaptive_learning": 0.85
+    }
+  },
+  "config": {
+    "enabled": true,
+    "max_experiences": 100,
+    "min_experiences_for_analysis": 5,
+    "confidence_threshold": 0.7,
+    "analysis_interval": 10,
+    "insight_validation": true,
+    "auto_apply_insights": false,
+    "persistence_enabled": false,
+    "export_path": "data/meta_learning_exports/",
+    "learning_rate_adjustment": {
+      "enabled": true,
+      "min_rate": 0.01,
+      "max_rate": 1.0,
+      "adjustment_factor": 0.1
+    },
+    "strategy_selection": {
+      "enabled": true,
+      "max_strategies": 5,
+      "selection_window": 100
+    },
+    "knowledge_abstraction": {
+      "enabled": true,
+      "abstraction_level": 2,
+      "pattern_min_support": 0.1
+    }
+  }
+}

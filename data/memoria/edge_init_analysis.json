@@ -1,0 +1,21 @@
+{
+  "file_path": "src/hands/edge/__init__.py",
+  "analysis_date": "2025-06-18",
+  "total_lines": 3,
+  "content": {
+    "description": "Módulo específico para Microsoft Edge.",
+    "is_simple_init": true,
+    "has_classes": false,
+    "has_functions": false,
+    "has_imports": false,
+    "complexity": "minimal"
+  },
+  "readme_status": "present_but_overdocumented",
+  "readme_comparison": {
+    "readme_has_more_info": true,
+    "readme_describes_classes_and_functions_not_present": true,
+    "file_actual_content": "Simple docstring only",
+    "readme_described_content": "EdgeCalibrator class and get_edge_calibrator function"
+  },
+  "recommendation": "README should be updated to reflect actual minimal content of the file, or the file should be expanded to match the documented functionality"
+}

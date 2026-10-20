@@ -1,0 +1,43 @@
+{
+  "executor_analysis": {
+    "file": "src/hands/executor.py",
+    "line_count": 1373,
+    "analysis_date": "2024-12-15",
+    "status": "comprobado",
+    "main_classes": [
+      "ExecutionStatus",
+      "ExecutionResult", 
+      "ExecutionState",
+      "Executor"
+    ],
+    "key_features": [
+      "Ejecución de planes completos con replanificación dinámica",
+      "Ejecución de acciones individuales con verificación de precondiciones y efectos",
+      "Manejo de estado del mundo y actualizaciones en tiempo real",
+      "Soporte para replanificación cuando una acción falla",
+      "Integración con el sistema de nodos y objetivos",
+      "Mantenimiento de compatibilidad con acciones legacy",
+      "Sistema de aprendizaje integrado (FASE 18)",
+      "Timeout handling y manejo robusto de errores"
+    ],
+    "responsibilities": [
+      "Ejecutar acciones individuales con verificación de precondiciones y efectos",
+      "Ejecutar planes completos (listas de nodos)",
+      "Manejar estado del mundo y actualizaciones",
+      "Soportar replanificación cuando una acción falla",
+      "Integrarse con el sistema de nodos y objetivos",
+      "Mantener compatibilidad con acciones legacy"
+    ],
+    "integration_points": [
+      "ActionRegistry para registro y ejecución de acciones",
+      "MemoryManager para estado del mundo y estadísticas",
+      "LearningSystem para aprendizaje y optimización (FASE 18)",
+      "Planner para planificación jerárquica de objetivos",
+      "Módulos de aplicaciones (keyboard, mouse, applications_core)"
+    ],
+    "phases_supported": [
+      "FASE 7-9 (Planificación jerárquica y ejecución)",
+      "FASE 18 (Sistema de aprendizaje y optimización)"
+    ]
+  }
+}

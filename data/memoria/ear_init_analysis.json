@@ -1,0 +1,9 @@
+{
+  "file": "src/ear/__init__.py",
+  "lines": 4,
+  "analysis": "Módulo de escucha de JARVIS con importación del sistema auditivo",
+  "exports": ["Ear"],
+  "imports": ["from .listener import Ear"],
+  "status": "verified",
+  "last_updated": "2025-06-17"
+}

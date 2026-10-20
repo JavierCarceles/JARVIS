@@ -1,0 +1,74 @@
+{
+  "file_analyzed": "src/memory/storage.py",
+  "analysis_date": "2025-06-18",
+  "total_lines": 1985,
+  "lines_analyzed": 1985,
+  "status": "COMPLETO",
+  "summary": "Sistema de almacenamiento mejorado para soportar planificación jerárquica con manejo avanzado de memoria, caché y persistencia. Implementa FASE 3 (Estado del mundo), FASE 5 (Memoria de dominio avanzada), FASE 6-7 (Soporte para planes y ejecuciones), FASE 18 (Estadísticas de aprendizaje) y manejo avanzado de caché para rendimiento.",
+  "key_components": {
+    "MemoryType_Enum": "CONVERSATIONAL, DOMAIN_KNOWLEDGE, ENTITIES, APPLICATIONS, STATE, PLANS, EXECUTIONS, LEARNING_STATS, RELATIONSHIPS, PREFERENCES",
+    "Entity_dataclass": "Entidad mejorada para memoria de dominio con id, type, name, properties, metadata, aliases, confidence y tags",
+    "ConversationalMemory_dataclass": "Memoria conversacional mejorada con id, message, response, timestamp, context, intent, entities, confidence, execution_time y success",
+    "WorldState_dataclass": "Estado del mundo mejorado con timestamp, applications, ui_elements, system_info, constraints, last_actions y active_goals",
+    "Plan_dataclass": "Plan de ejecución con id, goal, nodes, created_at, updated_at, status, execution_time, success, cost y heuristic_value",
+    "ExecutionRecord_dataclass": "Registro de ejecución para aprendizaje con id, plan_id, action_name, parameters, start_time, end_time, success, execution_time, error, retries, alternatives_tried y context",
+    "LearningStat_dataclass": "Estadística de aprendizaje con action_name, total_executions, successful_executions, average_execution_time, success_rate y last_updated",
+    "UserPreference_dataclass": "Preferencia de usuario con user_id, preference_type, preference_key, preference_value, confidence, created_at, updated_at, context y usage_count",
+    "EntityAttribute_dataclass": "Atributo extendido de entidad con entity_id, attribute_name, attribute_value, attribute_type, source, confidence, created_at, updated_at y metadata"
+  },
+  "main_classes": {
+    "MemoryStorage": "Interfaz abstracta para almacenamiento de memoria con métodos save, load y exists",
+    "JSONStorage": "Almacenamiento en archivos JSON con manejo avanzado, caché y procesamiento inteligente de datos según tipo de memoria",
+    "MemoryManager": "Gestor de memoria mejorado con caché, soporte completo para arquitectura y métodos específicos para cada tipo de memoria"
+  },
+  "key_methods": [
+    "MemoryManager.save_entity - Guarda una entidad en la memoria de dominio",
+    "MemoryManager.get_entity - Obtiene una entidad por su ID",
+    "MemoryManager.get_entities_by_type - Obtiene todas las entidades de un tipo específico",
+    "MemoryManager.find_entities - Busca entidades por texto en nombre, aliases, tags y propiedades",
+    "MemoryManager.add_conversational_memory - Añade un registro mejorado a la memoria conversacional",
+    "MemoryManager.save_world_state - Guarda el estado actual del mundo",
+    "MemoryManager.update_world_state - Actualiza una propiedad del estado del mundo",
+    "MemoryManager.save_plan - Guarda un plan",
+    "MemoryManager.update_learning_stats - Actualiza estadísticas de aprendizaje para una acción",
+    "MemoryManager.save_user_preference - Guarda una preferencia de usuario",
+    "MemoryManager.export_memory - Exporta toda la memoria a un archivo JSON"
+  ],
+  "global_functions": [
+    "get_memory_manager - Obtiene la instancia global del gestor de memoria",
+    "save_entity - Guarda una entidad",
+    "get_entity - Obtiene una entidad",
+    "get_entities_by_type - Obtiene entidades",
+    "find_entities - Busca entidades",
+    "add_conversational_memory - Añade memoria conversacional",
+    "get_world_state - Obtiene el estado del mundo",
+    "update_world_state - Actualiza el estado del mundo",
+    "save_plan - Guarda un plan",
+    "get_plan - Obtiene un plan",
+    "update_learning_stats - Actualiza estadísticas de aprendizaje",
+    "resolve_entity_to_url - Resuelve una entidad a una URL",
+    "get_entity_attributes - Obtiene atributos extendidos de una entidad",
+    "create_goal_from_entity - Integración entidad -> Goal",
+    "verify_entity_integrity - Verifica la integridad de una entidad"
+  ],
+  "features": [
+    "Manejo avanzado de caché con TTL configurable",
+    "Procesamiento inteligente de datos según tipo de memoria",
+    "Soporte para múltiples tipos de memoria: conversacional, entidades, estado del mundo, planes, ejecuciones, estadísticas de aprendizaje, preferencias y relaciones",
+    "Integración con sistema de planificación jerárquica",
+    "Persistencia en archivos JSON con manejo de errores robusto",
+    "Funciones globales para acceso fácil al sistema",
+    "Verificación de integridad de entidades",
+    "Resolución de entidades a URLs",
+    "Creación de objetivos desde entidades",
+    "Exportación completa de memoria"
+  ],
+  "integration_points": {
+    "Brain": "Integración con sistema de planificación jerárquica a través de MemoryManager",
+    "HTN": "Soporte para planes y ejecuciones en sistema HTN",
+    "WorldState": "Gestión del estado del mundo con aplicaciones, UI elements y system info",
+    "Learning": "Estadísticas de aprendizaje para optimización de acciones",
+    "UserPreferences": "Sistema de preferencias de usuario con aprendizaje basado en interacciones"
+  },
+  "file_status": "COMPROBADO"
+}

@@ -1,0 +1,135 @@
+[
+  {
+    "id": "nissaxter",
+    "type": "streamer",
+    "name": "Nissaxter",
+    "properties": {
+      "url": "https://www.twitch.tv/nissaxter",
+      "platform": "twitch",
+      "category": "gaming"
+    },
+    "aliases": [
+      "nissax",
+      "nisax",
+      "nisa"
+    ],
+    "tags": [],
+    "confidence": 1.0,
+    "created_at": "2024-09-27T00:00:00.000000",
+    "updated_at": "2024-09-27T00:00:00.000000",
+    "metadata": null
+  },
+  {
+    "id": "shroud",
+    "type": "streamer",
+    "name": "Shroud",
+    "properties": {
+      "url": "https://www.twitch.tv/shroud",
+      "platform": "twitch",
+      "category": "gaming"
+    },
+    "aliases": [
+      "shroudo",
+      "shurdo"
+    ],
+    "tags": [],
+    "confidence": 1.0,
+    "created_at": "2024-09-27T00:00:00.000000",
+    "updated_at": "2024-09-27T00:00:00.000000",
+    "metadata": null
+  },
+  {
+    "id": "pokimane",
+    "type": "streamer",
+    "name": "Pokimane",
+    "properties": {
+      "url": "https://www.twitch.tv/pokimane",
+      "platform": "twitch",
+      "category": "just_chatting"
+    },
+    "aliases": [
+      "poki",
+      "pokimein"
+    ],
+    "tags": [],
+    "confidence": 1.0,
+    "created_at": "2024-09-27T00:00:00.000000",
+    "updated_at": "2024-09-27T00:00:00.000000",
+    "metadata": null
+  },
+  {
+    "id": "youtube",
+    "type": "application",
+    "name": "YouTube",
+    "properties": {
+      "url": "https://www.youtube.com",
+      "executable": "chrome.exe",
+      "category": "video_platform"
+    },
+    "aliases": [
+      "yt",
+      "you"
+    ],
+    "tags": [],
+    "confidence": 1.0,
+    "created_at": "2024-09-27T00:00:00.000000",
+    "updated_at": "2024-09-27T00:00:00.000000",
+    "metadata": null
+  },
+  {
+    "id": "spotify",
+    "type": "application",
+    "name": "Spotify",
+    "properties": {
+      "executable": "spotify.exe",
+      "category": "music"
+    },
+    "aliases": [
+      "spoti",
+      "music"
+    ],
+    "tags": [],
+    "confidence": 1.0,
+    "created_at": "2024-09-27T00:00:00.000000",
+    "updated_at": "2024-09-27T00:00:00.000000",
+    "metadata": null
+  },
+  {
+    "id": "github",
+    "type": "application",
+    "name": "GitHub",
+    "properties": {
+      "url": "https://github.com",
+      "executable": "chrome.exe",
+      "category": "development"
+    },
+    "aliases": [
+      "gh",
+      "git"
+    ],
+    "tags": [],
+    "confidence": 1.0,
+    "created_at": "2024-09-27T00:00:00.000000",
+    "updated_at": "2024-09-27T00:00:00.000000",
+    "metadata": null
+  },
+  {
+    "id": "twitch",
+    "type": "application",
+    "name": "Twitch",
+    "properties": {
+      "url": "https://www.twitch.tv",
+      "executable": "chrome.exe",
+      "category": "streaming"
+    },
+    "aliases": [
+      "twich",
+      "twitchtv"
+    ],
+    "tags": [],
+    "confidence": 1.0,
+    "created_at": "2024-09-27T00:00:00.000000",
+    "updated_at": "2024-09-27T00:00:00.000000",
+    "metadata": null
+  }
+]

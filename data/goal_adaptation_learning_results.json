@@ -1,0 +1,36 @@
+{
+  "learning_results": [
+    {
+      "adaptation_id": "test_load_001",
+      "learned_patterns": [
+        {
+          "pattern_id": "pattern_001",
+          "pattern_type": "goal_adaptation_success",
+          "confidence": 0.9,
+          "context": {"goal_type": "navigate"},
+          "metrics": {"response_time": 1.5, "accuracy": 0.98}
+        }
+      ],
+      "updated_strategies": {
+        "strategy_id": "strategy_001",
+        "strategy_name": "adaptive_navigation",
+        "success_rate": 0.9,
+        "context": {"goal_type": "navigate"}
+      },
+      "convergence_metrics": {
+        "convergence_score": 0.85,
+        "learning_rate": 0.1,
+        "stability": 0.8,
+        "trend": "improving"
+      }
+    }
+  ],
+  "adaptation_strategies": {
+    "strategy_001": {
+      "confidence": 0.85,
+      "success_rate": 0.9,
+      "last_updated": "2026-10-14T00:33:40.112233",
+      "failure_count": 0
+    }
+  }
+}

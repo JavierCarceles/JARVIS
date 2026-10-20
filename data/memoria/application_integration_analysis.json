@@ -1,0 +1,32 @@
+{
+  "file_analyzed": "src/hands/planner/application_integration.py",
+  "analysis_date": "2025-06-17",
+  "file_size": 483,
+  "status": "COMPROBADO",
+  "analysis_summary": {
+    "main_class": "ApplicationKnowledgeIntegrator",
+    "purpose": "Convierte conocimiento declarativo de aplicaciones en Nodes compatibles con el modelo canónico de planificación",
+    "key_features": [
+      "Integración estructurada de conocimiento de aplicaciones con el planificador",
+      "Conversión de aplicaciones y capacidades a nodos canónicos",
+      "Manejo de elementos UI requeridos por capacidades",
+      "Generación automática de precondiciones y efectos",
+      "Consultas para aplicaciones por capacidad",
+      "Compatibilidad legacy con APIs anteriores"
+    ],
+    "methods_count": 19,
+    "lines_of_code": 483,
+    "dependencies": [
+      "utils.logger",
+      "hands.planner.node",
+      "memory.storage",
+      "src.hands.applications_core"
+    ]
+  },
+  "comparison_with_readme": {
+    "is_documented": true,
+    "is_complete": true,
+    "is_accurate": true,
+    "missing_elements": []
+  }
+}

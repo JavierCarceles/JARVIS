@@ -1,0 +1,97 @@
+{
+  "analysis_timestamp": "2025-06-17T00:00:00.000Z",
+  "file_path": "src/utils/self_improvement_system.py",
+  "total_lines": 1109,
+  "analysis_complete": true,
+  "key_components": {
+    "version": "v2.7.0",
+    "main_class": "SelfImprovementSystem",
+    "core_enums": [
+      "LearningMode",
+      "ImprovementType"
+    ],
+    "dataclasses": [
+      "LearningSession",
+      "ImprovementRule", 
+      "KnowledgeGraph"
+    ],
+    "key_dependencies": [
+      "advanced_logger",
+      "performance_optimizer",
+      "pattern_analyzer",
+      "log_analytics",
+      "log_predictor"
+    ],
+    "ml_models": [
+      "RandomForestClassifier",
+      "GradientBoostingClassifier",
+      "StandardScaler"
+    ]
+  },
+  "main_capabilities": {
+    "learning_modes": [
+      "PASSIVE_LEARNING",
+      "ACTIVE_LEARNING", 
+      "REINFORCEMENT_LEARNING",
+      "TRANSFER_LEARNING",
+      "FEDERATED_LEARNING"
+    ],
+    "improvement_types": [
+      "PERFORMANCE_IMPROVEMENT",
+      "ERROR_REDUCTION",
+      "EFFICIENCY_GAIN",
+      "RESOURCE_OPTIMIZATION",
+      "USER_EXPERIENCE",
+      "FEATURE_ENHANCEMENT",
+      "ALGORITHM_OPTIMIZATION",
+      "ARCHITECTURE_IMPROVEMENT"
+    ],
+    "core_features": [
+      "Continuous learning loop",
+      "ML model training and persistence",
+      "Rule-based improvement engine",
+      "Knowledge graph construction",
+      "Performance monitoring",
+      "Active learning experiments",
+      "Export learning reports"
+    ]
+  },
+  "architecture": {
+    "learning_pipeline": [
+      "Collect system data",
+      "Extract learning features", 
+      "Update ML models",
+      "Identify improvement opportunities",
+      "Execute improvement rules",
+      "Analyze learning patterns",
+      "Update knowledge graph"
+    ],
+    "key_methods": [
+      "_perform_passive_learning",
+      "_execute_improvement_rules",
+      "_analyze_learning_patterns",
+      "_update_knowledge_graph",
+      "perform_active_learning",
+      "export_learning_report"
+    ]
+  },
+  "integration_points": {
+    "performance_optimizer": "Uses PerformanceOptimizer for system metrics and optimization actions",
+    "pattern_analyzer": "Integrates with PatternAnalyzer for trend and anomaly detection",
+    "log_analytics": "Uses LogAnalytics for log-based insights",
+    "log_predictor": "Uses LogPredictor for error and performance prediction"
+  },
+  "configuration": {
+    "learning_interval": 300,
+    "max_concurrent_learning": 2,
+    "exploration_rate": 0.1,
+    "learning_rate": 0.01,
+    "confidence_threshold": 0.8,
+    "improvement_thresholds": {
+      "performance_gain": 0.1,
+      "error_reduction": 0.2,
+      "efficiency_gain": 0.15,
+      "resource_optimization": 0.1
+    }
+  }
+}

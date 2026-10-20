@@ -1,0 +1,77 @@
+{
+  "archivo": "src/hands/planner/planner_integration.py",
+  "lineas": 1086,
+  "estado": "COMPROBANDO",
+  "informacion": {
+    "descripcion": "Integración del StateGraph con el sistema de planificación (FASE 6.5). Responsabilidades: - Inicializar y preparar el grafo. - Construir transiciones de planificación a partir de precondiciones/efectos. - Resolver nodos inicial/final sin depender de IDs inventados. - Obtener una ruta del StateGraph/AdvancedStateGraph. - Devolver un resultado estructurado sin ejecutar acciones reales.",
+    "clases": [
+      {
+        "nombre": "IntegrationMode",
+        "tipo": "Enum",
+        "valores": ["GRAPH_ONLY", "HTN_PLUS_GRAPH", "FULL_INTEGRATION"]
+      },
+      {
+        "nombre": "GraphPlanningResult",
+        "tipo": "dataclass",
+        "campos": ["status", "plan", "path", "total_cost", "execution_time", "nodes_used", "edges_used", "alternative_paths", "warnings", "metadata"]
+      },
+      {
+        "nombre": "GraphPlannerIntegration",
+        "tipo": "Clase principal",
+        "descripcion": "Puente entre Goal/estado actual y StateGraph.",
+        "metodos": [
+          "__init__",
+          "initialize_graph",
+          "_configure_advanced_edges",
+          "_create_compatibility_edges",
+          "_create_sequence_edges",
+          "_prepare_planning_edges",
+          "_connect_if_plannable",
+          "_add_planning_edge",
+          "_add_edge_if_missing",
+          "create_plan_with_graph",
+          "_validate_planning_input",
+          "_determine_search_strategy",
+          "_calculate_goal_complexity",
+          "_execute_search",
+          "_select_search_method",
+          "_build_search_kwargs",
+          "_call_search_positionally",
+          "_normalize_route_result",
+          "_normalize_edge_ids",
+          "_prepare_contextual_planning_edges",
+          "_get_start_node_for_goal",
+          "_score_state_node",
+          "_get_goal_node_for_goal",
+          "_node_can_satisfy_goal",
+          "_goal_type_matches_effects",
+          "_calculate_path_cost",
+          "_find_edge",
+          "_get_edges_used_in_path",
+          "_convert_path_to_plan_metadata",
+          "_update_performance_metrics",
+          "_preconditions_satisfied",
+          "_effects_support_preconditions",
+          "_condition_supported_by_effects",
+          "_has_effect_key",
+          "_key_value_supported",
+          "_goal_satisfied_by_effects",
+          "_calculate_graph_metrics",
+          "get_integration_statistics",
+          "export_graph_state",
+          "import_graph_state",
+          "validate_graph_consistency",
+          "build_route",
+          "_safe_float"
+        ]
+      }
+    ],
+    "funciones_globales": [],
+    "importaciones": [
+      "src.hands.planner.graph",
+      "src.hands.planner.heuristic", 
+      "src.hands.planner.node",
+      "src.utils.logger"
+    ]
+  }
+}

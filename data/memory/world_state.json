@@ -1,0 +1,16 @@
+{
+  "timestamp": 1790631981.979101,
+  "applications": {},
+  "ui_elements": {},
+  "system_info": {
+    "last_intention": {
+      "user_input": "¡Suscríbete!",
+      "goal_type": "open_application",
+      "target": "Nissaxter",
+      "timestamp": 1790631981.978959
+    }
+  },
+  "constraints": [],
+  "last_actions": [],
+  "active_goals": []
+}

@@ -1,0 +1,28 @@
+{
+  "file_analyzed": "src/hands/windows/calibrator_windows.py",
+  "analysis_date": "2025-06-18",
+  "total_lines": 261,
+  "status": "COMPROBADO",
+  "summary": "Adaptador de compatibilidad para la calibración de aplicaciones Windows",
+  "key_components": {
+    "class": "WindowsCalibrator",
+    "description": "Adaptador legacy hacia CalibrationManager. No contiene lógica propia de coordenadas ni de visión.",
+    "methods": [
+      "get_calibration_prompt() - API legacy por compatibilidad",
+      "calibrate_app_both_screens() - API legacy que delega en CalibrationManager",
+      "calibrate_app() - API moderna de compatibilidad",
+      "_calibrate_universal() - Delegación interna en CalibrationManager"
+    ],
+    "global_function": "calibrate_app() - Función pública de compatibilidad"
+  },
+  "characteristics": [
+    "Detección multi-monitor integrada con ScreenManager",
+    "Soporte para cualquier número de monitores (no limitado a 1 o 2)",
+    "Verificación de instalación y disponibilidad",
+    "Movimiento y posicionamiento preciso",
+    "Compatibilidad con API legacy",
+    "No genera coordenadas artificiales",
+    "Utiliza calibración universal a través de CalibrationManager"
+  ],
+  "readme_status": "ACTUALIZADO - La información en README.md es precisa y completa"
+}

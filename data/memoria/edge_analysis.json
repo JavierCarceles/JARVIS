@@ -1,0 +1,48 @@
+{
+  "file_path": "src/hands/edge/edge.py",
+  "total_lines": 554,
+  "analysis_date": "2025-06-18",
+  "main_functions": [
+    "abrir_edge_pantalla",
+    "abrir_edge_pestana", 
+    "_get_edge_windows",
+    "_get_edge_window_info",
+    "_find_edge_window_on_monitor",
+    "_select_edge_window",
+    "_abrir_edge_desde_ruta",
+    "_verificar_edge_abierto",
+    "_verificar_edge_instalado",
+    "_move_edge_window",
+    "_mover_edge_a_pantalla",
+    "_cerrar_edge",
+    "_calibrar_edge",
+    "_generar_coordenadas_edge",
+    "_capturar_edge",
+    "get_edge_commands"
+  ],
+  "key_features": [
+    "Soporte multi-monitor para Microsoft Edge",
+    "Detección y selección inteligente de ventanas",
+    "Apertura de Edge en pantalla específica",
+    "Creación de nuevas pestañas",
+    "Movimiento de ventanas entre monitores",
+    "Cierre de aplicaciones Edge",
+    "Compatibilidad con funciones legacy",
+    "Integración con ScreenManager para geometría de monitores",
+    "Manejo robusto de errores y logging detallado"
+  ],
+  "integrations": [
+    "ScreenManager para detección de monitores",
+    "pyautogui para captura de pantalla",
+    "pygetwindow para detección de ventanas",
+    "utils.logger para logging detallado"
+  ],
+  "action_types": [
+    "APPLICATION - abrir_edge_pantalla",
+    "APPLICATION - abrir_edge_pestana"
+  ],
+  "deprecated_functions": [
+    "_calibrar_edge - Legacy, usa calibración universal",
+    "_generar_coordenadas_edge - Legacy, no genera coordenadas artificiales"
+  ]
+}

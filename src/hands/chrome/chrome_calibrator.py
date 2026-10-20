@@ -1,0 +1,56 @@
+"""Compatibilidad para Chrome sobre el calibrador universal de aplicaciones."""
+
+from __future__ import annotations
+
+from typing import Any, Dict
+
+from src.hands.calibration_manager import get_calibration_manager
+from src.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
+
+def calibrar_chrome() -> str:
+    """Compatibilidad legacy: delega en el flujo universal."""
+    result = ChromeCalibrator().calibrate_chrome(0)
+    if not isinstance(result, dict) or not result.get("success"):
+        return f"Error en calibración: {result.get('error', 'Error desconocido') if isinstance(result, dict) else result}"
+    monitor = result.get("monitor", 0)
+    count = int(result.get("total_elements", 0) or 0)
+    return f"Calibración de Chrome completada en monitor {monitor}: {count} elementos detectados."
+
+
+class ChromeCalibrator:
+    """Adaptador legacy que usa exactamente el flujo universal."""
+
+    def calibrate_chrome(self, monitor_num: int = 0) -> Dict[str, Any]:
+        manager = get_calibration_manager()
+        requested = None if int(monitor_num) == 0 else int(monitor_num)
+        result = manager.calibrate_application("chrome", requested)
+        data = result.to_dict() if hasattr(result, "to_dict") else dict(result or {})
+        calibration_data = data.get("calibration_data") or {}
+        elements = calibration_data.get("elements", []) if isinstance(calibration_data, dict) else []
+
+        chrome_coordinates: Dict[str, Dict[str, list[int]]] = {}
+        screen_number = int(data.get("screen_number", requested or 0) or 0)
+        screen_key = f"s{screen_number}" if screen_number > 0 else ""
+        for element in elements if isinstance(elements, list) else []:
+            if not isinstance(element, dict):
+                continue
+            name = str(element.get("name", "")).strip().lower()
+            center = element.get("center")
+            if not name or not isinstance(center, (list, tuple)) or len(center) < 2 or not screen_key:
+                continue
+            try:
+                chrome_coordinates[name] = {screen_key: [int(center[0]), int(center[1])] }
+            except (TypeError, ValueError):
+                continue
+
+        return {
+            "success": bool(data.get("success", False)),
+            "monitor": screen_number,
+            "chrome": chrome_coordinates,
+            "monitors_calibrated": 1 if data.get("success") else 0,
+            "total_elements": int(data.get("elements_count", 0) or len(chrome_coordinates)),
+            "error": data.get("error"),
+        }

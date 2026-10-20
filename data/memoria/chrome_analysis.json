@@ -1,0 +1,71 @@
+{
+  "file_analyzed": "src/hands/chrome/chrome.py",
+  "lines_count": 501,
+  "analysis_date": "2025-06-17",
+  "main_functions": [
+    "abrir_chrome",
+    "abrir_chrome_pantalla", 
+    "cerrar_chrome",
+    "calibrar_chrome",
+    "mover_chrome_pantalla",
+    "maximizar_chrome"
+  ],
+  "internal_functions": [
+    "_get_chrome_executable",
+    "_abrir_chrome_desde_ruta",
+    "_get_chrome_windows",
+    "_select_preferred_chrome_window",
+    "_verificar_chrome_abierto",
+    "_verificar_chrome_instalado",
+    "_capturar_chrome"
+  ],
+  "registered_actions": [
+    {
+      "name": "abrir_chrome",
+      "type": "APPLICATION",
+      "description": "Abre Google Chrome en la pantalla predeterminada"
+    },
+    {
+      "name": "abrir_chrome_pantalla", 
+      "type": "APPLICATION",
+      "description": "Abre Google Chrome en una pantalla específica"
+    },
+    {
+      "name": "cerrar_chrome",
+      "type": "APPLICATION", 
+      "description": "Cierra todas las ventanas de Google Chrome"
+    },
+    {
+      "name": "calibrar_chrome",
+      "type": "CALIBRATION",
+      "description": "Calibra elementos de Google Chrome usando visión artificial"
+    },
+    {
+      "name": "mover_chrome_pantalla",
+      "type": "NAVIGATION",
+      "description": "Mueve la ventana de Chrome a una pantalla específica"
+    },
+    {
+      "name": "maximizar_chrome",
+      "type": "NAVIGATION",
+      "description": "Maximiza la ventana de Chrome"
+    }
+  ],
+  "key_features": [
+    "Múltiples métodos de apertura con fallback",
+    "Soporte multi-monitor con validación",
+    "Integración con ScreenManager",
+    "Manejo robusto de errores",
+    "Selección inteligente de ventanas",
+    "API legacy para captura de pantalla"
+  ],
+  "dependencies": [
+    "pyautogui",
+    "subprocess", 
+    "webbrowser",
+    "os",
+    "pathlib",
+    "time",
+    "typing"
+  ]
+}

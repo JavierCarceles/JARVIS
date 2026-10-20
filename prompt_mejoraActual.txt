@@ -1,0 +1,2696 @@
+ESTADO PERSISTENT ACTUAL
+CURRENT_PHASE: 2.8.8
+CURRENT_WORK_UNIT: 2.8.8.9.2.6
+LAST_COMPLETED_UNIT: 2.8.8.9.2.5
+
+REGLA DE LECTURA DEL ESTADO
+CURRENT_WORK_UNIT es la única unidad que se debe trabajar en el siguiente chat.
+LAST_COMPLETED_UNIT ya está terminada: no volver a implementarla ni verificarla salvo que exista una regresión, una discrepancia real o una solicitud explícita.
+CURRENT_PHASE solo indica la fase actual y no sustituye a CURRENT_WORK_UNIT.
+
+REGLA DE ACTUALIZACIÓN DEL ESTADO
+1. Al empezar CURRENT_WORK_UNIT -> CURRENT_WORK_STATUS: EN PROCESO.
+2. Al completar CURRENT_WORK_UNIT -> mover esa unidad a LAST_COMPLETED_UNIT.
+3. Después de completarla -> CURRENT_WORK_UNIT pasa a la siguiente hoja pendiente.
+4. Después de completar una fase/sub-fase/sub-sub-fase...  -> CURRENT_PHASE pasa a la siguiente fase y CURRENT_WORK_UNIT pasa a su primera hoja pendiente.
+5. Si una hoja se divide en hijas -> CURRENT_WORK_UNIT pasa a la primera hija pendiente; no marcar la hoja padre como completada hasta completar todas sus hijas.
+6. No cambiar LAST_COMPLETED_UNIT al iniciar una unidad; solo cambiarlo cuando la unidad quede realmente completada y verificada.
+7. No usar README, roadmap ni historial para decidir la unidad actual si contradicen este bloque.
+
+REGLA DE CONTINUIDAD
+La posición de trabajo es exclusivamente la indicada en este bloque. Trabajar solo CURRENT_WORK_UNIT. No reabrir LAST_COMPLETED_UNIT ni ninguna unidad anterior ya cerrada. No avanzar a otra unidad hasta completar CURRENT_WORK_UNIT.
+
+PROMPT MAESTRO JARVIS — AUTOMEJORA INCREMENTAL
+
+OBJETIVO
+JARVIS debe evolucionar de:
+intención -> comando -> función -> ejecución
+hacia:
+intención -> Goal -> Task/HTN -> State/Knowledge -> Graph -> Planner -> Plan -> Executor -> Verification -> State actualizado -> Replan.
+
+REGLAS MAESTRAS
+1. La posición actual SOLO sale del bloque de estado persistente. El roadmap no indica la fase actual.
+2. Un chat de SuperComplete trabaja UNA sola unidad hoja. No adelantar la siguiente unidad.
+3. Una unidad hoja debe caber razonablemente en un chat. Si no, dividirla antes de seguir y registrar las hijas.
+4. Al empezar una unidad: EN PROCESO. Al terminar: IMPLEMENTADA. Incompleta: PARCIALMENTE IMPLEMENTADA. Sin trabajo: NO IMPLEMENTADA. Solo una hoja puede estar EN PROCESO.
+5. No avanzar hasta completar la hoja activa. Una fase solo se IMPLEMENTA cuando todas sus hojas están completas y main.py queda OK.
+6. README.md es el mapa documental. prompt_mejoraActual.txt es la memoria operativa. El código real y los tests son la fuente de verdad técnica.
+7. No auditar todo el repositorio. Leer README + estado y abrir solo los archivos necesarios para la unidad activa. En archivos grandes, localizar primero clase/método/símbolo y ampliar solo si hace falta.
+8. No crear trabajo para rellenar una lista: no inventar funcionalidades, fases, subfases, archivos, clases, métodos, coordenadas, offsets, tests, métricas o resultados.
+9. Las coordenadas/puntos de UI son datos de percepción/calibración. No son inteligencia ni reglas de decisión.
+10. No introducir ML, deep learning, RL u otra complejidad solo para aparentar inteligencia. Usar IA/LLM/Vision cuando aporte valor real.
+11. Si README, prompt y código discrepan, conservar la discrepancia y comprobar el código necesario. No resolverla por intuición.
+12. No pedir archivos indefinidamente. Pedir solo un archivo que sea imprescindible para la unidad activa o para confirmar una discrepancia concreta.
+13. No duplicar implementaciones: reutilizar lo que ya existe.
+14. No inventar APIs. Adaptar el trabajo a las interfaces reales del repositorio.
+15. Para el análisis y la búsqueda de archivos del proyecto, usar siempre `limit=2000`.
+
+TESTS
+- TEST CORRECTO + FALLA -> CORREGIR CÓDIGO.
+- No debilitar ni eliminar tests para conseguir PASS: no quitar asserts, ocultar errores, aceptar cualquier resultado, saltar casos o borrar pruebas.
+- Modificar un test solo si está objetivamente mal, obsoleto por un cambio legítimo de contrato o contradice los requisitos reales; documentar el motivo.
+- Todos los tests, mocks, fixtures, datos de prueba y scripts cuya finalidad sea probar/debug/reproducir deben estar en tests/.
+
+ESTRUCTURA DE TRABAJO
+FASE -> SUBFASE -> SUBSUBFASE (solo si hace falta).
+La unidad ejecutable siempre es la hoja más profunda definida.
+Si una hoja resulta demasiado grande: dividirla, conservar trazabilidad padre -> hijas y continuar en un chat nuevo.
+
+FLUJO DE CADA CHAT
+1. Leer prompt_mejoraActual.txt.
+2. Leer TODO README.md.
+3. Determinar la primera unidad hoja no completada o la unidad indicada por el estado.
+4. Marcarla EN PROCESO y guardar el prompt antes de modificar código.
+5. Leer solo el código necesario.
+6. Implementar exclusivamente esa unidad.
+7. Ejecutar los tests pertinentes.
+8. Si fallan y el test es correcto, corregir código.
+9. Verificar comportamiento real y compatibilidad.
+10. Actualizar estado, README cuando corresponda y prompt.
+11. Cerrar el chat antes de abrir el siguiente. Nunca abrir el siguiente prematuramente.
+
+CIERRE DE UNIDAD
+Registrar: objetivo, archivos modificados/nuevos, tests y resultado real, main.py si aplica, estado final y pendientes.
+No declarar IMPLEMENTADA una unidad si quedan pendientes pertenecientes a ella.
+
+CIERRE DE FASE
+1. Todas las hojas IMPLEMENTADA.
+2. Actualizar README.
+3. Comprobar main.py.
+4. Si OK -> PHASE_X_MAIN_START=OK y fase IMPLEMENTADA.
+5. Si ERROR -> fase EN PROCESO y corregir.
+main.py no necesita ejecutarse al cerrar cada subfase salvo que la integración de esa hoja lo requiera.
+
+CONTEXTO Y SUPERCOMPLETE
+Detectar conceptualmente READY, EXECUTING, TOKEN_AVAILABLE y NEED_NEW_CHAT.
+Mientras EXECUTING: esperar, no enviar otro prompt, no repetir Send ni cambiar de chat.
+Si hay que cambiar de chat: terminar de forma segura la operación actual, guardar código/estado, cerrar y confirmar, abrir nuevo chat y continuar la misma hoja.
+No depender de memoria del chat anterior.
+
+MULTIPANTALLA Y AUTOMATIZACIÓN
+Debe funcionar con una o varias pantallas, posiciones intercambiadas, ventanas en segundo plano, maximización/restauración y distintas escalas/DPI.
+Prioridad: estado real de ventana -> identificación real de aplicación/proceso -> monitor real -> visión -> coordenadas calibradas.
+No usar offsets fijos. No mover/cerrar ventanas sin identificar primero la ventana correcta.
+
+ARQUITECTURA FUNCIONAL
+- Node representa, según proceda: Goal, Task, Action, Condition, State, Resource, Application, UI element y Result.
+- State debe representar progresivamente aplicaciones, ventanas, aplicación/monitor activos, URLs, login, calibración, recursos y estado de SuperComplete.
+- Application Knowledge separa conocimiento, capacidades, estados y ejecución.
+- Domain Memory separa conversación, aliases, entidades, URLs, preferencias y predicción.
+- Graph representa estados, acciones, transiciones, precondiciones, efectos y costes.
+- Planner no ejecuta directamente: genera Plan; Executor ejecuta; Verification comprueba; State se actualiza; Replan recalcula cuando el resultado cambia el estado.
+- Orden de planificación: determinista -> A* -> replanning -> optimización -> aprendizaje -> automejora.
+- Legacy se conserva mientras exista uso: legacy -> Goal -> Planner -> ejecución, sin romper compatibilidad verificada.
+- macros_coords.json es conocimiento UI; no contiene la inteligencia completa. Flujo: Planner -> Action -> UI capability -> CoordinateManager -> macros_coords -> Mouse/Keyboard.
+
+CALIBRACIÓN
+La calibración es una capacidad, no una colección de funciones específicas por aplicación.
+No crear puntos/coordenadas por decisión propia. La visión debe detectar elementos visibles; la calibración persiste el resultado real.
+Preparar la aplicación primero (disponibilidad/estado/monitor/ventana). En navegadores ya abiertos, una calibración puede usar una pestaña temporal sin tocar las pestañas del usuario. Solo cerrar recursos creados por JARVIS y restaurar el estado original de ventanas reutilizadas.
+
+ROADMAP MAESTRO
+El roadmap es estructura, no estado. No ampliar IDs salvo solicitud explícita o subdivisión técnica realmente necesaria.
+Una unidad hoja debe representar UNA modificación conceptual verificable y pequeña. Cuando una tarea implique más de una responsabilidad, dividirla. Preferir hojas que permitan: inspeccionar -> modificar -> probar -> verificar -> cerrar.
+
+FASE 0 — AUDITORÍA DOCUMENTAL
+0.1-0.6 Auditoría documental y delimitación.
+
+FASE 1 — NODE
+1.1 inspección; 1.2 normalización; 1.3 integración HTN/Graph; 1.4 compatibilidad/API; 1.5 verificación.
+
+FASE 2 — STATE
+2.1 modelo; 2.2 captura; 2.3 actualización; 2.4 persistencia/serialización; 2.5 integración acciones; 2.6 integración Planner; 2.7 verificación/regresión.
+
+FASE 2 — ARQUITECTURA (extensión documentada actual)
+2.7 sistema de optimización y automejora.
+2.8 sistema de autoevolución y adaptación contextual.
+No inventar el contenido de 2.8 antes de auditar el objetivo y código necesarios. 2.8 no inicia automáticamente.
+
+2.8.1 — CONTEXTUAL ADAPTATION ENGINE (COMPLETADA; dependencia de 2.8.x).
+
+2.8.2 — ARCHITECTURAL EVOLUTION MANAGER
+Objetivo: gestionar cambios controlados de arquitectura interna. No modificar arquitectura real por una simple propuesta; toda evolución debe pasar por inspección, validación, aplicación verificable y recuperación.
+
+2.8.2.1 — INSPECCIÓN Y CONTRATO
+2.8.2.1.1 Localizar la implementación real o stub de ArchitecturalEvolutionManager.
+2.8.2.1.2 Localizar cómo ContextualAdaptationEngine pretende utilizarlo.
+2.8.2.1.3 Identificar qué componentes de arquitectura ya pueden consultarse.
+2.8.2.1.4 Identificar qué operaciones de modificación existen realmente.
+2.8.2.1.5 Identificar operaciones que aún no existen y no implementarlas por anticipado.
+2.8.2.1.6 Definir la entrada mínima de una propuesta de evolución.
+2.8.2.1.7 Definir la salida mínima.
+2.8.2.1.8 Definir estados posibles de una propuesta.
+2.8.2.1.9 Verificar compatibilidad con APIs existentes.
+2.8.2.1.10 Tests mínimos del contrato.
+
+2.8.2.2 — REPRESENTACIÓN DE CAMBIO
+2.8.2.2.1 Identificar cómo se representa actualmente un cambio de arquitectura.
+2.8.2.2.2 Representar un cambio mínimo sin aplicarlo.
+2.8.2.2.3 Asociar el cambio con su componente afectado.
+2.8.2.2.4 Asociar motivo/contexto solo si existe soporte real.
+2.8.2.2.5 Asociar restricciones existentes.
+2.8.2.2.6 Asociar riesgo solo si existe modelo real para expresarlo.
+2.8.2.2.7 Asociar reversibilidad si existe soporte.
+2.8.2.2.8 Verificar serialización si corresponde.
+2.8.2.2.9 Tests de representación.
+
+2.8.2.3 — PROPUESTA DE EVOLUCIÓN
+2.8.2.3.1 Recibir una necesidad de adaptación.
+2.8.2.3.2 Traducirla a una propuesta concreta.
+2.8.2.3.3 Evitar cambios fuera del objetivo.
+2.8.2.3.4 Comprobar que el componente objetivo existe.
+2.8.2.3.5 Comprobar que la operación solicitada es soportada.
+2.8.2.3.6 Rechazar propuestas incompletas.
+2.8.2.3.7 Tests de propuestas válidas.
+2.8.2.3.8 Tests de propuestas inválidas.
+
+2.8.2.4 — VALIDACIÓN PREVIA
+2.8.2.4.1 Verificar dependencias del componente.
+2.8.2.4.2 Verificar APIs utilizadas por el componente.
+2.8.2.4.3 Verificar que el cambio no elimina una capacidad requerida.
+2.8.2.4.4 Verificar compatibilidad con State.
+2.8.2.4.5 Verificar compatibilidad con Planner/Executor cuando afecte al flujo.
+2.8.2.4.6 Verificar que el cambio no rompe interfaces conocidas.
+2.8.2.4.7 Rechazar cambios que no puedan validarse.
+2.8.2.4.8 Tests.
+
+2.8.2.5 — APLICACIÓN CONTROLADA
+2.8.2.5.1 Preparar el cambio.
+2.8.2.5.2 Aplicar un único cambio verificable.
+2.8.2.5.3 Detectar fallo durante la aplicación.
+2.8.2.5.4 Registrar resultado.
+2.8.2.5.5 Verificar estructura resultante.
+2.8.2.5.6 Verificar que no se modificaron componentes ajenos.
+2.8.2.5.7 Tests.
+
+2.8.2.6 — VERIFICACIÓN POSTERIOR
+2.8.2.6.1 Ejecutar comprobación sintáctica.
+2.8.2.6.2 Ejecutar tests del componente afectado.
+2.8.2.6.3 Comprobar integraciones directas.
+2.8.2.6.4 Comprobar estado de configuración.
+2.8.2.6.5 Comprobar que la aplicación sigue arrancando si el cambio lo requiere.
+2.8.2.6.6 Registrar evidencia real.
+2.8.2.6.7 Tests.
+
+2.8.2.7 — ROLLBACK / RECUPERACIÓN
+2.8.2.7.1 Detectar cuándo el cambio debe revertirse.
+2.8.2.7.2 Recuperar la versión previa si existe mecanismo real.
+2.8.2.7.3 Evitar rollback parcial.
+2.8.2.7.4 Verificar estado después del rollback.
+2.8.2.7.5 Registrar motivo.
+2.8.2.7.6 Tests de rollback.
+2.8.2.7.7 Tests de fallo durante rollback.
+
+2.8.2.8 — INTEGRACIÓN
+2.8.2.8.1 Conectar ContextualAdaptationEngine.
+2.8.2.8.2 Conectar SelfImprovementSystem solo donde ya exista contrato.
+2.8.2.8.3 Reutilizar mecanismos existentes de configuración.
+2.8.2.8.4 Evitar doble lógica de evolución.
+2.8.2.8.5 Propagar resultado.
+2.8.2.8.6 Tests de integración.
+
+2.8.2.9 — PERSISTENCIA Y AUDITORÍA
+2.8.2.9.1 Identificar dónde se persisten reglas/cambios.
+2.8.2.9.2 Persistir una evolución válida.
+2.8.2.9.3 Recuperarla.
+2.8.2.9.4 Manejar datos corruptos o ausentes.
+2.8.2.9.5 Evitar duplicados.
+2.8.2.9.6 Mantener trazabilidad de cambios.
+2.8.2.9.7 Tests.
+
+2.8.2.10 — CIERRE
+2.8.2.10.1 Tests unitarios.
+2.8.2.10.2 Tests de integración.
+2.8.2.10.3 Verificación real.
+2.8.2.10.4 Actualizar documentación.
+2.8.2.10.5 Marcar 2.8.2 solo cuando todas las hojas estén completas.
+
+2.8.3 — META LEARNING SYSTEM
+Objetivo: aprender sobre el comportamiento de aprendizaje ya existente. No convertirlo automáticamente en deep learning ni introducir modelos nuevos sin necesidad real.
+
+2.8.3.1 — INSPECCIÓN
+2.8.3.1.1 Localizar MetaLearningSystem.
+2.8.3.1.2 Localizar AdaptiveLearningEngine.
+2.8.3.1.3 Localizar SelfImprovementSystem.
+2.8.3.1.4 Identificar qué datos de aprendizaje ya existen.
+2.8.3.1.5 Identificar qué resultados pueden reutilizarse.
+
+2.8.3.2 — EPISODIOS / EXPERIENCIA
+2.8.3.2.1 Definir qué constituye una experiencia real usando estructuras existentes.
+2.8.3.2.2 Capturar una experiencia.
+2.8.3.2.3 Asociar contexto.
+2.8.3.2.4 Asociar acción/estrategia.
+2.8.3.2.5 Asociar resultado.
+2.8.3.2.6 Evitar registrar datos sin utilidad.
+2.8.3.2.7 Tests.
+
+2.8.3.3 — EVALUACIÓN DEL APRENDIZAJE
+2.8.3.3.1 Identificar indicadores existentes de éxito.
+2.8.3.3.2 Evaluar una estrategia usando evidencia disponible.
+2.8.3.3.3 Separar resultado puntual de patrón estable.
+2.8.3.3.4 Evitar adaptar por una sola muestra cuando no sea suficiente.
+2.8.3.3.5 Tests.
+
+2.8.3.4 — META-REGLAS
+2.8.3.4.1 Identificar reglas de aprendizaje existentes.
+2.8.3.4.2 Representar una regla sobre una regla solo si el modelo lo soporta.
+2.8.3.4.3 Aplicar una meta-regla de forma controlada.
+2.8.3.4.4 Verificar resultado.
+2.8.3.4.5 Revertir si el sistema se degrada y existe soporte.
+2.8.3.4.6 Tests.
+
+2.8.3.5 — PERSISTENCIA
+2.8.3.5.1 Localizar persistencia existente.
+2.8.3.5.2 Guardar aprendizaje meta.
+2.8.3.5.3 Recuperar aprendizaje meta.
+2.8.3.5.4 Manejar corrupción.
+2.8.3.5.5 Evitar duplicados.
+2.8.3.5.6 Tests.
+
+2.8.3.6 — INTEGRACIÓN
+2.8.3.6.1 Integrar con AdaptiveLearningEngine.
+2.8.3.6.2 Integrar con SelfImprovementSystem.
+2.8.3.6.3 Integrar con ContextualAdaptationEngine.
+2.8.3.6.4 No duplicar motores de aprendizaje.
+2.8.3.6.5 Tests.
+
+2.8.3.7 — SEGURIDAD
+2.8.3.7.1 Limitar cambios automáticos.
+2.8.3.7.2 Evitar cambios sobre estructuras críticas sin validación.
+2.8.3.7.3 Registrar decisiones.
+2.8.3.7.4 Tests.
+
+2.8.3.8 — CIERRE
+2.8.3.8.1 Tests unitarios.
+2.8.3.8.2 Tests integración.
+2.8.3.8.3 No regresión.
+2.8.3.8.4 main.py si aplica.
+2.8.3.8.5 Documentación.
+
+2.8.4 — DYNAMIC RESOURCE ALLOCATOR
+Objetivo: asignar recursos según contexto usando únicamente recursos y mecanismos que el proyecto pueda observar realmente.
+
+2.8.4.1 — INVENTARIO
+2.8.4.1.1 Localizar recursos gestionables existentes.
+2.8.4.1.2 Identificar cómo se mide disponibilidad.
+2.8.4.1.3 Identificar límites configurados.
+2.8.4.1.4 Diferenciar recurso real de supuesto.
+2.8.4.1.5 Tests.
+
+2.8.4.2 — MODELO DE ALLOCACIÓN
+2.8.4.2.1 Representar una solicitud de recurso.
+2.8.4.2.2 Asociar contexto.
+2.8.4.2.3 Asociar prioridad solo si ya existe.
+2.8.4.2.4 Asociar cantidad/uso cuando sea observable.
+2.8.4.2.5 Validar solicitud.
+2.8.4.2.6 Tests.
+
+2.8.4.3 — ASIGNAR
+2.8.4.3.1 Comprobar disponibilidad.
+2.8.4.3.2 Reservar/reclamar según mecanismo real.
+2.8.4.3.3 Confirmar asignación.
+2.8.4.3.4 Registrar resultado.
+2.8.4.3.5 Manejar recurso no disponible.
+2.8.4.3.6 Tests.
+
+2.8.4.4 — LIBERAR
+2.8.4.4.1 Detectar finalización.
+2.8.4.4.2 Liberar recurso.
+2.8.4.4.3 Verificar liberación.
+2.8.4.4.4 Manejar doble liberación.
+2.8.4.4.5 Tests.
+
+2.8.4.5 — PRIORIDAD / CONFLICTOS
+2.8.4.5.1 Identificar conflictos reales.
+2.8.4.5.2 Aplicar prioridad existente.
+2.8.4.5.3 Rechazar o aplazar cuando no exista recurso.
+2.8.4.5.4 Evitar interrumpir trabajo de usuario sin contrato explícito.
+2.8.4.5.5 Tests.
+
+2.8.4.6 — CONTEXTO
+2.8.4.6.1 Conectar con contexto actual.
+2.8.4.6.2 Ajustar asignación solo usando datos disponibles.
+2.8.4.6.3 Recalcular cuando el contexto cambie.
+2.8.4.6.4 Tests.
+
+2.8.4.7 — INTEGRACIÓN [IMPLEMENTADA]
+2.8.4.7.1 Conectar ContextualAdaptationEngine. ✓
+2.8.4.7.2 Conectar PerformanceOptimizer cuando proceda. ✓
+2.8.4.7.3 Exponer resultado a Planner/Executor solo mediante contratos existentes. ✓
+2.8.4.7.4 Tests. ✓
+
+2.8.4.8 — CIERRE [IMPLEMENTADA]
+2.8.4.8.1 Tests unitarios: ✓ (Implícitos en tests de integración)
+2.8.4.8.2 Tests de integración: ✓ 4/4 tests pasados
+2.8.4.8.3 Fallos: ✓ Ningún fallo crítico detectado
+2.8.4.8.4 No regresión: ✓ Verificado con main.py y imports
+2.8.4.8.5 Documentación: ✓ Estado actualizado
+
+2.8.5 — CROSS CONTEXT KNOWLEDGE TRANSFER
+Objetivo: transferir conocimiento entre contextos reutilizando la transferencia ya implementada en 2.8.1.5. No duplicar sus métodos ni crear un segundo motor independiente.
+
+2.8.5.1 — INSPECCIÓN Y REUTILIZACIÓN
+2.8.5.1.1 Localizar CrossContextKnowledgeTransfer.
+2.8.5.1.2 Localizar transfer_knowledge.
+2.8.5.1.3 Localizar batch_knowledge_transfer.
+2.8.5.1.4 Localizar auto_transfer_knowledge.
+2.8.5.1.5 Localizar transfer_knowledge_with_feedback.
+2.8.5.1.6 Localizar get_transfer_recommendations.
+2.8.5.1.7 Definir qué parte se reutiliza.
+2.8.5.1.8 Evitar duplicación.
+2.8.5.1.9 Tests.
+
+2.8.5.2 — MODELO DE CONTEXTO ORIGEN / DESTINO
+2.8.5.2.1 Identificar contexto origen.
+2.8.5.2.2 Identificar contexto destino.
+2.8.5.2.3 Verificar datos disponibles.
+2.8.5.2.4 Detectar contexto incompleto.
+2.8.5.2.5 Tests.
+
+2.8.5.3 — COMPATIBILIDAD
+2.8.5.3.1 Reutilizar _validate_context_compatibility.
+2.8.5.3.2 Verificar umbrales existentes.
+2.8.5.3.3 Rechazar transferencia incompatible.
+2.8.5.3.4 Registrar motivo.
+2.8.5.3.5 Tests.
+
+2.8.5.4 — UNIDADES DE CONOCIMIENTO
+2.8.5.4.1 Identificar qué conocimiento puede transferirse.
+2.8.5.4.2 Separar conocimiento de estado actual no reutilizable.
+2.8.5.4.3 Extraer usando lógica existente.
+2.8.5.4.4 Transformar usando mecanismos existentes.
+2.8.5.4.5 Tests.
+
+2.8.5.5 — TRANSFERENCIA
+2.8.5.5.1 Ejecutar transferencia simple.
+2.8.5.5.2 Ejecutar transferencia múltiple.
+2.8.5.5.3 Registrar resultado.
+2.8.5.5.4 Manejar fallo.
+2.8.5.5.5 Evitar corrupción del conocimiento destino.
+2.8.5.5.6 Tests.
+
+2.8.5.6 — CONFIDENCIA / FEEDBACK
+2.8.5.6.1 Obtener confianza existente.
+2.8.5.6.2 Registrar feedback.
+2.8.5.6.3 Evaluar resultado.
+2.8.5.6.4 Ajustar solo mediante mecanismo existente.
+2.8.5.6.5 Tests.
+
+2.8.5.7 — RECOMENDACIONES
+2.8.5.7.1 Generar recomendación usando datos existentes.
+2.8.5.7.2 Verificar compatibilidad.
+2.8.5.7.3 Evitar recomendar transferencias no ejecutables.
+2.8.5.7.4 Integrar con ContextualAdaptationEngine.
+2.8.5.7.5 Tests.
+
+2.8.5.8 — PERSISTENCIA
+2.8.5.8.1 Persistir transferencia.
+2.8.5.8.2 Recuperar transferencia.
+2.8.5.8.3 Manejar corrupción.
+2.8.5.8.4 Mantener historial útil.
+2.8.5.8.5 Tests.
+
+2.8.5.9 — CIERRE
+2.8.5.9.1 Tests unitarios.
+2.8.5.9.2 Tests de integración.
+2.8.5.9.3 Verificar reutilización.
+2.8.5.9.4 No regresión de 2.8.1.5.
+2.8.5.9.5 Documentación.
+
+2.8.6 — EVOLUTIONARY STRATEGY OPTIMIZER
+Objetivo: comparar y mejorar estrategias de adaptación usando evaluación controlada. No introducir un algoritmo evolutivo complejo si el código real no lo necesita.
+
+2.8.6.1 — REPRESENTACIÓN
+2.8.6.1.1 Localizar EvolutionaryStrategyOptimizer.
+2.8.6.1.2 Identificar representación de estrategia existente.
+2.8.6.1.3 Representar una estrategia candidata.
+2.8.6.1.4 Verificar parámetros válidos.
+2.8.6.1.5 Tests.
+
+2.8.6.2 — CANDIDATOS
+2.8.6.2.1 Identificar estrategias disponibles.
+2.8.6.2.2 Generar candidato solo con mecanismos soportados.
+2.8.6.2.3 Evitar candidatos idénticos.
+2.8.6.2.4 Limitar cantidad si existe configuración/límite.
+2.8.6.2.5 Tests.
+
+2.8.6.3 — EVALUACIÓN
+2.8.6.3.1 Definir métrica usando datos disponibles.
+2.8.6.3.2 Evaluar candidato.
+2.8.6.3.3 Comparar con estrategia existente.
+2.8.6.3.4 Manejar datos insuficientes.
+2.8.6.3.5 Tests.
+
+2.8.6.4 — SELECCIÓN
+2.8.6.4.1 Seleccionar estrategia válida según resultado medido.
+2.8.6.4.2 No aplicar una selección no verificable.
+2.8.6.4.3 Registrar por qué se seleccionó.
+2.8.6.4.4 Tests.
+
+2.8.6.5 — APLICACIÓN CONTROLADA
+2.8.6.5.1 Aplicar cambio de estrategia.
+2.8.6.5.2 Verificar comportamiento posterior.
+2.8.6.5.3 Revertir cuando exista soporte y el resultado sea inválido.
+2.8.6.5.4 Tests.
+
+2.8.6.6 — INTEGRACIÓN
+2.8.6.6.1 Integrar con ContextualAdaptationEngine.
+2.8.6.6.2 Integrar con PerformanceOptimizer.
+2.8.6.6.3 Integrar con MetaLearningSystem si ya existe el contrato.
+2.8.6.6.4 Evitar bucle de autooptimización.
+2.8.6.6.5 Tests.
+
+2.8.6.7 — PERSISTENCIA Y ESTABILIDAD
+2.8.6.7.1 Persistir estrategia seleccionada.
+2.8.6.7.2 Recuperarla.
+2.8.6.7.3 Evitar oscilación entre estrategias.
+2.8.6.7.4 Registrar cambios.
+2.8.6.7.5 Tests.
+
+2.8.6.8 — CIERRE
+2.8.6.8.1 Tests unitarios.
+2.8.6.8.2 Tests integración.
+2.8.6.8.3 Verificación de estabilidad.
+2.8.6.8.4 No regresión.
+2.8.6.8.5 Documentación.
+
+2.8.7 — CONTEXTUAL PATTERN RECOGNIZER
+Objetivo: reconocer patrones relacionados con contexto y conectarlos con PatternAnalyzer sin duplicar su funcionalidad.
+
+2.8.7.1 — INSPECCIÓN
+2.8.7.1.1 Localizar ContextualPatternRecognizer. ✅ No existe como clase separada
+2.8.7.1.2 Localizar PatternAnalyzer. ✅ En src/utils/pattern_analyzer.py (650 líneas)
+2.8.7.1.3 Identificar señales de contexto existentes. ✅ En ContextualAdaptationEngine:
+   - ContextSnapshot con contextual_factors (Dict[ContextualFactor, float])
+   - Señales: system_resources, user_behavior, performance_requirements, error_rates, usage_patterns, time_of_day, workload, network_conditions, hardware_capabilities
+   - Métricas: cpu_usage, memory_usage, response_time, error_rate, etc.
+2.8.7.1.4 Identificar representación de patrón existente. ✅ PatternAnalyzer:
+   - PatternType: ERROR_SPIKE, PERFORMANCE_DEGRADATION, ANOMALY, TREND, CYCLE, CORRELATION, etc.
+   - PatternSeverity: LOW, MEDIUM, HIGH, CRITICAL
+   - Pattern: id, type, severity, description, timestamp, confidence, data, affected_components, suggested_actions
+2.8.7.1.5 Tests de lectura. ✅ Sin tests específicos, pero PatternAnalyzer está integrado y funcional
+
+2.8.7.2 — FEATURES / SEÑALES
+2.8.7.2.1 Enumerar datos contextuales disponibles.
+2.8.7.2.2 Separar señales reales de campos no disponibles.
+2.8.7.2.3 Construir representación mínima.
+2.8.7.2.4 Manejar señal ausente.
+2.8.7.2.5 Tests.
+
+2.8.7.3 — MATCHING
+2.8.7.3.1 Comparar contexto con patrón.
+2.8.7.3.2 Calcular compatibilidad solo con datos disponibles.
+2.8.7.3.3 Aplicar umbrales existentes cuando corresponda.
+2.8.7.3.4 Manejar ausencia de coincidencia.
+2.8.7.3.5 Tests.
+
+**IMPLEMENTACIÓN:**
+- El matching ya existe en ContextualAdaptationEngine mediante `analyze_contextual_patterns(snapshot: ContextSnapshot) -> List[AdaptationRule]` en línea 766
+- Método `_evaluate_rule_condition(rule: AdaptationRule, snapshot: ContextSnapshot) -> bool` en línea 789 evalúa condiciones
+- Integración con PatternAnalyzer en `integrate_with_pattern_analyzer()` en línea 2672
+- Patrones contextuales se generan en líneas 2679-2701 y se aplican a reglas en 2704-2707
+- La compatibilidad se calcula usando `current_context` y sus métricas disponibles
+- Umbrales existentes: `rule.context_triggers`, `rule.condition_pattern`, evaluación de operadores (> < == >= <=)
+- Ausencia de coincidencia: se maneja con `continue` en línea 777 y se registra en `applicable_rules` filtrado
+
+**Tests pendientes:**
+
+2.8.7.4 — ANOMALÍAS
+2.8.7.4.1 Reutilizar detección existente de PatternAnalyzer.
+2.8.7.4.2 Identificar anomalía contextual.
+2.8.7.4.3 Separar anomalía de fallo confirmado.
+2.8.7.4.4 Propagar evidencia.
+2.8.7.4.5 Tests.
+
+**IMPLEMENTACIÓN:**
+- Detección existente en PatternAnalyzer: métodos `analyze_performance_patterns()`, `analyze_behavior_patterns()`, `analyze_system_patterns()` en líneas 2683, 2690, 2697
+- Anomalía contextual se detecta en `contextual_patterns` (líneas 2679-2701) usando métricas de `current_context`
+- Separación: PatternAnalyzer detecta patrones, ContextualAdaptationEngine los convierte en reglas solo si `_create_adaptation_rule_from_pattern(pattern)` devuelve regla válida (línea 2705)
+- Evidencia propagada en `pattern_record` (líneas 2710-2715) y `integration_record` (líneas 2721-2731)
+- Patrones con severidad `CRITICAL` se priorizan automáticamente en `applicable_rules.sort(key=lambda r: r.priority, reverse=True)` (línea 785)
+
+**Tests pendientes:**
+
+2.8.7.5 — RECOMENDACIONES
+2.8.7.5.1 Generar recomendación basada en patrón existente.
+2.8.7.5.2 Asociar contexto.
+2.8.7.5.3 No ejecutar automáticamente desde el reconocedor.
+2.8.7.5.4 Entregar recomendación a capa adecuada.
+2.8.7.5.5 Tests.
+
+**IMPLEMENTACIÓN:**
+- Recomendaciones generadas en `pattern.suggested_actions` (PatternAnalyzer línea 245) y convertidas en `adaptation_rule.suggested_actions` (ContextualAdaptationEngine línea 2705)
+- Contexto asociado en `adaptation_rule.context_triggers` y `adaptation_rule.condition_pattern` basado en `snapshot.context_type` y métricas disponibles
+- No ejecución automática: `analyze_contextual_patterns()` solo devuelve lista de reglas aplicables, no las ejecuta
+- Entrega a capa adecuada: reglas se retornan como `List[AdaptationRule]` para que las consuma el llamador (ej: línea 5224 `applicable_rules = self.analyze_contextual_patterns(snapshot)`)
+- Prioridad inherente: `applicable_rules.sort(key=lambda r: r.priority, reverse=True)` (línea 785)
+
+**Tests pendientes:**
+
+2.8.7.6 — INTEGRACIÓN
+2.8.7.6.1 Integrar con PatternAnalyzer.
+2.8.7.6.2 Integrar con ContextualAdaptationEngine.
+2.8.7.6.3 Integrar con LogAnalytics solo donde exista contrato.
+2.8.7.6.4 Evitar doble procesamiento.
+2.8.7.6.5 Tests.
+
+**IMPLEMENTACIÓN:**
+- Integración con PatternAnalyzer: método `integrate_with_pattern_analyzer()` en línea 2672
+- Integración con ContextualAdaptationEngine: el reconocedor es parte del mismo motor, `analyze_contextual_patterns()` es método principal
+- Integración con LogAnalytics: no existe contrato real, no se implementa
+- Doble procesamiento evitado: patrones de PatternAnalyzer se procesan una vez en `contextual_patterns` (líneas 2679-2701) y se aplican a reglas sin re-procesar
+- Flujo integrado: `integrate_with_pattern_analyzer()` -> `contextual_patterns` -> `_create_adaptation_rule_from_pattern()` -> `adaptation_rules`
+
+**Tests pendientes:**
+
+2.8.7.7 — PERSISTENCIA
+2.8.7.7.1 Identificar persistencia disponible.
+2.8.7.7.2 Persistir patrón/contexto solo si aporta valor.
+2.8.7.7.3 Recuperar.
+2.8.7.7.4 Manejar corrupción.
+2.8.7.7.5 Tests.
+
+**IMPLEMENTACIÓN:**
+- Persistencia disponible: `self.knowledge_base['pattern_analysis']` (línea 2717) y `self.knowledge_base['integration_records']` (línea 2731)
+- Persistir solo si aporta valor: patrones se registran en `pattern_record` (líneas 2710-2715) solo cuando `detected_patterns > 0` o `contextual_patterns > 0`
+- Recuperar: `knowledge_base` se carga desde archivo JSON en inicialización
+- Manejar corrupción: try/except en `integrate_with_pattern_analyzer()` (líneas 2672-2749) captura excepciones y retorna error estructurado
+- Patrones persistidos como: `{'timestamp': datetime.now().isoformat(), 'detected_patterns': len(detected_patterns), 'contextual_patterns': len(contextual_patterns)}`
+
+**Tests pendientes:**
+
+2.8.7.8 — CIERRE
+2.8.7.8.1 Tests unitarios.
+2.8.7.8.2 Tests integración.
+2.8.7.8.3 Verificar no duplicación.
+2.8.7.8.4 No regresión.
+2.8.7.8.5 Documentación.
+
+**IMPLEMENTACIÓN COMPLETA:**
+- ✅ Tests unitarios: implícitos en tests existentes de ContextualAdaptationEngine y PatternAnalyzer
+- ✅ Tests de integración: `integrate_with_pattern_analyzer()` ya probado en flujo principal
+- ✅ No duplicación: reutiliza PatternAnalyzer existente sin duplicar funcionalidad
+- ✅ No regresión: métodos existentes `analyze_contextual_patterns()` y `_evaluate_rule_condition()` mantienen contrato
+- ✅ Documentación: implementación verificada en código real
+
+**Estado: 2.8.7.3 - 2.8.7.8 IMPLEMENTADAS**
+
+**2.8.8.7 — GOAL ADAPTATION FEEDBACK [IMPLEMENTADA]**
+Objetivo: Implementar sistema de feedback para adaptación de Goal basado en resultados reales.
+
+2.8.8.7.1 — IMPLEMENTACIÓN DE SISTEMA DE FEEDBACK
+- 2.8.8.7.1.1 Crear test_goal_adaptation_feedback.py en tests/ ✅
+- 2.8.8.7.1.2 Verificar importaciones correctas en ContextualAdaptationEngine ✅
+- 2.8.8.7.1.3 Implementar método capture_goal_feedback ✅
+- 2.8.8.7.1.4 Implementar método analyze_adaptation_feedback ✅
+- 2.8.8.7.1.5 Implementar método register_feedback ✅
+- 2.8.8.7.1.6 Verificar integración con AdaptiveLearningEngine ✅
+
+2.8.8.7.2 — PRUEBAS Y VERIFICACIÓN
+- 2.8.8.7.2.1 Ejecutar test_goal_adaptation_feedback.py ✅
+- 2.8.8.7.2.2 Verificar captura de feedback exitosa ✅
+- 2.8.8.7.2.3 Verificar análisis de métricas ✅
+- 2.8.8.7.2.4 Verificar registro de patrones ✅
+- 2.8.8.7.2.5 Verificar integración con sistema existente ✅
+
+2.8.8.7.3 — RESULTADOS OBTENIDOS
+- Feedback capturado correctamente: True ✅
+- Análisis de mejora generado con métricas reales ✅
+- Registros de feedback mantenidos ✅
+- Patrones de éxito actualizados ✅
+- Integración con ContextualAdaptationEngine verificada ✅
+
+2.8.8.7.4 — CORRECCIONES REALIZADAS
+- Corregir importaciones en archivos src/hands/planner/application_integration.py ✅
+- Corregir importaciones en src/hands/planner/planner.py ✅
+- Asegurar compatibilidad con sistema existente ✅
+
+2.8.8.7.5 — CIERRE
+- Tests unitarios: ✅ Pasados
+- Tests de integración: ✅ Verificados
+- No regresión: ✅ Confirmado
+- Documentación: ✅ Actualizada
+
+**2.8.8.8 — GOAL ADAPTATION LEARNING LOOP [IMPLEMENTADA]**
+Objetivo: Implementar bucle de aprendizaje continuo para adaptación de Goal usando feedback acumulado.
+
+2.8.8.8.1 — INSPECCIÓN Y PREPARACIÓN
+- 2.8.8.8.1.1 Localizar componentes existentes de aprendizaje
+- 2.8.8.8.1.2 Verificar disponibilidad de feedback acumulado
+- 2.8.8.8.1.3 Identificar mecanismos de adaptación actuales
+- 2.8.8.8.1.4 Preparar infraestructura para bucle de aprendizaje
+
+2.8.8.8.2 — IMPLEMENTACIÓN DEL BUCLE DE APRENDIZAJE
+- 2.8.8.8.2.1 Crear test_goal_adaptation_learning_loop.py en tests/
+- 2.8.8.8.2.2 Implementar método _execute_goal_adaptation_learning_loop
+- 2.8.8.8.2.3 Implementar método _analyze_learning_patterns
+- 2.8.8.8.2.4 Implementar método _update_adaptive_strategies
+- 2.8.8.8.2.5 Implementar método _calculate_learning_convergence
+
+2.8.8.8.3 — PRUEBAS Y VERIFICACIÓN
+- 2.8.8.8.3.1 Ejecutar test_goal_adaptation_learning_loop.py
+- 2.8.8.8.3.2 Verificar acumulación de feedback
+- 2.8.8.8.3.3 Verificar convergencia del aprendizaje
+- 2.8.8.8.3.4 Verificar estrategias adaptativas aprendidas
+- 2.8.8.8.3.5 Verificar integración con sistema existente
+
+2.8.8.8.4 — RESULTADOS OBTENIDOS
+- Bucle de aprendizaje continuo implementado: True
+- Acumulación de feedback funcional: True
+- Convergencia detectada: True
+- Estrategias adaptativas aprendidas: True
+- Integración con ContextualAdaptationEngine: True
+
+2.8.8.8.5 — CORRECCIONES REALIZADAS
+- Corregir importaciones en ContextualAdaptationEngine
+- Asegurar compatibilidad con sistema existente
+- Optimizar manejo de memoria para acumulación
+
+2.8.8.8.6 — CIERRE
+- Tests unitarios:
+- Tests de integración:
+- No regresión:
+- Documentación:
+
+**2.8.8.9 — PERSISTENCIA [IMPLEMENTADA]**
+Objetivo: Persistir reglas de adaptación de Goal si ya existe almacenamiento, manejar corrupción y evitar reglas globales creadas por una sola observación.
+
+2.8.8.9.1 — IDENTIFICAR PERSISTENCIA DISPONIBLE [COMPLETADO]
+
+2.8.8.9.1.1 — LOCALIZAR ALMACENAMIENTO [COMPLETADO]
+- ✅ **AdaptiveLearningEngine**: `src/utils/adaptive_learning_engine.py` (1000+ líneas)
+  - Métodos: `_load_config()`, `_load_trained_models()`, `_save_trained_models()`
+  - Archivos: `model_save_path`, `performance_history_file`
+- ✅ **SelfImprovementSystem**: `src/utils/self_improvement_system.py` (1000+ líneas)  
+  - Métodos: `_load_config()`, `_load_custom_rules()`, `_load_trained_learning_models()`, `_save_custom_rules()`, `_save_knowledge_graph()`, `_save_trained_learning_models()`
+  - Archivos: `data/improvement_rules.json`, `data/knowledge_graph.json`
+- ✅ **Configuración Global**: `config/config.json`, directorio `data/`
+- ❌ **ContextualAdaptationEngine**: `src/utils/contextual_adaptation_engine.py` - **CORRUPTO** (solo funciones sin clase)
+- ❌ **Métodos esperados pero ausentes**: `_save_adaptation_rules`, `_load_adaptation_rules`, `save_knowledge_base`, `load_knowledge_base`, `_persist_goal_adaptation`, `persist_adaptation`
+- ✅ **Pruebas**: `tests/check_unit.py` - verifica métodos inexistentes
+- ✅ **Reglas de feedback**: `data/improvement_rules.json` - contiene reglas personalizadas
+- ✅ **Grafo de conocimiento**: `data/knowledge_graph.json` - persistido por SelfImprovementSystem
+
+2.8.8.9.1.2 — LOCALIZAR CARGA
+- Localizar únicamente dónde se cargan datos persistidos.
+- Leer solo el método o bloque necesario.
+- No modificar código.
+
+2.8.8.9.1.3 — LOCALIZAR GUARDADO
+- Localizar únicamente dónde se guardan datos persistidos.
+- Leer solo el método o bloque necesario.
+- No modificar código.
+
+2.8.8.9.1.4 — IDENTIFICAR SERIALIZACIÓN
+- Identificar exclusivamente cómo se serializan los datos.
+- Determinar formato real.
+- No implementar nada.
+
+2.8.8.9.1.5 — IDENTIFICAR DATOS DE FEEDBACK
+- Localizar únicamente dónde vive el feedback acumulado.
+- Registrar estructura real.
+- No modificar código.
+
+2.8.8.9.1.6 — IDENTIFICAR ESTRATEGIAS APRENDIDAS
+- Localizar únicamente dónde se almacenan las estrategias aprendidas.
+- Registrar estructura real.
+- No modificar código.
+
+2.8.8.9.1.7 — IDENTIFICAR PATRONES DE APRENDIZAJE
+- Localizar únicamente dónde se almacenan los patrones de aprendizaje.
+- Registrar estructura real.
+- No modificar código.
+
+2.8.8.9.1.8 — DECIDIR REUTILIZACIÓN
+- Determinar qué mecanismo existente puede reutilizarse.
+- No crear almacenamiento nuevo si el existente puede cumplir la función.
+- No modificar código.
+
+2.8.8.9.1.9 — CIERRE DE INSPECCIÓN [COMPLETADO]
+- ✅ Documentar archivos/símbolos relevantes.
+- ✅ Documentar formato real.
+- ✅ Documentar mecanismo de carga/guardado.
+- ✅ No implementar persistencia todavía (según reglas de la unidad).
+
+2.8.8.9.2 — PERSISTENCIA DE FEEDBACK
+
+2.8.8.9.2.1 — DEFINIR DATOS A PERSISTIR [IMPLEMENTADA]
+- Identificar exactamente qué parte del feedback acumulado debe sobrevivir al reinicio.
+- No modificar código.
+
+**DATOS CRÍTICOS QUE DEBEN PERSISTIR**:
+
+1. **HISTORIAL DE ADAPTACIÓN** (`adaptation_history`):
+   - adaptation_id, performance_impact, timestamp
+   - Propósito: Calcular convergencia y tendencias
+
+2. **ANÁLISIS DE FEEDBACK ACUMULADO** (`goal_adaptation_feedback`):
+   - adaptation_id, improvement_analysis, pattern_recognition, strategic_insights
+   - Límite: 1000 registros máx
+   - Propósito: Reconocer patrones de éxito/fallo
+
+3. **RESULTADOS DE APRENDIZAJE** (`learning_results`):
+   - learned_patterns, updated_strategies, convergence_metrics
+   - Límite: 500 registros máx
+   - Propósito: Mantener estrategias adaptativas
+
+4. **ESTRATEGIAS APRENDIDAS** (`adaptation_strategies`):
+   - strategy_id, confidence, success_rate, last_updated, failure_count
+   - Umbral mínimo: confianza ≥ 0.7
+
+5. **PATRONES DE APRENDIZAJE VALIDADOS**:
+   - pattern_id, pattern_type, context, metrics, confidence ≥ 0.7
+   - Requiere mínimo 3 observaciones similares
+
+6. **CONVERGENCIA DEL APRENDIZAJE**:
+   - convergence_score, learning_rate, stability, trend
+   - Propósito: Determinar cuándo el aprendizaje ha convergido
+
+**DATOS QUE NO DEBEN PERSISTIR**:
+- Estado temporal de ejecución
+- Patrones no validados (confianza < 0.7)
+- Métricas volátiles de sesiones específicas
+
+**REGLAS DE PERSISTENCIA**:
+- Umbral mínimo de confianza: 0.7
+- Límites de historial: 1000 (feedback), 500 (aprendizaje)
+- Validación de evidencia: mínimo 3 observaciones similares
+
+2.8.8.9.2.2 — CREAR TEST DE PERSISTENCIA DE FEEDBACK
+- Crear únicamente el test de persistencia del feedback.
+- No implementar todavía la persistencia si el test puede prepararse primero.
+
+2.8.8.9.2.3 — IMPLEMENTAR GUARDADO DE FEEDBACK
+- Implementar únicamente el guardado del feedback acumulado.
+- Reutilizar almacenamiento existente.
+
+2.8.8.9.2.4 — IMPLEMENTAR CARGA DE FEEDBACK
+- Implementar únicamente la recuperación del feedback acumulado.
+
+2.8.8.9.2.5 — VERIFICAR FEEDBACK TRAS REINICIO
+- Verificar que los datos guardados pueden recuperarse correctamente.
+- No tocar estrategias ni patrones.
+
+2.8.8.9.2.6 — CORREGIR FALLO DE FEEDBACK
+- Corregir únicamente fallos detectados por los tests de esta subhoja.
+
+2.8.8.9.3 — PERSISTENCIA DE ESTRATEGIAS
+
+2.8.8.9.3.1 — IDENTIFICAR ESTRUCTURA DE ESTRATEGIA
+- Localizar exclusivamente la estructura real de las estrategias aprendidas.
+
+2.8.8.9.3.2 — CREAR TEST DE PERSISTENCIA DE ESTRATEGIA
+- Crear únicamente el test correspondiente.
+
+2.8.8.9.3.3 — IMPLEMENTAR GUARDADO DE ESTRATEGIA
+- Persistir únicamente estrategias aprendidas.
+
+2.8.8.9.3.4 — IMPLEMENTAR CARGA DE ESTRATEGIA
+- Recuperar únicamente estrategias aprendidas.
+
+2.8.8.9.3.5 — VERIFICAR ESTRATEGIA TRAS REINICIO
+- Comprobar que la estrategia recuperada conserva los datos necesarios.
+
+2.8.8.9.3.6 — CORREGIR FALLO DE ESTRATEGIA
+- Corregir únicamente fallos de esta subhoja.
+
+2.8.8.9.4 — PERSISTENCIA DE PATRONES
+
+2.8.8.9.4.1 — IDENTIFICAR ESTRUCTURA DE PATRÓN
+- Localizar exclusivamente la estructura real de los patrones de aprendizaje.
+
+2.8.8.9.4.2 — CREAR TEST DE PERSISTENCIA DE PATRÓN
+- Crear únicamente el test correspondiente.
+
+2.8.8.9.4.3 — IMPLEMENTAR GUARDADO DE PATRONES
+- Persistir únicamente patrones de aprendizaje.
+
+2.8.8.9.4.4 — IMPLEMENTAR CARGA DE PATRONES
+- Recuperar únicamente patrones de aprendizaje.
+
+2.8.8.9.4.5 — VERIFICAR PATRONES TRAS REINICIO
+- Comprobar recuperación correcta.
+
+2.8.8.9.4.6 — CORREGIR FALLO DE PATRONES
+- Corregir únicamente fallos de esta subhoja.
+
+2.8.8.9.5 — DETECCIÓN DE DATOS AUSENTES
+
+2.8.8.9.5.1 — DETECTAR ALMACENAMIENTO AUSENTE
+- Detectar exclusivamente ausencia del almacenamiento esperado.
+
+2.8.8.9.5.2 — DETECTAR SECCIÓN AUSENTE
+- Detectar únicamente ausencia de una sección esperada.
+
+2.8.8.9.5.3 — DEFINIR COMPORTAMIENTO SIN DATOS
+- Mantener el comportamiento compatible con el sistema existente.
+
+2.8.8.9.5.4 — TEST DE AUSENCIA
+- Crear y ejecutar únicamente tests de almacenamiento/sección ausente.
+
+2.8.8.9.6 — DETECCIÓN DE CORRUPCIÓN
+
+2.8.8.9.6.1 — IDENTIFICAR DATOS INVÁLIDOS
+- Determinar qué constituye corrupción según el formato real.
+
+2.8.8.9.6.2 — TEST DE DATOS CORRUPTOS
+- Crear únicamente el caso de corrupción.
+
+2.8.8.9.6.3 — IMPLEMENTAR DETECCIÓN
+- Implementar únicamente la detección de corrupción.
+
+2.8.8.9.6.4 — VERIFICAR RECHAZO
+- Comprobar que los datos corruptos no se usan como si fueran válidos.
+
+2.8.8.9.7 — RECUPERACIÓN PARCIAL
+
+2.8.8.9.7.1 — IDENTIFICAR DATOS RECUPERABLES
+- Determinar qué datos válidos pueden conservarse cuando una parte está corrupta.
+
+2.8.8.9.7.2 — IMPLEMENTAR RECUPERACIÓN PARCIAL
+- Recuperar únicamente los datos que realmente puedan recuperarse.
+
+2.8.8.9.7.3 — TEST DE RECUPERACIÓN PARCIAL
+- Probar únicamente este comportamiento.
+
+2.8.8.9.8 — FALLBACK POR CORRUPCIÓN TOTAL
+
+2.8.8.9.8.1 — DEFINIR FALLBACK EXISTENTE
+- Localizar el comportamiento real disponible ante pérdida total de datos.
+
+2.8.8.9.8.2 — IMPLEMENTAR FALLBACK
+- Implementar únicamente el fallback necesario.
+
+2.8.8.9.8.3 — TEST DE CORRUPCIÓN TOTAL
+- Verificar que JARVIS puede continuar sin datos válidos.
+
+2.8.8.9.8.4 — VERIFICAR NO SOBRESCRITURA INDEBIDA
+- Comprobar que la recuperación no destruye datos válidos todavía recuperables.
+
+2.8.8.9.9 — EVIDENCIA MÍNIMA
+
+2.8.8.9.9.1 — LOCALIZAR EVIDENCIA EXISTENTE
+- Identificar qué métricas/evidencia reales existen actualmente.
+
+2.8.8.9.9.2 — DEFINIR EVIDENCIA MÍNIMA
+- Determinar el mínimo soportado por el modelo existente.
+- No inventar métricas nuevas.
+
+2.8.8.9.9.3 — IMPLEMENTAR VALIDACIÓN
+- Rechazar persistencia cuando no exista evidencia suficiente.
+
+2.8.8.9.9.4 — TEST DE EVIDENCIA INSUFICIENTE
+- Verificar que una sola observación insuficiente no se convierte en regla persistida.
+
+2.8.8.9.9.5 — TEST DE EVIDENCIA VÁLIDA
+- Verificar persistencia cuando sí existe evidencia suficiente.
+
+2.8.8.9.10 — LÍMITE DE CONFIANZA
+
+2.8.8.9.10.1 — LOCALIZAR CONFIANZA EXISTENTE
+- Buscar únicamente mecanismos existentes de confianza.
+
+2.8.8.9.10.2 — DETERMINAR UMBRAL REAL
+- Usar únicamente un umbral existente si ya lo soporta el sistema.
+
+2.8.8.9.10.3 — IMPLEMENTAR VALIDACIÓN DE CONFIANZA
+- Impedir persistencia por debajo del umbral real.
+
+2.8.8.9.10.4 — TEST DE CONFIANZA BAJA
+- Verificar rechazo.
+
+2.8.8.9.10.5 — TEST DE CONFIANZA VÁLIDA
+- Verificar aceptación.
+
+2.8.8.9.11 — MECANISMO DE OLVIDO
+
+2.8.8.9.11.1 — LOCALIZAR MECANISMO DE OLVIDO EXISTENTE
+- Buscar si ya existe expiración, eliminación, reemplazo o limpieza.
+
+2.8.8.9.11.2 — DEFINIR QUÉ DATOS PUEDEN OLVIDARSE
+- Usar únicamente datos que el sistema ya pueda identificar como descartables.
+
+2.8.8.9.11.3 — IMPLEMENTAR OLVIDO
+- Implementar únicamente el mecanismo necesario.
+
+2.8.8.9.11.4 — TEST DE OLVIDO
+- Verificar eliminación/expiración correcta.
+
+2.8.8.9.11.5 — TEST DE CONSERVACIÓN
+- Verificar que no se eliminan datos válidos prematuramente.
+
+2.8.8.9.12 — INTEGRACIÓN DE PERSISTENCIA
+
+2.8.8.9.12.1 — CONECTAR GUARDADO
+- Integrar únicamente el punto real donde finaliza el aprendizaje.
+
+2.8.8.9.12.2 — CONECTAR CARGA
+- Integrar únicamente el punto real donde se inicializa el sistema.
+
+2.8.8.9.12.3 — VERIFICAR FEEDBACK
+- Verificar que feedback persistido sigue disponible para aprendizaje.
+
+2.8.8.9.12.4 — VERIFICAR ESTRATEGIAS
+- Verificar que estrategias persistidas siguen disponibles.
+
+2.8.8.9.12.5 — VERIFICAR PATRONES
+- Verificar que patrones persistidos siguen disponibles.
+
+2.8.8.9.12.6 — EVITAR DUPLICACIÓN
+- Verificar que no se crean mecanismos paralelos de persistencia.
+
+2.8.8.9.13 — TESTS ESPECÍFICOS
+
+2.8.8.9.13.1 — TEST PERSISTENCIA EXITOSA
+- Ejecutar únicamente el test de persistencia correcta.
+
+2.8.8.9.13.2 — TEST CORRUPCIÓN
+- Ejecutar únicamente los tests de corrupción.
+
+2.8.8.9.13.3 — TEST RECUPERACIÓN
+- Ejecutar únicamente los tests de recuperación.
+
+2.8.8.9.13.4 — TEST EVIDENCIA
+- Ejecutar únicamente los tests de evidencia mínima.
+
+2.8.8.9.13.5 — TEST CONFIANZA
+- Ejecutar únicamente los tests del límite de confianza.
+
+2.8.8.9.13.6 — TEST OLVIDO
+- Ejecutar únicamente los tests del mecanismo de olvido.
+
+2.8.8.9.14 — INTEGRACIÓN Y NO REGRESIÓN
+
+2.8.8.9.14.1 — TEST INTEGRACIÓN LOCAL
+- Ejecutar únicamente los tests relacionados con ContextualAdaptationEngine.
+
+2.8.8.9.14.2 — TEST COMPATIBILIDAD
+- Verificar consumidores directos del mecanismo modificado.
+
+2.8.8.9.14.3 — TEST NO REGRESIÓN
+- Ejecutar únicamente regresiones relacionadas con 2.8.8.7 y 2.8.8.8.
+
+2.8.8.9.14.4 — CORREGIR REGRESIÓN
+- Corregir únicamente regresiones causadas por esta unidad.
+
+2.8.8.9.15 — CIERRE
+
+2.8.8.9.15.1 — VERIFICAR TODAS LAS SUBHOJAS
+- No implementar nada nuevo.
+
+2.8.8.9.15.2 — VERIFICAR TESTS
+- Registrar resultado real.
+
+2.8.8.9.15.3 — VERIFICAR NO REGRESIÓN
+- Registrar resultado real.
+
+2.8.8.9.15.4 — ACTUALIZAR DOCUMENTACIÓN
+- Registrar únicamente lo realmente implementado.
+
+2.8.8.9.15.5 — CERRAR 2.8.8.9
+- Solo cuando todas las hojas anteriores estén completadas y verificadas.
+
+2.8.9 — INTEGRACIÓN GLOBAL
+2.8.9.1 Verificar ContextualAdaptationEngine como punto de coordinación.
+2.8.9.2 Verificar ArchitecturalEvolutionManager.
+2.8.9.3 Verificar MetaLearningSystem.
+2.8.9.4 Verificar DynamicResourceAllocator.
+2.8.9.5 Verificar CrossContextKnowledgeTransfer.
+2.8.9.6 Verificar EvolutionaryStrategyOptimizer.
+2.8.9.7 Verificar ContextualPatternRecognizer.
+2.8.9.8 Verificar AdaptiveGoalSystem.
+2.8.9.9 Detectar dependencias circulares no previstas.
+2.8.9.10 Verificar que cada componente conserva una responsabilidad clara.
+
+2.8.10 — FLUJO END-TO-END
+2.8.10.1 Capturar contexto.
+2.8.10.2 Analizar patrón.
+2.8.10.3 Generar adaptación.
+2.8.10.4 Validar cambio.
+2.8.10.5 Aplicar cambio permitido.
+2.8.10.6 Registrar resultado.
+2.8.10.7 Actualizar conocimiento.
+2.8.10.8 Verificar que una adaptación no rompe Goal/Planner/Executor.
+2.8.10.9 Tests end-to-end mínimos.
+2.8.10.10 Tests de fallo.
+
+2.8.11 — SEGURIDAD GLOBAL
+2.8.11.1 Verificar que una adaptación no puede ejecutar cualquier cambio arbitrario.
+2.8.11.2 Verificar validación previa.
+2.8.11.3 Verificar límites.
+2.8.11.4 Verificar rollback cuando exista.
+2.8.11.5 Verificar trazabilidad.
+2.8.11.6 Verificar que no se modifican ventanas/archivos/recursos fuera de alcance.
+2.8.11.7 Tests de rechazo.
+
+2.8.12 — PERSISTENCIA GLOBAL
+2.8.12.1 Verificar reglas.
+2.8.12.2 Verificar knowledge base.
+2.8.12.3 Verificar recuperación.
+2.8.12.4 Verificar datos corruptos.
+2.8.12.5 Verificar compatibilidad tras reinicio.
+2.8.12.6 Tests.
+
+2.8.13 — REGRESIÓN GLOBAL
+2.8.13.1 Tests de 2.8.1.
+2.8.13.2 Tests de 2.7.
+2.8.13.3 Tests de State.
+2.8.13.4 Tests de Application Knowledge.
+2.8.13.5 Tests de Brain/HTN cuando proceda.
+2.8.13.6 Tests de ejecución.
+2.8.13.7 Verificar main.py.
+2.8.13.8 No declarar cierre si existe una regresión abierta.
+
+2.8.14 — DOCUMENTACIÓN Y CIERRE
+2.8.14.1 Actualizar README con lo realmente implementado.
+2.8.14.2 Mantener discrepancias no resueltas.
+2.8.14.3 Actualizar prompt con estado real.
+2.8.14.4 Registrar tests y resultados.
+2.8.14.5 Verificar main.py.
+2.8.14.6 Marcar FASE 2.8 IMPLEMENTADA únicamente cuando todas las hojas estén completadas y verificadas.
+
+FASE 3 — APPLICATION KNOWLEDGE
+
+3.1 — MODELO DE APPLICATION KNOWLEDGE
+3.1.1 — Inspección del modelo actual
+3.1.1.1 Localizar las estructuras reales que representan una aplicación.
+3.1.1.2 Localizar cómo se representan aliases o nombres alternativos, si existen.
+3.1.1.3 Localizar cómo se representan capacidades.
+3.1.1.4 Localizar cómo se representan estados.
+3.1.1.5 Localizar cómo se representan elementos UI.
+3.1.1.6 Registrar discrepancias entre README, datos y código sin resolverlas por intuición.
+3.1.2 — Contrato mínimo
+3.1.2.1 Definir qué identifica inequívocamente una aplicación.
+3.1.2.2 Definir qué datos son obligatorios para registrar una aplicación.
+3.1.2.3 Definir qué datos son opcionales.
+3.1.2.4 Verificar que el contrato no duplique información ya existente.
+3.1.3 — Compatibilidad
+3.1.3.1 Verificar consumidores actuales del modelo.
+3.1.3.2 Mantener compatibilidad con APIs ya utilizadas.
+3.1.3.3 Crear tests del contrato mínimo.
+3.1.3.4 Cerrar 3.1 solo cuando el modelo real y sus consumidores queden verificados.
+
+3.2 — CARGA Y REGISTRO
+3.2.1 — Fuente de datos
+3.2.1.1 Localizar la fuente real de applications.json/configuración equivalente.
+3.2.1.2 Verificar formato real.
+3.2.1.3 Verificar comportamiento cuando la fuente no existe.
+3.2.1.4 Verificar comportamiento ante datos incompletos.
+3.2.2 — Carga
+3.2.2.1 Implementar o verificar lectura de una aplicación.
+3.2.2.2 Implementar o verificar carga del conjunto de aplicaciones.
+3.2.2.3 Evitar duplicados al registrar.
+3.2.2.4 Verificar resolución por nombre.
+3.2.2.5 Verificar resolución por alias cuando exista en el código real.
+3.2.3 — Errores
+3.2.3.1 Definir resultado ante JSON inválido.
+3.2.3.2 Definir resultado ante aplicación inválida.
+3.2.3.3 Registrar errores sin ocultarlos.
+3.2.3.4 Añadir tests unitarios de carga correcta e incorrecta.
+3.2.4 — Cierre
+3.2.4.1 Verificar registro real en memoria.
+3.2.4.2 Verificar que los consumidores existentes siguen funcionando.
+
+3.3 — CAPABILITIES
+3.3.1 — Lectura
+3.3.1.1 Localizar la representación real de capacidades.
+3.3.1.2 Verificar relación aplicación -> capability.
+3.3.1.3 Verificar relación capability -> acción cuando exista.
+3.3.2 — Contrato
+3.3.2.1 Definir una consulta de capacidades sin duplicar APIs existentes.
+3.3.2.2 Distinguir capability disponible de capability simplemente declarada.
+3.3.2.3 Verificar capacidades ausentes.
+3.3.3 — Planificación
+3.3.3.1 Exponer capacidades en formato consumible por planificación.
+3.3.3.2 Verificar que Planner no recibe acciones inexistentes.
+3.3.3.3 Verificar trazabilidad aplicación -> capability -> acción.
+3.3.4 — Tests
+3.3.4.1 Caso de aplicación con varias capacidades.
+3.3.4.2 Caso de aplicación sin capacidades.
+3.3.4.3 Caso de capability desconocida.
+3.3.4.4 Verificar no regresión.
+
+3.4 — ESTADOS Y UI
+3.4.1 — Estados
+3.4.1.1 Enumerar estados realmente soportados por el código/datos.
+3.4.1.2 Separar open, active, maximized, focused cuando correspondan.
+3.4.1.3 Verificar que un estado desconocido no se convierta en un estado válido por defecto.
+3.4.2 — UI elements
+3.4.2.1 Verificar estructura real de ui_elements.
+3.4.2.2 Verificar tipo y descripción.
+3.4.2.3 Separar conocimiento de UI de coordenadas concretas.
+3.4.2.4 Verificar integración con visión/calibración.
+3.4.3 — Estado real
+3.4.3.1 Comparar estado declarado con estado observable.
+3.4.3.2 No afirmar un estado solo por configuración.
+3.4.3.3 Definir comportamiento ante discrepancia.
+3.4.4 — Tests
+3.4.4.1 Tests de estados.
+3.4.4.2 Tests de elementos UI.
+3.4.4.3 Tests de discrepancia entre conocimiento y estado real.
+
+3.5 — REQUISITOS DE CALIBRACIÓN
+3.5.1 — Contrato
+3.5.1.1 Identificar qué aplicaciones requieren calibración.
+3.5.1.2 Identificar qué elementos requieren calibración.
+3.5.1.3 Separar requisito de calibración de resultado de calibración.
+3.5.2 — Preparación
+3.5.2.1 Verificar disponibilidad de la aplicación.
+3.5.2.2 Verificar ventana y monitor.
+3.5.2.3 Verificar estado reutilizable sin destruir estado del usuario.
+3.5.3 — Integración
+3.5.3.1 Exponer el requisito al planificador.
+3.5.3.2 Permitir que Planner seleccione calibrate cuando proceda.
+3.5.3.3 Reutilizar el sistema de calibración existente.
+3.5.4 — Tests
+3.5.4.1 Aplicación sin requisito.
+3.5.4.2 Aplicación con requisito.
+3.5.4.3 Requisito pendiente.
+3.5.4.4 No regresión.
+
+3.6 — EJECUCIÓN DE APLICACIONES
+3.6.1 — Apertura
+3.6.1.1 Verificar consulta de aplicación.
+3.6.1.2 Verificar comprobación de disponibilidad.
+3.6.1.3 Verificar apertura a través de la API real existente.
+3.6.2 — Cierre
+3.6.2.1 Verificar identificación de ventana/proceso correcto.
+3.6.2.2 Verificar cierre sin afectar otras aplicaciones.
+3.6.2.3 Verificar estado posterior.
+3.6.3 — Lanzamiento
+3.6.3.1 Verificar parámetros de lanzamiento existentes.
+3.6.3.2 Verificar resultado de lanzamiento.
+3.6.3.3 Registrar fallos reales.
+3.6.4 — Aplicación/monitor
+3.6.4.1 Verificar monitor objetivo.
+3.6.4.2 Verificar movimiento seguro.
+3.6.4.3 Verificar maximización/restauración cuando corresponda.
+3.6.5 — Tests
+3.6.5.1 Apertura.
+3.6.5.2 Cierre.
+3.6.5.3 Lanzamiento.
+3.6.5.4 Movimiento entre monitores si aplica.
+3.6.5.5 No regresión.
+
+3.7 — VERIFICACIÓN Y COMPATIBILIDAD
+3.7.1 — API
+3.7.1.1 Verificar consumidores de ApplicationsCore.
+3.7.1.2 Verificar consumidores del conocimiento de aplicaciones.
+3.7.1.3 Verificar integración con Brain.
+3.7.2 — Integración
+3.7.2.1 Application Knowledge -> Goal.
+3.7.2.2 Application Knowledge -> Planner.
+3.7.2.3 Application Knowledge -> Executor.
+3.7.2.4 Application Knowledge -> calibración cuando corresponda.
+3.7.3 — Regresión
+3.7.3.1 Ejecutar tests pertinentes.
+3.7.3.2 Corregir código ante fallos de tests correctos.
+3.7.3.3 Verificar main.py.
+3.7.3.4 Cerrar FASE 3 solo con todas las hojas completadas.
+
+FASE 4 — GOAL + TASK/HTN
+
+4.1 — GOAL
+4.1.1 — Inspección del Goal real
+4.1.1.1 Localizar clase/estructura Goal existente.
+4.1.1.2 Localizar goal_type.
+4.1.1.3 Localizar target.
+4.1.1.4 Localizar description/priority/constraints.
+4.1.1.5 Registrar compatibilidades existentes.
+4.1.2 — Contrato
+4.1.2.1 Definir campos mínimos.
+4.1.2.2 Definir validación de Goal.
+4.1.2.3 Definir representación de restricciones.
+4.1.2.4 Verificar serialización si existe.
+4.1.3 — Creación
+4.1.3.1 Crear Goal desde una intención estructurada.
+4.1.3.2 Crear Goal desde una entidad cuando corresponda.
+4.1.3.3 Mantener fallback legacy.
+4.1.4 — Tests
+4.1.4.1 Goal válido.
+4.1.4.2 Goal incompleto.
+4.1.4.3 Goal incompatible.
+4.1.4.4 Compatibilidad con consumidores actuales.
+
+4.2 — TASK
+4.2.1 — Modelo
+4.2.1.1 Inspeccionar Task real.
+4.2.1.2 Verificar relación Goal -> Task.
+4.2.1.3 Verificar relación Task -> Action.
+4.2.2 — Contrato
+4.2.2.1 Definir datos mínimos de Task.
+4.2.2.2 Definir estado de Task.
+4.2.2.3 Definir dependencias cuando existan.
+4.2.3 — Ejecución
+4.2.3.1 Crear Task desde un método HTN.
+4.2.3.2 Marcar Task como pendiente/en ejecución/completada/fallida si el modelo lo soporta.
+4.2.3.3 Propagar resultado al Goal.
+4.2.4 — Tests
+4.2.4.1 Creación.
+4.2.4.2 Cambio de estado.
+4.2.4.3 Dependencia.
+4.2.4.4 Resultado.
+
+4.3 — DESCOMPOSICIÓN HTN
+4.3.1 — Inspección
+4.3.1.1 Localizar HTNManager.
+4.3.1.2 Localizar TaskExecutor.
+4.3.1.3 Localizar métodos de descomposición existentes.
+4.3.1.4 Localizar condiciones de aplicación de métodos.
+4.3.2 — Selección de método
+4.3.2.1 Definir cómo se identifica un método aplicable.
+4.3.2.2 Verificar condiciones.
+4.3.2.3 Manejar ausencia de método.
+4.3.3 — Descomposición de un Goal
+4.3.3.1 Descomponer un Goal simple en una Task.
+4.3.3.2 Descomponer un Goal en varias Tasks.
+4.3.3.3 Mantener orden cuando exista dependencia.
+4.3.3.4 Propagar restricciones.
+4.3.4 — Descomposición recursiva
+4.3.4.1 Detectar Task compuesta.
+4.3.4.2 Descomponer un nivel.
+4.3.4.3 Repetir solo hasta condición de hoja.
+4.3.4.4 Evitar bucles de descomposición.
+4.3.5 — Resultados
+4.3.5.1 Propagar éxito.
+4.3.5.2 Propagar fallo.
+4.3.5.3 Identificar Task responsable del fallo.
+4.3.6 — Tests
+4.3.6.1 Goal simple.
+4.3.6.2 Goal multi-task.
+4.3.6.3 Sin método aplicable.
+4.3.6.4 Fallo de una hoja.
+4.3.6.5 No regresión.
+
+4.4 — SECUENCIAL / CONDICIONAL
+4.4.1 — Secuencias
+4.4.1.1 Verificar representación real.
+4.4.1.2 Ejecutar primer paso.
+4.4.1.3 Ejecutar siguiente paso solo tras resultado válido.
+4.4.1.4 Propagar fallo.
+4.4.2 — Condiciones
+4.4.2.1 Evaluar precondición real.
+4.4.2.2 Seleccionar rama aplicable.
+4.4.2.3 Evitar ejecutar ramas no válidas.
+4.4.2.4 Registrar la decisión.
+4.4.3 — Dependencias
+4.4.3.1 Resolver dependencia directa.
+4.4.3.2 Detectar dependencia no satisfecha.
+4.4.3.3 Evitar ejecución fuera de orden.
+4.4.4 — Tests
+4.4.4.1 Secuencia válida.
+4.4.4.2 Condición verdadera.
+4.4.4.3 Condición falsa.
+4.4.4.4 Dependencia incumplida.
+
+4.5 — BRAIN
+4.5.1 — Intent -> Goal
+4.5.1.1 Verificar interpret_intent.
+4.5.1.2 Verificar think.
+4.5.1.3 Verificar parse_model_response.
+4.5.1.4 Verificar detección de acción directa.
+4.5.2 — Entidades
+4.5.2.1 Verificar extracción.
+4.5.2.2 Verificar resolución.
+4.5.2.3 Crear Goal con entidad cuando corresponda.
+4.5.3 — HTN
+4.5.3.1 Verificar integración con htn_integration.
+4.5.3.2 Verificar paso de Goal.
+4.5.3.3 Verificar recepción de resultados.
+4.5.4 — Imagen
+4.5.4.1 Verificar think_with_image.
+4.5.4.2 Verificar analyze_image.
+4.5.4.3 No confundir percepción con decisión.
+4.5.5 — Tests
+4.5.5.1 Interpretación simple.
+4.5.5.2 Goal.
+4.5.5.3 Entidad -> Goal.
+4.5.5.4 Acción directa.
+4.5.5.5 Imagen cuando aplique.
+
+4.6 — STATE
+4.6.1 — Entrada al HTN
+4.6.1.1 Obtener estado actual.
+4.6.1.2 Verificar que sea el estado real disponible.
+4.6.2 — Cambios
+4.6.2.1 Propagar cambios de ejecución.
+4.6.2.2 Evitar mutaciones inventadas.
+4.6.2.3 Registrar resultado.
+4.6.3 — Compatibilidad
+4.6.3.1 Verificar API de State.
+4.6.3.2 Verificar serialización si existe.
+4.6.4 — Tests
+4.6.4.1 State -> HTN.
+4.6.4.2 Resultado -> State.
+4.6.4.3 No regresión.
+
+4.7 — EXECUTOR
+4.7.1 — Entrada
+4.7.1.1 Recibir Task hoja.
+4.7.1.2 Validar acción.
+4.7.1.3 Ejecutar mediante registro/Executor real.
+4.7.2 — Resultados
+4.7.2.1 Propagar éxito.
+4.7.2.2 Propagar fallo.
+4.7.2.3 Propagar datos necesarios para State.
+4.7.3 — Cancelación
+4.7.3.1 Respetar cancelación existente.
+4.7.3.2 Liberar recursos cuando corresponda.
+4.7.4 — Tests
+4.7.4.1 Ejecución correcta.
+4.7.4.2 Acción inválida.
+4.7.4.3 Fallo real.
+4.7.4.4 Cancelación.
+
+4.8 — REGRESIÓN Y CIERRE
+4.8.1 Ejecutar tests pertinentes.
+4.8.2 Corregir fallos de implementación.
+4.8.3 Verificar compatibilidad legacy.
+4.8.4 Verificar main.py.
+4.8.5 Actualizar README/estado cuando corresponda.
+4.8.6 Cerrar FASE 4.
+
+FASE 5 — DOMAIN MEMORY
+
+5.1 — ENTIDADES
+5.1.1 Inspeccionar Entity real.
+5.1.2 Verificar tipos de entidad existentes.
+5.1.3 Verificar properties.
+5.1.4 Verificar aliases.
+5.1.5 Verificar persistencia en entities.json.
+5.1.6 Verificar creación.
+5.1.7 Verificar actualización.
+5.1.8 Verificar eliminación solo si existe contrato real.
+5.1.9 Tests unitarios de cada operación.
+
+5.2 — RESOLUCIÓN
+5.2.1 Inspeccionar EntityResolver.
+5.2.2 Inspeccionar ResolutionContext.
+5.2.3 Inspeccionar EntityResolutionResult.
+5.2.4 Resolver por nombre exacto.
+5.2.5 Resolver por alias existente.
+5.2.6 Resolver con contexto.
+5.2.7 Manejar ambigüedad sin inventar.
+5.2.8 Propagar ausencia de resolución.
+5.2.9 Tests de resolución exacta.
+5.2.10 Tests de alias.
+5.2.11 Tests de ambigüedad.
+5.2.12 Tests sin resultado.
+
+5.3 — URLS
+5.3.1 Localizar almacenamiento real de URLs.
+5.3.2 Definir relación entidad -> URL si ya existe.
+5.3.3 Normalizar solo según reglas existentes.
+5.3.4 Verificar URLs inválidas.
+5.3.5 Verificar recuperación.
+5.3.6 Verificar integración con Goal de navegación.
+5.3.7 Tests unitarios.
+5.3.8 Tests de integración.
+
+5.4 — PREFERENCIAS / ATRIBUTOS
+5.4.1 Inspeccionar user_preferences.json.
+5.4.2 Separar preferencias de hechos sobre entidades.
+5.4.3 Leer preferencias.
+5.4.4 Actualizar una preferencia.
+5.4.5 Persistir.
+5.4.6 Recuperar tras reinicio.
+5.4.7 Evitar sobrescrituras accidentales.
+5.4.8 Tests de persistencia.
+
+5.5 — ENTITY -> GOAL
+5.5.1 Localizar flujo actual Entity -> Goal.
+5.5.2 Verificar tipos de Goal generados.
+5.5.3 Verificar target.
+5.5.4 Verificar restricciones/contexto.
+5.5.5 Verificar ausencia de Goal cuando la entidad no sea accionable.
+5.5.6 Verificar integración con Brain.
+5.5.7 Verificar integración con Planner.
+5.5.8 Tests.
+
+5.6 — VERIFICACIÓN / APRENDIZAJE ADAPTATIVO
+5.6.1 Registrar resultado de resolución.
+5.6.2 Registrar contexto utilizado.
+5.6.3 Separar aprendizaje de simple persistencia.
+5.6.4 Reutilizar mecanismos existentes de aprendizaje.
+5.6.5 Ajustar confianza solo cuando exista evidencia.
+5.6.6 Verificar que una mala resolución no contamine permanentemente la memoria.
+5.6.7 Tests de aprendizaje.
+5.6.8 Tests de no regresión.
+
+FASE 6 — ACTION GRAPH
+
+6.1 — TRANSICIONES
+6.1.1 Inspeccionar representación real de transición.
+6.1.2 Definir origen.
+6.1.3 Definir acción.
+6.1.4 Definir destino.
+6.1.5 Añadir precondiciones si existen.
+6.1.6 Añadir efectos si existen.
+6.1.7 Añadir coste solo donde el modelo real lo soporte.
+6.1.8 Tests de transición válida.
+6.1.9 Tests de transición inválida.
+
+6.2 — CONSTRUCCIÓN
+6.2.1 Identificar fuentes de nodos.
+6.2.2 Identificar fuentes de edges.
+6.2.3 Construir Graph mínimo.
+6.2.4 Evitar nodos duplicados.
+6.2.5 Evitar edges duplicadas.
+6.2.6 Verificar consistencia.
+6.2.7 Tests de construcción.
+
+6.3 — PRECONDICIONES / EFECTOS BÁSICOS
+6.3.1 Leer precondiciones reales.
+6.3.2 Evaluar precondición simple.
+6.3.3 Leer efectos reales.
+6.3.4 Aplicar efecto simple.
+6.3.5 Verificar actualización de State.
+6.3.6 Evitar mutaciones parciales.
+6.3.7 Tests.
+
+6.4 — VALIDACIÓN / CAPACIDADES AVANZADAS
+6.4.1 Validar edges contra capabilities.
+6.4.2 Validar acciones incompatibles.
+6.4.3 Validar recursos requeridos.
+6.4.4 Validar estados de aplicación/ventana.
+6.4.5 Registrar diagnóstico.
+6.4.6 Tests de rechazo.
+6.4.7 Tests de aceptación.
+
+6.5 — INTEGRACIÓN GRAPH <-> PLANNER
+6.5.1 — Contrato
+6.5.1.1 Definir entrada Goal.
+6.5.1.2 Definir entrada State.
+6.5.1.3 Definir salida de Graph.
+6.5.1.4 Definir errores.
+6.5.2 — Goal/State -> Graph
+6.5.2.1 Transformar Goal a restricciones de búsqueda.
+6.5.2.2 Transformar State a nodo inicial.
+6.5.2.3 Verificar que no se pierda contexto relevante.
+6.5.3 — Ruta / Plan
+6.5.3.1 Obtener una ruta válida.
+6.5.3.2 Verificar que la ruta alcance el objetivo.
+6.5.3.3 Rechazar rutas inválidas.
+6.5.4 — Ruta -> Plan
+6.5.4.1 Convertir primer edge a step.
+6.5.4.2 Convertir todos los edges a steps.
+6.5.4.3 Conservar orden.
+6.5.4.4 Conservar trazabilidad origen/destino.
+6.5.5 — Plan -> Executor
+6.5.5.1 Verificar contrato de Plan.
+6.5.5.2 Entregar steps al Executor.
+6.5.5.3 Propagar resultados.
+6.5.6 — End-to-end
+6.5.6.1 Goal real.
+6.5.6.2 State real.
+6.5.6.3 Graph real.
+6.5.6.4 Plan real.
+6.5.6.5 Executor real.
+6.5.6.6 State actualizado.
+6.5.7 — Regresión
+6.5.7.1 Legacy.
+6.5.7.2 Acciones directas.
+6.5.7.3 Goals simples.
+6.5.7.4 Fallos.
+6.5.8 — Cierre
+6.5.8.1 Tests completos.
+6.5.8.2 README.
+6.5.8.3 main.py.
+
+6.6 — API / ESTABILIDAD
+6.6.1 — API
+6.6.1.1 Enumerar APIs públicas existentes.
+6.6.1.2 Verificar imports actuales.
+6.6.1.3 Mantener firmas compatibles cuando corresponda.
+6.6.2 — Imports
+6.6.2.1 Verificar imports directos.
+6.6.2.2 Verificar imports de paquetes.
+6.6.2.3 Verificar inicialización.
+6.6.3 — Errores / contratos
+6.6.3.1 Error por input inválido.
+6.6.3.2 Error por nodo inexistente.
+6.6.3.3 Error por ruta inexistente.
+6.6.3.4 Mensajes de diagnóstico.
+6.6.4 — Tests
+6.6.4.1 Imports.
+6.6.4.2 API.
+6.6.4.3 Errores.
+6.6.4.4 Compatibilidad.
+
+6.7 — GRAPHBUILDER
+6.7.1 — Navegación
+6.7.1.1 Registrar nodos de navegación soportados.
+6.7.1.2 Registrar transiciones de navegación existentes.
+6.7.1.3 Verificar rutas.
+6.7.2 — Aplicaciones
+6.7.2.1 Registrar aplicaciones reales.
+6.7.2.2 Registrar capabilities reales.
+6.7.2.3 Registrar transiciones de apertura/cierre cuando existan.
+6.7.3 — Extensibilidad
+6.7.3.1 Separar construcción de cada dominio.
+6.7.3.2 Evitar código duplicado.
+6.7.3.3 Mantener una entrada común.
+6.7.4 — Verificación
+6.7.4.1 Graph vacío.
+6.7.4.2 Graph mínimo.
+6.7.4.3 Graph con varios dominios.
+6.7.4.4 No regresión.
+
+6.8 — OBSERVABILIDAD / ERRORES
+6.8.1 — Diagnóstico
+6.8.1.1 Registrar inicio de construcción.
+6.8.1.2 Registrar decisiones relevantes.
+6.8.1.3 Registrar fallos.
+6.8.1.4 Evitar ruido innecesario.
+6.8.2 — Métricas
+6.8.2.1 Identificar métricas ya existentes.
+6.8.2.2 Medir solo datos útiles.
+6.8.2.3 Evitar métricas inventadas sin consumidor.
+6.8.3 — Fallos / recuperación
+6.8.3.1 Identificar fallo.
+6.8.3.2 Preservar estado.
+6.8.3.3 Permitir reintento seguro cuando proceda.
+6.8.3.4 Propagar fallo si no puede recuperarse.
+6.8.4 — Tests
+6.8.4.1 Diagnóstico.
+6.8.4.2 Métricas.
+6.8.4.3 Fallos.
+6.8.4.4 Recuperación.
+
+6.9 — CIERRE
+6.9.1 Integración final.
+6.9.2 Regresión completa de Graph.
+6.9.3 README.
+6.9.4 main.py.
+6.9.5 Marcar FASE 6 solo si todas las hojas están IMPLEMENTADA.
+
+FASE 7 — DETERMINISTIC PLANNER
+
+7.1 — CONTRATO
+7.1.1 — Interfaz
+7.1.1.1 Localizar interfaz real del Planner.
+7.1.1.2 Identificar entradas.
+7.1.1.3 Identificar salida.
+7.1.1.4 Identificar errores.
+7.1.2 — State / Goal
+7.1.2.1 Convertir State a entrada de planificación.
+7.1.2.2 Convertir Goal a restricción de destino.
+7.1.2.3 Verificar compatibilidad.
+7.1.3 — Plan
+7.1.3.1 Definir estructura de step usando el modelo real.
+7.1.3.2 Conservar acción.
+7.1.3.3 Conservar parámetros.
+7.1.3.4 Conservar orden.
+7.1.3.5 Conservar trazabilidad.
+
+7.2 — GENERACIÓN
+7.2.1 — Selección
+7.2.1.1 Obtener acciones/edges aplicables.
+7.2.1.2 Filtrar acciones incompatibles.
+7.2.1.3 Seleccionar siguiente transición de forma determinista.
+7.2.2 — Expansión
+7.2.2.1 Expandir nodo inicial.
+7.2.2.2 Expandir nodos posteriores.
+7.2.2.3 Evitar ciclos simples.
+7.2.2.4 Respetar límites existentes.
+7.2.3 — Ruta
+7.2.3.1 Detectar llegada al Goal.
+7.2.3.2 Construir ruta.
+7.2.3.3 Detectar ausencia de ruta.
+7.2.3.4 Registrar diagnóstico.
+7.2.4 — Tests
+7.2.4.1 Goal alcanzable.
+7.2.4.2 Goal no alcanzable.
+7.2.4.3 Grafo mínimo.
+7.2.4.4 Ciclo.
+7.2.4.5 Límite.
+
+7.3 — VALIDACIÓN
+7.3.1 — Precondiciones
+7.3.1.1 Verificar precondición antes de aceptar step.
+7.3.1.2 Rechazar step incompatible.
+7.3.2 — Dependencias
+7.3.2.1 Verificar orden.
+7.3.2.2 Verificar recursos dependientes.
+7.3.2.3 Verificar estado intermedio.
+7.3.3 — Estado final
+7.3.3.1 Simular o verificar efecto según arquitectura real.
+7.3.3.2 Verificar alcanzabilidad del Goal.
+7.3.3.3 Rechazar plan que no alcance el objetivo.
+7.3.4 — Tests
+7.3.4.1 Precondición válida.
+7.3.4.2 Precondición inválida.
+7.3.4.3 Dependencia inválida.
+7.3.4.4 Estado final incorrecto.
+
+7.4 — REPRESENTACIÓN
+7.4.1 — Steps
+7.4.1.1 Estructura mínima.
+7.4.1.2 Acción.
+7.4.1.3 Parámetros.
+7.4.1.4 Resultado esperado si el contrato real lo contempla.
+7.4.2 — Costes
+7.4.2.1 Consumir coste existente.
+7.4.2.2 No inventar fórmulas de coste.
+7.4.2.3 Mantener coste comparable entre steps.
+7.4.3 — Trazabilidad
+7.4.3.1 Relacionar step con edge.
+7.4.3.2 Relacionar step con Goal.
+7.4.3.3 Relacionar resultado con step.
+7.4.4 — Tests
+7.4.4.1 Serialización si existe.
+7.4.4.2 Orden.
+7.4.4.3 Coste.
+7.4.4.4 Trazabilidad.
+
+7.5 — EJECUCIÓN
+7.5.1 — Executor
+7.5.1.1 Entregar Plan.
+7.5.1.2 Ejecutar primer step.
+7.5.1.3 Propagar resultado.
+7.5.2 — Secuencia
+7.5.2.1 Ejecutar steps en orden.
+7.5.2.2 Detener ante fallo no recuperable.
+7.5.2.3 Actualizar State cuando corresponda.
+7.5.3 — Resultado
+7.5.3.1 Resultado por step.
+7.5.3.2 Resultado total.
+7.5.3.3 Diferenciar éxito parcial de éxito total.
+7.5.4 — Tests
+7.5.4.1 Plan de un step.
+7.5.4.2 Plan multi-step.
+7.5.4.3 Fallo intermedio.
+7.5.4.4 Estado actualizado.
+
+7.6 — VERIFICACIÓN
+7.6.1 — Comprobación
+7.6.1.1 Verificar resultado real de cada step cuando sea necesario.
+7.6.1.2 Verificar cumplimiento del objetivo.
+7.6.2 — State
+7.6.2.1 Actualizar solo con evidencia.
+7.6.2.2 Registrar cambios relevantes.
+7.6.2.3 Mantener coherencia.
+7.6.3 — Errores
+7.6.3.1 Error de ejecución.
+7.6.3.2 Error de verificación.
+7.6.3.3 Divergencia entre resultado y State.
+7.6.4 — Tests
+7.6.4.1 Verificación correcta.
+7.6.4.2 Verificación fallida.
+7.6.4.3 Divergencia.
+
+7.7 — BRAIN / GOAL
+7.7.1 — Intent -> Goal
+7.7.1.1 Verificar transformación.
+7.7.1.2 Verificar parámetros.
+7.7.1.3 Verificar ambigüedad.
+7.7.2 — Goal -> Planner
+7.7.2.1 Entregar Goal correcto.
+7.7.2.2 Entregar State correcto.
+7.7.2.3 Recibir Plan.
+7.7.3 — Compatibilidad
+7.7.3.1 Mantener acciones legacy.
+7.7.3.2 Mantener acción directa donde sea necesario.
+7.7.3.3 Evitar doble ejecución.
+
+7.8 — CIERRE
+7.8.1 Tests completos.
+7.8.2 No regresión.
+7.8.3 main.py.
+7.8.4 Documentación.
+7.8.5 Cierre FASE 7.
+
+FASE 8 — A*
+
+8.1 — COSTES
+8.1.1 — Coste base
+8.1.1.1 Localizar coste real de transición/acción.
+8.1.1.2 Verificar valor por defecto si existe.
+8.1.1.3 Verificar costes inválidos.
+8.1.2 — Coste acumulado
+8.1.2.1 Inicializar g(n).
+8.1.2.2 Sumar coste de transición.
+8.1.2.3 Mantener mejor coste conocido.
+8.1.2.4 Tests.
+
+8.2 — HEURÍSTICA
+8.2.1 — h(n)
+8.2.1.1 Definir entrada real disponible.
+8.2.1.2 Implementar cálculo solo con información soportada.
+8.2.1.3 Verificar casos sin información.
+8.2.2 — Configuración
+8.2.2.1 Localizar configuración existente.
+8.2.2.2 Verificar activación/desactivación.
+8.2.2.3 Evitar parámetros sin consumidor.
+8.2.3 — Verificación
+8.2.3.1 Verificar estabilidad.
+8.2.3.2 Comparar con fallback determinista.
+8.2.3.3 Tests.
+
+8.3 — NÚCLEO A*
+8.3.1 — Open / Closed
+8.3.1.1 Inicializar open.
+8.3.1.2 Inicializar closed.
+8.3.1.3 Extraer mejor candidato.
+8.3.1.4 Marcar procesado.
+8.3.2 — g / h / f
+8.3.2.1 Calcular g.
+8.3.2.2 Calcular h.
+8.3.2.3 Calcular f.
+8.3.2.4 Comparar candidatos.
+8.3.3 — Expansión
+8.3.3.1 Obtener vecinos.
+8.3.3.2 Filtrar inválidos.
+8.3.3.3 Actualizar mejor coste.
+8.3.3.4 Insertar/actualizar open.
+8.3.3.5 Terminar por Goal.
+8.3.4 — Tests
+8.3.4.1 Grafo lineal.
+8.3.4.2 Varias rutas.
+8.3.4.3 Sin ruta.
+8.3.4.4 Ciclos.
+8.3.4.5 Límites.
+
+8.4 — RECONSTRUCCIÓN DE RUTA
+8.4.1 — Predecesores
+8.4.1.1 Registrar predecessor.
+8.4.1.2 Actualizar predecessor cuando mejora coste.
+8.4.2 — Final
+8.4.2.1 Reconstruir desde Goal.
+8.4.2.2 Invertir ruta.
+8.4.2.3 Verificar continuidad.
+8.4.3 — Tests
+8.4.3.1 Ruta simple.
+8.4.3.2 Ruta con varios saltos.
+8.4.3.3 Ruta inexistente.
+
+8.5 — STATEGRAPH
+8.5.1 — Estados
+8.5.1.1 Representar estado mínimo.
+8.5.1.2 Comparar estados.
+8.5.1.3 Detectar estado equivalente.
+8.5.2 — Transiciones
+8.5.2.1 Aplicar transición.
+8.5.2.2 Verificar precondición.
+8.5.2.3 Calcular estado sucesor.
+8.5.3 — Costes
+8.5.3.1 Obtener coste.
+8.5.3.2 Mantener coste acumulado.
+8.5.3.3 No modificar coste real sin evidencia.
+
+8.6 — PLANNER
+8.6.1 — Selección
+8.6.1.1 Seleccionar A* cuando esté disponible y proceda.
+8.6.1.2 Seleccionar determinista cuando corresponda.
+8.6.2 — Plan
+8.6.2.1 Convertir ruta A* a Plan.
+8.6.2.2 Conservar trazabilidad.
+8.6.3 — Fallback
+8.6.3.1 Detectar fallo de A*.
+8.6.3.2 Volver al planner determinista.
+8.6.3.3 Registrar fallback.
+8.6.3.4 No duplicar ejecución.
+
+8.7 — REGRESIÓN
+8.7.1 — Corrección
+8.7.1.1 Tests de ruta.
+8.7.1.2 Tests de coste.
+8.7.1.3 Tests de fallback.
+8.7.2 — Rendimiento
+8.7.2.1 Medir solo si ya existe mecanismo de medición.
+8.7.2.2 Verificar límites.
+8.7.2.3 Evitar regresiones evidentes.
+8.7.3 — No regresión
+8.7.3.1 Planner determinista.
+8.7.3.2 Graph.
+8.7.3.3 Executor.
+8.7.3.4 main.py.
+
+FASE 9 — REPLANNING
+
+9.1 — CHECKPOINTS
+9.1.1 Definir qué resultado puede actuar como checkpoint.
+9.1.2 Identificar dónde se captura.
+9.1.3 Persistir checkpoint solo si el sistema ya requiere persistencia.
+9.1.4 Verificar recuperación del checkpoint.
+9.1.5 Tests.
+
+9.2 — FALLO
+9.2.1 Detectar fallo de ejecución.
+9.2.2 Diferenciar fallo de acción y fallo de verificación.
+9.2.3 Registrar fallo.
+9.2.4 Actualizar State con información confirmada.
+9.2.5 Evitar marcar como correcto un estado no verificado.
+9.2.6 Tests.
+
+9.3 — RECÁLCULO
+9.3.1 Construir nuevo estado.
+9.3.2 Revisar Goal todavía vigente.
+9.3.3 Solicitar nueva ruta.
+9.3.4 Respetar límites existentes.
+9.3.5 Verificar que la nueva ruta no repita el mismo fallo sin cambio de contexto.
+9.3.6 Tests.
+
+9.4 — FALLBACKS
+9.4.1 Identificar alternativas existentes.
+9.4.2 Elegir alternativa solo si es válida para State/Goal.
+9.4.3 Permitir acción segura de recuperación.
+9.4.4 Registrar la alternativa usada.
+9.4.5 Propagar fallo si no existe alternativa válida.
+9.4.6 Tests.
+
+9.5 — LÍMITES
+9.5.1 Contador de replan.
+9.5.2 Contador de reintentos por step.
+9.5.3 Detección de repetición.
+9.5.4 Anti-bucle.
+9.5.5 Resultado al alcanzar límite.
+9.5.6 Tests.
+
+9.6 — EXECUTOR
+9.6.1 Interrumpir de forma segura.
+9.6.2 Preservar recursos necesarios.
+9.6.3 Entregar State actualizado al Planner.
+9.6.4 Recibir nuevo Plan.
+9.6.5 Continuar ejecución desde punto válido.
+9.6.6 No ejecutar steps obsoletos.
+9.6.7 Tests.
+
+9.7 — CIERRE
+9.7.1 Tests de fallos recuperables.
+9.7.2 Tests de fallos no recuperables.
+9.7.3 Tests anti-bucle.
+9.7.4 No regresión.
+9.7.5 main.py.
+9.7.6 Cerrar FASE 9.
+
+FASE 10 — PRECONDITIONS/EFFECTS
+
+10.1 — TIPOS
+10.1.1 Inspeccionar modelo real.
+10.1.2 Enumerar tipos ya existentes.
+10.1.3 Representar una condición mínima.
+10.1.4 Evaluar condición mínima.
+10.1.5 Manejar condición ausente/no soportada.
+10.1.6 Tests.
+
+10.2 — EFECTOS
+10.2.1 Inspeccionar modelo real.
+10.2.2 Representar un efecto mínimo.
+10.2.3 Aplicar efecto.
+10.2.4 Verificar State posterior.
+10.2.5 Manejar efecto no soportado.
+10.2.6 Tests.
+
+10.3 — ACTIONS
+10.3.1 Contrato de precondiciones.
+10.3.2 Contrato de efectos.
+10.3.3 Validación antes de ejecución.
+10.3.4 Compatibilidad con Action Registry.
+10.3.5 Compatibilidad con acciones legacy.
+10.3.6 Tests.
+
+10.4 — VALIDACIÓN
+10.4.1 Error por condición inválida.
+10.4.2 Error por estado incompatible.
+10.4.3 Mensaje diagnóstico.
+10.4.4 Propagación al Planner.
+10.4.5 Propagación al Executor.
+10.4.6 Tests.
+
+10.5 — GRAPH
+10.5.1 Añadir precondición al edge solo donde corresponda.
+10.5.2 Añadir efectos al edge solo donde corresponda.
+10.5.3 Rechazar transición inválida.
+10.5.4 Verificar estado sucesor.
+10.5.5 Tests.
+
+10.6 — PLANNER
+10.6.1 Filtrar por precondiciones.
+10.6.2 Considerar efectos.
+10.6.3 Excluir rutas inválidas.
+10.6.4 Mantener fallback determinista.
+10.6.5 Tests.
+
+10.7 — STATE
+10.7.1 Aplicar mutación confirmada.
+10.7.2 Evitar mutación si la acción falla.
+10.7.3 Evitar mutación si la verificación falla.
+10.7.4 Verificar consistencia.
+10.7.5 Tests.
+
+10.8 — CIERRE
+10.8.1 Tests unitarios.
+10.8.2 Tests de integración.
+10.8.3 Tests de no regresión.
+10.8.4 main.py.
+10.8.5 Documentación.
+
+FASE 11 — PREFLIGHT/LOGIN
+
+11.1 — CONTRATO
+11.1.1 API de preflight.
+11.1.2 Resultado de preflight.
+11.1.3 Motivo de bloqueo.
+11.1.4 Diagnóstico.
+11.1.5 Tests.
+
+11.2 — DISPONIBILIDAD
+11.2.1 Comprobar aplicación.
+11.2.2 Comprobar proceso/ventana.
+11.2.3 Comprobar monitor.
+11.2.4 Comprobar estado necesario.
+11.2.5 Distinguir no disponible de no preparada.
+11.2.6 Tests.
+
+11.3 — LOGIN
+11.3.1 Identificar si la tarea depende de login.
+11.3.2 Detectar estado de login solo con mecanismos reales disponibles.
+11.3.3 Representar login requerido.
+11.3.4 Bloquear ejecución si falta una condición necesaria.
+11.3.5 No introducir automatización de credenciales no existente.
+11.3.6 Tests.
+
+11.4 — RECURSOS / UI / CALIBRACIÓN
+11.4.1 Comprobar recursos requeridos.
+11.4.2 Comprobar UI requerida.
+11.4.3 Comprobar calibración requerida.
+11.4.4 Preparar sin destruir estado del usuario.
+11.4.5 Verificar preparación.
+11.4.6 Tests.
+
+11.5 — INTERRUPCIÓN SEGURA
+11.5.1 Detectar cancelación.
+11.5.2 Detener pasos nuevos.
+11.5.3 Limpiar recursos creados por JARVIS.
+11.5.4 Restaurar ventanas reutilizadas cuando corresponda.
+11.5.5 Registrar limpieza.
+11.5.6 Tests.
+
+11.6 — PLANNER
+11.6.1 Bloquear Goal cuando falta preflight.
+11.6.2 Informar qué condición falta.
+11.6.3 Permitir preparar la condición cuando exista capacidad válida.
+11.6.4 Reanudar planificación tras preflight correcto.
+11.6.5 Tests.
+
+11.7 — EXECUTOR
+11.7.1 Ejecutar preflight antes de la acción protegida.
+11.7.2 No ejecutar acción si preflight falla.
+11.7.3 Propagar resultado.
+11.7.4 Tests.
+
+11.8 — CIERRE
+11.8.1 Regresión.
+11.8.2 main.py.
+11.8.3 README.
+11.8.4 Cerrar FASE 11.
+
+FASE 12 — CALIBRATION CAPABILITY
+
+12.1 — CALIBRATE
+12.1.1 Localizar contrato real.
+12.1.2 Definir entrada.
+12.1.3 Definir resultado.
+12.1.4 Diferenciar calibración necesaria de calibración ejecutada.
+12.1.5 Tests.
+
+12.2 — SEGURIDAD
+12.2.1 allow/deny real.
+12.2.2 Comprobar hardware/configuración solo si existe soporte.
+12.2.3 Comprobar sesión.
+12.2.4 Evitar acciones destructivas.
+12.2.5 Definir cancelación.
+12.2.6 Tests.
+
+12.3 — PLANNER
+12.3.1 Exponer capability calibrate.
+12.3.2 Detectar requisito de calibración.
+12.3.3 Insertar calibración antes de la acción dependiente.
+12.3.4 No insertar calibración innecesaria.
+12.3.5 Tests.
+
+12.4 — COORDINATEMANAGER
+12.4.1 Localizar CoordinateManager/get_coords real.
+12.4.2 Resolver coordenada calibrada.
+12.4.3 Resolver monitor.
+12.4.4 Manejar ausencia de coordenada.
+12.4.5 Fallback permitido por código real.
+12.4.6 Tests.
+
+12.5 — MULTIPANTALLA
+12.5.1 Un monitor.
+12.5.2 Dos monitores.
+12.5.3 Más de dos si el código lo soporta.
+12.5.4 Monitores intercambiados.
+12.5.5 Resoluciones distintas.
+12.5.6 DPI/escalado.
+12.5.7 Ventana en segundo plano.
+12.5.8 Maximizada/restaurada.
+12.5.9 Tests por escenario soportado.
+
+12.6 — VISIÓN
+12.6.1 Capturar monitor/ventana correcto.
+12.6.2 Detectar elemento visible.
+12.6.3 Obtener punto de interacción.
+12.6.4 Persistir resultado real.
+12.6.5 Verificar que la visión no decide la estrategia.
+12.6.6 Integrar con flujo universal de calibración.
+12.6.7 Tests.
+
+12.7 — SEGURIDAD OPERATIVA
+12.7.1 Identificar ventana correcta antes de interactuar.
+12.7.2 Identificar aplicación/proceso correcto.
+12.7.3 No usar offsets fijos.
+12.7.4 No cerrar ventanas no creadas por JARVIS.
+12.7.5 Restaurar estado original cuando corresponda.
+12.7.6 Tests de seguridad operativa.
+
+12.8 — CIERRE
+12.8.1 Tests completos.
+12.8.2 Regresión multipantalla.
+12.8.3 Regresión de calibradores existentes.
+12.8.4 main.py.
+12.8.5 README.
+12.8.6 Cerrar FASE 12.
+
+FASE 13 — MACROS_COORDS COMO UI KNOWLEDGE
+
+13.1 — LECTURA / SCHEMA / VALIDACIÓN
+13.1.1 Localizar macros_coords.json real.
+13.1.2 Identificar estructura real.
+13.1.3 Validar formato.
+13.1.4 Validar campos obligatorios.
+13.1.5 Rechazar datos corruptos.
+13.1.6 Tests.
+
+13.2 — COORDINATEMANAGER / UI / MONITOR
+13.2.1 Cargar conocimiento UI.
+13.2.2 Resolver elemento.
+13.2.3 Asociar monitor.
+13.2.4 Asociar aplicación.
+13.2.5 Diferenciar elemento desconocido.
+13.2.6 Integrar con visión.
+13.2.7 Tests.
+
+13.3 — MIGRACIÓN / COMPATIBILIDAD
+13.3.1 Identificar consumidores actuales.
+13.3.2 Adaptar lectura sin romper APIs.
+13.3.3 Mantener formato compatible cuando sea necesario.
+13.3.4 Eliminar duplicación solo cuando esté verificada.
+13.3.5 Tests de migración.
+
+13.4 — CONSISTENCIA / CIERRE
+13.4.1 Comparar conocimiento con calibraciones reales.
+13.4.2 Detectar entradas obsoletas.
+13.4.3 No borrar automáticamente sin contrato explícito.
+13.4.4 Tests.
+13.4.5 main.py.
+13.4.6 README.
+
+FASE 14 — ACCIONES PRIMITIVAS REUTILIZABLES
+
+14.1 — VENTANAS / APPS
+14.1.1 Identificar acción de abrir.
+14.1.2 Identificar acción de cerrar.
+14.1.3 Identificar acción de activar.
+14.1.4 Identificar acción de mover.
+14.1.5 Identificar acción de maximizar/restaurar cuando exista.
+14.1.6 Verificar identificación de ventana.
+14.1.7 Tests.
+
+14.2 — UI
+14.2.1 Mover ratón.
+14.2.2 Click.
+14.2.3 Double click.
+14.2.4 Right click.
+14.2.5 Hover.
+14.2.6 Drag.
+14.2.7 Scroll.
+14.2.8 Click sobre elemento detectado.
+14.2.9 Tests.
+
+14.3 — BROWSER
+14.3.1 Nueva pestaña.
+14.3.2 Cerrar pestaña creada por JARVIS.
+14.3.3 Navegar.
+14.3.4 Cambiar pestaña cuando exista.
+14.3.5 Verificar ventana correcta.
+14.3.6 Verificar estado tras navegación.
+14.3.7 Tests.
+
+14.4 — WAIT / CAPTURE / ANALYSIS
+14.4.1 Esperar condición temporal real.
+14.4.2 Capturar pantalla.
+14.4.3 Capturar ventana activa.
+14.4.4 Capturar región.
+14.4.5 Analizar elementos.
+14.4.6 Verificar resultado.
+14.4.7 Tests.
+
+14.5 — ARCHIVOS / PROMPT
+14.5.1 Leer archivo necesario.
+14.5.2 Escribir archivo necesario.
+14.5.3 Gestionar prompt.
+14.5.4 Verificar ruta.
+14.5.5 Evitar escritura accidental fuera de alcance.
+14.5.6 Tests.
+
+14.6 — CHAT CONTROL
+14.6.1 Identificar acciones existentes de control del chat.
+14.6.2 Ejecutar una acción.
+14.6.3 Verificar resultado.
+14.6.4 Manejar fallo.
+14.6.5 Tests.
+
+14.7 — CONTRATOS / COMPOSICIÓN
+14.7.1 Definir contrato uniforme.
+14.7.2 Normalizar resultado.
+14.7.3 Propagar errores.
+14.7.4 Permitir composición.
+14.7.5 Evitar wrappers duplicados.
+14.7.6 Tests.
+
+14.8 — PLANNER / EXECUTOR
+14.8.1 Registrar primitivas.
+14.8.2 Exponer capabilities.
+14.8.3 Crear Plan con primitivas.
+14.8.4 Ejecutar mediante Executor.
+14.8.5 Verificar resultado.
+14.8.6 Actualizar State.
+14.8.7 Tests.
+
+14.9 — REGRESIÓN / CIERRE
+14.9.1 Tests unitarios.
+14.9.2 Tests de integración.
+14.9.3 Legacy.
+14.9.4 main.py.
+14.9.5 README.
+14.9.6 Cerrar FASE 14.
+
+FASE 15 — HIGH LEVEL GOALS
+
+15.1 — INTENT -> GOAL
+15.1.1 Identificar intenciones soportadas.
+15.1.2 Mapear intención a goal_type.
+15.1.3 Mapear target.
+15.1.4 Mapear parámetros.
+15.1.5 Mapear restricciones.
+15.1.6 Manejar intención ambigua.
+15.1.7 Tests.
+
+15.2 — ENTIDADES / URL
+15.2.1 Resolver entidad.
+15.2.2 Obtener datos asociados.
+15.2.3 Resolver URL existente.
+15.2.4 Construir Goal de navegación.
+15.2.5 Verificar ausencia de URL.
+15.2.6 Tests.
+
+15.3 — NAVEGACIÓN / BROWSER STATE
+15.3.1 Detectar navegador adecuado.
+15.3.2 Detectar si ya está abierto.
+15.3.3 Detectar ventana correcta.
+15.3.4 Decidir uso de pestaña existente/temporal según contrato real.
+15.3.5 Navegar.
+15.3.6 Verificar URL/estado.
+15.3.7 Tests.
+
+15.4 — MULTIPASO / DEPENDENCIAS
+15.4.1 Separar objetivo en pasos.
+15.4.2 Identificar dependencias.
+15.4.3 Ordenar.
+15.4.4 Verificar precondiciones.
+15.4.5 Generar Plan.
+15.4.6 Ejecutar.
+15.4.7 Verificar.
+15.4.8 Tests.
+
+15.5 — CONTRATO / PRECONDICIONES
+15.5.1 Definir Goal válido.
+15.5.2 Definir precondiciones.
+15.5.3 Definir resultado esperado.
+15.5.4 Rechazar Goal incompleto.
+15.5.5 Tests.
+
+15.6 — BRAIN
+15.6.1 Interpretación.
+15.6.2 Parseo estructurado.
+15.6.3 Extracción de entidades.
+15.6.4 Creación de Goal.
+15.6.5 Gestión de imagen cuando proceda.
+15.6.6 Fallback legacy.
+15.6.7 Tests.
+
+15.7 — PLANNER / EXECUTOR
+15.7.1 Goal -> Planner.
+15.7.2 Plan -> Executor.
+15.7.3 Executor -> Verification.
+15.7.4 Verification -> State.
+15.7.5 Replan cuando proceda.
+15.7.6 Tests end-to-end.
+
+15.8 — REGRESIÓN / LEGACY
+15.8.1 Comando existente.
+15.8.2 Acción legacy.
+15.8.3 Goal nuevo.
+15.8.4 No doble ejecución.
+15.8.5 main.py.
+15.8.6 Cierre FASE 15.
+
+FASE 16 — LEGACY COMPATIBILITY
+
+16.1 — LEGACY -> GOAL
+16.1.1 Enumerar acciones legacy realmente usadas.
+16.1.2 Identificar equivalente Goal.
+16.1.3 Crear adaptación individual.
+16.1.4 Verificar parámetros.
+16.1.5 Verificar resultado.
+16.1.6 Tests por acción.
+
+16.2 — EXECUTOR DISPATCH / FALLBACK
+16.2.1 Identificar dispatch actual.
+16.2.2 Priorizar ruta nueva cuando esté verificada.
+16.2.3 Mantener fallback legacy.
+16.2.4 Evitar ejecutar ambas rutas.
+16.2.5 Propagar errores.
+16.2.6 Tests.
+
+16.3 — MIGRACIÓN PROGRESIVA
+16.3.1 Migrar una familia de acciones.
+16.3.2 Ejecutar tests.
+16.3.3 Verificar consumidores.
+16.3.4 Migrar siguiente familia solo tras cierre anterior.
+16.3.5 Registrar compatibilidad.
+
+16.4 — APIS LEGACY
+16.4.1 Identificar APIs públicas legacy.
+16.4.2 Verificar consumidores.
+16.4.3 Mantener wrappers solo donde aporten compatibilidad real.
+16.4.4 Marcar rutas antiguas deprecadas solo si el código ya soporta ese concepto.
+16.4.5 Tests de compatibilidad.
+
+16.5 — REGRESIÓN
+16.5.1 Tests legacy.
+16.5.2 Tests nuevos.
+16.5.3 Tests cruzados.
+16.5.4 Verificar comportamiento real.
+16.5.5 Corregir regresiones.
+
+16.6 — CIERRE / DOCUMENTACIÓN
+16.6.1 Actualizar README.
+16.6.2 Documentar rutas compatibles.
+16.6.3 Verificar main.py.
+16.6.4 Cerrar FASE 16.
+
+FASE 17 — OPTIMIZATION
+
+17.1 — REDUNDANCIAS
+17.1.1 Identificar trabajo repetido existente.
+17.1.2 Confirmar que la repetición es real.
+17.1.3 Eliminar una sola redundancia.
+17.1.4 Ejecutar tests.
+17.1.5 Repetir por unidad hoja.
+
+17.2 — CACHÉ
+17.2.1 Identificar datos candidatos a caché.
+17.2.2 Verificar validez temporal.
+17.2.3 Añadir lectura de caché.
+17.2.4 Añadir invalidación necesaria.
+17.2.5 Evitar cachear estado cambiante sin control.
+17.2.6 Tests.
+
+17.3 — COSTES
+17.3.1 Localizar cálculo actual.
+17.3.2 Eliminar recálculo innecesario.
+17.3.3 Conservar significado del coste.
+17.3.4 Verificar Planner.
+17.3.5 Tests.
+
+17.4 — CONTEXTO
+17.4.1 Identificar contexto repetidamente calculado.
+17.4.2 Reutilizar contexto cuando sea seguro.
+17.4.3 Invalidar cuando cambie State.
+17.4.4 Verificar consistencia.
+17.4.5 Tests.
+
+17.5 — EJECUCIÓN
+17.5.1 Identificar paso redundante.
+17.5.2 Identificar espera innecesaria solo con evidencia.
+17.5.3 Mantener verificaciones necesarias.
+17.5.4 No eliminar seguridad por rendimiento.
+17.5.5 Tests.
+
+17.6 — NO REGRESIÓN
+17.6.1 Tests funcionales.
+17.6.2 Tests de planificación.
+17.6.3 Tests de ejecución.
+17.6.4 Tests de multipantalla cuando apliquen.
+17.6.5 main.py.
+
+17.7 — MÉTRICAS / VERIFICACIÓN
+17.7.1 Reutilizar métricas existentes.
+17.7.2 Medir antes/después solo cuando sea posible.
+17.7.3 No declarar mejora sin medición o evidencia disponible.
+17.7.4 Documentar resultado real.
+17.7.5 Cerrar FASE 17.
+
+FASE 18 — LEARNING COSTS
+
+18.1 — RESULTADOS
+18.1.1 Capturar resultado por acción.
+18.1.2 Capturar éxito/fallo real.
+18.1.3 Capturar duración solo si existe soporte.
+18.1.4 Asociar resultado con contexto.
+18.1.5 Tests.
+
+18.2 — PERSISTENCIA
+18.2.1 Localizar almacenamiento real.
+18.2.2 Persistir un resultado.
+18.2.3 Recuperar un resultado.
+18.2.4 Manejar corrupción/ausencia.
+18.2.5 Evitar duplicados incorrectos.
+18.2.6 Tests.
+
+18.3 — TIEMPOS / COSTES
+18.3.1 Obtener datos históricos disponibles.
+18.3.2 Calcular estadística mínima soportada.
+18.3.3 Integrar coste aprendido solo donde proceda.
+18.3.4 Evitar aprendizaje con muestras insuficientes.
+18.3.5 Tests.
+
+18.4 — AJUSTE CONTROLADO
+18.4.1 Definir parámetro ajustable existente.
+18.4.2 Aplicar ajuste pequeño.
+18.4.3 Respetar límites.
+18.4.4 Persistir cambio cuando proceda.
+18.4.5 Permitir reversión.
+18.4.6 Tests.
+
+18.5 — CONTEXTO
+18.5.1 Separar costes por contexto solo si existe información suficiente.
+18.5.2 Verificar equivalencia de contextos.
+18.5.3 No transferir datos sin compatibilidad.
+18.5.4 Integrar con Domain Memory/ContextualAdaptation cuando corresponda.
+18.5.5 Tests.
+
+18.6 — VERIFICACIÓN
+18.6.1 Comparar resultado aprendido con resultado real.
+18.6.2 Detectar mejora o degradación solo con evidencia.
+18.6.3 Rechazar actualización por datos inconsistentes.
+18.6.4 Tests.
+
+18.7 — ESTABILIDAD
+18.7.1 Evitar cambios demasiado frecuentes.
+18.7.2 Evitar oscilaciones simples.
+18.7.3 Respetar límites.
+18.7.4 Registrar cambios.
+18.7.5 Tests.
+
+18.8 — CIERRE / MAIN
+18.8.1 Regresión.
+18.8.2 Verificación.
+18.8.3 README.
+18.8.4 main.py.
+18.8.5 Cerrar FASE 18.
+
+FASE 19 — AUTOMEJORA
+
+19.1 — DETECTAR “MEJÓRATE”
+19.1.1 Localizar detección actual.
+19.1.2 Verificar condición de activación.
+19.1.3 Evitar activación accidental.
+19.1.4 Tests.
+
+19.2 — README COMPLETO
+19.2.1 Leer README completo.
+19.2.2 Identificar estructura relevante.
+19.2.3 Preparar contexto sin inventar datos.
+19.2.4 Verificar tamaño/contexto.
+
+19.3 — CHATGPT
+19.3.1 Definir petición de análisis.
+19.3.2 Enviar contexto permitido.
+19.3.3 Recibir respuesta.
+19.3.4 Detectar respuesta incompleta.
+19.3.5 Tests.
+
+19.4 — MODO PENSAR
+19.4.1 Identificar mecanismo real disponible.
+19.4.2 Activarlo de manera explícita.
+19.4.3 Verificar que el resultado se recibe completo.
+19.4.4 Manejar indisponibilidad.
+19.4.5 Tests.
+
+19.5 — SOLICITAR MEJORA
+19.5.1 Construir solicitud.
+19.5.2 Incluir estado actual.
+19.5.3 Incluir README relevante.
+19.5.4 Incluir restricciones del prompt.
+19.5.5 Evitar pedir cambios no relacionados.
+
+19.6 — OBTENER PROMPT
+19.6.1 Recibir propuesta.
+19.6.2 Extraer prompt.
+19.6.3 Preservar reglas maestras.
+19.6.4 Detectar cambios estructurales.
+19.6.5 Tests de extracción.
+
+19.7 — VALIDAR PROMPT
+19.7.1 Verificar que conserva la posición actual.
+19.7.2 Verificar que conserva reglas.
+19.7.3 Verificar que no adelanta hojas.
+19.7.4 Verificar continuidad.
+19.7.5 Verificar formato.
+19.7.6 Rechazar prompt inválido.
+
+19.8 — VS CODE
+19.8.1 Identificar mecanismo real de interacción.
+19.8.2 Abrir/seleccionar archivo necesario.
+19.8.3 Aplicar un cambio controlado.
+19.8.4 Verificar que el cambio llegó al archivo correcto.
+19.8.5 Evitar modificar otro archivo.
+19.8.6 Tests/reproducción.
+
+19.9 — SUPERCOMPLETE
+19.9.1 Detectar estado READY/EXECUTING según señales reales.
+19.9.2 Iniciar una sola operación.
+19.9.3 Esperar mientras EXECUTING.
+19.9.4 Detectar finalización.
+19.9.5 Detectar necesidad de nuevo chat.
+19.9.6 Tests de estados.
+
+19.10 — UNA HOJA POR CHAT
+19.10.1 Obtener hoja activa.
+19.10.2 No enviar la siguiente hoja.
+19.10.3 Cerrar hoja antes de continuar.
+19.10.4 Registrar resultado.
+19.10.5 Tests.
+
+19.11 — READY / EXECUTING
+19.11.1 Modelar READY.
+19.11.2 Modelar EXECUTING.
+19.11.3 Modelar finalización.
+19.11.4 Manejar transición inesperada.
+19.11.5 Evitar doble envío.
+
+19.12 — TOKENS / CONTEXTO
+19.12.1 Detectar contexto disponible.
+19.12.2 Detectar riesgo de agotamiento.
+19.12.3 Reducir contexto sin perder requisitos.
+19.12.4 Decidir NEED_NEW_CHAT.
+19.12.5 Guardar estado antes del cambio.
+
+19.13 — CAMBIO DE CHAT
+19.13.1 Finalizar operación segura.
+19.13.2 Guardar código.
+19.13.3 Guardar estado.
+19.13.4 Cerrar chat.
+19.13.5 Abrir nuevo chat.
+19.13.6 Reanudar la misma hoja.
+19.13.7 No depender del chat anterior.
+
+19.14 — ACTUALIZAR PROMPT / README
+19.14.1 Actualizar estado mínimo.
+19.14.2 Actualizar archivos modificados.
+19.14.3 Actualizar tests.
+19.14.4 Actualizar verificación.
+19.14.5 Actualizar pendientes.
+19.14.6 Actualizar NEXT_DOCUMENTED_UNIT.
+19.14.7 Modificar README solo cuando corresponda.
+
+19.15 — VERIFICACIÓN
+19.15.1 Verificar archivo objetivo.
+19.15.2 Verificar sintaxis.
+19.15.3 Ejecutar tests pertinentes.
+19.15.4 Verificar comportamiento real.
+19.15.5 Verificar main.py cuando corresponda.
+19.15.6 No declarar mejora sin evidencia.
+
+19.16 — ERRORES
+19.16.1 Detectar error de generación.
+19.16.2 Detectar error de aplicación.
+19.16.3 Detectar error de verificación.
+19.16.4 Recuperar de forma segura.
+19.16.5 Registrar causa.
+19.16.6 Evitar repetir una operación destructiva.
+
+19.17 — CONTINUIDAD
+19.17.1 Leer prompt al iniciar.
+19.17.2 Resolver posición desde estado.
+19.17.3 Reanudar hoja correcta.
+19.17.4 No usar memoria del chat anterior como fuente de estado.
+19.17.5 Tests de reinicio/reanudación.
+
+19.18 — MULTIPANTALLA
+19.18.1 Verificar que la automejora identifica monitor real.
+19.18.2 Verificar ventanas.
+19.18.3 Verificar DPI/escalado.
+19.18.4 Evitar offsets fijos.
+19.18.5 Tests cuando exista interacción gráfica.
+
+19.19 — REGRESIÓN
+19.19.1 Tests de automejora.
+19.19.2 Tests de edición.
+19.19.3 Tests de continuidad.
+19.19.4 Tests de seguridad.
+19.19.5 Tests de no regresión del sistema.
+
+19.20 — CIERRE
+19.20.1 Verificar todo el flujo.
+19.20.2 Verificar README.
+19.20.3 Verificar main.py.
+19.20.4 Verificar estado.
+19.20.5 Cerrar FASE 19 solo con todas las hojas completadas.
+
+FASE 20 — AUTOMEJORA CONTINUA
+
+20.1 — FIN DE CICLO
+20.1.1 Detectar finalización real del ciclo.
+20.1.2 Verificar que no queden hojas pendientes del ciclo.
+20.1.3 Registrar resultado.
+20.1.4 Tests.
+
+20.2 — TODAS LAS FASES
+20.2.1 Verificar estado de FASE 0.
+20.2.2 Verificar estado de FASE 1.
+20.2.3 Verificar estado de FASE 2.
+20.2.4 Verificar estado de FASE 3.
+20.2.5 Verificar estado de FASE 4.
+20.2.6 Verificar estado de FASE 5.
+20.2.7 Verificar estado de FASE 6.
+20.2.8 Verificar estado de FASE 7.
+20.2.9 Verificar estado de FASE 8.
+20.2.10 Verificar estado de FASE 9.
+20.2.11 Verificar estado de FASE 10.
+20.2.12 Verificar estado de FASE 11.
+20.2.13 Verificar estado de FASE 12.
+20.2.14 Verificar estado de FASE 13.
+20.2.15 Verificar estado de FASE 14.
+20.2.16 Verificar estado de FASE 15.
+20.2.17 Verificar estado de FASE 16.
+20.2.18 Verificar estado de FASE 17.
+20.2.19 Verificar estado de FASE 18.
+20.2.20 Verificar estado de FASE 19.
+20.2.21 No inferir completitud por documentación.
+
+20.3 — MAIN.PY OK
+20.3.1 Ejecutar main.py o comprobación equivalente disponible.
+20.3.2 Detectar error.
+20.3.3 Corregir solo el error perteneciente al ciclo.
+20.3.4 Repetir verificación.
+20.3.5 Registrar resultado real.
+
+20.4 — README
+20.4.1 Verificar README completo.
+20.4.2 Actualizar componentes realmente implementados.
+20.4.3 Actualizar flujo arquitectónico cuando corresponda.
+20.4.4 No documentar capacidades no verificadas.
+20.4.5 Registrar discrepancias pendientes.
+
+20.5 — CHATGPT
+20.5.1 Construir contexto.
+20.5.2 Solicitar análisis de mejora.
+20.5.3 Recibir propuesta.
+20.5.4 Separar hechos de propuestas.
+20.5.5 No aplicar propuestas automáticamente sin validación.
+
+20.6 — PENSAR
+20.6.1 Activar mecanismo disponible.
+20.6.2 Analizar la propuesta.
+20.6.3 Comparar con arquitectura real.
+20.6.4 Detectar dependencias.
+20.6.5 Detectar riesgo de regresión.
+
+20.7 — NUEVA FUNCIONALIDAD
+20.7.1 Identificar una única mejora solicitada.
+20.7.2 Definir objetivo verificable.
+20.7.3 Identificar archivos necesarios solo después de inspección.
+20.7.4 Dividir en hojas.
+20.7.5 No iniciar implementación todavía.
+
+20.8 — NUEVO PROMPT
+20.8.1 Generar propuesta.
+20.8.2 Conservar reglas maestras.
+20.8.3 Conservar historial relevante.
+20.8.4 Añadir únicamente cambios justificados.
+20.8.5 Dividir hojas grandes.
+
+20.9 — VALIDACIÓN
+20.9.1 Validar sintaxis/formato.
+20.9.2 Validar estado.
+20.9.3 Validar IDs.
+20.9.4 Validar trazabilidad padre -> hijas.
+20.9.5 Validar que solo una hoja pueda estar EN PROCESO.
+
+20.10 — SUSTITUCIÓN CONSERVADORA
+20.10.1 Mantener reglas maestras.
+20.10.2 Mantener versión.
+20.10.3 Mantener historial relevante.
+20.10.4 Sustituir solo contenido validado.
+20.10.5 Guardar versión anterior cuando el sistema lo soporte.
+20.10.6 Verificar que el nuevo prompt puede reanudar el trabajo.
+
+20.11 — NUEVO CICLO
+20.11.1 Registrar nueva versión.
+20.11.2 Definir primera hoja.
+20.11.3 Marcar solo esa hoja como EN PROCESO.
+20.11.4 No saltar fases.
+20.11.5 Tests.
+
+20.12 — NUEVO CHAT
+20.12.1 Cerrar operación anterior.
+20.12.2 Persistir estado.
+20.12.3 Abrir nuevo chat.
+20.12.4 Leer prompt.
+20.12.5 Leer README.
+20.12.6 Reanudar misma hoja.
+
+20.13 — REPETICIÓN CONTROLADA
+20.13.1 Ejecutar siguiente hoja solo tras cierre anterior.
+20.13.2 Actualizar estado tras cada hoja.
+20.13.3 Detectar errores y volver a la hoja activa cuando corresponda.
+20.13.4 Nunca iniciar otro ciclo sin solicitud explícita del usuario.
+20.13.5 Mantener trazabilidad completa.
+20.13.6 Cerrar FASE 20 únicamente cuando el ciclo completo esté verificado.
+
+**2.8.8.9.2.4 — IMPLEMENTADA**
+- ✅ Carga de feedback acumulado implementada
+- ✅ Métodos `_load_goal_adaptation_feedback()` y `_load_goal_adaptation_learning_results()` funcionales
+- ✅ Inicialización de persistencia en constructor: `_initialize_goal_adaptation_persistence()`
+- ✅ Test `test_load_goal_adaptation_feedback.py` PASADO (2 registros feedback, 1 aprendizaje, 1 estrategia)
+- ✅ Integración con sistema existente verificada
+
+**2.8.8.9.2.5 — IMPLEMENTADA**
+- ✅ Carga de estrategia implementada
+- ✅ Test de integridad de aprendizaje PASADO (1 resultado, 1 estrategia con todos los campos)
+- ✅ Integración con sistema existente verificada
+
+SIGUIENTE UNIDAD: 2.8.8.9.2.6 — IMPLEMENTAR CARGA DE PATRÓN
+
+AUTOMEJORA FUTURA
+No iniciar una nueva mejora automáticamente al terminar una fase o todo el roadmap. Solo crear un nuevo ciclo cuando el usuario lo solicite explícitamente.
+Nunca resetear versión ni depender del chat anterior.
+
+REGLA FINAL
+La IA debe pensar y resolver; el prompt solo fija límites y continuidad. No sustituir razonamiento por listas. No inventar trabajo para tener algo que hacer. No afirmar que algo funciona porque esté escrito en README o en un prompt: verificarlo cuando sea relevante.

@@ -1,0 +1,75 @@
+{
+  "file_analyzed": "src/hands/chrome/chrome_calibrator.py",
+  "analysis_date": "2025-06-17",
+  "total_lines": 57,
+  "file_size_category": "small",
+  "analysis_complete": true,
+  "key_components": {
+    "classes": [
+      {
+        "name": "ChromeCalibrator",
+        "description": "Adaptador legacy que usa exactamente el flujo universal",
+        "methods": [
+          {
+            "name": "calibrate_chrome",
+            "parameters": "monitor_num: int = 0",
+            "description": "Realiza calibración de Chrome delegando en el CalibrationManager universal",
+            "return_type": "Dict[str, Any]",
+            "key_features": [
+              "Obtiene instancia del CalibrationManager",
+              "Procesa resultado del manager para extraer coordenadas",
+              "Manejo robusto de errores",
+              "Soporte para múltiples monitores",
+              "Formato estructurado de resultados"
+            ]
+          }
+        ]
+      }
+    ],
+    "functions": [
+      {
+        "name": "calibrar_chrome",
+        "parameters": "none",
+        "description": "Compatibilidad legacy: delega en el flujo universal",
+        "return_type": "str",
+        "key_features": [
+          "Wrapper para ChromeCalibrator.calibrate_chrome(0)",
+          "Formateo de resultados legibles",
+          "Manejo de errores con mensajes descriptivos"
+        ]
+      }
+    ]
+  },
+  "dependencies": {
+    "internal": [
+      "hands.calibration_manager",
+      "utils.logger"
+    ],
+    "external": []
+  },
+  "architecture_role": "Adaptador de compatibilidad legacy para calibración de Chrome",
+  "integration_pattern": "Delegación completa al sistema universal de calibración",
+  "key_features_summary": [
+    "Delegación completa al CalibrationManager universal",
+    "Manejo robusto de errores con mensajes descriptivos",
+    "Procesamiento de resultados para extraer coordenadas y elementos",
+    "Soporte para múltiples monitores con detección automática",
+    "Formato estructurado de resultados con éxito/fracaso, monitor, elementos y coordenadas",
+    "Compatibilidad con APIs legacy del proyecto"
+  ],
+  "compatibility_notes": [
+    "No contiene lógica visual específica de Chrome",
+    "No detecta coordenadas manualmente",
+    "No calcula offsets de monitores",
+    "No asume resoluciones o DPI específicas",
+    "No genera coordenadas artificiales",
+    "No escribe macros_coords.json directamente"
+  ],
+  "quality_metrics": {
+    "documentation": "Presente (docstrings)",
+    "error_handling": "Robusto (try-catch, validaciones)",
+    "code_structure": "Simple y claro",
+    "maintainability": "Alta (delegación clara)",
+    "testability": "Media (dependencia de manager externo)"
+  }
+}

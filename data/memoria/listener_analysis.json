@@ -1,0 +1,77 @@
+{
+  "file": "src/ear/listener.py",
+  "lines": 587,
+  "analysis_date": "2025-06-17",
+  "status": "COMPROBADO",
+  "description": "Sistema de escucha y reconocimiento de voz para capturar comandos de voz con pipeline de nodos modular y soporte para activación por palabra. Utiliza Whisper para transcripción y procesamiento de audio en tiempo real.",
+  "classes": {
+    "AudioCapabilities": {
+      "type": "dataclass",
+      "purpose": "Configuración de capacidades de audio",
+      "properties": ["sample_rate", "channels", "dtype", "block_duration", "max_recording_time", "silence_threshold", "sensitivity_multiplier"]
+    },
+    "AudioNode": {
+      "type": "base_class",
+      "purpose": "Nodo base para procesamiento de audio con precondiciones, efectos y coste",
+      "methods": ["execute", "get_preconditions", "get_effects", "get_cost"]
+    },
+    "CalibrationNode": {
+      "type": "AudioNode",
+      "purpose": "Nodo para calibración de umbral de detección de voz mediante medición de ruido",
+      "methods": ["execute", "_rms"]
+    },
+    "TranscriptionNode": {
+      "type": "AudioNode", 
+      "purpose": "Nodo para transcripción de audio a texto usando WhisperModel",
+      "methods": ["execute", "_load_model"],
+      "features": ["Modo de prueba sin modelo", "Soporte para múltiples idiomas", "Initial prompt para mejorar transcripción"]
+    },
+    "DetectionNode": {
+      "type": "AudioNode",
+      "purpose": "Nodo para detección de voz en cola de audio con threshold configurable",
+      "methods": ["execute", "_rms"],
+      "features": ["Timeout configurable", "Detección de voz en tiempo real"]
+    },
+    "RecordingNode": {
+      "type": "AudioNode",
+      "purpose": "Nodo para grabación de audio con detección de silencio y timeout",
+      "methods": ["execute", "_rms"],
+      "features": ["Detección de silencio", "Timeout de grabación", "Acumulación de chunks"]
+    },
+    "Ear": {
+      "type": "main_class",
+      "purpose": "Clase principal del sistema de escucha con pipeline completo de procesamiento",
+      "methods": ["__init__", "get_audio_pipeline", "get_pipeline_cost", "get_pipeline_preconditions", "get_pipeline_effects", "listen", "_check_activation_word", "process_audio_batch", "get_audio_status", "_load_model"],
+      "features": ["Pipeline modular de 4 nodos", "Modo alerta continua", "Soporte para palabra de activación", "Integración con memoria conversacional", "Procesamiento por lotes"]
+    }
+  },
+  "pipeline_nodes": ["CalibrationNode", "DetectionNode", "RecordingNode", "TranscriptionNode"],
+  "activation_words": ["jarvis", "jarves", "jarbez", "garbez", "garves", "jarbes"],
+  "audio_config": {
+    "sample_rate": 16000,
+    "channels": 1,
+    "dtype": "float32",
+    "block_duration": 0.03,
+    "max_recording_time": 10.0,
+    "silence_threshold": 0.8,
+    "sensitivity_multiplier": 3.0
+  },
+  "whisper_config": {
+    "model_size": "medium",
+    "language": "es",
+    "device": "cpu",
+    "compute_type": "int8",
+    "beam_size": 5
+  },
+  "features": {
+    "continuous_listening": true,
+    "activation_word_support": true,
+    "audio_calibration": true,
+    "voice_detection": true,
+    "audio_recording": true,
+    "speech_transcription": true,
+    "batch_processing": true,
+    "memory_integration": true,
+    "error_handling": true
+  }
+}

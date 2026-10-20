@@ -1,0 +1,98 @@
+{
+  "file": "src/tools/os_info.py",
+  "analysis_date": "2025-06-18",
+  "total_lines": 533,
+  "status": "COMPLETO",
+  "main_classes": [
+    {
+      "name": "SystemHealth",
+      "type": "Enum",
+      "description": "Estados de salud del sistema",
+      "values": ["EXCELLENT", "GOOD", "WARNING", "CRITICAL"]
+    },
+    {
+      "name": "ApplicationWindow",
+      "type": "dataclass",
+      "description": "Información de una ventana de aplicación",
+      "attributes": ["title", "process_name", "handle", "position", "size", "is_visible", "is_minimized", "is_maximized", "monitor"],
+      "methods": ["to_dict"]
+    },
+    {
+      "name": "SystemResources",
+      "type": "dataclass", 
+      "description": "Recursos del sistema",
+      "attributes": ["cpu_percent", "ram_total_gb", "ram_used_percent", "disk_free_gb", "disk_total_gb", "disk_used_percent", "battery_percent", "battery_power_plugged", "system_health", "timestamp"],
+      "methods": ["to_dict"]
+    },
+    {
+      "name": "SystemContext",
+      "type": "dataclass",
+      "description": "Contexto completo del sistema para planificación",
+      "attributes": ["resources", "active_windows", "focused_window", "running_processes", "system_time", "uptime_seconds"],
+      "methods": ["to_dict"]
+    }
+  ],
+  "main_functions": [
+    {
+      "name": "get_system_stats",
+      "description": "Lee el estado de CPU, memoria RAM y disco",
+      "returns": "Diccionario con cpu, ram_total, ram_percent, disk_free, disk_total, disk_percent"
+    },
+    {
+      "name": "get_battery_info", 
+      "description": "Obtiene información de la batería",
+      "returns": "Optional[Dict[str, Any]]"
+    },
+    {
+      "name": "get_open_windows",
+      "description": "Obtiene información detallada de ventanas visibles",
+      "returns": "List[ApplicationWindow]"
+    },
+    {
+      "name": "get_focused_window",
+      "description": "Obtiene la ventana actualmente enfocada", 
+      "returns": "Optional[ApplicationWindow]"
+    },
+    {
+      "name": "get_running_processes",
+      "description": "Obtiene lista de procesos en ejecución",
+      "returns": "List[str]"
+    },
+    {
+      "name": "get_system_resources",
+      "description": "Obtiene recursos del sistema con estado de salud",
+      "returns": "SystemResources"
+    },
+    {
+      "name": "get_jarvis_system_context",
+      "description": "Empaqueta la información del sistema en un texto para el contexto de Jarvis",
+      "returns": "str"
+    },
+    {
+      "name": "get_system_context",
+      "description": "Obtiene el contexto completo del sistema para planificación",
+      "returns": "SystemContext"
+    }
+  ],
+  "dependencies": ["psutil", "pygetwindow", "src.utils.logger"],
+  "key_features": [
+    "Monitoreo completo del sistema (CPU, RAM, disco, batería)",
+    "Gestión de ventanas y aplicaciones multi-monitor",
+    "Detección de procesos en ejecución",
+    "Cálculo de salud del sistema basado en umbrales",
+    "Integración con ScreenManager para detección de monitores",
+    "Soporte para contexto estructurado para planificación",
+    "Manejo robusto de errores y excepciones",
+    "Compatibilidad con APIs legacy"
+  ],
+  "integrations": [
+    "ScreenManager para detección de monitores",
+    "CalibrationManager para calibración universal",
+    "Sistema de logging estructurado",
+    "Estado del mundo (FASE 3)",
+    "Memoria de dominio (FASE 5)",
+    "Sistema de planificación"
+  ],
+  "file_size_category": "MENOR_3000",
+  "lines_analyzed": 533
+}

@@ -1,0 +1,4367 @@
+# JARVIS - Asistente de IA con Planificación Jerárquica
+
+## Arquitectura del Proyecto
+
+### 📁 Módulo `src/` - Directorio Principal del Sistema
+
+#### `src/__init__.py` [1 línea] - Inicialización del Directorio Principal
+- **Descripción**: Módulo raíz del sistema JARVIS que sirve como punto de entrada y organización principal para todos los componentes del sistema. Este archivo está vacío pero establece la estructura del paquete src.
+- **Características**:
+  - Punto de entrada principal del sistema
+  - Organización jerárquica de módulos
+  - Base para importaciones de alto nivel
+  - Estructura modular escalable
+
+### 🧠 Módulo `src/brain/` - Cerebro Central
+
+#### `src/brain/__init__.py` [10 líneas] - Inicialización del Módulo Cerebro
+- **Descripción**: Módulo cerebro de JARVIS con procesamiento de lenguaje natural y planificación jerárquica.
+- **Métodos principales**:
+  - `Brain`: Clase principal del cerebro para procesamiento de lenguaje natural.
+  - `HTNBrainIntegration`: Integración del sistema HTN con el cerebro principal.
+  - `get_htn_integration`: Función para obtener instancia de integración HTN.
+
+#### `src/brain/htn_integration.py` [488 líneas] - Integración HTN con Brain
+- **Descripción**: Integra la descomposición jerárquica de objetivos con HTNManager y TaskExecutor, manteniendo compatibilidad con el Brain existente.
+- **Clases principales**:
+  - `HTNIntegrationResult` (dataclass): Resultado estructurado de la integración HTN-Brain con metadatos de ejecución.
+  - `HTNBrainIntegration`: Clase principal que integra interpretación de objetivos, HTN y ejecución de tareas.
+- **Métodos principales**:
+  - `process_goal_through_htn`: Descompone y ejecuta un objetivo completo mediante HTN con manejo de errores.
+  - `create_and_execute_htn_goal`: Crea un objetivo básico desde texto y lo procesa mediante HTN.
+  - `_create_goal_from_input`: Crea un objetivo compatible con los tipos usados por HTNManager desde input del usuario.
+  - `_process_execution_results`: Procesa el resultado, actualiza el estado y registra memoria.
+  - `_register_goal_completion`: Registra la finalización exitosa en la memoria conversacional.
+  - `_register_goal_failure`: Registra el fallo en la memoria conversacional.
+  - `_register_goal_memory`: Registra resultados del objetivo en memoria con contexto completo.
+  - `_serialize_task`: Serializa tareas HTN a formato diccionario para estructuración.
+  - `_serialize_execution_result`: Serializa resultados de ejecución a formato estructurado.
+  - `_record_integration`: Registra métricas de ejecución de integraciones.
+  - `get_integration_statistics`: Obtiene estadísticas completas de la integración HTN-Brain.
+  - `enable_integration`: Habilita o deshabilita la integración HTN.
+  - `get_htn_insights`: Obtiene información agregada del sistema HTN con estado de salud.
+- **Funciones globales**:
+  - `get_htn_integration`: Obtiene la instancia global de la integración HTN-Brain.
+
+#### `src/brain/llm.py` [1039 líneas] - Cerebro Principal y Comunicación con LLM
+- **Descripción**: Cerebro de JARVIS con interpretación de lenguaje natural, objetivos y sistema HTN. Gestiona la comunicación con el modelo LLM (Ollama) y la conversión de intenciones del usuario en acciones ejecutables.
+- **Claves de Acción y Normalización**: El módulo incluye un diccionario de aliases (`ACTION_ALIASES`) para normalizar nombres de acciones que el LLM pueda generar (ej. "calibrar_chrome" → "calibrar_chrome"). Detecta comandos directos como "calibrar aplicaciones" o "calibrar Chrome" y ejecuta acciones correspondientes sin necesidad de procesamiento complejo.
+- **Contexto del Sistema**: Construye un contexto para el LLM que incluye información sobre el sistema (estado general), aplicaciones disponibles y capacidades (ej. "calibrar_aplicaciones", "abrir_chrome").
+- **Procesamiento de Intenciones**: Interpreta la intención del usuario:
+  - Detecta acciones directas (como calibración de navegadores).
+  - Extrae entidades del input (streamers, plataformas, aplicaciones).
+  - Crea objetivos a partir de la entidad detectada.
+  - Procesa objetivos a través del sistema HTN si está disponible.
+- **Comunicación con LLM**: Utiliza la API de chat de Ollama para generar respuestas, con configuración de temperatura, top_p y penalización de repetición.
+- **Ejecución de Objetivos**:
+  - Convierte objetivos en acciones legacy (ej. "navigate_to_url").
+  - Soporta objetivos específicos como "navegar a stream", "abrir aplicación".
+  - Maneja la ejecución a través del sistema HTN para descomposición jerárquica de tareas complejas.
+- **Insights del Sistema HTN**: Proporciona estadísticas y métricas sobre la ejecución del sistema HTN.
+- **Extracción de Parámetros**: Extrae parámetros del input basado en el tipo de entidad (ej. calidad HD para streamers, búsqueda para plataformas).
+- **Métodos principales**:
+  - `__init__`: Inicializa el cerebro con modelo LLM, memoria y sistema HTN.
+  - `interpret_intent`: Interpreta la intención del usuario detectando acciones directas o entidades.
+  - `think`: Procesa el input del usuario y crea objetivos o acciones.
+  - `generate_response`: Genera respuesta usando el modelo LLM.
+  - `parse_model_response`: Parsea respuestas del modelo a formato estructurado.
+  - `_extract_entities_from_input`: Extrae entidades del input usando EntityResolver.
+  - `_create_goal_from_entity`: Crea objetivos desde entidades detectadas.
+  - `_detect_direct_action`: Detecta acciones deterministas como calibración.
+  - `think_with_image`: Procesa prompts con imágenes.
+  - `analyze_image`: Analiza imágenes para calibración.
+  - `_normalize_action_name`: Convierte nombres conocidos producidos por el LLM a nombres registrados.
+  - `_build_system_instruction`: Construye instrucciones del sistema con contexto y acciones disponibles.
+  - `_get_system_context`: Obtiene contexto del sistema combinando información general y de aplicaciones.
+  - `_get_available_actions`: Obtiene acciones registradas en el sistema para el modelo LLM.
+  - `_get_application_knowledge`: Obtiene conocimiento estructurado de aplicaciones disponibles.
+  - `_get_domain_entities`: Obtiene entidades del dominio (streamers, plataformas) desde memoria.
+  - `_chat_text`: Comunica con el modelo Ollama usando el chat API.
+  - `execute_goal`: Ejecuta objetivos del sistema convirtiéndolos en acciones legacy cuando es posible.
+  - `process_intent_to_execution`: Procesa intención y convierte en resultados de ejecución con HTN si está disponible.
+  - `process_with_htn`: Procesa prompts usando el sistema HTN integrado para descomposición jerárquica.
+  - `get_htn_insights`: Obtiene insights estadísticos del sistema HTN integrado.
+  - `_extract_parameters_from_input`: Extrae parámetros del input del usuario basado en tipo de entidad.
+  - `_extract_search_query`: Extrae consultas de búsqueda del input usando patrones regex.
+  - `_clean_json_response`: Limpia respuestas JSON del modelo eliminando markdown y formato incorrecto.
+  - `_extract_entities_fallback`: Método fallback para extracción de entidades cuando el resolver falla.
+  - `_create_system_goal`: Crea objetivos del sistema a partir de datos estructurados.
+  - `_get_entity_capabilities`: Obtiene capacidades requeridas para un tipo de objetivo y entidad.
+  - `_calculate_entity_goal_cost`: Calcula coste base para objetivos basados en entidad y tipo.
+  - `_calculate_entity_complexity`: Calcula complejidad para objetivos basados en entidad y tipo.
+  - `process_action_response`: Procesa respuestas del modelo que contienen acciones y las ejecuta.
+  - `clear_memory`: Limpia la memoria conversacional del cerebro.
+  - `get_conversation_history`: Obtiene historial de conversaciones desde memoria.
+  - `get_current_goals`: Obtiene objetivos actuales del sistema.
+  - `get_system_state`: Obtiene el estado actual del sistema desde memoria.
+  - `get_domain_entities`: Obtiene entidades del dominio (streamers, plataformas) desde memoria.
+  - `create_goal_from_user_input`: Crea un objetivo a partir del input del usuario extrayendo entidades.
+  - `get_planner_ready_data`: Obtiene datos estructurados para el sistema de planificación incluyendo objetivos, entidades, estado y acciones.
+  - `register_node`: Registra un nodo en el sistema de planificación.
+  - `register_task`: Registra una tarea en el sistema de planificación.
+  - `get_jarvis_context`: Función global que obtiene el contexto del sistema Jarvis.
+
+### 👂 Módulo `src/ear/` - Sistema de Escucha
+
+#### `src/ear/__init__.py` [4 líneas] - Inicialización del Módulo Escucha
+- **Descripción**: Módulo de escucha de JARVIS con importación del sistema auditivo.
+- **Métodos principales**:
+  - `Ear`: Clase principal del sistema de escucha importada desde listener.
+
+#### `src/ear/listener.py` [587 líneas] - Sistema de Escucha y Reconocimiento de Voz
+- **Descripción**: Sistema de escucha y reconocimiento de voz para capturar comandos de voz con pipeline de nodos modular y soporte para activación por palabra. Utiliza Whisper para transcripción y procesamiento de audio en tiempo real.
+- **Clases principales**:
+  - `AudioCapabilities` (dataclass): Configuración de capacidades de audio (sample_rate, channels, block_duration, silence_threshold).
+  - `AudioNode`: Nodo base para procesamiento de audio con precondiciones, efectos y coste.
+  - `CalibrationNode`: Nodo para calibración de umbral de detección de voz mediante medición de ruido.
+  - `TranscriptionNode`: Nodo para transcripción de audio a texto usando WhisperModel.
+  - `DetectionNode`: Nodo para detección de voz en cola de audio con threshold configurable.
+  - `RecordingNode`: Nodo para grabación de audio con detección de silencio y timeout.
+  - `Ear`: Clase principal del sistema de escucha con pipeline completo de procesamiento.
+- **Métodos principales**:
+  - `Ear.__init__`: Inicializa el sistema auditivo con capacidades modulares y nodos de pipeline.
+  - `get_audio_pipeline`: Devuelve la lista de nodos del pipeline de procesamiento de audio.
+  - `get_pipeline_cost`: Calcula el coste total del pipeline de audio.
+  - `get_pipeline_preconditions`: Devuelve las precondiciones necesarias para ejecutar el pipeline.
+  - `get_pipeline_effects`: Devuelve los efectos de ejecutar el pipeline.
+  - `listen`: Escucha el audio del usuario y transcribe usando el pipeline de nodos en modo alerta continua.
+  - `_check_activation_word`: Verifica si el texto contiene una variante de "Jarvis" (jarvis, jarves, jarbez, garbez, garves, jarbes).
+  - `process_audio_batch`: Procesa un lote de audios pregrabados directamente sin detección de voz.
+  - `get_audio_status`: Devuelve el estado actual del sistema de audio con información de pipeline y nodos.
+- **Funciones globales**:
+  - `AudioNode.execute`: Ejecuta el procesamiento de audio (heredado).
+  - `AudioNode.get_preconditions`: Devuelve precondiciones del nodo (heredado).
+  - `AudioNode.get_effects`: Devuelve efectos del nodo (heredado).
+  - `AudioNode.get_cost`: Devuelve el coste del nodo (heredado).
+  - `CalibrationNode.execute`: Calibra el umbral de detección de voz (heredado).
+  - `TranscriptionNode.execute`: Transcribe el audio a texto (heredado).
+  - `DetectionNode.execute`: Detecta voz en la cola de audio (heredado).
+  - `RecordingNode.execute`: Graba el audio detectado (heredado).
+  - `_rms`: Calcula el nivel de amplitud RMS del audio (método privado).
+
+### 👁️ Módulo `src/eyes/` - Sistema de Visión
+
+#### `src/eyes/__init__.py` - Inicialización del Módulo Visión
+- **Descripción**: Módulo de visión de JARVIS que exporta las clases principales para el sistema de visión y captura de pantalla. Importa `Vision` desde `vision_only` y `ScreenCapture` desde `screen_capture`.
+- **Exportaciones Principales**: 
+  - `Vision`: Clase principal del sistema de visión simplificado.
+  - `ScreenCapture`: Clase principal del sistema de captura de pantalla.
+  - `get_screen_capture`: Función para obtener la instancia global del sistema de captura de pantalla.
+
+#### `src/eyes/screen.py` [972 líneas] - Captura y Análisis de Pantalla
+- **Descripción**: Captura de pantalla y análisis para JARVIS con arquitectura de planificación. Proporciona captura de pantalla completa y regional, análisis del estado del mundo, detección de aplicaciones activas, verificación básica de elementos UI calibrados e integración con memoria de dominio.
+- **Clases principales**:
+  - `ApplicationState` (Enum): Estados conocidos de una aplicación (CLOSED, OPEN, ACTIVE, MINIMIZED, MAXIMIZED).
+  - `ApplicationInfo` (dataclass): Información de una aplicación detectada con estado, posición, tamaño y elementos visibles.
+  - `WorldState` (dataclass): Estado del mundo usado por las APIs legacy con aplicaciones, monitor activo, elementos calibrados y URLs conocidas.
+  - `ScreenAnalyzer`: Analizador de pantallas integrado con la capa Vision para análisis de aplicaciones y estado del mundo.
+  - `ScreenCapture`: Sistema de captura con geometría delegada a ScreenManager para capturas de monitor, región, elemento y ventana.
+- **Métodos principales**:
+  - `ScreenAnalyzer.__init__`: Inicializa el analizador de pantallas con memoria y visión diferida.
+  - `ScreenAnalyzer.analyze_application_state`: Analiza una aplicación en todos los monitores disponibles.
+  - `ScreenAnalyzer.build_world_state`: Construye el estado del mundo usando la capa Vision cuando está disponible.
+  - `ScreenAnalyzer._convert_visual_world_state`: Adapta el WorldState de memoria de Vision a la API legacy de este módulo.
+  - `ScreenAnalyzer._get_known_applications`: Obtiene aplicaciones conocidas desde memoria y descubrimiento global.
+  - `ScreenAnalyzer._detect_focused_application`: Detecta la aplicación enfocada mediante la ventana foreground.
+  - `ScreenAnalyzer._get_active_monitor`: Obtiene el monitor de la ventana foreground desde ScreenManager.
+  - `ScreenAnalyzer._get_calibrated_elements`: Obtiene elementos calibrados desde memoria.
+  - `ScreenAnalyzer._get_known_urls`: Obtiene URLs conocidas desde memoria de dominio.
+  - `ScreenAnalyzer._get_system_resources`: Obtiene recursos básicos del sistema.
+  - `ScreenCapture.__init__`: Inicializa sistema de captura de pantalla.
+  - `ScreenCapture.capture_monitor`: Captura exactamente el monitor indicado mediante ScreenManager.
+  - `ScreenCapture.capture_region`: Captura una región expresada en coordenadas absolutas del escritorio.
+  - `ScreenCapture.capture_element`: Captura una región descrita por x/y/width/height.
+  - `ScreenCapture.capture_active_window`: Captura la ventana foreground actual.
+  - `ScreenCapture.capture_desktop`: Captura el rectángulo completo del escritorio virtual.
+  - `ScreenCapture.get_world_state`: Obtiene el estado del mundo actual.
+  - `ScreenCapture.get_application_state`: Obtiene el estado de una aplicación específica.
+  - `ScreenCapture.check_element_visibility`: Comprueba visibilidad a partir del estado visual disponible.
+  - `ScreenCapture.clean_temp_files`: Elimina capturas temporales del directorio actual.
+  - `capture_screen`: Función de compatibilidad que captura el escritorio virtual completo.
+  - `capture_captcha_area`: Captura una región del escritorio para compatibilidad legacy.
+  - `get_screen_capture`: Obtiene la instancia global de captura.
+
+#### `src/eyes/screen_capture.py` [350 líneas] - Sistema de Captura de Pantalla
+- **Descripción**: Sistema de captura de pantalla con soporte multi-monitor y captura de regiones. Versión simplificada que no usa ScreenAnalyzer para evitar circular imports con el cerebro principal.
+- **Características principales**:
+  - Captura multi-monitor con soporte para monitores específicos
+  - Captura de regiones personalizadas con coordenadas absolutas
+  - Captura de elementos UI basada en coordenadas
+  - Captura de ventana activa actual
+  - Sistema de fallback usando pyautogui e ImageGrab
+  - Lazy initialization de ScreenAnalyzer para evitar circular imports
+  - Manejo completo de errores y logging detallado
+  - Soporte para rutas personalizadas de guardado
+- **Métodos principales**:
+  - `__init__`: Inicializa el sistema de captura.
+  - `_get_analyzer`: Lazy initialization de ScreenAnalyzer para evitar circular imports.
+  - `capture_monitor`: Captura un monitor específico.
+  - `capture_region`: Captura una región del escritorio virtual.
+  - `capture_element`: Captura un elemento a partir de sus coordenadas absolutas.
+  - `capture_active_window`: Captura la ventana activa actualmente.
+  - `get_world_state`: Obtiene el estado actual del mundo.
+  - `get_application_state`: Obtiene el estado de una aplicación específica.
+  - `get_screen_capture`: Obtiene la instancia global del sistema de captura.
+
+#### `src/eyes/vision.py` [923 líneas] - Procesamiento de Visión y Análisis de Imágenes
+- **Descripción**: Visión por computadora usando Qwen3-VL mediante Ollama. La capa de visión es genérica: no contiene coordenadas, offsets, resoluciones ni lógica específica de Chrome u otra aplicación. La geometría de monitores pertenece a ScreenManager y la calibración universal pertenece a UniversalVisualCalibrator / CalibrationManager.
+- **Clases principales**:
+  - `VisionNodeType` (Enum): Tipos de nodos de visión para planificación (SCREEN_ANALYSIS, UI_DETECTION, ELEMENT_VERIFICATION, STATE_VERIFICATION, CALIBRATION_ANALYSIS, APPLICATION_DETECTION).
+  - `VisionNode`: Nodo de percepción visual reutilizable por el planificador con ID, tipo, nombre, descripción, precondiciones, efectos y coste.
+  - `UIElement` (dataclass): Elemento UI detectado por visión con propiedades de tipo, texto, bounding box, centro, interactividad y confianza.
+  - `VisionResponse` (BaseModel): Respuesta estructurada del modelo de visión con lista de elementos UI.
+  - `Vision`: Clase principal del sistema de visión integrado con arquitectura de planificación jerárquica.
+- **Métodos principales**:
+  - `__init__`: Inicializa sistema de visión con modelo, captura de pantalla y memoria.
+  - `_create_vision_nodes`: Crea nodos de visión para planificación.
+  - `get_vision_nodes`: Obtiene todos los nodos de visión.
+  - `get_vision_node`: Obtiene nodo específico por ID.
+  - `get_nodes_by_type`: Obtiene nodos por tipo.
+  - `get_total_vision_cost`: Calcula coste total de nodos de visión.
+  - `_get_available_monitor_numbers`: Obtiene números de monitores disponibles.
+  - `_get_default_monitor_number`: Obtiene monitor por defecto.
+  - `analyze_screen_for_world_state`: Analiza pantallas para construir estado del mundo.
+  - `detect_ui_elements`: Detecta elementos UI en imágenes.
+  - `analyze_image`: Analiza imágenes para calibración.
+  - `verify_element_visibility`: Verifica visibilidad de elementos.
+  - `verify_action_result`: Verifica resultados de acciones.
+  - `_build_verification_prompt`: Construye prompts de verificación.
+  - `detect_application_state`: Detecta estado de aplicaciones.
+  - `_chat_json`: Comunica con Ollama en formato JSON.
+  - `_safe_json_loads`: Carga JSON seguro con manejo de errores.
+  - `_clamp_float`: Normaliza valores flotantes entre 0.0 y 1.0.
+  - `_normalize_int_list`: Normaliza listas de enteros.
+  - `_coordinates_match`: Compara coordenadas con tolerancia.
+  - `get_vision_capabilities`: Obtiene capacidades del sistema de visión.
+
+#### `src/eyes/vision_only.py` [438 líneas] - Sistema de Visión Simplificado
+- **Descripción**: Visión por computadora usando Qwen3-VL mediante Ollama. Versión simplificada sin dependencias circulares.
+- **Clases principales**:
+  - `VisionNodeType` (Enum): Tipos de nodos de visión para el planificador (SCREEN_ANALYSIS, UI_DETECTON, ELEMENT_VERIFICATION, STATE_VERIFICATION, CALIBRATION_ANALYSIS, APPLICATION_DETECTION).
+  - `UIElement` (dataclass): Elemento UI detectado por visión con propiedades de nombre, tipo, texto, bounding box, centro, interactividad y confianza.
+  - `VisionResponse` (BaseModel): Respuesta estructurada del modelo de visión con lista de elementos UI.
+  - `Vision`: Clase principal del sistema de visión integrado con arquitectura de planificación jerárquica.
+- **Métodos principales**:
+  - `Vision.__init__`: Inicializa sistema de visión con modelo, captura de pantalla y memoria, creando nodos de visión para el planificador.
+  - `_create_vision_nodes`: Crea los nodos de visión estándar para el planificador.
+  - `analyze_image`: Analiza una imagen usando el modelo de visión con prompt personalizado y formato JSON.
+  - `verify_action_result`: Verifica si una acción tuvo el resultado esperado visualmente con tolerancia configurable.
+  - `detect_application_state`: Detecta el estado de una aplicación específica visualmente (active/open/minimized/maximized/closed).
+  - `get_vision_capabilities`: Devuelve las capacidades de visión disponibles para el planificador.
+  - `get_total_vision_cost`: Calcula el costo total de las capacidades de visión.
+
+### 🤖 Módulo `src/hands/` - Sistema de Ejecución
+
+#### `src/hands/__init__.py` [30 líneas] - Inicialización del Módulo Ejecución
+- **Descripción**: Módulo principal de ejecución de JARVIS con importación y registro de sistemas de control, calibración, coordenadas y aplicaciones.
+- **Métodos principales**:
+  - `Executor`: Clase principal del sistema de ejecución importada desde executor.
+  - `get_action_registry`: Función para obtener el registro de acciones del sistema.
+  - `register_action`: Función para registrar nuevas acciones en el sistema.
+  - `register_module`: Función para registrar nuevos módulos en el sistema.
+  - `ActionType`: Enumeración que define los tipos de acciones disponibles en el sistema.
+  - `get_calibration_manager`: Función para obtener el gestor de calibración del sistema.
+  - `CalibrationManager`: Clase principal del gestor de calibración importada desde calibration_manager.
+  - `get_coordinate_manager`: Función para obtener el gestor de coordenadas del sistema.
+  - `CoordinateManager`: Clase principal del gestor de coordenadas importada desde coordinate_manager.
+  - `get_application_manager`: Función para obtener el gestor de aplicaciones del sistema.
+  - `get_applications_by_capability`: Función para obtener aplicaciones disponibles por capacidad específica.
+  - `register_custom_application`: Función para registrar aplicaciones personalizadas en el sistema.
+
+#### `src/hands/executor.py` [1373 líneas] - Ejecutor Mejorado con Planificación Jerárquica
+- **Descripción**: Ejecutor mejorado de JARVIS con arquitectura de planificación jerárquica que maneja la ejecución de acciones individuales y planes completos con replanificación dinámica.
+- **Clases principales**:
+  - `Executor`: Clase principal del sistema de ejecución con soporte para planificación jerárquica y replanificación
+  - `ExecutionResult`: Resultado de ejecución de un nodo o plan con estado, tiempo de ejecución, errores y alternativas
+  - `ExecutionStatus`: Enum con estados: PENDING, RUNNING, SUCCESS, FAILED, RETRYING, ALTERNATIVE
+  - `ExecutionState`: Estado actual del mundo para ejecución con timestamps y estados de aplicaciones/UI
+- **Métodos principales**:
+  - `execute_plan`: Ejecuta un plan completo (lista de nodos) con replanificación dinámica
+  - `execute_action`: Ejecuta una acción registrada con mejoras de estado y verificación
+  - `execute_goal`: Ejecuta un objetivo usando el planificador integrado
+  - `process_and_execute`: Procesa respuesta LLM y ejecuta comando (compatibilidad legacy)
+  - `get_current_state`: Obtiene el estado actual del mundo
+  - `get_action_stats`: Obtiene estadísticas de ejecución de acciones
+  - `get_learning_insights`: Obtiene insights del sistema de aprendizaje (FASE 18)
+- **Características mejoradas**:
+  - Ejecución de planes completos con replanificación cuando una acción falla
+  - Verificación de precondiciones y efectos de cada nodo
+  - Manejo de estado del mundo y actualizaciones en tiempo real
+  - Sistema de aprendizaje integrado (FASE 18) para optimización
+  - Timeout handling y manejo robusto de errores
+  - Soporte para acciones alternativas cuando falla la ejecución principal
+- **Integraciones**:
+  - `ActionRegistry` para registro y ejecución de acciones
+  - `MemoryManager` para estado del mundo y estadísticas
+  - `LearningSystem` para aprendizaje y optimización (FASE 18)
+  - `Planner` para planificación jerárquica de objetivos
+  - Módulos de aplicaciones (keyboard, mouse, applications_core)
+- **Fases soportadas**: FASE 7-9 (Planificación jerárquica y ejecución), FASE 18 (Sistema de aprendizaje y optimización)
+
+#### `src/hands/mouse.py` [129 líneas] - Control Básico del Ratón
+- **Descripción**: Control básico del ratón para JARVIS con capacidades de movimiento, clic y scroll integradas en el sistema de acciones.
+- **Funciones principales**:
+  - `move_to_position`: Mueve el ratón a una posición específica con duración configurable.
+  - `click_element`: Realiza clic con botón específico (left, right, middle) con espera posterior.
+  - `scroll_at_position`: Realiza scroll en una posición específica con número de clicks configurable.
+  - `register_mouse_capabilities`: Registra capacidades del ratón en el sistema de acciones.
+- **Características**:
+  - Validación de parámetros (coordenadas, botones, clicks)
+  - Manejo robusto de errores con logging detallado
+  - Integración con ActionRegistry para planificación
+  - Soporte para movimientos suaves con duración configurable
+  - Registro automático al importar el módulo
+- **Tipos de acciones registradas**:
+  - `move_mouse`: Mover ratón a posición (INTERACTION)
+  - `click_mouse`: Hacer clic con el ratón (INTERACTION)  
+  - `scroll_mouse`: Hacer scroll con el ratón (INTERACTION)
+- **Dependencias**: pyautogui para control del ratón, utils.logger para logging.
+
+#### `src/hands/universal_visual_calibrator.py` [916 líneas] - Calibrador Visual Universal
+- **Descripción**: Calibrador visual universal para la arquitectura de planificación jerárquica. Esta capa realiza exclusivamente percepción/calibración visual. No abre ni mueve aplicaciones y no persiste macros_coords.json directamente. El resultado de `calibrate()` utiliza coordenadas absolutas del escritorio virtual y asocia cada elemento al monitor físico real (`s1`, `s2`, ...).
+- **Clases principales**:
+  - `CalibrationPolicy` (Policy): Política centralizada de seguridad, no una allowlist de aplicaciones. La calibración visual es universal: una aplicación GUI no bloqueada puede ser analizada. Las aplicaciones peligrosas/protegidas se rechazan aquí y en el preflight del CalibrationManager cuando corresponde.
+  - `UICapability` (dataclass): Representa un elemento UI calibrado y consumible por acciones con propiedades de nombre, tipo, centro, bounding box, pantalla, confianza y timestamp.
+  - `CalibrationState`: Estado en memoria de los elementos calibrados con soporte para multipantalla (app -> sN -> element -> capability).
+  - `UniversalVisualCalibrator`: Calibrador visual universal integrado con las capas superiores que usa Qwen3-VL para análisis visual y normalización de coordenadas.
+- **Métodos principales**:
+  - `get_ui_capability`: Obtiene una capacidad UI específica para una aplicación y elemento en un monitor concreto con caché automático.
+  - `calibrate_application_elements`: Calibra todos los elementos de una aplicación en un monitor específico aplicando política de filtrado.
+  - `calibrate`: Método principal que realiza calibración completa de una aplicación usando captura de pantalla y análisis con Qwen3-VL.
+  - `_calibrate_element`: Método interno para calibrar un elemento específico dentro de una aplicación ya calibrada.
+  - `_build_prompt`: Construye prompt personalizado para Qwen3-VL basado en el nombre de la aplicación.
+  - `_parse_response`: Parsea respuesta JSON de Qwen3-VL con manejo robusto de errores y formato libre.
+  - `_normalize_elements`: Normaliza elementos crudos del modelo con transformación de coordenadas y deduplicación.
+  - `_normalize_single_element`: Normaliza un elemento individual con validación de coordenadas y confianza.
+  - `_extract_image_bbox`: Extrae bounding box de imagen normalizada (0-1000) y lo convierte a píxeles.
+  - `_image_bbox_to_monitor_bbox`: Convierte coordenadas de imagen a coordenadas absolutas del monitor.
+  - `_deduplicate_elements`: Elimina duplicados por nombre, centro y tipo manteniendo el de mayor confianza.
+- **Características principales**:
+  - Política de seguridad con listas de aplicaciones bloqueadas (juegos, herramientas sensibles, terminales, etc.) y tipos de elemento filtrados.
+  - Soporte multi-monitor con coordenadas absolutas del escritorio virtual asociadas a monitores físicos.
+  - Caché automático de elementos calibrados con historial y timestamps.
+  - Análisis visual con Qwen3-VL mediante Ollama para detección de elementos interactivos.
+  - Normalización robusta de coordenadas, nombres y confianza con validación exhaustiva.
+  - Sistema de deduplicación basado en nombre, centro y tipo de elemento.
+  - Máximo de 80 elementos por calibración con confianza mínima del 20%.
+- **Constantes de configuración**:
+  - `MODEL`: "qwen3-vl:8b-instruct" - Modelo de visión por computadora.
+  - `NORMALIZED_MAX`: 1000 - Valor máximo para coordenadas normalizadas.
+  - `MAX_ELEMENTS`: 80 - Máximo número de elementos detectables.
+  - `MIN_CONFIDENCE`: 0.20 - Confianza mínima para elementos detectados.
+- **Funciones globales**:
+  - `get_calibrator`: Obtiene instancia singleton del calibrador visual universal.
+  - `get_ui_capability`: Función de conveniencia para obtener capacidades UI específicas.
+- **Integraciones**:
+  - `Vision` para análisis de imágenes mediante Qwen3-VL.
+  - `ConversationMemory` para estado y caché de calibraciones.
+  - `ScreenManager` para información de monitores y geometría.
+  - `utils.logger` para logging detallado del proceso de calibración.
+- **Dependencias**: PIL para procesamiento de imágenes, json para manejo de respuestas, regex para normalización, unicodedata para normalización de texto.
+
+#### `src/hands/planner/__init__.py` [96 líneas] - Inicialización del Módulo Planificación
+- **Descripción**: Módulo de planificación de JARVIS que evita inicializar componentes pesados durante la importación para prevenir ciclos entre action_registry y los módulos del planner. Los componentes principales se resuelven de forma perezosa cuando se solicitan.
+- **Clases principales importadas**:
+  - `Goal`: Clase base para objetivos del sistema.
+  - `Node`: Clase base para nodos del planificador.
+  - `NodeType`: Enumeración que define tipos de nodos.
+  - `Task`: Clase base para tareas del sistema.
+  - `TaskStatus`: Enumeración que define estados de tareas.
+- **Funciones principales**:
+  - `get_htn_manager()`: Obtiene la instancia global del HTN Manager mediante importación perezosa.
+  - `get_application_knowledge_integrator()`: Obtiene la instancia global del integrador de conocimiento de aplicaciones.
+  - `get_task_executor()`: Obtiene la instancia global del TaskExecutor mediante importación perezosa.
+- **Funciones dinámicas (__getattr__)**:
+  - `StateGraph`, `GraphNode`, `GraphEdge`, `GraphBuilder`: Clases del sistema de grafos cargadas perezosamente.
+  - `HTNManager`: Clase principal del HTN Manager cargada perezosamente.
+  - `TaskExecutor`: Clase principal del Task Executor cargada perezosamente.
+- **Características principales**:
+  - Importación perezosa para evitar ciclos de dependencia
+  - Delegación directa en singletons definidos por cada módulo
+  - Evita mantener cachés duplicadas a nivel de paquete
+  - Sistema de carga dinámica bajo demanda
+- **Exportaciones (__all__)**:
+  - Clases base: Node, Goal, Task, NodeType, TaskStatus
+  - Componentes de grafos: StateGraph, GraphNode, GraphEdge, GraphBuilder
+  - Gestores: HTNManager, TaskExecutor
+  - Funciones de acceso: get_htn_manager, get_task_executor, get_application_knowledge_integrator
+
+#### `src/hands/planner/preconditions_effects.py` [1077 líneas] - Sistema Avanzado de Precondiciones y Efectos
+- **Descripción**: Sistema avanzado de precondiciones y efectos para planificación jerárquica con gestión centralizada de condiciones y efectos, evaluación segura y aplicación determinista sobre estados del mundo.
+- **Clases principales**:
+  - `PreconditionsEffectsManager`: Gestor centralizado de precondiciones y efectos con registro y reutilización.
+  - `Condition`: Representa condiciones evaluables sobre el estado del mundo.
+  - `Effect`: Representa efectos que modifican el estado del mundo.
+- **Métodos principales**:
+  - `create_condition()`: Crea y registra condiciones para reutilización.
+  - `create_effect()`: Crea y registra efectos para reutilización.
+  - `create_composite_condition()`: Crea condiciones compuestas AND/OR.
+  - `verify_action_preconditions()`: Verifica si todas las precondiciones de una acción se cumplen.
+  - `evaluate_condition()`: Evalúa condiciones individuales o funcionales de forma segura.
+  - `apply_action_effects()`: Aplica los efectos de una acción y devuelve un nuevo estado.
+  - `apply_effect()`: Aplica un efecto individual sobre el estado.
+  - `get_state_requirements_for_action()`: Extrae precondiciones representables como requisitos escalares.
+  - `get_state_modifications_from_action()`: Extrae modificaciones de estado estáticas de los efectos.
+  - `create_action_with_preconditions_effects()`: Crea ActionInfo compatible con el registro central.
+- **Funciones globales**:
+  - `get_preconditions_effects_manager()`: Obtiene la instancia global del gestor.
+  - `create_application_open_condition()`: Crea condición de aplicación abierta.
+  - `create_application_active_condition()`: Crea condición de aplicación activa.
+  - `create_ui_element_calibrated_condition()`: Crea condición de elemento UI calibrado.
+  - `create_application_open_effect()`: Crea efecto de aplicación abierta.
+  - `create_ui_element_calibrate_effect()`: Crea efecto de calibración de elemento UI.
+- **Características principales**:
+  - Construcción y reutilización de condiciones y efectos
+  - Evaluación segura de precondiciones simples, compuestas y funcionales
+  - Aplicación determinista y acumulativa de efectos sobre estados
+  - Integración con ActionInfo/ActionType del registro central de acciones
+  - Utilidades comunes para acciones de aplicaciones y elementos UI
+  - Manejo robusto de errores y logging detallado
+  - Soporte para condiciones compuestas con operadores AND/OR
+  - Sistema de plantillas para condiciones y efectos comunes
+- **Integraciones**:
+  - `ActionInfo` y `ActionType` del registro central de acciones
+  - `Condition` y `Effect` de preconditions_effects_types
+  - Sistema de logging para depuración y monitoreo
+- **Dependencias**: copy, math, typing, hands.action_registry, hands.planner.preconditions_effects_types, utils.logger
+
+#### `src/hands/chrome/__init__.py` [75 líneas] - Inicialización del Módulo Chrome
+- **Descripción**: Módulo específico para Google Chrome con sistema de acciones registrado.
+- **Importaciones principales**:
+  - `chrome`: Módulo con funciones de Chrome (abrir_chrome, abrir_chrome_pantalla, etc.)
+  - `chrome_calibrator`: Módulo con ChromeCalibrator y calibrar_chrome
+  - `action_registry`: Sistema de registro de acciones
+  - `ActionType`: Tipos de acciones disponibles
+- **Acciones registradas**:
+  - `abrir_chrome_action`: Abre Google Chrome en el navegador (APPLICATION, navegacion, ["chrome", "web", "navegador"])
+  - `abrir_chrome_pantalla_action`: Abre Google Chrome en una pantalla específica (APPLICATION, navegacion, ["chrome", "multi-monitor", "pantalla"])
+  - `calibrar_chrome_action`: Calibra Google Chrome con sistema mejorado y nombres semánticos (APPLICATION, calibracion, ["chrome", "calibracion", "qwen3vl", "multi-monitor"])
+- **Funciones globales**:
+  - `abrir_chrome`: Abre Google Chrome en el navegador.
+  - `abrir_chrome_pantalla`: Abre Google Chrome en una pantalla específica.
+  - `get_chrome_commands`: Obtiene los comandos específicos de Chrome.
+  - `calibrar_chrome`: Calibra Google Chrome con sistema mejorado y nombres semánticos.
+- **Exportaciones principales**:
+  - `ChromeCalibrator`: Clase principal del calibrador de Chrome.
+  - `abrir_chrome`, `abrir_chrome_pantalla`, `get_chrome_commands`: Funciones básicas de Chrome.
+  - `abrir_chrome_action`, `abrir_chrome_pantalla_action`, `calibrar_chrome_action`: Acciones registradas en el sistema.
+- **Módulo registrado**: `src.hands.chrome`
+
+#### `src/hands/chrome/chrome.py` [501 líneas] - Funciones Específicas de Google Chrome
+- **Descripción**: Módulo con acciones específicas para Google Chrome que maneja apertura, cierre, movimiento, maximización y calibración del navegador. La lógica universal de calibración, detección de aplicaciones y geometría de monitores pertenece a CalibrationManager y ScreenManager respectivamente.
+- **Clases principales**:
+  - Ninguna clase principal, solo funciones utilitarias.
+- **Métodos principales**:
+  - `abrir_chrome`: Abre Google Chrome en la pantalla predeterminada con múltiples métodos de fallback.
+  - `abrir_chrome_pantalla`: Abre Chrome en un monitor específico con validación de número de pantalla.
+  - `cerrar_chrome`: Cierra todas las ventanas de Google Chrome mediante ScreenManager.
+  - `calibrar_chrome`: Calibra elementos de Chrome usando el flujo universal de aplicaciones con selección automática o manual de monitor.
+  - `mover_chrome_pantalla`: Mueve ventana de Chrome a una pantalla específica con detección de ventanas existentes.
+  - `maximizar_chrome`: Maximiza la ventana de Chrome preferentemente la que está en primer plano.
+- **Funciones internas**:
+  - `_get_chrome_executable`: Busca chrome.exe en ubicaciones habituales de Windows.
+  - `_abrir_chrome_desde_ruta`: Abre Chrome directamente usando múltiples métodos de fallback.
+  - `_get_chrome_windows`: Obtiene ventanas de Chrome mediante ScreenManager.
+  - `_select_preferred_chrome_window`: Selecciona la ventana Chrome en primer plano.
+  - `_verificar_chrome_abierto`: Verifica si existe al menos una ventana visible de Chrome.
+  - `_verificar_chrome_instalado`: Verifica si Chrome está instalado o resoluble en el sistema.
+  - `_capturar_chrome`: Captura una ventana de Chrome (API legacy).
+- **Acciones registradas**:
+  - `abrir_chrome`: Abre Google Chrome (APPLICATION)
+  - `abrir_chrome_pantalla`: Abre Chrome en pantalla específica (APPLICATION)
+  - `cerrar_chrome`: Cierra todas las ventanas de Chrome (APPLICATION)
+  - `calibrar_chrome`: Calibra elementos de Chrome (CALIBRATION)
+  - `mover_chrome_pantalla`: Mueve Chrome a pantalla específica (NAVIGATION)
+  - `maximizar_chrome`: Maximiza ventana de Chrome (NAVIGATION)
+- **Características principales**:
+  - Múltiples métodos de apertura con fallback (subprocess, webbrowser)
+  - Soporte multi-monitor con validación de números de pantalla
+  - Integración con ScreenManager para detección y manejo de ventanas
+  - Manejo robusto de errores con logging detallado
+  - Selección inteligente de ventanas (preferir ventana en primer plano)
+  - API legacy para captura de pantalla (reemplazada por flujo universal)
+- **Dependencias**: pyautogui, subprocess, webbrowser, os, pathlib, time, typing.
+
+#### `src/hands/edge/__init__.py` - Inicialización del Módulo Edge
+- **Descripción**: Módulo específico para Microsoft Edge con importación del sistema de calibración y funciones específicas de Edge.
+- **Métodos principales**:
+  - `EdgeCalibrator`: Clase principal del calibrador de Edge importada desde calibrator_edge.
+  - `get_edge_calibrator`: Función para obtener el calibrador de Edge.
+
+#### `src/hands/edge/calibrator_edge.py` [233 líneas] - Calibrador de Compatibilidad para Microsoft Edge
+- **Descripción**: Adaptador de compatibilidad para la calibración de Microsoft Edge que delega en el sistema universal de calibración. Mantiene API legacy para compatibilidad con código antiguo.
+- **Arquitectura**: Delegating pattern hacia CalibrationManager → UniversalVisualCalibrator → Qwen3-VL
+- **Clases principales**:
+  - `EdgeCalibrator`: Adaptador legacy hacia CalibrationManager con métodos de compatibilidad.
+- **Métodos principales**:
+  - `calibrate_edge_both_screens()`: API legacy por compatibilidad (mantiene nombre histórico pero trabaja con cualquier número de monitores).
+  - `calibrate_edge()`: API moderna de compatibilidad que delega directamente en CalibrationManager.
+  - `_calibrate_edge_universal()`: Método de delegación universal que intenta múltiples nombres de aplicación ("Microsoft Edge", "Edge").
+- **Funciones globales**:
+  - `calibrate_edge()`: Función pública de compatibilidad que devuelve mensajes de estado de calibración.
+- **Características principales**:
+  - Mantiene compatibilidad con código antiguo que importe EdgeCalibrator o calibrate_edge()
+  - No asume número específico de monitores ni resoluciones
+  - No calcula offsets ni coordenadas manualmente
+  - Utiliza sistema universal de calibración con Qwen3-VL
+  - Soporte multi-monitor sin limitaciones
+  - Manejo robusto de errores con logging detallado
+- **Integraciones**:
+  - `CalibrationManager` para calibración real
+  - `UniversalVisualCalibrator` para análisis visual
+  - `Qwen3-VL` para detección de elementos
+  - `ScreenManager` para información de monitores
+- **Limitaciones**:
+  - No genera coordenadas manuales
+  - No analiza elementos uno por uno
+  - No escribe macros_coords.json directamente
+  - No utiliza pyautogui.size() para determinar monitores
+  - No asume DPI o resoluciones específicas
+
+#### `src/hands/edge/edge.py` [554 líneas] - Funciones Específicas de Microsoft Edge
+- **Descripción**: Módulo con acciones específicas para Microsoft Edge que maneja apertura, cierre, movimiento, maximización y calibración del navegador. La geometría de monitores se obtiene exclusivamente de ScreenManager. Este módulo conserva funciones antiguas por compatibilidad, pero no genera coordenadas artificiales, no asume dos monitores y no utiliza una resolución ni un DPI fijo.
+- **Funciones principales**:
+  - `abrir_edge_pantalla`: Abre Microsoft Edge y lo posiciona en la pantalla solicitada.
+  - `abrir_edge_pestana`: Abre una nueva pestaña de Edge en la pantalla solicitada.
+  - `_get_edge_windows`: Obtiene las ventanas visibles/localizables de Microsoft Edge.
+  - `_get_edge_window_info`: Obtiene metadatos y geometría actual de una ventana de Edge.
+  - `_find_edge_window_on_monitor`: Busca una ventana de Edge cuyo centro esté dentro del monitor indicado.
+  - `_select_edge_window`: Selecciona una ventana Edge, priorizando el monitor indicado.
+  - `_abrir_edge_desde_ruta`: Abre Edge desde una instalación local conocida.
+  - `_verificar_edge_abierto`: Verifica si Edge está abierto y visible.
+  - `_verificar_edge_instalado`: Verifica si Microsoft Edge está instalado.
+  - `_move_edge_window`: Mueve una ventana Edge al origen del monitor y trata de maximizarla.
+  - `_mover_edge_a_pantalla`: Mueve una ventana de Edge al monitor solicitado.
+  - `_cerrar_edge`: Cierra una ventana visible de Edge.
+  - `_calibrar_edge`: Compatibilidad con la implementación antigua (legacy).
+  - `_generar_coordenadas_edge`: Compatibilidad con código antiguo; no genera coordenadas artificiales.
+  - `_capturar_edge`: Captura la ventana visible de Edge (compatibilidad).
+  - `get_edge_commands`: Obtiene los comandos legacy de Edge.
+- **Características principales**:
+  - Soporte multi-monitor con validación de números de pantalla
+  - Integración con ScreenManager para detección y manejo de ventanas
+  - Múltiples métodos de apertura con fallback (subprocess, búsqueda de rutas)
+  - Selección inteligente de ventanas (priorizar ventana en primer plano)
+  - Manejo robusto de errores con logging detallado
+  - Funciones legacy para compatibilidad con sistemas antiguos
+  - Soporte para detección de instalación de Edge mediante múltiples métodos
+- **Acciones registradas**:
+  - `abrir_edge_pantalla`: Abre Microsoft Edge en pantalla específica (APPLICATION)
+  - `abrir_edge_pestana`: Abre nueva pestaña de Edge en pantalla específica (APPLICATION)
+- **Funciones legacy (deprecated)**:
+  - `_calibrar_edge`: La calibración específica legacy ha sido desactivada. Utiliza el calibrador universal de aplicaciones.
+  - `_generar_coordenadas_edge`: No genera coordenadas artificiales por diseño.
+- **Integraciones**:
+  - `ScreenManager` para información de monitores y geometría
+  - `pyautogui` para captura de pantalla
+  - `pygetwindow` para detección de ventanas
+  - `utils.logger` para logging detallado
+- **Dependencias**: pyautogui, pygetwindow, subprocess, os, pathlib, time, typing.
+
+#### `src/hands/firefox/__init__.py` [3 líneas] - Inicialización del Módulo Firefox
+- **Descripción**: Módulo específico para Mozilla Firefox con sistema de acciones registrado.
+- **Métodos principales**:
+  - `Firefox`: Clase principal del sistema de Firefox importada desde firefox.
+  - `abrir_firefox_action`: Acción wrapper para abrir Firefox.
+  - `abrir_firefox_pantalla_action`: Acción wrapper para abrir Firefox en pantalla específica.
+  - `calibrar_firefox_action`: Acción wrapper para calibrar Firefox.
+- **Funciones globales**:
+  - `abrir_firefox`: Abre Mozilla Firefox en el navegador.
+  - `abrir_firefox_pantalla`: Abre Mozilla Firefox en una pantalla específica.
+  - `get_firefox_commands`: Obtiene los comandos específicos de Firefox.
+  - `calibrar_firefox`: Calibra Mozilla Firefox con sistema mejorado y nombres semánticos.
+- **Exportaciones principales**:
+  - `FirefoxCalibrator`: Clase principal del calibrador de Firefox.
+  - `abrir_firefox`, `abrir_firefox_pantalla`, `get_firefox_commands`: Funciones básicas de Firefox.
+  - `abrir_firefox_action`, `abrir_firefox_pantalla_action`, `calibrar_firefox_action`: Acciones registradas en el sistema.
+
+#### `src/hands/firefox/firefox.py` [637 líneas] - Funciones Específicas de Mozilla Firefox
+- **Descripción**: Módulo con acciones específicas para Mozilla Firefox que maneja apertura, cierre, movimiento, maximización y calibración del navegador. La lógica universal de calibración, detección de aplicaciones y geometría de monitores pertenece a CalibrationManager y ScreenManager respectivamente.
+- **Clases principales**:
+  - Ninguna clase principal, solo funciones utilitarias.
+- **Métodos principales**:
+  - `abrir_youtube`: Abre YouTube en el navegador predeterminado.
+  - `abrir_spotify`: Abre Spotify Web en el navegador predeterminado.
+  - `abrir_firefox_pantalla`: Abre Mozilla Firefox y lo posiciona en la pantalla solicitada.
+  - `abrir_firefox_pestana`: Abre una nueva pestaña de Firefox en la pantalla solicitada.
+  - `_get_firefox_windows`: Obtiene las ventanas visibles/localizables de Mozilla Firefox.
+  - `_get_firefox_window_info`: Obtiene metadatos y geometría actual de una ventana de Firefox.
+  - `_find_firefox_window_on_monitor`: Busca una ventana de Firefox cuyo centro esté dentro del monitor indicado.
+  - `_select_firefox_window`: Selecciona una ventana Firefox, priorizando el monitor indicado.
+  - `_abrir_firefox_desde_ruta`: Abre Firefox desde una instalación local conocida.
+  - `_verificar_firefox_abierto`: Verifica si Firefox está abierto y visible.
+  - `_verificar_firefox_instalado`: Verifica si Mozilla Firefox está instalado.
+  - `_move_firefox_window`: Mueve una ventana Firefox al origen del monitor y trata de maximizarla.
+  - `_mover_firefox_a_pantalla`: Mueve una ventana de Firefox al monitor solicitado.
+  - `_cerrar_firefox`: Cierra una ventana visible de Firefox.
+  - `_calibrar_firefox`: Compatibilidad con la implementación antigua (no genera coordenadas).
+  - `_generar_coordenadas_firefox`: Compatibilidad con código antiguo; no genera coordenadas artificiales.
+  - `_capturar_firefox`: Captura la ventana visible de Firefox (compatibilidad).
+  - `get_firefox_commands`: Obtiene los comandos legacy de Firefox.
+- **Características principales**:
+  - Soporte multi-monitor con validación de números de pantalla
+  - Integración con ScreenManager para detección y manejo de ventanas
+  - Múltiples métodos de apertura con fallback (subprocess, búsqueda de rutas)
+  - Selección inteligente de ventanas (priorizar ventana en primer plano)
+  - Manejo robusto de errores con logging detallado
+  - Funciones legacy para compatibilidad con sistemas antiguos
+  - Soporte para detección de instalación de Firefox mediante múltiples métodos
+- **Acciones registradas**:
+  - `abrir_firefox_pantalla`: Abre Mozilla Firefox en pantalla específica (APPLICATION)
+  - `abrir_firefox_pestana`: Abre nueva pestaña de Firefox en pantalla específica (APPLICATION)
+- **Funciones legacy (deprecated)**:
+  - `_calibrar_firefox`: La calibración específica legacy ha sido desactivada. Utiliza el calibrador universal de aplicaciones.
+  - `_generar_coordenadas_firefox`: No genera coordenadas artificiales por diseño.
+- **Integraciones**:
+  - `ScreenManager` para información de monitores y geometría
+  - `pyautogui` para captura de pantalla
+  - `pygetwindow` para detección de ventanas
+  - `utils.logger` para logging detallado
+- **Dependencias**: pyautogui, pygetwindow, subprocess, os, pathlib, time, typing.
+
+#### `src/hands/firefox/calibrator_firefox.py` [227 líneas] - Calibrador de Compatibilidad para Mozilla Firefox
+- **Descripción**: Adaptador de compatibilidad para la calibración de Mozilla Firefox que delega en el sistema universal de calibración. Mantiene API legacy para compatibilidad con código antiguo.
+- **Arquitectura**: Delegating pattern hacia CalibrationManager → UniversalVisualCalibrator → Qwen3-VL
+- **Clases principales**:
+  - `FirefoxCalibrator`: Adaptador legacy hacia CalibrationManager con métodos de compatibilidad.
+- **Métodos principales**:
+  - `calibrate_firefox_both_screens()`: API legacy por compatibilidad (mantiene nombre histórico pero trabaja con cualquier número de monitores).
+  - `calibrate_firefox()`: API moderna de compatibilidad que delega directamente en CalibrationManager.
+  - `_calibrate_firefox_universal()`: Método de delegación universal que intenta múltiples nombres de aplicación ("Mozilla Firefox", "Firefox").
+- **Funciones globales**:
+  - `calibrate_firefox()`: Función pública de compatibilidad que devuelve mensajes de estado de calibración.
+- **Características principales**:
+  - Mantiene compatibilidad con código antiguo que importe FirefoxCalibrator o calibrate_firefox()
+  - No asume número específico de monitores ni resoluciones
+  - No calcula offsets ni coordenadas manualmente
+  - Utiliza sistema universal de calibración con Qwen3-VL
+  - Soporte multi-monitor sin limitaciones
+  - Manejo robusto de errores con logging detallado
+- **Integraciones**:
+  - `CalibrationManager` para calibración real
+  - `UniversalVisualCalibrator` para análisis visual
+  - `Qwen3-VL` para detección de elementos
+  - `ScreenManager` para información de monitores
+- **Limitaciones**:
+  - No genera coordenadas manuales
+  - No analiza elementos uno por uno
+  - No escribe macros_coords.json directamente
+  - No utiliza pyautogui.size() para determinar monitores
+  - No asume DPI o resoluciones específicas
+
+#### `src/hands/firefox/calibrator_firefox.py` [227 líneas] - Calibrador de Compatibilidad para Mozilla Firefox
+- **Descripción**: Adaptador de compatibilidad para la calibración de Mozilla Firefox que delega en el sistema universal de calibración. Mantiene API legacy para compatibilidad con código antiguo.
+- **Arquitectura**: Delegating pattern hacia CalibrationManager → UniversalVisualCalibrator → Qwen3-VL
+- **Clases principales**:
+  - `FirefoxCalibrator`: Adaptador legacy hacia CalibrationManager con métodos de compatibilidad.
+- **Métodos principales**:
+  - `calibrate_firefox_both_screens()`: API legacy por compatibilidad (mantiene nombre histórico pero trabaja con cualquier número de monitores).
+  - `calibrate_firefox()`: API moderna de compatibilidad que delega directamente en CalibrationManager.
+  - `_calibrate_firefox_universal()`: Método de delegación universal que intenta múltiples nombres de aplicación ("Mozilla Firefox", "Firefox").
+- **Funciones globales**:
+  - `calibrate_firefox()`: Función pública de compatibilidad que devuelve mensajes de estado de calibración.
+- **Características principales**:
+  - Mantiene compatibilidad con código antiguo que importe FirefoxCalibrator o calibrate_firefox()
+  - No asume número específico de monitores ni resoluciones
+  - No calcula offsets ni coordenadas manualmente
+  - Utiliza sistema universal de calibración con Qwen3-VL
+  - Soporte multi-monitor sin limitaciones
+  - Manejo robusto de errores con logging detallado
+- **Integraciones**:
+  - `CalibrationManager` para calibración real
+  - `UniversalVisualCalibrator` para análisis visual
+  - `Qwen3-VL` para detección de elementos
+  - `ScreenManager` para información de monitores
+- **Limitaciones**:
+  - No genera coordenadas manuales
+  - No analiza elementos uno por uno
+  - No escribe macros_coords.json directamente
+  - No utiliza pyautogui.size() para determinar monitores
+  - No asume DPI o resoluciones específicas
+
+#### `src/hands/planner/__init__.py` - Inicialización del Módulo de Planificación
+- **Descripción**: Módulo principal de planificación que carga componentes pesados de forma perezosa para evitar ciclos de importación y mantener compatibilidad con action_registry.
+- **Clases principales**:
+  - `Node`: Modelo conceptual común para todos los elementos del sistema (importado de node)
+  - `Goal`: Objetivos de alto nivel alcanzables mediante planificación (importado de node)
+  - `Task`: Tareas jerárquicas descomponibles en otras tareas o nodos (importado de node)
+  - `NodeType`: Tipos de nodos en el sistema de planificación (importado de node)
+  - `TaskStatus`: Estados de ejecución de tareas (importado de node)
+  - `StateGraph`: Sistema de grafos de estados para planificación (importado perezoso de graph)
+  - `GraphNode`: Nodo del grafo de estados (importado perezoso de graph)
+  - `GraphEdge`: Arista del grafo de estados (importado perezoso de graph)
+  - `GraphBuilder`: Constructor de grafos predefinidos (importado perezoso de graph)
+  - `HTNManager`: Gestor de descomposición jerárquica de tareas (importado perezoso de htn_manager)
+  - `TaskExecutor`: Ejecutor de tareas jerárquicas (importado perezoso de task_executor)
+- **Métodos principales**:
+  - `get_htn_manager`: Obtiene la instancia global del HTN Manager mediante importación perezosa
+  - `get_application_knowledge_integrator`: Obtiene la instancia global del integrador de conocimiento de aplicaciones
+  - `get_task_executor`: Obtiene la instancia global del TaskExecutor mediante importación perezosa
+  - `__getattr__`: Carga componentes pesados del planner solo cuando se solicitan (StateGraph, GraphNode, GraphEdge, GraphBuilder, HTNManager, TaskExecutor)
+  - `__dir__`: Expone nombres disponibles mediante carga perezosa para autocompletado
+- **Funciones globales**:
+  - `get_htn_manager`: Obtiene instancia singleton del gestor HTN
+  - `get_application_knowledge_integrator`: Obtiene instancia global del integrador de conocimiento
+  - `get_task_executor`: Obtiene instancia global del ejecutor de tareas
+- **Constantes**:
+  - `__all__`: Lista de exportaciones del módulo incluyendo clases y funciones principales
+
+#### `src/hands/windows/__init__.py` - Inicialización del Módulo Windows
+- **Descripción**: Módulo específico para aplicaciones de Windows. Archivo de inicialización del paquete Windows que contiene solo la documentación del módulo.
+- **Contenido**: Archivo `__init__.py` básico con docstring que define el módulo Windows para JARVIS.
+
+#### `src/hands/action_registry.py` [936 líneas] - Registro y Ejecución de Acciones
+- **Descripción**: Registro centralizado de acciones para JARVIS con sistema de planificación, validación de parámetros y monitoreo.
+- **Clases principales**:
+  - `ActionType` (Enum): Tipos de acciones (APPLICATION, SYSTEM, NAVIGATION, INTERACTION, CALIBRATION)
+  - `ActionInfo` (dataclass): Metadatos y contrato ejecutable de acciones registradas
+  - `ActionRegistry`: Registro y acceso a todas las acciones/capacidades disponibles
+- **Métodos principales**:
+  - `_serialize_rule`: Serializa condiciones/efectos sin serializar callbacks
+  - `_get_state_value`: Obtiene valores de estado desde dict, objetos o atributos
+  - `_condition_from_dict`: Convierte diccionarios a modelo canónico de condiciones
+  - `_match_condition`: Evalúa condiciones simples, compuestas, funcionales u objetos Condition
+  - `_matches_conditions`: Evalúa colección de precondiciones con semántica AND
+  - `_apply_effect_value`: Aplica efectos mediante modelo canónico o compatibilidad legacy
+  - `_normalize_cost`: Normaliza valores de coste a finitos y no negativos
+  - `_normalize_confidence`: Normaliza valores de confianza entre 0.0 y 1.0
+  - `_resolve_action_type`: Resuelve tipos de acción desde strings o enums
+  - `_extract_parameters`: Extrae metadatos básicos de parámetros de funciones
+  - `_validate_value_type`: Validación de tipos básicos y anotaciones parametrizadas
+  - `_store_action_info`: Almacena información de acción manteniendo categorías
+  - `get_action`: Obtiene información de acción por nombre
+  - `get_actions_by_category`: Obtiene acciones filtradas por categoría
+  - `get_all_actions`: Devuelve copia de todas las acciones registradas
+  - `get_plannable_actions`: Obtiene acciones habilitadas para planificación
+  - `get_actions_for_planner`: Formatea acciones para el sistema de planificación
+  - `get_actions_for_llama`: Formatea acciones para modelos LLM
+  - `validate_action`: Valida presencia, nombres y tipos de parámetros
+  - `can_execute`: Determina si una acción está disponible en un estado dado
+  - `get_action_cost`: Obtiene coste asociado a una acción
+  - `execute_action`: Ejecuta capacidad real registrada con manejo de errores
+  - `list_actions`: Lista acciones disponibles, opcionalmente por categoría
+  - `get_action_categories`: Obtiene lista de categorías disponibles
+  - `get_optimization_stats`: Obtiene estadísticas para monitoreo y optimización
+  - `optimize_logging`: Optimiza sistema de eliminando mensajes redundantes
+- **Funciones globales**:
+  - `get_action_registry`: Obtiene instancia singleton del registro de acciones
+  - `register_action`: Decorador de conveniencia para registrar acciones
+  - `register_module`: Importa módulo y registra sus acciones decoradas
+- **Funciones globales**:
+  - `get_action_registry`: Obtiene instancia singleton del registro de acciones
+  - `register_action`: Decorador de conveniencia para registrar acciones
+  - `register_module`: Importa módulo y registra sus acciones decoradas
+
+#### `src/hands/planner/application_integration.py` - Integración de Conocimiento de Aplicaciones
+- **Descripción**: Convierte conocimiento declarativo de aplicaciones en Nodes compatibles con el modelo canónico de planificación, manteniendo separadas planificación y ejecución.
+- **Clases principales**:
+  - `ApplicationKnowledgeIntegrator`: Integrador de conocimiento estructurado de aplicaciones con el planificador
+- **Métodos principales**:
+  - `__init__`: Inicializa integrador con gestor de aplicaciones y memoria
+  - `_normalize_name`: Normaliza nombres para IDs/keys de estado
+  - `_capability_value`: Obtiene el valor estable de una capacidad o su representación textual
+  - `_as_list`: Normaliza listas/tuplas/conjuntos y valores individuales
+  - `_get_application`: Obtiene aplicación del gestor por nombre
+  - `convert_application_to_nodes`: Convierte una aplicación y sus capacidades en Nodes canónicos
+  - `_create_application_node`: Crea el nodo declarativo principal de la aplicación
+  - `_create_capability_node`: Crea un nodo de acción para una capacidad de aplicación
+  - `_create_ui_element_node`: Crea un nodo declarativo para un elemento UI requerido
+  - `_safe_cost`: Calcula coste seguro con valores por defecto
+  - `_get_application_current_state`: Obtiene estado persistido de la aplicación cuando existe
+  - `_generate_application_preconditions`: Genera precondiciones reales de preparación de la aplicación
+  - `_generate_application_effects`: Genera efectos declarativos de disponibilidad/authenticación
+  - `get_applications_by_capability`: Obtiene aplicaciones que exponen una capacidad
+  - `get_application_capabilities`: Obtiene capacidades de una aplicación en formato declarativo
+  - `get_ui_elements_for_capability`: Obtiene elementos UI requeridos por una capacidad
+  - `is_application_capable`: Verifica si una aplicación ofrece una capacidad
+  - `register_application_knowledge`: Registra conocimiento de una aplicación mediante applications_core
+- **Funciones globales**:
+  - `get_application_knowledge_integrator`: Obtiene la instancia global del integrador
+  - `get_applications_by_capability`: Compatibilidad legacy usando ApplicationCapability cuando existe
+  - `get_application_knowledge`: Compatibilidad legacy para consultar el conocimiento de una aplicación
+
+#### `src/hands/application_preflight.py` [894 líneas] - Sistema de Preflight de Aplicaciones
+- **Descripción**: Sistema de verificación previa de aplicaciones antes de su apertura y calibración. Bloquea aplicaciones administrativas/técnicas, resuelve ejecutables, inspecciona manifiestos y detecta requisitos de elevación. No ejecuta aplicaciones ni realiza capturas.
+- **Clases principales**:
+  - `PreflightResult` (dataclass): Resultado estructurado del chequeo preflight con estado de permisos, razonamiento y metadatos.
+  - `ApplicationPreflight`: Clase principal para análisis seguro de aplicaciones sin ejecución.
+- **Métodos principales**:
+  - `check`: Analiza una aplicación sin ejecutarla, verificando bloqueos, login y recursos.
+  - `check_application`: Versión tipada del chequeo principal que devuelve PreflightResult.
+  - `is_safe_to_calibrate`: Indica si el resultado actual permite iniciar una calibración.
+  - `check_login_state`: Evalúa únicamente el conocimiento explícito de login disponible.
+  - `check_resources`: Evalúa recursos explícitamente conocidos por la aplicación.
+  - `resolve_executable`: Resuelve la ruta del ejecutable a partir del nombre y app_id usando PowerShell.
+  - `_resolve_from_apps_folder`: Busca ejecutables en la carpeta de aplicaciones de Windows.
+  - `_resolve_from_target_string`: Resuelve ejecutable desde cadena de destino.
+  - `_is_executable`: Verifica si una ruta corresponde a un ejecutable válido (.exe).
+  - `inspect_executable_manifest`: Inspecciona manifiesto de ejecutable para detectar elevación.
+  - `_parse_manifest_file`: Parsea archivo de manifiesto desde ruta.
+  - `_parse_manifest_xml`: Parsea XML de manifiesto con manejo de codificaciones.
+  - `_extract_embedded_manifest`: Extrae RT_MANIFEST del PE sin ejecutar el binario.
+  - `clear_cache`: Limpia resultados de resolución y manifest del caché.
+  - `_name_is_blocked`: Verifica si el nombre de aplicación está bloqueado.
+  - `_app_id_is_blocked`: Verifica si el app_id de aplicación está bloqueado.
+  - `_resolve_resources_status`: Resuelve estado de recursos requeridos por la aplicación.
+  - `_optional_bool`: Convierte valores a booleano opcional con manejo de cadenas.
+  - `_normalized_values`: Normaliza valores para comparación consistente.
+  - `_normalize`: Normaliza cadenas para eliminación de acentos y case-insensitive.
+- **Funciones globales**:
+  - `get_application_preflight`: Obtiene instancia singleton del sistema de preflight.
+- **Bloqueos conocidos**:
+  - Nombres: application verifier, administrator, task scheduler, event viewer, computer management, device manager, registry editor, hyper v, active directory, windows defender firewall, services, iscsi.
+  - AppIDs: application_verifier, task_scheduler, event_viewer, computer_management, device_manager, registry, hyper_v, active_directory, security_policy, firewall, services, administrative, elevated.
+- **Niveles de ejecución riesgosos**:
+  - `requireadministrator`, `highestavailable`.
+- **Módulos externos**:
+  - `pefile`: Para extracción de manifest embebido en binarios PE.
+
+#### `src/hands/applications_core.py` [1055 líneas] - Núcleo de Aplicaciones
+- **Descripción**: Sistema de conocimiento estructurado de aplicaciones para planificación jerárquica con capacidades reutilizables, integración con calibración específica y global, soporte para preflight y login, y compatibilidad con comandos legacy.
+- **Clases principales**:
+  - `ApplicationCapability` (Enum): Tipos de capacidades que puede ofrecer una aplicación
+  - `ApplicationState` (Enum): Estados posibles de una aplicación
+  - `UIElement` (dataclass): Elemento UI de una aplicación con coordenadas y calibración
+  - `ApplicationCapabilityDef` (dataclass): Definición de una capacidad de aplicación
+  - `ApplicationKnowledge` (dataclass): Conocimiento estructurado de una aplicación
+  - `ApplicationManager`: Gestor del conocimiento estructurado de aplicaciones
+- **Métodos principales**:
+  - `ApplicationManager.__init__`: Inicializa el gestor con aplicaciones base y memoria
+  - `ApplicationManager._normalize_name`: Normaliza nombres habituales de aplicaciones a clave interna
+  - `ApplicationManager._initialize_applications`: Inicializa conocimiento de aplicaciones base (Chrome, Spotify)
+  - `ApplicationManager.register_application`: Registra aplicación en memoria y gestor
+  - `ApplicationManager.get_application`: Obtiene aplicación por nombre o alias
+  - `ApplicationManager.get_applications_by_type`: Obtiene aplicaciones por tipo
+  - `ApplicationManager.get_applications_by_capability`: Obtiene aplicaciones con capacidad determinada
+  - `ApplicationManager._load_custom_applications`: Carga aplicaciones personalizadas persistidas en memoria
+  - `ApplicationManager.get_application_capabilities`: Obtiene capacidades en formato de planificación
+  - `ApplicationManager.get_application_ui_elements`: Obtiene elementos UI conocidos de aplicación
+  - `ApplicationKnowledge.get_capability`: Obtiene capacidad por nombre
+  - `ApplicationKnowledge.get_ui_element`: Obtiene elemento UI por nombre
+  - `ApplicationKnowledge.is_capable`: Comprueba si aplicación posee capacidad específica
+  - `ApplicationKnowledge.get_calibrated_elements`: Obtiene elementos UI calibrados
+  - `UIElement.is_calibrated`: Comprueba si existe información de coordenadas utilizable
+  - `UIElement._is_coordinate_pair`: Valida pareja de coordenadas sin asumir formato único
+- **Funciones globales**:
+  - `get_application_manager`: Obtiene instancia global del gestor de aplicaciones
+  - `open_application`: Abre aplicación conocida y valida disponibilidad
+  - `close_application`: Cierra aplicación por proceso sin afectar otras
+  - `wait_for_application_state`: Espera a que aplicación alcance estado específico
+  - `calibrate_application_ui`: Calibra elementos UI de aplicación específica
+  - `calibrar_aplicaciones`: Inicia calibración global de aplicaciones soportadas
+  - `calibrate_applications`: Alias programático de calibrar_aplicaciones
+  - `_call_calibrate_all_applications`: Invoca calibración global compatible con managers antiguos y nuevos
+  - `_check_application_available`: Comprueba si ejecutable configurado está disponible
+  - `_check_application_login`: Comprueba estado de login cuando exista backend
+  - `_looks_like_global_report`: Identifica contrato agregado del orquestador global
+  - `_build_global_calibration_report`: Convierte resultados de CalibrationManager en informe estable
+  - `get_application_knowledge`: Obtiene conocimiento estructurado de aplicación
+  - `get_applications_by_capability`: Obtiene aplicaciones que tienen capacidad específica
+  - `register_custom_application`: Registra aplicación personalizada
+- **Funciones legacy**:
+  - `get_available_commands`: Obtiene comandos registrados
+  - `navigate_to_url`: Abre URL en navegador predeterminado
+  - `abrir_youtube`: Abre YouTube
+  - `abrir_gmail`: Abre Gmail
+
+#### `src/hands/calibration_manager.py` [2343 líneas] - Gestor Universal de Calibración de Aplicaciones
+- **Descripción**: Sistema coordinador universal de calibración multiaplicación y multimonitor. Gestiona descubrimiento, preflight, apertura segura, preparación de ventanas, captura de monitor y persistencia de coordenadas.
+- **Clases principales**:
+  - `ApplicationType` (Enum): Tipos de aplicaciones soportadas (CHROME, EDGE, FIREFOX, NOTEPAD, CALCULATOR, PAINT, EXPLORER, CMD, SPOTIFY, GENERIC).
+  - `CalibrationPreflightResult` (dataclass): Resultado estructurado del chequeo preflight con permisos, razonamiento y metadatos.
+  - `CalibrationResult` (dataclass): Resultado estructurado de calibración con estado, elementos y datos.
+  - `_WindowStateSnapshot` (dataclass): Instantánea del estado de ventana para restauración.
+  - `CalibrationManager`: Clase principal coordinadora universal de calibración multiaplicación.
+- **Métodos principales**:
+  - `__init__`: Inicializa gestor con screen manager, visual calibrator y configuración.
+  - `register_calibrator`: Registra calibradores específicos para aplicaciones.
+  - `get_available_applications`: Obtiene aplicaciones GUI descubiertas.
+  - `get_supported_applications`: Obtiene aplicaciones soportadas (alias de available).
+  - `set_preflight_checker`: Establece checker externo de preflight.
+  - `preflight_application`: Realiza chequeo preflight de aplicación.
+  - `get_application_calibration_capability`: Obtiene capacidad de calibración de aplicación.
+  - `discover_applications`: Descubre aplicaciones GUI sin limitarse a lista conocida.
+  - `_should_ignore_application`: Verifica si aplicación debe ser ignorada.
+  - `_is_game_application`: Detecta aplicaciones de juegos.
+  - `_is_elevation_risk_application`: Detecta aplicaciones con riesgo de elevación.
+  - `_is_vscode_application`: Detecta Visual Studio Code.
+  - `_is_game_launcher_application`: Detecta lanzadores de juegos.
+  - `_get_window_handles`: Obtiene manejos de ventana válidos.
+  - `_win32_is_gui_window`: Verifica si ventana es GUI válida.
+  - `_window_is_usable`: Verifica si ventana es utilizable.
+  - `_get_window_geometry`: Obtiene geometría utilizable incluso minimizada.
+  - `_capture_window_state`: Captura estado de ventana para restauración.
+  - `_restore_window_state`: Restaura estado previo de ventana.
+  - `_find_existing_application_window`: Busca ventana existente de aplicación.
+  - `launch_application`: Reutiliza ventana existente o lanza aplicación genéricamente.
+  - `_wait_for_application_window`: Espera ventana de aplicación después de lanzamiento.
+  - `_set_window_position`: Posiciona ventana en coordenadas específicas.
+  - `_maximize_window`: Maximiza ventana.
+  - `_window_center`: Obtiene centro de ventana.
+  - `_window_is_on_monitor`: Verifica si ventana está en monitor específico.
+  - `_open_temporary_browser_tab`: Abre pestaña temporal en navegador.
+  - `_close_temporary_browser_tab`: Cierra pestaña temporal creada.
+  - `_prepare_window_for_calibration`: Prepara ventana (restaura/maximiza) y detecta monitor.
+  - `move_window_to_monitor`: Mueve ventana temporalmente a monitor indicado.
+  - `_post_close_message`: Envía mensaje de cierre a ventana.
+  - `_post_system_close`: Envía comando de cierre del sistema.
+  - `close_application_window`: Cierra ventana de aplicación de forma segura.
+  - `_close_all_owned_windows`: Cierra todas las ventanas propiedad del proceso.
+  - `_force_terminate_process`: Fuerza terminación de proceso.
+  - `is_application_calibrated`: Verifica si aplicación ya está calibrada.
+  - `_get_registered_calibrator`: Obtiene calibrador registrado para aplicación.
+  - `_instantiate_registered_calibrator`: Instancia calibrador registrado.
+  - `_invoke_registered_calibrator`: Ejecuta API de calibrador registrado.
+  - `_normalize_registered_result`: Normaliza resultado de calibrador registrado.
+  - `_calibrate_registered_application`: Calibra aplicación usando calibrador registrado.
+  - `calibrate_application`: Método principal de calibración universal para cualquier aplicación.
+  - `_get_monitors_to_calibrate`: Obtiene monitores para calibración.
+  - `_calibrate_open_window`: Calibra ventana ya abierta en monitor específico.
+  - `calibrate_all_applications`: Calibra múltiples aplicaciones con reporte consolidado.
+  - `_extract_elements`: Extrae elementos de análisis de calibración.
+  - `_extract_element_center`: Extrae coordenadas centrales de elemento.
+  - `_build_application_coordinates`: Construye mapa de coordenadas de aplicación.
+  - `_save_application_calibration`: Guarda resultados de calibración de aplicación.
+  - `_save_coordinate_map`: Guarda mapa de coordenaciones persistente.
+  - `get_calibration_statistics`: Obtiene estadísticas del sistema de calibración.
+  - `_resolve_application`: Resuelve información de aplicación desde input.
+  - `_resolve_application_list`: Resuelve lista de aplicaciones.
+  - `_get_application_type`: Obtiene tipo de aplicación.
+  - `_get_storage_application_key`: Obtiene clave de almacenamiento para aplicación.
+  - `_normalize_application_name`: Normaliza nombre de aplicación.
+  - `_normalize_element_name`: Normaliza nombre de elemento.
+  - `_expected_process_names`: Obtiene nombres de proceso esperados para aplicación.
+  - `_score_window_for_application`: Puntúa ventana para aplicación específica.
+  - `_get_window_by_handle`: Obtiene ventana por manejador.
+  - `_get_window_process_id`: Obtiene ID de proceso de ventana.
+  - `_get_window_process_name`: Obtiene nombre de proceso de ventana.
+  - `_get_process_ids`: Obtiene IDs de proceso actuales.
+  - `_get_process_tree`: Obtiene árbol de procesos hijo.
+  - `_is_process_alive`: Verifica si proceso está activo.
+  - `_is_process_elevated`: Verifica si proceso está elevado.
+  - `_reset_launch_context`: Reinicia contexto de lanzamiento.
+  - `_looks_like_game_launch_arguments`: Detecta argumentos de lanzamiento de juegos.
+  - `_is_game_launcher_executable`: Detecta ejecutables de lanzadores de juegos.
+  - `_is_game_installation_path`: Detecta rutas de instalación de juegos.
+  - `_looks_like_console_or_cli_launcher`: Detecta lanzadores de consola/CLI.
+  - `_reset_application_metadata_cache`: Reinicia caché de metadatos de aplicación.
+  - `_normalize_filesystem_path`: Normaliza rutas del sistema de archivos.
+  - `_normalize_executable_name`: Normaliza nombre de ejecutable.
+  - `_register_application_metadata`: Registra metadatos de aplicación.
+  - `_load_application_installation_metadata`: Carga metadatos de instalación de aplicaciones.
+  - `_get_application_metadata`: Obtiene metadatos de aplicación por nombre y app_id.
+- **Funciones globales**:
+  - `get_calibration_manager`: Obtiene instancia singleton del gestor de calibración.
+
+#### `src/hands/calibrator.py` [1010 líneas] - Fachada y Capacidades de Calibración
+- **Descripción**: Fachada y capacidades de calibración para JARVIS. Mantiene la API histórica de Calibrator y la capa de capacidades jerárquicas, pero delega la calibración real en CalibrationManager.
+- **Clases principales**:
+  - `CalibrationPolicy` (Enum): Políticas de calibración (NEVER, ASK, AUTOMATIC, REQUIRED).
+  - `CalibrationStatus` (Enum): Estados de calibración (UNKNOWN, NOT_CALIBRATED, CALIBRATED, OUTDATED, INVALID).
+  - `CalibrationElement` (dataclass): Elemento de calibración con ID, nombre, aplicación, coordenadas, estado y metadatos.
+  - `CalibrationCapability` (dataclass): Capacidad de calibración con ID, nombre, descripción, elementos soportados y método.
+  - `CalibrationStrategy` (ABC): Estrategia abstracta para calibración de elementos.
+  - `UniversalVisualCalibrationStrategy`: Estrategia visual delegada por completo al CalibrationManager.
+  - `KeyboardShortcutStrategy`: Estrategia alternativa basada en atajos de teclado.
+  - `EnhancedCalibrator`: Sistema de capacidades de calibración compatible con el planner.
+  - `Calibrator`: Fachada de compatibilidad para el sistema mejorado.
+- **Métodos principales**:
+  - `CalibrationPolicy`: NEVER, ASK, AUTOMATIC, REQUIRED
+  - `CalibrationStatus`: UNKNOWN, NOT_CALIBRATED, CALIBRATED, OUTDATED, INVALID
+  - `CalibrationElement.__init__`: Inicializa elemento de calibración con propiedades básicas
+  - `CalibrationCapability.__init__`: Inicializa capacidad de calibración con metadatos
+  - `CalibrationStrategy.can_calibrate`: Verifica si la estrategia puede calibrar un elemento
+  - `CalibrationStrategy.calibrate`: Ejecuta calibración del elemento
+  - `CalibrationStrategy.get_applicable_applications`: Obtiene aplicaciones soportadas por la estrategia
+  - `UniversalVisualCalibrationStrategy.__init__`: Inicializa estrategia visual universal
+  - `UniversalVisualCalibrationStrategy.can_calibrate`: Verifica si puede calibrar elemento (excluye juegos, IDEs, terminales)
+  - `UniversalVisualCalibrationStrategy.calibrate`: Ejecuta calibración visual delegada a CalibrationManager
+  - `UniversalVisualCalibrationStrategy._resolve_monitor_number`: Obtiene monitor asociado o monitor activo
+  - `UniversalVisualCalibrationStrategy.get_applicable_applications`: Obtiene aplicaciones disponibles del manager
+  - `UniversalVisualCalibrationStrategy._result_to_dict`: Convierte resultado a diccionario estructurado
+  - `UniversalVisualCalibrationStrategy._find_element_coordinates`: Extrae coordenadas de elemento del resultado
+  - `UniversalVisualCalibrationStrategy._find_element_confidence`: Extrae confianza del elemento calibrado
+  - `UniversalVisualCalibrationStrategy._normalize_element_name`: Normaliza nombre de elemento para comparación
+  - `KeyboardShortcutStrategy.can_calibrate`: Verifica si puede usar atajos (tiene alternativas)
+  - `KeyboardShortcutStrategy.calibrate`: Retorna información sobre requerimiento de atajos
+  - `KeyboardShortcutStrategy.get_applicable_applications`: Retorna lista vacía (no aplica a apps específicas)
+  - `EnhancedCalibrator.__init__`: Inicializa sistema mejorado con estrategias y capacidades
+  - `EnhancedCalibrator._initialize_capabilities`: Define capacidades disponibles de calibración
+  - `EnhancedCalibrator.get_calibration_capability`: Obtiene capacidad específica por ID
+  - `EnhancedCalibrator.get_available_capabilities`: Obtiene todas las capacidades disponibles
+  - `EnhancedCalibrator.check_element_calibration`: Verifica estado de calibración de elemento
+  - `EnhancedCalibrator.can_use_element`: Determina si elemento puede usarse según estado y política
+  - `EnhancedCalibrator.calibrate_element_if_needed`: Calibra elemento si es necesario según política
+  - `EnhancedCalibrator._find_alternative_strategy`: Busca estrategia alternativa cuando falla la principal
+  - `EnhancedCalibrator.register_element`: Registra elemento en el sistema de calibración
+  - `EnhancedCalibrator.get_element_coordinates`: Obtiene coordenadas calibradas de elemento
+  - `EnhancedCalibrator.create_calibration_node`: Crea nodo de calibración para el planner
+  - `EnhancedCalibrator.get_calibration_requirements_for_goal`: Obtiene elementos requeridos para un objetivo
+  - `EnhancedCalibrator.calibrate_applications`: Entrada legacy global compatible con CalibrationManager
+  - `EnhancedCalibrator._calibrate_single_application`: Califica aplicación individual con manejo de errores
+  - `EnhancedCalibrator._build_single_application_report`: Construye reporte de calibración individual
+  - `EnhancedCalibrator._call_global_manager`: Llama a método del manager con manejo de firma
+  - `EnhancedCalibrator._normalize_global_result`: Normaliza resultado global a formato estructurado
+  - `EnhancedCalibrator._looks_like_global_report`: Verifica si resultado tiene formato global esperado
+  - `EnhancedCalibrator._result_to_dict`: Convierte resultado a diccionario (método duplicado)
+  - `EnhancedCalibrator._extract_element_count`: Extrae cantidad de elementos de resultado
+  - `EnhancedCalibrator.calibrate_chrome_both_screens`: Compatibilidad legacy para Chrome en ambos monitores
+  - `EnhancedCalibrator._verify_system`: Verifica compatibilidad del sistema para calibración
+  - `EnhancedCalibrator.get_calibration_statistics`: Obtiene estadísticas del sistema de calibración
+  - `EnhancedCalibrator._is_already_calibrated`: Verifica si aplicación ya está calibrada
+  - `EnhancedCalibrator._save_organized_results`: Compatibilidad legacy (delegada al manager)
+  - `EnhancedCalibrator._build_setup_info`: Construye información de configuración del sistema
+  - `EnhancedCalibrator._has_calibration_command`: Verifica si manager tiene comando de calibración
+  - `EnhancedCalibrator._open_app_on_monitor`: Abre aplicación en monitor específico (compatibilidad legacy)
+  - `EnhancedCalibrator._close_app`: Cierra recursos creados por flujo de calibración
+  - `EnhancedCalibrator._get_calibration_manager`: Obtiene instancia del CalibrationManager
+  - `EnhancedCalibrator._normalize_name`: Normaliza nombre de aplicación/elemento
+  - `EnhancedCalibrator._single_failure_report`: Construye reporte de fallo para aplicación individual
+  - `EnhancedCalibrator._failure_report`: Construye reporte de fallo general
+  - `Calibrator.__init__`: Inicializa fachada de compatibilidad con sistema mejorado
+  - `Calibrator.calibrate_applications`: Delega calibración al sistema mejorado
+  - `Calibrator.calibrate_chrome_both_screens`: Delega calibración Chrome al sistema mejorado
+  - `Calibrator._build_setup_info`: Delega construcción de setup al sistema mejorado
+  - `Calibrator._verify_system`: Delega verificación de sistema al sistema mejorado
+  - `Calibrator._has_calibration_command`: Delega verificación de comando al sistema mejorado
+  - `Calibrator._open_app_on_monitor`: Delega apertura en monitor al sistema mejorado
+  - `Calibrator._close_app`: Delega cierre de app al sistema mejorado
+- **Funciones globales**:
+  - `get_enhanced_calibrator`: Obtiene instancia singleton del calibrador mejorado
+  - `calibrate_chrome_both_screens`: Función global legacy para calibrar Chrome en ambos monitores
+
+#### `src/hands/chrome/chrome_calibrator.py` [57 líneas] - Calibrador Específico para Chrome
+- **Descripción**: Adaptador de compatibilidad para la calibración de Google Chrome. La calibración real se realiza mediante el sistema universal: CalibrationManager -> descubrimiento de aplicación -> apertura/enfoque -> ScreenManager -> detección de monitor real -> captura -> UniversalVisualCalibrator -> Qwen3-VL 8B Instruct -> coordenadas absolutas -> guardado centralizado.
+- **Clases principales**:
+  - `ChromeCalibrator`: Adaptador legacy que usa exactamente el flujo universal.
+- **Métodos principales**:
+  - `ChromeCalibrator.__init__`: Inicialización del calibrador de Chrome (vacío, delega en el manager)
+  - `ChromeCalibrator.calibrate_chrome()`: Método principal de calibración que delega en el CalibrationManager universal
+  - `ChromeCalibrator._calibrate_chrome()`: Implementación interna que obtiene el manager y realiza la calibración
+- **Funciones globales**:
+  - `calibrar_chrome()`: Función pública de compatibilidad legacy para calibrar Chrome
+- **Características implementadas**:
+  - Delegación completa al sistema universal de calibración
+  - Manejo robusto de errores con mensajes descriptivos
+  - Procesamiento de resultados del manager para extraer coordenadas y elementos
+  - Soporte para múltiples monitores con detección automática
+  - Formato estructurado de resultados con éxito/fracaso, monitor, elementos y coordenadas
+  - Compatibilidad con APIs legacy del proyecto
+
+#### `src/hands/edge/calibrator_edge.py` [233 líneas] - Calibrador Específico para Edge
+- **Descripción**: Adaptador de compatibilidad para la calibración de Microsoft Edge. La calibración real se realiza mediante el sistema universal: CalibrationManager -> descubrimiento de aplicación -> apertura/enfoque -> ScreenManager -> detección de monitor real -> captura -> UniversalVisualCalibrator -> Qwen3-VL 8B Instruct -> coordenadas absolutas -> guardado centralizado.
+- **Clases principales**:
+  - `EdgeCalibrator`: Adaptador legacy que usa exactamente el flujo universal.
+- **Métodos principales**:
+  - `calibrate_edge_both_screens()`: Mantiene la API antigua por compatibilidad. El nombre histórico hacía referencia a dos pantallas, pero el sistema actual trabaja con cualquier número de monitores. Delega en la calibración universal.
+  - `calibrate_edge()`: API moderna de compatibilidad. Delega directamente en CalibrationManager.
+  - `_calibrate_edge_universal()`: Delega Edge en CalibrationManager. No selecciona monitores, no captura pantallas, no calcula coordenadas, no analiza elementos directamente.
+- **Funciones globales**:
+  - `calibrate_edge()`: Función pública de compatibilidad. No escribe macros_coords.json.
+
+#### `src/hands/firefox/calibrator_firefox.py` - Calibrador Específico para Firefox
+- **Descripción**: Adaptador de compatibilidad para la calibración de Mozilla Firefox. La calibración real ya NO se realiza mediante lógica específica de Firefox. El flujo oficial es: CalibrationManager -> detección de aplicación -> apertura/enfoque -> ScreenManager -> captura del monitor -> UniversalVisualCalibrator -> Qwen3-VL 8B Instruct -> coordenadas absolutas -> guardado centralizado. Este módulo existe únicamente para mantener compatibilidad con código antiguo que pudiera importar FirefoxCalibrator o calibrate_firefox(). NO detecta coordenadas manualmente, NO calcula offsets de monitores, NO asume dos pantallas, NO asume resoluciones, NO asume DPI, NO genera coordenadas artificiales, NO escribe macros_coords.json directamente.
+- **Clases principales**:
+  - `FirefoxCalibrator`: Adaptador legacy hacia CalibrationManager. No contiene lógica visual específica de Firefox.
+- **Métodos principales**:
+  - `__init__`: Inicializa el calibrador con CalibrationManager.
+  - `calibrate_firefox_both_screens()`: Mantiene el nombre antiguo por compatibilidad. Delegando en CalibrationManager.
+  - `calibrate_firefox()`: API moderna de compatibilidad. Delegación directa al flujo universal.
+  - `_calibrate_firefox_universal()`: Delega Firefox al CalibrationManager universal. No realiza ninguna operación de pantalla directamente.
+- **Funciones globales**:
+  - `calibrate_firefox()`: Función pública de compatibilidad. No escribe macros_coords.json.
+
+#### `src/hands/windows/calibrator_windows.py` - Calibrador Específico para Windows
+- **Descripción**: Adaptador de compatibilidad para la calibración de aplicaciones Windows. La calibración real se realiza mediante el sistema universal: CalibrationManager -> descubrimiento de aplicación -> apertura/enfoque -> ScreenManager -> detección de monitor real -> captura -> UniversalVisualCalibrator -> Qwen3-VL 8B Instruct -> coordenadas absolutas -> guardado centralizado.
+- **Clases principales**:
+  - `WindowsCalibrator`: Adaptador legacy que usa exactamente el flujo universal.
+- **Métodos principales**:
+  - `get_calibration_prompt()`: Mantiene la API antigua por compatibilidad. El flujo universal actual no depende de este prompt.
+  - `calibrate_app_both_screens()`: Mantiene el nombre antiguo por compatibilidad. Delegando en CalibrationManager.
+  - `calibrate_app()`: API de compatibilidad para calibrar Windows. La calibración la realiza íntegramente CalibrationManager.
+  - `_calibrate_universal()`: Delega la calibración en CalibrationManager. No realiza detección, captura ni cálculo de coordenadas.
+- **Funciones globales**:
+  - `calibrate_app()`: Función pública de compatibilidad. No escribe macros_coords.json.
+- **Características**:
+  - Detección multi-monitor integrada con ScreenManager
+  - Soporte para cualquier número de monitores (no limitado a 1 o 2)
+  - Verificación de instalación y disponibilidad
+  - Movimiento y posicionamiento preciso
+  - Compatibilidad con API legacy
+  - No genera coordenadas artificiales
+  - Utiliza calibración universal a través de CalibrationManager
+
+#### `src/hands/chrome/chrome.py` - Funciones Específicas para Google Chrome
+- **Descripción**: Funciones específicas para Google Chrome con apertura, cierre, calibración, movimiento y maximización de ventanas. Utiliza ScreenManager para gestión de monitores y CalibrationManager para calibración universal.
+- **Acciones Registradas**:
+  - `abrir_chrome`: Abre Google Chrome en la pantalla predeterminada.
+  - `abrir_chrome_pantalla`: Abre Google Chrome en una pantalla específica.
+  - `cerrar_chrome`: Cierra todas las ventanas de Google Chrome.
+  - `calibrar_chrome`: Calibra elementos de Google Chrome usando visión artificial.
+  - `mover_chrome_pantalla`: Mueve la ventana de Chrome a una pantalla específica.
+  - `maximizar_chrome`: Maximiza la ventana de Chrome.
+- **Funciones Principales**:
+  - `abrir_chrome()`: Abre específicamente Google Chrome, sin depender del navegador predeterminado.
+  - `abrir_chrome_pantalla(pantalla: int)`: Abre Chrome en un monitor específico.
+  - `cerrar_chrome()`: Cierra las ventanas de Google Chrome.
+  - `calibrar_chrome(pantalla: int = 0)`: Calibra Chrome usando el flujo universal de aplicaciones.
+  - `mover_chrome_pantalla(pantalla: int)`: Mueve una ventana de Chrome al monitor solicitado.
+  - `maximizar_chrome()`: Maximiza la ventana de Chrome preferentemente la que está en primer plano.
+- **Funciones Auxiliares**:
+  - `_get_chrome_executable()`: Busca chrome.exe en ubicaciones habituales de Windows.
+  - `_abrir_chrome_desde_ruta()`: Abre Chrome directamente; solo usa webbrowser como último fallback.
+  - `_get_chrome_windows(screen_manager)`: Obtiene ventanas de Chrome mediante ScreenManager.
+  - `_select_preferred_chrome_window(screen_manager, chrome_windows)`: Selecciona la ventana Chrome en primer plano cuando sea posible.
+  - `_verificar_chrome_abierto()`: Verifica si existe al menos una ventana visible de Chrome.
+  - `_verificar_chrome_instalado()`: Verifica si Chrome está instalado o resoluble en el sistema.
+  - `_capturar_chrome()`: Captura una ventana de Chrome (API legacy).
+- **Funciones Globales**:
+  - `get_chrome_commands()`: Obtiene los comandos específicos de Chrome.
+  - `get_chrome_action_commands()`: Escanea el módulo y devuelve las funciones registradas como acciones.
+
+#### `src/hands/chrome/chrome_calibrator.py` - Calibrador Específico para Chrome
+- **Descripción**: Adaptador de compatibilidad para la calibración de Google Chrome. La calibración real se realiza mediante el sistema universal: CalibrationManager -> descubrimiento de aplicación -> apertura/enfoque -> ScreenManager -> detección de monitor real -> captura -> UniversalVisualCalibrator -> Qwen3-VL 8B Instruct -> coordenadas absolutas -> guardado centralizado.
+- **Clases principales**:
+  - `ChromeCalibrator`: Adaptador legacy que usa exactamente el flujo universal.
+- **Métodos principales**:
+  - `get_calibration_prompt()`: Mantiene la API antigua por compatibilidad. El flujo universal actual no depende de este prompt.
+  - `calibrate_app_both_screens()`: Mantiene el nombre antiguo por compatibilidad. Delegando en CalibrationManager.
+  - `calibrate_app()`: API de compatibilidad para calibrar Chrome. La calibración la realiza íntegramente CalibrationManager.
+  - `_calibrate_universal()`: Delega la calibración en CalibrationManager. No realiza detección, captura ni cálculo de coordenadas.
+- **Funciones globales**:
+  - `calibrate_app()`: Función pública de compatibilidad. No escribe macros_coords.json.
+
+#### `src/hands/coordinate_manager.py` [1113 líneas] - Gestor Unificado de Coordenadas
+- **Descripción**: Gestor unificado de coordenadas para JARVIS - FASE 13. Responsabilidades: administrar recursos UI calibrados, proporcionar capacidades de UI al planificador, gestionar estado de calibración, convertir y validar sistemas de coordenadas, leer datos existentes de macros_coords.json, mantener compatibilidad con APIs legacy.
+- **Clases principales**:
+  - `ResourceType` (Enum): Tipos de recursos UI gestionados por el coordinate manager (ELEMENT, REGION, APPLICATION, WINDOW, MONITOR)
+  - `CalibrationStrategy` (Enum): Estrategias de calibración disponibles (VISUAL_DETECTION, WINDOW_DETECTION, SCREEN_CAPTURE, KEYBOARD_SHORTCUT, HOTKEY)
+  - `UIResource` (dataclass): Recurso UI calibrado utilizable por acciones del planificador
+  - `UICapability` (Clase): Capacidad UI que puede ser utilizada por una acción
+  - `CoordinateSystem` (Enum): Sistemas de coordenadas soportados por JARVIS (RELATIVE_SCREEN, ABSOLUTE_DESKTOP, WINDOW_RELATIVE)
+  - `BoundingBox` (dataclass): Rectángulo delimitador de un elemento
+  - `ElementInfo` (dataclass): Información de un elemento calibrado (compatibilidad)
+  - `CoordinateManager`: Gestor centralizado de conocimiento UI y coordenadas calibradas
+- **Métodos principales**:
+  - `CoordinateManager.__init__`: Inicializa el gestor con screen manager, UI resources, UI capabilities, UI knowledge y calibration policies
+  - `UIResource.__post_init__`: Inicializa recursos UI con normalización de valores y verificación de calibración
+  - `UIResource.is_usable`: Propiedad que verifica si el recurso está disponible y calibrado
+  - `UIResource.get_coordinates_for_screen`: Obtiene coordenadas para un monitor específico
+  - `UIResource.get_region_for_screen`: Obtiene regiones para un monitor específico
+  - `UIResource.get_best_coordinates`: Devuelve coordenadas del monitor activo o de cualquier monitor calibrado
+  - `UIResource.get_alternatives`: Obtiene recursos alternativos para el recurso actual
+  - `UIResource.can_use_fallback_strategy`: Verifica si se puede usar una estrategia de fallback
+  - `UICapability.__init__`: Inicializa capacidad UI con nombre, descripción y recursos requeridos
+  - `UICapability.can_execute_with_resources`: Verifica si la capacidad puede ejecutarse con recursos disponibles
+  - `CoordinateManager._initialize_base_capabilities`: Inicializa capacidades base (focus_element, click_element, type_in_element)
+  - `CoordinateManager._load_ui_knowledge`: Carga conocimiento UI desde macros_coords.json
+  - `CoordinateManager._process_ui_knowledge`: Procesa conocimiento UI y crea recursos correspondientes
+  - `CoordinateManager._create_resource_from_knowledge`: Crea recurso UI a partir de datos de conocimiento
+  - `CoordinateManager._resource_type_for_element`: Determina tipo de recurso para un elemento
+  - `CoordinateManager._parse_screen_data`: Parsea datos de pantallas para extraer coordenadas y regiones
+  - `CoordinateManager.register_ui_resource`: Registra un recurso UI en el sistema
+  - `CoordinateManager.get_ui_resource`: Obtiene un recurso UI por ID
+  - `CoordinateManager.get_available_resources`: Obtiene recursos UI disponibles, opcionalmente filtrados por aplicación
+  - `CoordinateManager.find_resources_by_type`: Encuentra recursos por tipo y aplicación
+  - `CoordinateManager.has_resource`: Verifica si existe un recurso usable por ID
+  - `CoordinateManager.get_resource_alternatives`: Obtiene alternativas para un recurso específico
+  - `CoordinateManager.get_fallback_strategies`: Obtiene estrategias de fallback para un recurso
+  - `CoordinateManager.get_capabilities_for_resources`: Obtiene capacidades que pueden usar los recursos especificados
+  - `CoordinateManager.can_execute_capability`: Verifica si una capacidad puede ejecutarse con recursos disponibles
+  - `CoordinateManager.get_capability_alternatives`: Obtiene alternativas para una capacidad específica
+  - `CoordinateManager.get_calibration_strategy`: Devuelve estrategia permitida para aplicación/elemento
+  - `CoordinateManager.is_application_calibrable`: Verifica si una aplicación puede ser calibrada
+  - `CoordinateManager.can_calibrate_element`: Verifica si un elemento puede ser calibrado
+  - `CoordinateManager.get_execution_strategy_for_action`: Obtiene estrategia de ejecución para una acción
+  - `CoordinateManager.get_resource_coordinates`: Obtiene coordenadas de un recurso para pantalla específica o mejor disponible
+  - `CoordinateManager.validate_resource_for_action`: Valida si un recurso es adecuado para una acción específica
+  - `CoordinateManager.load_from_macros_coords`: Carga recursos desde calibraciones o datos legacy
+  - `CoordinateManager._create_legacy_resource`: Crea recurso a partir de datos legacy de macros_coords.json
+  - `CoordinateManager._infer_element_type`: Inferir tipo de elemento basado en nombre
+  - `CoordinateManager.get_calibrated_coordinate`: Obtiene coordenadas calibradas con compatibilidad legacy
+  - `CoordinateManager._get_legacy_calibrated_coordinate`: Obtiene coordenadas legacy del sistema antiguo
+  - `CoordinateManager._case_insensitive_dict_get`: Obtiene valor de diccionario sin distinguir mayúsculas/minúsculas
+  - `CoordinateManager.monitor_number_from_object`: Extrae número de monitor de objeto sin asumir atributo concreto
+  - `CoordinateManager.get_screen_key`: Genera clave de pantalla (sN) para número específico
+  - `CoordinateManager.screen_number_from_key`: Convierte clave de pantalla (sN) a número
+  - `CoordinateManager.get_screen_number_from_key`: Obtiene número de pantalla desde clave
+  - `CoordinateManager._read_coordinate_value`: Lee y valida valor de coordenada
+  - `CoordinateManager.validate_coordinates`: Valida coordenadas dentro de límites de pantalla
+  - `CoordinateManager.validate_bounding_box`: Valida rectángulo delimitador dentro de límites de pantalla
+  - `CoordinateManager.get_window_bounding_box`: Obtiene rectángulo delimitador de ventana por título (compatibilidad legacy)
+  - `CoordinateManager._get_window_rect`: Obtiene geometría de ventana priorizando rectángulo normal de Win32
+- **Funciones globales**:
+  - `get_coordinate_manager`: Obtiene la instancia global del gestor de coordenadas
+- **Características implementadas**:
+  - Administración centralizada de recursos UI calibrados
+  - Sistema de capacidades UI para planificación jerárquica
+  - Gestión de estrategias de calibración (visual, detección de ventanas, captura de pantalla, atajos)
+  - Soporte para múltiples sistemas de coordenadas
+  - Carga persistente desde macros_coords.json
+  - Sistema de alternativas y fallbacks para robustez
+  - Validación de coordenadas y regiones
+  - Compatibilidad con APIs legacy del sistema anterior
+  - Detección automática de tipos de elementos
+  - Manejo de múltiples monitores con sistema sN
+  - Integración con ScreenManager para geometría de monitores
+
+#### `src/hands/edge/edge.py` - Funciones Específicas para Microsoft Edge
+- **Descripción**: Funciones específicas para Microsoft Edge con apertura, cierre, calibración, movimiento y maximización de ventanas. Utiliza ScreenManager para gestión de monitores y CalibrationManager para calibración universal. La geometría de monitores se obtiene exclusivamente de ScreenManager. Este módulo conserva funciones antiguas por compatibilidad, pero no genera coordenadas artificiales, no asume dos monitores y no utiliza una resolución ni un DPI fijo.
+- **Acciones Registradas**:
+  - `abrir_edge_pantalla`: Abre Microsoft Edge en una pantalla específica.
+  - `abrir_edge_pestana`: Abre una nueva pestaña de Edge en la pantalla solicitada.
+  - `cerrar_edge`: Cierra una ventana visible de Edge.
+  - `mover_edge_a_pantalla`: Mueve una ventana de Edge al monitor solicitado.
+- **Funciones Principales**:
+  - `abrir_edge_pantalla(pantalla: int = 1)`: Abre Microsoft Edge y lo posiciona en la pantalla solicitada.
+  - `abrir_edge_pestana(pantalla: int = 1)`: Abre una nueva pestaña de Edge en la pantalla solicitada.
+  - `cerrar_edge()`: Cierra una ventana visible de Edge.
+  - `mover_edge_a_pantalla(pantalla_num: int)`: Mueve una ventana de Edge al monitor solicitado.
+- **Funciones Auxiliares**:
+  - `_get_edge_windows()`: Obtiene las ventanas visibles/localizables de Microsoft Edge.
+  - `_get_edge_window_info()`: Obtiene metadatos y geometría actual de una ventana de Edge.
+  - `_find_edge_window_on_monitor()`: Busca una ventana de Edge cuyo centro esté dentro del monitor indicado.
+  - `_select_edge_window()`: Selecciona una ventana Edge, priorizando el monitor indicado.
+  - `_candidate_edge_paths()`: Devuelve rutas habituales donde puede estar instalado Edge.
+  - `_abrir_edge_desde_ruta()`: Abre Edge desde una instalación local conocida.
+  - `_verificar_edge_abierto()`: Verifica si Edge está abierto y visible.
+  - `_verificar_edge_instalado()`: Verifica si Microsoft Edge está instalado.
+  - `_move_edge_window()`: Mueve una ventana Edge al origen del monitor y trata de maximizarla.
+  - `_calibrar_edge()`: Compatibilidad con la implementación antigua (deprecated).
+  - `_generar_coordenadas_edge()`: Compatibilidad con código antiguo; no genera coordenadas artificiales (deprecated).
+  - `_capturar_edge()`: Captura la ventana visible de Edge (compatibilidad).
+- **Funciones Globales**:
+  - `get_edge_commands()`: Obtiene los comandos legacy de Edge.
+- **Características**:
+  - Detección multi-monitor integrada con ScreenManager
+  - Soporte para múltiples ventanas de Edge
+  - Verificación de instalación y disponibilidad
+  - Movimiento y posicionamiento preciso
+  - Compatibilidad con API legacy
+  - No genera coordenadas artificiales
+  - Utiliza calibración universal a través de CalibrationManager
+
+#### `src/hands/executor.py` [1373 líneas] - Ejecutor Central del Sistema
+- **Descripción**: Ejecutor mejorado de JARVIS con arquitectura de planificación jerárquica. Responsabilidades: ejecutar acciones individuales con verificación de precondiciones y efectos, ejecutar planes completos, manejar estado del mundo, soportar replanificación cuando una acción falla, integrarse con el sistema de nodos y objetivos, mantener compatibilidad con acciones legacy.
+- **Clases principales**:
+  - `ExecutionStatus` (Enum): Estados de ejecución de un nodo o plan (PENDING, RUNNING, SUCCESS, FAILED, RETRYING, ALTERNATIVE)
+  - `ExecutionResult` (dataclass): Resultado de ejecución de un nodo o plan con metadatos
+  - `ExecutionState` (dataclass): Estado actual del mundo para ejecución con timestamp y estados de aplicaciones
+  - `Executor`: Clase principal del ejecutor mejorado con soporte para planificación jerárquica y replanificación
+- **Métodos principales**:
+  - `__init__`: Inicializa el ejecutor mejorado con registro de acciones, memoria y estado del mundo
+  - `get_executor`: Obtiene la instancia global del ejecutor (método estático)
+  - `_initialize_state`: Inicializa el estado del mundo con aplicaciones, elementos UI y acciones disponibles
+  - `execute_plan`: Ejecuta un plan completo (lista de nodos) con replanificación y manejo de fallos
+  - `_execute_node`: Ejecuta un nodo individual con reintentos y replanificación
+  - `_verify_node_success`: Verifica si la ejecución de un nodo fue exitosa basado en efectos esperados
+  - `_replan_after_failure`: Realiza replanificación después de un fallo en un nodo
+  - `_find_alternative_nodes`: Encuentra nodos alternativos que proporcionen la misma capacidad
+  - `_extract_capability_from_action`: Extrae la capacidad principal de un nombre de acción
+  - `_action_provides_capability`: Verifica si una acción proporciona una capacidad específica
+  - `_should_replan`: Determina si se debe replanificar después de un fallo
+  - `execute_plan_with_replan`: Ejecuta un plan completo con replanificación dinámica
+  - `_update_world_state_after_failure`: Actualiza estado del mundo después de un fallo
+  - `_goal_achieved`: Verifica si un objetivo ha sido alcanzado en el estado actual
+  - `_execute_node_action`: Ejecuta la acción específica de un nodo
+  - `_check_node_preconditions`: Verifica si las precondiciones de un nodo se cumplen
+  - `_evaluate_condition`: Evalúa una condición simple contra el estado actual
+  - `_try_alternative`: Intenta una alternativa cuando un nodo falla
+  - `_update_world_state`: Actualiza el estado del mundo después de una ejecución exitosa
+  - `execute_action`: Ejecuta una acción registrada con mejoras de estado y verificación
+  - `can_execute`: Comprueba si una acción puede ejecutarse en el estado actual
+  - `process_and_execute`: Procesa respuesta LLM y ejecuta comando (mantenido para compatibilidad)
+  - `_execute_legacy_or_registered`: Ejecuta mediante ActionRegistry o fallback legacy
+  - `_positional_to_named_parameters`: Convierte argumentos posicionales a nombrados
+  - `_parse_args`: Parsea argumentos mediante ast.literal_eval
+  - `_get_legacy_function`: Busca función legacy en módulos
+  - `get_current_state`: Obtiene el estado actual del mundo
+  - `update_state`: Actualiza el estado del mundo
+  - `get_action_stats`: Obtiene estadísticas de ejecución de acciones
+  - `_record_action_execution`: Registra ejecución de acción para estadísticas
+  - `_get_screen_state`: Obtiene estado actual de la pantalla para aprendizaje
+  - `get_learning_insights`: Obtiene insights del sistema de aprendizaje (FASE 18)
+  - `get_action_learning_insights`: Obtiene insights específicos de una acción (FASE 18)
+  - `get_cost_adjustments`: Obtiene ajustes de coste aprendidos (FASE 18)
+  - `export_learning_data`: Exporta datos de aprendizaje (FASE 18)
+  - `import_learning_data`: Importa datos de aprendizaje (FASE 18)
+  - `clear_learning_data`: Limpia datos de aprendizaje (FASE 18)
+  - `enable_learning`: Habilita o deshabilita el aprendizaje (FASE 18)
+  - `_record_command_execution`: Registra ejecución de comando legacy
+  - `list_commands`: Lista todas las acciones conocidas
+  - `get_plannable_actions`: Obtiene acciones disponibles para planificación
+  - `get_action_info`: Obtiene información de una acción específica
+  - `execute_goal`: Ejecuta un objetivo usando el planificador integrado
+  - `_get_state_for_planning`: Obtiene estado actual en formato para planificación
+  - `create_goal_from_command`: Crea un objetivo a partir de un comando legacy
+- **Funciones globales**:
+  - `get_executor`: Obtiene la instancia global del ejecutor
+
+#### `src/hands/keyboard.py` [901 líneas] - Control del Teclado con Capacidades de Planificación
+- **Descripción**: Control del teclado transformado de acciones primitivas a capacidades reutilizables para el sistema de planificación jerárquica de JARVIS. Integrado con el sistema de registro de acciones y soporte para precondiciones, efectos y costes.
+- **Clases principales**:
+  - `KeyModifier` (Enum): Modificadores de tecla soportados (CTRL, ALT, SHIFT, WIN)
+  - `KeyboardCapabilities` (dataclass): Capacidades del teclado para el sistema de planificación
+  - `KeyboardCapabilitySystem`: Sistema de capacidades del teclado para la planificación jerárquica
+- **Métodos principales**:
+  - `keyboard_capability`: Decorador para registrar capacidades del teclado en el sistema de planificación
+  - `type_text`: Escribir texto en el campo activo con intervalo configurable y verificación de éxito
+  - `press_key`: Presionar una tecla individual con tiempo de espera configurable
+  - `execute_hotkey`: Ejecutar combinación de teclas (hotkeys) con validación de combinaciones
+  - `copy_text`: Copiar texto seleccionado (Ctrl+C) con verificación de portapapeles
+  - `paste_text`: Pegar texto desde el portapapeles (Ctrl+V) con verificación de campo enfocado
+  - `cut_text`: Cortar texto seleccionado (Ctrl+X) con verificación de selección
+  - `select_all_text`: Seleccionar todo el texto (Ctrl+A) con verificación de campo enfocado
+  - `navigate_tab`: Navegar entre campos con Tabulador (forward/backward)
+  - `navigate_enter`: Confirmar acción con la tecla Enter
+  - `switch_window`: Cambiar de ventana (Alt+Tab) con verificación de múltiples ventanas
+  - `close_window`: Cerrar ventana (Alt+F4) con verificación de datos no guardados
+  - `open_start_menu`: Abrir menú de inicio (Tecla Windows) con espera de estabilidad
+  - `get_keyboard_capability_system`: Obtener la instancia global del sistema de capacidades del teclado
+- **Capacidades del Sistema**:
+  - **Text Operations**: type_text, copy_text, paste_text, cut_text, select_all_text
+  - **Navigation**: navigate_tab, navigate_enter  
+  - **Shortcuts**: execute_hotkey, switch_window, close_window, open_start_menu
+  - **Basic**: press_key
+- **Funciones de Compatibilidad**:
+  - `escribir_texto`: Escribe texto en el campo activo (mantenido por compatibilidad)
+  - `presionar_enter`: Presiona la tecla Enter (mantenido por compatibilidad)
+  - `presionar_tecla`: Presiona una tecla específica (mantenido por compatibilidad)
+  - `copiar`: Ejecuta Ctrl+C (Copiar) (mantenido por compatibilidad)
+  - `pegar`: Ejecuta Ctrl+V (Pegar) (mantenido por compatibilidad)
+  - `cortar`: Ejecuta Ctrl+X (Cortar) (mantenido por compatibilidad)
+  - `seleccionar_todo`: Ejecuta Ctrl+A (Seleccionar todo) (mantenido por compatibilidad)
+  - `cambiar_ventana`: Ejecuta Alt+Tab (Cambiar ventana) (mantenido por compatibilidad)
+  - `cerrar_ventana`: Ejecuta Alt+F4 (Cerrar ventana) (mantenido por compatibilidad)
+  - `tecla_super`: Presiona la tecla Windows (Super) (mantenido por compatibilidad)
+  - `abrir_menu_inicio`: Abre el menú de inicio de Windows (mantenido por compatibilidad)
+- **Características del Sistema**:
+  - Integración con ActionRegistry para registro de capacidades
+  - Soporte para precondiciones y efectos en capacidades
+  - Sistema de costes para planificación A*
+  - Validación de teclas y combinaciones
+  - Manejo de errores con logging estructurado
+  - Configuración global de PyAutoGUI desde config.json
+  - Soporte para contextos de aplicación y estado del sistema
+  - Sistema de capacidades reutilizables para el planificador
+
+#### `src/hands/mouse.py` [129 líneas] - Control del Ratón con Capacidades de Planificación
+- **Descripción**: Control básico del ratón para JARVIS con capacidades fundamentales de interacción gráfica. Proporciona funciones esenciales de movimiento, clic y scroll integradas con el sistema de registro de acciones y soporte para planificación jerárquica.
+- **Clases principales**:
+  - Ninguna clase principal, implementación funcional pura
+- **Métodos principales**:
+  - `move_to_position(x: float, y: float, duration: float = 0.1)`: Mueve el ratón a una posición específica con validación de coordenadas y manejo de errores
+  - `click_element(button: str = "left", wait_after: float = 0.1)`: Realiza un clic con el ratón en el botón especificado (left, right, middle) con validación y espera posterior
+  - `scroll_at_position(x: float, y: float, clicks: int, wait_after: float = 0.1)`: Realiza scroll en una posición específica con número de clicks configurable (positivo para arriba, negativo para abajo)
+  - `register_mouse_capabilities()`: Registra las capacidades del ratón en el sistema de acciones
+- **Acciones Registradas**:
+  - `move_mouse`: Mover ratón a posición con parámetros de coordenadas y duración
+  - `click_mouse`: Hacer clic con el ratón con selección de botón y tiempo de espera
+  - `scroll_mouse`: Hacer scroll con el ratón en posición específica con número de clicks
+- **Características del Sistema**:
+  - Integración con ActionRegistry para registro automático de capacidades
+  - Validación robusta de parámetros (coordenadas, botones, clicks)
+  - Manejo estructurado de errores con logging detallado
+  - Configuración global de PyAutoGUI desde config.json
+  - Soporte para múltiples botones de ratón (left, right, middle)
+  - Control de tiempo de espera configurable para operaciones
+  - Registro automático al importar el módulo
+  - Funcionalidad básica pero completa para interacciones gráficas
+
+#### `src/hands/firefox/firefox.py` [637 líneas] - Funciones Específicas para Mozilla Firefox
+- **Descripción**: Funciones específicas para Mozilla Firefox con apertura, cierre, calibración, movimiento y maximización de ventanas. Utiliza ScreenManager para gestión de monitores y CalibrationManager para calibración universal. La geometría de monitores se obtiene exclusivamente de ScreenManager. Este módulo conserva funciones antiguas por compatibilidad, pero no genera coordenadas artificiales, no asume dos monitores y no utiliza una resolución ni un DPI fijo. La calibración real de aplicaciones debe pasar por el flujo universal: CalibrationManager -> ScreenManager -> UniversalVisualCalibrator -> Qwen3-VL.
+- **Acciones Registradas**:
+  - `abrir_firefox_pantalla`: Abre Mozilla Firefox en la pantalla solicitada.
+  - `abrir_firefox_pestana`: Abre una nueva pestaña de Firefox en la pantalla solicitada.
+  - `cerrar_firefox`: Cierra una ventana visible de Firefox.
+  - `mover_firefox_a_pantalla`: Mueve una ventana de Firefox al monitor solicitado.
+- **Funciones Principales**:
+  - `abrir_youtube()`: Abre YouTube en el navegador predeterminado.
+  - `abrir_spotify()`: Abre Spotify Web en el navegador predeterminado.
+  - `abrir_firefox_pantalla(pantalla: int = 1)`: Abre Mozilla Firefox y lo posiciona en la pantalla solicitada.
+  - `abrir_firefox_pestana(pantalla: int = 1)`: Abre una nueva pestaña de Firefox en la pantalla solicitada.
+  - `_verificar_firefox_abierto()`: Verifica si Firefox está abierto y visible.
+  - `_verificar_firefox_instalado()`: Verifica si Mozilla Firefox está instalado.
+  - `_move_firefox_window(window, monitor)`: Mueve una ventana Firefox al origen del monitor y trata de maximizarla.
+  - `_cerrar_firefox()`: Cierra una ventana visible de Firefox.
+  - `_calibrar_firefox()`: Compatibilidad con la implementación antigua. La calibración real utiliza el flujo universal.
+  - `_generar_coordenadas_firefox(tipo_elemento: str)`: Compatibilidad con código legacy; no genera coordenadas artificiales.
+  - `_capturar_firefox()`: Captura la ventana visible de Firefox para compatibilidad.
+  - `get_firefox_commands()`: Obtiene los comandos legacy de Firefox.
+- **Funciones Auxiliares**:
+  - `_get_firefox_windows()`: Obtiene las ventanas localizables de Mozilla Firefox.
+  - `_get_firefox_window_info(window)`: Obtiene metadatos y geometría actual de una ventana de Firefox.
+  - `_find_firefox_window_on_monitor(pantalla)`: Busca una ventana de Firefox cuyo centro esté dentro del monitor indicado.
+  - `_select_firefox_window(preferred_monitor)`: Selecciona una ventana Firefox, priorizando el monitor indicado.
+  - `_candidate_firefox_paths()`: Devuelve rutas habituales donde puede estar instalado Firefox.
+  - `_abrir_firefox_desde_ruta()`: Abre Firefox desde una instalación local conocida.
+  - `_mover_firefox_a_pantalla(pantalla_num: int)`: Mueve una ventana de Firefox al monitor solicitado.
+- **Características implementadas**:
+  - Detección multi-monitor integrada con ScreenManager
+  - Soporte para múltiples ventanas de Firefox
+  - Verificación de instalación y disponibilidad
+  - Movimiento y posicionamiento preciso
+  - Compatibilidad con API legacy
+  - No genera coordenadas artificiales
+  - Utiliza calibración universal a través de CalibrationManager
+  - Manejo robusto de errores con logging estructurado
+  - Búsqueda de ventanas por múltiples patrones de título
+  - Integración con pyautogui para capturas de pantalla
+  - Soporte para rutas de instalación múltiples en Windows
+  - Funciones de compatibilidad legacy para calibración y coordenadas
+- **Funciones Principales**:
+  - `abrir_firefox_pantalla(pantalla: int = 1)`: Abre Mozilla Firefox y lo posiciona en la pantalla solicitada.
+  - `abrir_firefox_pestana(pantalla: int = 1)`: Abre una nueva pestaña de Firefox en la pantalla solicitada.
+  - `_verificar_firefox_abierto()`: Verifica si Firefox está abierto y visible.
+  - `_verificar_firefox_instalado()`: Verifica si Mozilla Firefox está instalado.
+  - `_move_firefox_window(window, monitor)`: Mueve una ventana Firefox al origen del monitor y trata de maximizarla.
+  - `_cerrar_firefox()`: Cierra una ventana visible de Firefox.
+- **Funciones Auxiliares**:
+  - `_get_firefox_windows()`: Obtiene las ventanas localizables de Mozilla Firefox.
+  - `_get_firefox_window_info(window)`: Obtiene metadatos y geometría actual de una ventana de Firefox.
+  - `_find_firefox_window_on_monitor(pantalla)`: Busca una ventana de Firefox cuyo centro esté dentro del monitor indicado.
+  - `_select_firefox_window(preferred_monitor)`: Selecciona una ventana Firefox, priorizando el monitor indicado.
+  - `_candidate_firefox_paths()`: Devuelve rutas habituales donde puede estar instalado Firefox.
+  - `_abrir_firefox_desde_ruta()`: Abre Firefox desde una instalación local conocida.
+  - `_mover_firefox_a_pantalla(pantalla_num)`: Mueve una ventana de Firefox al monitor solicitado.
+  - `_calibrar_firefox()`: Compatibilidad con la implementación antigua. La calibración real utiliza el flujo universal.
+  - `_generar_coordenadas_firefox(tipo_elemento)`: Compatibilidad con código legacy; no genera coordenadas artificiales.
+  - `_capturar_firefox()`: Captura la ventana visible de Firefox para compatibilidad.
+  - `get_firefox_commands()`: Obtiene los comandos legacy de Firefox.
+- **Funciones Globales**:
+  - `get_firefox_commands()`: Obtiene los comandos específicos de Firefox.
+
+#### `src/hands/planner/goal_state_mapper.py` [1498 líneas] - Mapeo de Goal y World State al Grafo de Estados
+- **Descripción**: Mapea objetivos y estado del mundo al grafo de estados para planificación jerárquica, creando relaciones explícitas entre objetivos, capacidades, acciones y estado.
+- **Clases principales**:
+  - `MappingType` (Enum): Tipos de mapeo (GOAL_TO_NODES, STATE_TO_NODES, CAPABILITY_TO_NODES, HYBRID)
+  - `MappingResult` (dataclass): Resultado estructurado de operaciones de mapeo
+  - `GoalStateMapper`: Mapeador principal de objetivos y estado al grafo
+- **Métodos principales**:
+  - `__init__`: Inicializa mapeador con grafo de estados y capacidades base
+  - `map_goal_to_graph`: Mapea un Goal y contexto del World State al grafo
+  - `map_world_state_to_graph`: Mapea el World State actual al grafo
+  - `map_capabilities_to_graph`: Mapea capacidades abstractas a Nodes reutilizables
+  - `map_goal_and_world_state_to_graph`: Mapeo híbrido combinado de Goal + World State
+  - `get_mapping_history`: Devuelve copia del historial de mapeos
+  - `clear_mapping_history`: Limpia el historial de mapeos
+  - `_create_goal_node`: Crea nodo raíz de un Goal sin dependencias externas
+  - `_create_capability_nodes`: Crea nodos para capacidades conocidas
+  - `_build_capability_node`: Construye Node a partir de plantilla de capacidad
+  - `_create_goal_specific_nodes`: Crea acciones concretas asociadas al objetivo
+  - `_create_navigation_nodes`: Crea acciones específicas para navegación
+  - `_create_open_app_nodes`: Crea acciones específicas para abrir aplicaciones
+  - `_create_close_app_nodes`: Crea acciones específicas para cerrar aplicaciones
+  - `_create_search_nodes`: Crea acciones de búsqueda asociadas al objetivo
+  - `_map_goal_specific_nodes`: Añade especializaciones conocidas del dominio
+  - `_create_youtube_specific_nodes`: Crea acciones específicas para YouTube
+  - `_create_browser_specific_nodes`: Crea acciones específicas de navegador
+  - `_create_spotify_specific_nodes`: Crea acciones específicas para Spotify
+  - `_create_application_state_nodes`: Crea nodos STATE por aplicación conocida
+  - `_create_resource_nodes`: Crea nodos RESOURCE para monitores y recursos
+  - `_create_calibrated_element_nodes`: Crea nodos UI_ELEMENT para elementos calibrados
+  - `_establish_goal_transitions`: Crea relaciones de descomposición del Goal
+  - `_find_relevant_capability`: Encuentra capacidad base que mejor encaja con acción
+  - `_establish_state_transitions`: Relaciona nodos de estado con semántica
+  - `_calculate_mapping_quality`: Calcula cobertura del mapeo de Goal
+  - `_calculate_state_mapping_quality`: Calcula cobertura del estado representado
+  - `_add_node`: Añade nodo al grafo y actualiza resultado
+  - `_add_edge`: Añade arista al grafo y actualiza resultado
+  - `_get_graph_node`: Obtiene nodo del grafo con manejo de errores
+  - `_iter_graph_edges`: Itera sobre aristas del grafo
+  - `_update_graph_with_nodes`: Compatibilidad: asegura nodos en el grafo
+  - `_update_graph_with_state_nodes`: Compatibilidad: nodos ya agregados al crear
+  - `_get_required_capabilities`: Obtiene capacidades requeridas por objetivo
+  - `_capability_exists`: Verifica existencia de capacidad en el grafo
+  - `_get_goal_metadata`: Obtiene metadatos del objetivo
+  - `_get_goal_base_cost`: Obtiene coste base del objetivo
+  - `_get_goal_name`: Obtiene nombre del objetivo
+  - `_get_state_value`: Obtiene valor de estado de aplicación
+  - `_extract_screen_id`: Extrae ID de pantalla de nodo
+  - `_is_action_node`: Verifica si nodo es de tipo acción
+  - `_unique_preserve_order`: Elimina duplicados preserving orden
+  - `_unique_edges`: Elimina aristas duplicadas
+  - `_record_history`: Registra operación en historial de mapeo
+  - `_update_last_history_execution_time`: Actualiza tiempo de ejecución en historial
+  - `_safe_getattr`: Obtiene atributo con manejo de errores
+  - `_get_required_id`: Obtiene ID requerido con validación
+  - `_as_dict`: Convierte valor a diccionario
+  - `_safe_iterable`: Convierte valor a iterable seguro
+  - `_normalize_target_name`: Normaliza nombre de destino
+  - `_safe_id_component`: Limpia componente de ID para seguridad
+
+#### `src/hands/planner/graph.py` [1872 líneas] - Sistema de Grafos de Estados y Búsqueda de Rutas
+- **Descripción**: Sistema avanzado de grafos de estados para planificación con múltiples estrategias de búsqueda, gestión de precondiciones/efectos, caché de rendimiento y serialización completa. Mantiene separación entre planificación y ejecución, simulando transiciones sobre copias de estado para no alterar el estado real durante la búsqueda.
+- **Clases principales**:
+  - `SearchStrategy` (Enum): Estrategias de búsqueda (A_STAR, DIJKSTRA, BFS, DFS, GREEDY) con alias históricos
+  - `GraphNode` (dataclass): Nodo auxiliar de búsqueda con costes (g_cost, h_cost, f_cost) y estado
+  - `GraphEdge` (dataclass): Arista con condiciones, precondiciones, efectos y coste con evaluación robusta
+  - `RouteResult` (dataclass): Resultado estructurado con metadatos, alternativas, estadísticas y estado final
+  - `StateGraph`: Grafo principal con algoritmos de búsqueda, validación, exportación/importación JSON
+  - `GraphBuilder`: Constructores predefinidos para navegación y aplicaciones
+  - `CacheEntry`: Entrada de caché LRU con expiración, acceso y métricas
+  - `PerformanceMetrics`: Métricas acumuladas de búsqueda, caché y rendimiento
+  - `AdvancedStateGraph`: Grafo optimizado con caché inteligente, auto-optimización y estadísticas avanzadas
+- **Métodos principales**:
+  - `SearchStrategy`: A_STAR, DIJKSTRA, BFS, DFS, GREEDY
+  - `GraphNode.__init__`: Inicializa nodo con costes y estado
+  - `GraphNode.__lt__`: Comparación para prioridad en heap
+  - `GraphEdge.__init__`: Inicializa arista con condiciones y efectos
+  - `GraphEdge._values_equal`: Compara valores con normalización
+  - `GraphEdge.can_traverse`: Verifica si se puede atravesar arista con estado actual
+  - `GraphEdge.apply_effects`: Aplica efectos de la arista al estado
+  - `GraphEdge.get_total_cost`: Calcula coste total de la arista
+  - `RouteResult.__init__`: Inicializa resultado de ruta con metadatos
+  - `RouteResult.length`: Propiedad de longitud del camino
+  - `RouteResult.edge_count`: Propiedad de número de aristas
+  - `RouteResult.to_dict`: Conversión a diccionario serializable
+  - `StateGraph.__init__`: Inicializa grafo con heurística y componentes
+  - `StateGraph.add_node`: Añade nodo al grafo
+  - `StateGraph.get_node`: Obtiene nodo por ID
+  - `StateGraph.has_node`: Verifica existencia de nodo
+  - `StateGraph.add_edge`: Añade arista entre nodos con condiciones
+  - `StateGraph.get_edges_from`: Obtiene aristas desde un nodo
+  - `StateGraph.get_edge`: Obtiene arista específica
+  - `StateGraph.find_route`: Método principal de búsqueda de rutas
+  - `StateGraph.build_route`: Alias para find_route
+  - `StateGraph.find_path_astar`: Búsqueda A* con alternativas
+  - `StateGraph._find_path_astar_internal`: Implementación interna A*
+  - `StateGraph._reconstruct_state_path`: Reconstruye camino desde estado
+  - `StateGraph.find_path_dijkstra`: Búsqueda Dijkstra
+  - `StateGraph.find_path_bfs`: Búsqueda en anchura
+  - `StateGraph.find_path_dfs`: Búsqueda en profundidad
+  - `StateGraph.find_path_greedy`: Búsqueda voraz
+  - `StateGraph.get_edges_for_path`: Obtiene aristas para un camino
+  - `StateGraph.apply_path_effects`: Aplica efectos de un camino
+  - `StateGraph.get_node_path_cost`: Calcula coste de un camino
+  - `StateGraph.get_neighbors`: Obtiene vecinos accesibles
+  - `StateGraph.add_edge_with_preconditions`: Añade arista con precondiciones
+  - `StateGraph.create_conditional_edge`: Crea arista condicional
+  - `StateGraph.create_effect_edge`: Crea arista con efecto
+  - `StateGraph.validate_graph`: Valida integridad del grafo
+  - `StateGraph.validate_graph_advanced`: Validación avanzada con métricas
+  - `StateGraph._has_circular_path`: Detecta caminos circulares
+  - `StateGraph.get_graph_stats`: Obtiene estadísticas del grafo
+  - `StateGraph.clear_search_cache`: Limpia caché de búsqueda
+  - `StateGraph.export_to_json`: Exporta grafo a JSON
+  - `StateGraph.import_from_json`: Importa grafo desde JSON
+  - `StateGraph.export_graph`: Exporta grafo a archivo
+  - `StateGraph.import_graph`: Importa grafo desde archivo
+  - `StateGraph._serialize_node`: Serializa nodo para JSON
+  - `StateGraph._serialize_edge`: Serializa arista para JSON
+  - `StateGraph._serialize_condition`: Serializa condición para JSON
+  - `StateGraph._serialize_effect`: Serializa efecto para JSON
+  - `StateGraph._deserialize_node`: Deserializa nodo desde JSON
+  - `StateGraph._deserialize_condition`: Deserializa condición desde JSON
+  - `StateGraph._deserialize_effect`: Deserializa efecto desde JSON
+  - `StateGraph._json_safe`: Convierte valor a JSON seguro
+  - `StateGraph._normalize_strategy`: Normaliza estrategia de búsqueda
+  - `StateGraph._create_goal_from_node`: Crea objetivo desde nodo
+  - `StateGraph._estimate_heuristic`: Estima coste heurístico
+  - `StateGraph._state_signature`: Genera firma de estado
+  - `GraphBuilder.build_navigation_graph`: Construye grafo de navegación
+  - `GraphBuilder.build_application_graph`: Construye grafo de aplicaciones
+  - `CacheEntry.__init__`: Inicializa entrada de caché
+  - `CacheEntry.is_expired`: Verifica si entrada ha expirado
+  - `CacheEntry.increment_access`: Incrementa contador de accesos
+  - `PerformanceMetrics.__init__`: Inicializa métricas de rendimiento
+  - `PerformanceMetrics.record_search`: Registra búsqueda realizada
+  - `PerformanceMetrics.record_cache_hit`: Registra acierto de caché
+  - `PerformanceMetrics.record_cache_miss`: Registra fallo de caché
+  - `PerformanceMetrics.get_hit_rate`: Obtiene tasa de aciertos
+  - `PerformanceMetrics.get_average_search_time`: Obtiene tiempo promedio
+  - `PerformanceMetrics.to_dict`: Convierte a diccionario
+  - `AdvancedStateGraph.__init__`: Inicializa grafo avanzado con caché
+  - `AdvancedStateGraph.find_path_with_strategy`: Búsqueda con caché y métricas
+  - `AdvancedStateGraph._execute_strategy`: Ejecuta estrategia específica
+  - `AdvancedStateGraph.find_route`: Búsqueda con resultado estructurado
+  - `AdvancedStateGraph.build_route`: Alias para find_route
+  - `AdvancedStateGraph._build_cache_key`: Construye clave de caché
+  - `AdvancedStateGraph._get_from_cache`: Obtiene entrada de caché
+  - `AdvancedStateGraph._add_to_cache`: Añade entrada a caché
+  - `AdvancedStateGraph._cleanup_cache`: Limpia caché expirada
+  - `AdvancedStateGraph.get_advanced_stats`: Obtiene estadísticas avanzadas
+  - `AdvancedStateGraph.optimize_graph_for_performance`: Optimiza para rendimiento
+
+#### `src/hands/planner/heuristic.py` [894 líneas] - Heurísticas para Algoritmo de Búsqueda A*
+- **Descripción**: Sistema avanzado de heurísticas para A* con caché LRU determinista, serialización robusta, pesos ajustables y fallbacks seguros. Proporciona estimaciones finitas y no negativas, con soporte para objetivos estructurados y compatibilidad con formatos legacy.
+- **Clases principales**:
+  - `HeuristicType` (Enum): Tipos de heurísticas con alias históricos (MANHATTAN, EUCLIDEAN, UNIFORM, ZERO, GOAL_DISTANCE, CAPABILITY_BASED, STATE_SIMILARITY)
+  - `Heuristic`: Heurística principal con caché LRU, pesos, serialización segura y evaluación robusta con copias de estado
+  - `HeuristicFactory`: Factoría para crear heurísticas preconfiguradas (uniform, goal_distance, capability_based, state_similarity, custom)
+- **Métodos principales**:
+  - `Heuristic.__init__`: Inicializa heurística con tipo, peso y configuración de caché
+  - `Heuristic.estimate_cost`: Estima coste desde un nodo hasta el objetivo con caché
+  - `Heuristic._apply_heuristic`: Aplica la heurística seleccionada según el tipo
+  - `Heuristic._manhattan_distance`: Estimación discreta inspirada en distancia Manhattan
+  - `Heuristic._euclidean_distance`: Ajuste continuo de la estimación Manhattan
+  - `Heuristic._goal_distance_heuristic`: Estima trabajo mínimo restante para satisfacer objetivo
+  - `Heuristic._capability_based_heuristic`: Estima coste restante a partir de capacidades requeridas
+  - `Heuristic._state_similarity_heuristic`: Estima coste según similitud entre estados actual y esperado
+  - `Heuristic._build_cache_key`: Construye clave de caché segura y determinista
+  - `Heuristic._cache_get/_cache_set`: Operaciones de caché con política LRU
+  - `Heuristic.clear_cache`: Limpia la caché de heurísticas
+  - `Heuristic.get_cache_stats`: Obtiene estadísticas de la caché
+  - `Heuristic._normalize_heuristic_type`: Normaliza tipo de heurística con manejo de errores
+  - `Heuristic._normalize_weight`: Normaliza peso a número finito no negativo
+  - `Heuristic._stable_serialize`: Serializa valores de forma estable para claves de caché
+  - `Heuristic._json_fallback`: Representación estable de objetos no serializables
+  - `Heuristic._get_required_capabilities`: Obtiene capacidades requeridas con tolerancia a APIs antiguas
+  - `Heuristic._get_current_url`: Obtiene URL actual desde varias representaciones compatibles
+  - `Heuristic._application_flag`: Obtiene flag de aplicación de formatos de estado compatibles
+  - `Heuristic._capability_fulfilled`: Verifica si capacidad está satisfecha en estado actual
+  - `Heuristic._get_state_value`: Obtiene valor de estado admitiendo claves directas y anidadas
+  - `Heuristic._get_expected_state`: Obtiene estado esperado básico de un objetivo
+  - `Heuristic._capability_costs`: Costes unitarios conservadores por capacidad
+- **Métodos de HeuristicFactory**:
+  - `create_uniform_heuristic`: Crea heurística uniforme
+  - `create_goal_distance_heuristic`: Crea heurística basada en distancia al objetivo
+  - `create_capability_based_heuristic`: Crea heurística basada en capacidades
+  - `create_state_similarity_heuristic`: Crea heurística basada en similitud de estado
+  - `create_custom_heuristic`: Crea heurística personalizada
+
+#### `src/hands/planner/htn_manager.py` - Gestor de Descomposición Jerárquica de Tareas
+- **Descripción**: Gestor central de reglas HTN y ejecución jerárquica con integración de grafos de estados y estrategias de descomposición.
+- **Clases principales**:
+  - `HTNStatus` (Enum): Estados del gestor HTN (IDLE, DECOMPOSING, EXECUTING, COMPLETED, FAILED, RESTARTING)
+  - `TaskDecompositionStrategy` (Enum): Estrategias de descomposición (SEQUENTIAL, PARALLEL, CONDITIONAL, ITERATIVE)
+  - `TaskExecutionResult` (dataclass): Resultado estructurado de ejecución de tareas con metadatos
+  - `HTNDecompositionRule` (dataclass): Reglas de descomposición con patrones y precondiciones
+  - `HTNManager`: Gestor central de reglas HTN y ejecución jerárquica con integración de grafos
+- **Métodos principales**:
+  - `__init__`: Inicializa gestor HTN con planner, tareas disponibles y reglas de descomposición
+  - `initialize_decomposition_rules`: Inicializa reglas de descomposición predefinidas por prioridad
+  - `set_planner/set_state_graph`: Establece planner y grafo de estados para integración
+  - `enable_graph_decomposition`: Habilita descomposición con grafos con umbral configurable
+  - `decompose_and_execute`: Método principal de descomposición y ejecución de objetivos
+  - `_decompose_and_execute_with_graph`: Descomposición avanzada con integración de grafos
+  - `_decompose_with_graph_advanced`: Descomposición compleja con optimización de dependencias
+  - `_convert_htn_tasks_to_graph_nodes`: Convierte tareas HTN a nodos de grafo preserving referencias
+  - `_optimize_task_sequence_with_graph`: Optimiza secuencia de tareas usando algoritmo topológico
+  - `_convert_graph_sequence_to_execution_plan`: Convierte secuencia de grafo a plan ejecutable
+  - `_node_to_execution_dict`: Convierte nodo a formato ejecutable con metadatos
+  - `_convert_tasks_to_execution_plan`: Convierte lista de tareas a plan ejecutable
+  - `_execute_optimized_plan`: Ejecuta plan optimizado con integración de planner
+  - `_call_planner`: Llama al planner externo con manejo de diferentes firmas
+  - `_execute_with_graph_only`: Ejecución fallback usando solo grafo de estados
+  - `_estimate_task_cost`: Estima coste de tarea basado en nombre, metadatos o heurísticas
+  - `_execute_plan_directly`: Ejecución directa cuando no hay planner disponible
+  - `load_task_library`: Carga biblioteca predefinida de tareas para descomposición
+  - `decompose_goal`: Descompone objetivo usando reglas y estrategias disponibles
+  - `execute_goal_hierarchy`: Ejecuta jerarquía completa de tareas desde objetivo
+  - `_find_decomposition_rule`: Busca regla de descompción compatible con objetivo
+  - `_application_catalog_available`: Verifica disponibilidad de catálogo de aplicaciones
+  - `_check_preconditions`: Evalúa precondiciones de regla usando estado actual y especiales
+  - `_browser_available`: Verifica disponibilidad de navegador en estado actual
+  - `_entity_available`: Verifica disponibilidad de entidades en estado actual
+  - `_task_from_pattern`: Crea tarea desde patrón con metadatos y dependencias
+  - `_decompose_sequential`: Descompone objetivo usando estrategia secuencial
+  - `_decompose_parallel`: Descompone objetivo usando estrategia paralela
+  - `_decompose_conditional`: Descompone objetivo usando estrategia condicional
+  - `_decompose_iterative`: Descompone objetivo usando estrategia iterativa
+  - `_establish_hierarchy`: Establece jerarquía padre-hijo entre tareas descompuestas
+  - `_order_tasks_by_dependencies`: Ordena tareas por dependencias usando algoritmo topológico
+  - `_get_task_executor`: Obtiene TaskExecutor perezoso para evitar ciclos de importación
+  - `_execute_task_hierarchy`: Ejecuta jerarquía completa de tareas con manejo de estado
+  - `_execute_single_task`: Ejecuta tarea individual con manejo de errores y estado
+  - `_simulate_task_execution`: Método obsoleto para simulación de ejecución (no utilizado)
+  - `get_execution_statistics`: Obtiene estadísticas completas de ejecución del sistema
+  - `get_task_execution_history`: Devuelve historial completo de ejecuciones realizadas
+- **Funciones globales**:
+  - `get_htn_manager`: Obtiene instancia singleton del gestor HTN
+
+#### `src/hands/keyboard.py` [901 líneas] - Control de Teclado y Entrada
+- **Descripción**: Sistema de control de teclado para automatización de entrada de texto y comandos.
+- **Clases principales**:
+  - `KeyModifier` (Enum): Modificadores de tecla soportados (CTRL, ALT, SHIFT, WIN).
+  - `KeyboardCapabilities`: Capacidades del teclado para el sistema de planificación.
+  - `KeyboardCapabilitySystem`: Sistema de capacidades del teclado para planificación jerárquica.
+- **Métodos principales**:
+  - `keyboard_capability`: Decorador para registrar capacidades del teclado en el sistema de planificación.
+  - `type_text`: Escribir texto en el campo activo o en un campo específico.
+  - `press_key`: Presionar una tecla individual con tiempo de espera configurable.
+  - `execute_hotkey`: Ejecutar combinación de teclas (hotkeys) con contexto de aplicación.
+  - `copy_text`: Copiar texto seleccionado al portapapeles (Ctrl+C).
+  - `paste_text`: Pegar texto desde el portapapeles (Ctrl+V).
+  - `cut_text`: Cortar texto seleccionado al portapapeles (Ctrl+X).
+  - `select_all_text`: Seleccionar todo el texto en el campo activo (Ctrl+A).
+  - `navigate_tab`: Navegar entre campos con Tabulador (adelante/atrás).
+  - `navigate_enter`: Confirmar acción con la tecla Enter.
+  - `switch_window`: Cambiar a la siguiente ventana con Alt+Tab.
+  - `close_window`: Cerrar la ventana activa con Alt+F4.
+  - `open_start_menu`: Abrir el menú de inicio de Windows (Tecla Windows).
+  - `_get_typing_interval`: Obtiene el intervalo de escritura (mantenido por compatibilidad).
+  - `escribir_texto`: Escribe texto en el campo activo (mantenido por compatibilidad).
+  - `presionar_enter`: Presiona la tecla Enter (mantenido por compatibilidad).
+  - `presionar_tecla`: Presiona una tecla específica (mantenido por compatibilidad).
+  - `copiar`: Ejecuta Ctrl+C (Copiar) (mantenido por compatibilidad).
+  - `pegar`: Ejecuta Ctrl+V (Pegar) (mantenido por compatibilidad).
+  - `cortar`: Ejecuta Ctrl+X (Cortar) (mantenido por compatibilidad).
+  - `seleccionar_todo`: Ejecuta Ctrl+A (Seleccionar todo) (mantenido por compatibilidad).
+  - `cambiar_ventana`: Ejecuta Alt+Tab (Cambiar ventana) (mantenido por compatibilidad).
+  - `cerrar_ventana`: Ejecuta Alt+F4 (Cerrar ventana) (mantenido por compatibilidad).
+  - `tecla_super`: Presiona la tecla Windows (Super) (mantenido por compatibilidad).
+  - `abrir_menu_inicio`: Abre el menú de inicio de Windows (mantenido por compatibilidad).
+  - `KeyboardCapabilitySystem.__init__`: Inicializar el sistema de capacidades.
+  - `KeyboardCapabilitySystem._initialize_capabilities`: Inicializar el catálogo de capacidades.
+  - `KeyboardCapabilitySystem.get_capabilities_for_context`: Obtener capacidades que se pueden ejecutar con el contexto dado.
+  - `KeyboardCapabilitySystem._check_conditions`: Verificar si las condiciones se cumplen en el contexto dado.
+  - `KeyboardCapabilitySystem.can_execute_capability`: ¿Se puede ejecutar una capacidad con el contexto dado?
+  - `get_keyboard_capability_system`: Obtener la instancia global del sistema de capacidades del teclado.
+
+#### `src/hands/planner/learning_system.py` [872 líneas] - Sistema de Aprendizaje para Planificación
+- **Descripción**: Sistema central de registro y aprendizaje de planificación que registra ejecuciones reales, costes, tiempos, rutas y patrones para que el planificador pueda disponer de datos históricos sin mezclar el aprendizaje con la ejecución de acciones.
+- **Clases principales**:
+  - `LearningEventType` (Enum): Tipos de eventos de aprendizaje (ACTION_EXECUTION, PLAN_EXECUTION, NODE_EXECUTION, REPLANIFICATION, ALTERNATIVE_FOUND, GOAL_ACHIEVED, GOAL_FAILED, COST_ADJUSTMENT)
+  - `LearningEvent` (dataclass): Evento estructurado con metadatos de ejecución, timestamp, éxito, tiempo y costes
+  - `LearningStatistics` (dataclass): Estadísticas agregadas de eventos con tasas de éxito, tiempos y patrones
+  - `LearningSystem`: Sistema central de registro y aprendizaje de planificación con memoria persistente
+- **Métodos principales**:
+  - `__init__`: Inicializa sistema de aprendizaje con tamaño máximo de memoria y tasa de aprendizaje configurable
+  - `record_action_execution`: Registra ejecución de acciones individuales con éxito, tiempo y costes
+  - `record_plan_execution`: Registra ejecución completa de planes con secuencia de acciones
+  - `record_node_execution`: Registra ejecución de nodos individuales en la jerarquía de planificación
+  - `record_replanification`: Registra eventos de replanificación con rutas originales y nuevas
+  - `get_action_insights`: Obtiene insights detallados para una acción específica con tendencias de mejora
+  - `get_system_insights`: Obtiene visión general del sistema con estadísticas globales y salud
+  - `get_cost_adjustments`: Devuelve costes aprendidos para acciones con ajustes históricos
+  - `export_learning_data`: Exporta todos los datos de aprendizaje a archivo JSON
+  - `import_learning_data`: Importa datos de aprendizaje desde archivo JSON con validación
+  - `clear_learning_data`: Limpia todos los datos de aprendizaje y estadísticas
+  - `enable_learning`: Habilita o deshabilita el sistema de aprendizaje global
+  - `_build_event`: Construye evento estructurado con validación de tipos y normalización
+  - `_store_event`: Almacena evento en memoria con gestión de tamaño máximo y estadísticas
+  - `_update_statistics`: Actualiza estadísticas agregadas por acción, aplicación o nodo
+  - `_learn_action_cost`: Aprende costes ajustados usando algoritmo de promedio móvil ponderado
+  - `_discover_patterns`: Descubre patrones de éxito/fracaso y patrones temporales por hora
+  - `_register_optimal_route`: Registra rutas óptimas para objetivos con métricas de rendimiento
+  - `_learn_from_replanification`: Aprende de eventos de replanificación para mejorar futuras ejecuciones
+  - `_calculate_improvement_trend`: Calcula tendencia de mejora basada en ejecuciones recientes
+  - `_count_events_by_type`: Contabiliza eventos por tipo para análisis de actividad
+  - `_assess_system_health`: Evalúa salud del sistema con recomendaciones automáticas
+  - `_generate_health_recommendations`: Genera recomendaciones basadas en estado del sistema
+  - `_build_application_insights`: Construye insights por aplicación con métricas específicas
+  - `_build_action_insights_summary`: Resume estadísticas de acciones para análisis comparativo
+  - `_rebuild_statistics_from_events`: Reconstruye estadísticas completas desde eventos históricos
+  - `_count_unique_patterns`: Cuenta patrones únicos descubiertos en ejecuciones
+  - `_safe_float`: Convierte valores a float seguro con manejo de errores
+  - `_cost_error`: Calcula error relativo entre coste estimado y real
+- **Funciones globales**:
+  - `get_learning_system`: Obtiene instancia singleton del sistema de aprendizaje
+
+#### `src/hands/mouse.py` - Control Básico del Ratón
+- **Descripción**: Control básico del ratón para JARVIS con capacidades fundamentales de interacción del sistema. Proporciona funcionalidades esenciales de movimiento, clic y scroll para la automatización de tareas.
+- **Clases principales**:
+  - (Módulo funcional sin clases principales, solo funciones)
+- **Métodos principales**:
+  - `move_to_position(x: float, y: float, duration: float = 0.1)`: Mueve el ratón a una posición específica con validación de coordenadas y duración configurable.
+  - `click_element(button: str = "left", wait_after: float = 0.1)`: Realiza un clic con el ratón en el botón especificado (left, right, middle) con tiempo de espera posterior.
+  - `scroll_at_position(x: float, y: float, clicks: int, wait_after: float = 0.1)`: Realiza scroll en una posición específica con número de clicks configurable (positivo para arriba, negativo para abajo).
+- **Funciones globales**:
+  - `register_mouse_capabilities()`: Registra las capacidades del ratón en el sistema de acciones disponibles.
+- **Acciones Registradas**:
+  - `move_mouse`: Mover ratón a posición con tipo de acción INTERACTION.
+  - `click_mouse`: Hacer clic con el ratón con tipo de acción INTERACTION.
+  - `scroll_mouse`: Hacer scroll con el ratón con tipo de acción INTERACTION.
+- **Características implementadas**:
+  - Validación de coordenadas y parámetros de entrada
+  - Manejo de errores con logging estructurado
+  - Integración con el sistema de registro de acciones
+  - Soporte para múltiples botones del ratón
+  - Tiempos de espera configurables para operaciones sincrónicas
+  - Importación diferida de pyautogui para optimización de recursos
+  - Inicialización automática de capacidades al importar el módulo
+
+#### `src/hands/planner/node.py` [1138 líneas] - Modelo Canónico de Nodos para Planificación Jerárquica
+- **Descripción**: Fuente única de verdad para el sistema de planificación jerárquica de JARVIS. Implementa un modelo de nodos completo con soporte para múltiples fases del sistema, aprendizaje automático, grafos de estados, y ejecución con replanificación. El sistema soporta desde nodos simples hasta estructuras jerárquicas complejas con dependencias, precondiciones, efectos y gestión de estado.
+
+**Arquitectura Multi-Fase Integrada:**
+- **FASE 3**: Estado del mundo con `state_requirements` y `state_modifications`
+- **FASE 6**: Grafo de acciones con `in_edges`, `out_edges` y `edge_costs`
+- **FASE 10**: Precondiciones y efectos avanzados con funciones callback
+- **FASE 14**: Acciones reutilizables con categorías y marcado
+- **FASE 18**: Sistema de aprendizaje automático con métricas de ejecución
+
+- **Clases principales**:
+  - `NodeType` (Enum): Tipos de nodos en el sistema de planificación
+    - INTENTION, GOAL, TASK, ACTION, CONDITION, STATE, RESOURCE, APPLICATION, UI_ELEMENT, RESULT, PLAN
+  - `TaskStatus` (Enum): Estados de ejecución de tareas
+    - PENDING, EXECUTING, COMPLETED, FAILED, ABORTED
+  - `Node`: Modelo conceptual central para todos los elementos del sistema
+  - `Goal`: Objetivos de alto nivel con verificación de logro y estimación de coste
+  - `Task`: Tareas jerárquicas con descomposición recursiva y detección de ciclos
+  - `WorldState`: Estado del mundo canónico ligero para planificación
+
+- **Sistema de Node (Clase Principal)**:
+  - **Propiedades Esenciales**: `id`, `type`, `name`, `description`, `cost`, `dependencies`
+  - **Precondiciones y Efectos**: Soporte para declarativas (`preconditions`, `effects`) y funcionales (`preconditions_functions`, `effects_functions`)
+  - **Gestión de Estado**: `state_requirements` (precondiciones de estado) y `state_modifications` (efectos de estado)
+  - **Grafo de Acciones**: `in_edges`, `out_edges`, `edge_costs` para navegación y planificación
+  - **Ejecución Avanzada**: `execute_callback`, `success_criteria`, manejo de errores y métricas
+  - **Aprendizaje Automático**: `execution_history`, `success_rate`, `average_execution_time`, `last_executed`
+  - **Acciones Reutilizables**: `reusable_action`, `action_category` para componentes modulares
+
+- **Métodos Principales de Node**:
+  - `__init__`: Inicialización normalizada con validación de tipos y valores
+  - `_evaluate_precondition`: Evaluación robusta de precondiciones (simple, compuesta, funciones, custom)
+  - `can_execute`: Verificación completa de precondiciones, funciones y estado del mundo
+  - `_apply_effect`: Aplicación determinista de efectos con soporte para múltiples tipos
+  - `execute`: Ejecución con registro histórico, manejo de errores y actualización de estado
+  - `_update_learning_metrics`: Cálculo automático de métricas de aprendizaje
+  - `verify_success`: Verificación de éxito mediante criterios configurados
+  - `to_dict/from_dict`: Serialización completa con manejo de funciones no serializables
+  - `add_edge/add_in_edge`: Gestión de transiciones con costes normalizados
+  - `get_valid_transitions`: Devuelve transiciones ejecutables en estado actual
+  - `add_precondition_function/add_effect_function`: Integración con callbacks funcionales
+  - `set_state_requirement/set_state_modification`: Gestión declarativa de estado
+  - `mark_as_reusable_action`: Marcado para acciones reutilizables con categorías
+  - `get_execution_stats`: Estadísticas agregadas con manejo robusto de datos
+
+- **Sistema de Goal (Objetivos Inteligentes)**:
+  - **Propiedades**: `id`, `type`, `target`, `description`, `priority`, `deadline`, `constraints`
+  - **Verificación de Logro**: `is_achieved` con soporte para múltiples tipos (navigate, open_application, etc.)
+  - **Estimación de Coste**: `estimate_cost` con factores de complejidad y estado actual
+  - **Gestión de Capacidades**: `get_required_capabilities` con capacidades por defecto y personalizadas
+  - **Expiración**: `is_expired` con manejo de deadlines
+  - **Serialización**: `to_dict/from_dict` para persistencia
+
+- **Sistema de Task (Tareas Jerárquicas)**:
+  - **Jerarquía y Ciclos**: Detección automática de ciclos en `can_execute` y `decompose_task`
+  - **Descomposición Recursiva**: `decompose_task` convierte tareas complejas en nodos hoja
+  - **Plan de Ejecución**: `get_execution_plan` genera secuencia respetando dependencias
+  - **Estimación de Coste**: `estimate_task_cost` calcula coste de hijos ejecutables
+  - **Gestión de Estado**: `status`, timestamps, y validación de dependencias
+  - **Serialización**: Completa con manejo de estados y dependencias
+
+- **Sistema de WorldState (Estado del Mundo)**:
+  - **Operaciones Atómicas**: `get`, `set`, `update` con copias profundas seguras
+  - **Inmutabilidad**: `copy` crea estados independientes para evitar efectos colaterales
+  - **Serialización**: `to_dict/from_dict` para persistencia y transferencia
+
+- **Funciones Globales de Creación**:
+  - `create_action_node`: Crea nodos de acción reutilizables con categorías
+  - `create_application_node`: Crea nodos que representan aplicaciones
+  - `create_state_node`: Crea nodos de requisito de estado declarativo
+  - `create_condition_node`: Crea nodos de condición mediante callbacks
+
+- **Características Avanzadas**:
+  - **Sistema de Aprendizaje (FASE 18)**: Registro histórico automático con métricas de éxito y tiempo de ejecución
+  - **Gestión de Grafos**: Soporte completo para grafos de estados con aristas ponderadas
+  - **Serialización Inteligente**: Maneja funciones no serializables y referencias circulares
+  - **Validación Robusta**: Normalización automática de tipos, flotantes y estructuras de datos
+  - **Manejo de Errores**: Logging estructurado y recuperación graceful ante fallos
+  - **Integración HTN**: Diseñado para trabajar con sistemas de descomposición jerárquica de tareas
+  - **Estado del Mundo**: Integración completa con sistemas de memoria y estado persistente
+
+#### `src/hands/planner/optimization.py` [938 líneas] - Sistema de Optimización de Planificación
+- **Descripción**: Sistema avanzado de optimización para el planificador JARVIS con caché LRU de rutas, eliminación de redundancias, selección de alternativas y optimización contextual. Integración completa con LearningSystem para costes aprendidos y persistencia robusta de datos.
+- **Clases principales**:
+  - `OptimizationType` (Enum): Tipos de optimización disponibles (ROUTE_CACHE, COST_LEARNING, REDUNDANCY_REMOVAL, CONTEXT_AWARE, ALTERNATIVE_SELECTION, PERFORMANCE_MONITORING)
+  - `RouteCacheEntry` (dataclass): Entrada del caché de rutas con metadatos de calidad y acceso
+  - `CostLearningData` (dataclass): Dato individual de aprendizaje de coste con contexto y métricas
+  - `ContextData` (dataclass): Datos contextuales usados por la optimización (preferencias, patrones, éxito)
+  - `OptimizationManager`: Gestor principal de optimización sobre el Planner existente
+- **Métodos principales**:
+  - `__init__`: Inicializa gestor de optimización con planner, caché LRU y sistemas de aprendizaje
+  - `set_learning_system`: Establece sistema de aprendizaje externo para costes aprendidos
+  - `optimize_planning`: Método principal de planificación optimizada con múltiples estrategias
+  - `_check_route_cache`: Verifica caché de rutas para objetivo y estado actual
+  - `_add_to_route_cache`: Añade resultado de planificación al caché con gestión de tamaño
+  - `_build_cache_key`: Construye clave de caché estable basada en objetivo y estado
+  - `_hash_state`: Genera hash estable del estado ignorando campos volátiles
+  - `_stable_hash`: Método estático para hash estable de valores complejos
+  - `_normalize_for_json`: Normaliza valores para serialización JSON estable
+  - `_strip_volatile_state`: Elimina campos volátiles del estado para hash
+  - `_remove_redundancies`: Elimina redundancias conservadoras de planes
+  - `_select_optimal_alternatives`: Selecciona alternativas óptimas basadas en coste y compatibilidad
+  - `_apply_context_optimization`: Aplica optimización contextual basada en preferencias y patrones
+  - `_create_optimized_node`: Crea nodo optimizado con método preferido
+  - `_calculate_state_compatibility`: Calcula compatibilidad de plan con estado actual
+  - `_evaluate_condition_with_state`: Evalúa condiciones con estado actual
+  - `_get_nested_state_value`: Obtiene valor anidado del estado con manejo de errores
+  - `_get_learned_cost_for_plan`: Obtiene coste aprendido para plan externo o interno
+  - `record_execution_result`: Registra resultado de ejecución para aprendizaje y actualización de modelos
+  - `_update_cost_model`: Actualiza modelo de coste con datos de ejecución
+  - `_update_context_patterns`: Actualiza patrones contextuales con ejecuciones recientes
+  - `get_optimization_stats`: Obtiene estadísticas completas del sistema de optimización
+  - `clear_cache`: Limpia caché de rutas y estadísticas
+  - `enable_optimization`: Habilita/deshabilita tipos específicos de optimización
+  - `export_optimization_data`: Exporta todos los datos de optimización a archivo JSON
+  - `import_optimization_data`: Importa datos de optimización desde archivo JSON con validación
+  - `_node_identifier`: Obtiene identificador único de nodo
+  - `_node_cost`: Obtiene coste de nodo con manejo de errores
+  - `_plan_signature`: Genera firma estable de plan para comparación
+- **Características implementadas**:
+  - Caché LRU inteligente de rutas válidas por objetivo y estado relevante
+  - Comparación y selección automática de alternativas óptimas
+  - Eliminación conservadora de redundancias sin afectar funcionalidad
+  - Optimización contextual basada en preferencias de usuario y patrones temporales
+  - Integración completa con LearningSystem para costes aprendidos
+  - Persistencia robusta de datos de optimización con exportación/importación JSON
+  - Sistema de métricas detallado para monitoreo y mejora continua
+  - Manejo thread-safe de caché y datos compartidos
+  - Soporte para múltiples estrategias de optimización configurables
+
+#### `src/hands/planner/optimization_config.py` [355 líneas] - Configuración del Sistema de Optimización
+- **Descripción**: Configuración tipada y validada del sistema de optimización (FASE 17) con modos predefinidos, configuraciones por subsistema y serialización segura.
+- **Clases principales**:
+  - `OptimizationMode` (Enum): Modos de operación del sistema de optimización (AGGRESSIVE, BALANCED, CONSERVATIVE, LEARNING_ONLY)
+  - `RouteCacheConfig`: Configuración del caché de rutas con LRU, precarga y compresión
+  - `CostLearningConfig`: Configuración del aprendizaje de costes con tasa de aprendizaje y factor de descuento
+  - `RedundancyRemovalConfig`: Configuración de eliminación de redundancias con análisis de efectos y alternativas
+  - `ContextAwareConfig`: Configuración de optimización basada en contexto con patrones temporales y de usuario
+  - `AlternativeSelectionConfig`: Configuración de selección de alternativas con comparación multidimensional
+  - `PerformanceMonitoringConfig`: Configuración de monitoreo de rendimiento con detección de cuellos de botella
+  - `OptimizationConfig`: Configuración completa del sistema de optimización con validación automática
+- **Métodos principales**:
+  - `OptimizationMode`: AGGRESSIVE, BALANCED, CONSERVATIVE, LEARNING_ONLY
+  - `RouteCacheConfig.__init__`: Inicializa configuración de caché de rutas con valores por defecto
+  - `CostLearningConfig.__init__`: Inicializa configuración de aprendizaje de costes con hiperparámetros
+  - `RedundancyRemovalConfig.__init__`: Inicializa configuración de eliminación de redundancias
+  - `ContextAwareConfig.__init__`: Inicializa configuración de optimización contextual
+  - `AlternativeSelectionConfig.__init__`: Inicializa configuración de selección de alternativas
+  - `PerformanceMonitoringConfig.__init__`: Inicializa configuración de monitoreo de rendimiento
+  - `OptimizationConfig.__init__`: Inicializa configuración completa con normalización automática
+  - `OptimizationConfig.__post_init__`: Normaliza valores básicos y valida configuración anidada
+  - `OptimizationConfig._coerce_nested`: Convierte y valida configuraciones anidadas desde diccionarios
+  - `OptimizationConfig.get_aggressive_config`: Obtiene configuración optimizada para modo agresivo
+  - `OptimizationConfig.get_conservative_config`: Obtiene configuración para modo conservador
+  - `OptimizationConfig.get_learning_only_config`: Obtiene configuración para modo solo aprendizaje
+  - `OptimizationConfig.get_optimization_enabled`: Obtiene estado efectivo de cada técnica de optimización
+  - `OptimizationConfig.validate_config`: Valida configuración completa y devuelve advertencias
+  - `OptimizationConfig.to_dict`: Convierte configuración a diccionario serializable
+  - `OptimizationConfig.from_dict`: Crea configuración desde diccionario parcial o completo
+
+#### `src/hands/planner/planner.py` - Planificador Principal de JARVIS
+- **Descripción**: Planificador central de JARVIS con capacidades avanzadas de planificación jerárquica, integración HTN, optimización de rutas, aprendizaje automático y gestión de recursos UI. Coordina todas las operaciones de planificación y ejecución del sistema.
+- **Clases principales**:
+  - `PlannerStatus` (Enum): Estados del planificador (IDLE, PLANNING, EXECUTING, COMPLETED, FAILED, REPLANNING)
+  - `PlanQuality` (Enum): Calidad de planes (OPTIMAL, SUBOPTIMAL, MINIMAL, UNCERTAIN)
+  - `PlanningResult` (dataclass): Resultado estructurado de planificación con metadatos
+  - `Planner`: Planificador principal con integración HTN, grafos de estados y optimización
+- **Métodos principales**:
+  - `__init__`: Inicializa planificador con executor, nodos disponibles y sistemas de optimización
+  - `get_learning_insights`: Obtiene insights del sistema de aprendizaje
+  - `get_action_learning_insights`: Obtiene insights de aprendizaje para acción específica
+  - `get_cost_adjustments`: Obtiene ajustes de coste del sistema de aprendizaje
+  - `export_learning_data`: Exporta datos de aprendizaje a archivo
+  - `import_learning_data`: Importa datos de aprendizaje desde archivo
+  - `clear_learning_data`: Limpia datos de aprendizaje
+  - `enable_learning`: Habilita/deshabilita sistema de aprendizaje
+  - `initialize_htn_manager`: Inicializa gestor HTN
+  - `set_htn_manager`: Establece gestor HTN externo
+  - `plan_with_htn_integration`: Planificación integrada HTN + grafo de estados
+  - `_plan_with_graph_optimized`: Planificación con optimización de grafo
+  - `_plan_with_htn_traditional`: Planificación tradicional con HTN
+  - `_plan_complex_htn_graph`: Planificación compleja HTN + grafo
+  - `_convert_htn_result_to_plan`: Convierte resultados HTN a formato plan
+  - `set_state_graph`: Establece grafo de estados
+  - `get_state_graph`: Obtiene grafo de estados
+  - `create_graph_from_nodes`: Crea grafo desde nodos disponibles
+  - `_build_graph_edges`: Construye aristas del grafo
+  - `_should_create_edge`: Determina si debe crear arista entre nodos
+  - `_calculate_edge_cost_for_graph`: Calcula coste de arista en grafo
+  - `_get_edge_conditions`: Obtiene condiciones de arista
+  - `integrate_graph_with_htn`: Integra grafo con HTN
+  - `validate_graph_integration`: Valida integración grafo-HTN
+  - `get_graph_integration_status`: Obtiene estado de integración
+  - `configure_astar_planning`: Configura planificación A*
+  - `_create_graph_edges_from_nodes`: Construye aristas desde nodos
+  - `set_custom_graph`: Establece grafo personalizado
+  - `plan`: Método principal de planificación con optimización y alternativas
+  - `_plan_with_optional_optimization`: Planificación con optimización opcional
+  - `_create_plan_astar`: Planificación usando algoritmo A*
+  - `_create_plan`: Planificación determinística básica
+  - `_get_available_nodes`: Obtiene nodos disponibles
+  - `_create_compatibility_nodes`: Crea nodos de compatibilidad
+  - `_get_start_node_for_goal`: Obtiene nodo de inicio para objetivo
+  - `_get_goal_node_for_goal`: Obtiene nodo de objetivo
+  - `_convert_path_to_plan`: Convierte ruta a plan ejecutable
+  - `_convert_node_to_execution_node`: Convierte nodo a formato ejecutable
+  - `_build_hierarchical_plan`: Construye plan jerárquico
+  - `_find_nodes_for_capability`: Busca nodos por capacidad
+  - `_node_provides_capability`: Verifica si nodo proporciona capacidad
+  - `_select_best_node`: Selecciona mejor nodo disponible
+  - `_optimize_plan`: Optimiza plan existente
+  - `validate_ui_resources_for_plan`: Valida recursos UI para planes
+  - `get_optimal_ui_strategy`: Obtiene estrategia UI óptima
+  - `resolve_ui_conflicts`: Resuelve conflictos de recursos UI
+  - `check_ui_readiness`: Verifica preparación UI
+  - `_find_alternative_plans_astar`: Busca planes alternativos con A*
+  - `_find_alternatives_for_node`: Busca alternativas para nodo específico
+  - `_select_best_alternative`: Selecciona mejor alternativa
+  - `_calculate_plan_similarity`: Calcula similitud entre planes
+  - `_calculate_state_compatibility`: Calcula compatibilidad con estado
+  - `_evaluate_condition_with_state`: Evalúa condiciones con estado actual
+  - `replan`: Replanificación ante fallos
+  - `_evaluate_plan_quality`: Evalúa calidad de planes
+  - `_optimize_integrated_plan`: Optimiza plan integrado
+  - `_remove_redundancies`: Elimina redundancias en plan
+  - `_apply_learned_cost_adjustments`: Aplica ajustes de coste aprendidos
+  - `_ensure_optimization_systems`: Asegura sistemas de optimización
+  - `load_application_knowledge`: Carga conocimiento de aplicaciones
+  - `get_applications_by_capability`: Obtiene aplicaciones por capacidad
+  - `get_application_capabilities`: Obtiene capacidades de aplicación
+  - `find_application_for_goal`: Busca aplicación para objetivo
+  - `build_application_aware_plan`: Construye plan consciente de aplicaciones
+  - `is_application_available`: Verifica disponibilidad de aplicación
+  - `get_application_ui_requirements`: Obtiene requisitos UI de aplicación
+  - `get_planning_stats`: Obtiene estadísticas de planificación
+  - `execute_plan`: Ejecuta plan (compatibilidad)
+  - `record_execution_result`: Registra resultado de ejecución
+  - `get_optimization_stats`: Obtiene estadísticas de optimización
+  - `clear_optimization_cache`: Limpia caché de optimización
+  - `enable_optimization`: Habilita tipo de optimización
+  - `export_optimization_data`: Exporta datos de optimización
+  - `import_optimization_data`: Importa datos de optimización
+  - `get_optimization_recommendations`: Obtiene recomendaciones de optimización
+  - `_record_planning_history`: Registra historial de planificación
+  - `_get_default_state`: Obtiene estado por defecto
+  - `_safe_required_capabilities`: Obtiene capacidades requeridas de forma segura
+  - `_is_goal_expired`: Verifica si objetivo ha expirado
+  - `_is_goal_achieved`: Verifica si objetivo ya está alcanzado
+  - `_node_type_value`: Obtiene valor de tipo de nodo
+  - `_status_value`: Obtiene valor de estado
+  - `_normalize_identifier`: Normaliza identificador
+  - `_state_node_matches_context`: Verifica si nodo coincide con contexto
+- `_node_can_satisfy_goal`: Verifica si nodo de acción puede satisfacer objetivo
+- `_goal_satisfied_by_effects`: Verifica si objetivo está satisfecho por efectos
+- `_effects_support_preconditions`: Determina si efectos pueden habilitar precondiciones
+- `_normalize_route_result`: Normaliza resultados de búsqueda a formato consistente
+- `_create_sequential_navigation_edges`: Crea aristas de navegación secuenciales
+
+#### `src/hands/planner/planner_integration.py` [1215 líneas] - Integración del StateGraph con el Sistema de Planificación
+- **Descripción**: Puente entre Goal/estado actual y StateGraph. Inicializa y prepara el grafo, construye transiciones de planificación a partir de precondiciones/efectos, resuelve nodos inicial/final sin depender de IDs inventados, obtiene una ruta del StateGraph/AdvancedStateGraph y devuelve un resultado estructurado sin ejecutar acciones reales.
+- **Clases principales**:
+  - `IntegrationMode` (Enum): Modos de integración (GRAPH_ONLY, HTN_PLUS_GRAPH, FULL_INTEGRATION)
+  - `GraphPlanningResult` (dataclass): Resultado estructurado de planificación con grafo
+  - `GraphPlannerIntegration`: Puente entre Goal/estado actual y StateGraph
+- **Métodos principales**:
+  - `__init__`: Inicializa integración con modo, heurística y métricas de rendimiento
+  - `initialize_graph`: Crea el grafo y añade las transiciones declaradas y derivadas
+  - `_configure_advanced_edges`: Configura aristas avanzadas desde configuración
+  - `_create_compatibility_edges`: Crea aristas de compatibilidad predefinidas
+  - `_create_sequence_edges`: Crea aristas secuenciales con costes definidos
+  - `_prepare_planning_edges`: Conecta estados/acciones cuando existe una relación planificable
+  - `_connect_if_plannable`: Conecta nodos si precondiciones se satisfacen
+  - `_add_planning_edge`: Añade arista de planificación entre nodos
+  - `_add_edge_if_missing`: Añade arista si no existe ya
+  - `create_plan_with_graph`: Construye una ruta y sus metadatos, sin convertirla aún en Plan ejecutable
+  - `_validate_planning_input`: Valida entrada para planificación
+  - `_determine_search_strategy`: Determina estrategia de búsqueda según complejidad
+  - `_calculate_goal_complexity`: Calcula complejidad del objetivo basada en tipo y estado
+  - `_execute_search`: Invoca la API real del grafo respetando sus nombres de parámetros
+  - `_select_search_method`: Selecciona método de búsqueda compatible del grafo
+  - `_build_search_kwargs`: Construye parámetros para búsqueda con inspección de firma
+  - `_call_search_positionally`: Llama a búsqueda con parámetros posicionales como fallback
+  - `_normalize_route_result`: Normaliza resultados de búsqueda a formato consistente
+  - `_normalize_edge_ids`: Normaliza identificadores de aristas
+  - `_prepare_contextual_planning_edges`: Prepara aristas de planificación contextual
+  - `_get_start_node_for_goal`: Obtiene nodo de inicio para objetivo
+  - `_score_state_node`: Calcula puntuación de nodo de estado según contexto
+  - `_get_goal_node_for_goal`: Obtiene nodo de objetivo para Goal
+  - `_node_can_satisfy_goal`: Verifica si nodo de acción puede satisfacer objetivo
+  - `_goal_type_matches_effects`: Verifica si tipo de objetivo coincide con efectos
+  - `_calculate_path_cost`: Calcula coste total de un camino en el grafo
+  - `_find_edge`: Encuentra arista específica entre nodos
+  - `_get_edges_used_in_path`: Obtiene aristas usadas en un camino
+  - `_convert_path_to_plan_metadata`: Convierte ruta a metadatos de plan
+  - `_update_performance_metrics`: Actualiza métricas de rendimiento
+  - `_preconditions_satisfied`: Verifica si precondiciones se satisfacen con estado actual
+  - `_effects_support_preconditions`: Determina si efectos pueden habilitar precondiciones
+  - `_condition_supported_by_effects`: Verifica si condición específica es soportada por efectos
+  - `_has_effect_key`: Verifica si efecto contiene clave específica
+  - `_key_value_supported`: Verifica si efecto soporta clave-valor específico
+  - `_goal_satisfied_by_effects`: Verifica si objetivo está satisfecho por efectos
+  - `_calculate_graph_metrics`: Calcula métricas del grafo (densidad, grado medio)
+  - `get_integration_statistics`: Obtiene estadísticas completas de la integración
+  - `export_graph_state`: Exporta estado del grafo a archivo
+  - `import_graph_state`: Importa estado del grafo desde archivo
+  - `validate_graph_consistency`: Valida consistencia del grafo
+  - `build_route`: Método público compatible para construir rutas
+  - `_safe_float`: Convierte valor a float de forma segura
+  - `_node_can_satisfy_goal`: Verifica si nodo puede satisfacer objetivo
+  - `_goal_satisfied_by_effects`: Verifica si objetivo satisfecho por efectos
+  - `_effects_support_preconditions`: Verifica si efectos soportan precondiciones
+  - `_normalize_route_result`: Normaliza resultado de ruta
+  - `_create_sequential_navigation_edges`: Crea aristas de navegación secuenciales
+
+#### `src/hands/planner/preconditions_effects.py` - Sistema Avanzado de Precondiciones y Efectos
+- **Descripción**: Sistema avanzado de precondiciones y efectos para planificación jerárquica con construcción y reutilización de condiciones y efectos, evaluación de precondiciones simples y compuestas, aplicación determinista de efectos sobre estados, e integración con ActionInfo/ActionType del registro central de acciones.
+- **Clases principales**:
+  - `PreconditionsEffectsManager`: Gestor centralizado de precondiciones y efectos
+- **Métodos principales**:
+  - `__init__`: Inicializa gestor con condiciones, efectos y plantillas
+  - `_initialize_templates`: Inicializa plantillas comunes de condiciones y efectos
+  - `create_condition`: Crea una condición y la registra para reutilización
+  - `create_effect`: Crea un efecto y lo registra para reutilización
+  - `_make_registry_key`: Construye clave de registro única para condiciones/efectos
+  - `create_composite_condition`: Crea una condición compuesta AND u OR
+  - `verify_action_preconditions`: Verifica si todas las precondiciones de una acción se cumplen
+  - `evaluate_condition`: Evalúa una condición individual o funcional de forma segura
+  - `_dict_condition_matches`: Compara condición diccionario con estado actual
+  - `_dict_to_condition`: Convierte diccionario a objeto Condition
+  - `_resolve_condition_type`: Resuelve tipo de condición con aliases y normalización
+  - `apply_action_effects`: Aplica los efectos de una acción y devuelve un nuevo estado
+  - `apply_effect`: Aplica un efecto individual al estado actual
+  - `_dict_to_effect`: Convierte diccionario a objeto Effect
+  - `get_state_requirements_for_action`: Extrae requisitos de estado expresables como clave/valor
+  - `get_state_modifications_from_action`: Extrae modificaciones de estado estáticas de los efectos
+  - `create_action_with_preconditions_effects`: Crea un ActionInfo compatible con el registro central
+  - `_normalize_sequence`: Normaliza cualquier valor a lista
+  - `_ensure_condition`: Asegura que cualquier entrada sea un objeto Condition válido
+  - `_resolve_action_type`: Resuelve ActionType desde string con aliases
+- **Funciones globales**:
+  - `get_preconditions_effects_manager`: Obtiene la instancia global del gestor
+  - `create_application_open_condition`: Crea una condición que representa una aplicación abierta
+  - `create_application_active_condition`: Crea una condición que representa una aplicación activa
+  - `create_ui_element_calibrated_condition`: Crea una condición que representa un elemento UI calibrado
+  - `create_application_open_effect`: Crea un efecto que representa una aplicación abierta
+  - `create_ui_element_calibrate_effect`: Crea un efecto que representa un elemento UI calibrado
+
+#### `src/hands/planner/preconditions_effects_types.py` [822 líneas] - Sistema de Tipos para Precondiciones y Efectos
+- **Descripción**: Sistema avanzado de tipos base para precondiciones y efectos con copias de estado seguras, evaluación robusta y aplicación determinista. Proporciona estructuras de datos fundamentales para definir condiciones que deben cumplirse antes de ejecutar acciones y efectos que modifican el estado tras la ejecución. Evita importaciones circulares con action_registry y mantiene separación entre planificación y ejecución.
+- **Clases principales**:
+  - `ConditionType` (Enum): Tipos de condiciones con aliases históricos (STATE_EQUALS, STATE_EXISTS, STATE_TRUE, STATE_GREATER_THAN, STATE_LESS_THAN, APPLICATION_OPEN, APPLICATION_ACTIVE, UI_ELEMENT_AVAILABLE, UI_ELEMENT_CALIBRATED, CUSTOM_FUNCTION, COMPOSITE_AND, COMPOSITE_OR).
+  - `Condition` (dataclass): Condición robusta con evaluación segura, soporte para funciones personalizadas y condiciones compuestas con protección contra ciclos.
+  - `Effect` (dataclass): Efecto determinista que devuelve nuevos estados sin mutar el original, soportando múltiples tipos como state_set, state_increment, state_decrement, state_append, state_remove, application_open/close/activate, ui_element_calibrate/focus, custom_function, composite.
+  - `State` (type alias): Tipo alias para diccionario que representa el estado del sistema.
+  - `ConditionFunction` (type alias): Tipo alias para función de evaluación de condiciones.
+  - `EffectFunction` (type alias): Tipo alias para función de aplicación de efectos.
+- **Métodos principales**:
+  - `Condition.evaluate`: Evalúa condiciones contra estado actual con copias seguras, soporte para condiciones anidadas y manejo robusto de errores.
+  - `Effect.apply`: Aplica efectos deterministas con copias de estado, manejo de ejecución y múltiples tipos de efectos con acumulación opcional.
+  - `_safe_copy`: Copia defensiva de valores tolerando objetos no copiables.
+  - `_normalize_name`: Normalización consistente de nombres para claves de estado.
+  - `_get_nested_state_value`: Acceso a valores por ruta con puntos en estado anidado.
+  - `_get_application_state`: Búsqueda flexible de estado de aplicación en múltiples formatos.
+  - `_get_boolean_application_flag`: Evaluación de flags de aplicación con normalización.
+  - `_get_ui_element_state`: Gestión de estado de elementos UI con aislamiento por aplicación.
+  - `_get_ui_element_state`: Busca el estado de un elemento UI en varios formatos compatibles.
+  - `_resolve_condition_type`: Convierte el tipo recibido a ConditionType aceptando miembros del enum, valores string y alias históricos.
+  - `_coerce_condition`: Convierte una condición soportada a `Condition`.
+  - `_coerce_effect`: Convierte un efecto soportado a `Effect`.
+  - `_update_application_state`: Actualiza, cuando existe, el formato anidado `applications`.
+  - `_update_ui_element_state`: Actualiza, cuando existe, el formato anidado `ui_elements`.
+- **Características**:
+  - Sistema de tipos robusto para condiciones y efectos con soporte para operaciones compuestas
+  - Manejo de estado anidado y normalización de nombres para consistencia
+  - Soporte para aplicaciones y elementos UI con múltiples formatos compatibles
+  - Sistema de condiciones compuestas (AND/OR) para lógica compleja
+  - Manejo de errores robusto con fallbacks seguros
+  - Acumulación de efectos para operaciones incrementales
+  - Integración con el sistema de planificación jerárquica
+
+#### `src/hands/planner/task_executor.py` [1107 líneas] - Ejecutor de Tareas para HTN
+- **Descripción**: Convierte tareas HTN en unidades ejecutables y delega la ejecución real en las capacidades registradas o en el executor principal de JARVIS. El módulo no simula ejecuciones exitosas: cuando no existe una capacidad real disponible, la tarea termina en FAILED.
+- **Clases principales**:
+  - `TaskExecutorStatus` (Enum): Estados del ejecutor de tareas (IDLE, PREPARING, EXECUTING, COMPLETED, FAILED, RETRYING)
+  - `TaskExecutionMode` (Enum): Modos de ejecución (SEQUENTIAL, PARALLEL, CONDITIONAL, FALLBACK)
+  - `TaskExecutionConfig` (dataclass): Configuración de ejecución con reintentos, timeout y paralelismo
+  - `TaskExecutor`: Ejecutor principal de tareas HTN integrado con las capacidades reales de JARVIS
+- **Métodos principales**:
+  - `TaskExecutor.__init__`: Inicializa ejecutor con configuración y sistemas dependientes
+  - `execute_task`: Prepara y ejecuta una tarea individual sin simular éxito
+  - `execute_task_with_retry`: Ejecuta una tarea con reintentos limitados
+  - `execute_task_hierarchy`: Ejecuta jerarquía de tareas en modo secuencial, paralelo, condicional o fallback
+  - `_prepare_task_execution`: Prepara ejecución verificando precondiciones
+  - `_check_task_preconditions`: Verifica dependencias, disponibilidad de aplicaciones y recursos UI
+  - `_convert_task_to_node`: Convierte tarea HTN a nodo ejecutable del modelo canónico
+  - `_calculate_task_cost`: Calcula coste de tarea basado en metadatos, registry o heurísticas
+  - `_resolve_action_name`: Resuelve nombre de acción desde metadatos o tarea
+  - `_create_execution_callback`: Crea callback de ejecución para el nodo
+  - `_normalize_execution_result`: Normaliza resultados de ejecución a formato consistente
+  - `_execute_real_capability`: Ejecuta capacidad real registrada o delega en executor principal
+  - `_delegate_to_executor`: Adapta varias convenciones conocidas del executor sin inventar APIs
+  - `_signature_accepts`: Verifica si firma de método acepta argumentos específicos
+  - `_create_success_criteria`: Crea criterio de éxito personalizado o usa criterio por defecto
+  - `_execute_node`: Ejecuta nodo con callback y aplica modificaciones de estado
+  - `_apply_result_to_state`: Aplica resultado de ejecución al estado actual del sistema
+  - `_execute_fallback`: Ejecuta estrategia fallback cuando la ejecución principal falla
+  - `_execute_legacy_task_capability`: Compatibilidad: intenta ejecutar capacidad real con ID de tarea
+  - `_execute_resolve_entity`: Resuelve entidad mediante el resolver real de memoria
+  - `_get_conversation_history`: Obtiene historial de conversación desde memoria
+  - `_get_current_intent`: Obtiene intención actual desde contexto de ejecución
+  - `_get_recent_entities`: Obtiene entidades recientes desde estado del mundo
+  - `_get_user_preferences`: Obtiene preferencias de usuario desde memoria
+  - `_get_session_info`: Obtiene información de sesión actual
+  - `_update_world_state_with_entity`: Actualiza estado del mundo con entidad resuelta
+  - `_execute_sequential`: Ejecuta tareas en modo secuencial deteniéndose en fallos
+  - `_execute_parallel`: Ejecuta tareas en paralelo con copias independientes del estado
+  - `_execute_conditional`: Ejecuta tareas solo si se satisfacen condiciones específicas
+  - `_execute_with_fallback`: Ejecuta tareas con reintentos automáticos
+  - `_should_execute_conditionally`: Determina si tarea debe ejecutarse según condiciones
+  - `_update_execution_statistics`: Actualiza estadísticas de ejecución con promedio móvil
+  - `get_execution_statistics`: Devuelve estadísticas completas de ejecución del sistema
+- **Funciones globales**:
+  - `get_task_executor`: Obtiene instancia singleton del ejecutor de tareas
+  - `get_htn_manager`: Obtiene el HTN Manager mediante importación diferida
+  - `get_application_knowledge_integrator`: Obtiene el integrador de conocimiento de aplicaciones
+  - `get_executor`: Obtiene el executor principal de JARVIS mediante importación diferida
+  - `get_action_registry`: Obtiene el registro central de acciones mediante importación diferida
+
+#### `src/hands/universal_visual_calibrator.py` - Calibrador Visual Universal
+- **Descripción**: Calibrador visual universal para la arquitectura de planificación jerárquica. Esta capa realiza exclusivamente percepción/calibración visual. No abre ni mueve aplicaciones y no persiste macros_coords.json directamente. El resultado de `calibrate()` utiliza coordenadas absolutas del escritorio virtual y asocia cada elemento al monitor físico real (`s1`, `s2`, ...).
+- **Clases principales**:
+  - `CalibrationPolicy`: Política centralizada de seguridad, no una allowlist de aplicaciones. La calibración visual es universal: una aplicación GUI no bloqueada puede ser analizada. Las aplicaciones peligrosas/protegidas se rechazan aquí y en el preflight del CalibrationManager cuando corresponde.
+  - `UICapability`: Representa un elemento UI calibrado y consumible por acciones.
+  - `CalibrationState`: Estado en memoria de los elementos calibrados.
+  - `UniversalVisualCalibrator`: Calibrador visual universal integrado con las capas superiores.
+- **Métodos principales**:
+  - `UniversalVisualCalibrator.__init__`: Inicializa el calibrador con modelo Qwen3-VL, política y estado.
+  - `UniversalVisualCalibrator.get_ui_capability`: Obtiene una capacidad UI específica para una aplicación y elemento.
+  - `UniversalVisualCalibrator.calibrate_application_elements`: Calibra todos los elementos de una aplicación en un monitor específico.
+  - `UniversalVisualCalibrator.calibrate`: Método principal de calibración universal para cualquier aplicación.
+  - `UniversalVisualCalibrator._calibrate_element`: Calibra un elemento específico dentro de una aplicación.
+  - `UniversalVisualCalibrator._build_prompt`: Construye prompt personalizado para el modelo de visión.
+  - `UniversalVisualCalibrator._parse_response`: Parsea respuesta JSON del modelo de visión con manejo robusto de errores.
+  - `UniversalVisualCalibrator._normalize_elements`: Normaliza y filtra elementos detectados.
+  - `UniversalVisualCalibrator._normalize_single_element`: Normaliza un elemento individual con validación de coordenadas.
+  - `UniversalVisualCalibrator._extract_image_bbox`: Extrae bounding box de imagen con validación.
+  - `UniversalVisualCalibrator._bbox_to_image_pixels`: Convierte coordenadas normalizadas a píxeles de imagen.
+  - `UniversalVisualCalibrator._image_bbox_to_monitor_bbox`: Convierte coordenadas de imagen a coordenadas del monitor.
+  - `UniversalVisualCalibrator._normalize_element_name`: Normaliza nombres de elementos para consistencia.
+  - `UniversalVisualCalibrator._normalize_confidence`: Normaliza valores de confianza entre 0.0 y 1.0.
+  - `UniversalVisualCalibrator._deduplicate_elements`: Elimina duplicados manteniendo el elemento con mayor confianza.
+- **Funciones globales**:
+  - `get_calibrator`: Obtiene instancia singleton del calibrador visual universal.
+  - `get_ui_capability`: Función de conveniencia para obtener capacidades UI directamente.
+- **Características**:
+  - Modelo: Qwen3-VL 8B Instruct para análisis visual
+  - Sistema de coordenadas: absolutas del escritorio virtual con asociación a monitores físicos
+  - Política de seguridad: aplicaciones bloqueadas por tipo (juegos, herramientas sensibles, etc.)
+  - Filtrado de elementos: elementos no interactivos o con baja confianza se excluyen
+  - Normalización robusta: nombres, coordenadas y confianza se normalizan consistentemente
+  - Soporte multipantalla: elementos se asocian a monitores específicos (s1, s2, etc.)
+  - Persistencia: estado en memoria, no persiste directamente a archivos
+
+#### `src/hands/windows/windows.py` [678 líneas] - Funciones Específicas para Windows
+- **Funciones principales**:
+  - `actualizar_api_key_riot`: Abre Riot Developer Portal y solicita un análisis visual.
+  - `_capturar_pantalla`: Captura el escritorio completo. Se delega primero en ScreenManager para mantener una única implementación de captura dentro de Jarvis.
+  - `_abrir_aplicacion_windows`: Intenta abrir una aplicación de Windows. Esta función es legacy. La gestión universal de aplicaciones para calibración la realiza CalibrationManager.
+  - `_get_window_search_patterns`: Devuelve patrones de título compatibles con aplicaciones comunes.
+  - `_get_application_windows`: Busca ventanas de una aplicación por título.
+  - `_verificar_aplicacion_abierta`: Verifica si una aplicación tiene al menos una ventana visible.
+  - `_mover_aplicacion_a_pantalla`: Mueve una aplicación a un monitor concreto.
+  - `_cerrar_aplicacion_windows`: Cierra una ventana de la aplicación.
+  - `_get_default_calibration_screen_number`: Obtiene un monitor real de referencia para una API legacy.
+  - `_calibrar_aplicacion_windows`: API legacy. La calibración real de aplicaciones Windows se realiza mediante CalibrationManager.
+  - `_obtener_elementos_aplicacion`: API legacy. Ya no existe una lista fija de elementos por aplicación.
+  - `_generar_coordenadas_aplicacion`: API legacy. Nunca genera coordenadas artificiales.
+  - `_capturar_aplicacion_windows`: Captura la ventana de una aplicación.
+  - `_safe_filename`: Convierte un nombre de aplicación en un nombre de archivo seguro.
+  - `get_windows_commands`: Devuelve las funciones públicas/legacy asociadas a Windows.
+
+### 🗃️ Módulo `src/memory/` - Sistema de Memoria y Planificación
+
+#### `src/memory/__init__.py` [78 líneas] - Inicialización del Módulo Memoria
+- **Descripción**: Módulo de memoria mejorado para soportar planificación jerárquica con separación de memoria conversacional y conocimiento permanente, gestión de entidades de dominio, estado del mundo explícito y soporte para planificación jerárquica (FASE 5).
+- **Importaciones Principales**:
+  - Desde `storage`: MemoryType, Entity, ConversationalMemory, MemoryManager, JSONStorage, get_memory_manager, save_entity, get_entity, get_entities_by_type, add_conversational_memory, get_world_state, update_world_state, y funciones específicas para SUBFASE 5.1 (resolve_entity_to_url, get_entity_attributes, create_goal_from_entity, verify_entity_integrity)
+  - Desde `entity_resolver`: EntityResolver, EntityResolutionResult, ResolutionContext, entity_resolver (Sistema de resolución de entidades - SUBFASE 5.2)
+  - Compatibilidad con sistema existente: ConversationMemory como Memory y JSONStorage como Storage
+- **Exportaciones Principales**:
+  - Nuevas clases mejoradas: MemoryType, Entity, ConversationalMemory, MemoryManager, JSONStorage
+  - Funciones de gestión: get_memory_manager, save_entity, get_entity, get_entities_by_type, add_conversational_memory, get_world_state, update_world_state
+  - Funciones SUBFASE 5.1: resolve_entity_to_url, get_entity_attributes, create_goal_from_entity, verify_entity_integrity
+  - Sistema de resolución de entidades (SUBFASE 5.2): EntityResolver, EntityResolutionResult, ResolutionContext, entity_resolver
+  - Compatibilidad legacy: Memory, Storage
+
+#### `src/memory/conversation.py` [1129 líneas] - Memoria de Conversaciones y Sistema de Planificación
+- **Descripción**: Memoria de conversaciones y sistema de planificación jerárquica. Transforma el sistema de texto→comando→función a intención→objetivo→plan→ejecución. Cumple con: FASE 1: Modelo de nodos, FASE 2: Nodos jerárquicos, FASE 5: Memoria de dominio, FASE 15: Comandos de alto nivel, FASE 16: Compatibilidad.
+- **Clases principales**:
+  - `NodeType` (Enum): Tipos de nodos en el sistema de planificación (INTENTION, GOAL, TASK, ACTION, CONDITION, STATE, RESOURCE, APPLICATION, UI_ELEMENT, RESULT, PLAN).
+  - `TaskStatus` (Enum): Estado de ejecución de tareas (PENDING, EXECUTING, COMPLETED, FAILED, ABORTED).
+  - `Node`: Modelo básico de nodo para memoria.
+  - `Goal`: Modelo básico de objetivo para memoria.
+  - `Task`: Tarea jerárquica (FASE 2).
+  - `DomainMemory`: Memoria de conocimiento del dominio (FASE 5).
+  - `ConversationMemory`: Sistema de memoria transformado para planificación jerárquica.
+- **Métodos principales**:
+  - `NodeType`: INTENTION, GOAL, TASK, ACTION, CONDITION, STATE, RESOURCE, APPLICATION, UI_ELEMENT, RESULT, PLAN
+  - `TaskStatus`: PENDING, EXECUTING, COMPLETED, FAILED, ABORTED
+  - `Node.__init__`: Inicializa nodo con propiedades básicas para sistema de planificación
+  - `Goal.__init__`: Inicializa objetivo con tipo, target, descripción, prioridad y constraints
+  - `Task.__init__`: Inicializa tarea jerárquica con status, nodes, parent, children, dependencies y timestamps
+  - `Task.can_execute`: Verifica si la tarea puede ejecutarse basado en dependencias y estado actual
+  - `DomainMemory.__init__`: Inicializa memoria de dominio con entidades, aplicaciones, capacidades y preferencias
+  - `DomainMemory.load_domain_knowledge`: Carga conocimiento del dominio desde archivos
+  - `DomainMemory.load_user_preferences`: Carga preferencias del usuario desde archivo persistente
+  - `DomainMemory.save_user_preferences`: Guarda preferencias del usuario de forma persistente
+  - `DomainMemory.get_entity`: Obtiene una entidad por nombre o alias
+  - `DomainMemory.get_application_capabilities`: Obtiene capacidades de una aplicación
+  - `DomainMemory.get_capability_definition`: Obtiene definición detallada de una capacidad
+  - `DomainMemory.record_user_interaction`: Registra interacción del usuario para aprendizaje y preferencias
+  - `DomainMemory._update_preferences_from_interaction`: Actualiza preferencias basadas en interacciones exitosas
+  - `DomainMemory.get_user_preferences`: Obtiene preferencias del usuario
+  - `DomainMemory.get_preferred_entities`: Obtiene entidades preferidas por el usuario
+  - `DomainMemory.get_preferred_application`: Obtiene aplicación preferida para un tipo de acción
+  - `DomainMemory.add_knowledge_update`: Añade actualización de conocimiento para persistencia futura
+  - `DomainMemory.get_suggested_entities`: Obtiene sugerencias de entidades basadas en nombre parcial y preferencias
+  - `DomainMemory.reason_about_entities`: Realiza razonamiento básico sobre entidades basado en contexto y preferencias
+  - `DomainMemory._normalize_text`: Normaliza texto para búsqueda
+  - `ConversationMemory.__init__`: Inicializa sistema de memoria para planificación jerárquica
+  - `ConversationMemory._normalize_text`: Normaliza texto para búsqueda
+  - `ConversationMemory._remove_wake_word`: Elimina 'jarvis' inicial
+  - `ConversationMemory._load_aliases`: Carga aliases (mantener compatibilidad FASE 16)
+  - `ConversationMemory.parse_user_input`: Transforma entrada de usuario en objetivo (FASE 15)
+  - `ConversationMemory._extract_intention`: Extrae intención del texto normalizado
+  - `ConversationMemory._create_goal_from_intention`: Crea objetivo a partir de intención
+  - `ConversationMemory.create_plan_from_goal`: Crea un plan a partir de un objetivo (FASE 6, 7)
+  - `ConversationMemory.update_world_state`: Actualiza el estado del mundo
+  - `ConversationMemory.add_user_message`: Añade mensaje de usuario a la memoria conversacional (compatibilidad)
+  - `ConversationMemory.get_current_state`: Obtiene estado actual del mundo
+  - `ConversationMemory._check_achieved_goals`: Verifica si algún objetivo ha sido alcanzado
+  - `ConversationMemory.create_node`: Crea un nodo en el sistema de planificación
+  - `ConversationMemory.create_task`: Crea una tarea jerárquica
+  - `ConversationMemory.get_applicable_nodes`: Obtiene nodos aplicables en el estado actual
+  - `ConversationMemory.get_alias`: Método de compatibilidad para aliases antiguos
+  - `ConversationMemory.record_command_usage`: Registra uso de comando para análisis predictivo (compatibilidad)
+  - `ConversationMemory.save_conversation`: Guarda conversación con información de planificación
+  - `ConversationMemory.get_conversation_history`: Obtiene historial con información de planificación
+  - `ConversationMemory.clear_history`: Borra historial de conversaciones
+  - `ConversationMemory.clear_predictive_data`: Borra datos predictivos
+  - `ConversationMemory.get_learning_insights`: Obtiene insights de aprendizaje del nuevo sistema
+  - `ConversationMemory.save_domain_knowledge_persistence`: Guarda el estado completo del conocimiento de dominio para persistencia
+  - `ConversationMemory._get_most_used_entities`: Obtiene las entidades más usadas basadas en interacciones
+  - `ConversationMemory._get_most_used_actions`: Obtiene las acciones más usadas basadas en interacciones
+  - `ConversationMemory.load_domain_knowledge_persistence`: Carga conocimiento de dominio persistido
+
+#### `src/memory/entity_resolver.py` [825 líneas] - Sistema de Resolución Avanzada de Entidades
+- **Descripción**: Sistema avanzado de resolución de entidades para FASE 5 - DOMAIN MEMORY. Implementa resolución de entidades con contexto, manejo de ambigüedades, búsqueda semántica e integración con HTN y Goals.
+- **Clases principales**:
+  - `EntityResolutionResult` (dataclass): Resultado de la resolución de entidad con entidad, confianza, método de resolución, alternativas, contexto usado y timestamp.
+  - `ResolutionContext` (dataclass): Contexto para resolución de entidades con historial conversacional, intención actual, entidades recientes, preferencias de usuario y información de sesión.
+  - `EntityResolver`: Sistema avanzado de resolución de entidades con búsqueda exacta, difusa, por propiedades y aprendizaje continuo.
+- **Métodos principales**:
+  - `EntityResolver.__init__`: Inicializa el sistema de resolución con gestor de memoria, umbral de resolución, máximas alternativas y usuario por defecto.
+  - `EntityResolver.resolve_entity`: Resuelve una referencia de entidad a una entidad específica usando búsqueda exacta, difusa, por propiedades y creación temporal.
+  - `EntityResolver.resolve_entities_batch`: Resuelve múltiples entidades en lote con contexto compartido.
+  - `EntityResolver._normalize_reference`: Normaliza una referencia de entidad eliminando espacios extra, convirtiendo a minúsculas y eliminando caracteres especiales.
+  - `EntityResolver._find_exact_matches`: Busca coincidencias exactas por nombre, aliases y tags en el gestor de memoria.
+  - `EntityResolver._find_fuzzy_matches`: Busca coincidencias difusas usando similitud de secuencias con umbral configurable.
+  - `EntityResolver._find_by_properties`: Busca entidades por propiedades como URL, dominio, username, channel.
+  - `EntityResolver._select_best_match`: Selecciona la mejor coincidencia basada en contexto y desambiguación con preferencias aprendidas.
+  - `EntityResolver._disambiguate_with_context`: Usa contexto para desambiguar entre múltiples entidades verificando preferencias, entidades recientes e historial conversacional.
+  - `EntityResolver._create_temporary_entity`: Crea una entidad temporal para referencias no encontradas con metadata básica.
+  - `EntityResolver.get_entity_suggestions`: Obtiene sugerencias de entidades basadas en texto parcial con límite configurable.
+  - `EntityResolver.resolve_url`: Resuelve una URL a una entidad específica parseando información y buscando por dominio, plataforma o canal.
+  - `EntityResolver.extract_urls_from_text`: Extrae todas las URLs de un texto usando patrones regex conservadores.
+  - `EntityResolver._normalize_url`: Normaliza una URL de entrada añadiendo protocolo si es necesario y limpiando caracteres finales.
+  - `EntityResolver._parse_url`: Parsea una URL y extrae información estructurada como dominio, plataforma, nombre de canal y parámetros.
+  - `EntityResolver._create_entity_from_url`: Crea una entidad basada en información de URL con tipo, propiedades y aliases.
+  - `EntityResolver.get_url_suggestions`: Obtiene sugerencias de entidades basadas en URL parcial buscando en dominios y URLs almacenadas.
+  - `EntityResolver.learn_from_resolution`: Aprende de resultados de resolución ajustando confianza según feedback del usuario.
+  - `EntityResolver.set_user_preference`: Establece una preferencia de usuario para una entidad con tipo de preferencia y valor.
+  - `EntityResolver.get_user_preferences_for_entity`: Obtiene todas las preferencias del usuario para una entidad específica.
+  - `EntityResolver.get_preferred_entities`: Obtiene entidades preferidas por el usuario con umbral de confianza.
+  - `EntityResolver.set_entity_attribute`: Establece un atributo extendido para una entidad con nombre, valor, tipo, fuente y metadata.
+  - `EntityResolver.get_entity_attributes`: Obtiene todos los atributos extendidos de una entidad.
+  - `EntityResolver.get_entities_with_attribute`: Busca entidades que tienen un atributo específico.
+  - `EntityResolver.learn_entity_interaction`: Aprende de interacciones con entidades actualizando contadores y scores de preferencia.
+- **Funciones globales**:
+  - (Instancia global para uso fácil)
+
+#### `src/memory/prediction.py` [1081 líneas] - Memoria Predictiva Mejorada
+- **Descripción**: Memoria predictiva mejorada para sistema de planificación jerárquica. Integra predicciones con el nuevo sistema de intenciones y objetivos. Cumple con FASE 5 (Memoria de dominio mejorada), FASE 15 (Comandos de alto nivel), FASE 16 (Compatibilidad), FASE 17 (Optimización) y FASE 18 (Aprendizaje).
+- **Clases principales**:
+  - `PredictionResult` (dataclass): Resultado de predicción para planificación con goal predicho, confianza, razonamiento, alternativas, probabilidad de ejecución, coste estimado y tasa de éxito histórica.
+  - `ExecutionMetrics` (dataclass): Métricas de ejecución para aprendizaje con goal_id, éxito, tiempo de ejecución, coste real, timestamp, contexto, mensaje de error y replanificaciones.
+  - `EnhancedPredictionMemory`: Clase principal de memoria predictiva mejorada que integra predicciones de objetivos, aprendizaje de rutas exitosas, optimización de costes y compatibilidad con sistema legacy.
+- **Métodos principales**:
+  - `__init__`: Inicializa memoria predictiva mejorada con estructura de datos mejorada y límites de eventos, historial de goals y métricas.
+  - `_load`: Carga datos con migración a nuevo formato e inicialización de plantillas de objetivos.
+  - `_initialize_goal_templates`: Inicializa plantillas de objetivos para predicción rápida (open_application, navigate, navigate_stream, search).
+  - `_migrate_enhanced_data`: Migra datos al nuevo formato mejorado manteniendo datos legacy y nueva estructura.
+  - `_can_migrate_to_goal`: Verifica si un evento puede migrarse a goal.
+  - `_migrate_event_to_goal`: Migr evento a formato goal.
+  - `_infer_goal_type_from_command`: Infere tipo de goal desde comando legacy.
+  - `predict_goal_from_input`: Predice objetivo basado en entrada de usuario (FASE 15) con análisis de patrones históricos, estado actual y entidades.
+  - `_normalize_input`: Normaliza texto para análisis.
+  - `_analyze_historical_patterns`: Analiza patrones históricos para predicción.
+  - `_analyze_state_influence`: Analiza cómo el estado actual influye en la predicción.
+  - `_predict_entity_usage`: Predice uso de entidades basado en entrada.
+  - `_combine_predictions`: Combina diferentes predicciones para crear goal.
+  - `_determine_goal_type`: Determina el tipo de goal más probable.
+  - `_extract_goal_target`: Extrae target del goal basado en entrada y entidades.
+  - `_calculate_prediction_confidence`: Calcula confianza en la predicción.
+  - `_find_alternative_goals`: Busca goals alternativos basados en entrada.
+  - `_generate_synonym_goals`: Genera goals alternativos usando sinónimos.
+  - `_generate_state_based_goals`: Genera goals alternativos basados en estado actual.
+  - `_estimate_goal_cost`: Estima coste de ejecución del goal.
+  - `_estimate_execution_probability`: Estima probabilidad de éxito del goal.
+  - `_get_historical_success_rate`: Obtiene tasa de éxito histórica para tipo de goal.
+  - `_get_command_success_rate`: Obtiene tasa de éxito para comando legacy.
+  - `_generate_prediction_reasoning`: Genera explicación de la predicción.
+  - `record_goal_execution`: Registra ejecución de goal para aprendizaje (FASE 18).
+  - `_update_success_patterns`: Actualiza patrones de éxito por tipo de goal.
+  - `_update_cost_estimations`: Actualiza estimaciones de coste.
+  - `_update_path_cache`: Actualiza caché de rutas exitosas.
+  - `_update_entity_usage`: Actualiza estadísticas de uso de entidades.
+  - `get_goal_prediction_history`: Obtiene historial de predicciones de goals.
+  - `get_cached_path`: Obtiene ruta cacheada para goal específico.
+  - `get_cost_estimation`: Obtiene estimación de coste para tipo de goal.
+  - `get_success_rate`: Obtiene tasa de éxito para tipo de goal.
+  - `record_command`: Método legacy para registrar comandos (FASE 16) que integra con nuevo sistema pero mantiene compatibilidad.
+  - `_create_legacy_event`: Crea evento en formato legacy.
+  - `_get_open_windows`: Obtiene ventanas abiertas (legacy).
+  - `_get_active_window`: Obtiene ventana activa (legacy).
+  - `_get_system_state`: Obtiene estado del sistema (legacy).
+  - `_get_idle_seconds`: Obtiene segundos de inactividad (legacy).
+  - `_save`: Guarda datos en archivo.
+- **Funciones globales**:
+  - `get_enhanced_prediction_memory`: Obtiene instancia singleton de memoria predictiva mejorada.
+- **Clases de compatibilidad legacy**:
+  - `PredictionMemory`: Clase legacy para compatibilidad (FASE 16) que wrapper sobre EnhancedPredictionMemory.
+  - `get_prediction_memory`: Función singleton legacy para compatibilidad.
+
+#### `src/memory/storage.py` [1984 líneas] - Sistema de Almacenamiento Mejorado
+- **Descripción**: Sistema de almacenamiento mejorado para soportar planificación jerárquica con manejo avanzado de memoria, caché y persistencia. Implementa FASE 3 (Estado del mundo), FASE 5 (Memoria de dominio avanzada), FASE 6-7 (Soporte para planes y ejecuciones), FASE 18 (Estadísticas de aprendizaje) y manejo avanzado de caché para rendimiento.
+- **Clases principales**:
+  - `MemoryType` (Enum): Tipos de memoria en el sistema mejorado (CONVERSATIONAL, DOMAIN_KNOWLEDGE, ENTITIES, APPLICATIONS, STATE, PLANS, EXECUTIONS, LEARNING_STATS, RELATIONSHIPS, PREFERENCES).
+  - `Entity` (dataclass): Entidad mejorada para memoria de dominio con id, type, name, properties, metadata, aliases, confidence y tags.
+  - `ConversationalMemory` (dataclass): Memoria conversacional mejorada con id, message, response, timestamp, context, intent, entities, confidence, execution_time y success.
+  - `WorldState` (dataclass): Estado del mundo mejorado con timestamp, applications, ui_elements, system_info, constraints, last_actions y active_goals.
+  - `Plan` (dataclass): Plan de ejecución con id, goal, nodes, created_at, updated_at, status, execution_time, success, cost y heuristic_value.
+  - `ExecutionRecord` (dataclass): Registro de ejecución para aprendizaje con id, plan_id, action_name, parameters, start_time, end_time, success, execution_time, error, retries, alternatives_tried y context.
+  - `LearningStat` (dataclass): Estadística de aprendizaje con action_name, total_executions, successful_executions, average_execution_time, success_rate y last_updated.
+  - `UserPreference` (dataclass): Preferencia de usuario con user_id, preference_type, preference_key, preference_value, confidence, created_at, updated_at, context y usage_count.
+  - `EntityAttribute` (dataclass): Atributo extendido de entidad con entity_id, attribute_name, attribute_value, attribute_type, source, confidence, created_at, updated_at y metadata.
+  - `MemoryStorage` (ABC): Interfaz abstracta para almacenamiento de memoria con métodos save, load y exists.
+  - `JSONStorage` (Clase): Almacenamiento en archivos JSON con manejo avanzado, caché y procesamiento inteligente de datos según tipo de memoria.
+  - `MemoryManager` (Clase): Gestor de memoria mejorado con caché, soporte completo para arquitectura y métodos específicos para cada tipo de memoria.
+- **Métodos principales**:
+  - `MemoryType.__init__`: Tipos de memoria en el sistema mejorado.
+  - `Entity.__init__`: Inicializa entidad mejorada para memoria de dominio.
+  - `Entity.to_dict`: Convierte entidad a diccionario.
+  - `Entity.from_dict`: Crea entidad desde diccionario.
+  - `Entity.matches_query`: Verifica si la entidad coincide con una búsqueda.
+  - `ConversationalMemory.__init__`: Inicializa memoria conversacional mejorada.
+  - `ConversationalMemory.to_dict`: Convierte memoria conversacional a diccionario.
+  - `ConversationalMemory.from_dict`: Crea memoria conversacional desde diccionario.
+  - `WorldState.__init__`: Inicializa estado del mundo mejorado.
+  - `WorldState.to_dict`: Convierte estado del mundo a diccionario.
+  - `WorldState.from_dict`: Crea estado del mundo desde diccionario.
+  - `WorldState.get_application_state`: Obtiene el estado de una aplicación específica.
+  - `WorldState.get_ui_element_state`: Obtiene el estado de un elemento UI específico.
+  - `Plan.__init__`: Inicializa plan de ejecución.
+  - `Plan.to_dict`: Convierte plan a diccionario.
+  - `Plan.from_dict`: Crea plan desde diccionario.
+  - `ExecutionRecord.__init__`: Inicializa registro de ejecución para aprendizaje.
+  - `ExecutionRecord.to_dict`: Convierte registro de ejecución a diccionario.
+  - `ExecutionRecord.from_dict`: Crea registro de ejecución desde diccionario.
+  - `LearningStat.__init__`: Inicializa estadística de aprendizaje.
+  - `LearningStat.update`: Actualiza estadísticas con nueva ejecución.
+  - `UserPreference.__init__`: Inicializa preferencia de usuario.
+  - `UserPreference.to_dict`: Convierte preferencia de usuario a diccionario.
+  - `UserPreference.from_dict`: Crea preferencia de usuario desde diccionario.
+  - `EntityAttribute.__init__`: Inicializa atributo extendido de entidad.
+  - `EntityAttribute.to_dict`: Convierte atributo de entidad a diccionario.
+  - `EntityAttribute.from_dict`: Crea atributo de entidad desde diccionario.
+  - `MemoryStorage.__init__`: Interfaz abstracta para almacenamiento de memoria.
+  - `MemoryStorage.save`: Guarda datos (abstracto).
+  - `MemoryStorage.load`: Carga datos (abstracto).
+  - `MemoryStorage.exists`: Verifica si existe (abstracto).
+  - `JSONStorage.__init__`: Inicializa almacenamiento en archivos JSON con manejo avanzado.
+  - `JSONStorage.get_file_path`: Obtiene la ruta del archivo para un tipo de memoria.
+  - `JSONStorage.save`: Guarda datos en archivo JSON con manejo inteligente.
+  - `JSONStorage._load_existing_data`: Carga datos existentes del archivo.
+  - `JSONStorage._process_data_for_save`: Procesa datos según el tipo de memoria.
+  - `JSONStorage.load`: Carga datos desde archivo JSON.
+  - `JSONStorage._get_default_value`: Obtiene valor por defecto para un tipo de memoria.
+  - `JSONStorage.exists`: Verifica si el archivo existe.
+  - `MemoryManager.__init__`: Inicializa gestor de memoria mejorado con caché y soporte completo.
+  - `MemoryManager._warm_cache`: Inicializa el caché con datos frecuentes.
+  - `MemoryManager._get_from_cache`: Obtiene datos del caché si están frescos.
+  - `MemoryManager._update_cache`: Actualiza el caché con nuevos datos.
+  - `MemoryManager.save_entity`: Guarda una entidad en la memoria de dominio.
+  - `MemoryManager.get_entity`: Obtiene una entidad por su ID.
+  - `MemoryManager.get_entities_by_type`: Obtiene todas las entidades de un tipo específico.
+  - `MemoryManager.find_entities`: Busca entidades por texto en nombre, aliases, tags y propiedades.
+  - `MemoryManager.find_entities_by_property`: Busca entidades por propiedad específica.
+  - `MemoryManager.add_conversational_memory`: Añade un registro mejorado a la memoria conversacional.
+  - `MemoryManager.get_conversational_memory`: Obtiene la memoria conversacional con filtros.
+  - `MemoryManager.save_world_state`: Guarda el estado actual del mundo.
+  - `MemoryManager.get_world_state`: Obtiene el estado actual del mundo.
+  - `MemoryManager.update_world_state`: Actualiza una propiedad del estado del mundo.
+  - `MemoryManager.save_plan`: Guarda un plan.
+  - `MemoryManager.get_plan`: Obtiene un plan por su ID.
+  - `MemoryManager.save_execution_record`: Guarda un registro de ejecución.
+  - `MemoryManager.update_learning_stats`: Actualiza estadísticas de aprendizaje para una acción.
+  - `MemoryManager.get_learning_stats`: Obtiene estadísticas de aprendizaje.
+  - `MemoryManager.clear_memory`: Limpia la memoria especificada o toda la memoria.
+  - `MemoryManager.get_memory_stats`: Obtiene estadísticas detalladas de la memoria.
+  - `MemoryManager.save_user_preference`: Guarda una preferencia de usuario.
+  - `MemoryManager.get_user_preference`: Obtiene una preferencia específica del usuario.
+  - `MemoryManager.get_user_preferences`: Obtiene todas las preferencias de un usuario.
+  - `MemoryManager.update_user_preference`: Actualiza o crea una preferencia de usuario.
+  - `MemoryManager.learn_user_preference`: Aprende preferencias de usuario basadas en interacciones.
+  - `MemoryManager.save_entity_attribute`: Guarda un atributo extendido de entidad.
+  - `MemoryManager.get_entity_attribute`: Obtiene un atributo específico de una entidad.
+  - `MemoryManager.get_entity_attributes`: Obtiene todos los atributos extendidos de una entidad.
+  - `MemoryManager.update_entity_attribute`: Actualiza o crea un atributo extendido de entidad.
+  - `MemoryManager.get_entities_by_attribute`: Busca entidades por atributo y valor.
+  - `MemoryManager.export_memory`: Exporta toda la memoria a un archivo JSON.
+  - `get_memory_manager`: Obtiene la instancia global del gestor de memoria.
+  - `save_entity`: Guarda una entidad.
+  - `get_entity`: Obtiene una entidad.
+  - `get_entities_by_type`: Obtiene entidades.
+  - `find_entities`: Busca entidades.
+  - `add_conversational_memory`: Añade memoria conversacional.
+  - `get_world_state`: Obtiene el estado del mundo.
+  - `update_world_state`: Actualiza el estado del mundo.
+  - `save_plan`: Guarda un plan.
+  - `get_plan`: Obtiene un plan.
+  - `update_learning_stats`: Actualiza estadísticas de aprendizaje.
+  - `resolve_entity_to_url`: Resuelve una entidad a una URL.
+  - `get_entity_attributes`: Obtiene atributos extendidos de una entidad.
+  - `create_goal_from_entity`: Integración entidad -> Goal.
+  - `verify_entity_integrity`: Verifica la integridad de una entidad.
+
+### 🗣️ Módulo `src/mouth/` - Sistema de Voz
+
+#### `src/mouth/__init__.py` [4 líneas] - Inicialización del Módulo Voz
+- **Descripción**: Módulo principal de voz de JARVIS con importación del sistema de síntesis de voz.
+- **Métodos principales**:
+  - `Mouth`: Clase principal del sistema de voz importada desde speaker.
+
+#### `src/mouth/speaker.py` [680 líneas] - Sistema de Síntesis de Voz
+- **Descripción**: Sistema de síntesis de voz usando motor Kokoro ONNX. Controla la generación y reproducción de audio con múltiples voces y capacidades de tokenización.
+- **Clases principales**:
+  - `Mouth`: Clase principal que gestiona la síntesis de voz con capacidades de inicialización, gestión de voces, tokenización y síntesis.
+- **Métodos principales**:
+  - `__init__`: Inicializa el motor de síntesis de voz con configuración y parámetros básicos.
+  - `_initialize_session`: Inicializa la sesión ONNX para el modelo de voz.
+  - `_load_parameters`: Carga los parámetros necesarios del motor incluyendo mapa de tokens y configuración de voces.
+  - `get_available_voices`: Devuelve los IDs de voz disponibles en models/voices excluyendo archivos de grupo.
+  - `has_voice`: Comprueba si existe una voz concreta verificando su disponibilidad en el sistema.
+  - `_load_voice_style_vector`: Carga el vector de estilo correspondiente a voice_id.
+  - `_load_voice`: Carga una voz y la establece como voz actual.
+  - `set_voice`: Cambia la voz actualmente utilizada en caliente sin requerir reiniciar Jarvis.
+  - `get_current_voice`: Devuelve el ID de la voz actualmente activa.
+  - `_load_token_map`: Carga el mapa de tokens desde el archivo de configuración.
+  - `_text_to_tokens`: Convierte texto a tokens para el modelo con normalización y conversión fonética.
+  - `speak`: Convierte texto a voz y lo reproduce con manejo de límites de tokens y reproducción automática.
+  - `speak_async`: Versión asíncrona de speak que no bloquea el hilo principal.
+- **Características implementadas**:
+  - Motor de síntesis de voz Kokoro ONNX con soporte para múltiples voces
+  - Sistema de tokenización avanzado con normalización de texto y conversión fonética
+  - Gestión de voces con caché en memoria y persistencia de preferencias
+  - Soporte para voz asíncrona con hilos daemon
+  - Manejo automático de archivos temporales y limpieza
+  - Sistema de logging integrado para depuración y monitoreo
+  - Gestión de límites de tokens y truncación automática
+  - Integración con sistema de configuración y preferencias de usuario
+  - `_load_voice_style_vector`: Carga el vector de estilo correspondiente a voice_id desde archivo binario.
+  - `_load_voice`: Carga una voz y la establece como voz actual con opción de persistencia.
+  - `set_voice`: Cambia la voz actualmente utilizada en caliente sin requerir reiniciar Jarvis.
+  - `get_current_voice`: Devuelve el ID de la voz actualmente activa en el sistema.
+  - `_load_token_map`: Carga el mapa de tokens desde el archivo de configuración JSON.
+  - `_text_to_tokens`: Convierte texto a tokens para el modelo con normalización y procesamiento fonético.
+  - `speak`: Convierte texto a voz y lo reproduce con gestión de temporales y reproducción de audio.
+  - `speak_async`: Versión async de speak que no bloquea la ejecución usando threading.
+
+### 🛠️ Módulo `src/tools/` - Sistema de Herramientas
+
+#### `src/tools/__init__.py` [30 líneas] - Inicialización del Módulo Herramientas
+- **Descripción**: Paquete de herramientas de Jarvis que expone las clases y funciones principales del sistema de ejecución y registro de acciones para facilitar sus imports desde otros módulos.
+- **Métodos principales**:
+  - `UnifiedExecutor`: Clase principal del sistema de ejecución importada desde executor.
+  - `get_executor`: Función para obtener la instancia del executor.
+  - `process_and_execute`: Función para procesar y ejecutar acciones.
+  - `ActionInfo`: Información estructurada de acciones importada desde registry.
+  - `ActionRegistry`: Registro de acciones del sistema importado desde registry.
+  - `ActionType`: Enumeración que define los tipos de acciones disponibles en el sistema importada desde registry.
+  - `get_action`: Función para obtener una acción específica importada desde registry.
+  - `get_action_registry`: Función para obtener el registro de acciones del sistema importada desde registry.
+  - `get_available_actions`: Función para obtener todas las acciones disponibles importada desde registry.
+  - `register_action`: Función para registrar nuevas acciones en el sistema importada desde registry.
+
+#### `src/tools/executor.py` [559 líneas] - Fachada de Ejecución Unificada
+- **Descripción**: Fachada unificada para ejecutar acciones registradas. Mantiene compatibilidad con el formato histórico [CMD:...], pero utiliza ActionRegistry como fuente única de verdad para localizar y ejecutar acciones.
+- **Clases principales**:
+  - `UnifiedExecutor`: Fachada unificada para ejecutar acciones registradas con compatibilidad legacy.
+- **Métodos principales**:
+  - `UnifiedExecutor.__init__`: Inicializa la fachada de ejecución con registro de acciones e historial.
+  - `UnifiedExecutor.process_and_execute`: Procesa una respuesta del LLM y ejecuta el primer comando detectado.
+  - `UnifiedExecutor.execute_action`: Ejecuta una acción registrada con validación de parámetros y precondiciones.
+  - `UnifiedExecutor.can_execute`: Comprueba si una acción puede ejecutarse en el estado indicado.
+  - `UnifiedExecutor.execute_plan_step`: Punto de entrada explícito para un futuro Planner.
+  - `UnifiedExecutor._extract_command`: Extrae un comando legacy del formato [CMD:nombre(args)].
+  - `UnifiedExecutor._normalize_action_name`: Normaliza pequeñas variaciones de nombre sin cambiar su semántica.
+  - `UnifiedExecutor._parse_args`: Parsea argumentos legacy mediante ast.literal_eval.
+  - `UnifiedExecutor._args_to_dict`: Convierte argumentos posicionales legacy a parámetros nombrados.
+  - `UnifiedExecutor.get_command_suggestions`: Obtiene sugerencias simples a partir de acciones registradas.
+  - `UnifiedExecutor._format_action_suggestion`: Convierte ActionInfo al formato histórico de sugerencias.
+  - `UnifiedExecutor._record_history`: Registra una ejecución para compatibilidad y diagnóstico.
+  - `UnifiedExecutor.get_command_history`: Obtiene una copia del historial de comandos.
+  - `UnifiedExecutor.clear_command_history`: Limpia el historial de comandos.
+  - `UnifiedExecutor.list_available_commands`: Lista las acciones disponibles con sus metadatos.
+  - `UnifiedExecutor.get_command_info`: Obtiene información detallada de una acción registrada.
+  - `UnifiedExecutor.get_action_cost`: Obtiene el coste declarado de una acción para el planificador.
+  - `UnifiedExecutor.get_plannable_commands`: Obtiene las acciones habilitadas para planificación.
+  - `UnifiedExecutor._get_timestamp`: Obtiene la fecha/hora actual en formato ISO.
+- **Funciones globales**:
+  - `get_executor`: Obtiene la instancia global del ejecutor unificado.
+  - `process_and_execute`: Función de compatibilidad para código existente que delega en la instancia global.
+
+#### `src/tools/os_info.py` [533 líneas] - Información del Sistema para Jarvis
+- **Descripción**: Información del sistema para Jarvis con arquitectura de planificación. Proporciona información estructurada del sistema para construir el estado del mundo (FASE 3) y soportar la planificación jerárquica. Recoge: uso de CPU y memoria, estado del disco, información de ventanas y aplicaciones, recursos del sistema y contexto para planificación.
+- **Clases principales**:
+  - `SystemHealth` (Enum): Estados de salud del sistema (EXCELLENT, GOOD, WARNING, CRITICAL).
+  - `ApplicationWindow` (dataclass): Información de una ventana de aplicación con title, process_name, handle, position, size, is_visible, is_minimized, is_maximized, monitor y método to_dict.
+  - `SystemResources` (dataclass): Recursos del sistema con cpu_percent, ram_total_gb, ram_used_percent, disk_free_gb, disk_total_gb, disk_used_percent, battery_percent, battery_power_plugged, system_health, timestamp y método to_dict.
+  - `SystemContext` (dataclass): Contexto completo del sistema para planificación con resources, active_windows, focused_window, running_processes, system_time, uptime_seconds y método to_dict.
+- **Métodos principales**:
+  - `_get_system_drive`: Obtiene la unidad del sistema (SystemDrive en Windows, raíz en otros sistemas).
+  - `_calculate_system_health`: Calcula la salud del sistema basada en recursos (cpu_percent, ram_percent, disk_percent).
+  - `get_system_stats`: Lee el estado de CPU, memoria RAM y disco, retorna diccionario con cpu, ram_total, ram_percent, disk_free, disk_total, disk_percent.
+  - `get_battery_info`: Obtiene información de la batería (percent, power_plugged, secsleft) o None si no está disponible.
+  - `get_open_windows`: Obtiene información detallada de ventanas visibles, retorna lista de ApplicationWindow.
+  - `_get_monitor_from_position`: Determina qué monitor contiene la posición dada (x, y).
+  - `_get_process_name`: Obtiene el nombre del proceso de una ventana con fallback por título.
+  - `get_focused_window`: Obtiene la ventana actualmente enfocada o None.
+  - `get_running_processes`: Obtiene lista de procesos en ejecución (sin duplicados).
+  - `get_system_resources`: Obtiene recursos del sistema con estado de salud calculado.
+  - `get_jarvis_system_context`: Empaqueta la información del sistema en texto para el contexto de Jarvis (compatibilidad legacy).
+  - `get_system_context`: Obtiene el contexto completo del sistema para planificación, retorna SystemContext con toda la información estructurada.
+
+#### `src/tools/registry.py` [1072 líneas] - Registro Unificado de Acciones
+- **Descripción**: Registro unificado de acciones para Jarvis mediante decoradores que combina registro básico de acciones (compatibilidad legacy) con metadatos avanzados para planificación. Implementa un sistema de registro que reemplaza la duplicidad entre herramientas simples y sistemas completos.
+- **Clases principales**:
+  - `ActionType` (Enum): Tipos de acciones disponibles (APPLICATION, SYSTEM, NAVIGATION, INTERACTION, CALIBRATION).
+  - `ActionInfo` (dataclass): Metadatos completos de una acción ejecutable y planificable con propiedades como nombre, descripción, tipo, parámetros, precondiciones, efectos, coste, dependencias, etc.
+  - `ActionRegistry`: Clase principal que gestiona el registro unificado de acciones, manteniendo compatibilidad legacy con metadatos avanzados para planificación.
+- **Métodos principales de ActionRegistry**:
+  - `__init__`: Inicializa el registro de acciones con estructuras de indexación por categorías y tipos.
+  - `_normalize_name`: Normaliza el nombre de una acción.
+  - `_normalize_description`: Normaliza la descripción de una acción.
+  - `_normalize_confidence`: Normaliza el umbral de confianza al rango [0.0, 1.0].
+  - `_normalize_action_type`: Convierte un ActionType o su valor textual a ActionType.
+  - `_extract_parameters`: Extrae un esquema básico de parámetros desde la firma de una función.
+  - `register_action`: Decorador para registrar una acción con todos sus metadatos avanzados.
+  - `get_action`: Obtiene información de una acción por nombre.
+  - `get_available_actions`: Obtiene acciones disponibles en formato para el LLM, manteniendo compatibilidad legacy.
+  - `get_actions_for_planner`: Genera metadatos serializables de las acciones para el planificador.
+  - `get_plannable_actions`: Obtiene las acciones habilitadas para la capa de planificación.
+  - `get_actions_by_category`: Obtiene todas las acciones de una categoría específica.
+  - `list_all_actions`: Lista todas las acciones organizadas por tipo.
+  - `get_action_names_by_type`: Obtiene nombres de acciones por tipo de acción.
+  - `register_module`: Registra todas las acciones decoradas de un módulo.
+  - `_store_action_info`: Almacena una acción manteniendo sus índices internos.
+  - `get_action_suggestions`: Obtiene sugerencias de acciones a partir de un nombre parcial.
+  - `_validate_value_type`: Valida de forma segura un tipo de parámetro.
+  - `validate_action`: Valida si una acción y sus parámetros son válidos.
+  - `can_execute`: Comprueba si una acción puede ejecutarse según parámetros y estado.
+  - `get_action_cost`: Obtiene el coste declarado de una acción.
+  - `execute_action`: Ejecuta una acción registrada con parámetros nombrados (punto de compatibilidad).
+  - `execute_action_legacy`: Ejecuta una acción por su nombre (compatibilidad legacy con *args, **kwargs).
+  - `validate_parameters`: Valida los nombres de parámetros definidos por la acción.
+  - `clear_actions`: Limpia todas las acciones registradas.
+- **Funciones globales**:
+  - `get_action_registry`: Obtiene la instancia global única del registro de acciones.
+  - `register_action`: Atajo para registrar una acción usando la instancia global (versión completa).
+  - `register_action_legacy`: Atajo para registrar una acción usando la instancia global (versión legacy simplificada).
+  - `get_available_actions`: Atajo para obtener las acciones disponibles desde el registro global.
+  - `get_action`: Atajo para obtener una acción desde el registro global.
+- **Funciones helper**:
+  - `_get_state_value`: Obtiene un valor de estado desde dicts u objetos con atributos/get.
+  - `_match_condition`: Comprueba una única condición de estado.
+  - `_matches_conditions`: Comprueba un conjunto de condiciones de estado.
+
+### 🗂️ Módulo `src/utils/` - Utilidades del Sistema
+
+#### `src/utils/__init__.py` - Sistema de Optimización Completo v2.7.0
+- **Descripción**: Paquete principal de utilidades de Jarvis que integra todos los sistemas de optimización, aprendizaje automático, monitoreo y automejora. Proporciona una interfaz unificada para el sistema de optimización completo con componentes principales de performance optimization, self-improvement, adaptive learning y orchestration.
+- **Importaciones Principales**:
+  - Desde `advanced_logger`: AdvancedLogger
+  - Desde `performance_optimizer`: PerformanceOptimizer, OptimizationStrategy, OptimizationLevel, OptimizationMetrics, OptimizationAction
+  - Desde `self_improvement_system`: SelfImprovementSystem, LearningMode, ImprovementType, LearningSession, ImprovementRule, KnowledgeGraph
+  - Desde `adaptive_learning_engine`: AdaptiveLearningEngine, LearningTask, NeuralArchitecture, LearningTaskConfig, ModelPerformance
+  - Desde `optimization_orchestrator`: OptimizationOrchestrator, OrchestrationMode, OptimizationPriority, OptimizationJob, OrchestrationMetrics
+  - Desde `pattern_analyzer`: PatternAnalyzer
+  - Desde `log_analytics`: LogAnalytics
+  - Desde `log_predictor`: LogPredictor
+  - Desde `log_dashboard`: LogDashboard
+  - Desde `performance_monitor`: PerformanceMonitor
+  - Desde `log_integration`: LogIntegrator
+- **Exportaciones Principales**:
+  - Core Optimization Components: PerformanceOptimizer, SelfImprovementSystem, AdaptiveLearningEngine, OptimizationOrchestrator
+  - Supporting Components: AdvancedLogger, PatternAnalyzer, LogAnalytics, LogPredictor, LogDashboard, PerformanceMonitor, LogIntegrator
+  - Enums and Data Classes: OptimizationStrategy, OptimizationLevel, OptimizationMetrics, OptimizationAction, LearningMode, ImprovementType, LearningSession, ImprovementRule, KnowledgeGraph, LearningTask, NeuralArchitecture, LearningTaskConfig, ModelPerformance, OrchestrationMode, OptimizationPriority, OptimizationJob, OrchestrationMetrics
+- **Clase Principal**:
+  - `OptimizationSystem`: Sistema completo de optimización y automejora que integra todos los componentes con inicialización, gestión de estado, optimización manual/automática, exportación de reportes, recomendaciones y optimización de emergencia.
+- **Métodos Principales de OptimizationSystem**:
+  - `__init__`: Inicializa el sistema completo con componentes principales y de soporte.
+  - `get_system_status`: Obtiene estado completo del sistema con versión, timestamp, estado de cada componente y salud general.
+  - `_calculate_system_health`: Calcula salud general basada en eficiencia, tasa de éxito y utilización de recursos.
+  - `optimize_system`: Optimización manual coordinada a través del orquestador.
+  - `start_auto_optimization`: Inicia optimización automática de todos los componentes.
+  - `stop_auto_optimization`: Detiene optimización automática.
+  - `export_system_report`: Exporta reporte completo del sistema en formato JSON.
+  - `get_optimization_recommendations`: Obtiene recomendaciones combinadas de todos los sistemas.
+  - `emergency_optimization`: Optimización de emergencia para situaciones críticas.
+- **Funciones de Conveniencia**:
+  - `get_system_status`: Obtiene estado del sistema de optimización.
+  - `optimize_system`: Optimiza el sistema manualmente.
+  - `start_auto_optimization`: Inicia optimización automática.
+  - `stop_auto_optimization`: Detiene optimización automática.
+  - `get_optimization_recommendations`: Obtiene recomendaciones de optimización.
+  - `emergency_optimization`: Realiza optimización de emergencia.
+- **Variables Globales**:
+  - `optimization_system`: Instancia global del sistema de optimización completo.
+  - `__version__`: "2.7.0" - Versión del sistema de optimización.
+  - `__author__`: "JARVIS AI System"
+  - `__description__`: "Sistema avanzado de optimización y automejora con inteligencia artificial"
+- **Características Implementadas**:
+  - Sistema unificado de optimización con integración de múltiples componentes especializados
+  - Optimización manual y automática con estrategias coordinadas
+  - Monitoreo continuo del estado del sistema y salud general
+  - Sistema de recomendaciones inteligentes combinando insights de múltiples componentes
+  - Optimización de emergencia para situaciones críticas con estrategias prioritarias
+  - Exportación completa de reportes con todos los datos del sistema
+  - Instancia global única para acceso simplificado a todas las funcionalidades
+  - Soporte para diferentes niveles de optimización (BASIC, MODERATE, AGGRESSIVE, CRITICAL)
+
+#### `src/utils/adaptive_learning_engine.py` [1097 líneas] - Motor de Aprendizaje Adaptativo
+- **Descripción**: Motor de aprendizaje adaptativo con deep learning y optimización de hiperparámetros. Sistema avanzado que automatiza el entrenamiento, optimización y evaluación de modelos de machine learning para mejorar continuamente el rendimiento del sistema JARVIS.
+- **Clases principales**:
+  - `LearningTask` (Enum): Tipos de tareas de aprendizaje (HYPERPARAMETER_OPTIMIZATION, MODEL_TRAINING, FEATURE_SELECTION, ARCHITECTURE_SEARCH, KNOWLEDGE_TRANSFER, ONLINE_LEARNING, BATCH_LEARNING, REINFORCEMENT_LEARNING)
+  - `NeuralArchitecture` (Enum): Arquitecturas neuronales disponibles (MLP, CNN, LSTM, TRANSFORMER, ATTENTION, RESNET, GAN)
+  - `LearningTaskConfig` (dataclass): Configuración completa de tareas de aprendizaje con hiperparámetros, datos y métricas
+  - `ModelPerformance` (dataclass): Registro estructurado de rendimiento de modelos con métricas detalladas
+  - `AdaptiveLearningEngine`: Clase principal del motor de aprendizaje con integración completa de modelos, optimización y monitoreo
+- **Métodos principales**:
+  - `__init__`: Inicializa el motor de aprendizaje con configuración, modelos y sistemas auxiliares
+  - `_load_config`: Carga configuración del motor con valores por defecto y personalización
+  - `_initialize_model_registry`: Inicializa registro de modelos disponibles (MLP, Random Forest, Gradient Boosting)
+  - `_load_trained_models`: Carga modelos pre-entrenados desde almacenamiento persistente
+  - `_save_trained_models`: Guarda modelos entrenados y escaladores en disco
+  - `_start_learning_engine`: Inicia el bucle principal del motor de aprendizaje en hilo separado
+  - `_learning_engine_loop`: Bucle principal de procesamiento de tareas y optimización continua
+  - `_process_learning_queue`: Procesa cola de tareas concurrentes con gestión de hilos
+  - `_execute_learning_task`: Ejecutor principal de tareas de aprendizaje según tipo específico
+  - `_optimize_hyperparameters_task`: Optimización de hiperparámetros usando Grid Search y Cross Validation
+  - `_train_model_task`: Entrenamiento de modelos con división de datos y evaluación de rendimiento
+  - `_select_features_task`: Selección automática de características usando métodos estadísticos
+  - `_search_architecture_task`: Búsqueda de arquitecturas neuronales óptimas con comparación automática
+  - `_online_learning_task`: Aprendizaje online incremental con actualizaciones parciales del modelo
+  - `_batch_learning_task`: Aprendizaje por lotes con actualizaciones por lotes de datos
+  - `_prepare_training_data`: Preparación y extracción de características de datos del sistema
+  - `_create_neural_model`: Factoría para creación de modelos según arquitectura solicitada
+  - `_create_mlp_model`: Constructor específico para modelos MLP con configuración flexible
+  - `_create_lstm_model`: Constructor específico para modelos LSTM con secuencia temporal
+  - `_train_neural_model`: Entrenamiento de modelos neuronales con PyTorch y Early Stopping
+  - `_evaluate_model`: Evaluación completa de modelos con métricas R², MSE, MAE y tiempo de inferencia
+  - `_auto_detect_learning_opportunities`: Detección automática de necesidades de reentrenamiento y optimización
+  - `_optimize_hyperparameters`: Optimización automática programada de hiperparámetros para todos los modelos
+  - `_evaluate_model_performance`: Evaluación continua del rendimiento de todos los modelos activos
+  - `_get_last_model_performance`: Recuperación del último registro de rendimiento para un modelo específico
+  - `get_learning_engine_status`: Estado completo del motor de aprendizaje con métricas y tareas activas
+  - `_get_best_model`: Identificación del modelo con mejor rendimiento histórico
+  - `_get_average_performance`: Cálculo del rendimiento promedio de todos los modelos
+  - `add_learning_task`: Interface para añadir tareas de aprendizaje manualmente al sistema
+  - `get_model_info`: Información detallada de modelos registrados con hiperparámetros y estado
+  - `export_learning_report`: Exportación completa de reportes de aprendizaje y rendimiento a formato JSON
+  - `stop_learning_engine`: Detención segura del motor de aprendizaje con limpieza de recursos
+  - `start_learning_engine`: Reinicio del motor de aprendizaje con configuración actual
+  - `__del__`: Destructor con limpieza segura de hilos y recursos del sistema
+
+#### `src/utils/advanced_logger.py` [1557 líneas] - Sistema Avanzado de Logging y Análisis de Patrones
+- **Descripción**: Sistema avanzado de logging y análisis de patrones para Jarvis con capacidades de machine learning, detección de anomalías, métricas en tiempo real y almacenamiento persistente. Integración con sistema de logging existente y capacidades predictivas.
+- **Clases principales**:
+  - `LogLevel` (Enum): Niveles de log extendidos (DEBUG, INFO, WARNING, ERROR, CRITICAL, SUCCESS, PERFORMANCE)
+  - `LogCategory` (Enum): Categorías de logs para análisis (SYSTEM, APPLICATION, NETWORK, PERFORMANCE, SECURITY, BUSINESS, DEBUG, ERROR)
+  - `PatternType` (Enum): Tipos de patrones detectables (ERROR_SPIKE, PERFORMANCE_DEGRADATION, ANOMALY, TREND, CYCLE, CORRELATION)
+  - `LogEntry` (dataclass): Estructura de entrada de log enriquecida con timestamp, nivel, categoría, mensaje, contexto y metadatos
+  - `LogAnalyzer`: Analizador de logs avanzado con machine learning y detección de patrones complejos
+  - `AdvancedLogger`: Logger avanzado con capacidades de análisis y patrón detection
+  - `JsonFormatter`: Formateador JSON mejorado para logs estructurados
+  - `StatisticalAnomalyDetector`: Detector de anomalías usando métodos estadísticos
+  - `PatternRecognizer`: Reconocedor de patrones usando métodos de secuencia
+  - `AdvancedLogMetrics`: Métricas avanzadas de logging y análisis de rendimiento
+- **Métodos principales de LogAnalyzer**:
+  - `__init__`: Inicializa analizador con ventana de análisis, umbral de patrones y capacidades ML
+  - `analyze_log_entry`: Analizar una entrada de log y detectar patrones con ML
+  - `_collect_performance_metrics`: Recopilar métricas de rendimiento de logs
+  - `_detect_patterns`: Detectar patrones básicos en los logs
+  - `_detect_patterns_with_ml`: Detectar patrones con machine learning y análisis avanzado
+  - `_detect_error_spike`: Detectar picos de errores
+  - `_detect_performance_degradation`: Detectar degradación de rendimiento
+  - `_detect_anomaly`: Detectar anomalías básicas en los logs
+  - `_detect_error_spike_ml`: Detectar picos de errores con ML
+  - `_detect_performance_degradation_ml`: Detectar degradación de rendimiento con ML
+  - `_detect_anomaly_ml`: Detectar anomalías con ML
+  - `_detect_sequential_patterns`: Detectar patrones secuenciales
+  - `_detect_correlations`: Detectar correlaciones entre diferentes tipos de logs
+  - `_detect_advanced_anomalies`: Detección avanzada de anomalías
+  - `_detect_frequency_anomaly`: Detectar anomalías de frecuencia
+  - `_detect_context_anomaly`: Detectar anomalías de contexto
+  - `get_statistics`: Obtener estadísticas del analizador
+- **Métodos principales de AdvancedLogger**:
+  - `__init__`: Inicializa logger avanzado con nombre, nivel, directorio y base de datos
+  - `_setup_logging_infrastructure`: Configurar infraestructura de logging
+  - `_create_database`: Crear base de datos para logs con tablas de logs, patrones y métricas
+  - `_setup_handlers`: Configurar handlers del logger con formato JSON
+  - `_log_worker`: Worker asíncrono para procesamiento de logs
+  - `_store_log_entry`: Almacenar entrada de log en base de datos
+  - `_store_pattern`: Almacenar patrón detectado
+  - `_generate_alerts`: Generar alertas basadas en patrones detectados
+  - `log`: Método principal de logging - soporta ambas interfaces completa y simple
+  - `log_simple`: Interfaz simple de logging compatible con código existente
+  - `debug`: Log de nivel DEBUG
+  - `info`: Log de nivel INFO
+  - `warning`: Log de nivel WARNING
+  - `error`: Log de nivel ERROR
+  - `critical`: Log de nivel CRITICAL
+  - `success`: Log de nivel SUCCESS
+  - `performance`: Log de nivel PERFORMANCE
+  - `log_with_trace`: Log con trace ID para seguimiento distribuido
+  - `log_with_span`: Log con span ID para microservicios
+  - `query_logs`: Consultar logs desde la base de datos con filtros
+  - `get_patterns`: Obtener patrones detectados
+  - `acknowledge_pattern`: Marcar patrón como reconocido
+  - `get_statistics`: Obtener estadísticas del sistema de logging
+  - `export_logs`: Exportar logs en formato especificado (JSON, CSV)
+  - `shutdown`: Detener el logger de forma graceful
+  - `add_custom_filter`: Añadir filtro personalizado
+  - `add_custom_formatter`: Añadir formateador personalizado
+  - `add_custom_handler`: Añadir handler personalizado
+  - `log_with_metrics`: Log con métricas asociadas
+  - `log_with_context`: Log con contexto enriquecido
+  - `log_batch`: Logear múltiples entradas de forma eficiente
+  - `search_logs`: Buscar logs usando consulta de texto completo
+  - `get_real_time_metrics`: Obtener métricas en tiempo real
+  - `set_alert_threshold`: Establecer umbral de alerta para un tipo de patrón
+  - `get_alerts`: Obtener alertas activas
+  - `acknowledge_alert`: Marcar alerta como reconocida
+  - `export_analytics`: Exportar análisis avanzado de logs
+  - `_get_top_errors`: Obtener errores más frecuentes
+  - `_analyze_performance_logs`: Analizar logs de rendimiento
+  - `log_context`: Context manager para logging con contexto temporal
+  - `log_with_trace_context`: Log con contexto de trazado distribuido
+- **Métodos principales de JsonFormatter**:
+  - `format`: Formatear log record como JSON
+- **Métodos principales de StatisticalAnomalyDetector**:
+  - `__init__`: Inicializa detector con tamaño de ventana y umbral
+  - `add_data_point`: Añadir punto de datos y detectar anomalía
+- **Métodos principales de PatternRecognizer**:
+  - `__init__`: Inicializa reconocedor con longitudes de patrón
+  - `add_log_sequence`: Añadir secuencia de logs y detectar patrones
+  - `_detect_repetitive_pattern`: Detectar patrones repetitivos en secuencias
+- **Métodos principales de AdvancedLogMetrics**:
+  - `__init__`: Inicializa métricas avanzadas
+  - `add_metric`: Añadir métrica con análisis de tendencias
+  - `get_trend_analysis`: Análisis de tendencias para una métrica
+  - `_calculate_volatility`: Calcular volatilidad de una serie de valores
+- **Funciones globales**:
+  - `get_advanced_logger`: Obtener un logger avanzado
+- **Logger predeterminado**:
+  - `jarvis_logger`: Logger predeterminado para Jarvis
+
+#### 🚨 Módulo `src/utils/alert_system.py` [620 líneas] - Sistema de Alertas Integrado
+- **Descripción**: Sistema unificado de alertas que coordina diferentes sistemas de monitoreo, gestiona notificaciones y acciones con soporte multiple severidad y estado.
+- **Clases principales**:
+  - `AlertSeverity` (Enum): Severidad de las alertas (INFO, WARNING, CRITICAL, EMERGENCY)
+  - `AlertStatus` (Enum): Estado de las alertas (OPEN, ACKNOWLEDGED, RESOLVED, SUPPRESSED)
+  - `AlertRule` (dataclass): Regla de alerta configurada con condición, severidad y acciones
+  - `AlertAction` (dataclass): Acción a realizar ante una alerta (email, webhook, log, command)
+  - `Alert` (dataclass): Alerta generada por el sistema con timestamp y estado
+  - `AlertSystem`: Sistema de alertas integrado para JARVIS con monitoreo y gestión
+- **Métodos principales**:
+  - `__init__`: Inicializa el sistema de alertas con reglas y acciones por defecto.
+  - `start_monitoring`: Inicia el monitoreo de alertas en segundo plano.
+  - `stop_monitoring`: Detiene el monitoreo de alertas.
+  - `_monitoring_loop`: Bucle principal de monitoreo de alertas.
+  - `_evaluate_alert_rules`: Evalúa todas las reglas de alerta activas.
+  - `_evaluate_condition`: Evalúa una condición de alerta (simplificado).
+  - `_process_alert`: Procesa una alerta y ejecuta acciones asociadas.
+  - `_get_action`: Obtiene una acción por nombre.
+  - `_execute_action`: Ejecuta una acción de alerta según su tipo.
+  - `_execute_log_action`: Ejecuta acción de logging.
+  - `_execute_email_action`: Ejecuta acción de email notificación.
+  - `_execute_webhook_action`: Ejecuta acción de webhook HTTP.
+  - `_execute_command_action`: Ejecuta acción de comando del sistema.
+  - `_cleanup_old_alerts`: Limpia alertas antiguas resueltas.
+  - `acknowledge_alert`: Acepta una alerta especificada.
+  - `resolve_alert`: Resuelve una alerta especificada.
+  - `get_alerts`: Obtiene alertas filtradas por severidad, estado y fuente.
+  - `get_alert_statistics`: Obtiene estadísticas de alertas generales.
+  - `add_alert_callback`: Agrega un callback para recibir alertas.
+  - `add_acknowledgement_callback`: Agrega un callback para recibir aceptaciones.
+  - `add_resolution_callback`: Agrega un callback para recibir resoluciones.
+  - `add_alert_rule`: Agrega una regla de alerta personalizada.
+  - `add_alert_action`: Agrega una acción de alerta personalizada.
+  - `export_alerts`: Exporta alertas a un archivo JSON.
+  - `clear_resolved_alerts`: Limpia alertas resueltas del sistema.
+  - `__enter__`: Entry point para context manager.
+  - `__exit__`: Exit point para context manager.
+- **Funciones globales**:
+  - `get_alert_system`: Obtiene la instancia global del sistema de alertas.
+  - `start_alert_monitoring`: Inicia el monitoreo de alertas global.
+  - `stop_alert_monitoring`: Detiene el monitoreo de alertas global.
+
+#### `src/utils/app_utils.py` [804 líneas] - Utilidades para Aplicaciones
+- **Descripción**: Utilidades comunes para aplicaciones y automatización. La geometría de monitores procede exclusivamente de ScreenManager. La detección visual de elementos se realiza mediante Vision/Qwen3-VL. Este módulo no genera coordenadas ficticias.
+- **Arquitectura principal**:
+  - **AppManager**: Gestor general de aplicaciones con capacidades de monitorización, apertura, cierre, movimiento y verificación.
+  - **VisualAnalysis**: Sistema de detección visual de elementos mediante Vision/Qwen3-VL con análisis de capturas y normalización de coordenadas.
+  - **WindowManagement**: Gestión avanzada de ventanas con búsqueda robusta y detección de monitores asociados.
+  - **CompatibilityLayer**: Interfaz simplificada para operaciones comunes con abstracción de AppManager.
+- **Métodos principales de AppManager**:
+  - `__init__`: Inicializa gestor con ScreenManager y actualiza monitores.
+  - `open_app`: Abre aplicación y la coloca en monitor solicitado con soporte para Chrome, Firefox, Edge, Notepad, Calculator, Paint y aplicaciones genéricas.
+  - `close_app`: Cierra ventana encontrada para la aplicación mediante búsqueda de patrones de títulos.
+  - `move_window_to_screen`: Mueve ventana a monitor concreto mediante ScreenManager.
+  - `center_window`: Centra ventana en el monitor donde está situada actualmente sin utilizar el escritorio virtual completo.
+  - `verify_app_open`: Comprueba si existe ventana visible asociada a la aplicación.
+  - `_find_monitor_for_window`: Determina el monitor en el que se encuentra el centro de una ventana.
+  - `get_app_manager`: Obtiene instancia singleton del gestor de aplicaciones.
+- **Funciones de análisis visual**:
+  - `analyze_elements_in_screenshot`: Analiza captura mediante Vision/Qwen3-VL para detectar elementos interactivos (botones, campos, menús, enlaces, pestañas, checkboxes, radios, selectores, iconos interactivos, controles visibles).
+  - `_extract_json`: Extrae JSON incluso si Vision devuelve un bloque Markdown con manejo robusto de errores.
+  - `_normalize_bbox`: Valida bbox normalizada 0..1000 con verificación de coordenadas válidas.
+  - `_safe_confidence`: Normaliza confidence a 0..1 con manejo de valores inválidos.
+- **Funciones de gestión de ventanas**:
+  - `_find_application_windows`: Busca ventanas mediante varios nombres/patrones comunes con aliases para Chrome, Firefox, Edge, Notepad, Calculator, Paint, Explorer, CMD.
+- **Funciones de compatibilidad**:
+  - `open_app_on_screen`: Abre aplicación en monitor (compatibilidad).
+  - `close_app`: Cierra aplicación (compatibilidad).
+  - `move_window_to_screen`: Mueve ventana a monitor (compatibilidad).
+  - `center_window`: Centra ventana dentro de su monitor actual (compatibilidad).
+- **Características implementadas**:
+  - Gestión multi-monitor con ScreenManager
+  - Detección visual avanzada con Qwen3-VL
+  - Búsqueda robusta de ventanas con aliases
+  - Manejo de errores y logging extensivo
+  - Coordenadas normalizadas 0-1000
+  - Extracción JSON robusta de respuestas Vision
+
+#### `src/utils/architectural_evolution_manager.py` [10766 líneas] - Gestor de Evolución Arquitectónica
+- **Descripción**: Sistema avanzado de gestión de evolución arquitectónica que permite a JARVIS modificar sus estructuras internas, componentes y flujos de trabajo de forma controlada y segura con gestión de riesgos y rollback automático.
+- **Clases principales**:
+  - `EvolutionStatus` (Enum): Estados del ciclo de vida de propuestas (PENDING, VALIDATING, APPROVED, REJECTED, EXECUTING, COMPLETED, FAILED, ROLLING_BACK, ROLLED_BACK)
+  - `ChangeType` (Enum): Tipos de cambios arquitectónicos (COMPONENT_ADDITION, COMPONENT_REMOVAL, COMPONENT_MODIFICATION, INTERFACE_ADDITION, INTERFACE_REMOVAL, INTERFACE_MODIFICATION, FLOW_MODIFICATION, CONFIGURATION_CHANGE, INTEGRATION_ADDITION, INTEGRATION_REMOVAL)
+  - `RiskLevel` (Enum): Niveles de riesgo (LOW, MEDIUM, HIGH, CRITICAL)
+  - `ComponentInfo` (dataclass): Información detallada de componentes del sistema
+  - `InterfaceInfo` (dataclass): Información de interfaces entre componentes
+  - `ArchitecturalChange` (dataclass): Representación estructurada de cambios arquitectónicos
+  - `EvolutionProposal` (dataclass): Propuestas completas de evolución con múltiples cambios
+  - `ArchitecturalEvolutionManager`: Clase principal de gestión evolutiva del sistema
+- **Métodos principales**:
+  - `__init__`: Inicializa el gestor con configuración y sistemas auxiliares de optimización y aprendizaje
+  - `get_component_info`: Obtiene información detallada de un componente específico
+  - `list_components`: Lista todos los componentes con filtrado opcional por tipo
+  - `get_component_dependencies`: Obtiene dependencias de un componente
+  - `get_component_interfaces`: Obtiene interfaces de un componente
+  - `get_available_operations`: Devuelve operaciones de modificación soportadas
+  - `validate_component_existence`: Verifica existencia de componentes
+  - `get_architecture_state`: Obtiene estado actual completo de la arquitectura
+  - `register_component`: Registra nuevos componentes en el sistema
+  - `update_component_status`: Actualiza estado de componentes existentes
+  - `get_interface_info`: Obtiene información de interfaces específicas
+  - `register_interface`: Registra nuevas interfaces en el sistema
+  - `get_architecture_inspection_report`: Genera reporte detallado de inspección arquitectónica
+  - `validate_compatibility_with_existing_apis`: Verifica compatibilidad con APIs existentes
+  - `get_proposal_input_requirements`: Define entrada mínima para propuestas (contrato 2.8.2.1.6)
+  - `get_proposal_output_requirements`: Define salida mínima esperada (contrato 2.8.2.1.7)
+  - `get_proposal_states`: Define estados posibles de propuestas (contrato 2.8.2.1.8)
+  - `validate_proposal_contract`: Valida que propuestas cumplan con contrato mínimo
+  - `run_minimum_tests`: Ejecuta tests mínimos del contrato (2.8.2.1.10)
+  - `test_application_methods`: Tests de aplicación controlada (2.8.2.5.7)
+  - `prepare_change`: Prepara cambios antes de aplicación (2.8.2.5.1)
+  - `apply_change`: Aplica cambios arquitectónicos verificables (2.8.2.5.2)
+  - `detect_application_failure`: Detecta fallos durante aplicación (2.8.2.5.3)
+  - `register_application_result`: Registra resultados de aplicación (2.8.2.5.4)
+  - `verify_change_structure`: Verifica estructura resultante después de cambios (2.8.2.5.5)
+  - `verify_no_side_effects`: Verifica que no se modificaron componentes ajenos (2.8.2.5.6)
+  - `validate_proposal_previa`: Valida propuesta antes de aplicación (2.8.2.5.8)
+  - `execute_syntax_check`: Ejecuta comprobación sintáctica post-ejecución (2.8.2.6.1)
+  - `execute_component_tests`: Ejecuta tests del componente afectado (2.8.2.6.2)
+  - `check_direct_integrations`: Comprueba integraciones directas (2.8.2.6.3)
+  - `check_configuration_state`: Comprueba estado de configuración (2.8.2.6.4)
+  - `check_application_startup`: Comprueba que la aplicación sigue arrancando (2.8.2.6.5)
+  - `register_real_evidence`: Registra evidencia real (2.8.2.6.6)
+  - `test_post_verification_methods`: Tests de verificación posterior (2.8.2.6.7)
+  - `detect_rollback_need`: Detecta cuándo un cambio debe revertirse (2.8.2.7.1)
+  - `create_backup_for_rollback`: Crea copia de seguridad para rollback (2.8.2.7.2)
+  - `perform_rollback`: Realiza el rollback de un cambio (2.8.2.7.3)
+  - `run_compatibility_tests`: Ejecuta tests de compatibilidad (2.8.2.8)
+  - `run_persistence_and_audit_tests`: Ejecuta tests de persistencia y auditoría (2.8.2.9.7)
+  - `identify_persistence_locations`: Identifica ubicaciones de persistencia (2.8.2.9.1)
+  - `persist_evolution`: Persiste evolución en almacenamiento (2.8.2.9.2)
+  - `recover_evolution`: Recupera evolución desde almacenamiento (2.8.2.9.3)
+  - `handle_corrupted_or_missing_data`: Maneja datos corruptos o faltantes (2.8.2.9.4)
+  - `prevent_duplicates`: Evita duplicados en evoluciones (2.8.2.9.5)
+  - `maintain_change_traceability`: Mantiene trazabilidad de cambios (2.8.2.9.6)
+- **Métodos auxiliares de aplicación controlada**:
+  - `_verify_precondition`: Verifica precondiciones específicas
+  - `_prepare_change_resources`: Prepara recursos necesarios para cambios
+  - `_execute_change_by_type`: Ejecuta cambios según tipo específico
+  - `_execute_component_addition`: Ejecución de adición de componentes
+  - `_execute_component_modification`: Ejecución de modificación de componentes
+  - `_execute_component_removal`: Ejecución de remoción de componentes
+  - `_execute_interface_addition`: Ejecución de adición de interfaces
+  - `_execute_interface_modification`: Ejecución de modificación de interfaces
+  - `_execute_interface_removal`: Ejecución de remoción de interfaces
+  - `_execute_flow_modification`: Ejecución de modificación de flujos
+  - `_execute_configuration_change`: Ejecución de cambios de configuración
+  - `_execute_integration_addition`: Ejecución de adición de integraciones
+  - `_execute_integration_removal`: Ejecución de remoción de integraciones
+- **Métodos auxiliares de validación**:
+  - `_test_component_integrity`: Verifica integridad de un componente
+  - `_test_component_interfaces`: Verifica interfaces de un componente
+  - `_test_component_dependencies`: Verifica dependencias de un componente
+  - `_test_component_capabilities`: Verifica capacidades de un componente
+  - `_check_circular_dependencies`: Verifica dependencias circulares
+  - `_check_system_configuration`: Verifica configuración del sistema
+  - `_check_component_configuration`: Verifica configuración de un componente
+  - `_check_interfaces_configuration`: Verifica configuración de interfaces
+  - `_check_dependencies_configuration`: Verifica configuración de dependencias
+- **Métodos auxiliares de persistencia**:
+  - `_get_directory_size_mb`: Obtiene tamaño de directorio en MB
+  - `_validate_change_for_persistence`: Valida cambio para persistencia
+  - `_validate_proposal_for_persistence`: Valida propuesta para persistencia
+  - `_is_duplicate_evolution`: Verifica si evolución es duplicada
+  - `_serialize_evolution_for_persistence`: Serializa evolución para persistencia
+  - `_deserialize_evolution_from_persistence`: Deserializa evolución desde persistencia
+  - `_update_evolution_index`: Actualiza índice de evoluciones
+  - `_add_audit_record`: Agrega registro al auditoría
+  - `_validate_evolution_data_integrity`: Valida integridad de datos de evolución
+  - `_attempt_recovery_from_backup`: Intenta recuperar desde backup
+- **Características implementadas**:
+  - Sistema completo de gestión evolutiva con control de riesgos y rollback
+  - Validación automática de compatibilidad con APIs existentes
+  - Detección de dependencias circulares y efectos secundarios
+  - Gestión de estados del ciclo de vida con transiciones controladas
+  - Integración con sistemas de optimización y aprendizaje automático
+  - Reportes detallados de arquitectura y métricas de evolución
+  - Soporte para múltiples tipos de cambios con estrategias específicas
+  - Sistema de pruebas integrado para validación de cambios
+  - Gestión de recursos y permisos para operaciones críticas
+  - Persistencia de historial de cambios con métricas de rendimiento
+  - Sistema avanzado de persistencia y auditoría con manejo de datos corruptos
+  - Trazabilidad completa de todos los cambios arquitectónicos
+  - Recuperación automática desde backups en caso de fallos
+  - Prevención de duplicados y consistencia de datos
+
+#### `src/utils/circuit_breaker.py` [197 líneas] - Patrón Circuit Breaker para Resiliencia
+- **Descripción**: Implementación del patrón circuit breaker para proporcionar resiliencia contra fallos en cascada y proteger servicios dependientes.
+- **Clases principales**:
+  - `CircuitState` (Enum): Estados del circuit breaker (CLOSED, OPEN, HALF_OPEN).
+  - `CircuitBreakerConfig` (dataclass): Configuración para el circuit breaker con umbral de fallos, tiempo de recuperación, excepciones esperadas, timeout y llamadas máximas en estado medio abierto.
+  - `CircuitBreaker`: Implementación principal del circuit breaker con protección contra timeouts, manejo de estados y estadísticas.
+  - `CircuitBreakerOpenError` (Exception): Excepción lanzada cuando el circuito está abierto.
+  - `CircuitBreakerManager`: Gestor de múltiples circuit breakers con operaciones globales.
+- **Métodos principales**:
+  - `CircuitBreaker.__init__`: Inicializa circuit breaker con nombre y configuración.
+  - `CircuitBreaker.call`: Ejecuta función con protección de circuit breaker.
+  - `CircuitBreaker._should_attempt_reset`: Verifica si el circuito debe intentar resetearse.
+  - `CircuitBreaker._on_success`: Maneja llamada exitosa.
+  - `CircuitBreaker._on_failure`: Maneja llamada fallida.
+  - `CircuitBreaker._open_circuit`: Abre el circuit breaker.
+  - `CircuitBreaker._reset_circuit`: Resetea circuit breaker a estado cerrado.
+  - `CircuitBreaker.force_open`: Fuerza apertura del circuit breaker.
+  - `CircuitBreaker.force_close`: Fuerza cierre del circuit breaker.
+  - `CircuitBreaker.get_state`: Obtiene estado actual del circuit breaker.
+  - `CircuitBreaker.get_stats`: Obtiene estadísticas del circuit breaker.
+  - `CircuitBreakerManager.__init__`: Inicializa gestor de circuit breakers.
+  - `CircuitBreakerManager.get_breaker`: Obtiene o crea circuit breaker.
+  - `CircuitBreakerManager.get_all_stats`: Obtiene estadísticas de todos los circuit breakers.
+  - `CircuitBreakerManager.reset_all`: Resetea todos los circuit breakers.
+  - `CircuitBreakerManager.cleanup_stale`: Limpia circuit breakers obsoletos.
+- **Funciones globales**:
+  - `circuit_breaker`: Decorador para protección fácil con circuit breaker.
+
+#### `src/utils/config.py` - Configuración Centralizada
+- **Descripción**: Gestión centralizada de configuración del sistema JARVIS con configuración unificada para todos los componentes, validación automática, sistema de herencia de configuraciones, gestión de perfiles de usuario e integración con sistema de calibración.
+- **Clases principales**:
+  - `SystemConfig`: Configuración general del sistema Jarvis (nombre, versión, modo debug, sistema de coordenadas)
+  - `LoggingConfig`: Configuración del sistema de logging (nivel, formato, archivo)
+  - `KeyboardConfig`: Configuración de teclas de atajo (fail-safe, pausa entre acciones)
+  - `VoiceConfig`: Configuración de voz (voz por defecto, modelos, tokenizador)
+  - `MemoryConfig`: Configuración de memoria (archivos de historial, aliases, longitud máxima)
+  - `PredictiveConfig`: Configuración del sistema predictivo (aprendizaje, umbrales, memoria)
+  - `MonitorConfig`: Configuración compatible de monitores (geometría, DPI, sistema de coordenadas)
+  - `ScreenConfig`: Configuración auxiliar de pantallas (multi-monitor, calidad, límites)
+  - `TimeoutConfig`: Configuración de timeouts (llamadas, captura, clics, escritura)
+  - `CalibrationConfig`: Configuración del sistema de calibración (intentos, confianza, coordenadas)
+  - `ChromeConfig`: Configuración de Google Chrome para aperturas automáticas
+  - `Config`: Configuración principal del sistema que agrupa todas las subconfiguraciones
+- **Métodos principales**:
+  - `load_config`: Carga la configuración desde config/config.json con manejo de errores
+  - `_load_monitor`: Convierte bloque JSON de monitor en MonitorConfig
+  - `_load_default_monitors`: Retorna lista vacía de monitores por diseño
+  - `_voice_file_exists`: Comprueba si existe archivo .bin de una voz específica
+  - `load_saved_voice_preference`: Carga última voz seleccionada por el usuario
+  - `save_voice_preference`: Guarda voz actualmente seleccionada
+  - `get_project_root`: Retorna la ruta raíz del proyecto
+  - `get_config_path`: Retorna la ruta del archivo de configuración
+  - `get_models_path`: Retorna ruta al directorio de modelos
+  - `get_voices_path`: Retorna ruta al directorio de voces
+  - `get_macros_coords_path`: Retorna ruta al archivo de coordenadas de macros
+  - `get_voice_preference_path`: Retorna ruta de preferencia persistente de voz
+  - `get_system_config`: Retorna configuración general del sistema
+  - `get_logging_config`: Retorna configuración de logging
+  - `get_keyboard_config`: Retorna configuración del teclado
+  - `get_voice_config`: Retorna configuración de voz
+  - `get_memory_config`: Retorna configuración de memoria
+  - `get_screen_config`: Retorna configuración auxiliar de pantallas
+  - `get_timeout_config`: Retorna configuración de timeouts
+  - `get_predictive_config`: Retorna configuración predictiva
+  - `get_calibration_config`: Retorna configuración de calibración
+  - `get_chrome_config`: Retorna configuración de Chrome
+  - `get_element_types`: Retorna tipos de elementos configurados
+  - `get_monitors`: Retorna monitores definidos en config.json
+  - `get_monitor_config`: Retorna monitor concreto del JSON
+  - `get_primary_monitor_config`: Retorna monitor principal definido en el JSON
+  - `get_monitor_count`: Retorna número de monitores definidos en el JSON
+- **Características implementadas**:
+  - Sistema de configuración unificada con herencia y valores por defecto
+  - Validación automática de tipos y rangos en todas las configuraciones
+  - Sistema persistente de preferencias de voz con fallback automático
+  - Gestión avanzada de configuraciones de monitores con compatibilidad legacy
+  - Manejo robusto de errores con retorno de configuración neutral por defecto
+  - Integración completa con sistema de calibración y coordenadas
+  - Soporte para configuración predictiva y aprendizaje automático
+  - Sistema de timeouts configurable para todas las operaciones del sistema
+
+#### `src/utils/contextual_adaptation_audit.py` [444 líneas] - Auditoría del Sistema de Adaptación Contextual
+- **Descripción**: Sistema avanzado de auditoría para el objetivo real de autoevolución y adaptación contextual. Evalúa componentes existentes, identifica brechas del sistema, genera hallazgos detallados y proporciona recomendaciones para mejorar la arquitectura de adaptación contextual del sistema JARVIS.
+- **Clases principales**:
+  - `ComponentStatus` (dataclass): Estado detallado de un componente del sistema con información de implementación, funcionalidad, dependencias, nivel de integración y capacidades
+  - `AuditFinding` (dataclass): Hallazgo estructurado de auditoría con categoría, severidad, componente, descripción, evidencia, recomendación e impacto
+  - `SystemGap` (dataclass): Brecha identificada en el sistema con área, componente faltante, funcionalidad requerida, prioridad, esfuerzo estimado y dependencias
+  - `ContextualAdaptationAuditor`: Sistema principal de auditoría contextual con evaluación de componentes, detección de brechas y generación de reportes
+- **Métodos principales**:
+  - `__init__`: Inicializa el sistema de auditoría con timestamp, registro de hallazgos y componentes
+  - `audit_existing_components`: Audita componentes existentes relacionados con adaptación y evolución (Adaptive Learning Engine, Self Improvement System, Optimization Orchestrator, Pattern Analyzer)
+  - `_audit_component`: Audita un componente específico verificando existencia, implementación, funcionalidad, capacidades, integración y dependencias
+  - `_assess_functionality`: Evalúa nivel de implementación de funcionalidad basado en indicadores de código
+  - `_assess_capabilities`: Evalúa capacidades implementadas comparando con capacidades esperadas
+  - `_assess_integration`: Evalúa nivel de integración basado en palabras clave de dependencia
+  - `_extract_dependencies`: Extrae dependencias del componente desde imports del código
+  - `_identify_issues`: Identifica posibles problemas en el componente (TODOs, FIXMEs, métodos no implementados)
+  - `_add_audit_finding`: Agrega hallazgo estructurado al sistema de auditoría
+  - `identify_system_gaps`: Identifica brechas críticas en el sistema de autoevolución contextual
+  - `_add_system_gap`: Agrega brecha identificada al sistema con priorización y dependencias
+  - `generate_audit_report`: Genera reporte completo de auditoría con resumen de hallazgos y recomendaciones
+  - `_generate_recommendations`: Genera recomendaciones basadas en hallazgos críticos y estado de integración
+  - `_generate_next_steps`: Genera pasos siguientes para implementación ordenados por prioridad
+  - `_is_fully_integrated`: Verifica si el sistema está completamente integrado
+  - `save_audit_report`: Guarda reporte de auditoría completo en formato JSON
+- **Funciones globales**:
+  - `main`: Ejecuta auditoría completa del sistema de adaptación contextual con reporte final
+- **Características implementadas**:
+  - Auditoría completa de componentes clave de adaptación contextual
+  - Detección automática de brechas en arquitectura de autoevolución
+  - Sistema de hallazgos categorizados por severidad (CRITICAL, HIGH, MEDIUM, LOW)
+  - Evaluación de funcionalidad, capacidades y nivel de integración
+  - Generación automática de recomendaciones y pasos de implementación
+  - Reportes estructurados en JSON con timestamp y versionado
+  - Priorización automática de hallazgos y brechas por impacto crítico
+  - Sistema de seguimiento de issues y dependencias entre componentes
+
+#### `src/utils/contextual_adaptation_engine.py` [6998 líneas] - Motor de Adaptación Contextual
+- **Descripción**: Motor de adaptación contextual que permite a JARVIS evolucionar y adaptarse automáticamente a diferentes entornos, condiciones de uso y requerimientos cambiantes.
+- **Enums y dataclasses principales**:
+  - `ContextType` (Enum): Tipos de contexto (DEVELOPMENT, PRODUCTION, TESTING, MAINTENANCE, EMERGENCY, OPTIMIZATION, LEARNING, IDLE, RECOVERY)
+  - `AdaptationLevel` (Enum): Niveles de adaptación (MINIMAL, MODERATE, SIGNIFICANT, RADICAL)
+  - `ContextualFactor` (Enum): Factores contextuales (SYSTEM_RESOURCES, USER_BEHAVIOR, ENVIRONMENTAL_CONDITIONS, PERFORMANCE_REQUIREMENTS, ERROR_RATES, USAGE_PATTERNS, TIME_OF_DAY, WORKLOAD, NETWORK_CONDITIONS, HARDWARE_CAPABILITIES)
+  - `ContextSnapshot` (dataclass): Instantánea del contexto actual con métricas y factores
+  - `AdaptationRule` (dataclass): Regla de adaptación contextual con condiciones y acciones
+  - `KnowledgeTransfer` (dataclass): Transferencia de conocimiento entre contextos
+  - `AdaptationResult` (dataclass): Resultado de adaptación con impacto y métricas
+- **Métodos principales de ContextualAdaptationEngine**:
+  - `__init__`: Inicializa el motor con sistemas existentes, configuración y modelos de aprendizaje
+  - `_load_config`: Cargar configuración del motor de adaptación contextual
+  - `_initialize_adaptation_rules`: Inicializar reglas de adaptación contextual por defecto
+  - `_initialize_knowledge_base`: Inicializar base de conocimiento contextual
+  - `capture_context_snapshot`: Captura una instantánea del contexto actual del sistema
+  - `_collect_system_metrics`: Recopilar métricas del sistema usando psutil
+  - `_collect_performance_metrics`: Recopilar métricas de rendimiento usando PerformanceOptimizer
+  - `_collect_user_patterns`: Recopilar patrones de interacción del usuario usando SelfImprovementSystem
+  - `_collect_environmental_conditions`: Recopilar condiciones ambientales del sistema
+  - `_determine_context_type`: Determinar el tipo de contexto actual basado en métricas
+  - `_evaluate_contextual_factors`: Evaluar factores contextuales del sistema
+  - `_calculate_context_confidence`: Calcular puntuación de confianza en la determinación del contexto
+  - `_record_context_pattern`: Grabar patrón de contexto en la base de conocimiento
+  - `analyze_contextual_patterns`: Analizar patrones contextuales y determinar qué reglas de adaptación aplicar
+  - `_evaluate_rule_condition`: Evaluar si una regla de adaptación se aplica al contexto actual
+  - `_get_contextual_value`: Obtener el valor de una clave contextual desde la instantánea
+  - `_parse_value`: Parsear un valor string a float para condiciones
+  - `execute_adaptation`: Ejecutar adaptaciones basadas en las reglas aplicadas
+  - `_determine_adaptation_level`: Determinar el nivel de adaptación basado en las reglas aplicadas
+  - `_execute_adaptation_actions`: Ejecutar acciones de adaptación de una regla
+  - `_execute_single_action`: Ejecutar una acción de adaptación individual con integración real
+  - `_set_optimization_interval`: Ajustar intervalo de optimización de sistemas existentes
+  - `_reduce_data_transfer_real`: Reducir transferencia de datos usando LogAnalytics
+  - `transfer_knowledge`: Transferir conocimiento entre contextos con estrategia avanzada
+  - `_validate_context_compatibility`: Validar compatibilidad entre contextos para transferencia
+  - `_get_historical_compatibility`: Obtener compatibilidad basada en transferencias históricas
+  - `_calculate_factor_similarity`: Calcular similitud basada en factores contextuales
+  - `_calculate_transfer_efficiency`: Calcular eficiencia de transferencia según la estrategia seleccionada
+  - `_transform_knowledge_for_target`: Transformar conocimiento para adaptarlo al contexto destino
+  - `_update_transfer_patterns`: Actualizar patrones de transferencia basado en una transferencia exitosa
+  - `integrate_with_performance_optimizer`: Integrar con PerformanceOptimizer para optimización contextual
+  - `integrate_with_self_improvement_system`: Integrar con SelfImprovementSystem para aprendizaje continuo
+  - `integrate_with_adaptive_learning_engine`: Integrar con AdaptiveLearningEngine para aprendizaje adaptativo
+  - `integrate_with_pattern_analyzer`: Integrar con PatternAnalyzer para detección de patrones contextuales
+  - `set_meta_learning_system`: Conectar el MetaLearningSystem real (2.8.3.6); no lo instancia
+  - `integrate_with_meta_learning_system`: Observar el metaprendizaje (métricas, recomendaciones, evaluaciones y meta-reglas) y registrarlo en la base de conocimiento sin aplicarlo
+  - `full_system_integration`: Realizar integración completa con todos los sistemas existentes
+  - `_map_optimization_to_adaptation`: Mapear recomendación de optimización a acción de adaptación
+  - `_determine_learning_mode`: Determinar modo de aprendizaje basado en contexto actual
+  - `_sync_adaptation_rules`: Sincronizar reglas de adaptación con reglas de mejora
+  - `_calculate_adaptive_learning_rate`: Calcular tasa de aprendizaje adaptativa basada en contexto
+  - `_calculate_adaptive_batch_size`: Calcular tamaño de lote adaptativo basado en contexto
+  - `_calculate_adaptive_max_epochs`: Calcular número máximo de épocas adaptativo
+  - `_calculate_adaptive_patience`: Calcular paciencia adaptativa para early stopping
+  - `_create_adaptation_rule_from_pattern`: Crear regla de adaptación a partir de patrón detectado
+  - `get_integration_status`: Obtener estado actual de la integración con sistemas existentes
+  - `update_system_configs`: Actualizar configuraciones de sistemas basadas en contexto actual
+  - `_extract_relevant_metrics`: Extraer métricas relevantes de un contexto específico
+  - `_adapt_baselines_to_context`: Adaptar líneas base de rendimiento para un contexto destino
+  - `_filter_strategies_by_compatibility`: Filtrar estrategias de adaptación según compatibilidad
+  - `_filter_patterns_by_compatibility`: Filtrar patrones por compatibilidad con contexto destino
+  - `_calculate_strategy_applicability`: Calcular aplicabilidad de una estrategia en el contexto destino
+  - `_calculate_pattern_compatibility`: Calcular compatibilidad de un patrón con un contexto destino
+  - `batch_knowledge_transfer`: Realizar transferencias de conocimiento en batch con priorización
+  - `auto_transfer_knowledge`: Transferir conocimiento automáticamente a un contexto destino
+  - `_calculate_transfer_potential`: Calcular potencial de transferencia entre contextos
+  - `transfer_knowledge_with_feedback`: Transferir conocimiento con mecanismo de feedback y ajuste
+  - `get_transfer_recommendations`: Obtener recomendaciones de transferencia de conocimiento inteligentes
+  - `_calculate_transfer_urgency`: Calcular urgencia de transferencia para un contexto y tipo de conocimiento
+  - `_generate_recommendation_reasoning`: Generar razonamiento para una recomendación de transferencia
+  - `get_knowledge_transfers`: Obtener historial de transferencias de conocimiento con filtros avanzados
+  - `add_adaptation_rule`: Añadir una regla de adaptación personalizada
+  - `remove_adaptation_rule`: Eliminar una regla de adaptación
+  - `enable_rule`: Habilitar una regla de adaptación
+  - `disable_rule`: Deshabilitar una regla de adaptación
+  - `get_adaptation_rules`: Obtener lista de reglas de adaptación
+  - `_update_rule_success_rate`: Actualizar la tasa de éxito de una regla
+  - `save_adaptation_rules`: Guardar reglas de adaptación en archivo
+  - `load_adaptation_rules`: Cargar reglas de adaptación desde archivo
+  - `save_knowledge_base`: Guardar base de conocimiento en archivo
+  - `load_knowledge_base`: Cargar base de conocimiento desde archivo
+  - `_record_adaptation_result`: Grabar resultado de adaptación en la base de conocimiento
+  - `_calculate_overall_impact`: Calcular impacto general de las adaptaciones
+  - `_calculate_adaptation_confidence`: Calcular confianza en la adaptación realizada
+  - `start_contextual_adaptation_loop`: Iniciar el bucle de adaptación contextual
+  - `stop_contextual_adaptation_loop`: Detener el bucle de adaptación contextual
+  - `get_adaptation_summary`: Obtener resumen de adaptaciones realizadas
+  - `get_context_insights`: Obtener insights sobre los contextos detectados
+  - `get_engine_status`: Obtener estado completo del motor de adaptación contextual
+  - `_save_adaptation_rules`: Guardar reglas de adaptación en archivo JSON
+  - `_load_adaptation_rules`: Cargar reglas de adaptación desde archivo JSON
+  - `save_all_data`: Guardar todos los datos persistentes (reglas y knowledge base)
+  - `load_all_data`: Cargar todos los datos persistentes (reglas y knowledge base)
+  - `backup_data`: Crear una copia de seguridad de los datos persistentes
+  - `export_adaptation_history`: Exportar historial de adaptaciones a archivo JSON
+  - `_apply_transferred_knowledge`: Aplicar conocimiento transferido en el contexto destino
+  - `_apply_success_patterns`: Aplicar patrones de éxito transferidos
+  - `_apply_adaptation_strategies`: Aplicar estrategias de adaptación transferidas
+  - `_apply_performance_baselines`: Aplicar líneas base de rendimiento transferidas
+  - `_evaluate_knowledge_application`: Evaluar el resultado de la aplicación de conocimiento transferido
+  - `_get_available_knowledge_types`: Obtener tipos de conocimiento disponibles en un contexto
+- **Métodos de feedback y confianza (2.8.5.6)**:
+  - `get_transfer_confidence`: Obtener confianza existente para una transferencia específica (0.0-1.0)
+  - `register_transfer_feedback`: Registrar feedback de una transferencia completada con éxito, puntuación y comentarios
+  - `evaluate_transfer_result`: Evaluar resultado de una transferencia y actualizar confianza automáticamente
+  - `adjust_transfer_confidence`: Ajustar confianza de una transferencia mediante factor o feedback
+  - `evaluate_transfer_result__internal`: Método interno de evaluación para compatibilidad
+  - `register_transfer_feedback` (alias): Alias de register_transfer_feedback para compatibilidad con tests
+  - `_update_global_confidence_metrics`: Actualizar métricas de confianza globales basadas en feedback
+- **Métodos de registro de recursos**:
+  - `record_resource_allocation`: Registrar una asignación de recursos para adaptación contextual
+  - `_update_resource_usage_patterns`: Actualizar patrones de uso de recursos basados en asignaciones
+- **Funciones globales**:
+  - `main`: Demo del motor de adaptación contextual
+
+#### `src/utils/dynamic_resource_allocator.py` [1336 líneas] - Asignador Dinámico de Recursos v2.8.4.2
+- **Descripción**: Sistema avanzado de asignación de recursos dinámica según contexto con priorización, detección de conflictos, preemption, gestión de recursos del sistema (CPU, memoria, disco, red), integración con PerformanceMonitor y PerformanceOptimizer, soporte para trabajo diferido y notificación de cambios. Implementa modelo de asignación con solicitudes, asignaciones y disponibilidad de recursos.
+- **Enums principales**:
+  - `ResourceType`: Tipos de recursos gestionables (SYSTEM_CPU, SYSTEM_MEMORY, SYSTEM_DISK, SYSTEM_NETWORK, PROCESS_CPU, PROCESS_MEMORY, PROCESS_THREADS, EXECUTION_REGISTRY, EXECUTION_HISTORY, STORAGE_DATABASE, STORAGE_CACHE, THREAD_POOL)
+  - `ResourcePriority`: Prioridades de recurso (LOW, MEDIUM, HIGH, CRITICAL)
+  - `AllocationStatus`: Estados de asignación (PENDING, ASSIGNED, IN_USE, AVAILABLE, UNAVAILABLE, CONFLICT)
+- **Clases principales**:
+  - `ResourceRequest`: Solicitud de recurso con validación, contexto y prioridad
+  - `ResourceAllocation`: Asignación de recurso con estado, cantidad usada y metadatos
+  - `ResourceAvailability`: Disponibilidad de recurso con verificación de satisfacción
+  - `DynamicResourceAllocator`: Sistema principal de asignación con bucle de monitoreo
+- **Métodos principales de DynamicResourceAllocator**:
+  - `__init__`: Inicializa asignador con monitor y optimizer opcionales
+  - `register_resource`: Registrar recurso disponible con cantidad y límites
+  - `create_request`: Crear solicitud de recurso con validación completa
+  - `allocate`: Asignar recurso con manejo de conflictos y prioridad
+  - `get_conflicts`: Identificar conflictos reales con asignaciones existentes
+  - `_contexts_conflict`: Verificar conflictos entre contextos (idénticos o incompatibles)
+  - `_can_preempt`: Verificar si asignación existente puede ser preemptada
+  - `_try_preempt`: Intentar preemptar asignaciones según prioridad
+  - `defer_request`: Aplazar solicitud cuando no hay recurso disponible
+  - `process_deferred`: Intentar asignar solicitudes diferidas por prioridad
+  - `release`: Liberar asignación con manejo de doble liberación
+  - `get_availability`: Obtener disponibilidad de recurso específico
+  - `get_all_allocations`: Obtener todas las asignaciones activas
+  - `update_usage`: Actualizar uso real de asignación
+  - `update_system_resources`: Actualizar recursos del sistema desde PerformanceMonitor
+  - `get_resource_allocation_status`: Obtener estado completo con métricas y recomendaciones
+  - `integrate_with_planner_executor`: Integrar con Planner/Executor mediante contratos existentes
+  - `_get_available_capabilities_for_planner`: Obtener capacidades disponibles para Planner
+  - `_get_optimization_suggestions_for_planner`: Obtener sugerencias de optimización
+- **Características implementadas**:
+  - Sistema completo de asignación con priorización y detección de conflictos
+  - Preemption inteligente evitando interrumpir trabajo de usuario sin consentimiento
+  - Trabajo diferido con procesamiento automático cuando hay recursos disponibles
+  - Integración con PerformanceMonitor y PerformanceOptimizer para monitoreo y optimización
+  - Gestión de múltiples tipos de recursos del sistema y de proceso
+  - Notificación de cambios mediante callbacks
+  - Persistencia de estado con manejo de concurrencia con threading.RLock
+  - Compatibilidad con contratos existentes de Planner/Executor
+
+#### `src/utils/error_dashboard.py` [592 líneas] - Dashboard de Recuperación de Errores
+- **Descripción**: Dashboard visual para monitoreo y gestión de operaciones de recuperación de errores. Proporciona interfaz para visualizar errores activos, historial de recuperación, estado del sistema y alertas con actualización en tiempo real y caché de datos.
+- **Clases principales**:
+  - `DashboardView` (Enum): Tipos de vistas del dashboard (OVERVIEW, ACTIVE_ERRORS, RECOVERY_HISTORY, SYSTEM_HEALTH, ALERTS)
+  - `ErrorSeverity` (Enum): Niveles de severidad de errores (LOW, MEDIUM, HIGH, CRITICAL)
+  - `ErrorRecoveryDashboard`: Clase principal del dashboard para monitoreo de recuperación de errores
+- **Métodos principales**:
+  - `__init__`: Inicializa el dashboard con ruta de base de datos e intervalo de actualización
+  - `start_dashboard`: Inicia el hilo de actualización del dashboard
+  - `stop_dashboard`: Detiene el hilo de actualización del dashboard
+  - `_update_loop`: Bucle principal de actualización del dashboard
+  - `_update_all_data`: Actualiza todos los datos en caché
+  - `_get_cached_data`: Obtiene datos en caché si están disponibles y no expirados
+  - `_cache_data`: Almacena datos en caché con TTL opcional
+  - `_get_overview_data`: Obtiene datos generales del dashboard
+  - `_get_active_errors_data`: Obtiene datos de errores activos
+  - `_get_recovery_history_data`: Obtiene historial de recuperación
+  - `_get_system_health_data`: Obtiene estado de salud del sistema
+  - `_get_alerts_data`: Obtiene datos de alertas
+  - `_get_error_statistics`: Obtiene estadísticas de errores desde base de datos
+  - `_get_recovery_statistics`: Obtiene estadísticas de recuperación desde base de datos
+  - `_get_system_health`: Obtiene estado actual del sistema
+  - `_get_active_recoveries`: Obtiene lista de recuperaciones activas
+  - `_count_errors_by_severity`: Cuenta errores por severidad
+  - `_count_errors_by_component`: Cuenta errores por componente
+  - `_count_recoveries_by_action`: Cuenta recuperaciones por acción
+  - `_count_recoveries_by_component`: Cuenta recuperaciones por componente
+  - `_count_alerts_by_severity`: Cuenta alertas por severidad
+  - `_count_alerts_by_source`: Cuenta alertas por fuente
+  - `get_dashboard_data`: Obtiene datos del dashboard para vista especificada
+  - `get_dashboard_views`: Obtiene vistas disponibles del dashboard
+  - `refresh_data`: Fuerza actualización de todos los datos en caché
+  - `log_view_access`: Registra acceso a vistas del dashboard
+  - `get_view_statistics`: Obtiene estadísticas de acceso a vistas
+  - `__str__`: Representación string del dashboard
+- **Funciones globales**:
+  - `get_error_dashboard`: Obtiene instancia singleton del dashboard de errores
+  - `start_error_dashboard`: Inicia el dashboard de errores
+  - `stop_error_dashboard`: Detiene el dashboard de errores
+
+#### `src/utils/error_recovery.py` [522 líneas] - Sistema de Recuperación de Errores
+- **Descripción**: Sistema avanzado de detección, registro y recuperación de errores para JARVIS con estrategias automáticas, estadísticas detalladas y persistencia en base de datos SQLite.
+- **Enums principales**:
+  - `ErrorSeverity`: Niveles de severidad (LOW, MEDIUM, HIGH, CRITICAL)
+  - `ErrorType`: Categorías de errores (NETWORK, DATABASE, FILESYSTEM, MEMORY, PROCESS, EXTERNAL, SYSTEM)
+  - `RecoveryStrategy`: Tipos de estrategias (RETRY, FALLBACK, CIRCUIT_BREAKER, TIMEOUT, ROLLBACK, RESTART)
+- **Clases principales**:
+  - `ErrorRecoveryManager`: Gestor principal de recuperación de errores con base de datos SQLite y estrategias integradas
+- **Métodos principales**:
+  - `__init__`: Inicializa el gestor con ruta de base de datos y estrategias por defecto
+  - `get_error_recovery_manager`: Obtiene instancia singleton del gestor de recuperación de errores
+  - `_init_database`: Inicializa base de datos con tablas de errores, estadísticas y estrategias
+  - `_register_default_strategies`: Registra estrategias de recuperación por defecto
+  - `register_strategy`: Registra una estrategia de recuperación personalizada
+  - `register_handler`: Registra un manejador específico para tipos de errores
+  - `log_error`: Registra un error en la base de datos con detalles y contexto
+  - `_update_error_stats`: Actualiza estadísticas de errores con conteo y recuperación
+  - `recover_from_error`: Intenta recuperar de un error registrado con estrategia específica
+  - `_get_error_details`: Obtiene información detallada de un error por ID
+  - `_determine_best_strategy`: Determina la mejor estrategia basada en tipo y severidad
+  - `_execute_recovery_strategy`: Ejecuta una estrategia de recuperación específica
+  - `_retry_strategy`: Estrategia de reintento con retroceso exponencial
+  - `_fallback_strategy`: Estrategia de alternativa con implementación secundaria
+  - `_circuit_breaker_strategy`: Estrategia de disyuntor para fallos repetitivos
+  - `_timeout_strategy`: Estrategia de timeout para operaciones colgadas
+  - `_restart_strategy`: Estrategia de reinicio para fallos críticos
+  - `_update_recovery_status`: Actualiza estado de recuperación del error
+  - `_update_execution_time`: Actualiza tiempo de ejecución del intento de recuperación
+  - `get_error_statistics`: Obtiene estadísticas de errores para periodo especificado
+  - `get_active_errors`: Obtiene lista de errores activos (no recuperados)
+  - `cleanup_old_errors`: Limpia registros de errores antiguos
+  - `__str__`: Representación string del gestor de recuperación de errores
+- **Funciones globales**:
+  - `get_error_recovery_manager`: Obtiene instancia singleton del gestor de recuperación de errores
+  - `start_error_recovery`: Inicia el sistema de recuperación de errores
+  - `stop_error_recovery`: Detiene el sistema de recuperación de errores
+- **Características implementadas**:
+  - Sistema completo de gestión de errores con persistencia SQLite
+  - Estrategias de recuperación automáticas y personalizables
+  - Sistema de circuit breaker para protección contra fallos en cascada
+  - Estadísticas detalladas con tasas de recuperación y tiempos
+  - Manejo de diferentes tipos y severidades de errores
+  - Soporte para reintento con retroceso exponencial
+  - Estrategias de fallback, timeout y reinicio
+  - Limpieza automática de registros antiguos
+  - Interfaz singleton para acceso global al sistema
+
+#### `src/utils/get_coords.py` [501 líneas] - Calibrador Manual de Riot API
+- **Descripción**: Calibrador manual de la macro riot_api. Registra coordenadas absolutas del escritorio y las guarda asociadas al monitor real (s1, s2, ...). La topología, posición y resolución de los monitores se obtienen de config/config.json mediante ScreenManager. Este módulo es específico de la calibración manual de la macro riot_api. No modifica otras macros ni otras calibraciones existentes.
+- **Métodos principales**:
+  - `_get_macros_coords_path`: Obtiene la ruta de macros_coords.json.
+  - `_screen_key`: Convierte el ID lógico del monitor a la clave sN del JSON.
+  - `_format_monitor`: Devuelve una descripción legible del monitor.
+  - `_get_monitor_for_screen_number`: Obtiene un monitor configurado por su número lógico 1-based.
+  - `_detect_monitor_from_mouse`: Obtiene el monitor que contiene actualmente el puntero.
+  - `_capture_point_on_monitor`: Espera a que el ratón permanezca quieto IDLE_SECONDS sobre el monitor.
+  - `_calculate_capture_region`: Calcula [x, y, ancho, alto] usando las cuatro esquinas.
+  - `_build_calibration_data`: Construye el bloque de datos de calibración.
+  - `imprimir_resultados`: Muestra por consola los datos capturados.
+  - `_load_json`: Carga el JSON existente o crea una estructura raíz vacía.
+  - `_atomic_write_json`: Escribe el JSON de forma atómica para evitar archivos incompletos.
+  - `gestionar_json`: Actualiza únicamente riot_api para el monitor indicado.
+  - `calibrar_api_key_riot_macro`: Ejecuta la calibración manual de riot_api.
+  - `calibrarApiKeyRiotMacro`: Alias compatible con la función histórica del proyecto.
+
+#### `src/utils/health_checker.py` [498 líneas] - Sistema de Verificación de Salud
+- **Descripción**: Sistema avanzado de verificación de salud para JARVIS con monitoreo continuo de componentes críticos, detección de problemas, generación de reportes y capacidad de adaptación.
+- **Clases principales**:
+  - `HealthStatus` (Enum): Estados de salud de un componente (HEALTHY, WARNING, CRITICAL, UNKNOWN)
+  - `HealthCheck` (dataclass): Resultado estructurado de una verificación de salud con timestamp, mensaje y detalles
+  - `HealthCheckConfig` (dataclass): Configuración completa para verificaciones de salud con umbrales, tiempos de espera y componentes a monitorizar
+  - `HealthChecker`: Sistema principal de verificación de salud con monitoreo periódico, historial y callbacks de notificación
+- **Métodos principales**:
+  - `HealthChecker.__init__`: Inicializa el verificador de salud con configuración personalizable
+  - `HealthChecker.start_health_checks`: Inicia verificaciones periódicas en hilo separado
+  - `HealthChecker.stop_health_checks`: Detiene el monitoreo de salud
+  - `HealthChecker.perform_comprehensive_health_check`: Realiza verificación completa de todos los componentes
+  - `HealthChecker.check_component_health`: Verifica salud específica de un componente con importación dinámica
+  - `HealthChecker.check_system_health`: Verifica recursos del sistema (CPU, memoria, disco)
+  - `HealthChecker._get_component_module_path`: Mapea nombres de componentes a rutas de módulos
+  - `HealthChecker._process_health_check`: Procesa resultados y actualiza historial
+  - `HealthChecker._notify_health_change`: Notifica callbacks sobre cambios de salud
+  - `HealthChecker.add_health_change_callback`: Añade callback para notificaciones de cambios
+  - `HealthChecker.get_health_status`: Obtiene estado actual de salud de componentes
+  - `HealthChecker.get_health_summary`: Genera resumen con estado general y contadores
+  - `HealthChecker.get_component_health_history`: Obtiene historial de un componente específico
+  - `HealthChecker.export_health_report`: Exporta reporte completo a JSON
+  - `HealthChecker.clear_history`: Limpia historial de verificaciones
+  - `HealthChecker.is_component_healthy`: Verifica si componente está saludable
+  - `HealthChecker.get_unhealthy_components`: Lista componentes no saludables
+  - `HealthChecker.__enter__/__exit`: Context manager para uso con with
+- **Funciones globales**:
+  - `get_health_checker`: Obtiene instancia global del verificador de salud
+  - `start_health_checks`: Inicia verificaciones globales
+  - `stop_health_checks`: Detiene verificaciones globales
+- **Características implementadas**:
+  - Monitoreo continuo con intervalo configurable de componentes críticos y opcionales
+  - Sistema de umbrales de respuesta (warning, critical) basado en tiempo y recursos
+  - Importación dinámica de componentes con verificación de métodos check_health
+  - Historial configurable con tamaño máximo y exportación a JSON
+  - Sistema de callbacks para notificaciones de cambios de estado
+  - Verificación de recursos del sistema (CPU, memoria, disco) con umbrales configurables
+  - Context manager para integración con bloques de código
+  - Mapeo automático de nombres de componentes a rutas de módulos
+
+#### `src/utils/health_monitor.py` [418 líneas] - Sistema de Monitoreo de Salud
+- **Descripción**: Sistema avanzado de monitoreo de salud para JARVIS con detección proactiva de errores, métricas en tiempo real, almacenamiento persistente y capacidades de alerta. Proporciona monitoreo continuo de componentes críticos del sistema con umbrales configurables y recuperación automática.
+- **Enums principales**:
+  - `HealthStatus`: Niveles de salud (HEALTHY, WARNING, CRITICAL, UNKNOWN)
+  - `ComponentType`: Tipos de componentes (CORE, DATABASE, NETWORK, MEMORY, DISK, PROCESS, EXTERNAL)
+- **Clases principales**:
+  - `HealthMetric`: Métrica individual de salud con valor, umbral y estado
+  - `HealthMonitor`: Sistema principal de monitoreo de salud con base de datos SQLite
+- **Métodos principales de HealthMetric**:
+  - `__init__`: Inicializa métrica con nombre, valor, umbral, componente y tipo
+  - `is_healthy`: Verifica si métrica está dentro de límites saludables
+  - `get_status`: Obtiene estado de salud basado en valor actual
+- **Métodos principales de HealthMonitor**:
+  - `__init__`: Inicializa sistema de monitoreo con ruta de base de datos e intervalo de verificación
+  - `_init_database`: Inicializa base de datos SQLite con tablas de métricas, historial y alertas
+  - `_register_default_metrics`: Registra métricas por defecto (CPU, memoria, disco, red)
+  - `register_metric`: Registra una nueva métrica de salud personalizada
+  - `register_health_callback`: Registra callback para cambios de estado de salud
+  - `check_metric`: Verifica una métrica específica y actualiza su estado
+  - `check_all_metrics`: Verifica todas las métricas registradas del sistema
+  - `_log_metric`: Registra métrica en base de datos persistente
+  - `_log_health_summary`: Registra resumen general de salud del sistema
+  - `_trigger_health_callbacks`: Dispara callbacks registrados por cambios de estado
+  - `_create_alert`: Crea alerta para cambios de estado críticos
+  - `start_monitoring`: Inicia monitoreo continuo en hilo separado
+  - `stop_monitoring`: Detiene monitoreo continuo
+  - `_monitor_loop`: Bucle principal de monitoreo periódico
+  - `get_current_health`: Obtiene estado actual completo del sistema
+  - `get_health_history`: Obtiene historial de salud para periodo especificado
+  - `get_active_alerts`: Obtiene lista de alertas activas (no resueltas)
+  - `resolve_alert`: Resuelve una alerta específica
+  - `cleanup_old_data`: Limpia datos antiguos de la base de datos
+  - `__str__`: Representación string del monitor de salud
+- **Funciones globales**:
+  - `get_health_monitor`: Obtiene instancia singleton del monitor de salud
+  - `start_health_monitoring`: Inicia monitoreo de salud global
+  - `stop_health_monitoring`: Detiene monitoreo de salud global
+- **Características implementadas**:
+  - Monitoreo continuo con intervalo configurable de componentes críticos
+  - Sistema de umbrales de salud (healthy, warning, critical) basado en porcentajes
+  - Almacenamiento persistente en SQLite con historial completo
+  - Sistema de alertas con resolución y seguimiento
+  - Callbacks notificación para cambios de estado de componentes
+  - Monitoreo de recursos del sistema (CPU, memoria, disco, red)
+  - Limpieza automática de datos históricos
+  - Instancia singleton para acceso global al sistema
+
+#### `src/utils/jarvis_logging_system.py` [487 líneas] - Sistema Avanzado de Logging para JARVIS
+- **Descripción**: Sistema unificado de logging avanzado para JARVIS con capacidades predictivas, dashboard interactivo, análisis de patrones y gestión de alertas. Integración completa con machine learning para detección de anomalías y optimización continua del sistema.
+- **Clases principales**:
+  - `JarvisLoggingSystem`: Clase principal del sistema de logging avanzado con integración completa de predictores, dashboard y gestión de alertas
+- **Métodos principales**:
+  - `__init__`: Inicializa el sistema de logging con configuración personalizable, directorios y componentes principales
+  - `start`: Iniciar el sistema de logging avanzado con entrenamiento de modelos e hilos de predicción
+  - `stop`: Detener el sistema de logging avanzado con limpieza segura de recursos
+  - `_prediction_worker`: Worker para predicciones automáticas periódicas
+  - `_dashboard_worker`: Worker para dashboard interactivo
+  - `_perform_periodic_predictions`: Realizar predicciones periódicas basadas en características de logs recientes
+  - `_extract_recent_features`: Extraer características de logs recientes para predicciones
+  - `_check_and_retrain`: Verificar si es necesario reentrenar modelos predictivos
+  - `_cleanup_old_logs`: Limpiar logs antiguos según política de retención
+  - `_process_alert`: Procesar alerta generada por el sistema predictivo
+  - `_trigger_event`: Disparar evento a callbacks registrados
+  - `register_event_callback`: Registrar callback para evento específico
+  - `log`: Método principal de logging con niveles y categorías
+  - `log_error`: Loggear error en el sistema
+  - `log_warning`: Loggear warning en el sistema
+  - `log_info`: Loggear información en el sistema
+  - `log_debug`: Loggear debug en el sistema
+  - `log_performance`: Loggear métrica de rendimiento en el sistema
+  - `log_with_trace`: Loggear con trace ID para seguimiento distribuido
+  - `log_with_span`: Loggear con span ID para microservicios
+  - `get_logs`: Obtener logs desde la base de datos con filtros
+  - `get_statistics`: Obtener estadísticas completas del sistema de logging
+  - `get_predictions`: Obtener predicciones actuales del sistema
+  - `get_alerts`: Obtener alertas activas generadas
+  - `acknowledge_alert`: Reconocer alerta específica
+  - `resolve_alert`: Resolver alerta específica
+  - `export_logs`: Exportar logs en formato especificado
+  - `export_predictions`: Exportar datos de predicción
+  - `get_dashboard_url`: Obtener URL del dashboard interactivo
+  - `train_models`: Entrenar modelos predictivos manualmente
+  - `analyze_trends`: Analizar tendencias en los datos de logging
+  - `get_patterns`: Obtener patrones detectados en los logs
+- **Funciones globales**:
+  - `get_jarvis_logger`: Obtener instancia del sistema de logging de JARVIS
+  - `log_jarvis`: Loggear mensaje en el sistema de logging de JARVIS
+  - `log_jarvis_error`: Loggear error en el sistema de logging de JARVIS
+  - `log_jarvis_warning`: Loggear warning en el sistema de logging de JARVIS
+  - `log_jarvis_info`: Loggear información en el sistema de logging de JARVIS
+  - `log_jarvis_performance`: Loggear métrica de rendimiento en el sistema de logging de JARVIS
+- **Variables globales**:
+  - `jarvis_logging_system`: Instancia global única del sistema de logging de JARVIS
+
+#### `src/utils/log_analytics.py` [966 líneas] - Sistema Avanzado de Análisis de Logs
+- **Descripción**: Sistema avanzado de análisis de logs para Jarvis con capacidades de business intelligence, detección de patrones, análisis de tendencias, correlaciones y métricas de rendimiento con visualizaciones integradas.
+- **Clases principales**:
+  - `AnalyticsType` (Enum): Tipos de análisis (SUMMARY, TREND, PATTERN, CORRELATION, ANOMALY, PERFORMANCE, ERROR_ANALYSIS, BUSINESS_INTELLIGENCE, REAL_TIME)
+  - `TimeGranularity` (Enum): Granularidad temporal (MINUTE, HOUR, DAY, WEEK, MONTH)
+  - `AnalyticsResult` (dataclass): Resultado estructurado de análisis con timestamp, tipo, datos, insights, recomendaciones y visualizaciones
+  - `LogAnalyticsEngine`: Motor principal de análisis de logs con capacidades avanzadas de procesamiento, detección de patrones y generación de informes
+  - `LogAnalytics`: Wrapper que proporciona interfaz simplificada para el motor de análisis
+- **Métodos principales de LogAnalyticsEngine**:
+  - `__init__`: Inicializa el motor con base de datos SQLite, caché y configuración
+  - `_create_database`: Crea base de datos para análisis con tablas de resultados y métricas agregadas
+  - `generate_summary_analytics`: Genera análisis resumen con métricas totales, distribución por categorías y módulos, insights y recomendaciones
+  - `generate_trend_analytics`: Genera análisis de tendencias con detección de tendencias significativas y visualizaciones temporales
+  - `generate_pattern_analytics`: Detecta patrones repetitivos en logs y agrupa por tipo con análisis estadístico
+  - `generate_correlation_analytics`: Calcula correlaciones entre variables como nivel de log y categoría con matriz de correlación
+  - `generate_performance_analytics`: Analiza logs de rendimiento con tiempos de respuesta, tasas de éxito y recomendaciones de optimización
+  - `_query_logs`: Consulta logs desde base de datos con filtros temporales
+  - `_group_logs_by_time`: Agrupa logs por granularidad temporal configurable
+  - `_analyze_trends`: Analiza tendencias temporales con cálculo de tasas de error y detección de pendientes
+  - `_detect_significant_trends`: Detecta tendencias significativas con umbrales de severidad (high, medium, positive)
+  - `_detect_patterns`: Detecta patrones repetitivos en mensajes con simplificación numérica y conteo de ocurrencias
+  - `_calculate_correlations`: Calcula correlaciones entre variables categóricas con umbrales de significancia
+  - `_create_summary_visualizations`: Crea gráficos de distribución de categorías y módulos con matplotlib
+  - `_create_trend_visualizations`: Genera gráficos de líneas para tendencias temporales con marcadores y formato
+  - `_create_pattern_visualizations`: Crea gráficos de barras para distribución de tipos de patrones detectados
+  - `_create_correlation_visualizations`: Genera heatmap de matriz de correlación con colormap y barra de color
+  - `_create_performance_visualizations`: Crea dashboard de rendimiento con histogramas, series temporales y gráficos de dispersión
+  - `_store_analytics_result`: Almacena resultados de análisis en base de datos SQLite con serialización JSON
+  - `get_analytics_history`: Obtiene historial de análisis con filtrado por tipo y límite de resultados
+  - `export_analytics`: Exporta resultados de análisis en formato JSON con filtros temporales
+- **Métodos principales de LogAnalytics**:
+  - `__init__`: Inicializa wrapper con instancia del motor de análisis
+  - `get_analytics_summary`: Obtiene resumen de análisis simplificado
+  - `generate_summary_analytics`: Genera análisis resumen con interfaz simplificada
+  - `generate_trend_analytics`: Genera análisis de tendencias con interfaz simplificada
+  - `generate_pattern_analytics`: Genera análisis de patrones con interfaz simplificada
+  - `generate_correlation_analytics`: Genera análisis de correlaciones con interfaz simplificada
+  - `generate_performance_analytics`: Genera análisis de rendimiento con interfaz simplificada
+  - `get_analytics_history`: Obtiene historial de análisis con interfaz simplificada
+  - `export_analytics`: Exporta resultados de análisis con interfaz simplificada
+- **Funciones globales**:
+  - `log_analytics`: Instancia global del motor de análisis de logs
+  - `log_analytics_wrapper`: Instancia global del wrapper para interfaz simplificada
+
+#### `src/utils/log_dashboard.py` [824 líneas] - Dashboard Interactivo de Logs
+- **Descripción**: Dashboard interactivo para monitoreo y gestión de logs de Jarvis con visualización en tiempo real, widgets personalizables, alertas, análisis de métricas y múltiples vistas (overview, real_time, analytics, patterns, predictions, performance, alerts, settings). Basado en Flask y SocketIO con integración de Plotly para gráficos interactivos y almacenamiento persistente en SQLite.
+- **Clases principales**:
+  - `DashboardView` (Enum): Vistas del dashboard (OVERVIEW, REAL_TIME, ANALYTICS, PATTERNS, PREDICTIONS, PERFORMANCE, ALERTS, SETTINGS)
+  - `DashboardWidget` (Enum): Tipos de widgets (METRIC_CARD, LINE_CHART, BAR_CHART, PIE_CHART, HEATMAP, TABLE, LOG_VIEWER, ALERT_LIST)
+  - `WidgetConfig` (dataclass): Configuración de widgets con ID, tipo, título, fuente de datos, intervalo de refresco, posición y opciones
+  - `DashboardAlert` (dataclass): Alertas con ID, título, mensaje, severidad, timestamp, acknowledged, source y metadata
+  - `RealTimeDataStreamer`: Flujo de datos en tiempo real con subscriptores y buffering circular
+  - `LogDashboard`: Dashboard principal de logs con servidor Flask, SocketIO y actualización periódica
+- **Métodos principales de RealTimeDataStreamer**:
+  - `__init__`: Inicializa flujo con max_points, data_streams, subscribers y lock de threading
+  - `add_data_point`: Añade punto de datos con timestamp y metadata a un flujo
+  - `get_stream_data`: Obtiene datos de un flujo con límite opcional
+  - `subscribe_to_stream`: Suscribe callback a un flujo de datos
+  - `unsubscribe_from_stream`: Desuscribe callback de un flujo de datos
+- **Métodos principales de LogDashboard**:
+  - `__init__`: Inicializa dashboard con db_path, port, host, app Flask, SocketIO, data_streamer y estado
+  - `_create_database`: Crea tablas de widgets, alertas y preferencias de usuario en SQLite
+  - `_setup_routes`: Configura rutas Flask y eventos WebSocket para API y comunicación en tiempo real
+  - `_get_dashboard_template`: Genera plantilla HTML con JavaScript para dashboard interactivo
+  - `_update_loop`: Bucle de actualización que actualiza datos, widgets y verifica alertas cada 5 segundos
+  - `_update_real_time_data`: Actualiza métricas simuladas (cpu_usage, memory_usage, error_rate, response_time)
+  - `_update_widgets`: Actualiza todos los widgets y emite actualizaciones WebSocket a clientes
+  - `_get_widget_data`: Obtiene datos según tipo de widget (metric_card, line_chart, bar_chart, pie_chart, table)
+  - `_get_metric_card_data`: Obtiene datos para widget de métrica con valor, unidad, tendencia y cambio
+  - `_get_line_chart_data`: Obtiene datos históricos para gráfico de línea con timestamps y valores
+  - `_get_bar_chart_data`: Obtiene datos para gráfico de barras con categorías y valores
+  - `_get_pie_chart_data`: Obtiene datos para gráfico circular con labels y values
+  - `_get_table_data`: Obtiene datos para widget de tabla con columnas y filas de logs
+  - `_check_alerts`: Verifica umbrales de métricas y genera alertas si se superan
+  - `add_alert`: Añade alerta al sistema y emite evento WebSocket
+  - `_save_alert`: Guarda alerta en base de datos SQLite
+  - `_save_widget`: Guarda widget en base de datos SQLite
+  - `_delete_widget`: Elimina widget de base de datos
+  - `start`: Inicia dashboard, hilo de actualización, carga widgets por defecto y arranca servidor Flask con SocketIO
+  - `run`: Inicia el dashboard (alias de start())
+  - `stop`: Detiene dashboard y espera que el hilo de actualización termine
+  - `_load_default_widgets`: Carga 6 widgets por defecto (cpu_usage, memory_usage, error_rate, response_time, log_distribution, recent_logs)
+- **Funciones globales**:
+  - `get_log_dashboard`: Obtiene instancia global del dashboard de logs (instancia singleton)
+
+#### `src/utils/log_integration.py` [810 líneas] - Sistema de Integración de Logs
+- **Descripción**: Sistema completo de integración de logs desde múltiples fuentes con normalización, transformación y almacenamiento persistente. Soporta múltiples formatos (JSON, TEXT, CSV, SYSLOG, NGINX, APACHE) y fuentes de logs (APPLICATION, SYSTEM, DATABASE, NETWORK, SECURITY, PERFORMANCE, THIRD_PARTY, CUSTOM).
+- **Clases principales**:
+  - `LogSource` (Enum): Fuentes de logs soportadas (APPLICATION, SYSTEM, DATABASE, NETWORK, SECURITY, PERFORMANCE, THIRD_PARTY, CUSTOM)
+  - `LogFormat` (Enum): Formatos de logs soportados (JSON, TEXT, CSV, SYSLOG, NGINX, APACHE, CUSTOM)
+  - `IntegrationStatus` (Enum): Estados de integración (ACTIVE, INACTIVE, ERROR, PAUSED)
+  - `LogSourceConfig` (dataclass): Configuración de una fuente de logs con id, nombre, tipo, formato, connection_string, enabled, batch_size, timeout, retry_count, tags, metadata
+  - `LogIntegration` (dataclass): Integración de logs con id, config, status, last_sync, total_processed, error_count, last_error, performance_metrics
+  - `LogNormalizer`: Normalizador de logs para diferentes formatos
+  - `LogCollector`: Colector de logs desde múltiples fuentes con procesamiento concurrente
+  - `LogTransformer`: Transformador de logs para diferentes destinos
+  - `LogIntegrationSystem`: Sistema completo de integración de logs con base de datos SQLite
+  - `LogIntegrator`: Wrapper para LogIntegrationSystem con interfaz simplificada
+- **Métodos principales de LogNormalizer**:
+  - `normalize_log`: Normalizar un log a formato estándar
+  - `_parse_json`: Parsear log en formato JSON
+  - `_parse_text`: Parsear log en formato de texto libre
+  - `_parse_csv`: Parsear log en formato CSV
+  - `_parse_syslog`: Parsear log en formato syslog
+  - `_parse_nginx`: Parsear log en formato Nginx
+  - `_parse_apache`: Parsear log en formato Apache
+  - `_parse_custom`: Parsear log en formato personalizado
+  - `_standardize_fields`: Estandarizar campos del log
+  - `_extract_additional_info`: Extraer información adicional usando regex
+- **Métodos principales de LogCollector**:
+  - `__init__`: Inicializa el colector con max_workers y cola de logs
+  - `add_integration`: Añadir integración de logs
+  - `remove_integration`: Remover integración de logs
+  - `start_collection`: Iniciar recolección de logs en hilos separados
+  - `stop_collection`: Detener recolección de logs
+  - `_collection_loop`: Bucle principal de recolección
+  - `_collect_from_integration`: Recolectar logs desde una integración específica
+  - `_simulate_log_fetch`: Simular obtención de logs (para demostración)
+  - `_processing_loop`: Bucle de procesamiento de logs
+  - `_process_log`: Procesar un log individual
+  - `get_integration_status`: Obtener estado de todas las integraciones
+  - `get_collection_metrics`: Obtener métricas de recolección
+- **Métodos principales de LogTransformer**:
+  - `add_destination`: Añadir destino de logs
+  - `add_transform_rule`: Añadir regla de transformación
+  - `transform_log`: Transformar log para un destino específico
+  - `_apply_transform_rule`: Aplicar una regla de transformación
+  - `_apply_field_mapping`: Aplicar mapeo de campos
+- **Métodos principales de LogIntegrationSystem**:
+  - `__init__`: Inicializa el sistema con base de datos SQLite
+  - `_create_database`: Crear tablas de integraciones y processed_logs
+  - `add_log_source`: Añadir fuente de logs
+  - `remove_log_source`: Remover fuente de logs
+  - `start`: Iniciar sistema de integración
+  - `stop`: Detener sistema de integración
+  - `get_system_status`: Obtener estado del sistema
+  - `_save_integration`: Guardar integración en base de datos
+- **Métodos principales de LogIntegrator**:
+  - `__init__`: Inicializa wrapper con LogIntegrationSystem
+  - `add_log_source`: Añadir fuente de logs
+  - `remove_log_source`: Remover fuente de logs
+  - `start`: Iniciar sistema de integración
+  - `stop`: Detener sistema de integración
+  - `get_system_status`: Obtener estado del sistema
+- **Funciones globales**:
+  - `log_integration`: Instancia global del sistema de integración (LogIntegrationSystem)
+  - `log_integrator`: Instancia global del wrapper (LogIntegrator)
+
+#### `src/utils/log_predictor.py` [749 líneas] - Sistema Predictivo de Logs con Machine Learning
+- **Descripción**: Sistema predictivo de logs para JARVIS con machine learning y análisis de tendencias. Analiza entradas de log, extrae métricas, entrena modelos de regresión (Linear Regression, Random Forest, Gradient Boosting) para series temporales y un clasificador de fallos, y almacena las predicciones en SQLite.
+- **Clases principales**:
+  - `PredictionType` (Enum): Tipos de predicciones (ERROR_RATE, RESPONSE_TIME, THROUGHPUT, RESOURCE_USAGE, SYSTEM_HEALTH, FAILURE_PROBABILITY)
+  - `PredictionConfidence` (Enum): Niveles de confianza (LOW, MEDIUM, HIGH, CRITICAL)
+  - `Prediction` (dataclass): Estructura de predicción con valor, confianza, horizonte temporal, modelo usado y acciones sugeridas
+  - `TimeSeriesPredictor`: Predictor de series temporales con selección automática del mejor modelo por MAE
+  - `FailurePredictor`: Predictor de fallos del sistema con RandomForestClassifier balanceado
+  - `LogPredictor`: Sistema predictivo de logs integrado (series temporales + fallos + persistencia)
+- **Métodos principales de Prediction**:
+  - `to_dict`: Convierte a diccionario serializando timestamp, tipo, confianza y horizonte
+- **Métodos principales de TimeSeriesPredictor**:
+  - `__init__`: Inicializa con historial máximo por métrica, diccionarios de modelos, escaladores y accuracies
+  - `add_data_point`: Añade punto de datos (valor, timestamp, features) y dispara entrenamiento automático con 100 muestras
+  - `_train_model`: Entrena LinearRegression, RandomForest y GradientBoosting,escalando con StandardScaler y quedándose con el menor MAE
+  - `_prepare_training_data`: Construye dataset con lag features (1, 2, 3, 6, 12) y features temporales (hora, día de semana, día del mes)
+  - `predict`: Realiza predicción para un horizonte dado, calcula confianza según MAE y genera sugerencias
+  - `_get_prediction_type`: Determinar el tipo de predicción basado en el nombre de la métrica
+  - `_generate_suggested_actions`: Generar sugerencias basadas en la predicción (tasa de error, latencia, uso de recursos y confianza)
+- **Métodos principales de FailurePredictor**:
+  - `__init__`: Inicializa patrones de fallo, métricas del sistema y modelo sin entrenar
+  - `add_system_metrics`: Añade métricas por timestamp, poda a 1000 mediciones y entrena con 100 muestras
+  - `_train_failure_model`: Entrena RandomForestClassifier (100 árboles, class_weight balanced) con 50 muestras mínimas
+  - `_detect_failure_in_window`: Detectar si hubo fallos en un período de tiempo
+  - `predict_failure_probability`: Predice probabilidad de fallo, asigna confianza por umbral (0.4/0.6/0.8) y acciones preventivas
+- **Métodos principales de LogPredictor**:
+  - `__init__`: Inicializa predictores, historial y base de datos `logs/predictions.db`
+  - `_create_database`: Crea tabla `predictions` con valor real y precisión calculada
+  - `add_log_data`: Extrae métricas de la entrada de log (time, success_rate, error_count) y las alimenta a ambos predictores
+  - `generate_predictions`: Genera y almacena predicciones de todas las métricas más la de fallo
+  - `_store_prediction`: Inserta o reemplaza la predicción en SQLite serializando features, métricas y acciones
+  - `update_prediction_accuracy`: Actualiza precisión de predicción con valor real
+  - `get_predictions_by_type`: Obtiene predicciones por tipo con límite
+  - `get_active_predictions`: Obtiene las predicciones válidas de las últimas 24 horas
+  - `get_prediction_statistics`: Obtiene estadísticas (total, activas, por tipo, por confianza, accuracies del modelo, recientes)
+  - `export_predictions`: Exporta predicciones a JSON con filtro por rango temporal (límite 1000)
+  - `add_prediction_result`: Agrega resultado de predicción al historial
+  - `train_models`: Entrena todos los modelos predictivos
+  - `get_predictions`: Obtiene predicciones activas
+  - `last_training` (property): Obtiene tiempo de último entrenamiento
+- **Variables globales**:
+  - `log_predictor`: Instancia global del predictor de logs
+- **Características implementadas**:
+  - Persistencia de predicciones en SQLite con valor real y precisión
+  - Selección automática del mejor modelo por MAE entre tres algoritmos de regresión
+  - Extracción de métricas desde logs de rendimiento mediante expresiones regulares
+  - Niveles de confianza derivados del error del modelo y de la probabilidad de fallo
+
+#### `src/utils/logger.py` [136 líneas] - Sistema de Logging Estructurado
+- **Descripción**: Sistema de logging estructurado para Jarvis con soporte para JSON y mejores prácticas de Python 2024.
+- **Clases principales**:
+  - `StructuredLogger`: Logger estructurado con soporte para JSON y mejores prácticas
+  - `JsonFormatter`: Formateador que convierte logs a JSON
+- **Métodos principales de StructuredLogger**:
+  - `__init__`: Inicializa logger estructurado con nombre y nivel
+  - `debug`: Log de nivel DEBUG
+  - `info`: Log de nivel INFO
+  - `warning`: Log de nivel WARNING
+  - `error`: Log de nivel ERROR
+  - `critical`: Log de nivel CRITICAL
+  - `_log`: Log interno con contexto
+  - `_print_log`: Método de compatibilidad para logs antiguos
+- **Métodos principales de JsonFormatter**:
+  - `format`: Formatear un log record como JSON
+- **Funciones globales**:
+  - `get_logger`: Obtener un logger estructurado
+- **Logger predeterminado**:
+  - `logger`: Logger predeterminado para Jarvis
+
+#### `src/utils/meta_learning_system.py` [2401 líneas] - Sistema de Metaprendizaje v2.8.0
+- **Descripción**: Sistema de metaprendizaje que observa el comportamiento de los sistemas de aprendizaje existentes (adaptive_learning_engine, self_improvement_system, performance_optimizer, pattern_analyzer y log_analytics), captura experiencias de aprendizaje, las analiza por niveles de metaprendizaje y genera insights accionables sobre selección de estrategias, adaptación de parámetros, optimización contextual, abstracción de conocimiento y ajuste de la tasa de aprendizaje.
+- **Clases principales**:
+  - `MetaLearningLevel` (Enum): Niveles de metaprendizaje (STRATEGY_SELECTION, PARAMETER_ADAPTATION, CONTEXTUAL_OPTIMIZATION, KNOWLEDGE_ABSTRACTION, LEARNING_RATE_ADJUSTMENT)
+  - `MetaLearningResult` (Enum): Resultados del metaprendizaje (IMPROVEMENT_DETECTED, DEGRADATION_DETECTED, NO_CHANGE, INSUFFICIENT_DATA, CONFLICTING_SIGNALS)
+  - `LearningExperience` (dataclass): Experiencia de aprendizaje (sistema, tipo de tarea, contexto, estrategia, parámetros, resultado, métricas de éxito, confianza y metadata)
+  - `LearningEvaluation` (dataclass): Evaluación de una estrategia con evidencia disponible (muestras, tasa de éxito, confianza, consistencia, suficiencia de evidencia, patrón estable, veredicto e indicadores)
+  - `MetaLearningInsight` (dataclass): Insight generado (nivel, descripción, confianza, evidencias, recomendación, impacto, validación y estado de aplicación)
+  - `MetaLearningSystem`: Sistema principal con cola y hilo de procesamiento asíncrono
+- **Métodos principales de MetaLearningLevel**:
+  - STRATEGY_SELECTION, PARAMETER_ADAPTATION, CONTEXTUAL_OPTIMIZATION, KNOWLEDGE_ABSTRACTION, LEARNING_RATE_ADJUSTMENT
+- **Métodos principales de MetaLearningResult**:
+  - IMPROVEMENT_DETECTED, DEGRADATION_DETECTED, NO_CHANGE, INSUFFICIENT_DATA, CONFLICTING_SIGNALS
+- **Métodos principales de MetaLearningSystem**:
+  - `__init__`: Inicializa los sistemas de aprendizaje subyacentes, carga la configuración y prepara experiencias, insights, cola y métricas
+  - `_load_config`: Cargar configuración del sistema
+  - `_save_config`: Guardar configuración actual
+  - `capture_learning_experience`: Capturar una experiencia de aprendizaje básica (sistema, tarea, contexto, estrategia, parámetros, resultado, métricas y confianza)
+  - `capture_structured_experience`: Capturar experiencia estructurada con asociación explícita contexto/acción-estrategia/resultado e indicadores de éxito y fallo
+  - `capture_experience_with_context`: Capturar experiencia con contexto multi-nivel (entorno, usuario, sistema) y evaluación de valor de aprendizaje
+  - `_get_current_system_state`: Obtiene el estado actual del sistema
+  - `_extract_success_indicators`: Extrae indicadores de éxito de las métricas de rendimiento
+  - `_extract_failure_indicators`: Extrae indicadores de fallo del resultado de ejecución
+  - `_calculate_experience_confidence`: Calcula la confianza de la experiencia basada en métricas de rendimiento
+  - `_assess_context_completeness`: Evalúa la completitud del contexto
+  - `_assess_result_quality`: Evalúa la calidad del resultado de ejecución
+  - `_get_session_id`: Obtiene o genera un ID de sesión
+  - `_assess_task_complexity`: Evalúa la complejidad de la tarea
+  - `_assess_resource_availability`: Evalúa la disponibilidad de recursos del sistema
+  - `_extract_decision_points`: Extrae los puntos de decisión de la acción ejecutada
+  - `_extract_resource_usage`: Extrae el uso de recursos de la acción ejecutada
+  - `_assess_learning_potential`: Evalúa el potencial de aprendizaje de una tarea
+  - `_assess_reusability`: Evalúa la reutilización de una experiencia
+  - `_validate_experience_utility`: Valida si una experiencia aporta utilidad real al metaprendizaje
+  - `get_learning_success_indicators`: Identifica los indicadores de éxito realmente disponibles en las experiencias
+  - `_experience_success_score`: Extrae el valor de éxito de una experiencia usando los indicadores existentes
+  - `_calculate_consistency`: Calcula la consistencia de los resultados (1.0 idénticos, 0.0 máxima dispersión)
+  - `evaluate_learning_strategy`: Evalúa una estrategia con evidencia disponible, separando resultado puntual de patrón estable y rechazando muestras insuficientes
+  - `get_learning_evaluations`: Evalúa todas las combinaciones sistema/tarea/estrategia presentes
+  - `analyze_learning_patterns`: Analiza patrones de las experiencias y genera insights por nivel
+  - `_analyze_strategy_selection`: Análisis de selección de estrategias
+  - `_analyze_parameter_adaptation`: Análisis de adaptación de parámetros
+  - `_analyze_contextual_optimization`: Análisis de optimización contextual
+  - `_analyze_learning_rate_adjustment`: Análisis de ajuste de la tasa de aprendizaje
+  - `_create_context_pattern`: Crear patrón resumido a partir del contexto
+  - `apply_meta_learning_insights`: Aplicar insights al sistema y devolver el resumen de aplicación
+  - `_apply_strategy_selection_insight`: Aplicar insight de selección de estrategias
+  - `_apply_parameter_adaptation_insight`: Aplicar insight de adaptación de parámetros
+  - `_apply_contextual_optimization_insight`: Aplicar insight de optimización contextual
+  - `_apply_learning_rate_adjustment_insight`: Aplicar insight de ajuste de la tasa de aprendizaje
+  - `get_meta_learning_metrics`: Obtener métricas globales del metaprendizaje
+  - `_calculate_confidence_distribution`: Calcular la distribución de confianza
+  - `_get_system_coverage`: Calcular la cobertura por sistema de aprendizaje
+  - `_calculate_learning_progress`: Calcular el progreso del aprendizaje (reciente vs histórico)
+  - `save_meta_learning_data`: Guardar experiencias, insights, métricas y configuración en JSON
+  - `load_meta_learning_data`: Cargar datos de metaprendizaje desde archivo
+  - `start_meta_learning_process`: Iniciar el proceso asíncrono de metaprendizaje
+  - `stop_meta_learning_process`: Detener el proceso asíncrono de metaprendizaje
+  - `_meta_learning_loop`: Bucle principal de procesamiento de la cola de experiencias
+  - `_process_single_experience`: Procesa una experiencia individual y actualiza métricas
+  - `validate_meta_learning_insights`: Validar insights específicos por ID
+  - `get_recommendations`: Obtener recomendaciones filtradas por sistema y tipo de tarea, ordenadas por impacto y confianza
+  - `connect_component`: Conectar una instancia real de un componente de aprendizaje validando su API pública
+  - `connect_adaptive_learning_engine`: Integrar con AdaptiveLearningEngine compartiendo su instancia
+  - `connect_self_improvement_system`: Integrar con SelfImprovementSystem compartiendo su instancia
+  - `connect_contextual_adaptation_engine`: Integrar con ContextualAdaptationEngine con conexión bidireccional
+  - `get_integration_status`: Estado de integración y detección de motores de aprendizaje duplicados
+- **Características implementadas**:
+  - Tres vías de captura de experiencias: básica, estructurada y con contexto multi-nivel (entorno/usuario/sistema)
+  - Validación de utilidad previa al registro (duplicados, contexto/outcome vacíos, sistemas no soportados, tareas triviales)
+  - Análisis en cinco niveles de metaprendizaje con filtrado por umbral de confianza configurable
+  - Cola `queue.Queue` con hilo daemon y persistencia periódica cada 100 experiencias
+  - Aplicación de insights sobre los sistemas subyacentes con métricas de aplicación y tiempo de ejecución
+  - Persistencia JSON con serialización de datetimes, dataclasses y enums
+  - Configuración por defecto: máximo de experiencias, mínimo para análisis, umbral de confianza, intervalo de análisis, auto-aplicación, exportación y secciones de ajuste
+  - Integración (2.8.3.6) con AdaptiveLearningEngine, SelfImprovementSystem y ContextualAdaptationEngine compartiendo las instancias existentes, validando su API real y rechazando componentes que no la expongan; no se crean motores de aprendizaje nuevos
+
+#### `src/utils/metrics_collector.py` [592 líneas] - Sistema de Recolección de Métricas
+- **Descripción**: Sistema de recolección de métricas para JARVIS con almacenamiento persistente en SQLite, recolección en hilo daemon con buffer por lotes, limpieza por retención, copias de seguridad y exportación a JSON.
+- **Clases principales**:
+  - `MetricData` (dataclass): Datos de una métrica individual con timestamp, nombre, valor, tags y metadata
+  - `MetricConfig` (dataclass): Configuración de base de datos, retención, recolección y métricas predeterminadas
+  - `MetricsCollector`: Recolector principal de métricas con buffer en memoria y persistencia
+- **Métodos principales de MetricData**:
+  - `to_dict`: Convierte los datos de la métrica a un diccionario
+  - `from_dict` (classmethod): Crea una instancia de MetricData desde un diccionario
+- **Métodos principales de MetricConfig**:
+  - `to_dict`: Convierte la configuración a un diccionario
+- **Métodos principales de MetricsCollector**:
+  - `__init__`: Inicializa logger, configuración, buffer con lock, base de datos y directorios
+  - `_initialize_database`: Crea la tabla `metrics` en SQLite con índices por timestamp, nombre y (nombre, timestamp)
+  - `_ensure_directories`: Asegura que existan los directorios de datos y backups
+  - `start_collection`: Inicia la recolección continua en hilo daemon
+  - `stop_collection`: Detiene la recolección, vacía el buffer y espera al hilo (timeout 5s)
+  - `_collection_loop`: Bucle principal que recolecta métricas por defecto,.flush del buffer por lote y espera el intervalo
+  - `_collect_custom_metrics`: Recolecta con psutil CPU, memoria, disco, red y número de procesos
+  - `add_metric`: Añade una métrica al buffer con locking y volcado automático al superar el doble del batch
+  - `_flush_buffer`: Vacía el buffer a la base de datos serializando tags y metadata en JSON
+  - `get_metrics`: Obtiene métricas filtradas por nombre, rango temporal, tags y límite
+  - `get_metric_statistics`: Obtiene estadísticas (count, min, max, mean, median, std_dev, primer y último timestamp)
+  - `get_metric_names`: Obtiene todos los nombres de métricas disponibles
+  - `cleanup_old_metrics`: Limpia métricas antiguas según retención y límite por nombre
+  - `backup_metrics`: Realiza una copia de seguridad de la base de datos de métricas
+  - `export_metrics`: Exporta métricas a un archivo JSON con filtros opcionales
+  - `get_collector_status`: Obtiene estado del recolector (buffer, configuración, ruta, totales, nombres, última limpieza)
+  - `_get_total_metrics_count`: Obtiene el total de métricas en la base de datos
+  - `_get_last_cleanup_time`: Obtiene la última fecha de limpieza
+  - `clear_all_metrics`: Elimina todas las métricas de la base de datos y del buffer
+  - `__enter__` / `__exit__`: Soporte como context manager (inicia/detiene la recolección)
+- **Funciones globales**:
+  - `get_metrics_collector`: Obtiene la instancia global del recolector de métricas
+  - `start_metrics_collection`: Inicia la recolección de métricas globales
+  - `stop_metrics_collection`: Detiene la recolección de métricas globales
+- **Variables globales**:
+  - `_metrics_collector`: Instancia global única del recolector
+- **Características implementadas**:
+  - Persistencia en SQLite (`data/metrics/jarvis_metrics.db`) con índices para consultas por nombre y tiempo
+  - Buffer en memoria con escritura por lotes (`batch_size`) y volcado final al detener
+  - Métricas predeterminadas configurables: CPU, memoria, disco, acciones ejecutadas/fallidas y tiempo de respuesta
+  - Métricas de sistema mediante psutil con tags y metadata
+  - Limpieza por retención (30 días) y límite de métricas por nombre (10000)
+  - Copia de seguridad y exportación a JSON
+  - Context manager para integración con `with`
+
+#### `src/utils/monitoring_dashboard.py` [417 líneas] - Dashboard Unificado de Monitoreo
+- **Descripción**: Dashboard unificado para visualizar y gestionar todo el sistema de monitoreo de JARVIS (rendimiento, salud, métricas y alertas). Actualiza los datos periódicamente en un hilo daemon, mantiene historial y notifica a los callbacks registrados.
+- **Clases principales**:
+  - `DashboardConfig`: Configuración del dashboard (intervalo de actualización, límites de alertas/métricas mostradas, flags de visualización y umbrales de alerta)
+  - `DashboardData`: Snapshot de los datos del dashboard en un instante (timestamp, métricas, estado de salud, alertas recientes, resumen del sistema)
+  - `MonitoringDashboard`: Dashboard unificado de monitoreo (hilo de actualización, historial, callbacks y export de reportes)
+- **Métodos principales de DashboardConfig**:
+  - `to_dict`: Convierte la configuración a un diccionario
+- **Métodos principales de DashboardData**:
+  - `to_dict`: Convierte los datos del dashboard a un diccionario (timestamp en ISO)
+- **Métodos principales de MonitoringDashboard**:
+  - `__init__`: Inicializa dashboard con configuración, monitor de rendimiento, verificador de salud y recolector de métricas
+  - `start_dashboard`: Inicia el hilo de actualización del dashboard
+  - `stop_dashboard`: Detiene el hilo del dashboard con timeout de 5s
+  - `_dashboard_loop`: Bucle principal de actualización periódica, historial y notificación de callbacks
+  - `_update_dashboard_data`: Construye un `DashboardData` con métricas, salud, alertas y resumen
+  - `_get_current_performance_metrics`: Obtiene métricas actuales del monitor aplicando la configuración de visualización
+  - `_get_current_health_status`: Obtiene el resumen de salud del health checker
+  - `_get_recent_alerts`: Obtiene y ordena alertas recientes por timestamp
+  - `_generate_system_summary`: Genera resumen con estado general, conteo de alertas y estado de monitoreo
+  - `get_dashboard_data`: Obtiene los datos actuales del dashboard
+  - `get_dashboard_history`: Obtiene el historial del dashboard con límite opcional
+  - `add_update_callback`: Registra callback para recibir actualizaciones
+  - `remove_update_callback`: Elimina un callback de actualizaciones
+  - `export_dashboard_report`: Exporta reporte JSON del dashboard con historial opcional
+  - `get_system_health_score`: Calcula puntaje de salud (0-100) según estado general
+  - `get_critical_metrics`: Obtiene métricas que superan umbrales críticos (CPU, memoria, disco)
+  - `get_unhealthy_components`: Obtiene componentes con estado distinto de healthy
+  - `clear_dashboard_history`: Limpia el historial del dashboard
+  - `__enter__` / `__exit__`: Soporte como context manager (inicia/detiene el dashboard)
+- **Funciones globales**:
+  - `get_monitoring_dashboard`: Obtiene instancia singleton del dashboard de monitoreo
+  - `start_monitoring_dashboard`: Inicia el dashboard de monitoreo global
+  - `stop_monitoring_dashboard`: Detiene el dashboard de monitoreo global
+- **Características implementadas**:
+  - Actualización periódica en hilo daemon con intervalo configurable
+  - Historial en memoria con tamaño máximo (1000 snapshots)
+  - Sistema de callbacks para notificaciones de actualización
+  - Integración con performance_monitor, health_checker y metrics_collector
+  - Filtrado de métricas por configuración de visualización
+  - Resumen de estado general del sistema (healthy/warning/critical)
+  - Exportación de reportes en JSON
+  - Puntuación de salud del sistema y detección de métricas/componentes críticos
+  - Context manager para integración con `with`
+  - Instancia singleton para acceso global al sistema
+
+#### `src/utils/optimization_orchestrator.py` [892 líneas] - Orquestador de Optimización v2.7.0
+- **Descripción**: Orquestador de optimización que coordina todos los sistemas de optimización (performance_optimizer, self_improvement_system, adaptive_learning_engine, pattern_analyzer y log_analytics). Gestiona una cola de trabajos con prioridad, los agrupa por compatibilidad de recursos y los ejecuta en modos secuencial, paralelo, coordinado u optimizado, adaptando el modo dinámicamente.
+- **Clases principales**:
+  - `OrchestrationMode` (Enum): Modos de orquestación (COORDINATED, SEQUENTIAL, PARALLEL, ADAPTIVE, OPTIMIZED)
+  - `OptimizationPriority` (Enum): Prioridades de optimización (CRITICAL, HIGH, MEDIUM, LOW, BACKGROUND)
+  - `OptimizationJob` (dataclass): Trabajo de optimización con prioridad, estrategias, dependencias, recursos, estado y resultado
+  - `OrchestrationMetrics` (dataclass): Métricas de orquestación (trabajos por estado, duración media, eficiencia, utilización, tasa de éxito)
+  - `OptimizationOrchestrator`: Orquestador principal con bucle de orquestación en hilo daemon
+- **Métodos principales de OrchestrationMode**:
+  - COORDINATED, SEQUENTIAL, PARALLEL, ADAPTIVE, OPTIMIZED
+- **Métodos principales de OptimizationPriority**:
+  - CRITICAL, HIGH, MEDIUM, LOW, BACKGROUND
+- **Métodos principales de OptimizationOrchestrator**:
+  - `__init__`: Inicializa sistemas de optimización, configuración, cola de prioridad, métricas e inicia el bucle
+  - `_load_config`: Cargar configuración del orquestador
+  - `_initialize_resource_monitor`: Inicializar monitor de recursos
+  - `_start_orchestration_loop`: Iniciar bucle de orquestación
+  - `_orchestration_loop`: Bucle principal de orquestación
+  - `_update_system_metrics`: Actualizar métricas del sistema
+  - `_calculate_resource_utilization`: Calcular utilización de recursos
+  - `_calculate_success_rate`: Calcular tasa de éxito de optimización
+  - `_analyze_optimization_needs`: Analizar necesidades de optimización
+  - `_estimate_resources`: Estimar recursos requeridos para una estrategia
+  - `_add_optimization_job`: Añadir trabajo de optimización
+  - `_coordinate_optimization_strategies`: Coordinar estrategias de optimización
+  - `_group_compatible_jobs`: Agrupar trabajos compatibles
+  - `_are_jobs_compatible`: Verificar si dos trabajos son compatibles
+  - `_execute_sequential`: Ejecutar trabajos secuencialmente
+  - `_execute_parallel`: Ejecutar trabajos en paralelo
+  - `_execute_coordinated`: Ejecutar trabajos coordinados
+  - `_execute_optimized`: Ejecutar trabajos optimizados
+  - `_process_optimization_jobs`: Procesar trabajos de optimización
+  - `_execute_single_job`: Ejecutar un trabajo de optimización individual
+  - `_execute_coordinated_job`: Ejecutar trabajo coordinado con control de recursos
+  - `_execute_strategy`: Ejecutar una estrategia de optimización
+  - `_calculate_job_efficiency`: Calcular eficiencia esperada de un trabajo
+  - `_calculate_job_improvement`: Calcular mejora de un trabajo
+  - `_monitor_job_progress`: Monitorear progreso de trabajos
+  - `_adapt_orchestration_mode`: Adaptar modo de orquestación según condiciones del sistema
+  - `_optimize_orchestration_mode`: Optimizar modo de orquestación
+  - `_calculate_mode_performance`: Calcular rendimiento de un modo de orquestación
+  - `get_orchestration_status`: Obtener estado de orquestación
+  - `_calculate_average_job_duration`: Calcular duración promedio de trabajos
+  - `add_custom_optimization_job`: Añadir trabajo de optimización personalizado
+  - `get_job_status`: Obtener estado de un trabajo específico
+  - `cancel_job`: Cancelar un trabajo
+  - `export_orchestration_report`: Exportar reporte de orquestación
+  - `stop_orchestration`: Detener orquestación
+  - `start_orchestration`: Iniciar orquestación
+  - `__del__`: Destructor que detiene el bucle y une el hilo
+- **Características implementadas**:
+  - Cola `PriorityQueue` ponderada por prioridad para ordenar los trabajos de optimización
+  - Agrupación por compatibilidad de recursos (límite 80%), dependencias y estrategia
+  - Cuatro modos de ejecución: secuencial, paralelo (hilos daemon), coordinado (lock de recursos) y optimizado por eficiencia
+  - Detección automática de necesidades por umbrales de CPU, memoria, disco y red y por anomalías detectadas
+  - Adaptación y optimización dinámica del modo de orquestación según carga y tasa de éxito
+  - Timeout de trabajos, cancelación y limpieza de trabajos completados
+  - Alertas de éxito/fallo vía log_analytics y exportación de reporte JSON
+  - Configuración por defecto: límites de recursos, pesos de prioridad, preferencias de estrategia, timeout y reintentos
+
+#### `src/utils/pattern_analyzer.py` [650 líneas] - Analizador Avanzado de Patrones con Machine Learning
+- **Descripción**: Analizador avanzado de patrones para JARVIS con machine learning y detección de anomalías. Analiza logs para detectar picos de errores, degradación de rendimiento, anomalías (estadísticas y Isolation Forest), tendencias, ciclos, correlaciones, bursts y changepoints, manteniendo historial de patrones.
+- **Clases principales**:
+  - `PatternType` (Enum): Tipos de patrones detectables (ERROR_SPIKE, PERFORMANCE_DEGRADATION, ANOMALY, TREND, CYCLE, CORRELATION, SEASONAL, BURST, CHANGEPONT)
+  - `PatternSeverity` (Enum): Severidad de patrones (LOW, MEDIUM, HIGH, CRITICAL)
+  - `Pattern` (dataclass): Estructura de patrón detectado con tipo, severidad, confianza, datos, componentes afectados y acciones sugeridas
+  - `TimeSeriesAnalyzer`: Analizador de series temporales con StandardScaler e Isolation Forest
+  - `PatternDetector`: Detector de patrones con múltiples algoritmos
+  - `PatternAnalyzer`: Wrapper de `PatternDetector` que proporciona la interfaz esperada
+- **Métodos principales de Pattern**:
+  - `to_dict`: Convertir a diccionario
+- **Métodos principales de TimeSeriesAnalyzer**:
+  - `__init__`: Inicializa con tamaño de ventana, escalador, Isolation Forest (contaminación 0.1) y estado de entrenamiento
+  - `add_data_point`: Añade punto de datos a la serie temporal y dispara entrenamiento automático con 100 muestras
+  - `_train_model`: Entrena modelo de detección de anomalías con 100 valores normalizados
+  - `detect_anomalies`: Detecta anomalías en una serie temporal por z-score (>3) y por Isolation Forest (score < -0.5)
+- **Métodos principales de PatternDetector**:
+  - `__init__`: Inicializa analizador de series temporales, lista de patrones, historial por tipo y lock
+  - `analyze_logs`: Analizar logs y detectar patrones
+  - `_detect_error_spikes`: Detectar picos de errores por ventana horaria (umbral 30%, crítico >50%)
+  - `_detect_performance_degradation`: Detectar degradación de rendimiento comparando medias recientes vs anteriores (aumento >50%)
+  - `_detect_anomalies`: Detectar anomalías usando series temporales
+  - `_detect_trends`: Detectar tendencias en los logs
+  - `_detect_cycles`: Detectar patrones cíclicos
+  - `_detect_periodicity`: Detectar periodicidad en datos usando métodos simples
+  - `_detect_correlations`: Detectar correlaciones entre diferentes tipos de logs
+  - `_detect_bursts`: Detectar bursts de actividad
+  - `get_patterns_by_type`: Obtener patrones por tipo
+  - `get_active_patterns`: Obtener patrones activos
+  - `acknowledge_pattern`: Marcar patrón como reconocido
+  - `get_pattern_statistics`: Obtener estadísticas de patrones
+- **Métodos principales de PatternAnalyzer**:
+  - `__init__`: Inicializa el detector de patrones interno
+  - `get_pattern_analysis`: Obtener análisis completo de patrones
+  - `analyze_logs`: Analizar logs y detectar patrones
+  - `get_patterns_by_type`: Obtener patrones por tipo
+  - `get_active_patterns`: Obtener patrones activos
+  - `acknowledge_pattern`: Marcar patrón como reconocido
+  - `get_pattern_statistics`: Obtener estadísticas de patrones
+- **Variables globales**:
+  - `pattern_detector`: Instancia global del detector de patrones
+  - `pattern_analyzer`: Instancia global del analizador de patrones
+- **Características implementadas**:
+  - Detección estadística (z-score) y con machine learning (Isolation Forest) de anomalías
+  - Extracción de métricas de rendimiento desde logs con expresiones regulares (`time=`)
+  - Análisis por ventanas horarias, de 5 minutos y por segundo para picos, correlaciones y bursts
+  - Detección de tendencias por regresión lineal simple sobre errores por hora
+  - Detección de ciclos por periodicidad con tolerancia de 2 unidades
+  - Historial de patrones por tipo y estadísticas (total, activos, por tipo, por severidad, recientes)
+
+#### `src/utils/performance_monitor.py` [856 líneas] - Sistema de Monitoreo de Rendimiento
+- **Descripción**: Sistema avanzado de monitoreo de rendimiento para JARVIS con recolección de métricas, análisis de tendencias, detección de anomalías y alertas inteligentes. Incluye colector de métricas del sistema, analizador predictivo con Isolation Forest y sistema de alertas con reglas personalizables.
+- **Clases principales**:
+  - `MetricType` (Enum): Tipos de métricas (CPU, MEMORY, DISK, NETWORK, PROCESS, DATABASE, APPLICATION, CUSTOM)
+  - `AlertSeverity` (Enum): Severidad de alertas (INFO, WARNING, ERROR, CRITICAL)
+  - `PerformanceMetric` (dataclass): Estructura de métrica de rendimiento con valor, unidad, timestamp y metadatos
+  - `PerformanceAlert` (dataclass): Estructura de alerta con severidad, mensaje y estado
+  - `AlertRule` (dataclass): Regla de alerta con condición, umbral y cooldown
+  - `PerformanceCollector`: Colector de métricas del sistema usando psutil
+  - `PerformanceAnalyzer`: Analizador con detección de anomalías (Isolation Forest) y análisis de tendencias
+  - `PerformanceMonitor`: Monitor principal con recolección, análisis y alertas
+- **Métodos principales de MetricType**:
+  - CPU, MEMORY, DISK, NETWORK, PROCESS, DATABASE, APPLICATION, CUSTOM
+- **Métodos principales de AlertSeverity**:
+  - INFO, WARNING, ERROR, CRITICAL
+- **Métodos principales de PerformanceMetric**:
+  - `to_dict`: Convierte a diccionario
+- **Métodos principales de PerformanceAlert**:
+  - `to_dict`: Convierte a diccionario
+- **Métodos principales de PerformanceCollector**:
+  - `__init__`: Inicializa colector con intervalo y tamaño de historial
+  - `start_collection`: Inicia recolección de métricas en hilo separado
+  - `stop_collection`: Detiene recolección de métricas
+  - `_collection_loop`: Bucle principal de recolección
+  - `_collect_system_metrics`: Recolecta métricas del sistema (CPU, memoria, swap, carga)
+  - `_collect_process_metrics`: Recolecta métricas del proceso actual (CPU, memoria, hilos, conexiones)
+  - `_collect_network_metrics`: Recolecta estadísticas de red (bytes, paquetes por interfaz)
+  - `_collect_disk_metrics`: Recolecta estadísticas de disco (lectura/escritura, uso por partición)
+  - `_add_metric`: Añade nueva métrica con locking
+  - `_get_metric_type`: Determina tipo de métrica por nombre
+  - `get_metric_history`: Obtiene historial de una métrica filtrado por tiempo
+  - `get_latest_metrics`: Obtiene las últimas métricas de todas las categorías
+  - `get_metric_statistics`: Obtiene estadísticas (mean, median, std, min, max, p95, p99)
+- **Métodos principales de PerformanceAnalyzer**:
+  - `__init__`: Inicializa analizador con tamaño de ventana
+  - `train_anomaly_detector`: Entrena detector Isolation Forest para una métrica
+  - `detect_anomalies`: Detecta anomalías en una métrica con score y severidad
+  - `analyze_trends`: Analiza tendencias (increasing, decreasing, stable) con regresión lineal
+- **Métodos principales de PerformanceMonitor**:
+  - `__init__`: Inicializa monitor con base de datos SQLite
+  - `_create_database`: Crea tablas de métricas, alertas y reglas de alerta
+  - `_load_default_alert_rules`: Carga reglas por defecto (CPU>90%, memoria>85%, disco>90%)
+  - `start_monitoring`: Inicia monitoreo (colector + bucle principal + procesamiento de alertas)
+  - `stop_monitoring`: Detiene monitoreo y espera hilos
+  - `_monitoring_loop`: Bucle principal que verifica alertas cada 5 segundos y entrena detectores periódicamente
+  - `_alert_processing_loop`: Bucle de procesamiento de alertas desde cola
+  - `_evaluate_alert_condition`: Evalúa condición (greater_than, less_than, equal_to, not_equal_to)
+  - `_create_alert`: Crea alerta a partir de regla y métrica
+  - `_process_alert`: Procesa alerta (guarda, notifica, genera acciones correctivas)
+  - `_generate_corrective_actions`: Genera acciones sugeridas según tipo de métrica
+  - `_train_anomaly_detectors`: Entrena detectores con historial de 24 horas
+  - `_save_alert`: Guarda alerta en base de datos
+  - `_save_alert_rule`: Guarda regla de alerta en base de datos
+  - `add_alert_rule`: Añade regla de alerta nueva
+  - `remove_alert_rule`: Elimina regla de alerta
+  - `get_alerts`: Obtiene alertas filtradas por severidad y estado
+  - `acknowledge_alert`: Marca alerta como reconocida
+  - `resolve_alert`: Marca alerta como resuelta
+  - `get_performance_summary`: Obtiene resumen con métricas actuales, estadísticas y tendencias
+  - `export_performance_data`: Exporta datos de rendimiento a JSON (últimos 10000 registros)
+- **Variables globales**:
+  - `performance_monitor`: Instancia global del monitor de rendimiento
+
+#### `src/utils/performance_optimizer.py` [1099 líneas] - Optimizador de Rendimiento con Machine Learning
+- **Descripción**: Optimizador de rendimiento con machine learning y optimización predictiva. Monitoriza el sistema mediante PerformanceMonitor, PatternAnalyzer y LogAnalytics, calcula una puntuación de eficiencia, analiza tendencias, identifica oportunidades de optimización (CPU, memoria, disco, tiempo de respuesta y tasa de errores), genera y ejecuta acciones con comando de ejecución y rollback, y actualiza modelos ML con la mejora real obtenida.
+- **Clases principales**:
+  - `OptimizationStrategy` (Enum): Estrategias de optimización (CPU_OPTIMIZATION, MEMORY_OPTIMIZATION, DISK_OPTIMIZATION, NETWORK_OPTIMIZATION, PROCESS_OPTIMIZATION, CACHE_OPTIMIZATION, THREAD_POOL_OPTIMIZATION, ALGORITHM_OPTIMIZATION, RESOURCE_ALLOCATION, LOAD_BALANCING)
+  - `OptimizationLevel` (Enum): Niveles de optimización (BASIC, MODERATE, AGGRESSIVE, CRITICAL)
+  - `OptimizationMetrics` (dataclass): Métricas de optimización (CPU, memoria, disco, red, tiempo de respuesta, throughput, tasa de errores, eficiencia, ganancia y timestamp)
+  - `OptimizationAction` (dataclass): Acción de optimización con estrategia, nivel, mejora esperada, confianza, prioridad, recursos, comandos de ejecución/rollback y estado de resultado
+  - `PerformanceOptimizer`: Optimizador principal con bucle de optimización en hilo y cola de acciones
+- **Métodos principales de OptimizationStrategy**:
+  - CPU_OPTIMIZATION, MEMORY_OPTIMIZATION, DISK_OPTIMIZATION, NETWORK_OPTIMIZATION, PROCESS_OPTIMIZATION, CACHE_OPTIMIZATION, THREAD_POOL_OPTIMIZATION, ALGORITHM_OPTIMIZATION, RESOURCE_ALLOCATION, LOAD_BALANCING
+- **Métodos principales de OptimizationLevel**:
+  - BASIC, MODERATE, AGGRESSIVE, CRITICAL
+- **Métodos principales de PerformanceOptimizer**:
+  - `__init__`: Inicializa monitor, analizador de patrones, analizador de logs, carga configuración, inicializa modelos ML y arranca el bucle de optimización
+  - `_load_config`: Cargar configuración del optimizador
+  - `_initialize_models`: Inicializar los modelos de machine learning y escaladores
+  - `_load_trained_models`: Cargar modelos entrenados desde disco
+  - `_save_trained_models`: Guardar modelos entrenados en disco
+  - `_start_optimization_loop`: Iniciar el hilo del bucle de optimización
+  - `_optimization_loop`: Bucle principal de optimización periódica
+  - `_analyze_system_performance`: Analizar el rendimiento actual del sistema y actualizar métricas
+  - `_calculate_efficiency_score`: Calcular la puntuación de eficiencia del sistema
+  - `_analyze_performance_trends`: Analizar las tendencias de rendimiento históricas
+  - `_identify_optimization_opportunities`: Identificar oportunidades de optimización por umbral
+  - `_predict_optimization_opportunities`: Predecir oportunidades de optimización con modelos ML
+  - `_prepare_features_for_prediction`: Preparar el vector de características para la predicción
+  - `_create_cpu_optimization_action`: Crear acción de optimización de CPU
+  - `_create_memory_optimization_action`: Crear acción de optimización de memoria
+  - `_create_disk_optimization_action`: Crear acción de optimización de disco
+  - `_create_response_time_optimization_action`: Crear acción de optimización del tiempo de respuesta
+  - `_create_error_rate_optimization_action`: Crear acción de optimización de la tasa de errores
+  - `_create_ml_optimization_action`: Crear acción de optimización a partir de una predicción ML
+  - `_execute_optimization_actions`: Ejecutar las acciones de optimización pendientes
+  - `_execute_single_action`: Ejecutar una acción de optimización individual
+  - `_execute_optimization_command`: Ejecutar el comando de shell de una acción
+  - `_calculate_improvement`: Calcular la mejora entre métricas previas y posteriores
+  - `_calculate_actual_improvement`: Calcular la mejora real obtenida por una acción
+  - `_update_ml_models`: Actualizar los modelos ML con la mejora obtenida
+  - `get_optimization_status`: Obtener el estado actual del optimizador
+  - `get_optimization_history`: Obtener el historial de optimizaciones (con límite)
+  - `get_current_actions`: Obtener las acciones de optimización en curso
+  - `add_custom_optimization_action`: Añadir una acción de optimización personalizada
+  - `stop_optimization`: Detener la optimización
+  - `start_optimization`: Iniciar la optimización
+  - `optimize_system`: Lanzar una optimización manual por estrategia y nivel
+  - `get_optimization_recommendations`: Obtener recomendaciones de optimización según las métricas actuales
+  - `export_optimization_report`: Exportar reporte de optimización en JSON
+  - `__del__`: Destructor que detiene el bucle y une el hilo
+- **Características implementadas**:
+  - Detección de oportunidades por umbrales configurables (CPU 80%, memoria 85%, disco 90%, respuesta 1000ms, errores 5%)
+  - Modelos de machine learning con escaladores y features, entrenados en base a las mejoras reales de cada acción
+  - Acciones con comando de ejecución y comando de rollback, prioridad, recursos estimados y estado de resultado
+  - Cola `queue.Queue` de acciones y bucle periódico en hilo daemon con intervalo configurable
+  - Registro de historial de optimizaciones y exportación de reporte con métricas, historial y recomendaciones
+  - Configuración por defecto: activación, auto-optimización, intervalo, concurrencia máxima, prioridades por estrategia, ruta de modelos ML e historial
+
+#### `src/utils/recovery_strategies.py` [514 líneas] - Estrategias de Recuperación
+- **Descripción**: Sistema de estrategias de recuperación para los distintos tipos de fallos de JARVIS. Define acciones de recuperación parametrizables (base de datos, sistema de ficheros, procesos, memoria y red), un gestor central con registro de acciones, ejecución en hilos, persistencia SQLite del historial y estadísticas, y funciones factoría para crear acciones comunes.
+- **Clases principales**:
+  - `RecoveryType` (Enum): Tipos de recuperación (AUTOMATIC, SEMI_AUTOMATIC, MANUAL)
+  - `RecoveryStatus` (Enum): Estados de la recuperación (PENDING, IN_PROGRESS, COMPLETED, FAILED, CANCELLED)
+  - `RecoveryAction`: Clase base de acción de recuperación con gestión de estado, tiempos, resultado y error
+  - `DatabaseRecoveryAction` (RecoveryAction): Restaura la base de datos desde backup o repara la base de datos corrompida
+  - `FilesystemRecoveryAction` (RecoveryAction): Restaura un fichero desde backup o lo recrea vacío
+  - `ProcessRecoveryAction` (RecoveryAction): Reinicia un proceso ejecutando un comando
+  - `MemoryRecoveryAction` (RecoveryAction): Termina un proceso por PID o limpia la caché de memoria del sistema
+  - `NetworkRecoveryAction` (RecoveryAction): Reinicia una interfaz de red o vacía la caché DNS
+  - `RecoveryManager`: Gestor central de recuperaciones con persistencia SQLite, hilos y estadísticas
+- **Métodos principales de RecoveryAction**:
+  - `__init__`: Inicializa nombre, descripción, tipo de recuperación, estado PENDING y marcas de tiempo
+  - `execute`: Ejecuta la acción, actualiza estado/resultado y captura excepciones
+  - `_do_execute`: Método a sobrescribir en las subclases
+  - `cancel`: Cancela la acción si está en progreso
+  - `get_duration`: Devuelve la duración de ejecución en segundos
+- **Métodos principales de DatabaseRecoveryAction**:
+  - `__init__`: Inicializa con ruta de base de datos y backup por defecto `{db_path}.backup`
+  - `_do_execute`: Restaura desde backup si existe; si no, repara la base de datos
+  - `_repair_database`: Respalda la base de datos corrupta con timestamp y ejecuta `VACUUM`
+- **Métodos principales de FilesystemRecoveryAction**:
+  - `__init__`: Inicializa con ruta de fichero y backup opcional
+  - `_do_execute`: Restaura desde backup con `shutil.copy2` o crea el fichero vacío con `Path.touch()`
+- **Métodos principales de ProcessRecoveryAction**:
+  - `__init__`: Inicializa nombre de proceso y comando de reinicio (recuperación SEMI_AUTOMATIC)
+  - `_do_execute`: Ejecuta el comando con shell, check y timeout de 30s; traduce errores a excepciones
+- **Métodos principales de MemoryRecoveryAction**:
+  - `__init__`: Inicializa con PID opcional
+  - `_do_execute`: Con PID termina el proceso (`kill -9`); sin PID limpia caché (`sync` + `drop_caches`)
+- **Métodos principales de NetworkRecoveryAction**:
+  - `__init__`: Inicializa con interfaz opcional (recuperación SEMI_AUTOMATIC)
+  - `_do_execute`: Reinicia la interfaz (ifdown/ifup) o prueba sucesivamente comandos de flush DNS (systemctl flush-dns, dnsmasq, rndc)
+- **Métodos principales de RecoveryManager**:
+  - `__init__`: Inicializa ruta de BD, logger, registro de acciones, historial, recuperaciones activas, lock e inicializa la base de datos
+  - `_init_database`: Crea las tablas `recovery_actions` y `recovery_history` en SQLite
+  - `register_recovery_action`: Registra una acción de recuperación bajo lock
+  - `execute_recovery`: Registra el intento en BD, ejecuta la acción en un hilo daemon y registra el historial
+  - `_log_recovery_history`: Inserta un registro en `recovery_history` con datos adicionales en JSON
+  - `get_recovery_history`: Devuelve el historial de los últimos N días en orden descendente
+  - `get_recovery_statistics`: Calcula intentos totales, exitosos, tasa de éxito y tiempo medio de ejecución
+  - `get_active_recoveries`: Lista las recuperaciones en curso con estado y duración
+  - `cancel_recovery`: Cancela y elimina una recuperación activa
+  - `get_available_actions`: Lista las acciones registradas con nombre, descripción, tipo y estado
+  - `cleanup_old_history`: Elimina registros de historial más antiguos de N días y devuelve el número borrado
+  - `setup_default_actions`: Registra las acciones por defecto de base de datos, sistema de ficheros, memoria y red
+- **Funciones factoría**:
+  - `create_database_recovery_action`: Crear `DatabaseRecoveryAction`
+  - `create_filesystem_recovery_action`: Crear `FilesystemRecoveryAction`
+  - `create_process_recovery_action`: Crear `ProcessRecoveryAction`
+  - `create_memory_recovery_action`: Crear `MemoryRecoveryAction`
+  - `create_network_recovery_action`: Crear `NetworkRecoveryAction`
+  - `get_recovery_manager`: Obtener la instancia singleton de `RecoveryManager`
+- **Características implementadas**:
+  - Patrón de acción base con subclases especializadas para BD, ficheros, procesos, memoria y red
+  - Persistencia del estado de cada acción e historial de recuperaciones en SQLite
+  - Ejecución asíncrona en hilos daemon con control de recuperaciones activas y cancelación
+  - Estadísticas de tasa de éxito y tiempo medio de ejecución por periodo
+  - Limpieza programada del historial antiguo
+
+#### `src/utils/screen_manager.py` [1958 líneas] - Gestor de Pantallas
+- **Descripción**: Gestor unificado de pantallas y configuración del sistema Jarvis con detección nativa de Windows, gestión multi-monitor, Chrome integration y capturas de pantalla avanzadas.
+- **Clases principales**:
+  - `ScreenSetupType` (Enum): Tipos de configuración de pantalla (SINGLE, DUAL_HORIZONTAL, DUAL_VERTICAL, ULTRAWIDE, UNKNOWN)
+  - `MonitorInfo` (dataclass): Información física/lógica de un monitor en el escritorio virtual
+  - `ScreenManager`: Gestor centralizado de topología, ventanas y capturas
+- **Métodos principales**:
+  - `__init__`: Inicializa gestor con detección de monitores Windows y configuración
+  - `_make_dpi_aware`: Configura DPI awareness para Windows
+  - `_get_monitor_dpi`: Obtiene DPI de un monitor específico
+  - `_load_monitors_from_windows`: Detecta monitores usando API Win32 nativa
+  - `_load_monitors_from_config`: Carga monitores desde config.json como fallback
+  - `refresh_monitors`: Actualiza topología de monitores
+  - `_calculate_virtual_bounds`: Calcula límites virtuales del escritorio
+  - `_analyze_setup`: Analiza configuración de pantalla (single, dual, ultrawide)
+  - `get_monitor`: Obtiene monitor por número o índice
+  - `get_primary_monitor`: Obtiene monitor principal
+  - `get_monitor_by_point`: Obtiene monitor que contiene un punto específico
+  - `_get_window_geometry`: Obtiene geometría real de ventana Win32
+  - `get_monitor_for_window`: Obtiene monitor físico de una ventana
+  - `_get_window_handle`: Obtiene handle de ventana de varios formatos
+  - `get_foreground_window`: Obtiene ventana foreground activa
+  - `get_foreground_monitor`: Obtiene monitor de la ventana foreground
+  - `get_active_monitor`: Obtiene monitor activo (alias de get_foreground_monitor)
+  - `get_alternate_monitor`: Obtiene monitor alternativo al actual
+  - `_get_window_class`: Obtiene clase de ventana Win32
+  - `_get_window_process_id`: Obtiene ID de proceso de ventana
+  - `_get_window_process_name`: Obtiene nombre de proceso de ventana
+  - `_is_chrome_window`: Identifica ventana de Chrome por proceso real
+  - `_window_has_valid_size`: Verifica si ventana tiene tamaño válido
+  - `_window_is_visible`: Comprueba visibilidad real mediante Win32
+  - `_window_is_minimized`: Comprueba si ventana está minimizada según Windows
+  - `_restore_and_maximize_window`: Restaura y maximiza temporalmente una ventana
+  - `get_chrome_windows`: Enumera ventanas reales de Chrome evitando depender del orden
+  - `get_chrome_window_on_monitor`: Obtiene ventana de Chrome en monitor específico
+  - `get_chrome_monitor`: Detecta el monitor real de Chrome con manejo de ventanas minimizadas
+  - `_get_window_area`: Devuelve el área aproximada de una ventana en píxeles
+  - `get_calibration_monitor`: Obtiene monitor óptimo para calibración
+  - `is_window_minimized`: Indica si una ventana está minimizada según Win32
+  - `prepare_window_for_calibration`: Restaura/maximiza cualquier ventana y devuelve su monitor real
+  - `move_window_to_monitor`: Mueve ventana a monitor específico
+  - `_find_chrome_executable`: Busca ejecutable de Chrome en rutas estándar
+  - `_snapshot_chrome_handles`: Captura handles actuales de ventanas de Chrome
+  - `_find_new_chrome_window`: Encuentra nueva ventana de Chrome después de apertura
+  - `_activate_window`: Activa ventana específica
+  - `_launch_chrome_for_calibration`: Inicia Chrome para calibración en monitor específico
+  - `open_chrome_calibration_tab`: Abre pestaña de calibración en Chrome existente o nueva
+  - `open_chrome_on_monitor`: Abre Chrome en monitor específico
+  - `capture_monitor`: Captura exactamente el rectángulo físico del monitor
+  - `close_chrome`: Cierra Chrome como acción explícita del usuario
+  - `move_window_to_screen`: Mueve ventana a pantalla (compatibilidad)
+- **Funciones globales**:
+  - `get_screen_manager`: Obtiene instancia singleton del gestor de pantallas
+  - `get_monitor_info`: Obtiene información del monitor especificado
+  - `get_monitor_setup`: Obtiene configuración actual de monitores
+
+#### `src/utils/self_improvement_system.py` [1101 líneas] - Sistema de Automejora v2.7.0
+- **Descripción**: Sistema de automejora con aprendizaje continuo y optimización adaptativa. Integra PerformanceOptimizer, PatternAnalyzer, LogAnalytics y LogPredictor, ejecuta un bucle de aprendizaje en hilo, recoge datos del sistema, extrae características, entrena modelos de machine learning, identifica oportunidades de mejora, ejecuta reglas de mejora, actualiza un grafo de conocimiento y exporta reportes de aprendizaje.
+- **Clases principales**:
+  - `LearningMode` (Enum): Modos de aprendizaje (PASSIVE_LEARNING, ACTIVE_LEARNING, REINFORCEMENT_LEARNING, TRANSFER_LEARNING, FEDERATED_LEARNING)
+  - `ImprovementType` (Enum): Tipos de mejora (PERFORMANCE_IMPROVEMENT, ERROR_REDUCTION, EFFICIENCY_GAIN, RESOURCE_OPTIMIZATION, USER_EXPERIENCE, FEATURE_ENHANCEMENT, ALGORITHM_OPTIMIZATION, ARCHITECTURE_IMPROVEMENT)
+  - `LearningSession` (dataclass): Sesión de aprendizaje (session_id, modo, inicio/fin, duración, puntos de datos, mejoras realizadas, tasa de éxito, confianza, tasas de aprendizaje y exploración, métricas)
+  - `ImprovementRule` (dataclass): Regla de mejora (rule_id, nombre, descripción, condición, acción, prioridad, habilitación, tasa de éxito, ejecuciones, última ejecución y puntuación de mejora)
+  - `KnowledgeGraph` (dataclass): Nodo del grafo de conocimiento (node_id, tipo, propiedades, conexiones, confianza y última actualización)
+  - `SelfImprovementSystem`: Sistema principal con colas de aprendizaje/mejora, modelos de aprendizaje e hilo de ejecución
+- **Métodos principales de LearningMode**:
+  - PASSIVE_LEARNING, ACTIVE_LEARNING, REINFORCEMENT_LEARNING, TRANSFER_LEARNING, FEDERATED_LEARNING
+- **Métodos principales de ImprovementType**:
+  - PERFORMANCE_IMPROVEMENT, ERROR_REDUCTION, EFFICIENCY_GAIN, RESOURCE_OPTIMIZATION, USER_EXPERIENCE, FEATURE_ENHANCEMENT, ALGORITHM_OPTIMIZATION, ARCHITECTURE_IMPROVEMENT
+- **Métodos principales de SelfImprovementSystem**:
+  - `__init__`: Inicializa logger y sistemasunderlying (optimizador, analizador de patrones, analítica de logs, predictor), carga configuración, inicializa modelos y reglas y arranca el bucle de aprendizaje
+  - `_load_config`: Cargar configuración del sistema de automejora
+  - `_initialize_learning_models`: Inicializar los modelos de machine learning y escaladores
+  - `_load_trained_learning_models`: Cargar modelos entrenados desde disco
+  - `_save_trained_learning_models`: Guardar modelos entrenados en disco
+  - `_initialize_improvement_rules`: Inicializar el conjunto de reglas de mejora por defecto
+  - `_load_custom_rules`: Cargar reglas personalizadas desde archivo
+  - `_save_custom_rules`: Guardar las reglas personalizadas en archivo
+  - `_start_learning_loop`: Iniciar el hilo del bucle de aprendizaje
+  - `_learning_loop`: Bucle principal de aprendizaje periódico
+  - `_perform_passive_learning`: Ejecutar una iteración de aprendizaje pasivo
+  - `_collect_system_data`: Recopilar los datos actuales del sistema
+  - `_calculate_system_load`: Calcular la carga actual del sistema
+  - `_extract_learning_features`: Extraer el vector de características para el aprendizaje
+  - `_update_learning_models`: Actualizar los modelos ML con los datos nuevos
+  - `_determine_learning_labels`: Determinar las etiquetas de aprendizaje a partir de los datos
+  - `_identify_improvement_opportunities`: Identificar oportunidades de mejora
+  - `_execute_improvement_rules`: Ejecutar las reglas de mejora pendientes
+  - `_evaluate_rule_condition`: Evaluar la condición de una regla de mejora
+  - `_execute_rule_action`: Ejecutar la acción de una regla de mejora
+  - `_analyze_learning_patterns`: Analizar los patrones de aprendizaje detectados
+  - `_update_knowledge_graph`: Actualizar el grafo de conocimiento con los patrones
+  - `_calculate_node_confidence`: Calcular la confianza de un nodo del grafo
+  - `_save_knowledge_graph`: Guardar el grafo de conocimiento
+  - `_start_learning_session`: Iniciar una sesión de aprendizaje en un modo dado
+  - `_end_learning_session`: Finalizar una sesión de aprendizaje
+  - `get_learning_status`: Obtener el estado actual del aprendizaje
+
+## 🚀 Módulo `main.py` - Punto de Entrada Principal
+
+- **Descripción**: Punto de entrada principal del sistema JARVIS con inicialización completa de componentes, sistema de logging avanzado, manejo de voz, y bucle principal de procesamiento de comandos.
+- **Funciones principales**:
+  - `main`: Función principal que inicializa componentes y ejecuta el bucle principal del sistema.
+  - `_normalize_voice_text`: Normaliza texto para reconocimiento de voz, eliminando caracteres especiales.
+  - `_resolve_voice_id`: Resuelve ID de voz a partir de solicitud del usuario buscando coincidencias.
+  - `_try_change_voice`: Intenta cambiar la voz del sistema según la solicitud del usuario con patrones de activación.
+- **Características implementadas**:
+  - Inicialización de Ear, Brain, Executor, Memory y Mouth (opcional)
+  - Sistema de logging avanzado con JarvisLogger
+  - Configuración de DPI para Windows
+  - Manejo de calibración de coordenadas
+  - Sistema de aliases para comandos directos
+  - Sistema de predicción de comandos con confirmación
+  - Integración completa entre componentes
+  - Manejo de errores y logging detallado
+  - Soporte multilingüe y normalización de voz
+  - Bucle principal continuo de escucha y procesamiento
+  - Guardado de conversaciones y aprendizaje de aliases
+
+## Características Principales
+
+- 🧠 **Inteligencia Artificial**: Procesamiento de lenguaje natural con modelos LLM
+- 🎯 **Planificación Jerárquica**: Sistema HTN para descomposición de objetivos
+- 👁️ **Visión por Computadora**: Análisis de imágenes y detección de elementos
+- 👂 **Reconocimiento de Voz**: Captura de comandos de voz
+- 🤖 **Automatización**: Control de aplicaciones, teclado y ratón
+- 🧠 **Memoria Conversacional**: Almacenamiento y recuperación de interacciones
+- 📊 **Sistema de Monitoreo**: Métricas, salud y alertas en tiempo real
+- 📈 **Optimización Continua**: Mejora automática basada en ejecuciones pasadas

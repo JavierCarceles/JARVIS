@@ -1,0 +1,42 @@
+{
+  "coordinate_manager_analysis": {
+    "file": "src/hands/coordinate_manager.py",
+    "line_count": 1114,
+    "analysis_date": "2024-12-15",
+    "status": "comprobado",
+    "main_classes": [
+      "ResourceType",
+      "CalibrationStrategy", 
+      "UIResource",
+      "UICapability",
+      "CoordinateSystem",
+      "BoundingBox",
+      "ElementInfo",
+      "CoordinateManager"
+    ],
+    "key_features": [
+      "Administración centralizada de recursos UI calibrados",
+      "Sistema de capacidades UI para planificación jerárquica",
+      "Gestión de estrategias de calibración (visual, detección de ventanas, captura de pantalla, atajos)",
+      "Soporte para múltiples sistemas de coordenadas",
+      "Carga persistente desde macros_coords.json",
+      "Sistema de alternativas y fallbacks para robustez",
+      "Validación de coordenadas y regiones"
+    ],
+    "responsibilities": [
+      "Administrar recursos UI calibrados",
+      "Proporcionar capacidades de UI al planificador",
+      "Gestionar estado de calibración",
+      "Convertir y validar sistemas de coordenadas",
+      "Leer datos existentes de macros_coords.json",
+      "Mantener compatibilidad con APIs legacy"
+    ],
+    "integration_points": [
+      "ScreenManager para información de monitores",
+      "CalibrationManager para políticas de calibración",
+      "UniversalVisualCalibrator para análisis visual",
+      "Planner para ejecución de acciones",
+      "ActionRegistry para registro de acciones"
+    ]
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "file": "src/hands/edge/calibrator_edge.py",
+  "lines": 233,
+  "analysis": {
+    "type": "calibration_adapter",
+    "purpose": "Adaptador de compatibilidad para la calibración de Microsoft Edge",
+    "architecture": "Delegating pattern hacia CalibrationManager",
+    "key_features": [
+      "Mantiene API legacy para compatibilidad",
+      "Delega en CalibrationManager para calibración real",
+      "Soporte multi-monitor sin asumir número específico",
+      "No calcula offsets ni coordenadas manualmente",
+      "Utiliza sistema universal de calibración"
+    ],
+    "classes": [
+      {
+        "name": "EdgeCalibrator",
+        "purpose": "Adaptador legacy hacia CalibrationManager",
+        "methods": [
+          "calibrate_edge_both_screens() - API legacy por compatibilidad",
+          "calibrate_edge() - API moderna de compatibilidad",
+          "_calibrate_edge_universal() - Delegación universal"
+        ]
+      }
+    ],
+    "functions": [
+      {
+        "name": "calibrate_edge()",
+        "purpose": "Función pública de compatibilidad",
+        "returns": "Mensaje de estado de calibración"
+      }
+    ],
+    "integrations": [
+      "CalibrationManager para calibración real",
+      "UniversalVisualCalibrator para análisis visual",
+      "Qwen3-VL para detección de elementos",
+      "ScreenManager para información de monitores"
+    ],
+    "limitations": [
+      "No asume número específico de monitores",
+      "No calcula offsets manualmente",
+      "No utiliza pyautogui.size() para determinar monitores",
+      "No asume resoluciones o DPI",
+      "No genera coordenadas manuales",
+      "No analiza elementos uno por uno",
+      "No escribe macros_coords.json directamente"
+    ]
+  }
+}

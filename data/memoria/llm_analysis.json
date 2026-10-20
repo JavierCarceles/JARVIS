@@ -1,0 +1,44 @@
+{
+  "file_analyzed": "src/brain/llm.py",
+  "total_lines": 1040,
+  "analysis_date": "2025-06-18",
+  "key_features": {
+    "main_class": "Brain",
+    "model_integration": "Ollama (llama3 por defecto)",
+    "htn_integration": "Soporte integrado para HTN (Hierarchical Task Networks)",
+    "action_aliases": "Normalización de nombres de acciones legacy",
+    "entity_resolution": "Extracción y resolución de entidades del dominio",
+    "goal_creation": "Creación de objetivos desde entidades y lenguaje natural",
+    "legacy_support": "Compatibilidad con acciones existentes del sistema",
+    "image_processing": "Análisis de imágenes para calibración y procesamiento"
+  },
+  "core_methods": {
+    "interpret_intent": "Interpreta la intención del usuario detectando acciones directas o entidades",
+    "think": "Procesa input y crea objetivos o acciones",
+    "generate_response": "Genera respuesta usando modelo LLM",
+    "parse_model_response": "Parsea respuestas del modelo a formato estructurado",
+    "execute_goal": "Ejecuta objetivos convirtiéndolos en acciones legacy",
+    "process_intent_to_execution": "Procesa intención y convierte en resultados de ejecución",
+    "process_with_htn": "Procesa usando sistema HTN para descomposición jerárquica",
+    "get_htn_insights": "Obtiene estadísticas del sistema HTN",
+    "think_with_image": "Procesa prompts con imágenes",
+    "analyze_image": "Analiza imágenes para calibración"
+  },
+  "action_normalization": {
+    "calibrate_chrome": "calibrar_chrome",
+    "calibrate_applications": "calibrar_aplicaciones",
+    "open_chrome": "abrir_chrome",
+    "close_chrome": "cerrar_chrome",
+    "move_chrome_screen": "mover_chrome_pantalla",
+    "maximize_chrome": "maximizar_chrome"
+  },
+  "entity_types": ["streamer", "platform", "application", "website"],
+  "goal_types": ["navigate_stream", "navigate", "open_application", "close_application", "search_streamer"],
+  "capabilities": ["open", "navigate", "search", "play", "type", "click", "stream_interaction", "chat_interaction", "platform_navigation", "application_control"],
+  "system_features": {
+    "memory_management": "Gestión de memoria conversacional y estado del mundo",
+    "context_building": "Construcción de contexto dinámico para LLM",
+    "error_handling": "Manejo robusto de errores con logging",
+    "fallback_mechanisms": "Sistemas de fallback para acciones y entidades"
+  }
+}

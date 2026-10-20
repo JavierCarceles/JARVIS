@@ -1,0 +1,14 @@
+[
+  {
+    "content": "2.8.8.1 - INSPECCIÓN: Localizar AdaptiveGoalSystem, Goal real, Planner real, ContextualAdaptationEngine y cambios permitidos en Goal",
+    "id": "2.8.8.1", 
+    "priority": "high",
+    "status": "completed"
+  },
+  {
+    "content": "2.8.8.2 - REPRESENTACIÓN DE ADAPTACIÓN: Representar objetivo original, contexto, cambio propuesto y restricciones",
+    "id": "2.8.8.2",
+    "priority": "high", 
+    "status": "pending"
+  }
+]

@@ -1,0 +1,63 @@
+{
+  "file_analyzed": "src/hands/firefox/firefox.py",
+  "line_count": 637,
+  "analysis_date": "2025-06-18",
+  "key_functions": [
+    "abrir_youtube()",
+    "abrir_spotify()",
+    "abrir_firefox_pantalla(pantalla: int = 1)",
+    "abrir_firefox_pestana(pantalla: int = 1)",
+    "_abrir_firefox_desde_ruta()",
+    "_verificar_firefox_abierto()",
+    "_verificar_firefox_instalado()",
+    "_mover_firefox_a_pantalla(pantalla_num: int)",
+    "_cerrar_firefox()",
+    "_calibrar_firefox()",
+    "_generar_coordenadas_firefox(tipo_elemento: str)",
+    "_capturar_firefox()",
+    "get_firefox_commands()"
+  ],
+  "auxiliary_functions": [
+    "_get_firefox_windows()",
+    "_get_firefox_window_info(window)",
+    "_find_firefox_window_on_monitor(pantalla)",
+    "_select_firefox_window(preferred_monitor)",
+    "_candidate_firefox_paths()",
+    "_move_firefox_window(window, monitor)"
+  ],
+  "architecture_notes": [
+    "La geometría de monitores se obtiene exclusivamente de ScreenManager",
+    "No genera coordenadas artificiales, no asume dos monitores y no utiliza una resolución ni un DPI fijo",
+    "La calibración real de aplicaciones debe pasar por el flujo universal: CalibrationManager -> ScreenManager -> UniversalVisualCalibrator -> Qwen3-VL",
+    "Conserva funciones antiguas por compatibilidad pero no genera coordenadas artificiales",
+    "Utiliza ScreenManager para gestión de monitores y CalibrationManager para calibración universal"
+  ],
+  "legacy_functions": [
+    "_calibrar_firefox()",
+    "_generar_coordenadas_firefox(tipo_elemento: str)",
+    "_capturar_firefox()"
+  ],
+  "main_capabilities": [
+    "Apertura de Firefox en pantalla específica",
+    "Apertura de nuevas pestañas en pantalla específica",
+    "Cierre de ventanas de Firefox",
+    "Movimiento de ventanas entre monitores",
+    "Verificación de instalación y disponibilidad",
+    "Compatibilidad con APIs legacy"
+  ],
+  "file_structure": {
+    "description": "Funciones específicas para Mozilla Firefox con apertura, cierre, calibración, movimiento y maximización de ventanas",
+    "main_sections": [
+      "Utilidades de Firefox",
+      "Sitios web",
+      "Apertura de Firefox",
+      "Apertura desde ruta",
+      "Detección",
+      "Movimiento",
+      "Cierre",
+      "Calibración legacy",
+      "Captura legacy",
+      "Comandos"
+    ]
+  }
+}

@@ -1,0 +1,3 @@
+_estimate_transfer_efficiency: EXISTS
+_generate_transfer_reasoning: EXISTS
+_calculate_transfer_priority: EXISTS

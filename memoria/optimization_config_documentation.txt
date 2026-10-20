@@ -1,0 +1,40 @@
+#### `src/hands/planner/optimization_config.py` - Configuración del Sistema de Optimización
+- **Descripción**: Configuración tipada y validada del sistema de optimización (FASE 17) con modos predefinidos, configuraciones por subsistema y serialización segura.
+- **Clases principales**:
+  - `OptimizationMode` (Enum): Modos de operación del sistema de optimización (AGGRESSIVE, BALANCED, CONSERVATIVE, LEARNING_ONLY)
+  - `RouteCacheConfig`: Configuración del caché de rutas con LRU, precarga y compresión
+  - `CostLearningConfig`: Configuración del aprendizaje de costes con tasa de aprendizaje y factor de descuento
+  - `RedundancyRemovalConfig`: Configuración de eliminación de redundancias con análisis de efectos y alternativas
+  - `ContextAwareConfig`: Configuración de optimización basada en contexto con patrones temporales y de usuario
+  - `AlternativeSelectionConfig`: Configuración de selección de alternativas con comparación multidimensional
+  - `PerformanceMonitoringConfig`: Configuración de monitoreo de rendimiento con detección de cuellos de botella
+  - `OptimizationConfig`: Configuración completa del sistema de optimización con validación automática
+- **Métodos principales**:
+  - `OptimizationMode`: AGGRESSIVE, BALANCED, CONSERVATIVE, LEARNING_ONLY
+  - `RouteCacheConfig.__init__`: Inicializa configuración de caché de rutas con valores por defecto
+  - `CostLearningConfig.__init__`: Inicializa configuración de aprendizaje de costes con hiperparámetros
+  - `RedundancyRemovalConfig.__init__`: Inicializa configuración de eliminación de redundancias
+  - `ContextAwareConfig.__init__`: Inicializa configuración de optimización contextual
+  - `AlternativeSelectionConfig.__init__`: Inicializa configuración de selección de alternativas
+  - `PerformanceMonitoringConfig.__init__`: Inicializa configuración de monitoreo de rendimiento
+  - `OptimizationConfig.__init__`: Inicializa configuración completa con normalización automática
+  - `OptimizationConfig.__post_init__`: Normaliza valores básicos y valida configuración anidada
+  - `OptimizationConfig._coerce_nested`: Convierte y valida configuraciones anidadas desde diccionarios
+  - `OptimizationConfig.get_aggressive_config`: Obtiene configuración optimizada para modo agresivo
+  - `OptimizationConfig.get_conservative_config`: Obtiene configuración para modo conservador
+  - `OptimizationConfig.get_learning_only_config`: Obtiene configuración para modo solo aprendizaje
+  - `OptimizationConfig.get_optimization_enabled`: Obtiene estado efectivo de cada técnica de optimización
+  - `OptimizationConfig.validate_config`: Valida configuración completa y devuelve advertencias
+  - `OptimizationConfig.to_dict`: Convierte configuración a diccionario serializable
+  - `OptimizationConfig.from_dict`: Crea configuración desde diccionario parcial o completo
+- **Características implementadas**:
+  - Configuración tipada con dataclasses y validación automática
+  - Modos predefinidos (agresivo, balanceado, conservador, solo aprendizaje)
+  - Sistema de configuración anidada con coerción automática de tipos
+  - Validación completa de parámetros con mensajes descriptivos
+  - Serialización/deserialización segura a/from diccionarios
+  - Métodos de fábrica para configuraciones comunes
+  - Sistema de advertencias para configuraciones inválidas
+  - Integración con sistemas de optimización existentes
+  - Soporte para múltiples estrategias de optimización simultáneas
+  - Gestión de recursos con límites de memoria y tiempo

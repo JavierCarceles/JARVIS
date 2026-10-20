@@ -1,0 +1,56 @@
+{
+  "learning_system": {
+    "enabled": true,
+    "max_memory_size": 10000,
+    "learning_rate": 0.1,
+    "cost_learning_enabled": true,
+    "pattern_learning_enabled": true,
+    "route_learning_enabled": true,
+    "auto_export": true,
+    "export_interval_hours": 24,
+    "export_path": "data/learning_exports/"
+  },
+  "optimization_integration": {
+    "use_learned_costs": true,
+    "cost_threshold_improvement": 0.1,
+    "pattern_recognition": true,
+    "temporal_analysis": true,
+    "success_rate_threshold": 0.7
+  },
+  "action_learning": {
+    "minimum_executions": 5,
+    "success_rate_threshold": 0.6,
+    "cost_accuracy_threshold": 0.5,
+    "pattern_window_size": 10,
+    "temporal_patterns": true
+  },
+  "plan_learning": {
+    "minimum_plans": 3,
+    "success_rate_threshold": 0.8,
+    "route_optimization": true,
+    "alternative_preference": true,
+    "cost_comparison": true
+  },
+  "system_health": {
+    "monitoring_enabled": true,
+    "health_check_interval": 3600,
+    "alert_threshold_failure_rate": 0.3,
+    "alert_threshold_cost_error": 0.5,
+    "recommendation_generation": true
+  },
+  "export_settings": {
+    "format": "json",
+    "include_sensitive_data": false,
+    "compression": false,
+    "backup_count": 5,
+    "auto_cleanup": true,
+    "max_export_size_mb": 100
+  },
+  "logging": {
+    "level": "INFO",
+    "learning_events": true,
+    "optimization_events": true,
+    "system_health_events": true,
+    "performance_metrics": true
+  }
+}

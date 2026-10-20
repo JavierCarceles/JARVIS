@@ -1,0 +1,500 @@
+"""
+Funciones específicas para Google Chrome.
+
+Este módulo contiene únicamente acciones específicas de Chrome.
+La lógica universal de calibración, detección de aplicaciones y geometría de
+monitores pertenece a CalibrationManager y ScreenManager respectivamente.
+"""
+
+from __future__ import annotations
+
+import os
+from pathlib import Path
+import subprocess
+import time
+import webbrowser
+from typing import List, Optional, Any
+
+import pyautogui
+
+from hands.action_registry import ActionType, register_action
+from utils.logger import get_logger
+from utils.screen_manager import get_screen_manager
+
+logger = get_logger(__name__)
+
+
+# ============================================================================
+# APERTURA DE CHROME
+# ============================================================================
+
+
+@register_action(
+    name="abrir_chrome",
+    description="Abre Google Chrome en la pantalla predeterminada",
+    action_type=ActionType.APPLICATION,
+    parameters={},
+    confidence_threshold=0.9,
+)
+def abrir_chrome() -> str:
+    """Abre específicamente Google Chrome, sin depender del navegador predeterminado."""
+    logger._print_log("INFO", "[CHROME] Abriendo Chrome...", "chrome.py", "abrir_chrome", 41)
+    try:
+        if not _abrir_chrome_desde_ruta():
+            return "No se pudo abrir Google Chrome."
+
+        logger._print_log("INFO", "[CHROME] Chrome abierto exitosamente", "chrome.py", "abrir_chrome", 46)
+        return "He abierto Google Chrome en tu pantalla predeterminada."
+    except Exception as exc:
+        logger._print_log("ERROR", f"[CHROME] Error al abrir Chrome: {exc}", "chrome.py", "abrir_chrome", 49)
+        return f"Error al abrir Chrome: {exc}"
+
+
+@register_action(
+    name="abrir_chrome_pantalla",
+    description="Abre Google Chrome en una pantalla específica",
+    action_type=ActionType.APPLICATION,
+    parameters={
+        "pantalla": {
+            "type": "int",
+            "description": "Número de pantalla disponible",
+            "required": True,
+        }
+    },
+    confidence_threshold=0.9,
+)
+def abrir_chrome_pantalla(pantalla: int = 1) -> str:
+    """Abre Chrome en un monitor específico."""
+    logger._print_log("info", "Procesando solicitud", "chrome.py", "method", 68)
+    try:
+        if pantalla < 1:
+            return "Error: el número de pantalla debe ser mayor que 0."
+
+        screen_manager = get_screen_manager()
+        screen_manager.refresh_monitors()
+        monitor = screen_manager.get_monitor(pantalla)
+
+        if monitor is None:
+            total_monitores = len(getattr(screen_manager, "monitors", []) or [])
+            return (
+                f"Error: la pantalla {pantalla} no existe. "
+                f"Hay {total_monitores} pantalla(s) detectada(s)."
+            )
+
+        open_method = getattr(screen_manager, "open_chrome_on_monitor", None)
+        if not callable(open_method):
+            return "Error: ScreenManager no dispone de apertura de Chrome por monitor."
+
+        if open_method(pantalla):
+            logger._print_log("info", "Procesando solicitud", "chrome.py", "method", 68)
+            return f"He abierto Google Chrome en tu pantalla {pantalla}."
+
+        return f"No se pudo abrir Chrome en pantalla {pantalla}."
+    except Exception as exc:
+        logger._print_log("info", "Procesando solicitud", "chrome.py", "method", 68)
+        return f"Error al abrir Chrome en pantalla {pantalla}: {exc}"
+
+
+# ============================================================================
+# CIERRE EXPLÍCITO
+# ============================================================================
+
+
+@register_action(
+    name="cerrar_chrome",
+    description="Cierra todas las ventanas de Google Chrome",
+    action_type=ActionType.APPLICATION,
+    parameters={},
+    confidence_threshold=0.9,
+)
+def cerrar_chrome() -> str:
+    """Cierra las ventanas de Google Chrome."""
+    logger._print_log("info", r"[CHROME] Cerrando Chrome... [file:chrome.py, method:cerrar_chrome, line:120]", "chrome.py", "method", 112)
+    try:
+        screen_manager = get_screen_manager()
+        close_method = getattr(screen_manager, "close_chrome", None)
+        if not callable(close_method):
+            return "Error: ScreenManager no dispone de cierre de Chrome."
+
+        if close_method():
+            logger._print_log("info", r"[CHROME] Chrome cerrado exitosamente [file:chrome.py, method:cerrar_chrome, line:128]", "chrome.py", "method", 120)
+            return "He cerrado todas las ventanas de Google Chrome."
+
+        logger._print_log("warning", r"[CHROME] No se encontraron ventanas de Chrome para cerrar [file:chrome.py, method:cerrar_chrome, line:131]", "chrome.py", "method", 123)
+        return "No se encontraron ventanas de Chrome abiertas."
+    except Exception as exc:
+        logger._print_log("info", "Procesando solicitud", "chrome.py", "method", 68)
+        return f"Error al cerrar Chrome: {exc}"
+
+
+# ============================================================================
+# CALIBRACIÓN ESPECÍFICA DE CHROME
+# ============================================================================
+
+
+@register_action(
+    name="calibrar_chrome",
+    description=(
+        "Calibra elementos de Google Chrome usando visión artificial; "
+        "0 selecciona automáticamente el monitor adecuado"
+    ),
+    action_type=ActionType.CALIBRATION,
+    parameters={
+        "pantalla": {
+            "type": "int",
+            "description": "Número de pantalla a calibrar; 0 = selección automática",
+            "required": False,
+        }
+    },
+    confidence_threshold=0.8,
+)
+def calibrar_chrome(pantalla: int = 0) -> str:
+    """Calibra Chrome usando el flujo universal de aplicaciones.
+
+    La preparación de ventana, restauración de minimizadas, maximización,
+    detección de monitor, captura y análisis visual son exactamente las mismas
+    que para cualquier otra aplicación.
+    """
+    logger._print_log("info", "Procesando solicitud", "chrome.py", "method", 68)
+    try:
+        if pantalla < 0:
+            return "Error: el número de pantalla no puede ser negativo."
+
+        from src.hands.calibration_manager import get_calibration_manager
+
+        manager = get_calibration_manager()
+        requested = None if int(pantalla) == 0 else int(pantalla)
+        result = manager.calibrate_application("chrome", requested)
+
+        if result.success:
+            monitor = int(result.screen_number or 0)
+            count = int(result.elements_count or 0)
+            if monitor > 0:
+                return (
+                    "Calibración de Chrome completada en pantalla "
+                    f"{monitor}. Detectados {count} elementos."
+                )
+            return f"Calibración de Chrome completada. Detectados {count} elementos."
+
+        return f"Error en calibración: {result.error or 'Error desconocido'}"
+    except Exception as exc:
+        logger._print_log("info", "Procesando solicitud", "chrome.py", "method", 68)
+        return f"Error al calibrar Chrome: {exc}"
+
+
+# ============================================================================
+# MOVIMIENTO
+# ============================================================================
+
+
+@register_action(
+    name="mover_chrome_pantalla",
+    description="Mueve la ventana de Chrome a una pantalla específica",
+    action_type=ActionType.NAVIGATION,
+    parameters={
+        "pantalla": {
+            "type": "int",
+            "description": "Número de pantalla disponible",
+            "required": True,
+        }
+    },
+    confidence_threshold=0.9,
+)
+def mover_chrome_pantalla(pantalla: int) -> str:
+    """Mueve una ventana de Chrome al monitor solicitado."""
+    logger._print_log("info", "Procesando solicitud", "chrome.py", "method", 68)
+    try:
+        if pantalla < 1:
+            return "Error: el número de pantalla debe ser mayor que 0."
+
+        screen_manager = get_screen_manager()
+        screen_manager.refresh_monitors()
+        monitor = screen_manager.get_monitor(pantalla)
+
+        if monitor is None:
+            total_monitores = len(getattr(screen_manager, "monitors", []) or [])
+            return (
+                f"Error: la pantalla {pantalla} no existe. "
+                f"Hay {total_monitores} pantalla(s) detectada(s)."
+            )
+
+        chrome_windows = _get_chrome_windows(screen_manager)
+        if not chrome_windows:
+            return "No se encontró ninguna ventana de Chrome para mover."
+
+        move_method = getattr(screen_manager, "move_window_to_monitor", None)
+        if not callable(move_method):
+            return "Error: ScreenManager no dispone de movimiento de ventanas entre monitores."
+
+        window = _select_preferred_chrome_window(screen_manager, chrome_windows)
+
+        # Preferir HWND/objeto de ventana cuando ScreenManager lo soporte.
+        try:
+            moved = bool(move_method(window, pantalla))
+        except Exception:
+            # Compatibilidad con la API histórica basada en título.
+            moved = bool(move_method("Google", pantalla))
+
+        if moved:
+            logger._print_log("info", "Procesando solicitud", "chrome.py", "method", 68)
+            return f"He movido Google Chrome a tu pantalla {pantalla}."
+
+        return f"No se pudo mover Chrome a pantalla {pantalla}."
+    except Exception as exc:
+        logger._print_log("info", "Procesando solicitud", "chrome.py", "method", 68)
+        return f"Error al mover Chrome: {exc}"
+
+
+# ============================================================================
+# MAXIMIZAR
+# ============================================================================
+
+
+@register_action(
+    name="maximizar_chrome",
+    description="Maximiza la ventana de Chrome",
+    action_type=ActionType.NAVIGATION,
+    parameters={},
+    confidence_threshold=0.9,
+)
+def maximizar_chrome() -> str:
+    """Maximiza la ventana de Chrome preferentemente la que está en primer plano."""
+    logger._print_log("info", r"[CHROME] Maximizando Chrome... [file:chrome.py, method:maximizar_chrome, line:281]", "chrome.py", "method", 264)
+    try:
+        screen_manager = get_screen_manager()
+        chrome_windows = _get_chrome_windows(screen_manager)
+
+        if not chrome_windows:
+            logger._print_log("warning", r"[CHROME] No se encontró ventana de Chrome para maximizar [file:chrome.py, method:maximizar_chrome, line:287]", "chrome.py", "method", 270)
+            return "No se encontró ventana de Chrome para maximizar."
+
+        win = _select_preferred_chrome_window(screen_manager, chrome_windows)
+
+        maximize = getattr(win, "maximize", None)
+        if not callable(maximize):
+            return "No se pudo maximizar la ventana de Chrome."
+
+        maximize()
+        time.sleep(1)
+        logger._print_log("info", r"[CHROME] Chrome maximizado exitosamente [file:chrome.py, method:maximizar_chrome, line:299]", "chrome.py", "method", 281)
+        return "He maximizado la ventana de Google Chrome."
+    except Exception as exc:
+        logger._print_log("info", "Procesando solicitud", "chrome.py", "method", 68)
+        return f"Error al maximizar Chrome: {exc}"
+
+
+# ============================================================================
+# FUNCIONES INTERNAS
+# ============================================================================
+
+
+def _get_chrome_executable() -> Optional[str]:
+    """Busca chrome.exe en ubicaciones habituales de Windows."""
+    routes = [
+        r"%ProgramFiles%\Google\Chrome\Application\chrome.exe",
+        r"%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe",
+        r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe",
+        r"%PROGRAMFILES%\Google\Chrome\Application\chrome.exe",
+        r"%PROGRAMFILES(X86)%\Google\Chrome\Application\chrome.exe",
+    ]
+
+    seen: set[str] = set()
+    for route in routes:
+        expanded = os.path.expandvars(route)
+        if expanded in seen:
+            continue
+        seen.add(expanded)
+        if os.path.isfile(expanded):
+            return expanded
+
+    return None
+
+
+def _abrir_chrome_desde_ruta() -> bool:
+    """Abre Chrome directamente; solo usa webbrowser como último fallback."""
+    try:
+        chrome_exe = _get_chrome_executable()
+        if chrome_exe:
+            logger._print_log("info", "Procesando solicitud", "chrome.py", "method", 68)
+            subprocess.Popen([chrome_exe, "https://www.google.com"])
+            time.sleep(2)
+            return True
+
+        # Algunos sistemas tienen chrome.exe resoluble por PATH.
+        try:
+            subprocess.Popen(["chrome", "https://www.google.com"])
+            time.sleep(2)
+            return True
+        except (FileNotFoundError, OSError):
+            pass
+
+        logger._print_log("info", "Procesando solicitud", "chrome.py", "method", 68)
+        return bool(webbrowser.open("https://www.google.com"))
+    except Exception as exc:
+        logger._print_log("info", "Procesando solicitud", "chrome.py", "method", 68)
+        return False
+
+
+def _get_chrome_windows(screen_manager: Any) -> List[Any]:
+    """Obtiene ventanas de Chrome mediante ScreenManager, si está disponible."""
+    method = getattr(screen_manager, "get_chrome_windows", None)
+    if not callable(method):
+        return []
+
+    try:
+        result = method()
+        return list(result or [])
+    except Exception as exc:
+        logger._print_log("info", "Procesando solicitud", "chrome.py", "method", 68)
+        return []
+
+
+def _select_preferred_chrome_window(
+    screen_manager: Any,
+    chrome_windows: List[Any],
+) -> Any:
+    """Selecciona la ventana Chrome en primer plano cuando sea posible."""
+    foreground_method = getattr(screen_manager, "get_foreground_window", None)
+    chrome_check = getattr(screen_manager, "_is_chrome_window", None)
+
+    if callable(foreground_method) and callable(chrome_check):
+        try:
+            foreground = foreground_method()
+            if foreground is not None and chrome_check(foreground):
+                return foreground
+        except Exception:
+            pass
+
+    return chrome_windows[0]
+
+
+def _verificar_chrome_abierto() -> bool:
+    """Verifica si existe al menos una ventana visible de Chrome."""
+    try:
+        screen_manager = get_screen_manager()
+        for win in _get_chrome_windows(screen_manager):
+            try:
+                visible = getattr(win, "is_visible", True)
+                if callable(visible):
+                    visible = visible()
+                if visible is False:
+                    continue
+                logger._print_log("debug", r"[CHROME] Chrome detectado y visible [file:chrome.py, method:_verificar_chrome_abierto, line:406]", "chrome.py", "method", 384)
+                return True
+            except Exception:
+                continue
+
+        logger._print_log("debug", r"[CHROME] Chrome no detectado entre ventanas abiertas [file:chrome.py, method:_verificar_chrome_abierto, line:411]", "chrome.py", "method", 389)
+        return False
+    except Exception as exc:
+        logger._print_log("info", "Procesando solicitud", "chrome.py", "method", 68)
+        return False
+
+
+def _verificar_chrome_instalado() -> bool:
+    """Verifica si Chrome está instalado o resoluble en el sistema."""
+    try:
+        if _get_chrome_executable():
+            return True
+
+        try:
+            result = subprocess.run(
+                ["chrome", "--version"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            )
+            return result.returncode == 0
+        except (FileNotFoundError, subprocess.SubprocessError, OSError):
+            return False
+    except Exception as exc:
+        logger._print_log("info", "Procesando solicitud", "chrome.py", "method", 68)
+        return False
+
+
+def _capturar_chrome() -> Optional[str]:
+    """
+    Captura una ventana de Chrome.
+
+    API legacy. El flujo universal de calibración captura el monitor completo
+    mediante ScreenManager y no depende de esta función.
+    """
+    try:
+        screen_manager = get_screen_manager()
+        chrome_windows = _get_chrome_windows(screen_manager)
+        if not chrome_windows:
+            logger._print_log("warning", r"[CHROME] No se encontró ventana de Chrome para capturar [file:chrome.py, method:_capturar_chrome, line:451]", "chrome.py", "method", 429)
+            return None
+
+        win = _select_preferred_chrome_window(screen_manager, chrome_windows)
+        left = int(getattr(win, "left", 0))
+        top = int(getattr(win, "top", 0))
+        width = int(getattr(win, "width", 0))
+        height = int(getattr(win, "height", 0))
+
+        if width <= 0 or height <= 0:
+            return None
+
+        screenshot = pyautogui.screenshot(region=(left, top, width, height))
+
+        project_root = getattr(screen_manager, "project_root", None)
+        if project_root is None:
+            project_root = os.getcwd()
+
+        temp_path = Path(project_root) / f"temp_chrome_{int(time.time() * 1000)}.png"
+        screenshot.save(temp_path)
+        logger._print_log("info", "Procesando solicitud", "chrome.py", "method", 68)
+        return str(temp_path)
+    except Exception as exc:
+        logger._print_log("info", "Procesando solicitud", "chrome.py", "method", 68)
+        return None
+
+
+# ============================================================================
+# COMANDOS
+# ============================================================================
+
+
+def get_chrome_commands() -> List[str]:
+    """Obtiene los comandos específicos de Chrome."""
+    return [
+        "abrir_chrome",
+        "abrir_chrome_pantalla",
+        "cerrar_chrome",
+        "calibrar_chrome",
+        "mover_chrome_pantalla",
+        "maximizar_chrome",
+    ]
+
+
+def get_chrome_action_commands() -> List[str]:
+    """Escanea el módulo y devuelve las funciones registradas como acciones."""
+    import inspect
+
+    frame = inspect.currentframe()
+    try:
+        module = inspect.getmodule(frame)
+        if module is None:
+            return []
+
+        functions = inspect.getmembers(module, inspect.isfunction)
+        action_commands: List[str] = []
+        for name, func in functions:
+            if hasattr(func, "_jarvis_action_info") or hasattr(func, "_action_info"):
+                action_commands.append(name)
+        return action_commands
+    finally:
+        del frame
+
+
+__all__ = [
+    "abrir_chrome",
+    "abrir_chrome_pantalla",
+    "cerrar_chrome",
+    "calibrar_chrome",
+    "mover_chrome_pantalla",
+    "maximizar_chrome",
+    "get_chrome_commands",
+    "get_chrome_action_commands",
+]
