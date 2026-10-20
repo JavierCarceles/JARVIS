@@ -2655,6 +2655,88 @@ class ContextualAdaptationEngine:
             absent[name] = {"path": path, "reason": "not_a_file" if os.path.exists(path) else "file_not_found"}
         return {"expected": paths, "present": present, "absent": absent, "absent_count": len(absent), "has_absent": bool(absent)}
 
+    # Detección de sección ausente (2.8.8.9.5.2)
+    #
+    # Secciones de primer nivel que el motor espera dentro de cada fichero de
+    # persistencia. Cada sección tiene su origen real en el motor:
+    #   - `goal_adaptation_feedback.json` -> `_save_goal_adaptation_feedback`
+    #   - `goal_adaptation_learning_results.json` -> `_save_goal_adaptation_learning_results`
+    #   - `contextual_adaptation_rules.json` -> `_save_adaptation_rules`
+    #   - `contextual_knowledge_base.json` -> `save_knowledge_base`
+    # El valor de cada sección indica su clase:
+    #   - `data`: sección que el cargador real consume (`_load_goal_adaptation_*`,
+    #     `load_adaptation_rules`, `load_knowledge_base`).
+    #   - `metadata`: sección informativa que el escritor produce y que no se
+    #     usa para recuperar datos.
+    _STORAGE_SECTIONS: Dict[str, Dict[str, str]] = {
+        "goal_adaptation_feedback": {"goal_adaptation_feedback": "data", "adaptation_history": "data", "last_updated": "metadata"},
+        "goal_adaptation_learning_results": {"learning_results": "data", "adaptation_strategies": "data", "last_updated": "metadata"},
+        "adaptation_rules": {"rules": "data", "total_rules": "metadata", "version": "metadata", "last_updated": "metadata"},
+        "knowledge_base": {"data": "data", "context_snapshots": "metadata", "adaptation_history": "metadata",
+                           "knowledge_transfers": "metadata", "version": "metadata", "last_updated": "metadata"},
+    }
+
+    # Formato heredado admitido por `load_adaptation_rules`: el fichero puede
+    # contener la lista de reglas en su propia raíz. Esa sección de datos se
+    # considera presente aunque el payload no sea un diccionario.
+    _STORAGE_ROOT_LIST_SECTION: Dict[str, str] = {"adaptation_rules": "rules"}
+
+    def expected_storage_sections(self) -> Dict[str, Dict[str, str]]:
+        """Secciones de primer nivel que el motor espera en cada fichero de persistencia.
+
+        Solo cubre SECCIONES dentro de ficheros EXISTENTES. La ausencia del propio
+        fichero se detecta aparte, en 2.8.8.9.5.1 (`detect_absent_storage`).
+        """
+        return {name: dict(sections) for name, sections in self._STORAGE_SECTIONS.items()}
+
+    def detect_absent_sections(self) -> Dict[str, Any]:
+        """Detecta secciones ausentes dentro de los ficheros de persistencia existentes.
+
+        Operacion de SOLO LECTURA: no crea ficheros ni altera el estado del motor.
+        Solo se examinan los ficheros que EXISTEN; los ausentes se listan en
+        `missing_files` (su deteccion es la de 2.8.8.9.5.1). Un fichero presente
+        pero ilegible o con un payload que no es un diccionario se listan en
+        `unreadable`: la corrupcion del contenido se detecta en 2.8.8.9.6.
+
+        Cada ausencia informa su `path`, su `reason` y su `kind` (`data` o
+        `metadata`), para que el consumidor distinga una seccion de DATOS
+        ausente de una seccion informativa ausente.
+        """
+        paths = self.expected_storage_paths()
+        sections = self.expected_storage_sections()
+        checked: List[str] = []
+        absent: Dict[str, Dict[str, Any]] = {}
+        unreadable: Dict[str, Any] = {}
+        missing_files: List[str] = []
+        for name, path in paths.items():
+            if not os.path.isfile(path):
+                missing_files.append(name)
+                continue
+            try:
+                with open(path, "r", encoding="utf-8") as handle:
+                    payload = json.load(handle)
+            except Exception:
+                unreadable[name] = {"path": path, "reason": "unreadable_file"}
+                continue
+            expected = sections.get(name, {})
+            if isinstance(payload, dict):
+                found = set(payload.keys())
+            elif isinstance(payload, list):
+                found = set()
+                root_section = self._STORAGE_ROOT_LIST_SECTION.get(name)
+                if root_section and root_section in expected: found.add(root_section)
+            else:
+                unreadable[name] = {"path": path, "reason": "not_a_mapping"}
+                continue
+            missing = [section for section in expected if section not in found]
+            if missing:
+                absent[name] = {section: {"path": path, "reason": "section_not_found", "kind": expected[section]}
+                                for section in missing}
+            checked.append(name)
+        absent_count = sum(len(sections_missing) for sections_missing in absent.values())
+        return {"expected": sections, "checked": checked, "absent": absent, "absent_count": absent_count,
+                "has_absent": bool(absent), "missing_files": missing_files, "unreadable": unreadable}
+
     # Integración de evolución arquitectónica
     def set_architecture_manager(self, architecture_manager) -> None:
         self.architecture_manager = architecture_manager
@@ -2721,13 +2803,15 @@ class ContextualAdaptationEngine:
 
     def get_engine_status(self) -> Dict[str, Any]:
         storage = self.detect_absent_storage()
+        sections = self.detect_absent_sections()
         return {"adaptation_enabled": self.config.get("adaptation_enabled", True), "is_adapting": self.is_adapting,
             "current_context": self.current_context.context_type.value if self.current_context else None, "adaptation_level": self.adaptation_level.value,
             "total_snapshots": len(self.context_snapshots), "total_rules": len(self.adaptation_rules),
             "total_adaptations": len(self.adaptation_history), "total_knowledge_transfers": len(self.knowledge_transfers),
             "active_modes": {"lightweight": self._lightweight_mode, "offline": self._offline_mode, "performance": self._performance_mode, "recovery": self._recovery_mode, "safe": self._safe_mode},
             "knowledge_base_stats": {"context_patterns": len(self.knowledge_base.get("context_patterns", {})), "adaptation_strategies": len(self.knowledge_base.get("adaptation_strategies", {})), "transfer_efficiency": len(self.knowledge_base.get("transfer_efficiency", {}))},
-            "storage": {"absent": storage["absent"], "absent_count": storage["absent_count"]}}
+            "storage": {"absent": storage["absent"], "absent_count": storage["absent_count"]},
+            "storage_sections": {"absent": sections["absent"], "absent_count": sections["absent_count"]}}
 
     # Persistencia adicional y helpers
     @staticmethod

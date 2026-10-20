@@ -1,13 +1,19 @@
 ESTADO PERSISTENTE ACTUAL
 CURRENT_PHASE: 2.8.8
-CURRENT_WORK_UNIT: 2.8.8.9.5.2
+CURRENT_WORK_UNIT: 2.8.8.9.5.3
 CURRENT_WORK_STATUS: EN PROCESO
-LAST_COMPLETED_UNIT: 2.8.8.9.5.1
+LAST_COMPLETED_UNIT: 2.8.8.9.5.2
+
+# COMPLETADO: 2.8.8.9.5.2 - Detectar seccion ausente
+# Fecha: 2026-10-21
+# Archivo modificado: src/utils/contextual_adaptation_engine.py, tests/utils/contextual_adaptation_engine/detect_absent_sections_real.py (nuevo), README.md, prompt_mejoraActual.txt
+# Resultado: implementado el rastreo de la SECCION AUSENTE dentro de los ficheros de persistencia del motor de adaptacion contextual: `expected_storage_sections()` declara las secciones de primer nivel que el motor espera en cada fichero, con su origen real y su clase (`data` = la consume un cargador real; `metadata` = informativa), y `detect_absent_sections()` las compara con el contenido de los ficheros EXISTENTES en modo SOLO LECTURA, informando `path`, `reason` y `kind` por seccion ausente; los ficheros ausentes se listan en `missing_files` (deteccion de 2.8.8.9.5.1) y los ilegibles en `unreadable` (corrupcion de 2.8.8.9.6); `get_engine_status()` expone el resultado en la clave nueva `storage_sections` sin alterar ninguna clave previa
+# Estado real: 43/43 comprobaciones OK (sonda de runtime), 215 PASSED / 0 FAILED en la suite completa (baseline comparable de 215 de 2.8.8.9.5.1, 0 tests nuevos y 0 regresiones); el `data/` de produccion NO se modifica por la sonda
 
 # COMPLETADO: 2.8.8.9.5.1 - Detectar almacenamiento ausente
 # Fecha: 2026-10-21
 # Archivo modificado: src/utils/contextual_adaptation_engine.py, tests/utils/contextual_adaptation_engine/detect_absent_storage_real.py (nuevo), README.md, prompt_mejoraActual.txt
-# Resultado: implementado el rastreo del almacenamiento de persistencia AUSENTE del motor de adaptacion contextual: `expected_storage_paths()` devuelve las 4 rutas que el motor espera encontrar (`goal_adaptation_feedback.json`, `goal_adaptation_learning_results.json`, `contextual_adaptation_rules.json`, `contextual_knowledge_base.json`, cada una con su origen real en el motor) y `detect_absent_storage()` las compara con el disco en modo SOLO LECTURA, distinguendo `file_not_found` de `not_a_file`; `get_engine_status()` expone el resultado en la clave nueva `storage` sin alterar ninguna clave previa
+# Resultado: implementado el rastreo del almacenamiento de persistencia AUSENTE del motor de adaptacion contextual: `expected_storage_paths()` devuelve las 4 rutas que el motor espera encontrar (`goal_adaptation_feedback.json`, `goal_adaptation_learning_results.json`, `contextual_adaptation_rules.json`, `contextual_knowledge_base.json`, cada una con su origen real en el motor) y `detect_absent_storage()` las compara con el disco en modo SOLO LECTURA, distinguiendo `file_not_found` de `not_a_file`; `get_engine_status()` expone el resultado en la clave nueva `storage` sin alterar ninguna clave previa
 # Estado real: 27/27 comprobaciones OK (sonda de runtime), 215 PASSED / 0 FAILED en la suite completa (baseline comparable de 215 de 2.8.8.9.4.6, 0 tests nuevos y 0 regresiones); el `data/` de produccion NO se modifica por la sonda
 
 # COMPLETADO: 2.8.8.9.4.6 - Corregir fallo de patrones
@@ -1275,8 +1281,42 @@ Hoy `learning_results` se escribe verbatim (l. 2475) y no hay ningún contador d
 - HALLAZGO DE PRODUCCIÓN: en `data/` faltan `contextual_adaptation_rules.json` y
   `contextual_knowledge_base.json`; los dos ficheros de Goal sí están presentes.
 
-2.8.8.9.5.2 — DETECTAR SECCIÓN AUSENTE
+2.8.8.9.5.2 — DETECTAR SECCIÓN AUSENTE [IMPLEMENTADA]
 - Detectar únicamente ausencia de una sección esperada.
+- SECCIONES ESPERADAS: secciones de primer nivel de cada fichero de persistencia, con su origen real en el
+  motor y su clase (`data` = la consume un cargador real; `metadata` = informativa):
+  `goal_adaptation_feedback.json` -> `goal_adaptation_feedback` (data), `adaptation_history` (data),
+  `last_updated` (metadata); `goal_adaptation_learning_results.json` -> `learning_results` (data),
+  `adaptation_strategies` (data), `last_updated` (metadata); `contextual_adaptation_rules.json` -> `rules`
+  (data), `total_rules` / `version` / `last_updated` (metadata); `contextual_knowledge_base.json` -> `data`
+  (data), `context_snapshots` / `adaptation_history` / `knowledge_transfers` / `version` / `last_updated`
+  (metadata).
+- IMPLEMENTACIÓN: `expected_storage_sections()` devuelve el mapa `fichero -> {seccion: clase}` (copia
+  independiente: mutar el resultado no altera la tabla del motor). `detect_absent_sections()` compara esas
+  secciones con el contenido de los ficheros EXISTENTES en modo SOLO LECTURA y devuelve `expected`,
+  `checked`, `absent`, `absent_count`, `has_absent`, `missing_files` y `unreadable`; cada ausencia informa
+  su `path`, su `reason` (`section_not_found`) y su `kind` (`data` o `metadata`).
+- ALCANCE: los ficheros que NO existen se listan en `missing_files` (su detección es la de 2.8.8.9.5.1, NO se
+  reportan como sección ausente) y los ficheros presentes pero ilegibles o con un payload que no es un
+  diccionario se listan en `unreadable` (la corrupción del contenido se detecta en 2.8.8.9.6).
+  `get_engine_status()` expone el resultado en la clave nueva `storage_sections` (`absent` y `absent_count`),
+  de forma aditiva: no altera ninguna clave previa, incluida `storage` de 2.8.8.9.5.1.
+- FORMATO HEREDADO: `load_adaptation_rules()` admite que el fichero contenga la lista de reglas en su propia
+  raíz; en ese formato la sección de DATOS `rules` se considera presente y solo se reportan ausentes las
+  secciones de METADATA. La sección ausente se detecta sin dejar de cargar los datos.
+- RUNTIME: `tests/utils/contextual_adaptation_engine/detect_absent_sections_real.py` — 43/43 comprobaciones OK.
+  Inventaría las secciones esperadas y su origen, comprueba la detección en runtime (sección de DATOS ausente,
+  de METADATA ausente, varias a la vez en el mismo fichero, sección presente pero vacía, formato heredado,
+  fichero ilegible, payload que no es un mapeo, lista sin formato heredado y fichero ausente) y valida la API de
+  detección. Es independiente de la suite pytest, solo LEE el `data/` de producción mediante rutas absolutas y
+  mueve su CWD a un temporal ANTES de construir cualquier motor, sin restaurarlo, porque
+  `SelfImprovementSystem` escribe `data/knowledge_graph.json` con ruta RELATIVA desde un hilo asíncrono.
+- COMPORTAMIENTO CON SECCIÓN AUSENTE (verificado): una sección presente pero VACÍA no se reporta como ausente;
+  el formato heredado sigue siendo legible por `load_adaptation_rules()` (5 reglas); con una sección de DATOS
+  ausente el motor carga sin fallar y conserva su estado (`total_rules` = 5); y la detección NO crea ni
+  modifica ficheros de persistencia.
+- HALLAZGO DE PRODUCCIÓN: los dos ficheros de Goal de `data/` tienen todas sus secciones; en `data/` faltan
+  `contextual_adaptation_rules.json` y `contextual_knowledge_base.json` (ausencia de fichero de 2.8.8.9.5.1).
 
 2.8.8.9.5.3 — DEFINIR COMPORTAMIENTO SIN DATOS
 - Mantener el comportamiento compatible con el sistema existente.
@@ -3657,3 +3697,88 @@ PENDIENTES: 2.8.8.9.5.2 — detectar sección ausente.
 ESTADO FINAL: 2.8.8.9.5.1 — IMPLEMENTADA
 
 SIGUIENTE UNIDAD: 2.8.8.9.5.2 — DETECTAR SECCIÓN AUSENTE
+
+### REGISTRO DE UNIDAD: 2.8.8.9.5.2
+FECHA: 2026-10-21
+ESTADO: IMPLEMENTADA
+OBJETIVO: Detectar exclusivamente la ausencia de una sección esperada dentro de los ficheros de persistencia del motor de adaptación contextual.
+TIPO DE TRABAJO: IMPLEMENTACIÓN
+CAMBIOS / HALLAZGOS:
+- SECCIONES ESPERADAS: secciones de primer nivel que el motor espera dentro de cada fichero de persistencia,
+  cada una con su origen real en el motor y su clase (`data` = la consume un cargador real; `metadata` =
+  informativa que el escritor produce y que no se usa para recuperar datos):
+  `goal_adaptation_feedback.json` -> `goal_adaptation_feedback` (data), `adaptation_history` (data),
+  `last_updated` (metadata); `goal_adaptation_learning_results.json` -> `learning_results` (data),
+  `adaptation_strategies` (data), `last_updated` (metadata); `contextual_adaptation_rules.json` -> `rules`
+  (data), `total_rules` / `version` / `last_updated` (metadata); `contextual_knowledge_base.json` -> `data`
+  (data), `context_snapshots` / `adaptation_history` / `knowledge_transfers` / `version` / `last_updated`
+  (metadata). Las secciones de DATOS son las que consumen `_load_goal_adaptation_feedback`,
+  `_load_goal_adaptation_learning_results`, `load_adaptation_rules` y `load_knowledge_base`.
+- IMPLEMENTACIÓN: dos métodos nuevos en `src/utils/contextual_adaptation_engine.py`.
+  `expected_storage_sections()` devuelve el mapa `fichero -> {seccion: clase}` como COPIA independiente (mutar
+  el resultado no altera la tabla del motor). `detect_absent_sections()` compara esas secciones con el
+  contenido de los ficheros EXISTENTES en modo SOLO LECTURA y devuelve `expected`, `checked`, `absent`,
+  `absent_count`, `has_absent`, `missing_files` y `unreadable`; cada ausencia informa su `path`, su `reason`
+  (`section_not_found`) y su `kind` (`data` o `metadata`), para que el consumidor distinga una sección de DATOS
+  ausente de una sección informativa ausente.
+- ALCANCE RESPETADO: la hoja pide detectar "únicamente" la ausencia de una sección esperada. Por eso los
+  ficheros que NO existen NO se reportan como sección ausente: se listan en `missing_files`, que es la
+  detección de 2.8.8.9.5.1; y los ficheros presentes pero ilegibles o con un payload que no es un diccionario
+  se listan en `unreadable`, porque la corrupción del contenido corresponde a 2.8.8.9.6. El test pytest de
+  ausencia (2.8.8.9.5.4) NO se adelanta aquí.
+- FORMATO HEREDADO: `load_adaptation_rules()` admite que el fichero contenga la lista de reglas en su propia
+  raíz. En ese formato la sección de DATOS `rules` se considera presente aunque el payload no sea un
+  diccionario, y solo se reportan ausentes las secciones de METADATA (`version`, `last_updated`,
+  `total_rules`). Verificado que ese formato sigue siendo legible y que devuelve las 5 reglas.
+- EXPOSICIÓN: `get_engine_status()` incorpora la clave nueva `storage_sections` (`absent` y `absent_count`). Es
+  aditivo: no altera ninguna clave previa, incluida `storage` de 2.8.8.9.5.1, y no hay ningún consumidor
+  externo del método en `src/` ni en `main.py` (0 llamadores), por lo que no existe riesgo de ruptura de
+  esquema.
+- COMPORTAMIENTO REAL CON SECCIÓN AUSENTE (verificado en runtime, no inferido): una sección presente pero VACÍA
+  NO se reporta como ausente; se detectan varias secciones ausentes a la vez en el mismo fichero y el recuento
+  total las suma; un fichero ilegible NO se reporta como sección ausente (se marca `unreadable_file`); un
+  payload que no es un mapeo se marca `not_a_mapping`; una lista en un fichero sin formato heredado reporta la
+  sección de DATOS ausente; con una sección de DATOS ausente el motor carga sin fallar y conserva su estado
+  (`total_rules` = 5); y la detección NO crea ni modifica ficheros de persistencia.
+- AISLAMIENTO DE LA VERIFICACIÓN: la sonda mueve su CWD a un temporal ANTES de construir cualquier motor y
+  NO lo restaura, porque `src/utils/self_improvement_system.py` usa la ruta RELATIVA fija
+  `data/knowledge_graph.json` y su hilo de aprendizaje la escribe de forma asíncrona: restaurar el CWD antes
+  de que ese hilo terminase haría que la escritura cayese sobre el `data/` real de producción. El `data/`
+  de producción solo se LEE, mediante rutas absolutas. Verificado por hash sha256 que los cuatro ficheros de
+  persistencia de producción quedan byte a byte idénticos tras la sonda.
+- HALLAZGO DE PRODUCCIÓN: los dos ficheros de Goal de `data/` tienen todas sus secciones; en `data/` siguen
+  faltando `contextual_adaptation_rules.json` y `contextual_knowledge_base.json` (ausencia de FICHERO, que
+  pertenece a 2.8.8.9.5.1).
+ARCHIVOS MODIFICADOS:
+- PRODUCCIÓN: `src/utils/contextual_adaptation_engine.py`.
+- TESTS: `tests/utils/contextual_adaptation_engine/detect_absent_sections_real.py` (nuevo; sonda de runtime,
+  independiente de la suite pytest).
+- DOCUMENTACIÓN: `README.md`, `prompt_mejoraActual.txt`.
+TESTS Y RESULTADOS:
+- UNITARIOS: NO EJECUTADOS. La creación y ejecución del test pytest de sección ausente corresponde a la hoja
+  2.8.8.9.5.4 ("Crear y ejecutar únicamente tests de almacenamiento/sección ausente"); esta hoja no lo adelanta.
+- INTEGRACIÓN: `tests/utils/contextual_adaptation_engine/detect_absent_sections_real.py` — 43 comprobaciones
+  OK / 0 FALLIDAS / TOTAL 43. Cubre el inventario de las secciones esperadas y su origen real, la detección en
+  runtime (sección de DATOS ausente, de METADATA ausente, varias a la vez, sección vacía, formato heredado,
+  fichero ilegible, payload no mapeo, lista sin formato heredado, fichero ausente) y la API de detección.
+- NO REGRESIÓN: suite completa `tests/` — 215 PASSED / 0 FAILED / TOTAL 215, frente a la baseline comparable
+  de 215 PASSED / 0 FAILED de 2.8.8.9.5.1 (esta hoja no añade tests a la suite pytest). 0 regresiones.
+VERIFICACIÓN:
+- SINTAXIS: `py_compile` de `src/utils/contextual_adaptation_engine.py` y
+  `tests/utils/contextual_adaptation_engine/detect_absent_sections_real.py` — OK.
+- MAIN.PY: OK; `import main` completa sin error.
+- COMPORTAMIENTO / INTEGRACIÓN REAL: verificado en runtime que la detección NO crea ni modifica ficheros de
+  persistencia (sha256 idéntico antes/después), que distingue sección de DATOS ausente de sección de METADATA
+  ausente, que una sección vacía no se reporta como ausente, que el formato heredado se trata correctamente, y
+  que el `data/` de producción NO se modifica al ejecutar la sonda.
+DISCREPANCIAS: Se mantiene el antecedente de 2.8.8.9.4.6 / 2.8.8.9.5.1: los tests que crean el motor sin
+  `data_dir` reescriben `data/knowledge_graph.json` en cada ejecución, porque
+  `src/utils/self_improvement_system.py` (l. 161) usa la ruta RELATIVA fija `data/knowledge_graph.json` en
+  lugar de un `data_dir` configurable. Ese fichero pertenece al subsistema del grafo de conocimiento, no a la
+  persistencia de Goal, por lo que NO se ha corregido en esta hoja. La sonda de esta unidad no lo agrava: su
+  CWD temporal hace que su propia escritura caiga en el temporal, y se ha verificado por marca de tiempo que
+  `data/knowledge_graph.json` NO se modifica durante la ejecución de la sonda.
+PENDIENTES: 2.8.8.9.5.3 — definir comportamiento sin datos.
+ESTADO FINAL: 2.8.8.9.5.2 — IMPLEMENTADA
+
+SIGUIENTE UNIDAD: 2.8.8.9.5.3 — DEFINIR COMPORTAMIENTO SIN DATOS
