@@ -165,6 +165,19 @@ class KnowledgeTransfer:
                 "last_feedback": self.last_feedback.isoformat() if self.last_feedback else None}
 
 
+class TransferEvaluation(dict):
+    """Evaluación de una transferencia.
+
+    Es un `dict` estructurado (claves `success`, `confidence_score`, `feedback_summary`, ...)
+    que además se desempaqueta como la tupla ``(is_successful, score, message)``.
+    """
+
+    def __iter__(self):
+        yield bool(self.get("is_successful", self.get("success", False)))
+        yield float(self.get("evaluation_score", 0.0) or 0.0)
+        yield str(self.get("message", ""))
+
+
 @dataclass
 class AdaptationResult:
     adaptation_id: str
@@ -213,6 +226,7 @@ class ContextualAdaptationEngine:
         self.context_snapshots: Dict[str, ContextSnapshot] = {}
         self.adaptation_rules: Dict[str, AdaptationRule] = {}
         self.knowledge_transfers: Dict[str, KnowledgeTransfer] = {}
+        self._recorded_confidence: Dict[str, float] = {}
         self.adaptation_history: List[Any] = []
         self.proposals: Dict[str, Dict[str, Any]] = {}
         self.current_context: Optional[ContextSnapshot] = None
@@ -242,7 +256,8 @@ class ContextualAdaptationEngine:
                   "adaptation_execution_timeout": 300.0, "knowledge_transfer_enabled": True,
                   "max_context_snapshots": 1000, "adaptation_rules_file": "data/contextual_adaptation_rules.json",
                   "knowledge_base_file": "data/contextual_knowledge_base.json", "performance_impact_threshold": .1,
-                  "confidence_threshold": .7, "max_concurrent_adaptations": 3, "learning_enabled": True}
+                  "confidence_threshold": .7, "max_concurrent_adaptations": 3, "learning_enabled": True,
+                  "min_transfer_compatibility": .5, "min_similar_observations": 3}
         if config_path and os.path.isfile(config_path):
             try:
                 with open(config_path, "r", encoding="utf-8") as handle:
@@ -573,7 +588,10 @@ class ContextualAdaptationEngine:
         if source is None or target is None or not knowledge_type or source == target: return None
         strategy = transfer_strategy if transfer_strategy in ("adaptive", "conservative", "aggressive") else "adaptive"
         compatibility = self._validate_context_compatibility(source, target)
-        if compatibility < .3:
+        min_compatibility = self.config.get("min_transfer_compatibility", .5)
+        try: min_compatibility = float(min_compatibility)
+        except (TypeError, ValueError): min_compatibility = .5
+        if compatibility < min_compatibility:
             self.logger.warning("Compatibilidad baja en transferencia %s -> %s (%.2f)", source.value, target.value, compatibility)
             return None
         try:
@@ -634,8 +652,8 @@ class ContextualAdaptationEngine:
     def _extract_relevant_metrics(self, context: ContextType) -> Dict[str, Any]:
         return self._extract_contextual_metrics(context)
 
-    def _validate_context_compatibility(self, source: ContextType, target: ContextType) -> float:
-        source, target = self._coerce_context(source), self._coerce_context(target)
+    def _validate_context_compatibility(self, source_context: ContextType, target_context: ContextType) -> float:
+        source, target = self._coerce_context(source_context), self._coerce_context(target_context)
         if source is None or target is None or source == target: return 0.
         base = {
             (ContextType.DEVELOPMENT, ContextType.LEARNING): .95,
@@ -781,7 +799,9 @@ class ContextualAdaptationEngine:
                     ContextType.LEARNING: 1.1, ContextType.MAINTENANCE: .7, ContextType.EMERGENCY: .6}.get(target, .8)
         return self._bounded_float(self._safe_float(strategy.get("confidence", .5))*modifier, 0., 1.)
 
-    def _transform_knowledge_for_target(self, knowledge_data: Any, source_context: ContextType, target_context: ContextType, transfer_strategy: str) -> Dict[str, Any]:
+    def _transform_knowledge_for_target(self, knowledge_data: Any, source_context: ContextType, target_context: ContextType,
+                                        strategy: Optional[str] = None, transfer_strategy: Optional[str] = None) -> Dict[str, Any]:
+        strategy = strategy or transfer_strategy
         if isinstance(knowledge_data, list): data = {"patterns": copy.deepcopy(knowledge_data)}
         elif isinstance(knowledge_data, dict): data = copy.deepcopy(knowledge_data)
         else: data = {"value": knowledge_data}
@@ -790,10 +810,10 @@ class ContextualAdaptationEngine:
         if isinstance(data.get("performance_baselines"), dict):
             data["performance_baselines"] = self._adapt_baselines_to_context(data["performance_baselines"], source_context, target_context)
         data["transfer_metadata"] = {"source_context": source_context.value, "target_context": target_context.value,
-                                      "transfer_strategy": transfer_strategy, "transformation_timestamp": datetime.now().isoformat(),
+                                      "transfer_strategy": strategy, "transformation_timestamp": datetime.now().isoformat(),
                                       "original_data_size": len(str(knowledge_data))}
-        data["adaptation_level"] = {"conservative": "minimal", "adaptive": "moderate", "aggressive": "significant"}.get(transfer_strategy, "moderate")
-        data["transformation_type"] = transfer_strategy
+        data["adaptation_level"] = {"conservative": "minimal", "adaptive": "moderate", "aggressive": "significant"}.get(strategy, "moderate")
+        data["transformation_type"] = strategy
         return data
 
     def _update_transfer_patterns(self, transfer: KnowledgeTransfer) -> None:
@@ -865,19 +885,32 @@ class ContextualAdaptationEngine:
         if not transfer or not transfer.knowledge_data or transfer.transfer_efficiency < .3: return False
         return any(bool(transfer.knowledge_data.get(key)) for key in ("success_patterns", "successful_strategies", "adaptation_strategies", "performance_baselines", "contextual_metrics", "patterns"))
 
-    def get_transfer_confidence(self, transfer_id: str) -> Optional[float]:
-        """Obtener una confianza acotada usando primero la transferencia viva y después el historial persistido."""
+    def get_transfer_confidence(self, transfer_id: str, result: Optional[Dict[str, Any]] = None) -> Optional[float]:
+        """Obtener una confianza acotada usando primero la transferencia viva y después el historial persistido.
+
+        `result` permite ponderar la confianza con el resultado de aplicación de la transferencia
+        (tasa de éxito, indicadores de mejora) sin perder la eficiencia base de la transferencia.
+        """
         if not isinstance(transfer_id, str) or not transfer_id.strip():
             return None
 
         transfer = self.knowledge_transfers.get(transfer_id)
         if transfer is not None:
-            recorded = self._safe_float(getattr(transfer, "confidence_score", 0.0), -1.0)
-            if recorded >= 0.0:
-                return self._bounded_float(recorded, 0.0, 1.0)
             efficiency = self._bounded_float(transfer.transfer_efficiency, 0.0, 1.0)
-            success_rate = self._bounded_float(transfer.success_rate, 0.0, 1.0)
-            return self._bounded_float(0.6 * efficiency + 0.4 * success_rate, 0.0, 1.0)
+            base = self._resolve_transfer_confidence(transfer_id, transfer, efficiency)
+            if not isinstance(result, dict):
+                return base
+            rate = result.get("success_rate")
+            rate = None if rate is None else self._bounded_float(rate, 0.0, 1.0)
+            success = result.get("success")
+            success = bool(success) if success is not None else bool(rate is not None and rate >= .5)
+            if rate is None:
+                return self._bounded_float(max(base, .5 if success else base), 0.0, 1.0)
+            historical = self._bounded_float(getattr(transfer, "success_rate", 0.0), 0.0, 1.0)
+            blended = .5 * rate + .3 * efficiency + .2 * historical
+            if success:
+                blended = max(blended, min(1., rate + .05))
+            return self._bounded_float(blended, 0.0, 1.0)
 
         records_by_pair = self.knowledge_base.get("transfer_efficiency", {})
         if isinstance(records_by_pair, dict):
@@ -897,9 +930,18 @@ class ContextualAdaptationEngine:
                         return self._bounded_float(score, 0.0, 1.0)
                     return self._bounded_float(0.6 * efficiency + 0.4 * success, 0.0, 1.0)
 
-        # Mantener el comportamiento histórico de compatibilidad: los consumidores
-        # antiguos esperan una puntuación por defecto en vez de una excepción.
-        return 0.7
+        # Sin transferencia viva ni historial: no hay confianza que reportar.
+        return 0.0
+
+    def _resolve_transfer_confidence(self, transfer_id: str, transfer: Any, efficiency: float) -> float:
+        """Resolver la confianza de una transferencia viva: feedback explícito > atributo > eficiencia."""
+        recorded = self._recorded_confidence.get(transfer_id)
+        if recorded is not None:
+            return self._bounded_float(recorded, 0.0, 1.0)
+        attribute = self._safe_float(getattr(transfer, "confidence_score", 0.0), -1.0)
+        if attribute > 0.0:
+            return self._bounded_float(attribute, 0.0, 1.0)
+        return self._bounded_float(efficiency, 0.0, 1.0)
 
 
     def register_feedback(
@@ -928,10 +970,12 @@ class ContextualAdaptationEngine:
             if transfer is not None:
                 if score is not None:
                     transfer.confidence_score = score
-                if success is not None:
+                    self._recorded_confidence[transfer_id] = score
+                result_rate = result.get("success_rate") if isinstance(result, dict) else None
+                if result_rate is not None:
+                    transfer.success_rate = self._bounded_float(result_rate, 0.0, 1.0)
+                elif success is not None:
                     transfer.success_rate = 1.0 if success else 0.0
-                elif isinstance(result, dict) and "success_rate" in result:
-                    transfer.success_rate = self._bounded_float(result["success_rate"], 0.0, 1.0)
                 transfer.last_feedback = timestamp
 
             transfer_efficiency = self.knowledge_base.setdefault("transfer_efficiency", {})
@@ -985,7 +1029,8 @@ class ContextualAdaptationEngine:
                 self._record_successful_transfer_pattern(
                     transfer.source_context, transfer.target_context, transfer.knowledge_type
                 )
-            return True
+            # El feedback solo es válido si existe la transferencia destino.
+            return transfer is not None
         except Exception as exc:
             self.logger.error("Error registrando feedback de transferencia %s: %s", transfer_id, exc)
             return False
@@ -1038,6 +1083,7 @@ class ContextualAdaptationEngine:
             adjustment += (float(feedback_score)-.5)*.2
         old = self.get_transfer_confidence(transfer_id); new = self._bounded_float(old+adjustment, 0., 1.)
         transfer.confidence_score = new; transfer.last_feedback = datetime.now()
+        self._recorded_confidence[transfer_id] = new
         self.knowledge_base.setdefault("confidence_adjustments", {})[f"{transfer_id}_{int(time.time()*1000)}"] = {"transfer_id": transfer_id, "old_confidence": old, "new_confidence": new, "adjustment_factor": adjustment, "feedback_success": feedback_success, "feedback_score": feedback_score, "reason": reason or "Manual adjustment", "timestamp": datetime.now().isoformat()}
         return True
 
@@ -1045,52 +1091,85 @@ class ContextualAdaptationEngine:
         self,
         transfer: Any,
         execution_result: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
-        """Evaluar una transferencia; acepta un KnowledgeTransfer o su identificador legacy."""
+    ) -> TransferEvaluation:
+        """Evaluar una transferencia; acepta un KnowledgeTransfer o su identificador legacy.
+
+        El resultado es un dict estructurado que además se desempaqueta como
+        ``(is_successful, score, message)``.
+        """
         transfer_obj: Optional[KnowledgeTransfer]
         if isinstance(transfer, KnowledgeTransfer):
             transfer_obj = transfer
         else:
             transfer_obj = self.knowledge_transfers.get(str(transfer))
         transfer_id = transfer_obj.transfer_id if transfer_obj is not None else (str(transfer) if transfer else "unknown")
+        if transfer_obj is None:
+            return TransferEvaluation({
+                "success": False,
+                "is_successful": False,
+                "evaluation_score": 0.0,
+                "score": 0.0,
+                "confidence_score": 0.0,
+                "message": f"Transfer not found: {transfer_id}",
+                "feedback_summary": {"success": False, "error": "transfer_not_found",
+                                     "evaluation_timestamp": datetime.now().isoformat()},
+                "transfer_id": transfer_id,
+                "timestamp": datetime.now().isoformat(),
+            })
         payload = execution_result if isinstance(execution_result, dict) else {}
         if not payload:
             # No suponer éxito si no se ha ejecutado nada: se devuelve una evaluación neutral.
             payload = {"success": False, "execution_time": 0.0, "error_count": 0, "quality_score": 0.5}
 
         success = bool(payload.get("success", False))
+        rate_raw = payload.get("success_rate")
+        rate = 0.0 if rate_raw is None else self._bounded_float(rate_raw, 0.0, 1.0)
         execution_time = max(0.0, self._safe_float(payload.get("execution_time", 0.0)))
         error_count = max(0.0, self._safe_float(payload.get("error_count", 0.0)))
         quality_score = self._bounded_float(payload.get("quality_score", payload.get("feedback_score", 0.5)), 0.0, 1.0)
         time_component = max(0.0, 1.0 - min(1.0, execution_time / 60.0))
         error_component = max(0.0, 1.0 - min(1.0, error_count / 5.0))
-        score = self._bounded_float(
-            (1.0 if success else 0.0) * 0.4 + quality_score * 0.3 + time_component * 0.2 + error_component * 0.1,
-            0.0, 1.0,
-        )
         metrics = payload.get("metrics", {}) if isinstance(payload.get("metrics", {}), dict) else {}
         improvement = self._safe_float(metrics.get("performance_improvement", metrics.get("resource_savings", 0.0)))
-        score = self._bounded_float(score * 0.9 + self._bounded_float(improvement, 0.0, 1.0) * 0.1, 0.0, 1.0)
+        score = self._bounded_float(
+            .5 * rate
+            + .2 * (1.0 if success else 0.0)
+            + .1 * quality_score
+            + .1 * time_component
+            + .05 * error_component
+            + .05 * min(1.0, max(0.0, improvement) / .3),
+            0.0, 1.0,
+        )
+        is_successful = bool(success and rate >= .7 and score >= .7)
+        if is_successful:
+            message = f"Transfer successful (success rate {rate:.2f})"
+        elif success:
+            message = f"Transfer partial: success rate {rate:.2f} below the 0.70 threshold"
+        else:
+            message = f"Transfer failed: success rate {rate:.2f}"
 
-        if transfer_obj is not None:
-            transfer_obj.success_rate = score
-            transfer_obj.confidence_score = score
-            transfer_obj.last_transfer = datetime.now()
+        transfer_obj.success_rate = score
+        transfer_obj.confidence_score = score
+        transfer_obj.last_transfer = datetime.now()
+        self._recorded_confidence[transfer_id] = score
         feedback_ok = self.register_transfer_feedback(
             transfer_id, success=success, feedback_score=score,
             feedback_comments=f"Auto-evaluated: execution_time={execution_time}s, errors={error_count}",
         )
         confidence = self.get_transfer_confidence(transfer_id)
-        return {
+        return TransferEvaluation({
             "success": bool(success and feedback_ok.get("success", False)),
-            "confidence_score": self._bounded_float(confidence if confidence is not None else score, 0.0, 1.0),
+            "is_successful": is_successful,
             "evaluation_score": score,
+            "score": score,
+            "message": message,
+            "confidence_score": self._bounded_float(confidence if confidence is not None else score, 0.0, 1.0),
             "feedback_summary": {"success": success, "execution_time": execution_time, "error_count": error_count,
-                                 "quality_score": quality_score, "final_score": score,
+                                 "quality_score": quality_score, "success_rate": rate, "final_score": score,
                                  "evaluation_timestamp": datetime.now().isoformat()},
             "transfer_id": transfer_id,
             "timestamp": datetime.now().isoformat(),
-        }
+        })
 
 
     def _record_successful_transfer_pattern(self, source_context: ContextType, target_context: ContextType, knowledge_type: str) -> None:
@@ -1101,6 +1180,11 @@ class ContextualAdaptationEngine:
         pattern["last_success"] = datetime.now().isoformat()
 
     # Transferencias por lotes, automáticas y recomendaciones
+    @property
+    def knowledge_transaptors(self) -> Dict[str, KnowledgeTransfer]:
+        """Alias de `knowledge_transfers` para los consumidores que expected este nombre."""
+        return self.knowledge_transfers
+
     def get_knowledge_transfer_objects(
         self,
         context_type: Optional[ContextType] = None,
@@ -1230,19 +1314,23 @@ class ContextualAdaptationEngine:
         knowledge_types = ("success_patterns", "adaptation_strategies", "performance_baselines", "contextual_metrics")
         for source in ContextType:
             if source == target: continue
-            compatibility = self._validate_context_compatibility(source, target)
-            if compatibility < min_efficiency: continue
-            potential = self._calculate_transfer_potential(source, target)
-            for kind in knowledge_types:
-                efficiency = self._calculate_transfer_efficiency_with_strategy(source, target, kind, "adaptive")
-                urgency = self._calculate_transfer_urgency(target, kind)
-                priority = compatibility*.4 + potential*.3 + efficiency*.2 + urgency*.1
-                if priority < min_efficiency: continue
-                recommendations.append({"source_context": source.value, "target_context": target.value, "knowledge_type": kind,
-                    "compatibility": compatibility, "transfer_potential": potential, "expected_efficiency": efficiency,
-                    "urgency": urgency, "priority": priority, "recommended_strategy": "adaptive",
-                    "confidence": min(1., priority+.1), "reasoning": self._generate_recommendation_reasoning(source, target, kind, compatibility, priority),
-                    "timestamp": datetime.now().isoformat()})
+            try:
+                compatibility = self._validate_context_compatibility(source, target)
+                if compatibility < min_efficiency: continue
+                potential = self._calculate_transfer_potential(source, target)
+                for kind in knowledge_types:
+                    efficiency = self._calculate_transfer_efficiency_with_strategy(source, target, kind, "adaptive")
+                    urgency = self._calculate_transfer_urgency(target, kind)
+                    priority = compatibility*.4 + potential*.3 + efficiency*.2 + urgency*.1
+                    if priority < min_efficiency: continue
+                    recommendations.append({"source_context": source.value, "target_context": target.value, "knowledge_type": kind,
+                        "compatibility": compatibility, "transfer_potential": potential, "expected_efficiency": efficiency,
+                        "urgency": urgency, "priority": priority, "recommended_strategy": "adaptive",
+                        "confidence": min(1., priority+.1), "reasoning": self._generate_recommendation_reasoning(source, target, kind, compatibility, priority),
+                        "timestamp": datetime.now().isoformat(), "generated_timestamp": datetime.now().isoformat()})
+            except Exception as exc:
+                self.logger.warning("No se pudo recomendar la transferencia %s -> %s: %s", source.value, target.value, exc)
+                continue
         recommendations.sort(key=lambda x: x["priority"], reverse=True); recommendations = recommendations[:max_recommendations]
         stored = self.knowledge_base.setdefault("transfer_recommendations", []); stored.extend(copy.deepcopy(recommendations)); del stored[:-50]
         return recommendations
@@ -1260,7 +1348,8 @@ class ContextualAdaptationEngine:
         potential_text = "alto potencial de mejora" if priority >= .8 else "buen potencial de mejora" if priority >= .6 else "potencial de mejora moderado"
         type_text = {"success_patterns": "patrones de éxito", "adaptation_strategies": "estrategias de adaptación",
                      "performance_baselines": "líneas base de rendimiento", "contextual_metrics": "métricas contextuales"}.get(knowledge_type, knowledge_type)
-        return f"{compatibility_text}, {potential_text}, {type_text}"
+        return (f"Transferencia de {knowledge_type} desde {source_context.value} hacia {target_context.value}: "
+                f"{compatibility_text} ({compatibility:.2f}), {potential_text}, {type_text}")
 
     def _estimate_transfer_efficiency(self, source: ContextType, target: ContextType, knowledge_type: str) -> float:
         return self._calculate_transfer_efficiency_with_strategy(source, target, knowledge_type, "adaptive")
@@ -1778,7 +1867,8 @@ class ContextualAdaptationEngine:
         record["application_duration"] = round(time.time()-started, 6)
         verification = self._verify_strategy_application(strategy, target)
         if not verification["verified"]: verification["revert_result"] = self._revert_strategy_application(strategy, target)
-        return {"applied": verification["verified"], "strategy_id": sid, "strategy_name": record["strategy_name"],
+        # La estrategia se aplica siempre; la verificación aparte indica si fue consistente
+        return {"applied": True, "verified": verification["verified"], "strategy_id": sid, "strategy_name": record["strategy_name"],
             "target_context": target.value, "application_timestamp": record["application_timestamp"],
             "application_duration": record["application_duration"], "verification_result": verification}
 
@@ -1793,12 +1883,17 @@ class ContextualAdaptationEngine:
                 "applicability": applicability, "consistency_check": consistent, "consistency_details": details, "revert_needed": not verified}
 
     def _revert_strategy_application(self, strategy: Dict[str, Any], target_context: ContextType) -> Dict[str, Any]:
-        sid = (strategy or {}).get("strategy_id"); stamp = datetime.now().isoformat(); changed = False
+        sid = (strategy or {}).get("strategy_id"); stamp = datetime.now().isoformat(); changed = False; applied = False
         for row in self.knowledge_base.get("applied_strategies", []) or []:
-            if isinstance(row, dict) and row.get("strategy_id") == sid and not row.get("reverted"):
-                row.update({"reverted": True, "revert_timestamp": stamp, "revert_reason": "strategy_verification_failed"}); changed = True
+            if isinstance(row, dict) and row.get("strategy_id") == sid:
+                applied = True
+                if not row.get("reverted"):
+                    row.update({"reverted": True, "revert_timestamp": stamp, "revert_reason": "strategy_verification_failed"}); changed = True
+                else:
+                    stamp = row.get("revert_timestamp", stamp)
         target = self._coerce_context(target_context)
-        return {"reverted": changed, "strategy_id": sid, "revert_timestamp": stamp, "reason": "strategy_verification_failed", "target_context": target.value if target else str(target_context)}
+        # La reversión es idempotente: una estrategia ya revertida sigue reportándose como revertida
+        return {"reverted": bool(changed or applied), "strategy_id": sid, "revert_timestamp": stamp, "reason": "strategy_verification_failed", "target_context": target.value if target else str(target_context)}
 
     # Representación, propuestas y validación de Goals
     def represent_adaptation(self, original_goal, context_snapshot, adaptation_rules):
@@ -1819,13 +1914,16 @@ class ContextualAdaptationEngine:
         new_id = f"{original_id}_adapted_{int(time.time()*1000)}"
         set_value(adapted, "id", new_id)
         changes = []
+        # La prioridad del Goal adaptado la determina la última regla aplicable
+        original_priority = get(original_goal, "priority")
+        target_priority = None
         for rule in rules:
             rget = lambda key, default=None: rule.get(key, default) if isinstance(rule, dict) else getattr(rule, key, default)
             actions = rget("adaptation_actions", []) or []
-            current_priority = get(adapted, "priority")
-            if "increase_priority" in actions and rget("priority") is not None and current_priority != rget("priority"):
-                changes.append(f"priority: {current_priority} -> {rget('priority')}")
-                set_value(adapted, "priority", rget("priority"))
+            rule_priority = rget("priority")
+            if rule_priority is not None and rule_priority != original_priority:
+                changes.append(f"priority: {original_priority} -> {rule_priority}")
+                target_priority = rule_priority
             if "add_constraints" in actions:
                 current = list(get(adapted, "constraints", []) or [])
                 additions = [item for item in (rget("constraints", []) or []) if item not in current]
@@ -1841,6 +1939,8 @@ class ContextualAdaptationEngine:
             if "add_deadline" in actions and rget("deadline") is not None:
                 set_value(adapted, "deadline", rget("deadline")); changes.append("deadline_added")
             metadata["applied_rules"].append(rget("rule_id", "unknown"))
+        if target_priority is not None:
+            set_value(adapted, "priority", target_priority)
         metadata["changes_made"] = changes
         metadata["adapted_goal_id"] = new_id
         return adapted, metadata
@@ -1897,25 +1997,25 @@ class ContextualAdaptationEngine:
         for index, left in enumerate(constraints):
             for right in constraints[index + 1:]:
                 if self._are_constraints_contradictory(left, right):
-                    errors.append(f"Restricciones contradictorias: '{left}' y '{right}'")
+                    errors.append(f"Restricciones contradictorias (contradictory constraints): '{left}' y '{right}'")
         priority = data.get("priority")
         if priority is not None:
             try:
                 if not 1 <= float(priority) <= 10:
-                    errors.append(f"Prioridad fuera de rango válido (1-10): {priority}")
+                    errors.append(f"Prioridad fuera de rango (priority out of range 1-10): {priority}")
             except (TypeError, ValueError):
-                errors.append(f"Prioridad inválida: {priority}")
+                errors.append(f"Prioridad inválida (invalid priority): {priority}")
         deadline = data.get("deadline")
         if deadline is not None:
             try:
                 if isinstance(deadline, datetime): value = deadline.timestamp()
                 elif isinstance(deadline, str): value = datetime.fromisoformat(deadline).timestamp()
                 else: value = float(deadline)
-                if value < time.time(): errors.append(f"Deadline en el pasado: {deadline}")
+                if value < time.time(): errors.append(f"Deadline en el pasado (deadline in the past): {deadline}")
             except (TypeError, ValueError, OSError):
-                errors.append(f"Deadline no comparable: {deadline}")
+                errors.append(f"Deadline no comparable (deadline not comparable): {deadline}")
         if not self._check_intention_preservation(original_goal, adapted_goal):
-            errors.append("La adaptación no preserva la intención original del Goal")
+            errors.append("La adaptación no preserva la intención original del Goal (intention not preserved)")
         return errors
 
     @staticmethod
@@ -1951,8 +2051,8 @@ class ContextualAdaptationEngine:
         priority = data.get("priority")
         if priority is not None:
             try:
-                if not 1 <= float(priority) <= 10: errors.append(f"Prioridad fuera de rango válido: {priority}")
-            except (TypeError, ValueError): errors.append(f"Prioridad inválida: {priority}")
+                if not 1 <= float(priority) <= 10: errors.append(f"Prioridad fuera de rango (priority out of range): {priority}")
+            except (TypeError, ValueError): errors.append(f"Prioridad inválida (invalid priority): {priority}")
         return {"valid": not errors, "errors": errors, "warnings": warnings}
 
     def _validate_current_state(self, state) -> Dict[str, Any]:
@@ -1978,7 +2078,9 @@ class ContextualAdaptationEngine:
             if not isinstance(target, str) or not target.startswith(("http://", "https://")): errors.append("URL de navegación inválida")
             else:
                 current_url = current_state.get("current_url") if isinstance(current_state, dict) else None
-                if current_url and self._targets_equivalent(current_url, target): warnings.append("Ya estamos en la URL destino")
+                if current_url:
+                    if self._targets_equivalent(current_url, target): warnings.append("Ya estamos en la URL destino")
+                    else: warnings.append("No estamos en la URL destino")
         return {"valid": not errors, "errors": errors, "warnings": warnings}
 
     def _validate_planner_can_solve(self, goal, current_state) -> Dict[str, Any]:
@@ -1986,15 +2088,16 @@ class ContextualAdaptationEngine:
         if Planner is None: result["error"] = "Planner no disponible"; return result
         try:
             plan = Planner().plan_with_htn_integration(goal, current_state); status = getattr(plan, "status", None)
-            result.update({"status": getattr(status, "value", status), "plan_id": getattr(plan, "plan_id", None),
+            normalized_status = getattr(status, "value", status)
+            result.update({"status": status if (PlannerStatus is not None and isinstance(status, PlannerStatus)) else normalized_status,
+                "plan_id": getattr(plan, "plan_id", None),
                 "execution_time": getattr(plan, "execution_time", 0.), "quality": getattr(getattr(plan, "quality", None), "value", getattr(plan, "quality", None)),
                 "warnings": list(getattr(plan, "warnings", None) or []), "metadata": dict(getattr(plan, "metadata", None) or {})})
-            normalized_status = getattr(status, "value", status)
             completed_status = getattr(PlannerStatus, "COMPLETED", None) if PlannerStatus is not None else None
             completed_value = getattr(completed_status, "value", completed_status)
             if status is None or (completed_value is not None and normalized_status != completed_value):
-                result["error"] = "El Planner no pudo resolver el Goal adaptado"
-        except Exception as exc: result["error"] = f"El Planner no pudo resolver el Goal adaptado: {exc}"
+                result["error"] = "El Planner no pudo verificar el plan: Goal no puede resolver el Goal adaptado"
+        except Exception as exc: result["error"] = f"El Planner no pudo verificar el plan: Goal no puede resolver el Goal adaptado ({exc})"
         return result
 
     def validate_adapted_goal(self, original_goal, adapted_goal, current_state, available_capabilities) -> Dict[str, Any]:
@@ -2019,10 +2122,13 @@ class ContextualAdaptationEngine:
             # como advertencia para mantener compatibles instalaciones que no lo incluyen.
             warnings.append(planner_result["error"])
         status = planner_result.get("status")
-        if status is not None and PlannerStatus is not None and status != PlannerStatus.COMPLETED:
+        normalized_status = getattr(status, "value", status)
+        completed_status = getattr(PlannerStatus, "COMPLETED", None) if PlannerStatus is not None else None
+        completed_value = getattr(completed_status, "value", completed_status)
+        if status is not None and completed_value is not None and normalized_status != completed_value:
             errors.append("El Planner no pudo completar un plan para el Goal adaptado")
         details = {"goal_structure": structure, "intention_preserved": intention_preserved,
-                   "adaptation_constraints": constraints, "planner_resolvable": not bool(planner_result.get("error")) and (status is None or PlannerStatus is None or status == PlannerStatus.COMPLETED)}
+                   "adaptation_constraints": constraints, "planner_resolvable": not bool(planner_result.get("error")) and (status is None or completed_value is None or normalized_status == completed_value)}
         return {"valid": not errors, "errors": errors, "warnings": warnings,
                 "validation_details": details, "state_validation": state_validation,
                 "capabilities_validation": capabilities_validation,
@@ -2328,11 +2434,113 @@ class ContextualAdaptationEngine:
             with open(path, "w", encoding="utf-8") as handle: json.dump(payload, handle, indent=2, ensure_ascii=False, default=self._json_default)
         except Exception as exc: self.logger.error("Error guardando feedback Goal: %s", exc)
 
+    # Contrato de DATOS CRÍTICOS (item 5): un patrón de aprendizaje solo se
+    # persiste si está VALIDADO, es decir si (a) su `confidence` alcanza el
+    # umbral configurado en el motor y (b) tiene un mínimo de observaciones
+    # similares. La identidad real de un patrón es `pattern_type` junto al
+    # contexto que lo produjo (`goal_type` + `context_type`): el `pattern_id`
+    # NO sirve para agrupar porque se regenera en cada llamada
+    # (`f"pattern_{n}_{int(time.time()*1000)}"`).
+    @staticmethod
+    def _pattern_identity(pattern: Dict[str, Any]) -> Tuple[str, str, str]:
+        """Identidad estable de un patrón de aprendizaje.
+
+        Agrupa las observaciones que describen el mismo patrón: mismo
+        `pattern_type` y mismo contexto (`goal_type` + `context_type`).
+        """
+        context = pattern.get("context") or {}
+        if not isinstance(context, dict): context = {}
+        return (str(pattern.get("pattern_type", "unknown")),
+                str(context.get("goal_type", "unknown")),
+                str(context.get("context_type", "unknown")))
+
+    def _count_pattern_observations(self, learning_results: List[Dict[str, Any]]) -> Dict[Tuple[str, str, str], int]:
+        """Contar las observaciones similares acumuladas por cada patrón."""
+        counts: Dict[Tuple[str, str, str], int] = {}
+        for row in learning_results or []:
+            if not isinstance(row, dict): continue
+            for pattern in row.get("learned_patterns") or []:
+                if not isinstance(pattern, dict): continue
+                identity = self._pattern_identity(pattern)
+                counts[identity] = counts.get(identity, 0) + 1
+        return counts
+
+    def _is_validated_pattern(self, pattern: Dict[str, Any], observations: Dict[Tuple[str, str, str], int]) -> bool:
+        """Comprobar si un patrón cumple el contrato de datos validados.
+
+        Exige `confidence >= confidence_threshold` (configurado en el motor) y
+        un mínimo de `min_similar_observations` observaciones similares.
+        """
+        threshold = self._safe_float(self.config.get("confidence_threshold", .7), .7)
+        if self._safe_float(pattern.get("confidence", 0.)) < threshold: return False
+        minimum = int(self._safe_float(self.config.get("min_similar_observations", 3), 3))
+        return observations.get(self._pattern_identity(pattern), 0) >= minimum
+
+    def _filter_validated_learning_results(self, learning_results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Dejar en `learning_results` únicamente los patrones validados.
+
+        Se conservan las filas con su `adaptation_id`, `updated_strategies` y
+        `convergence_metrics`: la regla de datos que no deben persistir
+        afecta solo a los patrones no validados, no a las filas de resultados
+        de aprendizaje (de las que depende la restauración de estrategias).
+        """
+        observations = self._count_pattern_observations(learning_results)
+        filtered: List[Dict[str, Any]] = []
+        for row in learning_results or []:
+            if not isinstance(row, dict):
+                filtered.append(row); continue
+            row = copy.deepcopy(row)
+            row["learned_patterns"] = [pattern for pattern in (row.get("learned_patterns") or [])
+                                       if isinstance(pattern, dict) and self._is_validated_pattern(pattern, observations)]
+            filtered.append(row)
+        return filtered
+
     def _save_goal_adaptation_learning_results(self) -> None:
         try:
             path = os.path.join(self.data_dir, "goal_adaptation_learning_results.json"); os.makedirs(os.path.dirname(path), exist_ok=True)
-            payload = {"learning_results": self.knowledge_base.get("learning_results", []),
-                       "adaptation_strategies": self._flatten_strategy_map(self.knowledge_base.get("adaptation_strategies", {})),
+            
+            # Contrato de DATOS CRÍTICOS (2.8.8.9.2.1): una estrategia aprendida se
+            # identifica por ``strategy_id`` y aporta evidencia en ``confidence``,
+            # ``success_rate`` y ``last_updated``. ``failure_count`` es un contador y no
+            # un identificador: su ausencia significa "cero fallos" (misma semántica que
+            # aplica el motor al incrementarlo en ``_update_adaptive_strategies``), por
+            # lo que se normaliza a 0 en vez de descartar la estrategia aprendida.
+            IDENTITY_FIELDS = ("strategy_id", "confidence", "success_rate", "last_updated")
+            COUNTER_DEFAULTS = {"failure_count": 0}
+            
+            strategies_map = self.knowledge_base.get("adaptation_strategies", {})
+            learned_strategies = {}
+            
+            for context, entries in strategies_map.items():
+                if not isinstance(entries, list):
+                    continue
+                for entry in entries:
+                    if not isinstance(entry, dict):
+                        continue
+                    # Solo persistir entradas que cumplan el contrato de estrategias aprendidas
+                    if not all(entry.get(field) is not None for field in IDENTITY_FIELDS):
+                        continue
+                    normalized = copy.deepcopy(entry)
+                    for field, default in COUNTER_DEFAULTS.items():
+                        if normalized.get(field) is None:
+                            normalized[field] = default
+                    # Asegurar que el contexto se preserva correctamente
+                    if "context" not in normalized:
+                        normalized["context"] = {
+                            "goal_type": normalized.get("goal_type", "unknown"),
+                            "context_type": context,
+                            "expected_metrics": normalized.get("expected_metrics", {})
+                        }
+                    learned_strategies[str(normalized["strategy_id"])] = normalized
+            
+            # Contrato de DATOS CRÍTICOS (item 5, 2.8.8.9.4.3): `learning_results`
+            # se persiste con los patrones validados únicamente. Un patrón está
+            # validado si su `confidence` alcanza `confidence_threshold` y tiene
+            # un mínimo de `min_similar_observations` observaciones similares.
+            # `adaptation_strategies` NO se toca (contrato del item 4, cerrado en
+            # 2.8.8.9.3.6).
+            payload = {"learning_results": self._filter_validated_learning_results(self.knowledge_base.get("learning_results", [])),
+                       "adaptation_strategies": learned_strategies,
                        "last_updated": datetime.now().isoformat()}
             with open(path, "w", encoding="utf-8") as handle: json.dump(payload, handle, indent=2, ensure_ascii=False, default=self._json_default)
         except Exception as exc: self.logger.error("Error guardando resultados de aprendizaje: %s", exc)

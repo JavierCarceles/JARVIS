@@ -1,0 +1,163 @@
+gies": [
+                    {"strategy": "blue_green_deployment", "confidence": 0.85}
+                ]
+            }
+        }
+    
+        # Aplicar estrategia v�lida
+        apply_result = self.engine.apply_strategy(valid_strategy, ContextType.PRODUCTION)
+        self.assertTrue(apply_result["applied"])
+    
+        # Verificar que se aplic� correctamente
+        verification_result = self.engine._verify_strategy_application(valid_strategy, ContextType.PRODUCTION)
+        self.assertTrue(verification_result["verified"])
+    
+        # Aplicar una estrategia inv�lida que deber�a revertirse
+        invalid_strategy = {
+            "strategy_id": "test_revert_002",
+            "strategy_name": "invalid_strategy",
+            "knowledge_data": {
+                "adaptation_strategies": []  # Vac�o para causar inconsistencia
+            }
+        }
+    
+        # Aplicar estrategia inv�lida
+        apply_invalid_result = self.engine.apply_strategy(invalid_strategy, ContextType.PRODUCTION)
+>       self.assertTrue(apply_invalid_result["applied"])  # Se aplica pero deber�a fallar verificaci�n
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: False is not true
+
+tests\test_evolutionary_strategy_optimizer.py:562: AssertionError
+---------------------------- Captured stdout call -----------------------------
+{"timestamp": "2026-10-20T18:00:02.604425", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Modelos ML inicializados", "module": "advanced_logger", "function": "log", "line": 850, "thread": 20336, "process": 8900}
+{"timestamp": "2026-10-20T18:00:02.605748", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Bucle de optimizaci�n iniciado", "module": "advanced_logger", "function": "log", "line": 850, "thread": 20336, "process": 8900}
+{"timestamp": "2026-10-20T18:00:02.606047", "level": "INFO", "logger": "PerformanceOptimizer", "message": "PerformanceOptimizer inicializado", "module": "advanced_logger", "function": "log", "line": 850, "thread": 20336, "process": 8900}
+{"timestamp": "2026-10-20T18:00:02.714712", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Modelos ML inicializados", "module": "advanced_logger", "function": "log", "line": 850, "thread": 20336, "process": 8900}
+{"timestamp": "2026-10-20T18:00:02.715831", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Bucle de optimizaci�n iniciado", "module": "advanced_logger", "function": "log", "line": 850, "thread": 20336, "process": 8900}
+{"timestamp": "2026-10-20T18:00:02.716206", "level": "INFO", "logger": "PerformanceOptimizer", "message": "PerformanceOptimizer inicializado", "module": "advanced_logger", "function": "log", "line": 850, "thread": 20336, "process": 8900}
+{"timestamp": "2026-10-20T18:00:02.719095", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Modelos de aprendizaje inicializados", "module": "advanced_logger", "function": "log", "line": 850, "thread": 20336, "process": 8900}
+{"timestamp": "2026-10-20T18:00:02.720908", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Reglas personalizadas cargadas desde data/improvement_rules.json", "module": "advanced_logger", "function": "log", "line": 850, "thread": 20336, "process": 8900}
+{"timestamp": "2026-10-20T18:00:02.721180", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Reglas de mejora inicializadas: 162 reglas", "module": "advanced_logger", "function": "log", "line": 850, "thread": 20336, "process": 8900}
+{"timestamp": "2026-10-20T18:00:02.724505", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Bucle de aprendizaje iniciado", "module": "advanced_logger", "function": "log", "line": 850, "thread": 20336, "process": 8900}
+{"timestamp": "2026-10-20T18:00:02.724797", "level": "INFO", "logger": "SelfImprovementSystem", "message": "SelfImprovementSystem inicializado", "module": "advanced_logger", "function": "log", "line": 850, "thread": 20336, "process": 8900}
+{"timestamp": "2026-10-20T18:00:02.725554", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Grafo de conocimiento guardado en data/knowledge_graph.json", "module": "advanced_logger", "function": "log", "line": 850, "thread": 23416, "process": 8900}
+{"timestamp": "2026-10-20T18:00:02.847903", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Modelos ML inicializados", "module": "advanced_logger", "function": "log", "line": 850, "thread": 20336, "process": 8900}
+{"timestamp": "2026-10-20T18:00:02.848889", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Bucle de optimizaci�n iniciado", "module": "advanced_logger", "function": "log", "line": 850, "thread": 20336, "process": 8900}
+{"timestamp": "2026-10-20T18:00:02.849132", "level": "INFO", "logger": "PerformanceOptimizer", "message": "PerformanceOptimizer inicializado", "module": "advanced_logger", "function": "log", "line": 850, "thread": 20336, "process": 8900}
+{"timestamp": "2026-10-20T18:00:02.996624", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Modelos ML inicializados", "module": "advanced_logger", "function": "log", "line": 850, "thread": 20336, "process": 8900}
+{"timestamp": "2026-10-20T18:00:03.000663", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Bucle de optimizaci�n iniciado", "module": "advanced_logger", "function": "log", "line": 850, "thread": 20336, "process": 8900}
+{"timestamp": "2026-10-20T18:00:03.001157", "level": "INFO", "logger": "PerformanceOptimizer", "message": "PerformanceOptimizer inicializado", "module": "advanced_logger", "function": "log", "line": 850, "thread": 20336, "process": 8900}
+{"timestamp": "2026-10-20T18:00:03.004336", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Modelos de aprendizaje inicializados", "module": "advanced_logger", "function": "log", "line": 850, "thread": 20336, "process": 8900}
+{"timestamp": "2026-10-20T18:00:03.006876", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Reglas personalizadas cargadas desde data/improvement_rules.json", "module": "advanced_logger", "function": "log", "line": 850, "thread": 20336, "process": 8900}
+{"timestamp": "2026-10-20T18:00:03.007265", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Reglas de mejora inicializadas: 162 reglas", "module": "advanced_logger", "function": "log", "line": 850, "thread": 20336, "process": 8900}
+{"timestamp": "2026-10-20T18:00:03.015059", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Bucle de aprendizaje iniciado", "module": "advanced_logger", "function": "log", "line": 850, "thread": 20336, "process": 8900}
+{"timestamp": "2026-10-20T18:00:03.015522", "level": "INFO", "logger": "SelfImprovementSystem", "message": "SelfImprovementSystem inicializado", "module": "advanced_logger", "function": "log", "line": 850, "thread": 20336, "process": 8900}
+{"timestamp": "2026-10-20T18:00:03.016488", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Grafo de conocimiento guardado en data/knowledge_graph.json", "module": "advanced_logger", "function": "log", "line": 850, "thread": 8624, "process": 8900}
+{"timestamp": "2026-10-20T18:00:03.018292", "level": "INFO", "logger": "AdaptiveLearningEngine", "message": "Registro de modelos inicializado", "module": "advanced_logger", "function": "log", "line": 850, "thread": 20336, "process": 8900}
+{"timestamp": "2026-10-20T18:00:03.019073", "level": "INFO", "logger": "AdaptiveLearningEngine", "message": "Motor de aprendizaje iniciado", "module": "advanced_logger", "function": "log", "line": 850, "thread": 20336, "process": 8900}
+{"timestamp": "2026-10-20T18:00:03.019243", "level": "INFO", "logger": "AdaptiveLearningEngine", "message": "AdaptiveLearningEngine inicializado", "module": "advanced_logger", "function": "log", "line": 850, "thread": 20336, "process": 8900}
+------------------------------ Captured log call ------------------------------
+INFO     PerformanceOptimizer:advanced_logger.py:850 Modelos ML inicializados
+INFO     PerformanceOptimizer:advanced_logger.py:850 Bucle de optimizaci�n iniciado
+INFO     PerformanceOptimizer:advanced_logger.py:850 PerformanceOptimizer inicializado
+INFO     PerformanceOptimizer:advanced_logger.py:850 Modelos ML inicializados
+INFO     PerformanceOptimizer:advanced_logger.py:850 Bucle de optimizaci�n iniciado
+INFO     PerformanceOptimizer:advanced_logger.py:850 PerformanceOptimizer inicializado
+INFO     SelfImprovementSystem:advanced_logger.py:850 Modelos de aprendizaje inicializados
+INFO     SelfImprovementSystem:advanced_logger.py:850 Reglas personalizadas cargadas desde data/improvement_rules.json
+INFO     SelfImprovementSystem:advanced_logger.py:850 Reglas de mejora inicializadas: 162 reglas
+INFO     SelfImprovementSystem:advanced_logger.py:850 Bucle de aprendizaje iniciado
+INFO     SelfImprovementSystem:advanced_logger.py:850 SelfImprovementSystem inicializado
+INFO     SelfImprovementSystem:advanced_logger.py:850 Grafo de conocimiento guardado en data/knowledge_graph.json
+INFO     PerformanceOptimizer:advanced_logger.py:850 Modelos ML inicializados
+INFO     PerformanceOptimizer:advanced_logger.py:850 Bucle de optimizaci�n iniciado
+INFO     PerformanceOptimizer:advanced_logger.py:850 PerformanceOptimizer inicializado
+INFO     PerformanceOptimizer:advanced_logger.py:850 Modelos ML inicializados
+INFO     PerformanceOptimizer:advanced_logger.py:850 Bucle de optimizaci�n iniciado
+INFO     PerformanceOptimizer:advanced_logger.py:850 PerformanceOptimizer inicializado
+INFO     SelfImprovementSystem:advanced_logger.py:850 Modelos de aprendizaje inicializados
+INFO     SelfImprovementSystem:advanced_logger.py:850 Reglas personalizadas cargadas desde data/improvement_rules.json
+INFO     SelfImprovementSystem:advanced_logger.py:850 Reglas de mejora inicializadas: 162 reglas
+INFO     SelfImprovementSystem:advanced_logger.py:850 Bucle de aprendizaje iniciado
+INFO     SelfImprovementSystem:advanced_logger.py:850 SelfImprovementSystem inicializado
+INFO     SelfImprovementSystem:advanced_logger.py:850 Grafo de conocimiento guardado en data/knowledge_graph.json
+INFO     AdaptiveLearningEngine:advanced_logger.py:850 Registro de modelos inicializado
+INFO     AdaptiveLearningEngine:advanced_logger.py:850 Motor de aprendizaje iniciado
+INFO     AdaptiveLearningEngine:advanced_logger.py:850 AdaptiveLearningEngine inicializado
+=========================== short test summary info ===========================
+FAILED tests/test_goal_adaptation_learning_loop.py::test_goal_adaptation_learning_loop
+FAILED tests/test_goal_adaptation_learning_loop.py::test_learning_convergence
+FAILED tests/test_goal_adaptation_learning_loop.py::test_learning_adaptation_strategies
+FAILED tests/test_adapted_goal_validation.py::TestAdaptedGoalValidation::test_validate_adapted_goal_complete_success
+FAILED tests/test_adapted_goal_validation.py::TestAdaptedGoalValidation::test_validate_goal_preconditions_navigate_success
+FAILED tests/test_adapted_goal_validation.py::TestAdaptedGoalValidation::test_validate_planner_can_solve_failure
+FAILED tests/test_adapted_goal_validation.py::TestAdaptedGoalValidation::test_validate_planner_can_solve_success
+FAILED tests/test_context_compatibility.py::TestContextCompatibility::test_2_8_5_3_4_registrar_motivo
+FAILED tests/test_2_8_5_7_recommendations.py::Test2_8_5_7_Recommendations::test_2_8_5_7_4_integrar_con_contextual_adaptation_engine
+FAILED tests/test_2_8_5_7_recommendations.py::Test2_8_5_7_Recommendations::test_2_8_5_7_8_manejo_de_errores
+FAILED tests/test_2_8_5_7_recommendations.py::Test2_8_5_7_Recommendations::test_2_8_5_7_9_confianza_y_razonamiento
+FAILED tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_1_4_verificar_parametros_validos
+FAILED tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_5_3_revertir_cuando_exista_soporte_y_resultado_invalido
+13 failed, 44 passed, 34 subtests passed in 40.08s
+
+STDERR:
+n emit
+ValueError: I/O operation on closed file.
+Call stack:
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\__init__.py", line 297, in __del__
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\__init__.py", line 179, in stop_auto_optimization
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\self_improvement_system.py", line 1241, in stop_learning
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 801, in log
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 886, in log_simple
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 850, in log
+Message: 'Aprendizaje detenido'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\FO TARDA\AppData\Local\Python\pythoncore-3.14-64\Lib\logging\__init__.py", line 1154, in emit
+ValueError: I/O operation on closed file.
+Call stack:
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\__init__.py", line 297, in __del__
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\__init__.py", line 180, in stop_auto_optimization
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\adaptive_learning_engine.py", line 1077, in stop_learning_engine
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 801, in log
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 886, in log_simple
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 850, in log
+Message: 'Motor de aprendizaje detenido'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\FO TARDA\AppData\Local\Python\pythoncore-3.14-64\Lib\logging\__init__.py", line 1154, in emit
+ValueError: I/O operation on closed file.
+Call stack:
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\__init__.py", line 297, in __del__
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\__init__.py", line 181, in stop_auto_optimization
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\optimization_orchestrator.py", line 872, in stop_orchestration
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 801, in log
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 886, in log_simple
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 850, in log
+Message: 'Orquestaci�n detenida'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\FO TARDA\AppData\Local\Python\pythoncore-3.14-64\Lib\logging\__init__.py", line 1154, in emit
+ValueError: I/O operation on closed file.
+Call stack:
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\__init__.py", line 297, in __del__
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\__init__.py", line 183, in stop_auto_optimization
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 801, in log
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 886, in log_simple
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 850, in log
+Message: 'Optimizaci�n autom�tica detenida'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\FO TARDA\AppData\Local\Python\pythoncore-3.14-64\Lib\logging\__init__.py", line 1154, in emit
+ValueError: I/O operation on closed file.
+Call stack:
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\__init__.py", line 298, in __del__
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 801, in log
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 886, in log_simple
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 850, in log
+Message: 'Sistema de optimizaci�n finalizado'
+Arguments: ()

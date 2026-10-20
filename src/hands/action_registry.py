@@ -15,15 +15,146 @@ from __future__ import annotations
 import importlib
 import inspect
 import math
+import ast
+import threading
+import time
+import types
+from copy import deepcopy
 from dataclasses import asdict, dataclass, field, is_dataclass
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Union, get_args, get_origin
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Literal,
+    Optional,
+    Union,
+    get_args,
+    get_origin,
+    get_type_hints,
+)
 
 from src.hands.planner.preconditions_effects_types import Condition, Effect
 from src.memory.prediction import get_prediction_memory
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+
+def _log(level: str, message: Any, *_context: Any) -> None:
+    """Registra mensajes sin hacer que un logger incompatible rompa el registro."""
+    normalized_level = str(level or "info").strip().lower()
+    if normalized_level == "warn":
+        normalized_level = "warning"
+    method = getattr(logger, normalized_level, None)
+    if not callable(method):
+        method = getattr(logger, "info", None)
+    try:
+        if callable(method):
+            method("%s", str(message))
+            return
+    except TypeError:
+        try:
+            method(str(message))
+            return
+        except Exception:
+            pass
+    except Exception:
+        pass
+    try:
+        printer = getattr(logger, "_print_log", None)
+        if callable(printer):
+            printer(normalized_level, str(message), "action_registry.py", "_log", 0)
+    except Exception:
+        pass
+
+
+def _safe_copy(value: Any) -> Any:
+    """Copia defensivamente datos de estado preservando el fallback ante objetos opacos."""
+    try:
+        return deepcopy(value)
+    except Exception:
+        if isinstance(value, dict):
+            copied = {}
+            for key, item in value.items():
+                try:
+                    copied[key] = _safe_copy(item)
+                except Exception:
+                    copied[key] = item
+            return copied
+        if isinstance(value, list):
+            return [_safe_copy(item) for item in value]
+        if isinstance(value, tuple):
+            return tuple(_safe_copy(item) for item in value)
+        return value
+
+
+def _as_list(value: Any) -> List[Any]:
+    """Normaliza colecciones sin dividir por error cadenas en caracteres."""
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return list(value)
+    if isinstance(value, (tuple, set)):
+        return list(value)
+    return [value]
+
+
+def _state_to_dict(state: Any) -> Dict[str, Any]:
+    """Normaliza estados dict, dataclass y objetos con ``to_dict`` sin mutarlos."""
+    if isinstance(state, dict):
+        return dict(state)
+    if state is None:
+        return {}
+    to_dict = getattr(state, "to_dict", None)
+    if callable(to_dict):
+        try:
+            converted = to_dict()
+            if isinstance(converted, dict):
+                return dict(converted)
+        except Exception:
+            pass
+    try:
+        values = vars(state)
+        if isinstance(values, dict):
+            return {
+                key: value
+                for key, value in values.items()
+                if not str(key).startswith("_")
+            }
+    except (TypeError, AttributeError):
+        pass
+    return {}
+
+
+def _invoke_compatible(function: Callable[..., Any], candidates: Any) -> Any:
+    """Llama un callback con la primera firma compatible, sin repetir sus efectos."""
+    candidate_list = list(candidates)
+    try:
+        signature = inspect.signature(function)
+    except (TypeError, ValueError):
+        signature = None
+    if signature is not None:
+        for args, kwargs in candidate_list:
+            try:
+                signature.bind(*args, **kwargs)
+            except TypeError:
+                continue
+            return function(*args, **kwargs)
+        raise TypeError(
+            f"La firma de {function!r} no coincide con las llamadas admitidas"
+        )
+
+    last_error = None
+    for args, kwargs in candidate_list:
+        try:
+            return function(*args, **kwargs)
+        except TypeError as exc:
+            last_error = exc
+    if last_error is not None:
+        raise last_error
+    raise TypeError("No se proporcionaron firmas candidatas")
 
 
 class ActionType(Enum):
@@ -42,7 +173,7 @@ def _serialize_rule(value: Any) -> Any:
     """Serializa condiciones/efectos sin intentar serializar callbacks."""
     if isinstance(value, Condition):
         return {
-            "type": value.type.value,
+            "type": getattr(value.type, "value", value.type),
             "key": value.key,
             "expected_value": _serialize_rule(value.expected_value),
             "description": value.description,
@@ -53,7 +184,7 @@ def _serialize_rule(value: Any) -> Any:
         }
     if isinstance(value, Effect):
         return {
-            "type": value.type,
+            "type": _serialize_rule(value.type),
             "key": value.key,
             "value": _serialize_rule(value.value),
             "description": value.description,
@@ -69,11 +200,28 @@ def _serialize_rule(value: Any) -> Any:
         return value.value
     if isinstance(value, dict):
         return {str(key): _serialize_rule(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple, set)):
+    if isinstance(value, (list, tuple)):
         return [_serialize_rule(item) for item in value]
+    if isinstance(value, set):
+        return sorted((_serialize_rule(item) for item in value), key=repr)
     if is_dataclass(value) and not isinstance(value, type):
-        return _serialize_rule(asdict(value))
-    return value
+        try:
+            return _serialize_rule(asdict(value))
+        except Exception:
+            return repr(value)
+    if isinstance(value, type):
+        return value.__name__
+    if isinstance(value, float) and not math.isfinite(value):
+        return str(value)
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    # Paths and similar scalar wrappers are usually safely representable as text.
+    if hasattr(value, "__fspath__"):
+        try:
+            return str(value)
+        except Exception:
+            pass
+    return repr(value)
 
 
 def _get_state_value(state: Any, key: str, default: Any = None) -> Any:
@@ -83,7 +231,16 @@ def _get_state_value(state: Any, key: str, default: Any = None) -> Any:
     if not key:
         return default
     if isinstance(state, dict):
-        return state.get(key, default)
+        if key in state:
+            return state[key]
+        current: Any = state
+        for part in str(key).split("."):
+            if not isinstance(current, dict) or part not in current:
+                break
+            current = current[part]
+        else:
+            return current
+        return default
 
     getter = getattr(state, "get", None)
     if callable(getter):
@@ -95,7 +252,19 @@ def _get_state_value(state: Any, key: str, default: Any = None) -> Any:
             except Exception:
                 pass
 
-    return getattr(state, key, default)
+    if hasattr(state, key):
+        return getattr(state, key, default)
+    current = state
+    for part in str(key).split("."):
+        if isinstance(current, dict):
+            if part not in current:
+                return default
+            current = current[part]
+        else:
+            current = getattr(current, part, default)
+            if current is default:
+                return default
+    return current
 
 
 def _condition_from_dict(condition: Dict[str, Any]) -> Optional[Condition]:
@@ -140,11 +309,7 @@ def _match_condition(state: Any, condition: Any) -> bool:
     """Evalúa una condición simple, compuesta, funcional u objeto Condition."""
     if isinstance(condition, Condition):
         try:
-            return bool(
-                condition.evaluate(
-                    state if isinstance(state, dict) else dict(state or {})
-                )
-            )
+            return bool(condition.evaluate(_state_to_dict(state)))
         except Exception:
             return False
 
@@ -166,6 +331,10 @@ def _match_condition(state: Any, condition: Any) -> bool:
                 .lower()
             )
             children = condition.get("conditions") or []
+            if operator not in {"and", "or"} or not isinstance(
+                children, (list, tuple, set)
+            ):
+                return False
             results = [_match_condition(state, child) for child in children]
             if operator == "or":
                 return any(results)
@@ -175,13 +344,13 @@ def _match_condition(state: Any, condition: Any) -> bool:
         condition_obj = _condition_from_dict(condition)
         if condition_obj is not None:
             try:
-                return bool(
-                    condition_obj.evaluate(
-                        state if isinstance(state, dict) else dict(state or {})
-                    )
-                )
+                return bool(condition_obj.evaluate(_state_to_dict(state)))
             except Exception:
                 return False
+        if "type" in condition:
+            # Un tipo declarado pero desconocido no debe degradarse a una
+            # comparación legacy que pueda habilitar accidentalmente la acción.
+            return False
 
         # Forma simple legacy: {key: value} o {state/key: ..., value/equals: ...}
         if "key" in condition or "state" in condition:
@@ -218,7 +387,7 @@ def _apply_effect_value(
     execution_result: Dict[str, Any],
 ) -> Dict[str, Any]:
     """Aplica un efecto mediante el modelo canónico o compatibilidad legacy."""
-    state = dict(current_state)
+    state = _safe_copy(dict(current_state))
 
     if isinstance(effect, Effect):
         updated = effect.apply(state, execution_result)
@@ -227,10 +396,10 @@ def _apply_effect_value(
         return updated
 
     if callable(effect):
-        try:
-            updated = effect(state, execution_result)
-        except TypeError:
-            updated = effect(state)
+        updated = _invoke_compatible(
+            effect,
+            [((state, execution_result), {}), ((state,), {})],
+        )
         if not isinstance(updated, dict):
             raise TypeError("Un efecto funcional debe devolver un dict de estado")
         return updated
@@ -244,6 +413,7 @@ def _apply_effect_value(
         if callable(effect.get("function")):
             return _apply_effect_value(effect["function"], state, execution_result)
         effect_type = effect.get("type", "state_set")
+        effect_type = getattr(effect_type, "value", effect_type)
         key = effect.get("key", effect.get("state"))
         if key is None and effect_type != "composite":
             return state
@@ -285,16 +455,39 @@ class ActionInfo:
     planner_enabled: bool = True
     preconditions_functions: List[Callable] = field(default_factory=list)
     effects_functions: List[Callable] = field(default_factory=list)
+    _registered_at: float = field(default_factory=time.time, repr=False, compare=False)
+    accepts_extra_parameters: bool = False
 
     def __post_init__(self) -> None:
+        self.name = str(self.name or "").strip()
+        if not self.name:
+            raise ValueError("El nombre de la acción no puede estar vacío")
         if isinstance(self.action_type, str):
             self.action_type = _resolve_action_type(self.action_type)
+        if not isinstance(self.action_type, ActionType):
+            raise TypeError("action_type debe ser ActionType o una cadena válida")
+        self.description = str(self.description or "")
+        self.category = str(self.category or "general").strip() or "general"
+        self.module = str(self.module or "")
         self.parameters = dict(self.parameters or {})
-        self.tags = list(self.tags or [])
-        self.dependencies = list(self.dependencies or [])
-        self.required_resources = list(self.required_resources or [])
-        self.preconditions_functions = list(self.preconditions_functions or [])
-        self.effects_functions = list(self.effects_functions or [])
+        self.tags = _as_list(self.tags)
+        self.dependencies = _as_list(self.dependencies)
+        self.required_resources = _as_list(self.required_resources)
+        self.preconditions_functions = _as_list(self.preconditions_functions)
+        self.effects_functions = _as_list(self.effects_functions)
+        if callable(self.function):
+            try:
+                signature = inspect.signature(self.function)
+                self.accepts_extra_parameters = bool(
+                    self.accepts_extra_parameters
+                    or any(
+                        parameter.kind == inspect.Parameter.VAR_KEYWORD
+                        for parameter in signature.parameters.values()
+                    )
+                )
+            except (TypeError, ValueError):
+                pass
+        self.accepts_extra_parameters = bool(self.accepts_extra_parameters)
         self.confidence_threshold = _normalize_confidence(self.confidence_threshold)
         self.cost = _normalize_cost(self.cost)
 
@@ -318,6 +511,7 @@ class ActionInfo:
             "required_resources": list(self.required_resources),
             "requires_ui_element": self.requires_ui_element,
             "planner_enabled": self.planner_enabled,
+            "accepts_extra_parameters": self.accepts_extra_parameters,
             "preconditions_functions": "FUNCIONES_NO_SERIALIZABLES",
             "effects_functions": "FUNCIONES_NO_SERIALIZABLES",
         }
@@ -329,13 +523,15 @@ class ActionInfo:
 
         for precond_func in self.preconditions_functions:
             if not callable(precond_func):
-                logger._print_log("info", "Parámetro desconocido", "action_registry.py", "_validate_parameters", 679)
+                _log(
+                    "warning", f"Precondición no invocable configurada para {self.name}"
+                )
                 return False
             try:
                 if not bool(precond_func(state)):
                     return False
             except Exception as exc:
-                logger._print_log("INFO", "Procesando solicitud", "action_registry.py", "matches_preconditions", 338)
+                _log("warning", f"Falló una precondición de {self.name}: {exc}")
                 return False
         return True
 
@@ -344,15 +540,15 @@ class ActionInfo:
         if self.success_checker is None:
             return True
         try:
-            return bool(self.success_checker(result, *args, **kwargs))
-        except TypeError:
-            try:
-                return bool(self.success_checker(result))
-            except Exception as exc:
-                logger._print_log("INFO", "Procesando solicitud", "action_registry.py", "verify_success", 352)
-                return False
+            candidate_args = (result, *args)
+            return bool(
+                _invoke_compatible(
+                    self.success_checker,
+                    [(candidate_args, kwargs), ((result,), {}), ((), {})],
+                )
+            )
         except Exception as exc:
-            logger._print_log("INFO", "Procesando solicitud", "action_registry.py", "check_success", 355)
+            _log("warning", f"El verificador de éxito de {self.name} falló: {exc}")
             return False
 
     def apply_effects(
@@ -360,10 +556,14 @@ class ActionInfo:
         current_state: Dict[str, Any],
         execution_result: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        """Aplica efectos declarativos y funcionales de manera acumulativa."""
-        original_state = dict(current_state or {})
-        state = dict(original_state)
-        result = dict(execution_result or {})
+        """Aplica efectos declarativos y funcionales de manera transaccional."""
+        if current_state is not None and not isinstance(current_state, dict):
+            raise TypeError("current_state debe ser un diccionario")
+        if execution_result is not None and not isinstance(execution_result, dict):
+            raise TypeError("execution_result debe ser un diccionario")
+        original_state = _safe_copy(dict(current_state or {}))
+        state = _safe_copy(original_state)
+        result = _safe_copy(dict(execution_result or {}))
 
         try:
             effects = [] if self.effects is None else self.effects
@@ -375,23 +575,26 @@ class ActionInfo:
 
             for effect_func in self.effects_functions:
                 if not callable(effect_func):
-                    logger._print_log("info", "Parámetro requerido faltante", "action_registry.py", "_validate_parameters", 674)
-                    continue
+                    _log(
+                        "warning",
+                        f"Efecto no invocable configurado para {self.name}; se revierte el estado",
+                    )
+                    return original_state
                 try:
-                    try:
-                        updated_state = effect_func(state, result)
-                    except TypeError:
-                        updated_state = effect_func(state)
+                    updated_state = _invoke_compatible(
+                        effect_func,
+                        [((state, result), {}), ((state,), {})],
+                    )
                     if not isinstance(updated_state, dict):
                         raise TypeError("El efecto funcional debe devolver un dict")
                     state = updated_state
                 except Exception as exc:
-                    logger._print_log("INFO", "Procesando solicitud", "action_registry.py", "apply_effects", 389)
+                    _log("warning", f"Efecto funcional fallido en {self.name}: {exc}")
                     return original_state
 
             return state
         except Exception as exc:
-            logger._print_log("INFO", "Procesando solicitud", "action_registry.py", "_apply_effect_value", 394)
+            _log("warning", f"No se pudieron aplicar los efectos de {self.name}: {exc}")
             return original_state
 
 
@@ -425,6 +628,27 @@ def _resolve_action_type(raw_type: Union[str, ActionType]) -> ActionType:
     raise ValueError(f"ActionType desconocido: {raw_type}")
 
 
+def _split_type_arguments(value: str, separator: str = ",") -> List[str]:
+    """Divide argumentos de tipo respetando corchetes anidados."""
+    parts: List[str] = []
+    depth = 0
+    start = 0
+    for index, char in enumerate(value):
+        if char in "[({":
+            depth += 1
+        elif char in "])}":
+            depth = max(0, depth - 1)
+        elif char == separator and depth == 0:
+            part = value[start:index].strip()
+            if part:
+                parts.append(part)
+            start = index + 1
+    tail = value[start:].strip()
+    if tail:
+        parts.append(tail)
+    return parts
+
+
 class ActionRegistry:
     """Registro y acceso a todas las acciones/capacidades disponibles."""
 
@@ -435,12 +659,17 @@ class ActionRegistry:
         self._action_count: int = 0
         self._execution_count: int = 0
         self._error_count: int = 0
-        logger._print_log("info", "[ACTION-REGISTRY] Sistema de registro de acciones optimizado inicializado", "action_registry.py", "__init__", 450)
+        self._lock = threading.RLock()
+        _log("info", "[ACTION-REGISTRY] Sistema de registro de acciones inicializado")
 
     @staticmethod
     def _extract_parameters(func: Callable) -> Dict[str, Any]:
         """Extrae metadatos básicos de parámetros de una función."""
         sig = inspect.signature(func)
+        try:
+            resolved_hints = get_type_hints(func)
+        except Exception:
+            resolved_hints = {}
         extracted: Dict[str, Any] = {}
 
         for param_name, param in sig.parameters.items():
@@ -450,7 +679,7 @@ class ActionRegistry:
             }:
                 continue
 
-            annotation = param.annotation
+            annotation = resolved_hints.get(param_name, param.annotation)
             if annotation is inspect.Parameter.empty:
                 parameter_type: Any = "any"
             else:
@@ -501,6 +730,10 @@ class ActionRegistry:
     ) -> Callable:
         """Devuelve un decorador que registra una función como acción."""
 
+        if not str(name or "").strip():
+            raise ValueError("El nombre de la acción no puede estar vacío")
+        if not str(category or "").strip():
+            category = "general"
         normalized_action_type = _resolve_action_type(action_type)
         normalized_cost = _normalize_cost(cost)
         normalized_confidence = _normalize_confidence(confidence_threshold)
@@ -525,34 +758,37 @@ class ActionRegistry:
                 parameters=action_parameters,
                 module=func.__module__,
                 category=category,
-                tags=list(tags or []),
+                tags=_as_list(tags),
                 confidence_threshold=normalized_confidence,
                 preconditions=[] if preconditions is None else preconditions,
                 effects=[] if effects is None else effects,
                 cost=normalized_cost,
-                dependencies=list(dependencies or []),
+                dependencies=_as_list(dependencies),
                 capability=capability,
                 application=application,
-                required_resources=list(required_resources or []),
+                required_resources=_as_list(required_resources),
                 requires_ui_element=requires_ui_element,
                 success_checker=success_checker,
                 planner_enabled=bool(planner_enabled),
-                preconditions_functions=list(preconditions_functions or []),
-                effects_functions=list(effects_functions or []),
+                preconditions_functions=_as_list(preconditions_functions),
+                effects_functions=_as_list(effects_functions),
             )
 
             setattr(func, "_jarvis_action_info", action_info)
             self._store_action_info(action_info)
-            logger._print_log("info", "Procesando solicitud", "action_registry.py", "method", 332)
             return func
 
         return decorator
 
     def register_module(self, module_path: str) -> None:
         """Importa un módulo y registra sus acciones decoradas con logging optimizado."""
-        if module_path in self._registered_modules:
-            logger._print_log("debug", f"[ACTION-REGISTRY] Módulo ya registrado: {module_path}", "action_registry.py", "register_module", 548)
-            return
+        if not isinstance(module_path, str) or not module_path.strip():
+            raise ValueError("module_path debe ser una ruta de módulo no vacía")
+        module_path = module_path.strip()
+        with self._lock:
+            if module_path in self._registered_modules:
+                _log("debug", f"[ACTION-REGISTRY] Módulo ya registrado: {module_path}")
+                return
 
         try:
             module = importlib.import_module(module_path)
@@ -564,76 +800,130 @@ class ActionRegistry:
                 self._store_action_info(action_info)
                 count += 1
 
-            self._registered_modules.add(module_path)
+            with self._lock:
+                self._registered_modules.add(module_path)
             # Logging optimizado - solo información relevante
             if count > 0:
-                logger._print_log("info", f"[ACTION-REGISTRY] Módulo {module_path}: {count} acciones registradas exitosamente", "action_registry.py", "register_module", 566)
+                _log(
+                    "info",
+                    f"[ACTION-REGISTRY] Módulo {module_path}: {count} acciones registradas exitosamente",
+                    "action_registry.py",
+                    "register_module",
+                    566,
+                )
             else:
-                logger._print_log("debug", f"[ACTION-REGISTRY] Módulo {module_path}: no se encontraron acciones", "action_registry.py", "register_module", 568)
+                _log(
+                    "debug",
+                    f"[ACTION-REGISTRY] Módulo {module_path}: no se encontraron acciones",
+                    "action_registry.py",
+                    "register_module",
+                    568,
+                )
         except ImportError as exc:
-            logger._print_log("warning", f"[ACTION-REGISTRY] Error al importar módulo {module_path}: {exc}", "action_registry.py", "register_module", 570)
+            _log(
+                "warning",
+                f"[ACTION-REGISTRY] Error al importar módulo {module_path}: {exc}",
+                "action_registry.py",
+                "register_module",
+                570,
+            )
         except Exception as exc:
-            logger._print_log("error", f"[ACTION-REGISTRY] Error crítico al registrar módulo {module_path}: {exc}", "action_registry.py", "register_module", 572)
+            _log(
+                "error",
+                f"[ACTION-REGISTRY] Error crítico al registrar módulo {module_path}: {exc}",
+                "action_registry.py",
+                "register_module",
+                572,
+            )
 
     def _store_action_info(self, action_info: ActionInfo) -> None:
-        """Almacena ActionInfo manteniendo las categorías consistentes con logging optimizado."""
-        previous = self.actions.get(action_info.name)
-        if previous is not None and previous.category != action_info.category:
-            previous_names = self.categories.get(previous.category, [])
-            if action_info.name in previous_names:
-                previous_names.remove(action_info.name)
+        """Almacena una acción y mantiene los índices de categorías sincronizados."""
+        if not isinstance(action_info, ActionInfo):
+            raise TypeError("action_info debe ser una instancia de ActionInfo")
+        with self._lock:
+            previous = self.actions.get(action_info.name)
+            if previous is not None and previous.category != action_info.category:
+                previous_names = self.categories.get(previous.category, [])
+                if action_info.name in previous_names:
+                    previous_names.remove(action_info.name)
+                if not previous_names:
+                    self.categories.pop(previous.category, None)
 
-        self.actions[action_info.name] = action_info
-        category_actions = self.categories.setdefault(action_info.category, [])
-        if action_info.name not in category_actions:
-            category_actions.append(action_info.name)
-            
-        # Logging optimizado - solo registrar cuando sea relevante
-        self._action_count += 1
-        if self._action_count % 10 == 0:  # Log cada 10 acciones para evitar spam
-            logger._print_log("info", f"[ACTION-REGISTRY] Registradas {self._action_count} acciones. Categoría: {action_info.category}", "action_registry.py", "_store_action_info", 584)
+            self.actions[action_info.name] = action_info
+            category_actions = self.categories.setdefault(action_info.category, [])
+            if action_info.name not in category_actions:
+                category_actions.append(action_info.name)
+
+            self._action_count += 1
+            if self._action_count % 10 == 0:
+                _log(
+                    "info",
+                    f"[ACTION-REGISTRY] Registradas {self._action_count} acciones. "
+                    f"Categoría: {action_info.category}",
+                )
 
     def get_action(self, name: str) -> Optional[ActionInfo]:
-        return self.actions.get(name)
+        with self._lock:
+            return self.actions.get(name)
 
     def get_actions_by_category(self, category: str) -> List[ActionInfo]:
-        return [
-            self.actions[name]
-            for name in self.categories.get(category, [])
-            if name in self.actions
-        ]
+        with self._lock:
+            return [
+                self.actions[name]
+                for name in self.categories.get(category, [])
+                if name in self.actions
+            ]
 
     def get_all_actions(self) -> Dict[str, ActionInfo]:
-        return self.actions.copy()
+        with self._lock:
+            return self.actions.copy()
 
     def get_plannable_actions(self) -> Dict[str, ActionInfo]:
-        return {
-            name: info for name, info in self.actions.items() if info.planner_enabled
-        }
+        with self._lock:
+            return {
+                name: info
+                for name, info in self.actions.items()
+                if info.planner_enabled
+            }
 
     def get_actions_for_planner(self) -> List[Dict[str, Any]]:
-        return [
-            info.to_dict() for info in self.actions.values() if info.planner_enabled
-        ]
+        with self._lock:
+            items = [info for info in self.actions.values() if info.planner_enabled]
+        return [info.to_dict() for info in items]
 
     def get_actions_for_llama(self) -> List[Dict[str, Any]]:
-        actions_list = [info.to_dict() for info in self.actions.values()]
+        with self._lock:
+            items = list(self.actions.values())
+        actions_list = [info.to_dict() for info in items]
         # Logging optimizado - solo información relevante
         if len(actions_list) > 0:
-            logger._print_log("info", f"[ACTION-REGISTRY] Enviando {len(actions_list)} acciones al planificador", "action_registry.py", "get_actions_for_llama", 641)
+            _log(
+                "info",
+                f"[ACTION-REGISTRY] Enviando {len(actions_list)} acciones al planificador",
+                "action_registry.py",
+                "get_actions_for_llama",
+                641,
+            )
         else:
-            logger._print_log("warning", "[ACTION-REGISTRY] No hay acciones disponibles para el planificador", "action_registry.py", "get_actions_for_llama", 643)
+            _log(
+                "warning",
+                "[ACTION-REGISTRY] No hay acciones disponibles para el planificador",
+                "action_registry.py",
+                "get_actions_for_llama",
+                643,
+            )
         return actions_list
 
     @staticmethod
     def _validate_value_type(value: Any, expected_type: Any) -> bool:
-        """Valida tipos básicos y anotaciones parametrizadas frecuentes."""
-        if expected_type in (None, "any", "Any"):
+        """Valida tipos Python y anotaciones comunes, incluidas las diferidas."""
+        if expected_type in (None, "any", "Any", Any, inspect.Parameter.empty):
             return True
 
         if isinstance(expected_type, str):
-            type_name = expected_type.lower().strip()
-            type_map = {
+            annotation = expected_type.strip().replace("typing.", "")
+            lowered = annotation.lower()
+            primitive_types = {
                 "int": int,
                 "integer": int,
                 "float": float,
@@ -643,33 +933,144 @@ class ActionRegistry:
                 "boolean": bool,
                 "list": list,
                 "dict": dict,
+                "tuple": tuple,
+                "set": set,
+                "bytes": bytes,
+                "none": type(None),
+                "nonetype": type(None),
+                "any": Any,
             }
-            expected = type_map.get(type_name)
-            if expected is None:
-                # Anotaciones string no resueltas se consideran compatibles.
-                return True
-            return isinstance(value, expected) and not (
-                expected is int and isinstance(value, bool)
-            )
+            if lowered in primitive_types:
+                expected = primitive_types[lowered]
+                if expected is Any:
+                    return True
+                if expected is float:
+                    return isinstance(value, (int, float)) and not isinstance(
+                        value, bool
+                    )
+                return isinstance(value, expected) and not (
+                    expected is int and isinstance(value, bool)
+                )
+
+            # A small parser handles forward-reference strings without eval().
+            if lowered.startswith("literal[") and annotation.endswith("]"):
+                raw_literals = annotation[annotation.find("[") + 1 : -1]
+                literal_values = []
+                for part in _split_type_arguments(raw_literals):
+                    try:
+                        literal_values.append(ast.literal_eval(part))
+                    except (ValueError, SyntaxError):
+                        literal_values.append(part.strip().strip("\"'"))
+                return value in literal_values
+            if lowered.startswith("optional[") and annotation.endswith("]"):
+                inner = annotation[annotation.find("[") + 1 : -1].strip()
+                return value is None or ActionRegistry._validate_value_type(
+                    value, inner
+                )
+            if lowered.startswith("union[") and annotation.endswith("]"):
+                inner = annotation[annotation.find("[") + 1 : -1]
+                return any(
+                    ActionRegistry._validate_value_type(value, part)
+                    for part in _split_type_arguments(inner)
+                )
+            if "|" in annotation:
+                return any(
+                    ActionRegistry._validate_value_type(value, part)
+                    for part in _split_type_arguments(annotation, separator="|")
+                )
+            for container_name, container_type in (
+                ("list", list),
+                ("List", list),
+                ("set", set),
+                ("Set", set),
+            ):
+                prefix = container_name + "["
+                if annotation.startswith(prefix) and annotation.endswith("]"):
+                    if not isinstance(value, container_type):
+                        return False
+                    type_parts = _split_type_arguments(annotation[len(prefix) : -1])
+                    return not type_parts or all(
+                        ActionRegistry._validate_value_type(item, type_parts[0])
+                        for item in value
+                    )
+            for container_name in ("tuple", "Tuple"):
+                prefix = container_name + "["
+                if annotation.startswith(prefix) and annotation.endswith("]"):
+                    if not isinstance(value, tuple):
+                        return False
+                    type_parts = _split_type_arguments(annotation[len(prefix) : -1])
+                    if not type_parts:
+                        return True
+                    if len(type_parts) == 2 and type_parts[1] == "...":
+                        return all(
+                            ActionRegistry._validate_value_type(item, type_parts[0])
+                            for item in value
+                        )
+                    return len(value) == len(type_parts) and all(
+                        ActionRegistry._validate_value_type(item, item_type)
+                        for item, item_type in zip(value, type_parts)
+                    )
+            for container_name in ("dict", "Dict"):
+                prefix = container_name + "["
+                if annotation.startswith(prefix) and annotation.endswith("]"):
+                    if not isinstance(value, dict):
+                        return False
+                    type_parts = _split_type_arguments(annotation[len(prefix) : -1])
+                    if len(type_parts) >= 2:
+                        return all(
+                            ActionRegistry._validate_value_type(key, type_parts[0])
+                            and ActionRegistry._validate_value_type(item, type_parts[1])
+                            for key, item in value.items()
+                        )
+                    return True
+            # Unresolved forward references stay permissive for compatibility.
+            return True
 
         origin = get_origin(expected_type)
         args = get_args(expected_type)
-        if origin is Union:
+        if origin is Literal:
+            return value in args
+        if origin in (Union, types.UnionType):
             return any(ActionRegistry._validate_value_type(value, arg) for arg in args)
-        if origin in (list, List):
-            if not isinstance(value, list):
+        if origin in (list, List, set, tuple):
+            if not isinstance(value, origin if isinstance(origin, type) else list):
                 return False
-            return not args or all(
+            if not args:
+                return True
+            if origin is tuple and len(args) == 2 and args[1] is Ellipsis:
+                return all(
+                    ActionRegistry._validate_value_type(item, args[0]) for item in value
+                )
+            if origin is tuple and len(args) > 1:
+                return len(value) == len(args) and all(
+                    ActionRegistry._validate_value_type(item, item_type)
+                    for item, item_type in zip(value, args)
+                )
+            return all(
                 ActionRegistry._validate_value_type(item, args[0]) for item in value
             )
         if origin in (dict, Dict):
-            return isinstance(value, dict)
+            if not isinstance(value, dict):
+                return False
+            return not args or all(
+                ActionRegistry._validate_value_type(key, args[0])
+                and (
+                    len(args) < 2 or ActionRegistry._validate_value_type(item, args[1])
+                )
+                for key, item in value.items()
+            )
+        if expected_type is type(None):
+            return value is None
         if isinstance(expected_type, type):
             if expected_type is int:
                 return isinstance(value, int) and not isinstance(value, bool)
+            if expected_type is float:
+                return isinstance(value, (int, float)) and not isinstance(value, bool)
             return isinstance(value, expected_type)
-
-        return True
+        try:
+            return isinstance(value, expected_type)
+        except TypeError:
+            return True
 
     def validate_action(
         self, action_name: str, parameters: Optional[Dict[str, Any]]
@@ -677,9 +1078,18 @@ class ActionRegistry:
         """Valida presencia, nombres y tipos de los parámetros de la acción con logging optimizado."""
         action_info = self.get_action(action_name)
         if action_info is None:
-            logger._print_log("error", f"[ACTION-REGISTRY] Acción no encontrada: {action_name}", "action_registry.py", "validate_action", 659)
+            _log(
+                "error",
+                f"[ACTION-REGISTRY] Acción no encontrada: {action_name}",
+                "action_registry.py",
+                "validate_action",
+                659,
+            )
             return False
 
+        if parameters is not None and not isinstance(parameters, dict):
+            _log("warning", f"Los parámetros de {action_name} deben ser un diccionario")
+            return False
         safe_parameters = dict(parameters or {})
         definitions = action_info.parameters or {}
 
@@ -691,17 +1101,30 @@ class ActionRegistry:
                 missing_required.append(param_name)
 
         if missing_required:
-            logger._print_log("warning", f"[ACTION-REGISTRY] Parámetros requeridos faltantes para {action_name}: {missing_required}", "action_registry.py", "validate_action", 671)
+            _log(
+                "warning",
+                f"[ACTION-REGISTRY] Parámetros requeridos faltantes para {action_name}: {missing_required}",
+                "action_registry.py",
+                "validate_action",
+                671,
+            )
             return False
 
         # Validar parámetros desconocidos
         unknown_params = []
-        for param_name in safe_parameters:
-            if param_name not in definitions:
-                unknown_params.append(param_name)
+        if not action_info.accepts_extra_parameters:
+            for param_name in safe_parameters:
+                if param_name not in definitions:
+                    unknown_params.append(param_name)
 
         if unknown_params:
-            logger._print_log("warning", f"[ACTION-REGISTRY] Parámetros desconocidos para {action_name}: {unknown_params}", "action_registry.py", "validate_action", 680)
+            _log(
+                "warning",
+                f"[ACTION-REGISTRY] Parámetros desconocidos para {action_name}: {unknown_params}",
+                "action_registry.py",
+                "validate_action",
+                680,
+            )
             return False
 
         # Validar tipos de parámetros
@@ -710,13 +1133,27 @@ class ActionRegistry:
             info = definitions.get(param_name, {})
             expected_type = info.get("type", "any") if isinstance(info, dict) else "any"
             if not self._validate_value_type(value, expected_type):
-                type_errors.append(f"{param_name}: {type(value)} (esperado: {expected_type})")
+                type_errors.append(
+                    f"{param_name}: {type(value)} (esperado: {expected_type})"
+                )
 
         if type_errors:
-            logger._print_log("warning", f"[ACTION-REGISTRY] Errores de tipo en {action_name}: {type_errors}", "action_registry.py", "validate_action", 692)
+            _log(
+                "warning",
+                f"[ACTION-REGISTRY] Errores de tipo en {action_name}: {type_errors}",
+                "action_registry.py",
+                "validate_action",
+                692,
+            )
             return False
 
-        logger._print_log("debug", f"[ACTION-REGISTRY] Validación exitosa para {action_name}", "action_registry.py", "validate_action", 695)
+        _log(
+            "debug",
+            f"[ACTION-REGISTRY] Validación exitosa para {action_name}",
+            "action_registry.py",
+            "validate_action",
+            695,
+        )
         return True
 
     def can_execute(
@@ -729,23 +1166,56 @@ class ActionRegistry:
         """Determina si una acción está disponible en el estado proporcionado con logging optimizado."""
         action_info = self.get_action(action_name)
         if action_info is None:
-            logger._print_log("debug", f"[ACTION-REGISTRY] Acción no disponible: {action_name} (no encontrada)", "action_registry.py", "can_execute", 691)
+            _log(
+                "debug",
+                f"[ACTION-REGISTRY] Acción no disponible: {action_name} (no encontrada)",
+                "action_registry.py",
+                "can_execute",
+                691,
+            )
             return False
 
+        if parameters is not None and not isinstance(parameters, dict):
+            _log("debug", f"Acción {action_name} no disponible: parámetros no válidos")
+            return False
         safe_parameters = dict(parameters or {})
         if not self.validate_action(action_name, safe_parameters):
-            logger._print_log("debug", f"[ACTION-REGISTRY] Acción {action_name} no disponible: validación fallida", "action_registry.py", "can_execute", 696)
+            _log(
+                "debug",
+                f"[ACTION-REGISTRY] Acción {action_name} no disponible: validación fallida",
+                "action_registry.py",
+                "can_execute",
+                696,
+            )
             return False
 
         if check_preconditions and state is not None:
             preconditions_met = action_info.matches_preconditions(state)
             if not preconditions_met:
-                logger._print_log("debug", f"[ACTION-REGISTRY] Acción {action_name} no disponible: precondiciones no cumplidas", "action_registry.py", "can_execute", 702)
+                _log(
+                    "debug",
+                    f"[ACTION-REGISTRY] Acción {action_name} no disponible: precondiciones no cumplidas",
+                    "action_registry.py",
+                    "can_execute",
+                    702,
+                )
             else:
-                logger._print_log("debug", f"[ACTION-REGISTRY] Acción {action_name} disponible: precondiciones cumplidas", "action_registry.py", "can_execute", 704)
+                _log(
+                    "debug",
+                    f"[ACTION-REGISTRY] Acción {action_name} disponible: precondiciones cumplidas",
+                    "action_registry.py",
+                    "can_execute",
+                    704,
+                )
             return preconditions_met
         else:
-            logger._print_log("debug", f"[ACTION-REGISTRY] Acción {action_name} disponible (sin verificación de precondiciones)", "action_registry.py", "can_execute", 707)
+            _log(
+                "debug",
+                f"[ACTION-REGISTRY] Acción {action_name} disponible (sin verificación de precondiciones)",
+                "action_registry.py",
+                "can_execute",
+                707,
+            )
             return True
 
     def get_action_cost(self, action_name: str) -> float:
@@ -759,119 +1229,152 @@ class ActionRegistry:
         action_name: str,
         parameters: Optional[Dict[str, Any]] = None,
     ) -> Any:
-        """Ejecuta la capacidad real registrada con logging optimizado.
+        """Ejecuta la función registrada y registra éxito/fallo sin ocultar errores.
 
-        La actualización del World State se mantiene fuera del registro; los
-        efectos declarados se pueden aplicar después mediante ``ActionInfo.apply_effects``.
+        Los efectos declarados sobre el World State se aplican explícitamente a
+        través de ``ActionInfo.apply_effects``; esta función solo ejecuta la
+        capacidad real y registra la telemetría de la llamada.
         """
-        self._execution_count += 1
-        
-        # Logging optimizado - inicio de ejecución
-        logger._print_log("info", f"[ACTION-REGISTRY] Ejecutando acción: {action_name} (ejecución #{self._execution_count})", "action_registry.py", "execute_action", 717)
-        
-        action_info = self.get_action(action_name)
-        if not action_info:
-            error_msg = f"Acción no encontrada: {action_name}"
-            logger._print_log("error", f"[ACTION-REGISTRY] {error_msg}", "action_registry.py", "execute_action", 720)
-            raise ValueError(error_msg)
-        if action_info.function is None:
-            error_msg = f"La acción no tiene función ejecutable: {action_name}"
-            logger._print_log("error", f"[ACTION-REGISTRY] {error_msg}", "action_registry.py", "execute_action", 723)
-            raise ValueError(error_msg)
-
-        safe_parameters = dict(parameters or {})
-        if not self.validate_action(action_name, safe_parameters):
-            error_msg = f"Parámetros inválidos para la acción: {action_name}"
-            logger._print_log("warning", f"[ACTION-REGISTRY] {error_msg}. Parámetros: {safe_parameters}", "action_registry.py", "execute_action", 727)
-            raise ValueError(error_msg)
-
+        with self._lock:
+            self._execution_count += 1
+            execution_number = self._execution_count
+        prediction_memory = None
+        success = False
         try:
-            prediction_memory = get_prediction_memory()
-        except Exception:
-            prediction_memory = None
-            
-        try:
-            # Logging optimizado - parámetros validados
-            logger._print_log("debug", f"[ACTION-REGISTRY] Acción {action_name}: parámetros validados, ejecutando función", "action_registry.py", "execute_action", 733)
-            result = action_info.function(**safe_parameters)
-            
-            # Logging optimizado - ejecución exitosa
-            logger._print_log("info", f"[ACTION-REGISTRY] Acción {action_name} ejecutada exitosamente", "action_registry.py", "execute_action", 736)
-            
+            _log(
+                "info",
+                f"[ACTION-REGISTRY] Ejecutando acción {action_name} (#{execution_number})",
+            )
+            action_info = self.get_action(action_name)
+            if action_info is None:
+                raise ValueError(f"Acción no encontrada: {action_name}")
+            if not callable(action_info.function):
+                raise ValueError(
+                    f"La acción no tiene función ejecutable: {action_name}"
+                )
+            if parameters is not None and not isinstance(parameters, dict):
+                raise TypeError("parameters debe ser un diccionario")
+
+            safe_parameters = dict(parameters or {})
+            if not self.validate_action(action_name, safe_parameters):
+                raise ValueError(f"Parámetros inválidos para la acción: {action_name}")
+
             try:
-                if prediction_memory:
-                    prediction_memory.record_command(
-                        command=action_name,
-                        success=True,
-                        source="action_registry",
-                    )
-            except Exception as memory_error:
-                logger._print_log("warning", f"[ACTION-REGISTRY] Error al registrar comando en memoria predictiva: {memory_error}", "action_registry.py", "execute_action", 745)
+                prediction_memory = get_prediction_memory()
+            except Exception as exc:
+                _log("debug", f"Memoria predictiva no disponible: {exc}")
+
+            result = action_info.function(**safe_parameters)
+            success = True
+            _log(
+                "info",
+                f"[ACTION-REGISTRY] Acción {action_name} ejecutada correctamente",
+            )
             return result
         except Exception as exc:
-            # Logging optimizado - error detallado
-            self._error_count += 1
-            logger._print_log("error", f"[ACTION-REGISTRY] Error al ejecutar acción {action_name} (error #{self._error_count}): {exc}", "action_registry.py", "execute_action", 751)
+            with self._lock:
+                self._error_count += 1
+                error_number = self._error_count
+            _log(
+                "error",
+                f"[ACTION-REGISTRY] Falló {action_name} (error #{error_number}): {exc}",
+            )
+            raise
+        finally:
+            # La persistencia de aprendizaje nunca debe alterar el resultado real.
+            if prediction_memory is None:
+                try:
+                    prediction_memory = get_prediction_memory()
+                except Exception:
+                    prediction_memory = None
             try:
-                if prediction_memory:
-                    prediction_memory.record_command(
-                        command=action_name,
-                        success=False,
-                        source="action_registry",
+                recorder = getattr(prediction_memory, "record_command", None)
+                if callable(recorder):
+                    recorder(
+                        command=action_name, success=success, source="action_registry"
                     )
             except Exception as memory_error:
-                logger._print_log("warning", f"[ACTION-REGISTRY] Error al registrar comando fallido en memoria predictiva: {memory_error}", "action_registry.py", "execute_action", 759)
-            raise
+                _log(
+                    "warning",
+                    f"No se pudo registrar {action_name} en memoria predictiva: {memory_error}",
+                )
 
     def list_actions(self, category: Optional[str] = None) -> List[str]:
-        if category:
-            return [
-                name
-                for name in self.categories.get(category, [])
-                if name in self.actions
-            ]
-        return list(self.actions.keys())
+        with self._lock:
+            if category:
+                return [
+                    name
+                    for name in self.categories.get(category, [])
+                    if name in self.actions
+                ]
+            return list(self.actions.keys())
 
     def get_action_categories(self) -> List[str]:
-        return list(self.categories.keys())
-    
+        with self._lock:
+            return list(self.categories.keys())
+
     def get_optimization_stats(self) -> Dict[str, Any]:
-        """Obtiene estadísticas del sistema de registro de acciones para monitoreo y optimización."""
+        """Devuelve una instantánea consistente de las métricas del registro."""
+        with self._lock:
+            actions = list(self.actions.values())
+            categories = {
+                category: list(names) for category, names in self.categories.items()
+            }
+            registrations = self._action_count
+            executions = self._execution_count
+            errors = self._error_count
+
         stats = {
-            "total_actions": len(self.actions),
-            "total_categories": len(self.categories),
-            "total_registrations": self._action_count,
-            "total_executions": self._execution_count,
-            "total_errors": self._error_count,
-            "categories": list(self.categories.keys()),
-            "actions_by_category": {cat: len(actions) for cat, actions in self.categories.items()},
-            "plannable_actions": len([a for a in self.actions.values() if a.planner_enabled]),
-            "average_cost": sum(a.cost for a in self.actions.values()) / len(self.actions) if self.actions else 0,
-            "success_rate": (self._execution_count - self._error_count) / max(self._execution_count, 1) * 100,
-            "last_registered": max((a for a in self.actions.values()), key=lambda x: getattr(x, '_registered_at', 0), default=None)
+            "total_actions": len(actions),
+            "total_categories": len(categories),
+            "total_registrations": registrations,
+            "total_executions": executions,
+            "total_errors": errors,
+            "categories": list(categories.keys()),
+            "actions_by_category": {
+                category: len(names) for category, names in categories.items()
+            },
+            "plannable_actions": sum(1 for action in actions if action.planner_enabled),
+            "average_cost": sum(action.cost for action in actions) / len(actions)
+            if actions
+            else 0.0,
+            "success_rate": (executions - errors) / max(executions, 1) * 100.0,
+            "last_registered": max(
+                actions, key=lambda item: item._registered_at, default=None
+            ),
         }
-        
-        # Logging de estadísticas solo cuando sea relevante
-        if self._execution_count % 50 == 0:  # Cada 50 ejecuciones
-            logger._print_log("info", f"[ACTION-REGISTRY] Estadísticas: {stats['total_actions']} acciones, {stats['success_rate']:.1f}% tasa de éxito", "action_registry.py", "get_optimization_stats", 786)
-            
+        if executions and executions % 50 == 0:
+            _log(
+                "info",
+                f"[ACTION-REGISTRY] Estadísticas: {stats['total_actions']} acciones, "
+                f"{stats['success_rate']:.1f}% de éxito",
+            )
         return stats
-    
+
     def optimize_logging(self) -> None:
         """Optimiza el sistema de logging eliminando mensajes redundantes y mejorando la información."""
         # Aquí se podrían implementar estrategias de logging más avanzadas
         # como batching, niveles dinámicos, etc.
-        logger._print_log("info", "[ACTION-REGISTRY] Sistema de logging optimizado", "action_registry.py", "optimize_logging", 794)
+        _log(
+            "info",
+            "[ACTION-REGISTRY] Sistema de logging optimizado",
+            "action_registry.py",
+            "optimize_logging",
+            794,
+        )
 
 
 _action_registry: Optional[ActionRegistry] = None
+_action_registry_lock = threading.RLock()
 
 
 def get_action_registry() -> ActionRegistry:
+    """Devuelve el registro compartido, creado de forma segura entre hilos."""
     global _action_registry
-    if _action_registry is None:
-        _action_registry = ActionRegistry()
-    return _action_registry
+    with _action_registry_lock:
+        if _action_registry is None:
+            _action_registry = ActionRegistry()
+        return _action_registry
 
 
 def register_action(

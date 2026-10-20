@@ -1,0 +1,189 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.14.7, pytest-9.1.1, pluggy-1.7.0 -- C:\Users\FO TARDA\AppData\Local\Python\pythoncore-3.14-64\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\FO TARDA\Documents\VSC_JC\JARVIS
+plugins: anyio-4.14.2
+collecting ... collected 6 items
+
+tests/test_goal_adaptation_learned_strategy_persistence.py::test_la_estrategia_aprendida_sobrevive_una_sola_vez_al_reinicio PASSED [ 16%]
+tests/test_goal_adaptation_learned_strategy_persistence.py::test_la_estrategia_aprendida_conserva_su_contexto_tras_el_reinicio PASSED [ 33%]
+tests/test_goal_adaptation_learned_strategy_persistence.py::test_la_estrategia_aprendida_conserva_sus_datos_criticos PASSED [ 50%]
+tests/test_goal_adaptation_learned_strategy_persistence.py::test_la_estrategia_persistida_conserva_su_contexto PASSED [ 66%]
+tests/test_goal_adaptation_learned_strategy_persistence.py::test_el_indice_persistido_contiene_exactamente_las_estrategias_aprendidas PASSED [ 83%]
+tests/test_goal_adaptation_learned_strategy_persistence.py::test_ningun_registro_aparece_duplicado_tras_el_reinicio PASSED [100%]
+
+============================= 6 passed in 11.69s ==============================
+python : --- Logging error ---
+En línea: 1 Carácter: 49
++ ... JC/JARVIS"; python -m pytest tests/test_goal_adaptation_learned_strat ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (--- Logging error ---:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Traceback (most recent call last):
+  File "C:\Users\FO TARDA\AppData\Local\Python\pythoncore-3.14-64\Lib\logging\__init__.py", line 1154, in emit
+ValueError: I/O operation on closed file.
+Call stack:
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\__init__.py", line 297, in __del__
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\__init__.py", line 178, in stop_auto_optimization
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\performance_optimizer.py", line 877, in stop_optimization
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 801, in log
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 886, in log_simple
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 850, in log
+Message: 'Optimizaci¾n detenida'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\FO TARDA\AppData\Local\Python\pythoncore-3.14-64\Lib\logging\__init__.py", line 1154, in emit
+ValueError: I/O operation on closed file.
+Call stack:
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\__init__.py", line 297, in __del__
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\__init__.py", line 179, in stop_auto_optimization
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\self_improvement_system.py", line 1241, in stop_learning
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 801, in log
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 886, in log_simple
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 850, in log
+Message: 'Aprendizaje detenido'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\FO TARDA\AppData\Local\Python\pythoncore-3.14-64\Lib\logging\__init__.py", line 1154, in emit
+ValueError: I/O operation on closed file.
+Call stack:
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\__init__.py", line 297, in __del__
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\__init__.py", line 180, in stop_auto_optimization
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\adaptive_learning_engine.py", line 1077, in 
+stop_learning_engine
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 801, in log
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 886, in log_simple
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 850, in log
+Message: 'Motor de aprendizaje detenido'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\FO TARDA\AppData\Local\Python\pythoncore-3.14-64\Lib\logging\__init__.py", line 1154, in emit
+ValueError: I/O operation on closed file.
+Call stack:
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\__init__.py", line 297, in __del__
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\__init__.py", line 181, in stop_auto_optimization
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\optimization_orchestrator.py", line 872, in 
+stop_orchestration
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 801, in log
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 886, in log_simple
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 850, in log
+Message: 'Orquestaci¾n detenida'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\FO TARDA\AppData\Local\Python\pythoncore-3.14-64\Lib\logging\__init__.py", line 1154, in emit
+ValueError: I/O operation on closed file.
+Call stack:
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\__init__.py", line 297, in __del__
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\__init__.py", line 183, in stop_auto_optimization
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 801, in log
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 886, in log_simple
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 850, in log
+Message: 'Optimizaci¾n automßtica detenida'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\FO TARDA\AppData\Local\Python\pythoncore-3.14-64\Lib\logging\__init__.py", line 1154, in emit
+ValueError: I/O operation on closed file.
+Call stack:
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\__init__.py", line 298, in __del__
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 801, in log
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 886, in log_simple
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 850, in log
+Message: 'Sistema de optimizaci¾n finalizado'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\FO TARDA\AppData\Local\Python\pythoncore-3.14-64\Lib\logging\__init__.py", line 1154, in emit
+ValueError: I/O operation on closed file.
+Call stack:
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\__init__.py", line 297, in __del__
+    self.stop_auto_optimization()
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\__init__.py", line 178, in stop_auto_optimization
+    self.performance_optimizer.stop_optimization()
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\performance_optimizer.py", line 877, in 
+stop_optimization
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\advanced_logger.py", line 801, in log
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\advanced_logger.py", line 886, in log_simple
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\advanced_logger.py", line 850, in log
+Message: 'Optimizaci¾n detenida'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\FO TARDA\AppData\Local\Python\pythoncore-3.14-64\Lib\logging\__init__.py", line 1154, in emit
+ValueError: I/O operation on closed file.
+Call stack:
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\__init__.py", line 297, in __del__
+    self.stop_auto_optimization()
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\__init__.py", line 179, in stop_auto_optimization
+    self.self_improvement_system.stop_learning()
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\self_improvement_system.py", line 1241, in 
+stop_learning
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\advanced_logger.py", line 801, in log
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\advanced_logger.py", line 886, in log_simple
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\advanced_logger.py", line 850, in log
+Message: 'Aprendizaje detenido'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\FO TARDA\AppData\Local\Python\pythoncore-3.14-64\Lib\logging\__init__.py", line 1154, in emit
+ValueError: I/O operation on closed file.
+Call stack:
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\__init__.py", line 297, in __del__
+    self.stop_auto_optimization()
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\__init__.py", line 180, in stop_auto_optimization
+    self.adaptive_learning_engine.stop_learning_engine()
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\adaptive_learning_engine.py", line 1077, in 
+stop_learning_engine
+    self.logger.log("Motor de aprendizaje detenido", level="INFO")
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\advanced_logger.py", line 801, in log
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\advanced_logger.py", line 886, in log_simple
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\advanced_logger.py", line 850, in log
+Message: 'Motor de aprendizaje detenido'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\FO TARDA\AppData\Local\Python\pythoncore-3.14-64\Lib\logging\__init__.py", line 1154, in emit
+ValueError: I/O operation on closed file.
+Call stack:
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\__init__.py", line 297, in __del__
+    self.stop_auto_optimization()
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\__init__.py", line 181, in stop_auto_optimization
+    self.optimization_orchestrator.stop_orchestration()
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\optimization_orchestrator.py", line 872, in 
+stop_orchestration
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\advanced_logger.py", line 801, in log
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\advanced_logger.py", line 886, in log_simple
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\advanced_logger.py", line 850, in log
+Message: 'Orquestaci¾n detenida'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\FO TARDA\AppData\Local\Python\pythoncore-3.14-64\Lib\logging\__init__.py", line 1154, in emit
+ValueError: I/O operation on closed file.
+Call stack:
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\__init__.py", line 297, in __del__
+    self.stop_auto_optimization()
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\__init__.py", line 183, in stop_auto_optimization
+    self.logger.log("Optimizaci¾n automßtica detenida", level="INFO")
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\advanced_logger.py", line 801, in log
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\advanced_logger.py", line 886, in log_simple
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\advanced_logger.py", line 850, in log
+Message: 'Optimizaci¾n automßtica detenida'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\FO TARDA\AppData\Local\Python\pythoncore-3.14-64\Lib\logging\__init__.py", line 1154, in emit
+ValueError: I/O operation on closed file.
+Call stack:
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\__init__.py", line 298, in __del__
+    self.logger.log("Sistema de optimizaci¾n finalizado", level="INFO")
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\advanced_logger.py", line 801, in log
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\advanced_logger.py", line 886, in log_simple
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\advanced_logger.py", line 850, in log
+Message: 'Sistema de optimizaci¾n finalizado'
+Arguments: ()

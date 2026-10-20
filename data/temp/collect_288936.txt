@@ -1,0 +1,349 @@
+tests/test_2_8_5_7_recommendations.py::Test2_8_5_7_Recommendations::test_2_8_5_7_1_generar_recomendacion_usando_datos_existentes
+tests/test_2_8_5_7_recommendations.py::Test2_8_5_7_Recommendations::test_2_8_5_7_2_verificar_compatibilidad
+tests/test_2_8_5_7_recommendations.py::Test2_8_5_7_Recommendations::test_2_8_5_7_3_evitar_recomendar_transferencias_no_ejecutables
+tests/test_2_8_5_7_recommendations.py::Test2_8_5_7_Recommendations::test_2_8_5_7_4_integrar_con_contextual_adaptation_engine
+tests/test_2_8_5_7_recommendations.py::Test2_8_5_7_Recommendations::test_2_8_5_7_5_ordenacion_por_prioridad
+tests/test_2_8_5_7_recommendations.py::Test2_8_5_7_Recommendations::test_2_8_5_7_6_limitar_numero_de_recomendaciones
+tests/test_2_8_5_7_recommendations.py::Test2_8_5_7_Recommendations::test_2_8_5_7_7_tipos_de_conocimiento_evaluados
+tests/test_2_8_5_7_recommendations.py::Test2_8_5_7_Recommendations::test_2_8_5_7_8_manejo_de_errores
+tests/test_2_8_5_7_recommendations.py::Test2_8_5_7_Recommendations::test_2_8_5_7_9_confianza_y_razonamiento
+tests/test_2_8_7_2_features_signals.py::TestFeaturesSignals::test_2_8_7_2_1_enumerate_contextual_data
+tests/test_2_8_7_2_features_signals.py::TestFeaturesSignals::test_2_8_7_2_2_separate_real_signals_from_unavailable
+tests/test_2_8_7_2_features_signals.py::TestFeaturesSignals::test_2_8_7_2_3_build_minimal_representation
+tests/test_2_8_7_2_features_signals.py::TestFeaturesSignals::test_2_8_7_2_4_handle_missing_signal
+tests/test_2_8_7_2_features_signals.py::TestFeaturesSignals::test_2_8_7_2_5_confidence_threshold_handling
+tests/test_adapted_goal_validation.py::TestAdaptedGoalValidation::test_register_validation_result
+tests/test_adapted_goal_validation.py::TestAdaptedGoalValidation::test_validate_adapted_goal_complete_failure
+tests/test_adapted_goal_validation.py::TestAdaptedGoalValidation::test_validate_adapted_goal_complete_success
+tests/test_adapted_goal_validation.py::TestAdaptedGoalValidation::test_validate_capabilities_missing
+tests/test_adapted_goal_validation.py::TestAdaptedGoalValidation::test_validate_capabilities_success
+tests/test_adapted_goal_validation.py::TestAdaptedGoalValidation::test_validate_current_state_invalid_structure
+tests/test_adapted_goal_validation.py::TestAdaptedGoalValidation::test_validate_current_state_success
+tests/test_adapted_goal_validation.py::TestAdaptedGoalValidation::test_validate_goal_preconditions_navigate_invalid_url
+tests/test_adapted_goal_validation.py::TestAdaptedGoalValidation::test_validate_goal_preconditions_navigate_success
+tests/test_adapted_goal_validation.py::TestAdaptedGoalValidation::test_validate_goal_structure_missing_fields
+tests/test_adapted_goal_validation.py::TestAdaptedGoalValidation::test_validate_goal_structure_success
+tests/test_adapted_goal_validation.py::TestAdaptedGoalValidation::test_validate_planner_can_solve_failure
+tests/test_adapted_goal_validation.py::TestAdaptedGoalValidation::test_validate_planner_can_solve_success
+tests/test_context_compatibility.py::TestContextCompatibility::test_2_8_5_3_1_reutilizar_validate_context_compatibility
+tests/test_context_compatibility.py::TestContextCompatibility::test_2_8_5_3_2_verificar_umbrales_existentes
+tests/test_context_compatibility.py::TestContextCompatibility::test_2_8_5_3_3_rechazar_transferencia_incompatible
+tests/test_context_compatibility.py::TestContextCompatibility::test_2_8_5_3_4_registrar_motivo
+tests/test_context_compatibility.py::TestContextCompatibility::test_2_8_5_3_5_tests
+tests/test_context_model_origin_destination.py::TestContextModelOriginDestination::test_2_8_5_2_1_identificar_contexto_origen
+tests/test_context_model_origin_destination.py::TestContextModelOriginDestination::test_2_8_5_2_2_identificar_contexto_destino
+tests/test_context_model_origin_destination.py::TestContextModelOriginDestination::test_2_8_5_2_3_verificar_datos_disponibles
+tests/test_context_model_origin_destination.py::TestContextModelOriginDestination::test_2_8_5_2_4_detectar_contexto_incompleto
+tests/test_context_model_origin_destination.py::TestContextModelOriginDestination::test_2_8_5_2_5_tests
+tests/test_context_model_origin_destination.py::TestContextModelOriginDestination::test_context_snapshot_model
+tests/test_cross_context_confidence_feedback.py::TestTransferConfidence::test_get_transfer_confidence_basic
+tests/test_cross_context_confidence_feedback.py::TestTransferConfidence::test_get_transfer_confidence_with_result
+tests/test_cross_context_confidence_feedback.py::TestTransferConfidence::test_get_transfer_confidence_nonexistent
+tests/test_cross_context_confidence_feedback.py::TestTransferConfidence::test_get_transfer_confidence_zero_efficiency
+tests/test_cross_context_confidence_feedback.py::TestTransferFeedback::test_register_feedback_basic
+tests/test_cross_context_confidence_feedback.py::TestTransferFeedback::test_register_feedback_with_result
+tests/test_cross_context_confidence_feedback.py::TestTransferFeedback::test_register_feedback_nonexistent
+tests/test_cross_context_confidence_feedback.py::TestTransferFeedback::test_register_feedback_quality_update
+tests/test_cross_context_confidence_feedback.py::TestTransferResultEvaluation::test_evaluate_transfer_result_success
+tests/test_cross_context_confidence_feedback.py::TestTransferResultEvaluation::test_evaluate_transfer_result_partial
+tests/test_cross_context_confidence_feedback.py::TestTransferResultEvaluation::test_evaluate_transfer_result_failure
+tests/test_cross_context_confidence_feedback.py::TestTransferResultEvaluation::test_evaluate_transfer_result_nonexistent
+tests/test_cross_context_confidence_feedback.py::TestFeedbackIntegrationWithExistingMechanisms::test_feedback_updates_transfer_patterns
+tests/test_cross_context_confidence_feedback.py::TestFeedbackIntegrationWithExistingMechanisms::test_feedback_does_not_modify_critical_data
+tests/test_cross_context_confidence_feedback.py::TestFeedbackIntegrationWithExistingMechanisms::test_confidence_calculation_uses_existing_mechanisms
+tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_1_1_localizar_cross_context_knowledge_transfer
+tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_1_2_localizar_transfer_knowledge
+tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_1_3_localizar_batch_knowledge_transfer
+tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_1_4_localizar_auto_transfer_knowledge
+tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_1_5_localizar_transfer_knowledge_with_feedback
+tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_1_6_localizar_get_transfer_recommendations
+tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_1_7_definir_que_parte_se_reutiliza
+tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_1_8_evitar_duplicacion
+tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_1_9_tests
+tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_2_1_identificar_contexto_origen
+tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_2_2_identificar_contexto_destino
+tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_2_3_verificar_datos_disponibles
+tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_2_4_detectar_contexto_incompleto
+tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_3_1_reutilizar_validate_context_compatibility
+tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_3_2_verificar_umbrales_existentes
+tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_3_3_rechazar_transferencia_incompatible
+tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_3_4_registrar_motivo
+tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_4_1_identificar_que_conocimiento_puede_transferirse
+tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_4_2_separar_conocimiento_no_reutilizable
+tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_4_3_extraer_usando_logica_existente
+tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_4_4_transformar_usando_mecanismos_existentes
+tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_6_1_obtener_confianza_existente
+tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_6_2_registrar_feedback
+tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_6_3_evaluar_resultado
+tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_6_4_ajustar_confianza
+tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_6_5_tests
+tests/test_cross_context_units.py::TestCrossContextUnits::test_2_8_5_4_1_identificar_que_conocimiento_puede_transferirse
+tests/test_cross_context_units.py::TestCrossContextUnits::test_2_8_5_4_2_separar_conocimiento_no_reutilizable
+tests/test_cross_context_units.py::TestCrossContextUnits::test_2_8_5_4_3_extraer_usando_logica_existente
+tests/test_cross_context_units.py::TestCrossContextUnits::test_2_8_5_4_4_transformar_usando_mecanismos_existentes
+tests/test_cross_context_units.py::TestCrossContextUnits::test_2_8_5_4_5_tests
+tests/test_direct.py::test_methods_direct
+tests/test_dynamic_resource_allocator_integration.py::TestDynamicResourceAllocatorIntegration::test_2_8_4_7_1_connect_contextual_adaptation_engine
+tests/test_dynamic_resource_allocator_integration.py::TestDynamicResourceAllocatorIntegration::test_2_8_4_7_2_connect_performance_optimizer
+tests/test_dynamic_resource_allocator_integration.py::TestDynamicResourceAllocatorIntegration::test_2_8_4_7_3_expose_result_to_planner_executor
+tests/test_dynamic_resource_allocator_integration.py::TestDynamicResourceAllocatorIntegration::test_2_8_4_7_4_integration_workflow
+tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_1_1_localizar_evolutionary_strategy_optimizer
+tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_1_2_identificar_representacion_estrategia_existente
+tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_1_3_representar_estrategia_candidata
+tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_1_4_verificar_parametros_validos
+tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_1_5_tests
+tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_2_1_identificar_estrategias_disponibles
+tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_2_2_generar_candidato_solo_mecanismos_soportados
+tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_2_3_evitar_candidatos_identico
+tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_2_4_limitar_cantidad_si_existe_configuracion_limite
+tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_2_5_tests
+tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_4_1_seleccionar_estrategia_valida
+tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_4_2_seleccionar_con_estrategia_actual
+tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_4_3_sin_mejora_significativa
+tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_4_4_sin_estrategias_validas
+tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_4_5_comparar_estrategias
+tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_4_6_empate_en_comparacion
+tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_5_1_aplicar_cambio_estrategia
+tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_5_2_verificar_comportamiento_posterior
+tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_5_3_revertir_cuando_exista_soporte_y_resultado_invalido
+tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_6_1_conectar_contextual_adaptation_engine
+tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_6_2_conectar_performance_optimizer_cuando_proceda
+tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_6_3_exponer_resultado_a_planner_executor_solo_mediante_contratos_existentes
+tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_6_4_tests
+tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_7_1_persistencia_y_estabilidad
+tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_7_2_evitar_oscilacion_entre_estrategias
+tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_7_3_registrar_cambios
+tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_7_4_tests
+tests/test_final.py::test_methods_direct
+tests/test_goal_adaptation_feedback.py::test_goal_adaptation_feedback
+tests/test_goal_adaptation_feedback.py::test_adaptation_improvement_analysis
+tests/test_goal_adaptation_feedback_persistence.py::test_capture_feedback_registra_en_knowledge_base
+tests/test_goal_adaptation_feedback_persistence.py::test_capture_feedback_devuelve_adaptation_id
+tests/test_goal_adaptation_feedback_persistence.py::test_performance_improvement_se_calcula
+tests/test_goal_adaptation_feedback_persistence.py::test_performance_improvement_detecta_degradacion
+tests/test_goal_adaptation_feedback_persistence.py::test_adaptation_history_se_registra_y_persiste
+tests/test_goal_adaptation_feedback_persistence.py::test_feedback_persiste_en_disco
+tests/test_goal_adaptation_feedback_persistence.py::test_limite_persistencia_feedback
+tests/test_goal_adaptation_feedback_persistence.py::test_persistencia_serializa_a_json
+tests/test_goal_adaptation_learned_strategy_persistence.py::test_la_estrategia_aprendida_sobrevive_una_sola_vez_al_reinicio
+tests/test_goal_adaptation_learned_strategy_persistence.py::test_la_estrategia_aprendida_conserva_su_contexto_tras_el_reinicio
+tests/test_goal_adaptation_learned_strategy_persistence.py::test_la_estrategia_aprendida_conserva_sus_datos_criticos
+tests/test_goal_adaptation_learned_strategy_persistence.py::test_la_estrategia_persistida_conserva_su_contexto
+tests/test_goal_adaptation_learned_strategy_persistence.py::test_el_indice_persistido_contiene_exactamente_las_estrategias_aprendidas
+tests/test_goal_adaptation_learned_strategy_persistence.py::test_ningun_registro_aparece_duplicado_tras_el_reinicio
+tests/test_goal_adaptation_learning_loop.py::test_goal_adaptation_learning_loop
+tests/test_goal_adaptation_learning_loop.py::test_learning_convergence
+tests/test_goal_adaptation_learning_loop.py::test_learning_adaptation_strategies
+tests/test_goal_adaptation_persistence_real.py::test_captura_y_bucle_de_aprendizaje
+tests/test_goal_adaptation_persistence_real.py::test_bucle_registra_resultados_con_adaptation_id
+tests/test_goal_adaptation_persistence_real.py::test_archivos_persistidos_se_crean
+tests/test_goal_adaptation_persistence_real.py::test_carga_recupera_datos_persistidos
+tests/test_goal_adaptation_persistence_real.py::test_integridad_datos_cargados
+tests/test_goal_adaptation_persistence_simple.py::test_estructuras_base_inicializadas
+tests/test_goal_adaptation_persistence_simple.py::test_guardar_feedback_crea_archivo
+tests/test_goal_adaptation_persistence_simple.py::test_guardar_aprendizaje_crea_archivo
+tests/test_goal_adaptation_persistence_simple.py::test_cargar_datos_persistidos
+tests/test_goal_adaptation_persistence_simple.py::test_inicializacion_persistencia_estructuras
+tests/test_goal_adaptation_persistence_simple.py::test_integridad_serializacion
+tests/test_goal_adaptation_proposal.py::TestGoalAdaptationProposal::test_application_integrity_preservation
+tests/test_goal_adaptation_proposal.py::TestGoalAdaptationProposal::test_are_constraints_contradictory
+tests/test_goal_adaptation_proposal.py::TestGoalAdaptationProposal::test_check_intention_preservation
+tests/test_goal_adaptation_proposal.py::TestGoalAdaptationProposal::test_create_goal_adaptation_proposal_basic
+tests/test_goal_adaptation_proposal.py::TestGoalAdaptationProposal::test_create_goal_adaptation_proposal_no_rules
+tests/test_goal_adaptation_proposal.py::TestGoalAdaptationProposal::test_create_goal_adaptation_proposal_with_adaptation
+tests/test_goal_adaptation_proposal.py::TestGoalAdaptationProposal::test_deadline_validation
+tests/test_goal_adaptation_proposal.py::TestGoalAdaptationProposal::test_navigation_integrity_preservation
+tests/test_goal_adaptation_proposal.py::TestGoalAdaptationProposal::test_priority_validation
+tests/test_goal_adaptation_proposal.py::TestGoalAdaptationProposal::test_proposal_registration
+tests/test_goal_adaptation_proposal.py::TestGoalAdaptationProposal::test_validate_adaptation_constraints
+tests/test_goal_adaptation_representation.py::TestGoalAdaptationRepresentation::test_represent_adaptation_constraints_addition
+tests/test_goal_adaptation_representation.py::TestGoalAdaptationRepresentation::test_represent_adaptation_deadline_addition
+tests/test_goal_adaptation_representation.py::TestGoalAdaptationRepresentation::test_represent_adaptation_metadata_update
+tests/test_goal_adaptation_representation.py::TestGoalAdaptationRepresentation::test_represent_adaptation_multiple_rules
+tests/test_goal_adaptation_representation.py::TestGoalAdaptationRepresentation::test_represent_adaptation_no_rules
+tests/test_goal_adaptation_representation.py::TestGoalAdaptationRepresentation::test_represent_adaptation_preserve_original
+tests/test_goal_adaptation_representation.py::TestGoalAdaptationRepresentation::test_represent_adaptation_priority_change
+tests/test_goal_adaptation_representation.py::TestGoalAdaptationRepresentation::test_represent_adaptation_trazabilidad
+tests/test_goal_adaptation_strategy_persistence.py::test_mapa_por_contexto_conserva_el_contrato_del_motor
+tests/test_goal_adaptation_strategy_persistence.py::test_estrategia_aprendida_sobrevive_al_reinicio
+tests/test_goal_adaptation_strategy_persistence.py::test_estrategia_recuperada_conserva_su_contexto
+tests/test_goal_adaptation_strategy_persistence.py::test_estrategia_recuperada_es_utilizable
+tests/test_goal_adaptation_strategy_persistence.py::test_archivo_persistido_usa_indice_plano
+tests/test_goal_adaptation_strategy_persistence.py::test_carga_no_ensucia_el_mapa_por_contexto
+tests/test_goal_adaptation_strategy_restart_verification.py::test_la_estrategia_recuperada_conserva_el_conjunto_canonico_completo
+tests/test_goal_adaptation_strategy_restart_verification.py::test_la_estrategia_recuperada_conserva_las_estructuras_anidadas
+tests/test_goal_adaptation_strategy_restart_verification.py::test_la_estrategia_recuperada_conserva_los_valores_sin_perdida
+tests/test_goal_adaptation_strategy_restart_verification.py::test_la_estrategia_recuperada_sigue_disponible_para_los_consumidores
+tests/test_goal_adaptation_strategy_restart_verification.py::test_la_estrategia_recuperada_es_estable_tras_un_segundo_reinicio
+tests/test_goal_adaptation_strategy_restart_verification.py::test_el_reconocimiento_de_un_registro_sin_strategy_id_no_contamina_la_estrategia
+tests/test_load_goal_adaptation_feedback.py::test_carga_feedback_acumulado
+tests/test_load_goal_adaptation_feedback.py::test_carga_resultados_aprendizaje
+tests/test_load_goal_adaptation_feedback.py::test_carga_estrategias
+tests/test_load_goal_adaptation_feedback.py::test_inicializacion_crea_estructuras_base
+tests/test_load_goal_adaptation_feedback.py::test_inicializacion_conserva_datos_persistidos
+tests/test_load_goal_adaptation_feedback.py::test_carga_adaptacion_history
+tests/test_simple.py::test_methods
+
+185 tests collected in 12.46s
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\FO TARDA\AppData\Local\Python\pythoncore-3.14-64\Lib\logging\__init__.py", line 1154, in emit
+ValueError: I/O operation on closed file.
+Call stack:
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\__init__.py", line 297, in __del__
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\__init__.py", line 178, in stop_auto_optimization
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\performance_optimizer.py", line 877, in stop_optimization
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 801, in log
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 886, in log_simple
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 850, in log
+Message: 'Optimizaci�n detenida'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\FO TARDA\AppData\Local\Python\pythoncore-3.14-64\Lib\logging\__init__.py", line 1154, in emit
+ValueError: I/O operation on closed file.
+Call stack:
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\__init__.py", line 297, in __del__
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\__init__.py", line 179, in stop_auto_optimization
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\self_improvement_system.py", line 1241, in stop_learning
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 801, in log
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 886, in log_simple
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 850, in log
+Message: 'Aprendizaje detenido'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\FO TARDA\AppData\Local\Python\pythoncore-3.14-64\Lib\logging\__init__.py", line 1154, in emit
+ValueError: I/O operation on closed file.
+Call stack:
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\__init__.py", line 297, in __del__
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\__init__.py", line 180, in stop_auto_optimization
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\adaptive_learning_engine.py", line 1077, in stop_learning_engine
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 801, in log
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 886, in log_simple
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 850, in log
+Message: 'Motor de aprendizaje detenido'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\FO TARDA\AppData\Local\Python\pythoncore-3.14-64\Lib\logging\__init__.py", line 1154, in emit
+ValueError: I/O operation on closed file.
+Call stack:
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\__init__.py", line 297, in __del__
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\__init__.py", line 181, in stop_auto_optimization
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\optimization_orchestrator.py", line 872, in stop_orchestration
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 801, in log
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 886, in log_simple
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 850, in log
+Message: 'Orquestaci�n detenida'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\FO TARDA\AppData\Local\Python\pythoncore-3.14-64\Lib\logging\__init__.py", line 1154, in emit
+ValueError: I/O operation on closed file.
+Call stack:
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\__init__.py", line 297, in __del__
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\__init__.py", line 183, in stop_auto_optimization
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 801, in log
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 886, in log_simple
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 850, in log
+Message: 'Optimizaci�n autom�tica detenida'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\FO TARDA\AppData\Local\Python\pythoncore-3.14-64\Lib\logging\__init__.py", line 1154, in emit
+ValueError: I/O operation on closed file.
+Call stack:
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\__init__.py", line 298, in __del__
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 801, in log
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 886, in log_simple
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\src\utils\advanced_logger.py", line 850, in log
+Message: 'Sistema de optimizaci�n finalizado'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\FO TARDA\AppData\Local\Python\pythoncore-3.14-64\Lib\logging\__init__.py", line 1154, in emit
+ValueError: I/O operation on closed file.
+Call stack:
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\__init__.py", line 297, in __del__
+    self.stop_auto_optimization()
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\__init__.py", line 178, in stop_auto_optimization
+    self.performance_optimizer.stop_optimization()
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\performance_optimizer.py", line 877, in stop_optimization
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\advanced_logger.py", line 801, in log
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\advanced_logger.py", line 886, in log_simple
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\advanced_logger.py", line 850, in log
+Message: 'Optimizaci�n detenida'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\FO TARDA\AppData\Local\Python\pythoncore-3.14-64\Lib\logging\__init__.py", line 1154, in emit
+ValueError: I/O operation on closed file.
+Call stack:
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\__init__.py", line 297, in __del__
+    self.stop_auto_optimization()
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\__init__.py", line 179, in stop_auto_optimization
+    self.self_improvement_system.stop_learning()
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\self_improvement_system.py", line 1241, in stop_learning
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\advanced_logger.py", line 801, in log
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\advanced_logger.py", line 886, in log_simple
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\advanced_logger.py", line 850, in log
+Message: 'Aprendizaje detenido'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\FO TARDA\AppData\Local\Python\pythoncore-3.14-64\Lib\logging\__init__.py", line 1154, in emit
+ValueError: I/O operation on closed file.
+Call stack:
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\__init__.py", line 297, in __del__
+    self.stop_auto_optimization()
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\__init__.py", line 180, in stop_auto_optimization
+    self.adaptive_learning_engine.stop_learning_engine()
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\adaptive_learning_engine.py", line 1077, in stop_learning_engine
+    self.logger.log("Motor de aprendizaje detenido", level="INFO")
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\advanced_logger.py", line 801, in log
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\advanced_logger.py", line 886, in log_simple
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\advanced_logger.py", line 850, in log
+Message: 'Motor de aprendizaje detenido'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\FO TARDA\AppData\Local\Python\pythoncore-3.14-64\Lib\logging\__init__.py", line 1154, in emit
+ValueError: I/O operation on closed file.
+Call stack:
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\__init__.py", line 297, in __del__
+    self.stop_auto_optimization()
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\__init__.py", line 181, in stop_auto_optimization
+    self.optimization_orchestrator.stop_orchestration()
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\optimization_orchestrator.py", line 872, in stop_orchestration
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\advanced_logger.py", line 801, in log
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\advanced_logger.py", line 886, in log_simple
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\advanced_logger.py", line 850, in log
+Message: 'Orquestaci�n detenida'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\FO TARDA\AppData\Local\Python\pythoncore-3.14-64\Lib\logging\__init__.py", line 1154, in emit
+ValueError: I/O operation on closed file.
+Call stack:
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\__init__.py", line 297, in __del__
+    self.stop_auto_optimization()
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\__init__.py", line 183, in stop_auto_optimization
+    self.logger.log("Optimizaci�n autom�tica detenida", level="INFO")
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\advanced_logger.py", line 801, in log
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\advanced_logger.py", line 886, in log_simple
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\advanced_logger.py", line 850, in log
+Message: 'Optimizaci�n autom�tica detenida'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\FO TARDA\AppData\Local\Python\pythoncore-3.14-64\Lib\logging\__init__.py", line 1154, in emit
+ValueError: I/O operation on closed file.
+Call stack:
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\__init__.py", line 298, in __del__
+    self.logger.log("Sistema de optimizaci�n finalizado", level="INFO")
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\advanced_logger.py", line 801, in log
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\advanced_logger.py", line 886, in log_simple
+  File "C:\Users\FO TARDA\Documents\VSC_JC\JARVIS\tests\..\src\utils\advanced_logger.py", line 850, in log
+Message: 'Sistema de optimizaci�n finalizado'
+Arguments: ()

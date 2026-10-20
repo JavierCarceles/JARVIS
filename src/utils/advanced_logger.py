@@ -8,6 +8,7 @@ import logging
 import os
 import re
 import sqlite3
+import sys
 import threading
 import time
 import uuid
@@ -885,33 +886,52 @@ class AdvancedLogger:
         
         self.log(log_level, log_category, message, **kwargs)
 
-    def debug(self, message: str, category: LogCategory = LogCategory.DEBUG, **kwargs) -> None:
+    @staticmethod
+    def _format_message(message: Any, args: Tuple[Any, ...]) -> str:
+        """Aplicar formato estilo printf a un mensaje de log (compatibilidad con logging estándar)."""
+        text = message if isinstance(message, str) else str(message)
+        if not args:
+            return text
+        try:
+            return text % args
+        except (TypeError, ValueError):
+            return f"{text} {args}"
+
+    def debug(self, message: str, *args: Any, category: LogCategory = LogCategory.DEBUG, **kwargs) -> None:
         """Log de nivel DEBUG."""
-        self.log(LogLevel.DEBUG, category, message, **kwargs)
+        self.log(LogLevel.DEBUG, category, self._format_message(message, args), **kwargs)
     
-    def info(self, message: str, category: LogCategory = LogCategory.SYSTEM, **kwargs) -> None:
+    def info(self, message: str, *args: Any, category: LogCategory = LogCategory.SYSTEM, **kwargs) -> None:
         """Log de nivel INFO."""
-        self.log(LogLevel.INFO, category, message, **kwargs)
+        self.log(LogLevel.INFO, category, self._format_message(message, args), **kwargs)
     
-    def warning(self, message: str, category: LogCategory = LogCategory.SYSTEM, **kwargs) -> None:
+    def warning(self, message: str, *args: Any, category: LogCategory = LogCategory.SYSTEM, **kwargs) -> None:
         """Log de nivel WARNING."""
-        self.log(LogLevel.WARNING, category, message, **kwargs)
+        self.log(LogLevel.WARNING, category, self._format_message(message, args), **kwargs)
     
-    def error(self, message: str, category: LogCategory = LogCategory.ERROR, **kwargs) -> None:
+    def error(self, message: str, *args: Any, category: LogCategory = LogCategory.ERROR, **kwargs) -> None:
         """Log de nivel ERROR."""
-        self.log(LogLevel.ERROR, category, message, **kwargs)
+        self.log(LogLevel.ERROR, category, self._format_message(message, args), **kwargs)
+
+    def exception(self, message: str, *args: Any, category: LogCategory = LogCategory.ERROR, **kwargs) -> None:
+        """Log de nivel ERROR incluyendo la excepción activa."""
+        text = self._format_message(message, args)
+        active = sys.exc_info()[1]
+        if active is not None:
+            text = f"{text}: {active!r}"
+        self.log(LogLevel.ERROR, category, text, **kwargs)
     
-    def critical(self, message: str, category: LogCategory = LogCategory.ERROR, **kwargs) -> None:
+    def critical(self, message: str, *args: Any, category: LogCategory = LogCategory.ERROR, **kwargs) -> None:
         """Log de nivel CRITICAL."""
-        self.log(LogLevel.CRITICAL, category, message, **kwargs)
+        self.log(LogLevel.CRITICAL, category, self._format_message(message, args), **kwargs)
     
-    def success(self, message: str, category: LogCategory = LogCategory.SYSTEM, **kwargs) -> None:
+    def success(self, message: str, *args: Any, category: LogCategory = LogCategory.SYSTEM, **kwargs) -> None:
         """Log de nivel SUCCESS."""
-        self.log(LogLevel.SUCCESS, category, message, **kwargs)
+        self.log(LogLevel.SUCCESS, category, self._format_message(message, args), **kwargs)
     
-    def performance(self, message: str, category: LogCategory = LogCategory.PERFORMANCE, **kwargs) -> None:
+    def performance(self, message: str, *args: Any, category: LogCategory = LogCategory.PERFORMANCE, **kwargs) -> None:
         """Log de nivel PERFORMANCE."""
-        self.log(LogLevel.PERFORMANCE, category, message, **kwargs)
+        self.log(LogLevel.PERFORMANCE, category, self._format_message(message, args), **kwargs)
     
     def log_with_trace(self, message: str, category: LogCategory = LogCategory.SYSTEM, 
                       trace_id: str = None, **kwargs) -> None:

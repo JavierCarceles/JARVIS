@@ -126,6 +126,13 @@ class AdaptiveLearningEngine:
         self.performance_history = []
         self.hyperparameter_tuning_history = []
         
+        # Base de conocimiento (bucle de aprendizaje continuo de adaptación de Goal)
+        self.knowledge_base: Dict[str, Any] = {
+            "goal_adaptation_feedback": [],
+            "adaptation_strategies": {"successful_strategies": []},
+            "learning_patterns": [],
+        }
+        
         # Inicialización
         self._initialize_model_registry()
         self._start_learning_engine()
@@ -953,6 +960,171 @@ class AdaptiveLearningEngine:
             self.logger.log(f"Error obteniendo rendimiento del modelo: {e}", level="ERROR")
             return None
     
+    # ---------------------------------------------------------------
+    # Bucle de aprendizaje continuo de adaptación de Goal (2.8.8.8)
+    # ---------------------------------------------------------------
+    @staticmethod
+    def _safe_float(value: Any, default: float = 0.0) -> float:
+        """Convertir un valor a float de forma segura."""
+        try:
+            if value is None: return default
+            return float(value)
+        except (TypeError, ValueError):
+            return default
+
+    def _capture_feedback(self, feedback_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Capturar y analizar el feedback de una adaptación de Goal.
+
+        El feedback se almacena en ``knowledge_base['goal_adaptation_feedback']``
+        para que los ciclos posteriores puedan aprender de las ejecuciones previas.
+        """
+        data = feedback_data if isinstance(feedback_data, dict) else {}
+        adaptation_id = data.get("adaptation_id")
+        try:
+            execution = data.get("execution_result") or {}
+            verification = data.get("verification_result") or {}
+            raw_metrics = execution.get("performance_metrics", {}) or {}
+            metrics = {
+                "response_time": self._safe_float(raw_metrics.get("response_time", 0.0)),
+                "accuracy": self._safe_float(raw_metrics.get("accuracy", 0.0)),
+                "success": bool(execution.get("success", False)),
+                "verified": bool(verification.get("verified", False)),
+                "impact_score": self._safe_float(verification.get("impact_score", 0.0)),
+            }
+            expected = (data.get("adaptation_context") or {}).get("expected_metrics", {}) or {}
+            changes: Dict[str, float] = {}
+            for metric in ("response_time", "accuracy"):
+                before = self._safe_float(expected.get(metric, 0.0))
+                after = metrics[metric]
+                if not before: continue
+                # En response_time menos es mejor; en accuracy más es mejor
+                delta = (before - after) if metric == "response_time" else (after - before)
+                changes[metric] = delta / abs(before) * 100.0
+            values = list(changes.values())
+            analysis = {
+                "performance_improvement": (sum(values) / len(values)) if values else 0.0,
+                "resource_efficiency": 0.0,
+                "response_time_improvement": changes.get("response_time", 0.0),
+                "accuracy_improvement": changes.get("accuracy", 0.0),
+                "pattern_recognition": [],
+                "strategic_insights": [],
+            }
+            is_success = metrics["success"] and metrics["verified"]
+            context = data.get("adaptation_context") or {}
+            analysis["pattern_recognition"].append({
+                "pattern_type": "goal_adaptation_success" if is_success else "goal_adaptation_failure",
+                "context": context, "metrics": metrics,
+                "timestamp": datetime.now().isoformat(),
+                "confidence": 0.9 if is_success else 0.8,
+            })
+            if metrics["impact_score"] > 0.7:
+                analysis["strategic_insights"].append({
+                    "strategy_type": "adaptation_strategies", "context": context, "metrics": metrics,
+                    "timestamp": datetime.now().isoformat(), "confidence": 0.85,
+                })
+            record = {
+                "success": True, "adaptation_id": adaptation_id,
+                "original_goal_id": data.get("original_goal_id"),
+                "adapted_goal_id": data.get("adapted_goal_id"),
+                "adaptation_context": context,
+                "execution_result": execution,
+                "verification_result": verification,
+                "improvement_analysis": analysis,
+                "feedback_metrics": metrics,
+                "timestamp": datetime.now().isoformat(),
+            }
+            self.knowledge_base.setdefault("goal_adaptation_feedback", []).append(record)
+            return record
+        except Exception as exc:
+            self.logger.error("Error capturando feedback de Goal: %s", exc)
+            return {"success": False, "adaptation_id": adaptation_id, "error_message": str(exc),
+                    "feedback_metrics": {}, "adaptation_context": data.get("adaptation_context", {}) or {}}
+
+    def _execute_learning_loop(self, feedback_result: Dict[str, Any]) -> Dict[str, Any]:
+        """Ejecutar el bucle de aprendizaje continuo sobre un feedback capturado."""
+        try:
+            feedback = feedback_result if isinstance(feedback_result, dict) else {}
+            if not feedback.get("success"):
+                return {"success": False, "message": "No se puede aprender de un feedback fallido",
+                        "learned_patterns": [], "adaptation_strategies": {}, "impact_score": 0.0}
+            analysis = feedback.get("improvement_analysis", {}) or {}
+            metrics = feedback.get("feedback_metrics", {}) or {}
+            patterns = self._analyze_goal_learning_patterns(analysis.get("pattern_recognition", []), metrics)
+            strategies = self._update_goal_adaptation_strategies(patterns, self.knowledge_base.get("adaptation_strategies", {}))
+            convergence = self._calculate_goal_learning_convergence(metrics, self._safe_float(analysis.get("performance_improvement", 0.0)))
+            self.knowledge_base.setdefault("learning_patterns", []).extend(patterns)
+            return {"success": True, "learned_patterns": patterns, "adaptation_strategies": strategies,
+                    "convergence_metrics": convergence, "adaptation_id": feedback.get("adaptation_id"),
+                    "impact_score": self._safe_float(metrics.get("impact_score", 0.0)),
+                    "timestamp": datetime.now().isoformat()}
+        except Exception as exc:
+            self.logger.error("Error en bucle de aprendizaje Goal: %s", exc)
+            return {"success": False, "message": str(exc), "learned_patterns": [], "adaptation_strategies": {}}
+
+    def _analyze_goal_learning_patterns(self, patterns: List[Dict[str, Any]], metrics: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Normalizar los patrones detectados a partir del análisis de feedback."""
+        output: List[Dict[str, Any]] = []
+        impact = self._safe_float(metrics.get("impact_score", 0.0))
+        for pattern in patterns or []:
+            if not isinstance(pattern, dict): continue
+            confidence = self._safe_float(pattern.get("confidence", 0.0))
+            if impact > 0.7: confidence = min(1.0, confidence * 1.2)
+            elif impact < 0.3: confidence = max(0.0, confidence * 0.8)
+            output.append({
+                "pattern_id": f"pattern_{len(output) + 1}_{int(time.time() * 1000)}",
+                "pattern_type": pattern.get("pattern_type", "unknown"),
+                "context": pattern.get("context", {}) or {},
+                "metrics": pattern.get("metrics", {}) or {},
+                "confidence": confidence,
+                "timestamp": pattern.get("timestamp", datetime.now().isoformat()),
+                "description": self._describe_goal_learning_pattern(pattern),
+            })
+        return output
+
+    @staticmethod
+    def _describe_goal_learning_pattern(pattern: Dict[str, Any]) -> str:
+        """Descripción legible de un patrón de aprendizaje."""
+        context = pattern.get("context", {}) or {}
+        context_type = context.get("context_type") or context.get("complexity") or "desconocido"
+        pattern_type = pattern.get("pattern_type", "unknown")
+        return f"Patrón '{pattern_type}' detectado en contexto '{context_type}'"
+
+    def _update_goal_adaptation_strategies(self, learned_patterns: List[Dict[str, Any]], current_strategies: Dict[str, Any]) -> Dict[str, Any]:
+        """Actualizar las estrategias aprendidas a partir de los patrones de éxito."""
+        strategies: Dict[str, Any] = {"successful_strategies": []}
+        if isinstance(current_strategies, dict):
+            for item in current_strategies.get("successful_strategies", []) or []:
+                if isinstance(item, dict): strategies["successful_strategies"].append(dict(item))
+        for pattern in learned_patterns or []:
+            if not isinstance(pattern, dict): continue
+            if pattern.get("pattern_type") != "goal_adaptation_success": continue
+            context = pattern.get("context", {}) or {}
+            metrics = pattern.get("metrics", {}) or {}
+            context_type = context.get("context_type") or context.get("complexity") or "generic"
+            success_rate = min(1.0, max(0.0, self._safe_float(metrics.get("impact_score", 0.0))))
+            strategies["successful_strategies"].append({
+                "strategy_id": f"goal_strategy_{len(strategies['successful_strategies']) + 1}",
+                "strategy_name": f"goal_adaptation_{context_type}",
+                "context": context, "context_type": context_type,
+                "success_rate": success_rate, "confidence": self._safe_float(pattern.get("confidence", 0.0)),
+                "metrics": metrics, "timestamp": pattern.get("timestamp", datetime.now().isoformat()),
+            })
+        self.knowledge_base["adaptation_strategies"] = strategies
+        return strategies
+
+    @staticmethod
+    def _calculate_goal_learning_convergence(metrics: Dict[str, Any], improvement: float) -> Dict[str, Any]:
+        """Calcular las métricas de convergencia del aprendizaje."""
+        impact = AdaptiveLearningEngine._safe_float(metrics.get("impact_score", 0.0))
+        verified = bool(metrics.get("verified", False))
+        success = bool(metrics.get("success", False))
+        return {
+            "improvement": round(float(improvement), 4),
+            "impact_score": round(impact, 4),
+            "converged": bool(verified and success and impact >= 0.5),
+            "stability": round(min(1.0, max(0.0, impact)), 4),
+        }
+
     def get_learning_engine_status(self) -> Dict[str, Any]:
         """Obtener estado del motor de aprendizaje"""
         try:

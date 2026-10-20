@@ -1,0 +1,742 @@
+{
+ "tests/test_2_8_5_7_recommendations.py::Test2_8_5_7_Recommendations::test_2_8_5_7_1_generar_recomendacion_usando_datos_existentes": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_2_8_5_7_recommendations.py::Test2_8_5_7_Recommendations::test_2_8_5_7_2_verificar_compatibilidad": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_2_8_5_7_recommendations.py::Test2_8_5_7_Recommendations::test_2_8_5_7_3_evitar_recomendar_transferencias_no_ejecutables": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_2_8_5_7_recommendations.py::Test2_8_5_7_Recommendations::test_2_8_5_7_4_integrar_con_contextual_adaptation_engine": {
+  "outcome": "failed",
+  "msg": "'generated_timestamp' not found in {'source_context': 'optimization', 'target_context': 'production', 'knowledge_type': 'success_patterns', 'compatibility': 0.8600000000000001, 'transfer_potential': 0.669, 'expected_efficiency': 0.8600000000000001, 'urgency': 0.48, 'priority': 0.7647000000000002, 'recommended_strategy': 'adaptive', 'confidence': 0.8647000000000001, 'reasoning': 'alta compatibilida..."
+ },
+ "tests/test_2_8_5_7_recommendations.py::Test2_8_5_7_Recommendations::test_2_8_5_7_5_ordenacion_por_prioridad": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_2_8_5_7_recommendations.py::Test2_8_5_7_Recommendations::test_2_8_5_7_6_limitar_numero_de_recomendaciones": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_2_8_5_7_recommendations.py::Test2_8_5_7_Recommendations::test_2_8_5_7_7_tipos_de_conocimiento_evaluados": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_2_8_5_7_recommendations.py::Test2_8_5_7_Recommendations::test_2_8_5_7_8_manejo_de_errores": {
+  "outcome": "failed",
+  "msg": "Error de compatibilidad"
+ },
+ "tests/test_2_8_5_7_recommendations.py::Test2_8_5_7_Recommendations::test_2_8_5_7_9_confianza_y_razonamiento": {
+  "outcome": "failed",
+  "msg": "'optimization' not found in 'alta compatibilidad, buen potencial de mejora, patrones de éxito'"
+ },
+ "tests/test_2_8_7_2_features_signals.py::TestFeaturesSignals::test_2_8_7_2_1_enumerate_contextual_data": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_2_8_7_2_features_signals.py::TestFeaturesSignals::test_2_8_7_2_2_separate_real_signals_from_unavailable": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_2_8_7_2_features_signals.py::TestFeaturesSignals::test_2_8_7_2_3_build_minimal_representation": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_2_8_7_2_features_signals.py::TestFeaturesSignals::test_2_8_7_2_4_handle_missing_signal": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_2_8_7_2_features_signals.py::TestFeaturesSignals::test_2_8_7_2_5_confidence_threshold_handling": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_adapted_goal_validation.py::TestAdaptedGoalValidation::test_register_validation_result": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_adapted_goal_validation.py::TestAdaptedGoalValidation::test_validate_adapted_goal_complete_failure": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_adapted_goal_validation.py::TestAdaptedGoalValidation::test_validate_adapted_goal_complete_success": {
+  "outcome": "failed",
+  "msg": "False is not true"
+ },
+ "tests/test_adapted_goal_validation.py::TestAdaptedGoalValidation::test_validate_capabilities_missing": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_adapted_goal_validation.py::TestAdaptedGoalValidation::test_validate_capabilities_success": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_adapted_goal_validation.py::TestAdaptedGoalValidation::test_validate_current_state_invalid_structure": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_adapted_goal_validation.py::TestAdaptedGoalValidation::test_validate_current_state_success": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_adapted_goal_validation.py::TestAdaptedGoalValidation::test_validate_goal_preconditions_navigate_invalid_url": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_adapted_goal_validation.py::TestAdaptedGoalValidation::test_validate_goal_preconditions_navigate_success": {
+  "outcome": "failed",
+  "msg": "'Ya estamos en la URL destino' not found in []"
+ },
+ "tests/test_adapted_goal_validation.py::TestAdaptedGoalValidation::test_validate_goal_structure_missing_fields": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_adapted_goal_validation.py::TestAdaptedGoalValidation::test_validate_goal_structure_success": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_adapted_goal_validation.py::TestAdaptedGoalValidation::test_validate_planner_can_solve_failure": {
+  "outcome": "failed",
+  "msg": "'failed' != <PlannerStatus.FAILED: 'failed'>"
+ },
+ "tests/test_adapted_goal_validation.py::TestAdaptedGoalValidation::test_validate_planner_can_solve_success": {
+  "outcome": "failed",
+  "msg": "'completed' != <PlannerStatus.COMPLETED: 'completed'>"
+ },
+ "tests/test_context_compatibility.py::TestContextCompatibility::test_2_8_5_3_1_reutilizar_validate_context_compatibility": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_context_compatibility.py::TestContextCompatibility::test_2_8_5_3_2_verificar_umbrales_existentes": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_context_compatibility.py::TestContextCompatibility::test_2_8_5_3_3_rechazar_transferencia_incompatible": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_context_compatibility.py::TestContextCompatibility::test_2_8_5_3_4_registrar_motivo": {
+  "outcome": "failed",
+  "msg": "KnowledgeTransfer(transfer_id='transfer_1792511669310_0', source_context=<ContextType.DEVELOPMENT: 'development'>, target_context=<ContextType.EMERGENCY: 'emergency'>, knowledge_type='success_patterns', knowledge_data={'success_patterns': [], 'successful_strategies': [], 'performance_baselines': {'adaptation_metadata': {'source_context': 'development', 'target_context': 'emergency', 'compatibility..."
+ },
+ "tests/test_context_compatibility.py::TestContextCompatibility::test_2_8_5_3_5_tests": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_context_model_origin_destination.py::TestContextModelOriginDestination::test_2_8_5_2_1_identificar_contexto_origen": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_context_model_origin_destination.py::TestContextModelOriginDestination::test_2_8_5_2_2_identificar_contexto_destino": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_context_model_origin_destination.py::TestContextModelOriginDestination::test_2_8_5_2_3_verificar_datos_disponibles": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_context_model_origin_destination.py::TestContextModelOriginDestination::test_2_8_5_2_4_detectar_contexto_incompleto": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_context_model_origin_destination.py::TestContextModelOriginDestination::test_2_8_5_2_5_tests": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_context_model_origin_destination.py::TestContextModelOriginDestination::test_context_snapshot_model": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_cross_context_confidence_feedback.py::TestTransferConfidence::test_get_transfer_confidence_basic": {
+  "outcome": "failed",
+  "msg": "assert 0.0 == 0.85"
+ },
+ "tests/test_cross_context_confidence_feedback.py::TestTransferConfidence::test_get_transfer_confidence_with_result": {
+  "outcome": "failed",
+  "msg": "ContextualAdaptationEngine.get_transfer_confidence() takes 2 positional arguments but 3 were given"
+ },
+ "tests/test_cross_context_confidence_feedback.py::TestTransferConfidence::test_get_transfer_confidence_nonexistent": {
+  "outcome": "failed",
+  "msg": "assert 0.7 == 0.0"
+ },
+ "tests/test_cross_context_confidence_feedback.py::TestTransferConfidence::test_get_transfer_confidence_zero_efficiency": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_cross_context_confidence_feedback.py::TestTransferFeedback::test_register_feedback_basic": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_cross_context_confidence_feedback.py::TestTransferFeedback::test_register_feedback_with_result": {
+  "outcome": "failed",
+  "msg": "assert 1.0 == 0.95 |  +  where 1.0 = KnowledgeTransfer(transfer_id='test_transfer_5', source_context=<ContextType.TESTING: 'testing'>, target_context=<Cont... transfer_strategy='adaptive', confidence_score=0.9, last_feedback=datetime.datetime(2026, 10, 20, 17, 54, 36, 773449)).success_rate"
+ },
+ "tests/test_cross_context_confidence_feedback.py::TestTransferFeedback::test_register_feedback_nonexistent": {
+  "outcome": "failed",
+  "msg": "assert True is False"
+ },
+ "tests/test_cross_context_confidence_feedback.py::TestTransferFeedback::test_register_feedback_quality_update": {
+  "outcome": "failed",
+  "msg": "'ContextualAdaptationEngine' object has no attribute 'knowledge_transaptors'"
+ },
+ "tests/test_cross_context_confidence_feedback.py::TestTransferResultEvaluation::test_evaluate_transfer_result_success": {
+  "outcome": "failed",
+  "msg": "too many values to unpack (expected 3, got 6)"
+ },
+ "tests/test_cross_context_confidence_feedback.py::TestTransferResultEvaluation::test_evaluate_transfer_result_partial": {
+  "outcome": "failed",
+  "msg": "too many values to unpack (expected 3, got 6)"
+ },
+ "tests/test_cross_context_confidence_feedback.py::TestTransferResultEvaluation::test_evaluate_transfer_result_failure": {
+  "outcome": "failed",
+  "msg": "too many values to unpack (expected 3, got 6)"
+ },
+ "tests/test_cross_context_confidence_feedback.py::TestTransferResultEvaluation::test_evaluate_transfer_result_nonexistent": {
+  "outcome": "failed",
+  "msg": "too many values to unpack (expected 3, got 6)"
+ },
+ "tests/test_cross_context_confidence_feedback.py::TestFeedbackIntegrationWithExistingMechanisms::test_feedback_updates_transfer_patterns": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_cross_context_confidence_feedback.py::TestFeedbackIntegrationWithExistingMechanisms::test_feedback_does_not_modify_critical_data": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_cross_context_confidence_feedback.py::TestFeedbackIntegrationWithExistingMechanisms::test_confidence_calculation_uses_existing_mechanisms": {
+  "outcome": "failed",
+  "msg": "assert 0.0 < 0.0"
+ },
+ "tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_1_1_localizar_cross_context_knowledge_transfer": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_1_2_localizar_transfer_knowledge": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_1_3_localizar_batch_knowledge_transfer": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_1_4_localizar_auto_transfer_knowledge": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_1_5_localizar_transfer_knowledge_with_feedback": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_1_6_localizar_get_transfer_recommendations": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_1_7_definir_que_parte_se_reutiliza": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_1_8_evitar_duplicacion": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_1_9_tests": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_2_1_identificar_contexto_origen": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_2_2_identificar_contexto_destino": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_2_3_verificar_datos_disponibles": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_2_4_detectar_contexto_incompleto": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_3_1_reutilizar_validate_context_compatibility": {
+  "outcome": "failed",
+  "msg": "ContextualAdaptationEngine._validate_context_compatibility() got an unexpected keyword argument 'source_context'"
+ },
+ "tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_3_2_verificar_umbrales_existentes": {
+  "outcome": "failed",
+  "msg": "ContextualAdaptationEngine._validate_context_compatibility() got an unexpected keyword argument 'source_context'"
+ },
+ "tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_3_3_rechazar_transferencia_incompatible": {
+  "outcome": "failed",
+  "msg": "ContextualAdaptationEngine._validate_context_compatibility() got an unexpected keyword argument 'source_context'"
+ },
+ "tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_3_4_registrar_motivo": {
+  "outcome": "failed",
+  "msg": "ContextualAdaptationEngine._validate_context_compatibility() got an unexpected keyword argument 'source_context'"
+ },
+ "tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_4_1_identificar_que_conocimiento_puede_transferirse": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_4_2_separar_conocimiento_no_reutilizable": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_4_3_extraer_usando_logica_existente": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_4_4_transformar_usando_mecanismos_existentes": {
+  "outcome": "failed",
+  "msg": "ContextualAdaptationEngine._transform_knowledge_for_target() got an unexpected keyword argument 'strategy'"
+ },
+ "tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_6_1_obtener_confianza_existente": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_6_2_registrar_feedback": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_6_3_evaluar_resultado": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_6_4_ajustar_confianza": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_cross_context_knowledge_transfer.py::TestCrossContextKnowledgeTransfer::test_2_8_5_6_5_tests": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_cross_context_units.py::TestCrossContextUnits::test_2_8_5_4_1_identificar_que_conocimiento_puede_transferirse": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_cross_context_units.py::TestCrossContextUnits::test_2_8_5_4_2_separar_conocimiento_no_reutilizable": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_cross_context_units.py::TestCrossContextUnits::test_2_8_5_4_3_extraer_usando_logica_existente": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_cross_context_units.py::TestCrossContextUnits::test_2_8_5_4_4_transformar_usando_mecanismos_existentes": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_cross_context_units.py::TestCrossContextUnits::test_2_8_5_4_5_tests": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_direct.py::test_methods_direct": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_dynamic_resource_allocator_integration.py::TestDynamicResourceAllocatorIntegration::test_2_8_4_7_1_connect_contextual_adaptation_engine": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_dynamic_resource_allocator_integration.py::TestDynamicResourceAllocatorIntegration::test_2_8_4_7_2_connect_performance_optimizer": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_dynamic_resource_allocator_integration.py::TestDynamicResourceAllocatorIntegration::test_2_8_4_7_3_expose_result_to_planner_executor": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_dynamic_resource_allocator_integration.py::TestDynamicResourceAllocatorIntegration::test_2_8_4_7_4_integration_workflow": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_1_1_localizar_evolutionary_strategy_optimizer": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_1_2_identificar_representacion_estrategia_existente": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_1_3_representar_estrategia_candidata": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_1_4_verificar_parametros_validos": {
+  "outcome": "failed",
+  "msg": "ContextualAdaptationEngine._validate_context_compatibility() got an unexpected keyword argument 'source_context'"
+ },
+ "tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_1_5_tests": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_2_1_identificar_estrategias_disponibles": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_2_2_generar_candidato_solo_mecanismos_soportados": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_2_3_evitar_candidatos_identico": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_2_4_limitar_cantidad_si_existe_configuracion_limite": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_2_5_tests": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_4_1_seleccionar_estrategia_valida": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_4_2_seleccionar_con_estrategia_actual": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_4_3_sin_mejora_significativa": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_4_4_sin_estrategias_validas": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_4_5_comparar_estrategias": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_4_6_empate_en_comparacion": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_5_1_aplicar_cambio_estrategia": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_5_2_verificar_comportamiento_posterior": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_5_3_revertir_cuando_exista_soporte_y_resultado_invalido": {
+  "outcome": "failed",
+  "msg": "False is not true"
+ },
+ "tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_6_1_conectar_contextual_adaptation_engine": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_6_2_conectar_performance_optimizer_cuando_proceda": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_6_3_exponer_resultado_a_planner_executor_solo_mediante_contratos_existentes": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_6_4_tests": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_7_1_persistencia_y_estabilidad": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_7_2_evitar_oscilacion_entre_estrategias": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_7_3_registrar_cambios": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_evolutionary_strategy_optimizer.py::TestEvolutionaryStrategyOptimizer::test_2_8_6_7_4_tests": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_final.py::test_methods_direct": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_feedback.py::test_goal_adaptation_feedback": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_feedback.py::test_adaptation_improvement_analysis": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_feedback_persistence.py::test_capture_feedback_registra_en_knowledge_base": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_feedback_persistence.py::test_capture_feedback_devuelve_adaptation_id": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_feedback_persistence.py::test_performance_improvement_se_calcula": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_feedback_persistence.py::test_performance_improvement_detecta_degradacion": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_feedback_persistence.py::test_adaptation_history_se_registra_y_persiste": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_feedback_persistence.py::test_feedback_persiste_en_disco": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_feedback_persistence.py::test_limite_persistencia_feedback": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_feedback_persistence.py::test_persistencia_serializa_a_json": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_learned_strategy_persistence.py::test_la_estrategia_aprendida_sobrevive_una_sola_vez_al_reinicio": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_learned_strategy_persistence.py::test_la_estrategia_aprendida_conserva_su_contexto_tras_el_reinicio": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_learned_strategy_persistence.py::test_la_estrategia_aprendida_conserva_sus_datos_criticos": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_learned_strategy_persistence.py::test_la_estrategia_persistida_conserva_su_contexto": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_learned_strategy_persistence.py::test_el_indice_persistido_contiene_exactamente_las_estrategias_aprendidas": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_learned_strategy_persistence.py::test_ningun_registro_aparece_duplicado_tras_el_reinicio": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_learning_loop.py::test_goal_adaptation_learning_loop": {
+  "outcome": "failed",
+  "msg": "'AdaptiveLearningEngine' object has no attribute '_capture_feedback'"
+ },
+ "tests/test_goal_adaptation_learning_loop.py::test_learning_convergence": {
+  "outcome": "failed",
+  "msg": "'AdaptiveLearningEngine' object has no attribute '_capture_feedback'"
+ },
+ "tests/test_goal_adaptation_learning_loop.py::test_learning_adaptation_strategies": {
+  "outcome": "failed",
+  "msg": "'AdaptiveLearningEngine' object has no attribute '_capture_feedback'"
+ },
+ "tests/test_goal_adaptation_persistence_real.py::test_captura_y_bucle_de_aprendizaje": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_persistence_real.py::test_bucle_registra_resultados_con_adaptation_id": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_persistence_real.py::test_archivos_persistidos_se_crean": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_persistence_real.py::test_carga_recupera_datos_persistidos": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_persistence_real.py::test_integridad_datos_cargados": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_persistence_simple.py::test_estructuras_base_inicializadas": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_persistence_simple.py::test_guardar_feedback_crea_archivo": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_persistence_simple.py::test_guardar_aprendizaje_crea_archivo": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_persistence_simple.py::test_cargar_datos_persistidos": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_persistence_simple.py::test_inicializacion_persistencia_estructuras": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_persistence_simple.py::test_integridad_serializacion": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_proposal.py::TestGoalAdaptationProposal::test_application_integrity_preservation": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_proposal.py::TestGoalAdaptationProposal::test_are_constraints_contradictory": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_proposal.py::TestGoalAdaptationProposal::test_check_intention_preservation": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_proposal.py::TestGoalAdaptationProposal::test_create_goal_adaptation_proposal_basic": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_proposal.py::TestGoalAdaptationProposal::test_create_goal_adaptation_proposal_no_rules": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_proposal.py::TestGoalAdaptationProposal::test_create_goal_adaptation_proposal_with_adaptation": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_proposal.py::TestGoalAdaptationProposal::test_deadline_validation": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_proposal.py::TestGoalAdaptationProposal::test_navigation_integrity_preservation": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_proposal.py::TestGoalAdaptationProposal::test_priority_validation": {
+  "outcome": "failed",
+  "msg": "False is not true"
+ },
+ "tests/test_goal_adaptation_proposal.py::TestGoalAdaptationProposal::test_proposal_registration": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_proposal.py::TestGoalAdaptationProposal::test_validate_adaptation_constraints": {
+  "outcome": "failed",
+  "msg": "False is not true"
+ },
+ "tests/test_goal_adaptation_representation.py::TestGoalAdaptationRepresentation::test_represent_adaptation_constraints_addition": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_representation.py::TestGoalAdaptationRepresentation::test_represent_adaptation_deadline_addition": {
+  "outcome": "failed",
+  "msg": "1 != 2"
+ },
+ "tests/test_goal_adaptation_representation.py::TestGoalAdaptationRepresentation::test_represent_adaptation_metadata_update": {
+  "outcome": "failed",
+  "msg": "1 != 2"
+ },
+ "tests/test_goal_adaptation_representation.py::TestGoalAdaptationRepresentation::test_represent_adaptation_multiple_rules": {
+  "outcome": "failed",
+  "msg": "4 != 2"
+ },
+ "tests/test_goal_adaptation_representation.py::TestGoalAdaptationRepresentation::test_represent_adaptation_no_rules": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_representation.py::TestGoalAdaptationRepresentation::test_represent_adaptation_preserve_original": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_representation.py::TestGoalAdaptationRepresentation::test_represent_adaptation_priority_change": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_representation.py::TestGoalAdaptationRepresentation::test_represent_adaptation_trazabilidad": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_strategy_persistence.py::test_mapa_por_contexto_conserva_el_contrato_del_motor": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_strategy_persistence.py::test_estrategia_aprendida_sobrevive_al_reinicio": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_strategy_persistence.py::test_estrategia_recuperada_conserva_su_contexto": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_strategy_persistence.py::test_estrategia_recuperada_es_utilizable": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_strategy_persistence.py::test_archivo_persistido_usa_indice_plano": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_strategy_persistence.py::test_carga_no_ensucia_el_mapa_por_contexto": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_strategy_restart_verification.py::test_la_estrategia_recuperada_conserva_el_conjunto_canonico_completo": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_strategy_restart_verification.py::test_la_estrategia_recuperada_conserva_las_estructuras_anidadas": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_strategy_restart_verification.py::test_la_estrategia_recuperada_conserva_los_valores_sin_perdida": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_strategy_restart_verification.py::test_la_estrategia_recuperada_sigue_disponible_para_los_consumidores": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_strategy_restart_verification.py::test_la_estrategia_recuperada_es_estable_tras_un_segundo_reinicio": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_goal_adaptation_strategy_restart_verification.py::test_el_reconocimiento_de_un_registro_sin_strategy_id_no_contamina_la_estrategia": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_load_goal_adaptation_feedback.py::test_carga_feedback_acumulado": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_load_goal_adaptation_feedback.py::test_carga_resultados_aprendizaje": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_load_goal_adaptation_feedback.py::test_carga_estrategias": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_load_goal_adaptation_feedback.py::test_inicializacion_crea_estructuras_base": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_load_goal_adaptation_feedback.py::test_inicializacion_conserva_datos_persistidos": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_load_goal_adaptation_feedback.py::test_carga_adaptacion_history": {
+  "outcome": "passed",
+  "msg": ""
+ },
+ "tests/test_simple.py::test_methods": {
+  "outcome": "passed",
+  "msg": ""
+ }
+}
