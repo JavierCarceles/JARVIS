@@ -1,0 +1,44 @@
+﻿=== REGISTRO PREVIO 2.8.8.9.4.2 (L3224-3254) ===
+3224 ESTADO FINAL: 2.8.8.9.4.1 ? IMPLEMENTADA
+3225 
+3226 FECHA: 2026-10-20
+3227 ESTADO: IMPLEMENTADA
+3228 OBJETIVO: Crear ?nicamente el test de persistencia de patrones que fije el contrato de las brechas 1 y 2 identificadas en 2.8.8.9.4.1.
+3229 TIPO DE TRABAJO: TEST
+3230 CAMBIOS / HALLAZGOS:
+3231 - Test creado: `tests/test_goal_adaptation_pattern_persistence.py` (9 tests).
+3232 - Contrato fijado sobre `learning_results[i]["learned_patterns"]`: filtro `confidence >= self.config["confidence_threshold"]` (0.7), m?nimo de tres observaciones similares, no agrupar observaciones de contextos distintos, respeto del umbral configurado, conservaci?n de los cinco campos cr?ticos del item 5 de DATOS CR?TICOS y supervivencia al reinicio.
+3233 - La similitud se define por identidad real del patr?n (`pattern_type` + `context`), ya que `pattern_id` se regenera en cada llamada.
+3234 - Todas las instancias usadas por el test emplean `data_dir=str(tmp_path)`. Se verific? que el test no modifica `data/goal_adaptation_feedback.json` ni `data/goal_adaptation_learning_results.json`.
+3235 - La contaminaci?n previa procedente de `tests/test_goal_adaptation_feedback.py` no se corrigi? porque no existe una unidad que lo autorice; se verific? de forma aislada que es la ?nica fuente que escribe en `data/`.
+3236 ARCHIVOS MODIFICADOS:
+3237 - PRODUCCI?N: Ninguno (`main.py` y `src/utils/contextual_adaptation_engine.py` sin cambios).
+3238 - TESTS: `tests/test_goal_adaptation_pattern_persistence.py` (nuevo; 9 tests); sonda temporal `tests/test_probe_24942_pattern_contract.py`, ejecutada y eliminada al cerrar la hoja.
+3239 - DOCUMENTACI?N: `README.md`, `prompt_mejoraActual.txt`.
+3240 TESTS Y RESULTADOS:
+3241 - UNITARIOS: test nuevo ? 4 PASSED / 5 FAILED / TOTAL 9. Los cinco FAILED son los contratos pendientes de 2.8.8.9.4.3-2.8.8.9.4.6, no defectos del test.
+3242 - INTEGRACI?N: NO APLICA (hoja de creaci?n de test).
+3243 - NO REGRESI?N: 11 ficheros de goal/adaptation ? 65 PASSED / 5 FAILED; los cinco fallos corresponden a los nuevos casos de contrato; 0 regresiones.
+3244 VERIFICACI?N:
+3245 - SINTAXIS: `py_compile` de `main.py` y `src/utils/contextual_adaptation_engine.py` ? OK.
+3246 - MAIN.PY: NO APLICA; sin cambios de producci?n. `py_compile` ? OK.
+3247 - COMPORTAMIENTO / INTEGRACI?N REAL: Aislamiento con `tmp_path` verificado; no se escribieron los archivos de datos reales.
+3248 DISCREPANCIAS: NINGUNA REGISTRADA. Los cinco fallos son el contrato pendiente previsto por esta hoja.
+3249 PENDIENTES: 2.8.8.9.4.3 ? implementar guardado de patrones; despu?s, continuar ?nicamente con las hojas pendientes de 2.8.8.9.4.
+3250 ESTADO FINAL: 2.8.8.9.4.2 ? IMPLEMENTADA
+3251 
+3252 SIGUIENTE UNIDAD: 2.8.8.9.4.3 ? IMPLEMENTAR GUARDADO DE PATRONES
+3253 
+3254 AUTOMEJORA FUTURA
+
+=== CONTADORES ===
+NO tocar adaptation_strategies : 1
+header 2.8.8.9.4.3            : 2
+SIGUIENTE UNIDAD: 2.8.8.9.4.3 : 1
+index 2.8.8.9.4.2              : 1
+index 2.8.8.9.4.3              : 0
+
+=== TEST FILE REAL PATH ===
+tests\utils\contextual_adaptation_engine\test_goal_adaptation_pattern_persistence.py
+tests\utils\contextual_adaptation_engine\__pycache__\test_goal_adaptation_pattern_persistence.cpython-314-pytest-9.1.1.pyc
+tests\__pycache__\test_goal_adaptation_pattern_persistence.cpython-314-pytest-9.1.1.pyc

@@ -1,0 +1,35 @@
+....................................................................................................... [ 55%]
+........................................................................ [ 94%]
+..........                                                               [100%]
+============================== warnings summary ===============================
+tests/test_goal_adaptation_feedback.py::test_goal_adaptation_feedback
+  C:\Users\FO TARDA\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\_pytest\python.py:171: PytestReturnNotNoneWarning: Test functions should return None, but tests/test_goal_adaptation_feedback.py::test_goal_adaptation_feedback returned <class 'bool'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+tests/test_goal_adaptation_feedback.py::test_adaptation_improvement_analysis
+  C:\Users\FO TARDA\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\_pytest\python.py:171: PytestReturnNotNoneWarning: Test functions should return None, but tests/test_goal_adaptation_feedback.py::test_adaptation_improvement_analysis returned <class 'bool'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+tests/test_goal_adaptation_learning_loop.py::test_goal_adaptation_learning_loop
+  C:\Users\FO TARDA\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\_pytest\python.py:171: PytestReturnNotNoneWarning: Test functions should return None, but tests/test_goal_adaptation_learning_loop.py::test_goal_adaptation_learning_loop returned <class 'bool'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+tests/test_goal_adaptation_learning_loop.py::test_learning_convergence
+  C:\Users\FO TARDA\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\_pytest\python.py:171: PytestReturnNotNoneWarning: Test functions should return None, but tests/test_goal_adaptation_learning_loop.py::test_learning_convergence returned <class 'bool'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+tests/test_goal_adaptation_learning_loop.py::test_learning_adaptation_strategies
+  C:\Users\FO TARDA\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\_pytest\python.py:171: PytestReturnNotNoneWarning: Test functions should return None, but tests/test_goal_adaptation_learning_loop.py::test_learning_adaptation_strategies returned <class 'bool'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
