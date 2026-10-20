@@ -2737,6 +2737,100 @@ class ContextualAdaptationEngine:
         return {"expected": sections, "checked": checked, "absent": absent, "absent_count": absent_count,
                 "has_absent": bool(absent), "missing_files": missing_files, "unreadable": unreadable}
 
+    # Comportamiento SIN DATOS (2.8.8.9.5.3)
+    #
+    # Contrato NORMATIVO y DECLARATIVO de lo que el motor hace cuando el
+    # almacenamiento de persistencia esta AUSENTE (2.8.8.9.5.1) o le falta una
+    # SECCION (2.8.8.9.5.2).
+    #
+    # Este contrato NO implementa el comportamiento: lo DECLARA. Su valor es
+    # que puede contrastarse de forma automatica contra el comportamiento
+    # OBSERVADO en runtime, mediante la sonda
+    # `tests/utils/contextual_adaptation_engine/no_data_behavior_real.py`.
+    # Si lo observado se desvía, el contraste falla y el contrato queda
+    # obsoleto: es intencional, un contrato que nunca falla no prueba nada.
+    #
+    # Es de SOLO LECTURA: no crea ficheros ni modifica el estado del motor.
+    _NO_DATA_BEHAVIOR: Dict[str, Any] = {
+        "version": "2.8.8.9.5.3",
+        "principle": ("La ausencia de datos nunca es un error fatal: el motor arranca, "
+                      "expone valores por defecto seguros, la deteccion informa de la ausencia, "
+                      "y el almacenamiento se recrea en el momento en que alguien escribe."),
+        "startup": {
+            "raises": False,
+            "creates_data_dir": True,
+            "creates_persistence_files": False,
+            "defaults": {
+                "adaptation_rules": "builtin_rules",
+                "knowledge_base": "empty_sections",
+                "adaptation_history": "empty",
+                "knowledge_transfers": "empty",
+            },
+        },
+        # API de LECTURA: nunca lanzan excepcion con el almacenamiento ausente y
+        # devuelven siempre un valor del tipo declarado.
+        "read_apis": [
+            {"api": "get_engine_status", "returns": "dict", "args": []},
+            {"api": "get_adaptation_summary", "returns": "dict", "args": []},
+            {"api": "get_context_insights", "returns": "dict", "args": []},
+            {"api": "get_adaptation_rules", "returns": "list", "args": []},
+            {"api": "list_adaptation_rules", "returns": "list", "args": []},
+            {"api": "get_available_strategies", "returns": "list", "args": ["context"]},
+            {"api": "get_knowledge_transfers", "returns": "list", "args": []},
+            {"api": "load_adaptation_rules", "returns": "bool", "args": []},
+            {"api": "load_knowledge_base", "returns": "bool", "args": []},
+            {"api": "load_all_data", "returns": "bool", "args": []},
+        ],
+        # API de ESCRITURA: recrean el almacenamiento ausente.
+        "write_apis": [
+            {"api": "save_adaptation_rules", "returns": "bool", "creates": "adaptation_rules"},
+            {"api": "save_knowledge_base", "returns": "bool", "creates": "knowledge_base"},
+            {"api": "save_all_data", "returns": "bool", "creates": ["adaptation_rules", "knowledge_base"]},
+            {"api": "_save_goal_adaptation_feedback", "returns": "none", "creates": "goal_adaptation_feedback"},
+            {"api": "_save_goal_adaptation_learning_results", "returns": "none", "creates": "goal_adaptation_learning_results"},
+        ],
+        # API de DETECCION: informan de la ausencia sin escribir nada.
+        # `detect_absent_sections` solo examina ficheros EXISTENTES: los
+        # ficheros ausentes se listan en `missing_files`, y una seccion ausente
+        # solo puede darse dentro de un fichero presente.
+        "detection": {
+            "detect_absent_storage": "reports_absent",
+            "detect_absent_sections": "reports_missing_sections_in_existing_files",
+            "detect_absent_sections_missing_files": "reports_absent_files",
+            "get_engine_status": ["storage", "storage_sections"],
+            "detection_writes": False,
+        },
+        # Tras escribir, el almacenamiento deja de reportarse como ausente.
+        "recovery": {
+            "recreates_storage_on_write": True,
+            "detect_absent_storage_after_write": "no_absent",
+        },
+        "invariants": [
+            "read_apis_never_raise",
+            "detection_never_writes",
+            "defaults_are_empty_not_null",
+            "writes_recreate_missing_storage",
+        ],
+    }
+
+    def no_data_behavior(self) -> Dict[str, Any]:
+        """Contrato DECLARATIVO del comportamiento del motor SIN DATOS (2.8.8.9.5.3).
+
+        Declara que debe hacer el motor cuando el almacenamiento de persistencia
+        esta ausente (2.8.8.9.5.1) o le falta una seccion (2.8.8.9.5.2):
+        arranque, valores por defecto, API de lectura, escritura, deteccion y
+        recuperacion.
+
+        Es de SOLO LECTURA: no crea ficheros, no escribe y no altera el estado
+        del motor. Devuelve una COPIA profunda, de modo que el llamante no pueda
+        mutar el contrato de la clase.
+
+        La declaracion NO sustituye a la verificacion: la sonda
+        `tests/utils/contextual_adaptation_engine/no_data_behavior_real.py`
+        contrasta esta declaracion contra el comportamiento OBSERVADO en runtime.
+        """
+        return copy.deepcopy(self._NO_DATA_BEHAVIOR)
+
     # Integración de evolución arquitectónica
     def set_architecture_manager(self, architecture_manager) -> None:
         self.architecture_manager = architecture_manager

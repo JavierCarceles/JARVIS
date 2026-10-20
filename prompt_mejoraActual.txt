@@ -1,8 +1,14 @@
 ESTADO PERSISTENTE ACTUAL
 CURRENT_PHASE: 2.8.8
-CURRENT_WORK_UNIT: 2.8.8.9.5.3
+CURRENT_WORK_UNIT: 2.8.8.9.5.4
 CURRENT_WORK_STATUS: EN PROCESO
-LAST_COMPLETED_UNIT: 2.8.8.9.5.2
+LAST_COMPLETED_UNIT: 2.8.8.9.5.3
+
+# COMPLETADO: 2.8.8.9.5.3 - Definir comportamiento sin datos
+# Fecha: 2026-10-21
+# Archivo modificado: src/utils/contextual_adaptation_engine.py, tests/utils/contextual_adaptation_engine/no_data_behavior_real.py (nuevo), README.md, prompt_mejoraActual.txt
+# Resultado: implementado el CONTRATO DECLARATIVO del comportamiento del motor SIN DATOS: `no_data_behavior()` expone en el motor una declaracion NORMATIVA de lo que el motor hace cuando el almacenamiento de persistencia esta AUSENTE (2.8.8.9.5.1) o le falta una SECCION (2.8.8.9.5.2), con el principio de que la ausencia de datos nunca es un error fatal, y seis secciones: `startup` (si el arranque lanza, si crea el `data_dir`, si crea ficheros de persistencia y los valores por defecto), `read_apis` (las 10 APIs de lectura con su tipo de retorno), `write_apis` (las 5 APIs de escritura con el fichero que crean), `detection` (que informa la deteccion y de que no escribe), `recovery` (que el almacenamiento se recrea al escribir) e `invariants` (4 invariantes); es de SOLO LECTURA, devuelve una COPIA profunda y no altera el comportamiento existente; la DECLARACION se contrasta contra el comportamiento OBSERVADO en runtime mediante la sonda `no_data_behavior_real.py`, de modo que un contrato que nunca falla no pasa inadvertido
+# Estado real: 77/77 comprobaciones OK (sonda de runtime), 4/4 mutaciones detectadas, 215 PASSED / 0 FAILED en la suite completa (baseline comparable de 215 de 2.8.8.9.5.2, 0 tests nuevos y 0 regresiones); el `data/` de produccion NO se modifica por la sonda (sha256 identico)
 
 # COMPLETADO: 2.8.8.9.5.2 - Detectar seccion ausente
 # Fecha: 2026-10-21
@@ -1318,8 +1324,67 @@ Hoy `learning_results` se escribe verbatim (l. 2475) y no hay ningún contador d
 - HALLAZGO DE PRODUCCIÓN: los dos ficheros de Goal de `data/` tienen todas sus secciones; en `data/` faltan
   `contextual_adaptation_rules.json` y `contextual_knowledge_base.json` (ausencia de fichero de 2.8.8.9.5.1).
 
-2.8.8.9.5.3 — DEFINIR COMPORTAMIENTO SIN DATOS
+2.8.8.9.5.3 — DEFINIR COMPORTAMIENTO SIN DATOS [IMPLEMENTADA]
 - Mantener el comportamiento compatible con el sistema existente.
+- PRINCIPIO DECLARADO: la ausencia de datos nunca es un error fatal. El motor arranca, expone valores por
+  defecto seguros, la detección informa de la ausencia y el almacenamiento se recrea en el momento en que
+  alguien escribe.
+- IMPLEMENTACIÓN: `no_data_behavior()` devuelve el CONTRATO DECLARATIVO del comportamiento del motor cuando el
+  almacenamiento de persistencia está AUSENTE (2.8.8.9.5.1) o le falta una SECCIÓN (2.8.8.9.5.2). El contrato
+  vive en `_NO_DATA_BEHAVIOR` y se expone por un método de SOLO LECTURA que devuelve una COPIA profunda
+  (`copy.deepcopy`): el llamante no puede mutar el contrato de la clase, el método no crea ficheros, no escribe
+  y no altera el estado del motor.
+- CONTENIDO DEL CONTRATO: `version`, `principle` y seis secciones.
+  - `startup`: `raises` (el arranque con el almacenamiento ausente no lanza), `creates_data_dir`,
+    `creates_persistence_files` (la carga NO crea ficheros de persistencia) y `defaults` (`adaptation_rules` =
+    reglas integradas, `knowledge_base` = secciones vacías, `adaptation_history` = vacío, `knowledge_transfers` =
+    vacío).
+  - `read_apis`: las 10 APIs de lectura con su tipo de retorno (`get_engine_status` dict, `get_adaptation_summary`
+    dict, `get_context_insights` dict, `get_adaptation_rules` list, `list_adaptation_rules` list,
+    `get_available_strategies` list, `get_knowledge_transfers` list, `load_adaptation_rules` bool,
+    `load_knowledge_base` bool, `load_all_data` bool).
+  - `write_apis`: las 5 APIs de escritura con el fichero que crean (`save_adaptation_rules` ->
+    `adaptation_rules`, `save_knowledge_base` -> `knowledge_base`, `save_all_data` -> ambos,
+    `_save_goal_adaptation_feedback` -> `goal_adaptation_feedback`, `_save_goal_adaptation_learning_results` ->
+    `goal_adaptation_learning_results`).
+  - `detection`: `detect_absent_storage` informa de la ausencia, `detect_absent_sections` informa de la sección
+    ausente EN FICHEROS EXISTENTES, los ficheros ausentes se listan aparte, `get_engine_status` expone
+    `storage` y `storage_sections`, y la detección NO escribe.
+  - `recovery`: escribir recrea el almacenamiento y la detección deja de reportarlo como ausente.
+  - `invariants`: `read_apis_never_raise`, `detection_never_writes`, `defaults_are_empty_not_null`,
+    `writes_recreate_missing_storage`.
+- PRECISIÓN DEL ALCANCE (corregida sobre la redacción inicial): una sección ausente solo puede darse dentro de
+  un fichero EXISTENTE. Con el almacenamiento TOTALMENTE ausente, `detect_absent_sections()` no inventa secciones:
+  `absent` va vacío, `absent_count` es 0 y los 4 ficheros ausentes se listan en `missing_files` (que es la
+  detección de 2.8.8.9.5.1). La detección de CORRUPCIÓN (2.8.8.9.6) y el test pytest de ausencia (2.8.8.9.5.4) NO
+  se adelantan aquí.
+- LA DECLARACIÓN NO SUSTITUYE A LA VERIFICACIÓN: la sonda `no_data_behavior_real.py` contrasta el contrato
+  declarado contra el comportamiento OBSERVADO en runtime. Si lo observado se desvía, el contraste falla y el
+  contrato queda obsoleto: es intencional, un contrato que nunca falla no prueba nada.
+- RUNTIME: `tests/utils/contextual_adaptation_engine/no_data_behavior_real.py` — 77/77 comprobaciones OK.
+  Cubre la FORMA del contrato (secciones, tipos, APIs existentes, copia defensiva y que consultarlo NO crea
+  ficheros), la AUSENCIA TOTAL (arranque, defaults, las 10 APIs de lectura, la detección y la no escritura), la
+  AUSENCIA PARCIAL (una sección ausente dentro de un fichero existente, y que las lecturas siguen siendo seguras)
+  y la ESCRITURA y RECUPERACIÓN (cada API de escritura CREA el fichero que declara, y después de escribir el
+  almacenamiento deja de reportarse como ausente y sus ficheros son JSON válido). Es independiente de la suite
+  pytest, solo LEE el `data/` de producción mediante rutas absolutas y trabaja sobre directorios temporales.
+- NO VACUIDAD DE LA SONDA: `data/temp/nodata_mutation_check.py` muta el contrato declarado (tipo de retorno
+  incorrecto, `creates_persistence_files`, fichero creado por una API de escritura y `detection_writes`) y
+  comprueba que las 4 mutaciones son detectadas y que el contrato original pasa. Esta verificación detectó DOS
+  comprobaciones vacías de la sonda, corregidas: (1) el arranque se contrastaba contra una EXPECTATIVA fija
+  ("no crea ficheros") en vez de contra el valor declarado, de modo que cambiar el contrato no la activaba; y
+  (2) la escritura se comprobaba con "el fichero existe", de modo que un fichero declarado que ya existía por
+  otra escritura daba un falso OK; ahora cada API de escritura se prueba sobre un motor NUEVO, lo que permite
+  afirmar que lo CREA esa misma llamada.
+- AISLAMIENTO: `data/temp/nodata_isolation_check.py` comprueba por sha256 que la sonda NO modifica el `data/` de
+  producción: los 4 ficheros de persistencia y `data/knowledge_graph.json` quedan byte a byte idénticos.
+- COMPATIBILIDAD: el cambio es puramente ADITIVO. No se altera ninguna clave previa de `get_engine_status()`,
+  ni el comportamiento de arranque, carga, detección o escritura. El diff del motor son 94 líneas nuevas (el
+  contrato y su accessor) y 0 líneas modificadas o eliminadas.
+- ALCANCE: esta hoja DECLARA y VERIFICA el comportamiento; NO lo cambia. El test pytest de ausencia
+  (2.8.8.9.5.4) NO se adelanta aquí.
+- HALLAZGO DE PRODUCCIÓN: sin cambios. En `data/` siguen faltando `contextual_adaptation_rules.json` y
+  `contextual_knowledge_base.json` (ausencia de FICHERO, de 2.8.8.9.5.1).
 
 2.8.8.9.5.4 — TEST DE AUSENCIA
 - Crear y ejecutar únicamente tests de almacenamiento/sección ausente.
@@ -3778,7 +3843,88 @@ DISCREPANCIAS: Se mantiene el antecedente de 2.8.8.9.4.6 / 2.8.8.9.5.1: los test
   persistencia de Goal, por lo que NO se ha corregido en esta hoja. La sonda de esta unidad no lo agrava: su
   CWD temporal hace que su propia escritura caiga en el temporal, y se ha verificado por marca de tiempo que
   `data/knowledge_graph.json` NO se modifica durante la ejecución de la sonda.
-PENDIENTES: 2.8.8.9.5.3 — definir comportamiento sin datos.
-ESTADO FINAL: 2.8.8.9.5.2 — IMPLEMENTADA
+PENDIENTES: 2.8.8.9.5.4 — crear y ejecutar únicamente tests de almacenamiento/sección ausente.
+ESTADO FINAL: 2.8.8.9.5.3 — IMPLEMENTADA
 
-SIGUIENTE UNIDAD: 2.8.8.9.5.3 — DEFINIR COMPORTAMIENTO SIN DATOS
+SIGUIENTE UNIDAD: 2.8.8.9.5.4 — TEST DE AUSENCIA
+
+### REGISTRO DE UNIDAD: 2.8.8.9.5.3
+FECHA: 2026-10-21
+ESTADO: IMPLEMENTADA
+OBJETIVO: Definir el comportamiento del motor de adaptación contextual cuando el almacenamiento de persistencia está ausente (2.8.8.9.5.1) o le falta una sección (2.8.8.9.5.2), manteniendo el comportamiento compatible con el sistema existente.
+TIPO DE TRABAJO: DEFINICIÓN + VERIFICACIÓN
+CAMBIOS / HALLAZGOS:
+- PRINCIPIO DECLARADO: la ausencia de datos nunca es un error fatal. El motor arranca, expone valores por
+  defecto seguros, la detección informa de la ausencia y el almacenamiento se recrea en el momento en que
+  alguien escribe.
+- IMPLEMENTACIÓN: un contrato declarativo `_NO_DATA_BEHAVIOR` en `src/utils/contextual_adaptation_engine.py` y
+  su accessor `no_data_behavior()`, que devuelve una COPIA profunda. Es de SOLO LECTURA: no crea ficheros, no
+  escribe y no altera el estado del motor. El diff del motor son 94 líneas nuevas y 0 modificadas o
+  eliminadas: el cambio es puramente aditivo y NO altera ningún comportamiento previo.
+- CONTENIDO DEL CONTRATO: `version`, `principle` y seis secciones — `startup` (si el arranque lanza, si crea el
+  `data_dir`, si crea ficheros de persistencia y los valores por defecto), `read_apis` (las 10 APIs de lectura
+  con su tipo de retorno), `write_apis` (las 5 APIs de escritura con el fichero que crean), `detection` (qué
+  informa la detección y de que no escribe), `recovery` (que escribir recrea el almacenamiento) e `invariants`
+  (4 invariantes: `read_apis_never_raise`, `detection_never_writes`, `defaults_are_empty_not_null`,
+  `writes_recreate_missing_storage`).
+- PRECISIÓN DEL ALCANCE: una sección ausente solo puede darse dentro de un fichero EXISTENTE. Con el
+  almacenamiento totalmente ausente, `detect_absent_sections()` no inventa secciones: `absent` va vacío,
+  `absent_count` es 0, y los 4 ficheros ausentes se listan en `missing_files` (que es la detección de
+  2.8.8.9.5.1). La detección de CORRUPCIÓN (2.8.8.9.6) y el test pytest de ausencia (2.8.8.9.5.4) NO se adelantan
+  aquí.
+- LA DECLARACIÓN NO SUSTITUYE A LA VERIFICACIÓN: la sonda contrasta el contrato contra el comportamiento
+  OBSERVADO en runtime. Si lo observado se desvía, el contraste falla y el contrato queda obsoleto: es
+  intencional, un contrato que nunca falla no prueba nada.
+- HALLAZGO DE LA VERIFICACIÓN POR MUTACIÓN: la sonda tenía DOS comprobaciones VACÍAS, que el harness de
+  mutación reveló y que se han corregido.
+  (1) El arranque se contrastaba contra una EXPECTATIVA FIJA ("no crea ficheros") en vez de contra el valor
+  declarado, de modo que cambiar el contrato no la activaba. Ahora el arranque se OBSERVA y se contrasta con
+  `startup.raises` y `startup.creates_persistence_files`.
+  (2) La escritura se comprobaba con "el fichero existe", de modo que un fichero declarado que ya existía por
+  otra escritura daba un falso OK. Ahora cada API de escritura se prueba sobre un motor NUEVO, lo que permite
+  afirmar que lo CREA esa misma llamada.
+- AISLAMIENTO DE LA VERIFICACIÓN: la sonda trabaja sobre directorios temporales y solo LEE el `data/` de
+  producción mediante rutas absolutas. Verificado por hash sha256 que los cuatro ficheros de persistencia y
+  `data/knowledge_graph.json` quedan byte a byte idénticos tras la sonda.
+- HALLAZGO DE PRODUCCIÓN: sin cambios. En `data/` siguen faltando `contextual_adaptation_rules.json` y
+  `contextual_knowledge_base.json` (ausencia de FICHERO, que pertenece a 2.8.8.9.5.1).
+ARCHIVOS MODIFICADOS:
+- PRODUCCIÓN: `src/utils/contextual_adaptation_engine.py`.
+- TESTS: `tests/utils/contextual_adaptation_engine/no_data_behavior_real.py` (nuevo; sonda de runtime,
+  independiente de la suite pytest).
+- DOCUMENTACIÓN: `README.md`, `prompt_mejoraActual.txt`.
+TESTS Y RESULTADOS:
+- UNITARIOS: NO EJECUTADOS. La creación y ejecución del test pytest de almacenamiento/sección ausente
+  corresponde a la hoja 2.8.8.9.5.4 ("Crear y ejecutar únicamente tests de almacenamiento/sección ausente");
+  esta hoja no lo adelanta.
+- INTEGRACIÓN: `tests/utils/contextual_adaptation_engine/no_data_behavior_real.py` — 77 comprobaciones
+  OK / 0 FALLIDAS / TOTAL 77. Cubre la forma del contrato, la AUSENCIA TOTAL del almacenamiento (arranque,
+  defaults, las 10 APIs de lectura, la detección y la no escritura), la AUSENCIA PARCIAL (una sección ausente
+  dentro de un fichero existente) y la ESCRITURA y RECUPERACIÓN (cada API de escritura crea el fichero que
+  declara, y tras escribir el almacenamiento deja de reportarse como ausente con ficheros JSON válidos).
+- NO VACUIDAD: `data/temp/nodata_mutation_check.py` — 4/4 mutaciones detectadas (tipo de retorno incorrecto,
+  `creates_persistence_files`, fichero creado por una API de escritura y `detection_writes`) y el contrato
+  original pasa. 0 mutaciones no detectadas.
+- NO REGRESIÓN: suite completa `tests/` — 215 PASSED / 0 FAILED / TOTAL 215, frente a la baseline comparable
+  de 215 PASSED / 0 FAILED de 2.8.8.9.5.2 (esta hoja no añade tests a la suite pytest). 0 regresiones.
+VERIFICACIÓN:
+- SINTAXIS: `py_compile` de `src/utils/contextual_adaptation_engine.py` y
+  `tests/utils/contextual_adaptation_engine/no_data_behavior_real.py` — OK.
+- MAIN.PY: OK; `import main` completa sin error.
+- COMPORTAMIENTO / INTEGRACIÓN REAL: verificado en runtime que el motor arranca sin lanzar con el
+  almacenamiento ausente, que la carga NO crea ficheros de persistencia, que las 10 APIs de lectura devuelven
+  el tipo declarado, que la detección no escribe, que cada API de escritura recrea el almacenamiento, y que el
+  `data/` de producción NO se modifica al ejecutar la sonda.
+- AISLAMIENTO: `data/temp/nodata_isolation_check.py` — sha256 de los 4 ficheros de persistencia y de
+  `data/knowledge_graph.json` idénticos antes y después de la sonda. 5/5 intactos.
+DISCREPANCIAS: Se mantiene el antecedente de 2.8.8.9.4.6 / 2.8.8.9.5.1: los tests que crean el motor sin
+  `data_dir` reescriben `data/knowledge_graph.json` en cada ejecución, porque
+  `src/utils/self_improvement_system.py` (l. 161) usa la ruta RELATIVA fija `data/knowledge_graph.json` en
+  lugar de un `data_dir` configurable. Ese fichero pertenece al subsistema del grafo de conocimiento, no a la
+  persistencia de Goal, por lo que NO se ha corregido en esta hoja. La sonda de esta unidad no lo agrava: la
+  sonda pasa SIEMPRE un `data_dir` temporal explícito al motor, y se ha verificado por sha256 que
+  `data/knowledge_graph.json` NO se modifica durante la ejecución de la sonda.
+PENDIENTES: 2.8.8.9.5.4 — crear y ejecutar únicamente tests de almacenamiento/sección ausente.
+ESTADO FINAL: 2.8.8.9.5.3 — IMPLEMENTADA
+
+SIGUIENTE UNIDAD: 2.8.8.9.5.4 — TEST DE AUSENCIA
