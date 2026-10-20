@@ -1,8 +1,14 @@
 ESTADO PERSISTENTE ACTUAL
 CURRENT_PHASE: 2.8.8
-CURRENT_WORK_UNIT: 2.8.8.9.4.5
+CURRENT_WORK_UNIT: 2.8.8.9.4.6
 CURRENT_WORK_STATUS: EN PROCESO
-LAST_COMPLETED_UNIT: 2.8.8.9.4.4
+LAST_COMPLETED_UNIT: 2.8.8.9.4.5
+
+# COMPLETADO: 2.8.8.9.4.5 - Verificar patrones tras reinicio
+# Fecha: 2026-10-20
+# Archivo modificado: tests/utils/contextual_adaptation_engine/verify_pattern_restart_real.py (nuevo), README.md, prompt_mejoraActual.txt
+# Resultado: verificacion en runtime de la recuperacion de patrones tras reiniciar el motor (15/15 comprobaciones OK); los patrones validados se recuperan con el conjunto canonico completo de 7 campos, las estructuras anidadas intactas, las filas de resultados de aprendizaje con sus metricas de convergencia y estrategias conservadas, estabilidad ante un segundo reinicio y conservacion de lo recuperado tras un nuevo ciclo de aprendizaje; la carga no reescribe el fichero persistido
+# Estado real: 9 PASSED / 0 FAILED (test de verificacion de reinicio), 5/5 mutaciones detectadas, 212 PASSED / 0 FAILED en la suite completa (203 previos + 9 nuevos)
 
 # COMPLETADO: 2.8.8.9.4.4 - Implementar carga de patrones
 # Fecha: 2026-10-20
@@ -1177,8 +1183,20 @@ Hoy `learning_results` se escribe verbatim (l. 2475) y no hay ningún contador d
   `pattern_001` (`confidence` 0.9, una sola observacion) ya no se recupera, la fila se conserva y
   las estrategias siguen restaurandose. `data/` no se modifico.
 
-2.8.8.9.4.5 — VERIFICAR PATRONES TRAS REINICIO
+2.8.8.9.4.5 — VERIFICAR PATRONES TRAS REINICIO [IMPLEMENTADA]
 - Comprobar recuperación correcta.
+- VERIFICACION: los 9 tests de `tests/utils/contextual_adaptation_engine/test_goal_adaptation_pattern_restart_verification.py`
+  comprueban la recuperacion tras el reinicio (conjunto canonico completo de 7 campos, estructuras anidadas
+  intactas, valores sin perdida, fila de resultados con contexto y convergencia intactos, consumo por
+  `_update_adaptive_strategies()`, estabilidad ante un segundo reinicio, no contaminacion por un patron
+  no validado y carga sin reescribir el fichero persistido). 9 PASSED / 0 FAILED.
+- MUTACION: `tests/utils/contextual_adaptation_engine/mutation_check_pattern_restart.py` detecta las 5
+  mutaciones aplicadas al motor (carga verbatim, recorte a los 5 datos criticos, contexto anidado vaciado,
+  filas sin metricas de convergencia y reescritura del fichero al cargar). 5/5 DETECTADAS.
+- RUNTIME: `tests/utils/contextual_adaptation_engine/verify_pattern_restart_real.py` ejecuta el ciclo real
+  (feedback -> aprendizaje -> persistencia -> reinicio) sobre directorio temporal y sobre una COPIA del
+  fichero de produccion: 15/15 comprobaciones OK. `data/` no se modifico.
+- NO REGRESION: suite completa 212 PASSED / 0 FAILED (203 previos de 2.8.8.9.4.4 + 9 nuevos).
 
 2.8.8.9.4.6 — CORREGIR FALLO DE PATRONES
 - Corregir únicamente fallos de esta subhoja.
@@ -3344,3 +3362,67 @@ PENDIENTES: 2.8.8.9.4.5 — verificar los patrones tras el reinicio.
 ESTADO FINAL: 2.8.8.9.4.4 — IMPLEMENTADA
 
 SIGUIENTE UNIDAD: 2.8.8.9.4.5 — VERIFICAR PATRONES TRAS REINICIO
+
+REGISTRO DE UNIDAD: 2.8.8.9.4.5
+FECHA: 2026-10-20
+ESTADO: IMPLEMENTADA
+OBJETIVO: Verificar en runtime que los patrones de aprendizaje validados se recuperan correctamente tras reiniciar el motor, sin perdida de datos y sin reescribir el fichero persistido.
+TIPO DE TRABAJO: VERIFICACIÓN
+CAMBIOS / HALLAZGOS:
+- La hoja es de VERIFICACION: no se modifico codigo de produccion. `src/utils/contextual_adaptation_engine.py`
+  queda intacto (`git diff` vacio), por lo que el comportamiento verificado es el de 2.8.8.9.4.4 ya implementado.
+- VERIFICACION POR TESTS: `tests/utils/contextual_adaptation_engine/test_goal_adaptation_pattern_restart_verification.py`
+  (9 tests) comprueba la recuperacion tras el reinicio: conjunto canonico completo de 7 campos (no solo los 5
+  DATOS CRITICOS), estructuras anidadas (`context`, `metrics`) intactas, valores sin perdida, fila de
+  resultados con `adaptation_id`, `updated_strategies` y `convergence_metrics` intactos, consumo real por
+  `_update_adaptive_strategies()` con enlace `strategy["pattern_id"] -> pattern["pattern_id"]`, estabilidad
+  ante un segundo reinicio, conservacion de lo recuperado tras un nuevo ciclo de aprendizaje, no
+  contaminacion por un patron no validado y carga sin reescribir el fichero persistido (compara contenido,
+  tamano y `st_mtime_ns`). 9 PASSED / 0 FAILED.
+- VERIFICACION POR MUTACION (no vacuidad): `tests/utils/contextual_adaptation_engine/mutation_check_pattern_restart.py`
+  aplica 5 mutaciones al motor y exige que cada una la detecte al menos un test. Resultado: 5/5 DETECTADAS
+  (carga verbatim, recorte a los 5 datos criticos, contexto anidado vaciado, filas sin metricas de
+  convergencia, reescritura del fichero al cargar). El fichero original se restaura tras cada mutacion y
+  `git diff` confirma que `src/utils/contextual_adaptation_engine.py` queda intacto.
+- VERIFICACION EN RUNTIME (independiente del pytest): nuevo script
+  `tests/utils/contextual_adaptation_engine/verify_pattern_restart_real.py` que ejecuta el ciclo real del
+  motor (feedback -> aprendizaje -> persistencia -> reinicio) sobre un directorio temporal. Resultado
+  15/15 comprobaciones OK: 3 patrones aprendidos y 3 recuperados tras el reinicio con el MISMO `pattern_id`,
+  ningun campo canonico ausente ni cambiado de valor, estructuras anidadas ainda diccionarios, 3 filas de
+  resultados conservadas con metricas de convergencia y estrategias, la carga NO reescribe el fichero
+  persistido, el segundo reinicio recupera los mismos 3 patrones y un nuevo ciclo de aprendizaje posterior
+  no pierde ninguno de los ya recuperados (`perdidos=[]`).
+- VERIFICACION SOBRE COPIA DEL FICHERO REAL DE PRODUCCION: sobre una COPIA de
+  `data/goal_adaptation_learning_results.json` (el original NO se toca) se recuperan 1 fila y 0 patrones:
+  el patron real `pattern_001` (`confidence` 0.9, una sola observacion) no esta validado y se descarta
+  correctamente, con el log real "Patrones de aprendizaje no validados descartados al cargar: 1 de 1"; las
+  estrategias reales siguen restaurandose. La copia no se modifica.
+- La recuperacion de estrategias (2.8.8.9.3) no se ve afectada: las filas de resultados de aprendizaje se
+  conservan integras tras la carga.
+ARCHIVOS MODIFICADOS:
+- PRODUCCIÓN: NINGUNO (hoja de verificacion; `src/utils/contextual_adaptation_engine.py` intacto).
+- TESTS: `tests/utils/contextual_adaptation_engine/verify_pattern_restart_real.py` (nuevo, script de sonda
+  en runtime, 15 comprobaciones).
+- DOCUMENTACIÓN: `README.md`, `prompt_mejoraActual.txt`.
+TESTS Y RESULTADOS:
+- UNITARIOS: `tests/utils/contextual_adaptation_engine/test_goal_adaptation_pattern_restart_verification.py`
+  — 9 PASSED / 0 FAILED / TOTAL 9.
+- MUTACION: `tests/utils/contextual_adaptation_engine/mutation_check_pattern_restart.py` — 5/5 mutaciones
+  detectadas.
+- RUNTIME: `tests/utils/contextual_adaptation_engine/verify_pattern_restart_real.py` — 15/15 comprobaciones OK.
+- INTEGRACIÓN: NO APLICA.
+- NO REGRESIÓN: suite completa `tests/` — 212 PASSED / 0 FAILED / TOTAL 212, frente a la baseline comparable
+  de 203 PASSED / 0 FAILED de 2.8.8.9.4.4 (los 9 tests nuevos de esta hoja). 0 regresiones.
+VERIFICACIÓN:
+- SINTAXIS: `py_compile` de `main.py`, `src/utils/contextual_adaptation_engine.py` y
+  `tests/utils/contextual_adaptation_engine/verify_pattern_restart_real.py` — OK.
+- MAIN.PY: OK; `import main` completa sin error.
+- COMPORTAMIENTO / INTEGRACIÓN REAL: ciclo real feedback -> aprendizaje -> persistencia -> reinicio ejecutado
+  en runtime con evidencia impresa (patrones aprendidos = recuperados = 3, `pattern_id` identicos, 0 perdidas
+  tras un nuevo ciclo) y sobre una COPIA del fichero real de produccion (1 fila recuperada, 0 patrones no
+  validados, estrategias restauradas). Verificado en runtime que ni el test ni el script escriben en `data/`.
+DISCREPANCIAS: NINGUNA REGISTRADA.
+PENDIENTES: 2.8.8.9.4.6 — corregir fallo de patrones (unicamente fallos de esta subhoja).
+ESTADO FINAL: 2.8.8.9.4.5 — IMPLEMENTADA
+
+SIGUIENTE UNIDAD: 2.8.8.9.4.6 — CORREGIR FALLO DE PATRONES
