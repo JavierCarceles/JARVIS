@@ -1,9 +1,16 @@
 [
   {
+<<<<<<< HEAD
     "node_id": "node_1792517575",
     "node_type": "system_state",
     "properties": {
       "timestamp": "2026-10-20T19:32:55.951223",
+=======
+    "node_id": "node_1792524823",
+    "node_type": "system_state",
+    "properties": {
+      "timestamp": "2026-10-20T21:33:43.911152",
+>>>>>>> 8d6d091 (correccion pull)
       "efficiency_score": 90.0,
       "optimization_gain": 0.0,
       "system_load": 0.0,
@@ -12,6 +19,10 @@
     },
     "connections": [],
     "confidence": 0.9,
+<<<<<<< HEAD
     "last_updated": "2026-10-20T19:32:55.951241"
+=======
+    "last_updated": "2026-10-20T21:33:43.911157"
+>>>>>>> 8d6d091 (correccion pull)
   }
 ]
