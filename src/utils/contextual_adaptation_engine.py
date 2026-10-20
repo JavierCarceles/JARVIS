@@ -653,16 +653,6 @@ class ContextualAdaptationEngine:
         return self._extract_contextual_metrics(context)
 
     def _validate_context_compatibility(self, source_context: ContextType, target_context: ContextType) -> float:
-<<<<<<< HEAD
-        # Los nombres de los parámetros son ``source_context``/``target_context`` para
-        # coincidir con el resto de la API de transferencia (2.8.5.3.1).
-=======
-<<<<<<< HEAD
-=======
-        # Los nombres de los parámetros son ``source_context``/``target_context`` para
-        # coincidir con el resto de la API de transferencia (2.8.5.3.1).
->>>>>>> 8d6d091 (correccion pull)
->>>>>>> 4ab3495
         source, target = self._coerce_context(source_context), self._coerce_context(target_context)
         if source is None or target is None or source == target: return 0.
         base = {
@@ -810,25 +800,8 @@ class ContextualAdaptationEngine:
         return self._bounded_float(self._safe_float(strategy.get("confidence", .5))*modifier, 0., 1.)
 
     def _transform_knowledge_for_target(self, knowledge_data: Any, source_context: ContextType, target_context: ContextType,
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
                                         strategy: Optional[str] = None, transfer_strategy: Optional[str] = None) -> Dict[str, Any]:
         strategy = strategy or transfer_strategy
-=======
->>>>>>> 4ab3495
-                                        transfer_strategy: Optional[str] = None, *, strategy: Optional[str] = None) -> Dict[str, Any]:
-        """Transformar el conocimiento al contexto destino.
-
-        ``strategy`` es un alias de ``transfer_strategy`` para los llamadores que
-        usan el nombre corto; si no se indica ninguno se usa ``adaptive``.
-        """
-        effective_strategy = strategy if strategy is not None else transfer_strategy
-        effective_strategy = effective_strategy if effective_strategy in ("adaptive", "conservative", "aggressive") else "adaptive"
-<<<<<<< HEAD
-=======
->>>>>>> 8d6d091 (correccion pull)
->>>>>>> 4ab3495
         if isinstance(knowledge_data, list): data = {"patterns": copy.deepcopy(knowledge_data)}
         elif isinstance(knowledge_data, dict): data = copy.deepcopy(knowledge_data)
         else: data = {"value": knowledge_data}
@@ -837,24 +810,10 @@ class ContextualAdaptationEngine:
         if isinstance(data.get("performance_baselines"), dict):
             data["performance_baselines"] = self._adapt_baselines_to_context(data["performance_baselines"], source_context, target_context)
         data["transfer_metadata"] = {"source_context": source_context.value, "target_context": target_context.value,
-<<<<<<< HEAD
-                                      "transfer_strategy": effective_strategy, "transformation_timestamp": datetime.now().isoformat(),
-                                      "original_data_size": len(str(knowledge_data))}
-        data["adaptation_level"] = {"conservative": "minimal", "adaptive": "moderate", "aggressive": "significant"}.get(effective_strategy, "moderate")
-        data["transformation_type"] = effective_strategy
-=======
-<<<<<<< HEAD
                                       "transfer_strategy": strategy, "transformation_timestamp": datetime.now().isoformat(),
                                       "original_data_size": len(str(knowledge_data))}
         data["adaptation_level"] = {"conservative": "minimal", "adaptive": "moderate", "aggressive": "significant"}.get(strategy, "moderate")
         data["transformation_type"] = strategy
-=======
-                                      "transfer_strategy": effective_strategy, "transformation_timestamp": datetime.now().isoformat(),
-                                      "original_data_size": len(str(knowledge_data))}
-        data["adaptation_level"] = {"conservative": "minimal", "adaptive": "moderate", "aggressive": "significant"}.get(effective_strategy, "moderate")
-        data["transformation_type"] = effective_strategy
->>>>>>> 8d6d091 (correccion pull)
->>>>>>> 4ab3495
         return data
 
     def _update_transfer_patterns(self, transfer: KnowledgeTransfer) -> None:
@@ -929,30 +888,14 @@ class ContextualAdaptationEngine:
     def get_transfer_confidence(self, transfer_id: str, result: Optional[Dict[str, Any]] = None) -> Optional[float]:
         """Obtener una confianza acotada usando primero la transferencia viva y después el historial persistido.
 
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
         `result` permite ponderar la confianza con el resultado de aplicación de la transferencia
         (tasa de éxito, indicadores de mejora) sin perder la eficiencia base de la transferencia.
-=======
->>>>>>> 4ab3495
-        Sin feedback registrado la confianza refleja la eficiencia de la transferencia;
-        con feedback registrado prevalece la confianza anotada. Si se entrega un
-        ``result`` de ejecución, este modula la confianza según el ``success_rate``
-        obtenido.
-<<<<<<< HEAD
-=======
->>>>>>> 8d6d091 (correccion pull)
->>>>>>> 4ab3495
         """
         if not isinstance(transfer_id, str) or not transfer_id.strip():
             return None
 
         transfer = self.knowledge_transfers.get(transfer_id)
         if transfer is not None:
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
             efficiency = self._bounded_float(transfer.transfer_efficiency, 0.0, 1.0)
             base = self._resolve_transfer_confidence(transfer_id, transfer, efficiency)
             if not isinstance(result, dict):
@@ -968,25 +911,6 @@ class ContextualAdaptationEngine:
             if success:
                 blended = max(blended, min(1., rate + .05))
             return self._bounded_float(blended, 0.0, 1.0)
-=======
->>>>>>> 4ab3495
-            recorded = self._safe_float(getattr(transfer, "confidence_score", 0.0), -1.0)
-            # ``confidence_score`` vale 0.0 por defecto en el dataclass: ese valor no
-            # significa "confianza nula" sino "aún sin feedback". Solo se usa cuando
-            # existe feedback registrado o la confianza anotada es positiva.
-            if recorded > 0.0 or getattr(transfer, "last_feedback", None) is not None:
-                return self._bounded_float(recorded, 0.0, 1.0)
-            confidence = self._bounded_float(transfer.transfer_efficiency, 0.0, 1.0)
-            if isinstance(result, dict):
-                rate = self._bounded_float(self._safe_float(result.get("success_rate"), 0.0), 0.0, 1.0)
-                confidence = self._bounded_float(0.5 * confidence + 0.5 * rate, 0.0, 1.0)
-                if result.get("success") is False:
-                    confidence = self._bounded_float(confidence * 0.5, 0.0, 1.0)
-            return confidence
-<<<<<<< HEAD
-=======
->>>>>>> 8d6d091 (correccion pull)
->>>>>>> 4ab3495
 
         records_by_pair = self.knowledge_base.get("transfer_efficiency", {})
         if isinstance(records_by_pair, dict):
@@ -999,17 +923,13 @@ class ContextualAdaptationEngine:
                 for record in records:
                     if not isinstance(record, dict) or record.get("transfer_id") != transfer_id:
                         continue
-                    efficiency = self._bounded_float(record.get("efficiency", 0.0), 0.0, 1.0)
+                    efficiency = self._bounded_float(record.get("efficiency", 0.5), 0.0, 1.0)
+                    success = self._bounded_float(record.get("success_rate", 0.5), 0.0, 1.0)
                     score = record.get("feedback_score")
                     if score is not None:
                         return self._bounded_float(score, 0.0, 1.0)
-                    return efficiency
+                    return self._bounded_float(0.6 * efficiency + 0.4 * success, 0.0, 1.0)
 
-<<<<<<< HEAD
-        # Una transferencia inexistente no tiene evidencia: la confianza es 0.0.
-        return 0.0
-=======
-<<<<<<< HEAD
         # Sin transferencia viva ni historial: no hay confianza que reportar.
         return 0.0
 
@@ -1022,11 +942,6 @@ class ContextualAdaptationEngine:
         if attribute > 0.0:
             return self._bounded_float(attribute, 0.0, 1.0)
         return self._bounded_float(efficiency, 0.0, 1.0)
-=======
-        # Una transferencia inexistente no tiene evidencia: la confianza es 0.0.
-        return 0.0
->>>>>>> 8d6d091 (correccion pull)
->>>>>>> 4ab3495
 
 
     def register_feedback(
@@ -1044,10 +959,7 @@ class ContextualAdaptationEngine:
 
             transfer = self.knowledge_transfers.get(transfer_id)
             if transfer is None:
-                # Sin transferencia viva no hay sobre qué aplicar el feedback: no se
-                # registra un historial huérfano ni se informa de un registro exitoso.
                 self.logger.warning("No existe transferencia activa para feedback: %s", transfer_id)
-                return False
 
             score_raw = feedback_data.get("quality", feedback_data.get("score", feedback_data.get("feedback_score", None)))
             score = None if score_raw is None else self._bounded_float(score_raw, 0.0, 1.0)
@@ -1058,23 +970,10 @@ class ContextualAdaptationEngine:
             if transfer is not None:
                 if score is not None:
                     transfer.confidence_score = score
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
                     self._recorded_confidence[transfer_id] = score
                 result_rate = result.get("success_rate") if isinstance(result, dict) else None
                 if result_rate is not None:
                     transfer.success_rate = self._bounded_float(result_rate, 0.0, 1.0)
-=======
->>>>>>> 4ab3495
-                # El ``success_rate`` del resultado es más preciso que el booleano
-                # ``success``, por lo que se prefiere cuando está disponible.
-                if isinstance(result, dict) and "success_rate" in result:
-                    transfer.success_rate = self._bounded_float(self._safe_float(result["success_rate"], 0.0), 0.0, 1.0)
-<<<<<<< HEAD
-=======
->>>>>>> 8d6d091 (correccion pull)
->>>>>>> 4ab3495
                 elif success is not None:
                     transfer.success_rate = 1.0 if success else 0.0
                 transfer.last_feedback = timestamp
@@ -1192,27 +1091,11 @@ class ContextualAdaptationEngine:
         self,
         transfer: Any,
         execution_result: Optional[Dict[str, Any]] = None,
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
     ) -> TransferEvaluation:
         """Evaluar una transferencia; acepta un KnowledgeTransfer o su identificador legacy.
 
         El resultado es un dict estructurado que además se desempaqueta como
         ``(is_successful, score, message)``.
-=======
->>>>>>> 4ab3495
-    ) -> Tuple[bool, float, str]:
-        """Evaluar una transferencia; acepta un KnowledgeTransfer o su identificador legacy.
-
-        Devuelve la tripleta ``(is_successful, score, message)``: si la transferencia
-        no existe el score es 0.0 y el mensaje lo indica; si existe, el score pondera
-        el ``success_rate`` real, la bandera ``success``, la calidad, el tiempo de
-        ejecución y la mejora medida.
-<<<<<<< HEAD
-=======
->>>>>>> 8d6d091 (correccion pull)
->>>>>>> 4ab3495
         """
         transfer_obj: Optional[KnowledgeTransfer]
         if isinstance(transfer, KnowledgeTransfer):
@@ -1221,9 +1104,6 @@ class ContextualAdaptationEngine:
             transfer_obj = self.knowledge_transfers.get(str(transfer))
         transfer_id = transfer_obj.transfer_id if transfer_obj is not None else (str(transfer) if transfer else "unknown")
         if transfer_obj is None:
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
             return TransferEvaluation({
                 "success": False,
                 "is_successful": False,
@@ -1236,16 +1116,6 @@ class ContextualAdaptationEngine:
                 "transfer_id": transfer_id,
                 "timestamp": datetime.now().isoformat(),
             })
-=======
->>>>>>> 4ab3495
-            self.knowledge_base.setdefault("transfer_evaluations", []).append({
-                "transfer_id": transfer_id, "verified": False, "score": 0.0,
-                "message": "Transfer not found", "timestamp": datetime.now().isoformat()})
-            return False, 0.0, f"Transfer not found: {transfer_id}"
-<<<<<<< HEAD
-=======
->>>>>>> 8d6d091 (correccion pull)
->>>>>>> 4ab3495
         payload = execution_result if isinstance(execution_result, dict) else {}
         if not payload:
             # No suponer éxito si no se ha ejecutado nada: se devuelve una evaluación neutral.
@@ -1261,9 +1131,6 @@ class ContextualAdaptationEngine:
         error_component = max(0.0, 1.0 - min(1.0, error_count / 5.0))
         metrics = payload.get("metrics", {}) if isinstance(payload.get("metrics", {}), dict) else {}
         improvement = self._safe_float(metrics.get("performance_improvement", metrics.get("resource_savings", 0.0)))
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
         score = self._bounded_float(
             .5 * rate
             + .2 * (1.0 if success else 0.0)
@@ -1285,39 +1152,11 @@ class ContextualAdaptationEngine:
         transfer_obj.confidence_score = score
         transfer_obj.last_transfer = datetime.now()
         self._recorded_confidence[transfer_id] = score
-=======
->>>>>>> 4ab3495
-        # El ``success_rate`` real es la evidencia principal de la evaluación.
-        success_rate = self._bounded_float(self._safe_float(payload.get("success_rate", 0.0), 0.0), 0.0, 1.0)
-        score = self._bounded_float(
-            success_rate * 0.6 + (1.0 if success else 0.0) * 0.2 + quality_score * 0.1
-            + time_component * 0.05 + error_component * 0.05,
-            0.0, 1.0,
-        )
-        score = self._bounded_float(score * 0.9 + self._bounded_float(improvement, 0.0, 1.0) * 0.1, 0.0, 1.0)
-
-        if success_rate >= 0.7:
-            is_successful, message = True, f"Transfer successful: success_rate={success_rate:.2f}"
-        elif success_rate >= 0.3:
-            is_successful, message = False, f"Transfer partial: success_rate={success_rate:.2f}"
-        else:
-            is_successful, message = False, f"Transfer failed: success_rate={success_rate:.2f}"
-
-        transfer_obj.success_rate = score
-        transfer_obj.confidence_score = score
-        transfer_obj.last_transfer = datetime.now()
-<<<<<<< HEAD
-=======
->>>>>>> 8d6d091 (correccion pull)
->>>>>>> 4ab3495
         feedback_ok = self.register_transfer_feedback(
             transfer_id, success=success, feedback_score=score,
             feedback_comments=f"Auto-evaluated: execution_time={execution_time}s, errors={error_count}",
         )
         confidence = self.get_transfer_confidence(transfer_id)
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
         return TransferEvaluation({
             "success": bool(success and feedback_ok.get("success", False)),
             "is_successful": is_successful,
@@ -1331,21 +1170,6 @@ class ContextualAdaptationEngine:
             "transfer_id": transfer_id,
             "timestamp": datetime.now().isoformat(),
         })
-=======
->>>>>>> 4ab3495
-        self.knowledge_base.setdefault("transfer_evaluations", []).append({
-            "transfer_id": transfer_id, "verified": is_successful, "score": score, "message": message,
-            "success": success, "success_rate": success_rate, "quality_score": quality_score,
-            "execution_time": execution_time, "error_count": error_count, "improvement": improvement,
-            "confidence_score": self._bounded_float(confidence if confidence is not None else score, 0.0, 1.0),
-            "feedback_registered": bool(feedback_ok.get("success", False)),
-            "evaluation_timestamp": datetime.now().isoformat()})
-        del self.knowledge_base["transfer_evaluations"][:-200]
-        return is_successful, score, message
-<<<<<<< HEAD
-=======
->>>>>>> 8d6d091 (correccion pull)
->>>>>>> 4ab3495
 
 
     def _record_successful_transfer_pattern(self, source_context: ContextType, target_context: ContextType, knowledge_type: str) -> None:
@@ -2631,15 +2455,39 @@ class ContextualAdaptationEngine:
                 str(context.get("context_type", "unknown")))
 
     def _count_pattern_observations(self, learning_results: List[Dict[str, Any]]) -> Dict[Tuple[str, str, str], int]:
-        """Contar las observaciones similares acumuladas por cada patrón."""
+        """Contar las observaciones similares acumuladas por cada patrón.
+
+        Solo se cuentan las observaciones que superan el umbral de confianza:
+        son exactamente las que el propio guardado conserva. Así el recuento de
+        la carga coincide con el del guardado y el ciclo guardar/cargar no
+        pierde ningún patrón validado (2.8.8.9.4.4).
+        """
+        threshold = self._confidence_threshold()
         counts: Dict[Tuple[str, str, str], int] = {}
         for row in learning_results or []:
             if not isinstance(row, dict): continue
             for pattern in row.get("learned_patterns") or []:
                 if not isinstance(pattern, dict): continue
+                if self._safe_float(pattern.get("confidence", 0.)) < threshold: continue
                 identity = self._pattern_identity(pattern)
                 counts[identity] = counts.get(identity, 0) + 1
         return counts
+
+    def _confidence_threshold(self) -> float:
+        """Umbral de confianza configurado en el motor.
+
+        La configuración se lee con `getattr` porque la validación se usa
+        también en la carga, donde el motor puede haber sido construido sin
+        inicializar `config` (por ejemplo, en las pruebas que reutilizan una
+        instancia creada con `__new__`).
+        """
+        config = getattr(self, "config", None) or {}
+        return self._safe_float(config.get("confidence_threshold", .7), .7)
+
+    def _min_similar_observations(self) -> int:
+        """Mínimo de observaciones similares exigido por el motor."""
+        config = getattr(self, "config", None) or {}
+        return int(self._safe_float(config.get("min_similar_observations", 3), 3))
 
     def _is_validated_pattern(self, pattern: Dict[str, Any], observations: Dict[Tuple[str, str, str], int]) -> bool:
         """Comprobar si un patrón cumple el contrato de datos validados.
@@ -2647,10 +2495,8 @@ class ContextualAdaptationEngine:
         Exige `confidence >= confidence_threshold` (configurado en el motor) y
         un mínimo de `min_similar_observations` observaciones similares.
         """
-        threshold = self._safe_float(self.config.get("confidence_threshold", .7), .7)
-        if self._safe_float(pattern.get("confidence", 0.)) < threshold: return False
-        minimum = int(self._safe_float(self.config.get("min_similar_observations", 3), 3))
-        return observations.get(self._pattern_identity(pattern), 0) >= minimum
+        if self._safe_float(pattern.get("confidence", 0.)) < self._confidence_threshold(): return False
+        return observations.get(self._pattern_identity(pattern), 0) >= self._min_similar_observations()
 
     def _filter_validated_learning_results(self, learning_results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Dejar en `learning_results` únicamente los patrones validados.
@@ -2670,6 +2516,32 @@ class ContextualAdaptationEngine:
                                        if isinstance(pattern, dict) and self._is_validated_pattern(pattern, observations)]
             filtered.append(row)
         return filtered
+
+    def _recover_learning_patterns(self, learning_results: Any) -> Any:
+        """Recuperar únicamente los patrones de aprendizaje validados (2.8.8.9.4.4).
+
+        Aplica el mismo contrato de DATOS CRÍTICOS (item 5) que el guardado
+        (2.8.8.9.4.3): un patrón solo se recupera si su `confidence` alcanza el
+        umbral configurado en el motor y tiene un mínimo de
+        `min_similar_observations` observaciones similares.
+
+        El guardado ya escribe el fichero filtrado, de modo que para los
+        ficheros que produce el motor esta recuperación es idéntica al
+        contenido persistido. El filtro evita que un fichero heredado, escrito
+        a mano o por otra herramienta introduzca en la base de conocimiento
+        patrones que nunca fueron validados.
+
+        Las filas de resultados de aprendizaje se conservan íntegras: de ellas
+        depende la restauración de estrategias (2.8.8.9.3).
+        """
+        if not isinstance(learning_results, list): return learning_results
+        recovered = self._filter_validated_learning_results(learning_results)
+        persisted = sum(len(row.get("learned_patterns") or []) for row in learning_results if isinstance(row, dict))
+        restored = sum(len(row.get("learned_patterns") or []) for row in recovered if isinstance(row, dict))
+        if persisted != restored:
+            self.logger.info("Patrones de aprendizaje no validados descartados al cargar: %s de %s",
+                             persisted - restored, persisted)
+        return recovered
 
     def _save_goal_adaptation_learning_results(self) -> None:
         try:
@@ -2737,7 +2609,12 @@ class ContextualAdaptationEngine:
         try:
             with open(path, "r", encoding="utf-8") as handle: payload = json.load(handle)
             if not isinstance(payload, dict): return
-            self.knowledge_base["learning_results"] = payload.get("learning_results", self.knowledge_base.get("learning_results", []))
+            # Contrato de DATOS CRÍTICOS (item 5, 2.8.8.9.4.4): la carga aplica
+            # el mismo filtro de validación que el guardado, de modo que solo
+            # se recuperan los patrones validados (confianza >= umbral y mínimo
+            # de observaciones similares).
+            loaded_results = payload.get("learning_results", self.knowledge_base.get("learning_results", []))
+            self.knowledge_base["learning_results"] = self._recover_learning_patterns(loaded_results)
             # El contexto exacto con el que se aprendieron las estrategias solo
             # consta en `updated_strategies` de cada resultado de aprendizaje, así
             # que se restaura primero; el índice plano completa las que falten.

@@ -89,17 +89,23 @@ def persisted_data(tmp_path):
         }
     ]
 
+    # Contrato de DATOS CRITICOS (item 5, 2.8.8.9.4.4): un patron validado exige
+    # `confidence >= 0.7` y un minimo de 3 observaciones similares. La identidad
+    # del patron es `pattern_type` + `context`; por eso el fixture persiste tres
+    # observaciones del mismo patron (antes persistia una sola, que la carga
+    # descarta por justamente no tener evidencia suficiente).
     learning_records = [
         {
             "adaptation_id": "test_load_001",
             "learned_patterns": [
                 {
-                    "pattern_id": "pattern_001",
+                    "pattern_id": f"pattern_{index:03d}",
                     "pattern_type": "goal_adaptation_success",
                     "confidence": 0.9,
-                    "context": {"goal_type": "navigate"},
+                    "context": {"goal_type": "navigate", "context_type": "production"},
                     "metrics": {"response_time": 1.5, "accuracy": 0.98}
                 }
+                for index in (1, 2, 3)
             ],
             "updated_strategies": {
                 "strategy_001": {
@@ -158,7 +164,11 @@ def test_carga_resultados_aprendizaje(persisted_data):
 
     record = loaded_learning[0]
     assert record["adaptation_id"] == "test_load_001"
-    assert len(record["learned_patterns"]) == 1
+    # Las tres observaciones del patron validado deben recuperarse intactas
+    # (2.8.8.9.4.4): la carga no descarta patrones validados.
+    assert len(record["learned_patterns"]) == 3
+    assert {p["pattern_id"] for p in record["learned_patterns"]} == {
+        "pattern_001", "pattern_002", "pattern_003"}
     assert record["learned_patterns"][0]["pattern_id"] == "pattern_001"
 
 

@@ -1,14 +1,14 @@
 ESTADO PERSISTENTE ACTUAL
 CURRENT_PHASE: 2.8.8
-CURRENT_WORK_UNIT: 2.8.8.9.4.4
-CURRENT_WORK_STATUS: PENDIENTE
-LAST_COMPLETED_UNIT: 2.8.8.9.4.3
+CURRENT_WORK_UNIT: 2.8.8.9.4.5
+CURRENT_WORK_STATUS: EN PROCESO
+LAST_COMPLETED_UNIT: 2.8.8.9.4.4
 
-# COMPLETADO: 2.8.8.9.4.3 - Implementar guardado de patrones
+# COMPLETADO: 2.8.8.9.4.4 - Implementar carga de patrones
 # Fecha: 2026-10-20
-# Archivo modificado: src/utils/contextual_adaptation_engine.py, README.md, prompt_mejoraActual.txt
-# Resultado: `_save_goal_adaptation_learning_results()` persiste en `learning_results` unicamente los patrones validados (confidence >= confidence_threshold del motor y minimo de 3 observaciones similares por identidad `pattern_type` + `context`); `adaptation_strategies` intacto
-# Estado real: 9 PASSED / 0 FAILED (test de persistencia de patrones) y 194 PASSED / 0 FAILED en la suite completa
+# Archivo modificado: src/utils/contextual_adaptation_engine.py, tests/utils/contextual_adaptation_engine/test_goal_adaptation_pattern_load.py (nuevo), tests/utils/contextual_adaptation_engine/test_load_goal_adaptation_feedback.py, README.md, prompt_mejoraActual.txt
+# Resultado: `_load_goal_adaptation_learning_results()` ya no restaura `learning_results` verbatim; aplica el mismo contrato de DATOS CRITICOS (item 5) que el guardado y recupera unicamente los patrones validados (confidence >= umbral configurado en el motor y minimo de 3 observaciones similares por identidad `pattern_type` + `context`); las filas de resultados de aprendizaje se conservan integras para no romper la restauracion de estrategias (2.8.8.9.3)
+# Estado real: 9 PASSED / 0 FAILED (test de carga de patrones) y 203 PASSED / 0 FAILED en la suite completa (194 previos + 9 nuevos)
 
 REGLA DE LECTURA DEL ESTADO
 CURRENT_WORK_UNIT es la única unidad que se debe trabajar en el siguiente chat.
@@ -41,7 +41,7 @@ REGLAS MAESTRAS
 3. Una unidad hoja debe caber razonablemente en un chat. Si no, dividirla antes de seguir y registrar las hijas.
 4. Al empezar una unidad: EN PROCESO. Al terminar: IMPLEMENTADA. Incompleta: PARCIALMENTE IMPLEMENTADA. Sin trabajo: NO IMPLEMENTADA. Solo una hoja puede estar EN PROCESO.
 5. No avanzar hasta completar la hoja activa. Una fase solo se IMPLEMENTA cuando todas sus hojas están completas y main.py queda OK.
-6. README.md es el mapa documental. prompt_mejoraActual.txt es la memoria operativa. El código real y los tests son la fuente de verdad técnica.
+6. README.md es el mapa documental. prompt_mejoraActual.txt es la memoria operativa. El código real y los tests son la fuente de verdad técnica. El README documenta únicamente el código: por fichero, con su descripción, clases, métodos, dependencias y comportamiento. El README NO contiene fases, subfases, hojas, unidades, IDs de mejora, historial de avance, logs de tests ni estado del proyecto: ese seguimiento vive solo en prompt_mejoraActual.txt. No reintroducirlo.
 7. No auditar todo el repositorio. Leer README + estado y abrir solo los archivos necesarios para la unidad activa. En archivos grandes, localizar primero clase/método/símbolo y ampliar solo si hace falta.
 8. No crear trabajo para rellenar una lista: no inventar funcionalidades, fases, subfases, archivos, clases, métodos, coordenadas, offsets, tests, métricas o resultados.
 9. Las coordenadas/puntos de UI son datos de percepción/calibración. No son inteligencia ni reglas de decisión.
@@ -1152,9 +1152,30 @@ Hoy `learning_results` se escribe verbatim (l. 2475) y no hay ningún contador d
   `test_observaciones_de_contextos_distintos_no_se_agrupan`
 - NO tocar `adaptation_strategies` (contrato del item 4 ya cerrado en 2.8.8.9.3.6).
 
-2.8.8.9.4.4 — IMPLEMENTAR CARGA DE PATRONES
+2.8.8.9.4.4 — IMPLEMENTAR CARGA DE PATRONES [IMPLEMENTADA]
 - Recuperar únicamente patrones de aprendizaje.
 - `_load_goal_adaptation_learning_results()` (l. 2491) restaura hoy `learning_results` verbatim.
+- IMPLEMENTACION: la carga aplica el mismo contrato de DATOS CRITICOS (item 5) que el guardado
+  (2.8.8.9.4.3). Metodos nuevos en `src/utils/contextual_adaptation_engine.py`:
+  `_recover_learning_patterns()`, `_filter_validated_learning_results()`, `_is_validated_pattern()`,
+  `_count_pattern_observations()`, `_pattern_identity()`, `_confidence_threshold()`,
+  `_min_similar_observations()`. Se recuperan solo los patrones con
+  `confidence >= self.config["confidence_threshold"]` (0.7) y con minimo de 3 observaciones
+  similares (identidad = `pattern_type` + `context`).
+- El recuento de observaciones de la carga cuenta SOLO las que superan el umbral, igual que el
+  guardado, de modo que el ciclo guardar/cargar es la inversa exacta y no pierde ningun patron
+  validado. Las filas de resultados de aprendizaje se conservan integras (de ellas depende la
+  restauracion de estrategias de 2.8.8.9.3).
+- TEST NUEVO: `tests/utils/contextual_adaptation_engine/test_goal_adaptation_pattern_load.py`
+  (9 tests), aislado con `data_dir=str(tmp_path)`. 9 PASSED / 0 FAILED.
+- NO REGRESION: suite completa 203 PASSED / 0 FAILED (194 previos de 2.8.8.9.4.3 + 9 nuevos).
+- TEST HEREDADO ACTUALIZADO (motivo documentado): `test_load_goal_adaptation_feedback.py::test_carga_resultados_aprendizaje`
+  persistia un patron de UNA sola observacion, que el item 5 ya no considera validado. El fixture
+  persiste ahora 3 observaciones similares del mismo patron y la asercion se REFUERZA (3 patrones
+  recuperados con sus `pattern_id`); no se elimino ni se debilito ninguna comprobacion.
+- VERIFICACION REAL: sobre una copia temporal del fichero de produccion, el patron real
+  `pattern_001` (`confidence` 0.9, una sola observacion) ya no se recupera, la fila se conserva y
+  las estrategias siguen restaurandose. `data/` no se modifico.
 
 2.8.8.9.4.5 — VERIFICAR PATRONES TRAS REINICIO
 - Comprobar recuperación correcta.
@@ -3266,4 +3287,60 @@ La IA debe pensar y resolver; el prompt solo fija límites y continuidad. No sus
 ### REGISTRO DE UNIDAD: 2.8.8.9.3.6
 ### REGISTRO DE UNIDAD: 2.8.8.9.4.1
 ### REGISTRO DE UNIDAD: 2.8.8.9.4.2
+### REGISTRO DE UNIDAD: 2.8.8.9.4.3
+### REGISTRO DE UNIDAD: 2.8.8.9.4.4
 ## CONTINUIDAD OPERATIVA
+
+REGISTRO DE UNIDAD: 2.8.8.9.4.3
+FECHA: 2026-10-20
+ESTADO: IMPLEMENTADA
+OBJETIVO: Persistir en `learning_results` únicamente los patrones de aprendizaje validados, cumpliendo el contrato de DATOS CRÍTICOS (item 5) fijado en 2.8.8.9.4.2.
+TIPO DE TRABAJO: IMPLEMENTACIÓN
+CAMBIOS / HALLAZGOS:
+- `_save_goal_adaptation_learning_results()` deja en `learning_results` solo los patrones con `confidence >= self.config["confidence_threshold"]` (0.7) y con un mínimo de 3 observaciones similares; la identidad de agrupación es `pattern_type` + `context` (`goal_type` y `context_type`), porque el `pattern_id` se regenera en cada llamada.
+- `adaptation_strategies` intacto (contrato del item 4, cerrado en 2.8.8.9.3.6).
+- Las filas de resultados de aprendizaje se conservan íntegras: de ellas depende la restauración de estrategias de 2.8.8.9.3.
+ARCHIVOS MODIFICADOS:
+- PRODUCCIÓN: `src/utils/contextual_adaptation_engine.py`.
+- TESTS: NO APLICA (hoja de implementación; el test ya existía desde 2.8.8.9.4.2).
+- DOCUMENTACIÓN: `README.md`, `prompt_mejoraActual.txt`.
+TESTS Y RESULTADOS:
+- UNITARIOS: `tests/test_goal_adaptation_pattern_persistence.py` — 9 PASSED / 0 FAILED / TOTAL 9 (antes 4 PASSED / 5 FAILED).
+- INTEGRACIÓN: NO APLICA.
+- NO REGRESIÓN: suite completa — 194 PASSED / 0 FAILED.
+VERIFICACIÓN:
+- SINTAXIS: `py_compile` de `main.py` y `src/utils/contextual_adaptation_engine.py` — OK.
+- MAIN.PY: NO APLICA; sin cambios de producción. `py_compile` — OK.
+- COMPORTAMIENTO / INTEGRACIÓN REAL: los 5 tests que fijaban el contrato de 2.8.8.9.4.2 pasaron sin modificar el test.
+DISCREPANCIAS: NINGUNA REGISTRADA.
+PENDIENTES: 2.8.8.9.4.4 — implementar la carga de patrones.
+ESTADO FINAL: 2.8.8.9.4.3 — IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 2.8.8.9.4.4
+FECHA: 2026-10-20
+ESTADO: IMPLEMENTADA
+OBJETIVO: Recuperar únicamente los patrones de aprendizaje validados al cargar `learning_results`, aplicando el mismo contrato de DATOS CRÍTICOS (item 5) que el guardado de 2.8.8.9.4.3, sin perder ningún patrón validado y sin romper la restauración de estrategias.
+TIPO DE TRABAJO: IMPLEMENTACIÓN
+CAMBIOS / HALLAZGOS:
+- `_load_goal_adaptation_learning_results()` ya no restaura `learning_results` verbatim: aplica `_recover_learning_patterns()`, que descarta los patrones con `confidence` por debajo del umbral configurado en el motor o sin el mínimo de 3 observaciones similares (identidad `pattern_type` + `context`).
+- Métodos nuevos en `src/utils/contextual_adaptation_engine.py`: `_recover_learning_patterns()`, `_filter_validated_learning_results()`, `_is_validated_pattern()`, `_count_pattern_observations()`, `_pattern_identity()`, `_confidence_threshold()` y `_min_similar_observations()`. `_count_pattern_observations()` cuenta solo las observaciones que superan el umbral, igual que el guardado, de modo que el ciclo guardar/cargar es la inversa exacta y no pierde ningún patrón validado.
+- Las filas de resultados de aprendizaje se conservan íntegras tras la carga: la restauración de estrategias aprendidas (2.8.8.9.3) no se ve afectada por el descarte de patrones no validados.
+- Verificación de no-regresión del contrato: con el código de carga anterior (verbatim) fallan 3 de los 9 tests nuevos (`test_la_carga_no_recupera_un_patron_por_debajo_del_umbral_de_confianza`, `test_la_carga_no_recupera_un_patron_con_observaciones_insuficientes`, `test_la_carga_usa_el_umbral_configurado_en_el_motor`); con la implementación nueva pasan los 9. Se restauró después el código correcto.
+- Comportamiento real sobre el fichero de producción (copiado a un directorio temporal, sin escribir en `data/`): el patrón real `pattern_001` (`confidence` 0.9, una sola observación) ya no se recupera porque no está validado; la fila se conserva y las estrategias se siguen restaurando.
+ARCHIVOS MODIFICADOS:
+- PRODUCCIÓN: `src/utils/contextual_adaptation_engine.py`.
+- TESTS: `tests/utils/contextual_adaptation_engine/test_goal_adaptation_pattern_load.py` (nuevo, 9 tests); `tests/utils/contextual_adaptation_engine/test_load_goal_adaptation_feedback.py` (test heredado `test_carga_resultados_aprendizaje` actualizado, motivo documentado abajo).
+- DOCUMENTACIÓN: `README.md`, `prompt_mejoraActual.txt`.
+TESTS Y RESULTADOS:
+- UNITARIOS: `tests/utils/contextual_adaptation_engine/test_goal_adaptation_pattern_load.py` — 9 PASSED / 0 FAILED / TOTAL 9. `tests/utils/contextual_adaptation_engine/` — 196 PASSED / 0 FAILED.
+- INTEGRACIÓN: NO APLICA (la hoja no toca `adaptation_strategies` ni la carga de estrategias).
+- NO REGRESIÓN: suite completa `tests/` — 203 PASSED / 0 FAILED / TOTAL 203, frente a la baseline comparable de 194 PASSED / 0 FAILED de 2.8.8.9.4.3 (los 9 tests nuevos). 0 regresiones.
+VERIFICACIÓN:
+- SINTAXIS: `py_compile` de `main.py` y `src/utils/contextual_adaptation_engine.py` — OK.
+- MAIN.PY: OK; `import main` completa sin error.
+- COMPORTAMIENTO / INTEGRACIÓN REAL: comprobación en runtime sobre una copia temporal del fichero de producción (`data/goal_adaptation_learning_results.json`): 1 patrón en el fichero, 0 patrones recuperados (no validado), 1 fila conservada, ninguna escritura en el directorio temporal. Verificado en runtime que los tests nuevos no escriben en `data/`.
+DISCREPANCIAS: `tests/utils/contextual_adaptation_engine/test_load_goal_adaptation_feedback.py::test_carga_resultados_aprendizaje` fallaba tras el cambio porque su fixture persistía un patrón de UNA sola observación, que el item 5 de DATOS CRÍTICOS ya no considera validado. Se actualizó el fixture para persistir 3 observaciones similares del mismo patrón y se reforzó la aserción (3 patrones recuperados con sus `pattern_id`); no se eliminó ni se debilitó ninguna comprobación. Motivo: cambio legítimo de contrato (2.8.8.9.4.4).
+PENDIENTES: 2.8.8.9.4.5 — verificar los patrones tras el reinicio.
+ESTADO FINAL: 2.8.8.9.4.4 — IMPLEMENTADA
+
+SIGUIENTE UNIDAD: 2.8.8.9.4.5 — VERIFICAR PATRONES TRAS REINICIO

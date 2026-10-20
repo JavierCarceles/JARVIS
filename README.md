@@ -282,21 +282,21 @@
   - `process_and_execute`: Procesa respuesta LLM y ejecuta comando (compatibilidad legacy)
   - `get_current_state`: Obtiene el estado actual del mundo
   - `get_action_stats`: Obtiene estadísticas de ejecución de acciones
-  - `get_learning_insights`: Obtiene insights del sistema de aprendizaje (FASE 18)
+  - `get_learning_insights`: Obtiene insights del sistema de aprendizaje
 - **Características mejoradas**:
   - Ejecución de planes completos con replanificación cuando una acción falla
   - Verificación de precondiciones y efectos de cada nodo
   - Manejo de estado del mundo y actualizaciones en tiempo real
-  - Sistema de aprendizaje integrado (FASE 18) para optimización
+  - Sistema de aprendizaje integrado para optimización
   - Timeout handling y manejo robusto de errores
   - Soporte para acciones alternativas cuando falla la ejecución principal
 - **Integraciones**:
   - `ActionRegistry` para registro y ejecución de acciones
   - `MemoryManager` para estado del mundo y estadísticas
-  - `LearningSystem` para aprendizaje y optimización (FASE 18)
+  - `LearningSystem` para aprendizaje y optimización
   - `Planner` para planificación jerárquica de objetivos
   - Módulos de aplicaciones (keyboard, mouse, applications_core)
-- **Fases soportadas**: FASE 7-9 (Planificación jerárquica y ejecución), FASE 18 (Sistema de aprendizaje y optimización)
+- **Capacidades**: Planificación jerárquica y ejecución de planes; sistema de aprendizaje y optimización
 
 #### `src/hands/mouse.py` [129 líneas] - Control Básico del Ratón
 - **Descripción**: Control básico del ratón para JARVIS con capacidades de movimiento, clic y scroll integradas en el sistema de acciones.
@@ -1132,7 +1132,7 @@
   - `calibrate_app()`: Función pública de compatibilidad. No escribe macros_coords.json.
 
 #### `src/hands/coordinate_manager.py` [1113 líneas] - Gestor Unificado de Coordenadas
-- **Descripción**: Gestor unificado de coordenadas para JARVIS - FASE 13. Responsabilidades: administrar recursos UI calibrados, proporcionar capacidades de UI al planificador, gestionar estado de calibración, convertir y validar sistemas de coordenadas, leer datos existentes de macros_coords.json, mantener compatibilidad con APIs legacy.
+- **Descripción**: Gestor unificado de coordenadas para JARVIS. Responsabilidades: administrar recursos UI calibrados, proporcionar capacidades de UI al planificador, gestionar estado de calibración, convertir y validar sistemas de coordenadas, leer datos existentes de macros_coords.json, mantener compatibilidad con APIs legacy.
 - **Clases principales**:
   - `ResourceType` (Enum): Tipos de recursos UI gestionados por el coordinate manager (ELEMENT, REGION, APPLICATION, WINDOW, MONITOR)
   - `CalibrationStrategy` (Enum): Estrategias de calibración disponibles (VISUAL_DETECTION, WINDOW_DETECTION, SCREEN_CAPTURE, KEYBOARD_SHORTCUT, HOTKEY)
@@ -1280,13 +1280,13 @@
   - `get_action_stats`: Obtiene estadísticas de ejecución de acciones
   - `_record_action_execution`: Registra ejecución de acción para estadísticas
   - `_get_screen_state`: Obtiene estado actual de la pantalla para aprendizaje
-  - `get_learning_insights`: Obtiene insights del sistema de aprendizaje (FASE 18)
-  - `get_action_learning_insights`: Obtiene insights específicos de una acción (FASE 18)
-  - `get_cost_adjustments`: Obtiene ajustes de coste aprendidos (FASE 18)
-  - `export_learning_data`: Exporta datos de aprendizaje (FASE 18)
-  - `import_learning_data`: Importa datos de aprendizaje (FASE 18)
-  - `clear_learning_data`: Limpia datos de aprendizaje (FASE 18)
-  - `enable_learning`: Habilita o deshabilita el aprendizaje (FASE 18)
+  - `get_learning_insights`: Obtiene insights del sistema de aprendizaje
+  - `get_action_learning_insights`: Obtiene insights específicos de una acción
+  - `get_cost_adjustments`: Obtiene ajustes de coste aprendidos
+  - `export_learning_data`: Exporta datos de aprendizaje
+  - `import_learning_data`: Importa datos de aprendizaje
+  - `clear_learning_data`: Limpia datos de aprendizaje
+  - `enable_learning`: Habilita o deshabilita el aprendizaje
   - `_record_command_execution`: Registra ejecución de comando legacy
   - `list_commands`: Lista todas las acciones conocidas
   - `get_plannable_actions`: Obtiene acciones disponibles para planificación
@@ -1773,14 +1773,14 @@
   - Inicialización automática de capacidades al importar el módulo
 
 #### `src/hands/planner/node.py` [1138 líneas] - Modelo Canónico de Nodos para Planificación Jerárquica
-- **Descripción**: Fuente única de verdad para el sistema de planificación jerárquica de JARVIS. Implementa un modelo de nodos completo con soporte para múltiples fases del sistema, aprendizaje automático, grafos de estados, y ejecución con replanificación. El sistema soporta desde nodos simples hasta estructuras jerárquicas complejas con dependencias, precondiciones, efectos y gestión de estado.
+- **Descripción**: Fuente única de verdad para el sistema de planificación jerárquica de JARVIS. Implementa un modelo de nodos completo con soporte para múltiples niveles del sistema, aprendizaje automático, grafos de estados, y ejecución con replanificación. El sistema soporta desde nodos simples hasta estructuras jerárquicas complejas con dependencias, precondiciones, efectos y gestión de estado.
 
-**Arquitectura Multi-Fase Integrada:**
-- **FASE 3**: Estado del mundo con `state_requirements` y `state_modifications`
-- **FASE 6**: Grafo de acciones con `in_edges`, `out_edges` y `edge_costs`
-- **FASE 10**: Precondiciones y efectos avanzados con funciones callback
-- **FASE 14**: Acciones reutilizables con categorías y marcado
-- **FASE 18**: Sistema de aprendizaje automático con métricas de ejecución
+**Arquitectura Integrada:**
+- **Estado del mundo**: `state_requirements` y `state_modifications`
+- **Grafo de acciones**: `in_edges`, `out_edges` y `edge_costs`
+- **Precondiciones y efectos avanzados**: funciones callback
+- **Acciones reutilizables**: con categorías y marcado
+- **Aprendizaje automático**: con métricas de ejecución
 
 - **Clases principales**:
   - `NodeType` (Enum): Tipos de nodos en el sistema de planificación
@@ -1845,7 +1845,7 @@
   - `create_condition_node`: Crea nodos de condición mediante callbacks
 
 - **Características Avanzadas**:
-  - **Sistema de Aprendizaje (FASE 18)**: Registro histórico automático con métricas de éxito y tiempo de ejecución
+  - **Sistema de Aprendizaje**: Registro histórico automático con métricas de éxito y tiempo de ejecución
   - **Gestión de Grafos**: Soporte completo para grafos de estados con aristas ponderadas
   - **Serialización Inteligente**: Maneja funciones no serializables y referencias circulares
   - **Validación Robusta**: Normalización automática de tipos, flotantes y estructuras de datos
@@ -1903,7 +1903,7 @@
   - Soporte para múltiples estrategias de optimización configurables
 
 #### `src/hands/planner/optimization_config.py` [355 líneas] - Configuración del Sistema de Optimización
-- **Descripción**: Configuración tipada y validada del sistema de optimización (FASE 17) con modos predefinidos, configuraciones por subsistema y serialización segura.
+- **Descripción**: Configuración tipada y validada del sistema de optimización con modos predefinidos, configuraciones por subsistema y serialización segura.
 - **Clases principales**:
   - `OptimizationMode` (Enum): Modos de operación del sistema de optimización (AGGRESSIVE, BALANCED, CONSERVATIVE, LEARNING_ONLY)
   - `RouteCacheConfig`: Configuración del caché de rutas con LRU, precarga y compresión
@@ -2256,27 +2256,27 @@
 ### 🗃️ Módulo `src/memory/` - Sistema de Memoria y Planificación
 
 #### `src/memory/__init__.py` [78 líneas] - Inicialización del Módulo Memoria
-- **Descripción**: Módulo de memoria mejorado para soportar planificación jerárquica con separación de memoria conversacional y conocimiento permanente, gestión de entidades de dominio, estado del mundo explícito y soporte para planificación jerárquica (FASE 5).
+- **Descripción**: Módulo de memoria mejorado para soportar planificación jerárquica con separación de memoria conversacional y conocimiento permanente, gestión de entidades de dominio, estado del mundo explícito y soporte para planificación jerárquica.
 - **Importaciones Principales**:
-  - Desde `storage`: MemoryType, Entity, ConversationalMemory, MemoryManager, JSONStorage, get_memory_manager, save_entity, get_entity, get_entities_by_type, add_conversational_memory, get_world_state, update_world_state, y funciones específicas para SUBFASE 5.1 (resolve_entity_to_url, get_entity_attributes, create_goal_from_entity, verify_entity_integrity)
-  - Desde `entity_resolver`: EntityResolver, EntityResolutionResult, ResolutionContext, entity_resolver (Sistema de resolución de entidades - SUBFASE 5.2)
+  - Desde `storage`: MemoryType, Entity, ConversationalMemory, MemoryManager, JSONStorage, get_memory_manager, save_entity, get_entity, get_entities_by_type, add_conversational_memory, get_world_state, update_world_state, y funciones de resolución de entidades (resolve_entity_to_url, get_entity_attributes, create_goal_from_entity, verify_entity_integrity)
+  - Desde `entity_resolver`: EntityResolver, EntityResolutionResult, ResolutionContext, entity_resolver (Sistema de resolución de entidades)
   - Compatibilidad con sistema existente: ConversationMemory como Memory y JSONStorage como Storage
 - **Exportaciones Principales**:
   - Nuevas clases mejoradas: MemoryType, Entity, ConversationalMemory, MemoryManager, JSONStorage
   - Funciones de gestión: get_memory_manager, save_entity, get_entity, get_entities_by_type, add_conversational_memory, get_world_state, update_world_state
-  - Funciones SUBFASE 5.1: resolve_entity_to_url, get_entity_attributes, create_goal_from_entity, verify_entity_integrity
-  - Sistema de resolución de entidades (SUBFASE 5.2): EntityResolver, EntityResolutionResult, ResolutionContext, entity_resolver
+  - Funciones de resolución de entidades: resolve_entity_to_url, get_entity_attributes, create_goal_from_entity, verify_entity_integrity
+  - Sistema de resolución de entidades: EntityResolver, EntityResolutionResult, ResolutionContext, entity_resolver
   - Compatibilidad legacy: Memory, Storage
 
 #### `src/memory/conversation.py` [1129 líneas] - Memoria de Conversaciones y Sistema de Planificación
-- **Descripción**: Memoria de conversaciones y sistema de planificación jerárquica. Transforma el sistema de texto→comando→función a intención→objetivo→plan→ejecución. Cumple con: FASE 1: Modelo de nodos, FASE 2: Nodos jerárquicos, FASE 5: Memoria de dominio, FASE 15: Comandos de alto nivel, FASE 16: Compatibilidad.
+- **Descripción**: Memoria de conversaciones y sistema de planificación jerárquica. Transforma el sistema de texto→comando→función a intención→objetivo→plan→ejecución. Incluye: modelo de nodos, nodos jerárquicos, memoria de dominio, comandos de alto nivel y compatibilidad con el sistema legacy.
 - **Clases principales**:
   - `NodeType` (Enum): Tipos de nodos en el sistema de planificación (INTENTION, GOAL, TASK, ACTION, CONDITION, STATE, RESOURCE, APPLICATION, UI_ELEMENT, RESULT, PLAN).
   - `TaskStatus` (Enum): Estado de ejecución de tareas (PENDING, EXECUTING, COMPLETED, FAILED, ABORTED).
   - `Node`: Modelo básico de nodo para memoria.
   - `Goal`: Modelo básico de objetivo para memoria.
-  - `Task`: Tarea jerárquica (FASE 2).
-  - `DomainMemory`: Memoria de conocimiento del dominio (FASE 5).
+  - `Task`: Tarea jerárquica.
+  - `DomainMemory`: Memoria de conocimiento del dominio.
   - `ConversationMemory`: Sistema de memoria transformado para planificación jerárquica.
 - **Métodos principales**:
   - `NodeType`: INTENTION, GOAL, TASK, ACTION, CONDITION, STATE, RESOURCE, APPLICATION, UI_ELEMENT, RESULT, PLAN
@@ -2304,11 +2304,11 @@
   - `ConversationMemory.__init__`: Inicializa sistema de memoria para planificación jerárquica
   - `ConversationMemory._normalize_text`: Normaliza texto para búsqueda
   - `ConversationMemory._remove_wake_word`: Elimina 'jarvis' inicial
-  - `ConversationMemory._load_aliases`: Carga aliases (mantener compatibilidad FASE 16)
-  - `ConversationMemory.parse_user_input`: Transforma entrada de usuario en objetivo (FASE 15)
+  - `ConversationMemory._load_aliases`: Carga aliases (mantener compatibilidad legacy)
+  - `ConversationMemory.parse_user_input`: Transforma entrada de usuario en objetivo
   - `ConversationMemory._extract_intention`: Extrae intención del texto normalizado
   - `ConversationMemory._create_goal_from_intention`: Crea objetivo a partir de intención
-  - `ConversationMemory.create_plan_from_goal`: Crea un plan a partir de un objetivo (FASE 6, 7)
+  - `ConversationMemory.create_plan_from_goal`: Crea un plan a partir de un objetivo
   - `ConversationMemory.update_world_state`: Actualiza el estado del mundo
   - `ConversationMemory.add_user_message`: Añade mensaje de usuario a la memoria conversacional (compatibilidad)
   - `ConversationMemory.get_current_state`: Obtiene estado actual del mundo
@@ -2329,7 +2329,7 @@
   - `ConversationMemory.load_domain_knowledge_persistence`: Carga conocimiento de dominio persistido
 
 #### `src/memory/entity_resolver.py` [825 líneas] - Sistema de Resolución Avanzada de Entidades
-- **Descripción**: Sistema avanzado de resolución de entidades para FASE 5 - DOMAIN MEMORY. Implementa resolución de entidades con contexto, manejo de ambigüedades, búsqueda semántica e integración con HTN y Goals.
+- **Descripción**: Sistema avanzado de resolución de entidades para la memoria de dominio. Implementa resolución de entidades con contexto, manejo de ambigüedades, búsqueda semántica e integración con HTN y Goals.
 - **Clases principales**:
   - `EntityResolutionResult` (dataclass): Resultado de la resolución de entidad con entidad, confianza, método de resolución, alternativas, contexto usado y timestamp.
   - `ResolutionContext` (dataclass): Contexto para resolución de entidades con historial conversacional, intención actual, entidades recientes, preferencias de usuario y información de sesión.
@@ -2364,7 +2364,7 @@
   - (Instancia global para uso fácil)
 
 #### `src/memory/prediction.py` [1081 líneas] - Memoria Predictiva Mejorada
-- **Descripción**: Memoria predictiva mejorada para sistema de planificación jerárquica. Integra predicciones con el nuevo sistema de intenciones y objetivos. Cumple con FASE 5 (Memoria de dominio mejorada), FASE 15 (Comandos de alto nivel), FASE 16 (Compatibilidad), FASE 17 (Optimización) y FASE 18 (Aprendizaje).
+- **Descripción**: Memoria predictiva mejorada para sistema de planificación jerárquica. Integra predicciones con el nuevo sistema de intenciones y objetivos. Cubre memoria de dominio mejorada, comandos de alto nivel, compatibilidad, optimización y aprendizaje.
 - **Clases principales**:
   - `PredictionResult` (dataclass): Resultado de predicción para planificación con goal predicho, confianza, razonamiento, alternativas, probabilidad de ejecución, coste estimado y tasa de éxito histórica.
   - `ExecutionMetrics` (dataclass): Métricas de ejecución para aprendizaje con goal_id, éxito, tiempo de ejecución, coste real, timestamp, contexto, mensaje de error y replanificaciones.
@@ -2377,7 +2377,7 @@
   - `_can_migrate_to_goal`: Verifica si un evento puede migrarse a goal.
   - `_migrate_event_to_goal`: Migr evento a formato goal.
   - `_infer_goal_type_from_command`: Infere tipo de goal desde comando legacy.
-  - `predict_goal_from_input`: Predice objetivo basado en entrada de usuario (FASE 15) con análisis de patrones históricos, estado actual y entidades.
+  - `predict_goal_from_input`: Predice objetivo basado en entrada de usuario con análisis de patrones históricos, estado actual y entidades.
   - `_normalize_input`: Normaliza texto para análisis.
   - `_analyze_historical_patterns`: Analiza patrones históricos para predicción.
   - `_analyze_state_influence`: Analiza cómo el estado actual influye en la predicción.
@@ -2394,7 +2394,7 @@
   - `_get_historical_success_rate`: Obtiene tasa de éxito histórica para tipo de goal.
   - `_get_command_success_rate`: Obtiene tasa de éxito para comando legacy.
   - `_generate_prediction_reasoning`: Genera explicación de la predicción.
-  - `record_goal_execution`: Registra ejecución de goal para aprendizaje (FASE 18).
+  - `record_goal_execution`: Registra ejecución de goal para aprendizaje.
   - `_update_success_patterns`: Actualiza patrones de éxito por tipo de goal.
   - `_update_cost_estimations`: Actualiza estimaciones de coste.
   - `_update_path_cache`: Actualiza caché de rutas exitosas.
@@ -2403,7 +2403,7 @@
   - `get_cached_path`: Obtiene ruta cacheada para goal específico.
   - `get_cost_estimation`: Obtiene estimación de coste para tipo de goal.
   - `get_success_rate`: Obtiene tasa de éxito para tipo de goal.
-  - `record_command`: Método legacy para registrar comandos (FASE 16) que integra con nuevo sistema pero mantiene compatibilidad.
+  - `record_command`: Método legacy para registrar comandos que integra con nuevo sistema pero mantiene compatibilidad.
   - `_create_legacy_event`: Crea evento en formato legacy.
   - `_get_open_windows`: Obtiene ventanas abiertas (legacy).
   - `_get_active_window`: Obtiene ventana activa (legacy).
@@ -2413,11 +2413,11 @@
 - **Funciones globales**:
   - `get_enhanced_prediction_memory`: Obtiene instancia singleton de memoria predictiva mejorada.
 - **Clases de compatibilidad legacy**:
-  - `PredictionMemory`: Clase legacy para compatibilidad (FASE 16) que wrapper sobre EnhancedPredictionMemory.
+  - `PredictionMemory`: Clase legacy para compatibilidad que wrapper sobre EnhancedPredictionMemory.
   - `get_prediction_memory`: Función singleton legacy para compatibilidad.
 
 #### `src/memory/storage.py` [1984 líneas] - Sistema de Almacenamiento Mejorado
-- **Descripción**: Sistema de almacenamiento mejorado para soportar planificación jerárquica con manejo avanzado de memoria, caché y persistencia. Implementa FASE 3 (Estado del mundo), FASE 5 (Memoria de dominio avanzada), FASE 6-7 (Soporte para planes y ejecuciones), FASE 18 (Estadísticas de aprendizaje) y manejo avanzado de caché para rendimiento.
+- **Descripción**: Sistema de almacenamiento mejorado para soportar planificación jerárquica con manejo avanzado de memoria, caché y persistencia. Implementa estado del mundo, memoria de dominio avanzada, soporte para planes y ejecuciones, estadísticas de aprendizaje y manejo avanzado de caché para rendimiento.
 - **Clases principales**:
   - `MemoryType` (Enum): Tipos de memoria en el sistema mejorado (CONVERSATIONAL, DOMAIN_KNOWLEDGE, ENTITIES, APPLICATIONS, STATE, PLANS, EXECUTIONS, LEARNING_STATS, RELATIONSHIPS, PREFERENCES).
   - `Entity` (dataclass): Entidad mejorada para memoria de dominio con id, type, name, properties, metadata, aliases, confidence y tags.
@@ -2607,7 +2607,7 @@
   - `process_and_execute`: Función de compatibilidad para código existente que delega en la instancia global.
 
 #### `src/tools/os_info.py` [533 líneas] - Información del Sistema para Jarvis
-- **Descripción**: Información del sistema para Jarvis con arquitectura de planificación. Proporciona información estructurada del sistema para construir el estado del mundo (FASE 3) y soportar la planificación jerárquica. Recoge: uso de CPU y memoria, estado del disco, información de ventanas y aplicaciones, recursos del sistema y contexto para planificación.
+- **Descripción**: Información del sistema para Jarvis con arquitectura de planificación. Proporciona información estructurada del sistema para construir el estado del mundo y soportar la planificación jerárquica. Recoge: uso de CPU y memoria, estado del disco, información de ventanas y aplicaciones, recursos del sistema y contexto para planificación.
 - **Clases principales**:
   - `SystemHealth` (Enum): Estados de salud del sistema (EXCELLENT, GOOD, WARNING, CRITICAL).
   - `ApplicationWindow` (dataclass): Información de una ventana de aplicación con title, process_name, handle, position, size, is_visible, is_minimized, is_maximized, monitor y método to_dict.
@@ -2672,7 +2672,7 @@
 
 ### 🗂️ Módulo `src/utils/` - Utilidades del Sistema
 
-#### `src/utils/__init__.py` - Sistema de Optimización Completo v2.7.0
+#### `src/utils/__init__.py` - Sistema de Optimización Completo
 - **Descripción**: Paquete principal de utilidades de Jarvis que integra todos los sistemas de optimización, aprendizaje automático, monitoreo y automejora. Proporciona una interfaz unificada para el sistema de optimización completo con componentes principales de performance optimization, self-improvement, adaptive learning y orchestration.
 - **Importaciones Principales**:
   - Desde `advanced_logger`: AdvancedLogger
@@ -2964,37 +2964,37 @@
   - `register_interface`: Registra nuevas interfaces en el sistema
   - `get_architecture_inspection_report`: Genera reporte detallado de inspección arquitectónica
   - `validate_compatibility_with_existing_apis`: Verifica compatibilidad con APIs existentes
-  - `get_proposal_input_requirements`: Define entrada mínima para propuestas (contrato 2.8.2.1.6)
-  - `get_proposal_output_requirements`: Define salida mínima esperada (contrato 2.8.2.1.7)
-  - `get_proposal_states`: Define estados posibles de propuestas (contrato 2.8.2.1.8)
+  - `get_proposal_input_requirements`: Define entrada mínima para propuestas
+  - `get_proposal_output_requirements`: Define salida mínima esperada
+  - `get_proposal_states`: Define estados posibles de propuestas
   - `validate_proposal_contract`: Valida que propuestas cumplan con contrato mínimo
-  - `run_minimum_tests`: Ejecuta tests mínimos del contrato (2.8.2.1.10)
-  - `test_application_methods`: Tests de aplicación controlada (2.8.2.5.7)
-  - `prepare_change`: Prepara cambios antes de aplicación (2.8.2.5.1)
-  - `apply_change`: Aplica cambios arquitectónicos verificables (2.8.2.5.2)
-  - `detect_application_failure`: Detecta fallos durante aplicación (2.8.2.5.3)
-  - `register_application_result`: Registra resultados de aplicación (2.8.2.5.4)
-  - `verify_change_structure`: Verifica estructura resultante después de cambios (2.8.2.5.5)
-  - `verify_no_side_effects`: Verifica que no se modificaron componentes ajenos (2.8.2.5.6)
-  - `validate_proposal_previa`: Valida propuesta antes de aplicación (2.8.2.5.8)
-  - `execute_syntax_check`: Ejecuta comprobación sintáctica post-ejecución (2.8.2.6.1)
-  - `execute_component_tests`: Ejecuta tests del componente afectado (2.8.2.6.2)
-  - `check_direct_integrations`: Comprueba integraciones directas (2.8.2.6.3)
-  - `check_configuration_state`: Comprueba estado de configuración (2.8.2.6.4)
-  - `check_application_startup`: Comprueba que la aplicación sigue arrancando (2.8.2.6.5)
-  - `register_real_evidence`: Registra evidencia real (2.8.2.6.6)
-  - `test_post_verification_methods`: Tests de verificación posterior (2.8.2.6.7)
-  - `detect_rollback_need`: Detecta cuándo un cambio debe revertirse (2.8.2.7.1)
-  - `create_backup_for_rollback`: Crea copia de seguridad para rollback (2.8.2.7.2)
-  - `perform_rollback`: Realiza el rollback de un cambio (2.8.2.7.3)
-  - `run_compatibility_tests`: Ejecuta tests de compatibilidad (2.8.2.8)
-  - `run_persistence_and_audit_tests`: Ejecuta tests de persistencia y auditoría (2.8.2.9.7)
-  - `identify_persistence_locations`: Identifica ubicaciones de persistencia (2.8.2.9.1)
-  - `persist_evolution`: Persiste evolución en almacenamiento (2.8.2.9.2)
-  - `recover_evolution`: Recupera evolución desde almacenamiento (2.8.2.9.3)
-  - `handle_corrupted_or_missing_data`: Maneja datos corruptos o faltantes (2.8.2.9.4)
-  - `prevent_duplicates`: Evita duplicados en evoluciones (2.8.2.9.5)
-  - `maintain_change_traceability`: Mantiene trazabilidad de cambios (2.8.2.9.6)
+  - `run_minimum_tests`: Ejecuta tests mínimos del contrato
+  - `test_application_methods`: Tests de aplicación controlada
+  - `prepare_change`: Prepara cambios antes de aplicación
+  - `apply_change`: Aplica cambios arquitectónicos verificables
+  - `detect_application_failure`: Detecta fallos durante aplicación
+  - `register_application_result`: Registra resultados de aplicación
+  - `verify_change_structure`: Verifica estructura resultante después de cambios
+  - `verify_no_side_effects`: Verifica que no se modificaron componentes ajenos
+  - `validate_proposal_previa`: Valida propuesta antes de aplicación
+  - `execute_syntax_check`: Ejecuta comprobación sintáctica post-ejecución
+  - `execute_component_tests`: Ejecuta tests del componente afectado
+  - `check_direct_integrations`: Comprueba integraciones directas
+  - `check_configuration_state`: Comprueba estado de configuración
+  - `check_application_startup`: Comprueba que la aplicación sigue arrancando
+  - `register_real_evidence`: Registra evidencia real
+  - `test_post_verification_methods`: Tests de verificación posterior
+  - `detect_rollback_need`: Detecta cuándo un cambio debe revertirse
+  - `create_backup_for_rollback`: Crea copia de seguridad para rollback
+  - `perform_rollback`: Realiza el rollback de un cambio
+  - `run_compatibility_tests`: Ejecuta tests de compatibilidad
+  - `run_persistence_and_audit_tests`: Ejecuta tests de persistencia y auditoría
+  - `identify_persistence_locations`: Identifica ubicaciones de persistencia
+  - `persist_evolution`: Persiste evolución en almacenamiento
+  - `recover_evolution`: Recupera evolución desde almacenamiento
+  - `handle_corrupted_or_missing_data`: Maneja datos corruptos o faltantes
+  - `prevent_duplicates`: Evita duplicados en evoluciones
+  - `maintain_change_traceability`: Mantiene trazabilidad de cambios
 - **Métodos auxiliares de aplicación controlada**:
   - `_verify_precondition`: Verifica precondiciones específicas
   - `_prepare_change_resources`: Prepara recursos necesarios para cambios
@@ -3208,7 +3208,7 @@
   - `integrate_with_self_improvement_system`: Integrar con SelfImprovementSystem para aprendizaje continuo
   - `integrate_with_adaptive_learning_engine`: Integrar con AdaptiveLearningEngine para aprendizaje adaptativo
   - `integrate_with_pattern_analyzer`: Integrar con PatternAnalyzer para detección de patrones contextuales
-  - `set_meta_learning_system`: Conectar el MetaLearningSystem real (2.8.3.6); no lo instancia
+  - `set_meta_learning_system`: Conectar el MetaLearningSystem real; no lo instancia
   - `integrate_with_meta_learning_system`: Observar el metaprendizaje (métricas, recomendaciones, evaluaciones y meta-reglas) y registrarlo en la base de conocimiento sin aplicarlo
   - `full_system_integration`: Realizar integración completa con todos los sistemas existentes
   - `_map_optimization_to_adaptation`: Mapear recomendación de optimización a acción de adaptación
@@ -3265,7 +3265,7 @@
   - `_apply_performance_baselines`: Aplicar líneas base de rendimiento transferidas
   - `_evaluate_knowledge_application`: Evaluar el resultado de la aplicación de conocimiento transferido
   - `_get_available_knowledge_types`: Obtener tipos de conocimiento disponibles en un contexto
-- **Persistencia de feedback de Goal (2.8.8.9.2)**:
+- **Persistencia de feedback de Goal**:
   - `_initialize_goal_adaptation_persistence`: Inicializar la persistencia de feedback y aprendizaje de Goal
   - `_save_goal_adaptation_feedback`: Guardar el feedback acumulado y el historial de adaptación en `goal_adaptation_feedback.json`
   - `_load_goal_adaptation_feedback`: Recuperar el feedback acumulado y el historial de adaptación desde disco
@@ -3274,38 +3274,34 @@
   - `_flatten_strategy_map`: Normalizar el mapa de estrategias al índice plano `strategy_id -> entrada` usado en disco
   - `_project_strategies_by_context`: Proyectar el índice plano de estrategias sobre el mapa `contexto -> lista` del motor
   - `_merge_strategies_by_context`: Restaurar el contexto exacto de cada estrategia aprendida desde `updated_strategies`
-- **Estructura real de las estrategias aprendidas (2.8.8.9.3.1)**:
+- **Estructura de las estrategias aprendidas**:
   - Contenedor: `ContextualAdaptationEngine.knowledge_base["adaptation_strategies"]` con contrato `contexto -> lista` (los 9 contextos de `ContextType`), inicializado en `_initialize_knowledge_base()`
   - Forma canónica (estrategia aprendida, creada en `_update_adaptive_strategies()`): `strategy_id`, `strategy_type`, `strategy`, `context` (`goal_type`, `context_type`, `expected_metrics`), `pattern_id`, `metrics`, `confidence`, `success_rate`, `last_updated`, `description`, `applied_rules`, `failure_count`
   - Registro de aplicación (creado en `apply_strategy()`): `strategy`, `confidence`, `strategy_id`, `description`, `knowledge_data`
   - Registro de resultado de adaptación (creado en `_record_adaptation_result()`): `adaptation_id`, `timestamp`, `applied_rules`, `confidence` (sin `strategy_id`)
   - Lectores del contrato: `get_available_strategies()`, `generate_strategy_candidates()`, `_filter_strategies_by_compatibility()`, `_calculate_strategy_applicability()`, `transfer_knowledge()`, `get_engine_status()`
-  - Persistencia vigente: `data/goal_adaptation_learning_results.json` = `learning_results` + índice plano `adaptation_strategies` (`strategy_id -> entrada`), escrito desde `_record_learning_results()` y leído con `_merge_strategies_by_context()` + `_project_strategies_by_context()`
-  - Brecha de 2.8.8.9.3.1 VERIFICADA COMO CERRADA (2.8.8.9.3.5): el contexto de aprendizaje sí se conserva tras el reinicio (se restaura desde `updated_strategies` de cada resultado de aprendizaje) y las entradas sin `strategy_id` (forma C) ya no se duplican en otro contexto con identificador sintetizado, porque el guardado filtra por DATOS CRÍTICOS y por tanto nunca las persiste
-  - Verificación end-to-end (2.8.8.9.3.5): `tests/test_goal_adaptation_strategy_restart_verification.py` (6 tests) comprueba que la estrategia recuperada conserva el conjunto canónico completo de la forma A (12 campos, no solo los DATOS CRÍTICOS), que las estructuras anidadas (`context`, `metrics`, `applied_rules`) sobreviven intactas, que sigue siendo consumible por `get_available_strategies()` y `generate_strategy_candidates()`, y que un segundo reinicio no duplica ni degrada la entrada
-  - Corrección del guardado (2.8.8.9.3.6): `_save_goal_adaptation_learning_results()` identifica las estrategias aprendidas por los campos identificadores y de evidencia (`strategy_id`, `confidence`, `success_rate`, `last_updated`) y normaliza `failure_count` a 0 cuando no existe, en vez de descartar la entrada por faltar ese contador; el registro persistido sigue cumpliendo el item 4 completo de DATOS CRÍTICOS (los 5 campos presentes) y las formas B (registro de aplicación) y C (resultado de adaptación) siguen sin persistirse
-  - Verificación de la corrección (2.8.8.9.3.6): `tests/test_goal_adaptation_persistence_simple.py` 6/6 PASSED (antes 3 FAILED: `test_guardar_aprendizaje_crea_archivo`, `test_cargar_datos_persistidos`, `test_integridad_serializacion`) y `tests/test_goal_adaptation_learned_strategy_persistence.py` 6/6 PASSED (sin regresión del contrato 2.8.8.9.3.2)
-- **Estructura real de los patrones de aprendizaje (2.8.8.9.4.1)**:
+  - Persistencia: `data/goal_adaptation_learning_results.json` = `learning_results` + índice plano `adaptation_strategies` (`strategy_id -> entrada`), escrito desde `_record_learning_results()` y leído con `_merge_strategies_by_context()` + `_project_strategies_by_context()`
+  - Contexto de aprendizaje: se conserva tras el reinicio (se restaura desde `updated_strategies` de cada resultado de aprendizaje) y las entradas sin `strategy_id` (forma C) no se duplican en otro contexto con identificador sintetizado, porque el guardado solo persiste las entradas que cumplen el contrato de datos críticos y por tanto nunca persiste esas formas
+  - Identificación de estrategias aprendidas al guardar: `_save_goal_adaptation_learning_results()` las identifica por los campos identificadores y de evidencia (`strategy_id`, `confidence`, `success_rate`, `last_updated`) y normaliza `failure_count` a 0 cuando no existe, en vez de descartar la entrada por faltar ese contador; el registro persistido incluye los 5 campos obligatorios del contrato de datos críticos y las formas B (registro de aplicación) y C (resultado de adaptación) no se persisten
+  - Tests de referencia: `tests/test_goal_adaptation_strategy_restart_verification.py` comprueba que la estrategia recuperada conserva el conjunto canónico completo de la forma A (12 campos, no solo los obligatorios), que las estructuras anidadas (`context`, `metrics`, `applied_rules`) sobreviven intactas, que sigue siendo consumible por `get_available_strategies()` y `generate_strategy_candidates()`, y que un segundo reinicio no duplica ni degrada la entrada; `tests/test_goal_adaptation_persistence_simple.py` y `tests/test_goal_adaptation_learned_strategy_persistence.py` cubren la persistencia y la no regresión del contrato
+- **Estructura de los patrones de aprendizaje**:
   - Contenedor canónico: `ContextualAdaptationEngine.knowledge_base["learning_results"][i]["learned_patterns"]` (lista de patrones por resultado de aprendizaje). No existe un contenedor de nivel superior `learning_patterns` en este motor
-  - Estructura real del patrón (7 campos, producida por `_analyze_learning_patterns()`): `pattern_id`, `pattern_type`, `context` (`goal_type`, `context_type`, `expected_metrics`), `metrics` (`response_time`, `accuracy`, `success`, `verified`, `impact_score`), `confidence`, `timestamp`, `description` — contiene los 5 campos del item 5 de DATOS CRÍTICOS
-  - `pattern_id` NO es estable: se genera como `pattern_{n}_{int(time.time()*1000)}` y cambia en cada llamada, de modo que hoy no existe forma de agrupar "observaciones similares" del mismo patrón
+  - Estructura real del patrón (7 campos, producida por `_analyze_learning_patterns()`): `pattern_id`, `pattern_type`, `context` (`goal_type`, `context_type`, `expected_metrics`), `metrics` (`response_time`, `accuracy`, `success`, `verified`, `impact_score`), `confidence`, `timestamp`, `description` — contiene los 5 campos obligatorios del contrato de datos críticos
+  - `pattern_id` NO es estable: se genera como `pattern_{n}_{int(time.time()*1000)}` y cambia en cada llamada, de modo que no sirve para agrupar "observaciones similares" del mismo patrón
   - Cadena productora: `_capture_goal_adaptation_feedback()` (patrón crudo de 5 campos, sin `pattern_id`) -> `_execute_goal_adaptation_learning_loop()` -> `_analyze_learning_patterns()` -> `_record_learning_results()` (tope 500 filas) -> `_save_goal_adaptation_learning_results()`
-  - Persistencia vigente: `data/goal_adaptation_learning_results.json` (`learning_results`, `adaptation_strategies`, `last_updated`); `learning_results` se escribe verbatim, por lo que los `learned_patterns` ya llegan a disco y ya sobreviven al reinicio (`_load_goal_adaptation_learning_results()`)
-  - Brecha 1 (2.8.8.9.4.1): el guardado NO filtra los patrones por `confidence >= 0.7`, incumpliendo "DATOS QUE NO DEBEN PERSISTIR: Patrones no validados (confianza < 0.7)"; verificado en runtime, un patrón producido con `confidence` 0.16 queda en disco con `confidence` 0.128 (0.16 × 0.8 por `impact_score` < 0.3) y se relee desde `goal_adaptation_learning_results.json`
-  - Brecha 2 (2.8.8.9.4.1): no existe contador de "mínimo 3 observaciones similares" (las 6 coincidencias de `observation|support_count|occurrences|similar` en el motor son `_calculate_factor_similarity`, es decir compatibilidad de contextos origen/destino, no agrupación de observaciones de un patrón) y no es implementable con el `pattern_id` inestable actual
-  - Brecha 3 (2.8.8.9.4.1): `context_patterns` (se escribe en producción vía `_record_context_pattern()`) se pierde al reiniciar; `success_patterns` y `failure_patterns` nunca se escriben (contenedores muertos); `applied_patterns` y `transfer_patterns` tampoco se persisten; `save_knowledge_base()` vuelca todo el `knowledge_base` pero solo lo invoca `save_all_data()`, que nadie llama en producción — verificado en runtime: `save_knowledge_base()` funciona cuando se llama explícitamente, lo que falta es la invocación en el flujo, por lo que tras reiniciar los contenedores reaparecen con la forma normalizada (una clave vacía por `ContextType`) pero con el contenido perdido
+  - Persistencia: `data/goal_adaptation_learning_results.json` (`learning_results`, `adaptation_strategies`, `last_updated`); `learning_results` se escribe filtrado (solo patrones validados) y la carga aplica el mismo filtro, de modo que los `learned_patterns` que llegan a disco son los validados y los que se recuperan son los mismos (`_load_goal_adaptation_learning_results()`)
+  - Contrato de validación de patrones, aplicado al guardar y al cargar: solo se persisten y se recuperan los patrones validados, es decir con `confidence >= self.config["confidence_threshold"]` (0.7) y con un mínimo de 3 observaciones similares; las observaciones de contextos distintos no se agrupan
+  - Identidad de agrupación de un patrón: `pattern_type` + `context` (`goal_type` y `context_type`)
+  - Los patrones no validados se descartan al escribir y al cargar, pero las filas de resultados de aprendizaje se conservan íntegras (de ellas depende la restauración de estrategias aprendidas)
+  - El recuento de observaciones de la carga cuenta solo las que superan el umbral, igual que el guardado, por lo que el ciclo guardar/cargar es la inversa exacta y no puede perder ningún patrón validado
+  - Contenedores sin persistencia propia: `context_patterns` (se escribe en producción vía `_record_context_pattern()`) se pierde al reiniciar; `success_patterns` y `failure_patterns` nunca se escriben (contenedores muertos); `applied_patterns` y `transfer_patterns` tampoco se persisten; `save_knowledge_base()` vuelca todo el `knowledge_base` pero solo lo invoca `save_all_data()`, que no tiene llamador en producción — verificado en runtime: `save_knowledge_base()` funciona cuando se llama explícitamente, lo que falta es la invocación en el flujo, por lo que tras reiniciar los contenedores reaparecen con la forma normalizada (una clave vacía por `ContextType`) pero con el contenido perdido
   - Implementación paralela sin persistencia: `AdaptiveLearningEngine.knowledge_base["learning_patterns"]` (`src/utils/adaptive_learning_engine.py`, misma estructura de 7 campos) — su `knowledge_base` no se guarda en ningún sitio y `_execute_learning_loop()` no tiene llamador en producción
   - Mecanismo reutilizable ya existente: `self.config["confidence_threshold"]` = 0.7 (ya usado en `adaptation_readiness`)
-  - Contaminación de datos de producción (preexistente, verificada en 2.8.8.9.4.1): `tests/test_goal_adaptation_feedback.py` crea el motor sin `data_dir` (l. 18 y l. 80) y escribe sobre el `data/` real — `data/goal_adaptation_feedback.json` contiene 43 registros, 42 de ellos de test (`test_adaptation_001`), y 36 entradas de test en `adaptation_history`; el resto de ficheros de test sí aíslan con `data_dir=str(tmp_path)`. No corregido en 2.8.8.9.4.1 (hoja de identificación): el test de 2.8.8.9.4.2 debe usar `data_dir` temporal y no tocar `data/`
-- **Test de persistencia de patrones (2.8.8.9.4.2)**:
-  - Fichero: `tests/test_goal_adaptation_pattern_persistence.py` (9 tests). Hoja de CREACIÓN DE TEST pura: no modifica código de producción
-  - Contrato fijado sobre el contenedor canónico `knowledge_base["learning_results"][i]["learned_patterns"]`: solo se persisten patrones con `confidence >= self.config["confidence_threshold"]` (0.7) y con un mínimo de 3 observaciones similares; las observaciones de contextos distintos no se agrupan
-  - Estado real en 2.8.8.9.4.2: 4 PASSED (los que ya se cumplen) y 5 FAILED (los que fijan el contrato pendiente de 2.8.8.9.4.3-2.8.8.9.4.6)
-  - FAILED por brecha 1 (sin filtro de confianza): `test_un_patron_por_debajo_del_umbral_de_confianza_no_se_persiste` (3 patrones de `confidence` 0.64 quedan en disco), `test_ningun_patron_persistido_esta_por_debajo_del_umbral`, `test_el_umbral_aplicado_es_el_configurado_en_el_motor` (con `confidence_threshold` 0.95 el patrón de 0.9 tampoco debe persistirse)
-  - FAILED por brecha 2 (sin mínimo de 3 observaciones similares): `test_una_observacion_aislada_no_se_persiste` (una sola observación ya se persiste) y `test_observaciones_de_contextos_distintos_no_se_agrupan` (2 observaciones en "production" + 2 en "development" no alcanzan el mínimo para ningún patrón)
-  - PASSED: `test_un_patron_validado_tras_tres_observaciones_similares_se_persiste`, `test_el_patron_persistido_conserva_los_datos_criticos`, `test_el_patron_persistido_sobrevive_al_reinicio`, `test_el_test_no_escribe_en_los_ficheros_de_persistencia_de_produccion`
-  - Aislamiento verificado: el motor se instancia siempre con `data_dir=str(tmp_path)`; comprobado en runtime que `tests/test_goal_adaptation_pattern_persistence.py` NO modifica `data/goal_adaptation_feedback.json` ni `data/goal_adaptation_learning_results.json` (la contaminación sigue siendo solo de `tests/test_goal_adaptation_feedback.py`)
-- **Métodos de feedback y confianza (2.8.5.6)**:
+  - Aislamiento de los tests: el motor debe instanciarse con `data_dir=str(tmp_path)`. `tests/test_goal_adaptation_feedback.py` lo crea sin `data_dir` (l. 18 y l. 80) y por eso escribe sobre el `data/` real — `data/goal_adaptation_feedback.json` contiene 43 registros, 42 de ellos de test (`test_adaptation_001`), y 36 entradas de test en `adaptation_history`
+  - Tests de referencia: `tests/test_goal_adaptation_pattern_persistence.py` (persistencia de patrones validados), `tests/utils/contextual_adaptation_engine/test_goal_adaptation_pattern_load.py` (carga de patrones validados) y `tests/utils/contextual_adaptation_engine/test_load_goal_adaptation_feedback.py` (carga de resultados y estrategias), todos aislados con `data_dir=str(tmp_path)`
+- Verificacion de reinicio de los patrones: `tests/utils/contextual_adaptation_engine/test_goal_adaptation_pattern_restart_verification.py` comprueba que el patron recuperado tras reiniciar el motor conserva el conjunto canonico completo (7 campos, no solo los 5 obligatorios), que las estructuras anidadas (`context`, `metrics`) sobreviven intactas, que los valores no se degradan, que sigue siendo consumible por los consumidores publicos del `knowledge_base`, que un segundo reinicio no lo duplica ni lo altera, que un patron no validado no contamina los recuperados y que la carga no reescribe el fichero persistido (compara contenido, tamano y `st_mtime_ns` antes/despues)
+- Comprobacion por mutacion de los patrones: `tests/utils/contextual_adaptation_engine/mutation_check_pattern_restart.py` aplica sobre `src/utils/contextual_adaptation_engine.py` cinco mutaciones (carga verbatim sin filtro de validacion, recorte a los 5 datos criticos, vaciado del contexto anidado, filas de aprendizaje sin metricas de convergencia y reescritura del fichero al cargar) y exige que cada una la detecte al menos un test; restaura el fichero original tras cada mutacion
+- **Métodos de feedback y confianza**:
   - `get_transfer_confidence`: Obtener confianza existente para una transferencia específica (0.0-1.0)
   - `register_transfer_feedback`: Registrar feedback de una transferencia completada con éxito, puntuación y comentarios
   - `evaluate_transfer_result`: Evaluar resultado de una transferencia y actualizar confianza automáticamente
@@ -3319,7 +3315,7 @@
 - **Funciones globales**:
   - `main`: Demo del motor de adaptación contextual
 
-#### `src/utils/dynamic_resource_allocator.py` [1336 líneas] - Asignador Dinámico de Recursos v2.8.4.2
+#### `src/utils/dynamic_resource_allocator.py` [1336 líneas] - Asignador Dinámico de Recursos
 - **Descripción**: Sistema avanzado de asignación de recursos dinámica según contexto con priorización, detección de conflictos, preemption, gestión de recursos del sistema (CPU, memoria, disco, red), integración con PerformanceMonitor y PerformanceOptimizer, soporte para trabajo diferido y notificación de cambios. Implementa modelo de asignación con solicitudes, asignaciones y disponibilidad de recursos.
 - **Enums principales**:
   - `ResourceType`: Tipos de recursos gestionables (SYSTEM_CPU, SYSTEM_MEMORY, SYSTEM_DISK, SYSTEM_NETWORK, PROCESS_CPU, PROCESS_MEMORY, PROCESS_THREADS, EXECUTION_REGISTRY, EXECUTION_HISTORY, STORAGE_DATABASE, STORAGE_CACHE, THREAD_POOL)
@@ -3816,7 +3812,7 @@
 - **Logger predeterminado**:
   - `logger`: Logger predeterminado para Jarvis
 
-#### `src/utils/meta_learning_system.py` [2401 líneas] - Sistema de Metaprendizaje v2.8.0
+#### `src/utils/meta_learning_system.py` [2401 líneas] - Sistema de Metaprendizaje
 - **Descripción**: Sistema de metaprendizaje que observa el comportamiento de los sistemas de aprendizaje existentes (adaptive_learning_engine, self_improvement_system, performance_optimizer, pattern_analyzer y log_analytics), captura experiencias de aprendizaje, las analiza por niveles de metaprendizaje y genera insights accionables sobre selección de estrategias, adaptación de parámetros, optimización contextual, abstracción de conocimiento y ajuste de la tasa de aprendizaje.
 - **Clases principales**:
   - `MetaLearningLevel` (Enum): Niveles de metaprendizaje (STRATEGY_SELECTION, PARAMETER_ADAPTATION, CONTEXTUAL_OPTIMIZATION, KNOWLEDGE_ABSTRACTION, LEARNING_RATE_ADJUSTMENT)
@@ -3891,7 +3887,7 @@
   - Aplicación de insights sobre los sistemas subyacentes con métricas de aplicación y tiempo de ejecución
   - Persistencia JSON con serialización de datetimes, dataclasses y enums
   - Configuración por defecto: máximo de experiencias, mínimo para análisis, umbral de confianza, intervalo de análisis, auto-aplicación, exportación y secciones de ajuste
-  - Integración (2.8.3.6) con AdaptiveLearningEngine, SelfImprovementSystem y ContextualAdaptationEngine compartiendo las instancias existentes, validando su API real y rechazando componentes que no la expongan; no se crean motores de aprendizaje nuevos
+  - Integración con AdaptiveLearningEngine, SelfImprovementSystem y ContextualAdaptationEngine compartiendo las instancias existentes, validando su API real y rechazando componentes que no la expongan; no se crean motores de aprendizaje nuevos
 
 #### `src/utils/metrics_collector.py` [592 líneas] - Sistema de Recolección de Métricas
 - **Descripción**: Sistema de recolección de métricas para JARVIS con almacenamiento persistente en SQLite, recolección en hilo daemon con buffer por lotes, limpieza por retención, copias de seguridad y exportación a JSON.
@@ -3986,7 +3982,7 @@
   - Context manager para integración con `with`
   - Instancia singleton para acceso global al sistema
 
-#### `src/utils/optimization_orchestrator.py` [892 líneas] - Orquestador de Optimización v2.7.0
+#### `src/utils/optimization_orchestrator.py` [892 líneas] - Orquestador de Optimización
 - **Descripción**: Orquestador de optimización que coordina todos los sistemas de optimización (performance_optimizer, self_improvement_system, adaptive_learning_engine, pattern_analyzer y log_analytics). Gestiona una cola de trabajos con prioridad, los agrupa por compatibilidad de recursos y los ejecuta en modos secuencial, paralelo, coordinado u optimizado, adaptando el modo dinámicamente.
 - **Clases principales**:
   - `OrchestrationMode` (Enum): Modos de orquestación (COORDINATED, SEQUENTIAL, PARALLEL, ADAPTIVE, OPTIMIZED)
@@ -4332,7 +4328,7 @@
   - `get_monitor_info`: Obtiene información del monitor especificado
   - `get_monitor_setup`: Obtiene configuración actual de monitores
 
-#### `src/utils/self_improvement_system.py` [1101 líneas] - Sistema de Automejora v2.7.0
+#### `src/utils/self_improvement_system.py` [1101 líneas] - Sistema de Automejora
 - **Descripción**: Sistema de automejora con aprendizaje continuo y optimización adaptativa. Integra PerformanceOptimizer, PatternAnalyzer, LogAnalytics y LogPredictor, ejecuta un bucle de aprendizaje en hilo, recoge datos del sistema, extrae características, entrena modelos de machine learning, identifica oportunidades de mejora, ejecuta reglas de mejora, actualiza un grafo de conocimiento y exporta reportes de aprendizaje.
 - **Clases principales**:
   - `LearningMode` (Enum): Modos de aprendizaje (PASSIVE_LEARNING, ACTIVE_LEARNING, REINFORCEMENT_LEARNING, TRANSFER_LEARNING, FEDERATED_LEARNING)
