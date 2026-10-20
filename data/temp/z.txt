@@ -1,0 +1,31 @@
+﻿2310                 "response_time_improvement": self._safe_float(analysis.get("response_time_improvement", 0.)),
+2311                 "accuracy_improvement": self._safe_float(analysis.get("accuracy_improvement", 0.))},
+2312             "context": adaptation_context, "timestamp": datetime.now().isoformat(),
+2313             "success": bool((analysis.get("pattern_recognition") or [{}])[0].get("pattern_type") == "goal_adaptation_success")})
+2314         self.adaptation_history.append(entry); del self.adaptation_history[:-1000]; self._save_goal_adaptation_feedback()
+2315 
+2316     @staticmethod
+2317     def _extract_performance_improvement(entry: Dict[str, Any]) -> float:
+2318         try:
+2319             impact = entry.get("performance_impact", 0.)
+2320             return float(impact.get("performance_improvement", 0.) or 0.) if isinstance(impact, dict) else float(impact or 0.)
+2321         except (TypeError, ValueError): return 0.
+2322 
+2323     def _record_learning_results(self, adaptation_id: str, patterns: List[Dict[str, Any]], strategies: Dict[str, Any], convergence: Dict[str, Any]) -> None:
+2324         if strategies: self.knowledge_base["adaptation_strategies"] = strategies
+2325         rows = self.knowledge_base.setdefault("learning_results", [])
+2326         rows.append({"adaptation_id": adaptation_id, "learned_patterns": patterns, "updated_strategies": strategies,
+2327                      "convergence_metrics": convergence, "timestamp": datetime.now().isoformat(), "status": "completed"})
+2328         del rows[:-500]; self._save_goal_adaptation_learning_results()
+2329 
+2330     def _generate_pattern_description(self, pattern: Dict[str, Any]) -> str:
+2331         pattern = pattern if isinstance(pattern, dict) else {}
+2332         context = pattern.get("context", {})
+2333         context = context if isinstance(context, dict) else {}
+2334         metrics = pattern.get("metrics", {})
+2335         metrics = metrics if isinstance(metrics, dict) else {}
+2336         return (
+2337             f"Patr?n {pattern.get('pattern_type', 'desconocido')} para "
+2338             f"{context.get('goal_type', 'Goal')} en {context.get('context_type', 'contexto')}; "
+2339             f"tiempo={self._safe_float(metrics.get('response_time', 0.)):.2f}, "
+2340             f"precisi?n={self._safe_float(metrics.get('accuracy', 0.)):.2f}"
