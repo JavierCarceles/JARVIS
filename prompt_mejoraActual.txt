@@ -1,7 +1,7 @@
 ESTADO PERSISTENTE ACTUAL
 CURRENT_PHASE: 2.8.8
 CURRENT_WORK_UNIT: 2.8.8.9.8.1
-CURRENT_WORK_STATUS: PENDIENTE
+CURRENT_WORK_STATUS: EN PROCESO
 LAST_COMPLETED_UNIT: 2.8.8.9.7.3
 
 # COMPLETADO: 2.8.8.9.7.3 - Test de recuperacion parcial
@@ -1239,68 +1239,68 @@ Hoy `learning_results` se escribe verbatim (l. 2475) y no hay ningún contador d
   `_count_pattern_observations()`, `_pattern_identity()`, `_confidence_threshold()`,
   `_min_similar_observations()`. Se recuperan solo los patrones con
   `confidence >= self.config["confidence_threshold"]` (0.7) y con minimo de 3 observaciones
-  similares (identidad = `pattern_type` + `context`).
+similares (identidad = `pattern_type` + `context`).
 - El recuento de observaciones de la carga cuenta SOLO las que superan el umbral, igual que el
-  guardado, de modo que el ciclo guardar/cargar es la inversa exacta y no pierde ningun patron
-  validado. Las filas de resultados de aprendizaje se conservan integras (de ellas depende la
-  restauracion de estrategias de 2.8.8.9.3).
+guardado, de modo que el ciclo guardar/cargar es la inversa exacta y no pierde ningun patron
+validado. Las filas de resultados de aprendizaje se conservan integras (de ellas depende la
+restauracion de estrategias de 2.8.8.9.3).
 - TEST NUEVO: `tests/utils/contextual_adaptation_engine/test_goal_adaptation_pattern_load.py`
   (9 tests), aislado con `data_dir=str(tmp_path)`. 9 PASSED / 0 FAILED.
 - NO REGRESION: suite completa 203 PASSED / 0 FAILED (194 previos de 2.8.8.9.4.3 + 9 nuevos).
 - TEST HEREDADO ACTUALIZADO (motivo documentado): `test_load_goal_adaptation_feedback.py::test_carga_resultados_aprendizaje`
-  persistia un patron de UNA sola observacion, que el item 5 ya no considera validado. El fixture
-  persiste ahora 3 observaciones similares del mismo patron y la asercion se REFUERZA (3 patrones
-  recuperados con sus `pattern_id`); no se elimino ni se debilito ninguna comprobacion.
+persistia un patron de UNA sola observacion, que el item 5 ya no considera validado. El fixture
+persiste ahora 3 observaciones similares del mismo patron y la asercion se REFUERZA (3 patrones
+recuperados con sus `pattern_id`); no se elimino ni se debilito ninguna comprobacion.
 - VERIFICACION REAL: sobre una copia temporal del fichero de produccion, el patron real
   `pattern_001` (`confidence` 0.9, una sola observacion) ya no se recupera, la fila se conserva y
-  las estrategias siguen restaurandose. `data/` no se modifico.
+las estrategias siguen restaurandose. `data/` no se modifico.
 
 2.8.8.9.4.5 — VERIFICAR PATRONES TRAS REINICIO [IMPLEMENTADA]
 - Comprobar recuperación correcta.
 - VERIFICACION: los 9 tests de `tests/utils/contextual_adaptation_engine/test_goal_adaptation_pattern_restart_verification.py`
-  comprueban la recuperacion tras el reinicio (conjunto canonico completo de 7 campos, estructuras anidadas
-  intactas, valores sin perdida, fila de resultados con contexto y convergencia intactos, consumo por
+comprueban la recuperacion tras el reinicio (conjunto canonico completo de 7 campos, estructuras anidadas
+intactas, valores sin perdida, fila de resultados con contexto y convergencia intactos, consumo por
   `_update_adaptive_strategies()`, estabilidad ante un segundo reinicio, no contaminacion por un patron
-  no validado y carga sin reescribir el fichero persistido). 9 PASSED / 0 FAILED.
+no validado y carga sin reescribir el fichero persistido). 9 PASSED / 0 FAILED.
 - MUTACION: `tests/utils/contextual_adaptation_engine/mutation_check_pattern_restart.py` detecta las 5
-  mutaciones aplicadas al motor (carga verbatim, recorte a los 5 datos criticos, contexto anidado vaciado,
-  filas sin metricas de convergencia y reescritura del fichero al cargar). 5/5 DETECTADAS.
+mutaciones aplicadas al motor (carga verbatim, recorte a los 5 datos criticos, contexto anidado vaciado,
+filas sin metricas de convergencia y reescritura del fichero al cargar). 5/5 DETECTADAS.
 - RUNTIME: `tests/utils/contextual_adaptation_engine/verify_pattern_restart_real.py` ejecuta el ciclo real
   (feedback -> aprendizaje -> persistencia -> reinicio) sobre directorio temporal y sobre una COPIA del
-  fichero de produccion: 15/15 comprobaciones OK. `data/` no se modifico.
+fichero de produccion: 15/15 comprobaciones OK. `data/` no se modifico.
 - NO REGRESION: suite completa 212 PASSED / 0 FAILED (203 previos de 2.8.8.9.4.4 + 9 nuevos).
 
 2.8.8.9.4.6 — CORREGIR FALLO DE PATRONES [IMPLEMENTADA]
 - Corregir únicamente fallos de esta subhoja.
 - FALLO REAL CORREGIDO: la persistencia de patrones de `data/` estaba contaminada por datos de test.
-  - ACTIVO: `tests/utils/contextual_adaptation_engine/test_goal_adaptation_feedback.py` creaba el motor SIN
+- ACTIVO: `tests/utils/contextual_adaptation_engine/test_goal_adaptation_feedback.py` creaba el motor SIN
     `data_dir`, por lo que `_capture_goal_adaptation_feedback()` escribia en
     `data/goal_adaptation_feedback.json` de PRODUCCIÓN en cada ejecución de la suite
     (verificado: sha256, tamaño y `st_mtime_ns` cambiaban en cada ejecución; el fichero crecía sin límite).
-  - RESIDUAL: `data/goal_adaptation_feedback.json` (18 registros y 18 entradas de historial, TODOS
+- RESIDUAL: `data/goal_adaptation_feedback.json` (18 registros y 18 entradas de historial, TODOS
     `test_adaptation_001`, 100% contaminado) y `data/goal_adaptation_learning_results.json` (fila
     `test_load_001` con el patrón `pattern_001` y la estrategia `strategy_001`, artefactos del fixture de
     `test_load_goal_adaptation_feedback.py`). 38 artefactos de test eliminados; ambos ficheros quedan en su
-    payload canónico vacío (`learning_results`/`adaptation_strategies`/`goal_adaptation_feedback`/
+payload canónico vacío (`learning_results`/`adaptation_strategies`/`goal_adaptation_feedback`/
     `adaptation_history`/`last_updated`).
-  - El resultado era que la persistencia de producción no contenía ningún patrón real, sino fixtures de test.
+- El resultado era que la persistencia de producción no contenía ningún patrón real, sino fixtures de test.
 - CORRECCIÓN: `test_goal_adaptation_feedback.py` se aísla con `data_dir=str(tmp_path)` (además se
-  REFUERZA con una aserción real de captura correcta del feedback, antes solo imprimía) y se limpian los
-  artefactos de test de los dos ficheros de producción. Copia de los ficheros originales en
+REFUERZA con una aserción real de captura correcta del feedback, antes solo imprimía) y se limpian los
+artefactos de test de los dos ficheros de producción. Copia de los ficheros originales en
   `data/temp/backup_4946/` y script de limpieza en `data/temp/clean_goal_test_artifacts_4946.py`.
 - TEST DE GUARDA NUEVO: `tests/utils/contextual_adaptation_engine/test_goal_adaptation_production_data_clean.py`
   (3 tests): (1) los ficheros de persistencia de Goal de `data/` no contienen artefactos de test;
   (2) el ciclo real de persistencia de patrones con `data_dir` temporal NO reescribe los ficheros de
-  producción; (3) chequeo estático: ningún test que ejecute la vía de escritura de Goal crea el motor
-  sin `data_dir`. 3 PASSED / 0 FAILED.
+producción; (3) chequeo estático: ningún test que ejecute la vía de escritura de Goal crea el motor
+sin `data_dir`. 3 PASSED / 0 FAILED.
 - MUTACIÓN: 2/2 DETECTADAS (inyectar una fila `test_mut_001` en el fichero de producción → 1 FAILED;
-  quitar el `data_dir` de un test de Goal → 1 FAILED).
+quitar el `data_dir` de un test de Goal → 1 FAILED).
 - VERIFICACIÓN EN RUNTIME: tras la corrección, la suite completa deja
   `data/goal_adaptation_feedback.json` y `data/goal_adaptation_learning_results.json` byte a byte
-  idénticos (sha256, tamaño y `st_mtime_ns` sin cambios). `data/` ya no se modifica.
+idénticos (sha256, tamaño y `st_mtime_ns` sin cambios). `data/` ya no se modifica.
 - NO REGRESIÓN: suite completa `tests/` - 215 PASSED / 0 FAILED (212 previos de 2.8.8.9.4.5 + 3 nuevos).
 - `src/utils/contextual_adaptation_engine.py` queda INTACTO (`git diff` vacío): el defecto no estaba en el
-  motor, sino en el aislamiento de los tests y en los datos de producción ya contaminados.
+motor, sino en el aislamiento de los tests y en los datos de producción ya contaminados.
 
 2.8.8.9.5 — DETECCIÓN DE DATOS AUSENTES
 
@@ -1315,30 +1315,30 @@ Hoy `learning_results` se escribe verbatim (l. 2475) y no hay ningún contador d
   (las de reglas y base de conocimiento se resuelven con `_resolve_path()`, que respeta
   `adaptation_rules_file` y `knowledge_base_file` de la configuración; las de Goal se resuelven contra
   `self.data_dir`). `detect_absent_storage()` compara esas rutas con el disco en modo SOLO LECTURA y
-  devuelve `expected`, `present`, `absent`, `absent_count` y `has_absent`; cada ausencia informa su
+devuelve `expected`, `present`, `absent`, `absent_count` y `has_absent`; cada ausencia informa su
   `path` y su `reason`, que distingue `file_not_found` (no existe) de `not_a_file` (la ruta existe pero
-  no es un fichero). `get_engine_status()` expone el resultado en la clave nueva `storage` (`absent` y
+no es un fichero). `get_engine_status()` expone el resultado en la clave nueva `storage` (`absent` y
   `absent_count`), de forma aditiva: no altera ninguna clave previa.
 - ALCANCE: esta hoja detecta la ausencia de FICHEROS. La ausencia de una SECCIÓN dentro de un fichero
-  existente se detecta aparte, en 2.8.8.9.5.2. El test pytest de ausencia corresponde a 2.8.8.9.5.4.
+existente se detecta aparte, en 2.8.8.9.5.2. El test pytest de ausencia corresponde a 2.8.8.9.5.4.
 - RUNTIME: `tests/utils/contextual_adaptation_engine/detect_absent_storage_real.py` — 27/27 comprobaciones
-  OK. Inventaría el almacenamiento esperado y su origen, comprueba el comportamiento del motor con el
-  almacenamiento ausente y valida la API de detección (ausencia total, total, parcial y ruta que no es un
-  fichero). Es independiente de la suite pytest, solo LEE el `data/` de producción mediante rutas
-  absolutas y mueve su CWD a un temporal ANTES de construir cualquier motor, sin restaurarlo, porque
+OK. Inventaría el almacenamiento esperado y su origen, comprueba el comportamiento del motor con el
+almacenamiento ausente y valida la API de detección (ausencia total, total, parcial y ruta que no es un
+fichero). Es independiente de la suite pytest, solo LEE el `data/` de producción mediante rutas
+absolutas y mueve su CWD a un temporal ANTES de construir cualquier motor, sin restaurarlo, porque
   `SelfImprovementSystem` escribe `data/knowledge_graph.json` con ruta RELATIVA desde un hilo asíncrono.
 - COMPORTAMIENTO CON ALMACENAMIENTO AUSENTE (verificado): el motor arranca sin fallar,
   `load_adaptation_rules()` y `load_knowledge_base()` devuelven `True` sin fichero, se conservan las 5
-  reglas por defecto, `goal_adaptation_feedback` y `learning_results` quedan como listas vacías,
+reglas por defecto, `goal_adaptation_feedback` y `learning_results` quedan como listas vacías,
   `adaptation_strategies` conserva la forma normalizada por contexto y la CARGA NO crea los ficheros
-  ausentes.
+ausentes.
 - HALLAZGO DE PRODUCCIÓN: en `data/` faltan `contextual_adaptation_rules.json` y
   `contextual_knowledge_base.json`; los dos ficheros de Goal sí están presentes.
 
 2.8.8.9.5.2 — DETECTAR SECCIÓN AUSENTE [IMPLEMENTADA]
 - Detectar únicamente ausencia de una sección esperada.
 - SECCIONES ESPERADAS: secciones de primer nivel de cada fichero de persistencia, con su origen real en el
-  motor y su clase (`data` = la consume un cargador real; `metadata` = informativa):
+motor y su clase (`data` = la consume un cargador real; `metadata` = informativa):
   `goal_adaptation_feedback.json` -> `goal_adaptation_feedback` (data), `adaptation_history` (data),
   `last_updated` (metadata); `goal_adaptation_learning_results.json` -> `learning_results` (data),
   `adaptation_strategies` (data), `last_updated` (metadata); `contextual_adaptation_rules.json` -> `rules`
@@ -1346,89 +1346,89 @@ Hoy `learning_results` se escribe verbatim (l. 2475) y no hay ningún contador d
   (data), `context_snapshots` / `adaptation_history` / `knowledge_transfers` / `version` / `last_updated`
   (metadata).
 - IMPLEMENTACIÓN: `expected_storage_sections()` devuelve el mapa `fichero -> {seccion: clase}` (copia
-  independiente: mutar el resultado no altera la tabla del motor). `detect_absent_sections()` compara esas
-  secciones con el contenido de los ficheros EXISTENTES en modo SOLO LECTURA y devuelve `expected`,
+independiente: mutar el resultado no altera la tabla del motor). `detect_absent_sections()` compara esas
+secciones con el contenido de los ficheros EXISTENTES en modo SOLO LECTURA y devuelve `expected`,
   `checked`, `absent`, `absent_count`, `has_absent`, `missing_files` y `unreadable`; cada ausencia informa
-  su `path`, su `reason` (`section_not_found`) y su `kind` (`data` o `metadata`).
+su `path`, su `reason` (`section_not_found`) y su `kind` (`data` o `metadata`).
 - ALCANCE: los ficheros que NO existen se listan en `missing_files` (su detección es la de 2.8.8.9.5.1, NO se
-  reportan como sección ausente) y los ficheros presentes pero ilegibles o con un payload que no es un
-  diccionario se listan en `unreadable` (la corrupción del contenido se detecta en 2.8.8.9.6).
+reportan como sección ausente) y los ficheros presentes pero ilegibles o con un payload que no es un
+diccionario se listan en `unreadable` (la corrupción del contenido se detecta en 2.8.8.9.6).
   `get_engine_status()` expone el resultado en la clave nueva `storage_sections` (`absent` y `absent_count`),
-  de forma aditiva: no altera ninguna clave previa, incluida `storage` de 2.8.8.9.5.1.
+de forma aditiva: no altera ninguna clave previa, incluida `storage` de 2.8.8.9.5.1.
 - FORMATO HEREDADO: `load_adaptation_rules()` admite que el fichero contenga la lista de reglas en su propia
-  raíz; en ese formato la sección de DATOS `rules` se considera presente y solo se reportan ausentes las
-  secciones de METADATA. La sección ausente se detecta sin dejar de cargar los datos.
+raíz; en ese formato la sección de DATOS `rules` se considera presente y solo se reportan ausentes las
+secciones de METADATA. La sección ausente se detecta sin dejar de cargar los datos.
 - RUNTIME: `tests/utils/contextual_adaptation_engine/detect_absent_sections_real.py` — 43/43 comprobaciones OK.
-  Inventaría las secciones esperadas y su origen, comprueba la detección en runtime (sección de DATOS ausente,
-  de METADATA ausente, varias a la vez en el mismo fichero, sección presente pero vacía, formato heredado,
-  fichero ilegible, payload que no es un mapeo, lista sin formato heredado y fichero ausente) y valida la API de
-  detección. Es independiente de la suite pytest, solo LEE el `data/` de producción mediante rutas absolutas y
-  mueve su CWD a un temporal ANTES de construir cualquier motor, sin restaurarlo, porque
+Inventaría las secciones esperadas y su origen, comprueba la detección en runtime (sección de DATOS ausente,
+de METADATA ausente, varias a la vez en el mismo fichero, sección presente pero vacía, formato heredado,
+fichero ilegible, payload que no es un mapeo, lista sin formato heredado y fichero ausente) y valida la API de
+detección. Es independiente de la suite pytest, solo LEE el `data/` de producción mediante rutas absolutas y
+mueve su CWD a un temporal ANTES de construir cualquier motor, sin restaurarlo, porque
   `SelfImprovementSystem` escribe `data/knowledge_graph.json` con ruta RELATIVA desde un hilo asíncrono.
 - COMPORTAMIENTO CON SECCIÓN AUSENTE (verificado): una sección presente pero VACÍA no se reporta como ausente;
-  el formato heredado sigue siendo legible por `load_adaptation_rules()` (5 reglas); con una sección de DATOS
-  ausente el motor carga sin fallar y conserva su estado (`total_rules` = 5); y la detección NO crea ni
-  modifica ficheros de persistencia.
+el formato heredado sigue siendo legible por `load_adaptation_rules()` (5 reglas); con una sección de DATOS
+ausente el motor carga sin fallar y conserva su estado (`total_rules` = 5); y la detección NO crea ni
+modifica ficheros de persistencia.
 - HALLAZGO DE PRODUCCIÓN: los dos ficheros de Goal de `data/` tienen todas sus secciones; en `data/` faltan
   `contextual_adaptation_rules.json` y `contextual_knowledge_base.json` (ausencia de fichero de 2.8.8.9.5.1).
 
 2.8.8.9.5.3 — DEFINIR COMPORTAMIENTO SIN DATOS [IMPLEMENTADA]
 - Mantener el comportamiento compatible con el sistema existente.
 - PRINCIPIO DECLARADO: la ausencia de datos nunca es un error fatal. El motor arranca, expone valores por
-  defecto seguros, la detección informa de la ausencia y el almacenamiento se recrea en el momento en que
-  alguien escribe.
+defecto seguros, la detección informa de la ausencia y el almacenamiento se recrea en el momento en que
+alguien escribe.
 - IMPLEMENTACIÓN: `no_data_behavior()` devuelve el CONTRATO DECLARATIVO del comportamiento del motor cuando el
-  almacenamiento de persistencia está AUSENTE (2.8.8.9.5.1) o le falta una SECCIÓN (2.8.8.9.5.2). El contrato
-  vive en `_NO_DATA_BEHAVIOR` y se expone por un método de SOLO LECTURA que devuelve una COPIA profunda
+almacenamiento de persistencia está AUSENTE (2.8.8.9.5.1) o le falta una SECCIÓN (2.8.8.9.5.2). El contrato
+vive en `_NO_DATA_BEHAVIOR` y se expone por un método de SOLO LECTURA que devuelve una COPIA profunda
   (`copy.deepcopy`): el llamante no puede mutar el contrato de la clase, el método no crea ficheros, no escribe
-  y no altera el estado del motor.
+y no altera el estado del motor.
 - CONTENIDO DEL CONTRATO: `version`, `principle` y seis secciones.
-  - `startup`: `raises` (el arranque con el almacenamiento ausente no lanza), `creates_data_dir`,
+- `startup`: `raises` (el arranque con el almacenamiento ausente no lanza), `creates_data_dir`,
     `creates_persistence_files` (la carga NO crea ficheros de persistencia) y `defaults` (`adaptation_rules` =
-    reglas integradas, `knowledge_base` = secciones vacías, `adaptation_history` = vacío, `knowledge_transfers` =
-    vacío).
-  - `read_apis`: las 10 APIs de lectura con su tipo de retorno (`get_engine_status` dict, `get_adaptation_summary`
-    dict, `get_context_insights` dict, `get_adaptation_rules` list, `list_adaptation_rules` list,
+reglas integradas, `knowledge_base` = secciones vacías, `adaptation_history` = vacío, `knowledge_transfers` =
+vacío).
+- `read_apis`: las 10 APIs de lectura con su tipo de retorno (`get_engine_status` dict, `get_adaptation_summary`
+dict, `get_context_insights` dict, `get_adaptation_rules` list, `list_adaptation_rules` list,
     `get_available_strategies` list, `get_knowledge_transfers` list, `load_adaptation_rules` bool,
     `load_knowledge_base` bool, `load_all_data` bool).
-  - `write_apis`: las 5 APIs de escritura con el fichero que crean (`save_adaptation_rules` ->
+- `write_apis`: las 5 APIs de escritura con el fichero que crean (`save_adaptation_rules` ->
     `adaptation_rules`, `save_knowledge_base` -> `knowledge_base`, `save_all_data` -> ambos,
     `_save_goal_adaptation_feedback` -> `goal_adaptation_feedback`, `_save_goal_adaptation_learning_results` ->
     `goal_adaptation_learning_results`).
   - `detection`: `detect_absent_storage` informa de la ausencia, `detect_absent_sections` informa de la sección
-    ausente EN FICHEROS EXISTENTES, los ficheros ausentes se listan aparte, `get_engine_status` expone
+ausente EN FICHEROS EXISTENTES, los ficheros ausentes se listan aparte, `get_engine_status` expone
     `storage` y `storage_sections`, y la detección NO escribe.
-  - `recovery`: escribir recrea el almacenamiento y la detección deja de reportarlo como ausente.
-  - `invariants`: `read_apis_never_raise`, `detection_never_writes`, `defaults_are_empty_not_null`,
+- `recovery`: escribir recrea el almacenamiento y la detección deja de reportarlo como ausente.
+- `invariants`: `read_apis_never_raise`, `detection_never_writes`, `defaults_are_empty_not_null`,
     `writes_recreate_missing_storage`.
 - PRECISIÓN DEL ALCANCE (corregida sobre la redacción inicial): una sección ausente solo puede darse dentro de
-  un fichero EXISTENTE. Con el almacenamiento TOTALMENTE ausente, `detect_absent_sections()` no inventa secciones:
+un fichero EXISTENTE. Con el almacenamiento TOTALMENTE ausente, `detect_absent_sections()` no inventa secciones:
   `absent` va vacío, `absent_count` es 0 y los 4 ficheros ausentes se listan en `missing_files` (que es la
-  detección de 2.8.8.9.5.1). La detección de CORRUPCIÓN (2.8.8.9.6) y el test pytest de ausencia (2.8.8.9.5.4) NO
-  se adelantan aquí.
+detección de 2.8.8.9.5.1). La detección de CORRUPCIÓN (2.8.8.9.6) y el test pytest de ausencia (2.8.8.9.5.4) NO
+se adelantan aquí.
 - LA DECLARACIÓN NO SUSTITUYE A LA VERIFICACIÓN: la sonda `no_data_behavior_real.py` contrasta el contrato
-  declarado contra el comportamiento OBSERVADO en runtime. Si lo observado se desvía, el contraste falla y el
-  contrato queda obsoleto: es intencional, un contrato que nunca falla no prueba nada.
+declarado contra el comportamiento OBSERVADO en runtime. Si lo observado se desvía, el contraste falla y el
+contrato queda obsoleto: es intencional, un contrato que nunca falla no prueba nada.
 - RUNTIME: `tests/utils/contextual_adaptation_engine/no_data_behavior_real.py` — 77/77 comprobaciones OK.
-  Cubre la FORMA del contrato (secciones, tipos, APIs existentes, copia defensiva y que consultarlo NO crea
-  ficheros), la AUSENCIA TOTAL (arranque, defaults, las 10 APIs de lectura, la detección y la no escritura), la
-  AUSENCIA PARCIAL (una sección ausente dentro de un fichero existente, y que las lecturas siguen siendo seguras)
-  y la ESCRITURA y RECUPERACIÓN (cada API de escritura CREA el fichero que declara, y después de escribir el
-  almacenamiento deja de reportarse como ausente y sus ficheros son JSON válido). Es independiente de la suite
-  pytest, solo LEE el `data/` de producción mediante rutas absolutas y trabaja sobre directorios temporales.
+Cubre la FORMA del contrato (secciones, tipos, APIs existentes, copia defensiva y que consultarlo NO crea
+ficheros), la AUSENCIA TOTAL (arranque, defaults, las 10 APIs de lectura, la detección y la no escritura), la
+AUSENCIA PARCIAL (una sección ausente dentro de un fichero existente, y que las lecturas siguen siendo seguras)
+y la ESCRITURA y RECUPERACIÓN (cada API de escritura CREA el fichero que declara, y después de escribir el
+almacenamiento deja de reportarse como ausente y sus ficheros son JSON válido). Es independiente de la suite
+pytest, solo LEE el `data/` de producción mediante rutas absolutas y trabaja sobre directorios temporales.
 - NO VACUIDAD DE LA SONDA: `data/temp/nodata_mutation_check.py` muta el contrato declarado (tipo de retorno
-  incorrecto, `creates_persistence_files`, fichero creado por una API de escritura y `detection_writes`) y
-  comprueba que las 4 mutaciones son detectadas y que el contrato original pasa. Esta verificación detectó DOS
-  comprobaciones vacías de la sonda, corregidas: (1) el arranque se contrastaba contra una EXPECTATIVA fija
+incorrecto, `creates_persistence_files`, fichero creado por una API de escritura y `detection_writes`) y
+comprueba que las 4 mutaciones son detectadas y que el contrato original pasa. Esta verificación detectó DOS
+comprobaciones vacías de la sonda, corregidas: (1) el arranque se contrastaba contra una EXPECTATIVA fija
   ("no crea ficheros") en vez de contra el valor declarado, de modo que cambiar el contrato no la activaba; y
   (2) la escritura se comprobaba con "el fichero existe", de modo que un fichero declarado que ya existía por
-  otra escritura daba un falso OK; ahora cada API de escritura se prueba sobre un motor NUEVO, lo que permite
-  afirmar que lo CREA esa misma llamada.
+otra escritura daba un falso OK; ahora cada API de escritura se prueba sobre un motor NUEVO, lo que permite
+afirmar que lo CREA esa misma llamada.
 - AISLAMIENTO: `data/temp/nodata_isolation_check.py` comprueba por sha256 que la sonda NO modifica el `data/` de
-  producción: los 4 ficheros de persistencia y `data/knowledge_graph.json` quedan byte a byte idénticos.
+producción: los 4 ficheros de persistencia y `data/knowledge_graph.json` quedan byte a byte idénticos.
 - COMPATIBILIDAD: el cambio es puramente ADITIVO. No se altera ninguna clave previa de `get_engine_status()`,
-  ni el comportamiento de arranque, carga, detección o escritura. El diff del motor son 94 líneas nuevas (el
-  contrato y su accessor) y 0 líneas modificadas o eliminadas.
+ni el comportamiento de arranque, carga, detección o escritura. El diff del motor son 94 líneas nuevas (el
+contrato y su accessor) y 0 líneas modificadas o eliminadas.
 - ALCANCE: esta hoja DECLARA y VERIFICA el comportamiento; NO lo cambia. El test pytest de ausencia
   (2.8.8.9.5.4) NO se adelanta aquí.
 - HALLAZGO DE PRODUCCIÓN: sin cambios. En `data/` siguen faltando `contextual_adaptation_rules.json` y
@@ -1437,39 +1437,39 @@ Hoy `learning_results` se escribe verbatim (l. 2475) y no hay ningún contador d
 2.8.8.9.5.4 — TEST DE AUSENCIA [IMPLEMENTADA]
 - Crear y ejecutar únicamente tests de almacenamiento/sección ausente.
 - TEST PYTEST: `tests/utils/contextual_adaptation_engine/test_absent_storage_and_sections.py` (nuevo) — 29 tests
-  en un ÚNICO módulo, que es lo que pedía la hoja: tests de almacenamiento/sección ausente y NADA más. No se toca
-  el motor de producción en esta hoja: es una hoja de VERIFICACIÓN.
+en un ÚNICO módulo, que es lo que pedía la hoja: tests de almacenamiento/sección ausente y NADA más. No se toca
+el motor de producción en esta hoja: es una hoja de VERIFICACIÓN.
 - AUSENCIA TOTAL (comportamiento sin datos): el motor arranca sin lanzar, la carga NO crea los ficheros de
-  persistencia ausentes, los valores por defecto no son nulos (lista vacía, no `None`) y las 10 APIs de lectura no
-  lanzan excepción.
+persistencia ausentes, los valores por defecto no son nulos (lista vacía, no `None`) y las 10 APIs de lectura no
+lanzan excepción.
 - DETECCIÓN DE ALMACENAMIENTO AUSENTE (2.8.8.9.5.1): `expected_storage_paths()` declara las cuatro rutas, la
-  detección informa de las cuatro ausencias con su `reason`, distingue la ruta que no es un fichero, es de SOLO
-  LECTURA, y se contrasta con el almacenamiento parcial y con el completo; `get_engine_status()` expone la
-  detección en la clave `storage` y conserva todas las claves previas.
+detección informa de las cuatro ausencias con su `reason`, distingue la ruta que no es un fichero, es de SOLO
+LECTURA, y se contrasta con el almacenamiento parcial y con el completo; `get_engine_status()` expone la
+detección en la clave `storage` y conserva todas las claves previas.
 - DETECCIÓN DE SECCIÓN AUSENTE (2.8.8.9.5.2): sección de DATOS ausente, sección de METADATA ausente, varias
-  ausentes a la vez en el mismo fichero, sección presente pero VACÍA (no se reporta como ausente), formato heredado
+ausentes a la vez en el mismo fichero, sección presente pero VACÍA (no se reporta como ausente), formato heredado
   (la sección de DATOS se considera presente), fichero ilegible y payload que no es un mapeo (ambos en
   `unreadable`, no como sección ausente), y los ficheros ausentes listados aparte en `missing_files`; la detección es
-  de SOLO LECTURA y `get_engine_status()` expone el resultado en `storage_sections` sin alterar claves previas.
+de SOLO LECTURA y `get_engine_status()` expone el resultado en `storage_sections` sin alterar claves previas.
 - RECUPERACIÓN: la escritura recrea el almacenamiento ausente y la sección ausente no impide la carga de los datos
-  presentes.
+presentes.
 - TEST DE GUARDA DE PRODUCCIÓN (dentro del mismo módulo): 3 tests comprueban por sha256 que el propio módulo NO
-  modifica el `data/` de producción — los 4 ficheros de persistencia y los 4 ficheros de los subsistemas ajenos
+modifica el `data/` de producción — los 4 ficheros de persistencia y los 4 ficheros de los subsistemas ajenos
   (`knowledge_graph.json`, `learning_history.json`, `improvement_rules.json`, `adaptive_performance.json`).
 - AISLAMIENTO DEL MÓDULO: los motores se crean con `data_dir` temporal y, además, se parchean por ambas partes
   (`_load_config` y `_save_knowledge_graph`) las rutas RELATIVAS de `SelfImprovementSystem`, que escribe
   `data/knowledge_graph.json` desde un hilo asíncrono y contaminaba el `data/` real. Al importar el módulo también
-  se redirigen las instancias vivas que el paquete `utils` crea en el import.
+se redirigen las instancias vivas que el paquete `utils` crea en el import.
 - AISLAMIENTO DE LA SUITE (corregido en esta hoja): `tests/conftest.py` ejecuta TODA la sesión en un temporal
   (`_SANDBOX_DIR`), de modo que ninguna ruta relativa resuelta contra el CWD pueda tocar el repo; y
   `pytest_sessionfinish` vuelve al sandbox porque `pytest.main.wrap_session` restaura el CWD original en su
   `finally` ANTES de ese hook, con lo que los hilos vivos de `AdvancedLogger` escribían `logs/jarvis_logs.db` en el
-  repo de producción. Verificado con `sys.addaudithook`: 17.558 conexiones `sqlite3.connect` durante la suite, todas
-  resueltas en el temporal, 0 en el repo.
+repo de producción. Verificado con `sys.addaudithook`: 17.558 conexiones `sqlite3.connect` durante la suite, todas
+resueltas en el temporal, 0 en el repo.
 - HALLAZGO DE PRODUCCIÓN: sin cambios. En `data/` siguen faltando `contextual_adaptation_rules.json` y
   `contextual_knowledge_base.json` (ausencia de FICHERO, de 2.8.8.9.5.1).
 - ESTADO: 29/29 PASSED en el módulo; 244 PASSED / 0 FAILED en la suite completa (215 de 2.8.8.9.5.3 + 29 nuevos,
-  0 regresiones). La detección de CORRUPCIÓN (2.8.8.9.6) NO se adelanta aquí.
+0 regresiones). La detección de CORRUPCIÓN (2.8.8.9.6) NO se adelanta aquí.
 
 2.8.8.9.6 — DETECCIÓN DE CORRUPCIÓN
 
@@ -1494,15 +1494,15 @@ Hoy `learning_results` se escribe verbatim (l. 2475) y no hay ningún contador d
 - Crear únicamente el caso de corrupción.
 - Módulo: `tests/utils/contextual_adaptation_engine/test_corrupt_data.py` (86 tests, 69 PASSED / 17 FAILED).
 - CONTRATO A CUMPLIR (fijado en 2.8.8.9.6.2): para las 27 clases de corrupción declaradas en
-  2.8.8.9.6.1, el dato corrupto NO debe producir ninguno de los 5 efectos que lo usan como si
-  fuera válido: `value_coerced`, `state_contaminated`, `read_api_raises`, `write_api_breaks` y
+2.8.8.9.6.1, el dato corrupto NO debe producir ninguno de los 5 efectos que lo usan como si
+fuera válido: `value_coerced`, `state_contaminated`, `read_api_raises`, `write_api_breaks` y
   `corruption_persisted`. Sí se admiten los 3 efectos seguros: `silently_ignored`,
   `record_dropped` y `rejected_whole_file`.
 - CASO MATERIALIZADO: cada clase se construye con el formato real declarado (payload sano + UNA
-  desviación) sobre un `data/` temporal por parámetro, con `data_dir` propio. El `data/` de
-  producción NO se toca; el módulo incorpora un TEST DE GUARDA por sha256 de los 8 ficheros
-  vigilados y un CONTROL de no vacío (los MISMOS ficheros con payload VÁLIDO no producen ningún
-  efecto inseguro).
+desviación) sobre un `data/` temporal por parámetro, con `data_dir` propio. El `data/` de
+producción NO se toca; el módulo incorpora un TEST DE GUARDA por sha256 de los 8 ficheros
+vigilados y un CONTROL de no vacío (los MISMOS ficheros con payload VÁLIDO no producen ningún
+efecto inseguro).
 - TESTS QUE DEBEN PASAR AL TERMINAR 2.8.8.9.6.3 (hoy FAILED por diseño), todos en
   `test_el_dato_corrupto_no_se_usa_como_si_fuera_valido`:
   `adaptation_rules.actions_string`, `adaptation_rules.enabled_string`,
@@ -1520,55 +1520,55 @@ Hoy `learning_results` se escribe verbatim (l. 2475) y no hay ningún contador d
 - Implementar únicamente la detección de corrupción.
 - CONTRATO A CUMPLIR (fijado en 2.8.8.9.6.2): los 17 tests RED del módulo
   `tests/utils/contextual_adaptation_engine/test_corrupt_data.py` deben pasar. La detección debe
-  ser de SOLO LECTURA (como la de 2.8.8.9.5.1/5.2) y no puede crear ficheros.
+ser de SOLO LECTURA (como la de 2.8.8.9.5.1/5.2) y no puede crear ficheros.
 - IMPLEMENTADO: cuatro helpers de validación sobre el FORMATO REAL en
   `src/utils/contextual_adaptation_engine.py` (`_cumple_tipo`, `_desviaciones_de_regla`,
   `_fila_valida`, `_seccion_de_conocimiento_valida`), aplicados en los 4 cargadores reales
   (`load_adaptation_rules`, `load_knowledge_base`, `_load_goal_adaptation_feedback`,
   `_load_goal_adaptation_learning_results`). El dato que se aparta del formato NO llega al
-  estado ni se persiste; se admiten los 3 efectos seguros (`record_dropped`, `silently_ignored`,
+estado ni se persiste; se admiten los 3 efectos seguros (`record_dropped`, `silently_ignored`,
   `rejected_whole_file`). La detección es de SOLO LECTURA y no crea ficheros.
 - HALLAZGO DE LA VERIFICACIÓN: los observadores de la sonda de 2.8.8.9.6.1 solo comprobaban si
-  una clave concreta faltaba o estaba, y NO que el contenido corrupto hubiera dejado de llegar
-  al estado. Reforzados con marcadores distinguibles y con la exigencia de estado vacío donde el
-  fichero no declara filas; sin este refuerzo el banco de mutación daba falsos negativos.
+una clave concreta faltaba o estaba, y NO que el contenido corrupto hubiera dejado de llegar
+al estado. Reforzados con marcadores distinguibles y con la exigencia de estado vacío donde el
+fichero no declara filas; sin este refuerzo el banco de mutación daba falsos negativos.
 - BANCO DE MUTACIÓN: `tests/utils/contextual_adaptation_engine/mutation_check_2_8_8_9_6_3.py`
-  aplica 11 mutaciones (una por pieza de la detección) sobre una COPIA de `src/` en un temporal y
-  exige que la sonda falle en cada una: 11/11 detectadas. El repositorio nunca se modifica.
+aplica 11 mutaciones (una por pieza de la detección) sobre una COPIA de `src/` en un temporal y
+exige que la sonda falle en cada una: 11/11 detectadas. El repositorio nunca se modifica.
 - RESULTADO: 86 PASSED / 0 FAILED en `test_corrupt_data.py` (los 17 RED de 6.2 pasan), 323
-  PASSED / 0 FAILED en la suite de `tests/utils/contextual_adaptation_engine/`, 0 comprobaciones
-  fallidas en las sondas de 6.1 y 6.3, 0 regresiones.
+PASSED / 0 FAILED en la suite de `tests/utils/contextual_adaptation_engine/`, 0 comprobaciones
+fallidas en las sondas de 6.1 y 6.3, 0 regresiones.
 
 2.8.8.9.6.4 — VERIFICAR RECHAZO [IMPLEMENTADA]
 - Comprobar que los datos corruptos no se usan como si fueran válidos.
 - CONTRATO A CUMPLIR (fijado en 2.8.8.9.6.2): los 17 tests RED del módulo
   `tests/utils/contextual_adaptation_engine/test_corrupt_data.py` deben seguir pasando, y el resto
-  del módulo (69 tests) no debe romperse. Ninguno de los 5 efectos inseguros puede aparecer en el
-  estado del motor tras cargar un fichero corrupto.
+del módulo (69 tests) no debe romperse. Ninguno de los 5 efectos inseguros puede aparecer en el
+estado del motor tras cargar un fichero corrupto.
 - VERIFICADO: la sonda `tests/utils/contextual_adaptation_engine/verify_rejection_real.py` (0
-  comprobaciones fallidas, 0 hallazgos) define sus PROPIOS 27 escenarios, con un SENTINELA propio
-  incrustado en el punto exacto que se corrompe, y sus PROPIOS instrumentos de observacion; por
-  clase exige arranque sin lanzar, contenido corrupto PRESENTE en disco, ausencia de fuga al
-  estado operativo, ninguna API de lectura o de escritura rota, ninguna devolucion del dato
-  corrupto, deteccion reportada por su clase y ninguna persistencia del dato corrupto al escribir.
+comprobaciones fallidas, 0 hallazgos) define sus PROPIOS 27 escenarios, con un SENTINELA propio
+incrustado en el punto exacto que se corrompe, y sus PROPIOS instrumentos de observacion; por
+clase exige arranque sin lanzar, contenido corrupto PRESENTE en disco, ausencia de fuga al
+estado operativo, ninguna API de lectura o de escritura rota, ninguna devolucion del dato
+corrupto, deteccion reportada por su clase y ninguna persistencia del dato corrupto al escribir.
 - SELECTIVIDAD DEL RECHAZO: cada escenario declara su ALCANCE (`fila`, `contenedor` o `fichero`) y
-  de el se DERIVA si el contenido sano que acompana a la corrupcion debe sobrevivir; el contraste
-  se hace contra un motor de REFERENCIA sin ficheros corruptos, de modo que lo que la corrupcion
-  destruye tiene que quedar en el valor por DEFECTO.
+de el se DERIVA si el contenido sano que acompana a la corrupcion debe sobrevivir; el contraste
+se hace contra un motor de REFERENCIA sin ficheros corruptos, de modo que lo que la corrupcion
+destruye tiene que quedar en el valor por DEFECTO.
 - HALLAZGOS DE LA VERIFICACION, CORREGIDOS: (1) la comprobacion de deteccion se ejecutaba DESPUES
-  de las APIs de escritura, que sanean el fichero y hacen desaparecer la corrupcion del disco: se
-  movio ANTES, mientras el fichero corrupto sigue presente. (2) el informe de deteccion NOMBRA la
-  desviacion, de modo que su `location` puede contener el identificador de la clave o de la fila
-  corrupta: eso es INFORMAR, no USAR, asi que la comprobacion de "no devuelve el dato corrupto"
-  ignora las `location` y la deteccion se exige por su clase en un bloque aparte.
+de las APIs de escritura, que sanean el fichero y hacen desaparecer la corrupcion del disco: se
+movio ANTES, mientras el fichero corrupto sigue presente. (2) el informe de deteccion NOMBRA la
+desviacion, de modo que su `location` puede contener el identificador de la clave o de la fila
+corrupta: eso es INFORMAR, no USAR, asi que la comprobacion de "no devuelve el dato corrupto"
+ignora las `location` y la deteccion se exige por su clase en un bloque aparte.
 - BANCO DE MUTACION: `tests/utils/contextual_adaptation_engine/mutation_check_2_8_8_9_6_4.py`
-  aplica 3 mutaciones al motor (M1: `_desviaciones_de_regla` no detecta ninguna desviacion; M2:
+aplica 3 mutaciones al motor (M1: `_desviaciones_de_regla` no detecta ninguna desviacion; M2:
   `_seccion_de_conocimiento_valida` acepta cualquier seccion; M3: `detect_corruption` no informa de
-  nada) y exige que el test falle en cada una: 3/3 detectadas. El motor se restaura byte a byte.
+nada) y exige que el test falle en cada una: 3/3 detectadas. El motor se restaura byte a byte.
 - RESULTADO: 0 comprobaciones fallidas en la sonda, 60 PASSED / 0 FAILED en
   `test_2_8_8_9_6_4_rejection_runtime.py`, 383 PASSED / 0 FAILED en la suite de
   `tests/utils/contextual_adaptation_engine/` (323 previos + 60 nuevos, 0 regresiones), 3/3
-  mutaciones detectadas y los 4 ficheros de persistencia del `data/` de produccion intactos.
+mutaciones detectadas y los 4 ficheros de persistencia del `data/` de produccion intactos.
 
 2.8.8.9.7 — RECUPERACIÓN PARCIAL
 
@@ -3724,125 +3724,124 @@ OBJETIVO: Verificar en runtime que los patrones de aprendizaje validados se recu
 TIPO DE TRABAJO: VERIFICACIÓN
 CAMBIOS / HALLAZGOS:
 - La hoja es de VERIFICACION: no se modifico codigo de produccion. `src/utils/contextual_adaptation_engine.py`
-  queda intacto (`git diff` vacio), por lo que el comportamiento verificado es el de 2.8.8.9.4.4 ya implementado.
+queda intacto (`git diff` vacio), por lo que el comportamiento verificado es el de 2.8.8.9.4.4 ya implementado.
 - VERIFICACION POR TESTS: `tests/utils/contextual_adaptation_engine/test_goal_adaptation_pattern_restart_verification.py`
   (9 tests) comprueba la recuperacion tras el reinicio: conjunto canonico completo de 7 campos (no solo los 5
-  DATOS CRITICOS), estructuras anidadas (`context`, `metrics`) intactas, valores sin perdida, fila de
-  resultados con `adaptation_id`, `updated_strategies` y `convergence_metrics` intactos, consumo real por
+DATOS CRITICOS), estructuras anidadas (`context`, `metrics`) intactas, valores sin perdida, fila de
+resultados con `adaptation_id`, `updated_strategies` y `convergence_metrics` intactos, consumo real por
   `_update_adaptive_strategies()` con enlace `strategy["pattern_id"] -> pattern["pattern_id"]`, estabilidad
-  ante un segundo reinicio, conservacion de lo recuperado tras un nuevo ciclo de aprendizaje, no
-  contaminacion por un patron no validado y carga sin reescribir el fichero persistido (compara contenido,
-  tamano y `st_mtime_ns`). 9 PASSED / 0 FAILED.
+ante un segundo reinicio, conservacion de lo recuperado tras un nuevo ciclo de aprendizaje, no
+contaminacion por un patron no validado y carga sin reescribir el fichero persistido (compara contenido,
+tamano y `st_mtime_ns`). 9 PASSED / 0 FAILED.
 - VERIFICACION POR MUTACION (no vacuidad): `tests/utils/contextual_adaptation_engine/mutation_check_pattern_restart.py`
-  aplica 5 mutaciones al motor y exige que cada una la detecte al menos un test. Resultado: 5/5 DETECTADAS
+aplica 5 mutaciones al motor y exige que cada una la detecte al menos un test. Resultado: 5/5 DETECTADAS
   (carga verbatim, recorte a los 5 datos criticos, contexto anidado vaciado, filas sin metricas de
-  convergencia, reescritura del fichero al cargar). El fichero original se restaura tras cada mutacion y
+convergencia, reescritura del fichero al cargar). El fichero original se restaura tras cada mutacion y
   `git diff` confirma que `src/utils/contextual_adaptation_engine.py` queda intacto.
 - VERIFICACION EN RUNTIME (independiente del pytest): nuevo script
   `tests/utils/contextual_adaptation_engine/verify_pattern_restart_real.py` que ejecuta el ciclo real del
-  motor (feedback -> aprendizaje -> persistencia -> reinicio) sobre un directorio temporal. Resultado
-  15/15 comprobaciones OK: 3 patrones aprendidos y 3 recuperados tras el reinicio con el MISMO `pattern_id`,
-  ningun campo canonico ausente ni cambiado de valor, estructuras anidadas ainda diccionarios, 3 filas de
-  resultados conservadas con metricas de convergencia y estrategias, la carga NO reescribe el fichero
-  persistido, el segundo reinicio recupera los mismos 3 patrones y un nuevo ciclo de aprendizaje posterior
-  no pierde ninguno de los ya recuperados (`perdidos=[]`).
+motor (feedback -> aprendizaje -> persistencia -> reinicio) sobre un directorio temporal. Resultado
+15/15 comprobaciones OK: 3 patrones aprendidos y 3 recuperados tras el reinicio con el MISMO `pattern_id`,
+ningun campo canonico ausente ni cambiado de valor, estructuras anidadas ainda diccionarios, 3 filas de
+resultados conservadas con metricas de convergencia y estrategias, la carga NO reescribe el fichero
+persistido, el segundo reinicio recupera los mismos 3 patrones y un nuevo ciclo de aprendizaje posterior
+no pierde ninguno de los ya recuperados (`perdidos=[]`).
 - VERIFICACION SOBRE COPIA DEL FICHERO REAL DE PRODUCCION: sobre una COPIA de
   `data/goal_adaptation_learning_results.json` (el original NO se toca) se recuperan 1 fila y 0 patrones:
-  el patron real `pattern_001` (`confidence` 0.9, una sola observacion) no esta validado y se descarta
-  correctamente, con el log real "Patrones de aprendizaje no validados descartados al cargar: 1 de 1"; las
-  estrategias reales siguen restaurandose. La copia no se modifica.
+el patron real `pattern_001` (`confidence` 0.9, una sola observacion) no esta validado y se descarta
+correctamente, con el log real "Patrones de aprendizaje no validados descartados al cargar: 1 de 1"; las
+estrategias reales siguen restaurandose. La copia no se modifica.
 - La recuperacion de estrategias (2.8.8.9.3) no se ve afectada: las filas de resultados de aprendizaje se
-  conservan integras tras la carga.
+conservan integras tras la carga.
 ARCHIVOS MODIFICADOS:
 - PRODUCCIÓN: NINGUNO (hoja de verificacion; `src/utils/contextual_adaptation_engine.py` intacto).
 - TESTS: `tests/utils/contextual_adaptation_engine/verify_pattern_restart_real.py` (nuevo, script de sonda
-  en runtime, 15 comprobaciones).
+en runtime, 15 comprobaciones).
 - DOCUMENTACIÓN: `README.md`, `prompt_mejoraActual.txt`.
 TESTS Y RESULTADOS:
 - UNITARIOS: `tests/utils/contextual_adaptation_engine/test_goal_adaptation_pattern_restart_verification.py`
   — 9 PASSED / 0 FAILED / TOTAL 9.
 - MUTACION: `tests/utils/contextual_adaptation_engine/mutation_check_pattern_restart.py` — 5/5 mutaciones
-  detectadas.
+detectadas.
 - RUNTIME: `tests/utils/contextual_adaptation_engine/verify_pattern_restart_real.py` — 15/15 comprobaciones OK.
 - INTEGRACIÓN: NO APLICA.
 - NO REGRESIÓN: suite completa `tests/` — 212 PASSED / 0 FAILED / TOTAL 212, frente a la baseline comparable
-  de 203 PASSED / 0 FAILED de 2.8.8.9.4.4 (los 9 tests nuevos de esta hoja). 0 regresiones.
+de 203 PASSED / 0 FAILED de 2.8.8.9.4.4 (los 9 tests nuevos de esta hoja). 0 regresiones.
 VERIFICACIÓN:
 - SINTAXIS: `py_compile` de `main.py`, `src/utils/contextual_adaptation_engine.py` y
   `tests/utils/contextual_adaptation_engine/verify_pattern_restart_real.py` — OK.
 - MAIN.PY: OK; `import main` completa sin error.
 - COMPORTAMIENTO / INTEGRACIÓN REAL: ciclo real feedback -> aprendizaje -> persistencia -> reinicio ejecutado
-  en runtime con evidencia impresa (patrones aprendidos = recuperados = 3, `pattern_id` identicos, 0 perdidas
-  tras un nuevo ciclo) y sobre una COPIA del fichero real de produccion (1 fila recuperada, 0 patrones no
-  validados, estrategias restauradas). Verificado en runtime que ni el test ni el script escriben en `data/`.
+en runtime con evidencia impresa (patrones aprendidos = recuperados = 3, `pattern_id` identicos, 0 perdidas
+tras un nuevo ciclo) y sobre una COPIA del fichero real de produccion (1 fila recuperada, 0 patrones no
+validados, estrategias restauradas). Verificado en runtime que ni el test ni el script escriben en `data/`.
 DISCREPANCIAS: NINGUNA REGISTRADA.
 PENDIENTES: 2.8.8.9.4.6 — corregir fallo de patrones (unicamente fallos de esta subhoja).
 ESTADO FINAL: 2.8.8.9.4.5 — IMPLEMENTADA
 
 SIGUIENTE UNIDAD: 2.8.8.9.4.6 — CORREGIR FALLO DE PATRONES
 
-### REGISTRO DE UNIDAD: 2.8.8.9.4.6
 FECHA: 2026-10-20
 ESTADO: IMPLEMENTADA
 OBJETIVO: Corregir el fallo real de la subhoja 2.8.8.9.4 (PERSISTENCIA DE PATRONES): los ficheros de persistencia de Goal de `data/` estaban contaminados por datos de test, tanto de forma residual (contenido ya escrito) como de forma activa (la suite los reescribia en cada ejecucion).
 TIPO DE TRABAJO: CORRECCIÓN
 CAMBIOS / HALLAZGOS:
 - DIAGNÓSTICO: la suite completa `tests/` estaba en verde (212 PASSED / 0 FAILED), por lo que el fallo no era
-  visible en los tests. Se detecto verificando en runtime que la persistencia de patrones de PRODUCCIÓN no
-  contenía ningún patrón real.
+visible en los tests. Se detecto verificando en runtime que la persistencia de patrones de PRODUCCIÓN no
+contenía ningún patrón real.
 - FALLO 1 (ACTIVO): `tests/utils/contextual_adaptation_engine/test_goal_adaptation_feedback.py` creaba el motor
-  SIN `data_dir` (l. 18 y l. 80), por lo que `_capture_goal_adaptation_feedback()` -> `_record_feedback_analysis()`
-  -> `_save_goal_adaptation_feedback()` escribia en `data/goal_adaptation_feedback.json` de PRODUCCIÓN en cada
-  ejecución de la suite. Verificado en runtime: sha256 `836672ca...` -> `993f5eb7...`, tamaño 36234 -> 38491 y
+SIN `data_dir` (l. 18 y l. 80), por lo que `_capture_goal_adaptation_feedback()` -> `_record_feedback_analysis()`
+-> `_save_goal_adaptation_feedback()` escribia en `data/goal_adaptation_feedback.json` de PRODUCCIÓN en cada
+ejecución de la suite. Verificado en runtime: sha256 `836672ca...` -> `993f5eb7...`, tamaño 36234 -> 38491 y
   `st_mtime_ns` distinto al ejecutar solo ese test. El fichero crecia de forma ilimitada.
-  Este es exactamente el fallo que 2.8.8.9.4.1 documento como "CONTAMINACIÓN DE DATOS DE PRODUCCIÓN" y
-  difirio ("NO se ha corregido en esta hoja: ... el arreglo pertenece a una unidad que lo autorice"), y el
-  contrato de 2.8.8.9.4.2 imposedo de forma expresa ("el test nuevo debe usar `data_dir` temporal y NUNCA
+Este es exactamente el fallo que 2.8.8.9.4.1 documento como "CONTAMINACIÓN DE DATOS DE PRODUCCIÓN" y
+difirio ("NO se ha corregido en esta hoja: ... el arreglo pertenece a una unidad que lo autorice"), y el
+contrato de 2.8.8.9.4.2 imposedo de forma expresa ("el test nuevo debe usar `data_dir` temporal y NUNCA
   tocar `data/`").
 - FALLO 2 (RESIDUAL): `data/goal_adaptation_feedback.json` contenia 18 registros y 18 entradas de historial,
-  TODOS con `adaptation_id` `test_adaptation_001` (100% contaminado). `data/goal_adaptation_learning_results.json`
-  contenia 1 fila `test_load_001` con el patrón `pattern_001` (confidence 0.9) y la estrategia `strategy_001`,
-  ambos artefactos del fixture de `test_load_goal_adaptation_feedback.py` (que hoy ya esta aislado, pero que en
-  su version anterior escribia sobre el `data/` real). Consecuencia: la persistencia de patrones de producción
-  era íntegramente ficticia, y la estrategia `strategy_001` se restauraba en el `knowledge_base` de producción
-  en cada arranque.
+TODOS con `adaptation_id` `test_adaptation_001` (100% contaminado). `data/goal_adaptation_learning_results.json`
+contenia 1 fila `test_load_001` con el patrón `pattern_001` (confidence 0.9) y la estrategia `strategy_001`,
+ambos artefactos del fixture de `test_load_goal_adaptation_feedback.py` (que hoy ya esta aislado, pero que en
+su version anterior escribia sobre el `data/` real). Consecuencia: la persistencia de patrones de producción
+era íntegramente ficticia, y la estrategia `strategy_001` se restauraba en el `knowledge_base` de producción
+en cada arranque.
 - CORRECCIÓN 1: `test_goal_adaptation_feedback.py` se aisla con `data_dir=str(tmp_path)` en AMBAS funciones de
-  test, y se REFUERZA con una aserción real (`assert feedback_result.get("success") is True`), ya que antes
-  solo imprimía y devolvía `True` sin comprobar nada.
+test, y se REFUERZA con una aserción real (`assert feedback_result.get("success") is True`), ya que antes
+solo imprimía y devolvía `True` sin comprobar nada.
 - CORRECCIÓN 2: `data/temp/clean_goal_test_artifacts_4946.py` retira de los dos ficheros de producción SOLO las
-  entradas identificadas como artefactos de test (`adaptation_id`/`strategy_id`/`pattern_id` con prefijo
+entradas identificadas como artefactos de test (`adaptation_id`/`strategy_id`/`pattern_id` con prefijo
   `test_`) y arrastra las estrategias que solo existían por una fila de test (vinculo via `strategy_id` de
   `updated_strategies`). 38 artefactos eliminados. Los ficheros quedan en su payload canónico vacío. Copia
-  original de ambos en `data/temp/backup_4946/`.
+original de ambos en `data/temp/backup_4946/`.
 - CORRECCIÓN 3 (guarda de regresión): nuevo
   `tests/utils/contextual_adaptation_engine/test_goal_adaptation_production_data_clean.py` con 3 tests:
   (1) los ficheros de producción de Goal no contienen artefactos de test;
   (2) el ciclo real de persistencia de patrones con `data_dir` temporal no reescribe los ficheros de producción
       (compara `st_mtime_ns`, tamaño y sha256, y exige que el ciclo haya persistido de verdad en el temporal
-      para que la comprobación no sea vacua);
+para que la comprobación no sea vacua);
   (3) chequeo estático sobre `tests/**/test_*.py`: ningún test que ejecute la vía de escritura de Goal
       (`_capture_goal_adaptation_feedback`, `_execute_goal_adaptation_learning_loop`, `_record_learning_results`,
       `_save_goal_adaptation_*`) puede crear el motor sin `data_dir`.
 - `src/utils/contextual_adaptation_engine.py` queda INTACTO (`git diff` vacío): el motor cumplía correctamente
-  el contrato de DATOS CRÍTICOS (item 5) al guardar y al cargar. El defecto no estaba en el motor, sino en el
-  aislamiento de los tests y en los datos de producción ya contaminados. No se ha tocado `adaptation_strategies`
+el contrato de DATOS CRÍTICOS (item 5) al guardar y al cargar. El defecto no estaba en el motor, sino en el
+aislamiento de los tests y en los datos de producción ya contaminados. No se ha tocado `adaptation_strategies`
   (contrato del item 4, cerrado en 2.8.8.9.3.6) ni ningún otro contenedor.
 ARCHIVOS MODIFICADOS:
 - PRODUCCIÓN: `data/goal_adaptation_feedback.json` y `data/goal_adaptation_learning_results.json` (limpieza de
-  artefactos de test; el código de `src/` no se ha modificado).
+artefactos de test; el código de `src/` no se ha modificado).
 - TESTS: `tests/utils/contextual_adaptation_engine/test_goal_adaptation_feedback.py` (aislamiento + aserción
-  reforzada), `tests/utils/contextual_adaptation_engine/test_goal_adaptation_production_data_clean.py` (nuevo).
+reforzada), `tests/utils/contextual_adaptation_engine/test_goal_adaptation_production_data_clean.py` (nuevo).
 - DOCUMENTACIÓN: `README.md`, `prompt_mejoraActual.txt`.
 TESTS Y RESULTADOS:
 - UNITARIOS: `tests/utils/contextual_adaptation_engine/test_goal_adaptation_production_data_clean.py` —
-  3 PASSED / 0 FAILED / TOTAL 3.
+3 PASSED / 0 FAILED / TOTAL 3.
 - MUTACIÓN: 2/2 DETECTADAS. (a) Inyección de una fila `test_mut_001` en
   `data/goal_adaptation_learning_results.json` -> 1 FAILED (test de artefactos de test). (b) Sustitución de
   `ContextualAdaptationEngine(data_dir=str(tmp_path))` por `ContextualAdaptationEngine()` en el test de feedback
-  -> 1 FAILED (chequeo estático de aislamiento). En ambos casos el fichero original se restauró.
+-> 1 FAILED (chequeo estático de aislamiento). En ambos casos el fichero original se restauró.
 - INTEGRACIÓN: NO APLICA.
 - NO REGRESIÓN: suite completa `tests/` — 215 PASSED / 0 FAILED / TOTAL 215, frente a la baseline comparable de
-  212 PASSED / 0 FAILED de 2.8.8.9.4.5 (los 3 tests nuevos de esta hoja). 0 regresiones.
+212 PASSED / 0 FAILED de 2.8.8.9.4.5 (los 3 tests nuevos de esta hoja). 0 regresiones.
 VERIFICACIÓN:
 - SINTAXIS: `py_compile` de `main.py`, `src/utils/contextual_adaptation_engine.py`,
   `tests/utils/contextual_adaptation_engine/test_goal_adaptation_feedback.py` y
@@ -3851,20 +3850,19 @@ VERIFICACIÓN:
 - COMPORTAMIENTO / INTEGRACIÓN REAL: verificado en runtime que la suite completa deja
   `data/goal_adaptation_feedback.json` y `data/goal_adaptation_learning_results.json` byte a byte idénticos
   (sha256, tamaño y `st_mtime_ns` sin cambios) y que ambos ficheros quedan con 0 registros, 0 entradas de
-  historial, 0 filas de aprendizaje y 0 estrategias.
+historial, 0 filas de aprendizaje y 0 estrategias.
 DISCREPANCIAS: La hoja 2.8.8.9.4.1 situaba la contaminación de `data/` como pendiente de "una unidad que lo
   autorice"; 2.8.8.9.4.6 es la unica unidad restante de la subhoja y es de correccion, por lo que se ha
-  aplicado aqui. Se deja constancia de un hallazgo FUERA del alcance de esta subhoja: los 27 ficheros de test
-  que crean el motor sin `data_dir` reescriben `data/knowledge_graph.json` en cada ejecucion, porque
+aplicado aqui. Se deja constancia de un hallazgo FUERA del alcance de esta subhoja: los 27 ficheros de test
+que crean el motor sin `data_dir` reescriben `data/knowledge_graph.json` en cada ejecucion, porque
   `src/utils/self_improvement_system.py` (l. 161) usa la ruta RELATIVA fija `data/knowledge_graph.json` en
-  lugar de un `data_dir` configurable. Ese fichero pertenece al subsistema del grafo de conocimiento, no a la
-  persistencia de patrones de Goal, por lo que NO se ha corregido en esta hoja.
+lugar de un `data_dir` configurable. Ese fichero pertenece al subsistema del grafo de conocimiento, no a la
+persistencia de patrones de Goal, por lo que NO se ha corregido en esta hoja.
 PENDIENTES: 2.8.8.9.5.1 — detectar almacenamiento ausente.
 ESTADO FINAL: 2.8.8.9.4.6 — IMPLEMENTADA
 
 SIGUIENTE UNIDAD: 2.8.8.9.5.1 — DETECTAR ALMACENAMIENTO AUSENTE
 
-### REGISTRO DE UNIDAD: 2.8.8.9.5.1
 FECHA: 2026-10-21
 ESTADO: IMPLEMENTADA
 OBJETIVO: Detectar exclusivamente la ausencia del almacenamiento de persistencia esperado por el motor de adaptación contextual.
@@ -3878,77 +3876,76 @@ CAMBIOS / HALLAZGOS:
   `save_all_data()` y `backup_data()` operan sobre estas mismas rutas.
 - IMPLEMENTACIÓN: dos métodos nuevos en `src/utils/contextual_adaptation_engine.py`.
   `expected_storage_paths()` devuelve el mapa `nombre -> ruta` del almacenamiento esperado (las rutas de
-  reglas y base de conocimiento se resuelven con `_resolve_path()`, que respeta `adaptation_rules_file` y
+reglas y base de conocimiento se resuelven con `_resolve_path()`, que respeta `adaptation_rules_file` y
   `knowledge_base_file` de la configuración; las de Goal se resuelven contra `self.data_dir`).
   `detect_absent_storage()` compara esas rutas con el disco en modo SOLO LECTURA y devuelve `expected`,
   `present`, `absent`, `absent_count` y `has_absent`, con `path` y `reason` por ausencia, distinguiendo
   `file_not_found` (no existe) de `not_a_file` (la ruta existe pero no es un fichero).
 - EXPOSICIÓN: `get_engine_status()` incorpora la clave nueva `storage` (`absent` y `absent_count`). Es
-  aditivo: no altera ninguna clave previa, y no hay ningún consumidor externo del método en `src/` ni en
+aditivo: no altera ninguna clave previa, y no hay ningún consumidor externo del método en `src/` ni en
   `main.py` (0 llamadores), por lo que no existe riesgo de ruptura de esquema.
 - ALCANCE RESPETADO: la hoja pide detectar "exclusivamente" la ausencia del almacenamiento esperado, por
-  lo que se implementa la ausencia de FICHEROS. La ausencia de una SECCIÓN dentro de un fichero existente
-  se deja para 2.8.8.9.5.2, y el test pytest de ausencia a 2.8.8.9.5.4 ("Crear y ejecutar únicamente
+lo que se implementa la ausencia de FICHEROS. La ausencia de una SECCIÓN dentro de un fichero existente
+se deja para 2.8.8.9.5.2, y el test pytest de ausencia a 2.8.8.9.5.4 ("Crear y ejecutar únicamente
   tests de almacenamiento/sección ausente"), que NO se adelanta aquí.
 - COMPORTAMIENTO REAL CON ALMACENAMIENTO AUSENTE (verificado en runtime, no inferido): el motor arranca sin
-  fallar; `load_adaptation_rules()` y `load_knowledge_base()` devuelven `True` sin fichero; se conservan las
-  5 reglas por defecto; `goal_adaptation_feedback` y `learning_results` quedan como listas vacías;
+fallar; `load_adaptation_rules()` y `load_knowledge_base()` devuelven `True` sin fichero; se conservan las
+5 reglas por defecto; `goal_adaptation_feedback` y `learning_results` quedan como listas vacías;
   `adaptation_strategies` conserva la forma normalizada por contexto (9 contextos); `adaptation_history`
-  queda vacío; la CARGA NO crea los ficheros ausentes; y un `data_dir` inexistente se crea sin error.
+queda vacío; la CARGA NO crea los ficheros ausentes; y un `data_dir` inexistente se crea sin error.
 - AISLAMIENTO DE LA VERIFICACIÓN: la sonda mueve su CWD a un temporal ANTES de construir cualquier motor y
-  NO lo restaura, porque `src/utils/self_improvement_system.py` usa la ruta RELATIVA fija
+NO lo restaura, porque `src/utils/self_improvement_system.py` usa la ruta RELATIVA fija
   `data/knowledge_graph.json` y su hilo de aprendizaje la escribe de forma asíncrona: restaurar el CWD antes
-  de que ese hilo terminase haría que la escritura cayese sobre el `data/` real de producción. El `data/`
-  de producción solo se LEE, mediante rutas absolutas.
+de que ese hilo terminase haría que la escritura cayese sobre el `data/` real de producción. El `data/`
+de producción solo se LEE, mediante rutas absolutas.
 - HALLAZGO DE PRODUCCIÓN: en `data/` faltan `contextual_adaptation_rules.json` y
   `contextual_knowledge_base.json`; los dos ficheros de Goal sí están presentes. La ausencia es inocua para
-  el arranque (comportamiento verificado arriba).
+el arranque (comportamiento verificado arriba).
 ARCHIVOS MODIFICADOS:
 - PRODUCCIÓN: `src/utils/contextual_adaptation_engine.py`.
 - TESTS: `tests/utils/contextual_adaptation_engine/detect_absent_storage_real.py` (nuevo; sonda de runtime,
-  independiente de la suite pytest).
+independiente de la suite pytest).
 - DOCUMENTACIÓN: `README.md`, `prompt_mejoraActual.txt`.
 TESTS Y RESULTADOS:
 - UNITARIOS: NO EJECUTADOS. La creación y ejecución del test pytest de almacenamiento ausente corresponde a
-  la hoja 2.8.8.9.5.4 ("Crear y ejecutar únicamente tests de almacenamiento/sección ausente"); esta hoja no
-  lo adelanta.
+la hoja 2.8.8.9.5.4 ("Crear y ejecutar únicamente tests de almacenamiento/sección ausente"); esta hoja no
+lo adelanta.
 - INTEGRACIÓN: `tests/utils/contextual_adaptation_engine/detect_absent_storage_real.py` — 27 comprobaciones
-  OK / 0 FALLIDAS / TOTAL 27. Cubre el inventario del almacenamiento esperado, el comportamiento del motor
-  con el almacenamiento ausente y la API de detección (ausencia total, total, parcial y ruta que no es un
-  fichero).
+OK / 0 FALLIDAS / TOTAL 27. Cubre el inventario del almacenamiento esperado, el comportamiento del motor
+con el almacenamiento ausente y la API de detección (ausencia total, total, parcial y ruta que no es un
+fichero).
 - NO REGRESIÓN: suite completa `tests/` — 215 PASSED / 0 FAILED / TOTAL 215, frente a la baseline comparable
-  de 215 PASSED / 0 FAILED de 2.8.8.9.4.6 (esta hoja no añade tests a la suite pytest). 0 regresiones.
+de 215 PASSED / 0 FAILED de 2.8.8.9.4.6 (esta hoja no añade tests a la suite pytest). 0 regresiones.
 VERIFICACIÓN:
 - SINTAXIS: `py_compile` de `src/utils/contextual_adaptation_engine.py` y
   `tests/utils/contextual_adaptation_engine/detect_absent_storage_real.py` — OK.
 - MAIN.PY: OK; `import main` completa sin error.
 - COMPORTAMIENTO / INTEGRACIÓN REAL: verificado en runtime que la detección NO crea ficheros (el `data_dir`
-  sigue vacío tras `detect_absent_storage()`), que distingue almacenamiento total, parcial y presente, y que
-  el `data/` de producción NO se modifica al ejecutar la sonda (`git status` de `data/` sin cambios antes y
-  después). Verificado también que la suite completa deja `data/knowledge_graph.json` modificado, con y sin
-  el cambio de `src/`, lo que confirma que ese efecto es preexistente y ajeno a esta hoja.
+sigue vacío tras `detect_absent_storage()`), que distingue almacenamiento total, parcial y presente, y que
+el `data/` de producción NO se modifica al ejecutar la sonda (`git status` de `data/` sin cambios antes y
+después). Verificado también que la suite completa deja `data/knowledge_graph.json` modificado, con y sin
+el cambio de `src/`, lo que confirma que ese efecto es preexistente y ajeno a esta hoja.
 DISCREPANCIAS: Se mantiene el antecedente de 2.8.8.9.4.6: los 27 ficheros de test que crean el motor sin
   `data_dir` reescriben `data/knowledge_graph.json` en cada ejecucion, porque
   `src/utils/self_improvement_system.py` (l. 161) usa la ruta RELATIVA fija `data/knowledge_graph.json` en
-  lugar de un `data_dir` configurable. Ese fichero pertenece al subsistema del grafo de conocimiento, no a la
-  persistencia de patrones de Goal, por lo que NO se ha corregido en esta hoja. RESOLUCIÓN DE ESTA HOJA: se
-  ha VERIFICADO que el efecto es preexistente y NO lo introduce este cambio (la suite se ejecutó con y sin la
-  modificación de `src/` y en ambos casos el fichero queda modificado), de modo que la implementación de la
-  detección no agrava la discrepancia.
+lugar de un `data_dir` configurable. Ese fichero pertenece al subsistema del grafo de conocimiento, no a la
+persistencia de patrones de Goal, por lo que NO se ha corregido en esta hoja. RESOLUCIÓN DE ESTA HOJA: se
+ha VERIFICADO que el efecto es preexistente y NO lo introduce este cambio (la suite se ejecutó con y sin la
+modificación de `src/` y en ambos casos el fichero queda modificado), de modo que la implementación de la
+detección no agrava la discrepancia.
 PENDIENTES: 2.8.8.9.5.2 — detectar sección ausente.
 ESTADO FINAL: 2.8.8.9.5.1 — IMPLEMENTADA
 
 SIGUIENTE UNIDAD: 2.8.8.9.5.2 — DETECTAR SECCIÓN AUSENTE
 
-### REGISTRO DE UNIDAD: 2.8.8.9.5.2
 FECHA: 2026-10-21
 ESTADO: IMPLEMENTADA
 OBJETIVO: Detectar exclusivamente la ausencia de una sección esperada dentro de los ficheros de persistencia del motor de adaptación contextual.
 TIPO DE TRABAJO: IMPLEMENTACIÓN
 CAMBIOS / HALLAZGOS:
 - SECCIONES ESPERADAS: secciones de primer nivel que el motor espera dentro de cada fichero de persistencia,
-  cada una con su origen real en el motor y su clase (`data` = la consume un cargador real; `metadata` =
-  informativa que el escritor produce y que no se usa para recuperar datos):
+cada una con su origen real en el motor y su clase (`data` = la consume un cargador real; `metadata` =
+informativa que el escritor produce y que no se usa para recuperar datos):
   `goal_adaptation_feedback.json` -> `goal_adaptation_feedback` (data), `adaptation_history` (data),
   `last_updated` (metadata); `goal_adaptation_learning_results.json` -> `learning_results` (data),
   `adaptation_strategies` (data), `last_updated` (metadata); `contextual_adaptation_rules.json` -> `rules`
@@ -3958,114 +3955,113 @@ CAMBIOS / HALLAZGOS:
   `_load_goal_adaptation_learning_results`, `load_adaptation_rules` y `load_knowledge_base`.
 - IMPLEMENTACIÓN: dos métodos nuevos en `src/utils/contextual_adaptation_engine.py`.
   `expected_storage_sections()` devuelve el mapa `fichero -> {seccion: clase}` como COPIA independiente (mutar
-  el resultado no altera la tabla del motor). `detect_absent_sections()` compara esas secciones con el
-  contenido de los ficheros EXISTENTES en modo SOLO LECTURA y devuelve `expected`, `checked`, `absent`,
+el resultado no altera la tabla del motor). `detect_absent_sections()` compara esas secciones con el
+contenido de los ficheros EXISTENTES en modo SOLO LECTURA y devuelve `expected`, `checked`, `absent`,
   `absent_count`, `has_absent`, `missing_files` y `unreadable`; cada ausencia informa su `path`, su `reason`
   (`section_not_found`) y su `kind` (`data` o `metadata`), para que el consumidor distinga una sección de DATOS
-  ausente de una sección informativa ausente.
+ausente de una sección informativa ausente.
 - ALCANCE RESPETADO: la hoja pide detectar "únicamente" la ausencia de una sección esperada. Por eso los
-  ficheros que NO existen NO se reportan como sección ausente: se listan en `missing_files`, que es la
-  detección de 2.8.8.9.5.1; y los ficheros presentes pero ilegibles o con un payload que no es un diccionario
-  se listan en `unreadable`, porque la corrupción del contenido corresponde a 2.8.8.9.6. El test pytest de
-  ausencia (2.8.8.9.5.4) NO se adelanta aquí.
+ficheros que NO existen NO se reportan como sección ausente: se listan en `missing_files`, que es la
+detección de 2.8.8.9.5.1; y los ficheros presentes pero ilegibles o con un payload que no es un diccionario
+se listan en `unreadable`, porque la corrupción del contenido corresponde a 2.8.8.9.6. El test pytest de
+ausencia (2.8.8.9.5.4) NO se adelanta aquí.
 - FORMATO HEREDADO: `load_adaptation_rules()` admite que el fichero contenga la lista de reglas en su propia
-  raíz. En ese formato la sección de DATOS `rules` se considera presente aunque el payload no sea un
-  diccionario, y solo se reportan ausentes las secciones de METADATA (`version`, `last_updated`,
+raíz. En ese formato la sección de DATOS `rules` se considera presente aunque el payload no sea un
+diccionario, y solo se reportan ausentes las secciones de METADATA (`version`, `last_updated`,
   `total_rules`). Verificado que ese formato sigue siendo legible y que devuelve las 5 reglas.
 - EXPOSICIÓN: `get_engine_status()` incorpora la clave nueva `storage_sections` (`absent` y `absent_count`). Es
-  aditivo: no altera ninguna clave previa, incluida `storage` de 2.8.8.9.5.1, y no hay ningún consumidor
-  externo del método en `src/` ni en `main.py` (0 llamadores), por lo que no existe riesgo de ruptura de
-  esquema.
+aditivo: no altera ninguna clave previa, incluida `storage` de 2.8.8.9.5.1, y no hay ningún consumidor
+externo del método en `src/` ni en `main.py` (0 llamadores), por lo que no existe riesgo de ruptura de
+esquema.
 - COMPORTAMIENTO REAL CON SECCIÓN AUSENTE (verificado en runtime, no inferido): una sección presente pero VACÍA
-  NO se reporta como ausente; se detectan varias secciones ausentes a la vez en el mismo fichero y el recuento
-  total las suma; un fichero ilegible NO se reporta como sección ausente (se marca `unreadable_file`); un
-  payload que no es un mapeo se marca `not_a_mapping`; una lista en un fichero sin formato heredado reporta la
-  sección de DATOS ausente; con una sección de DATOS ausente el motor carga sin fallar y conserva su estado
+NO se reporta como ausente; se detectan varias secciones ausentes a la vez en el mismo fichero y el recuento
+total las suma; un fichero ilegible NO se reporta como sección ausente (se marca `unreadable_file`); un
+payload que no es un mapeo se marca `not_a_mapping`; una lista en un fichero sin formato heredado reporta la
+sección de DATOS ausente; con una sección de DATOS ausente el motor carga sin fallar y conserva su estado
   (`total_rules` = 5); y la detección NO crea ni modifica ficheros de persistencia.
 - AISLAMIENTO DE LA VERIFICACIÓN: la sonda mueve su CWD a un temporal ANTES de construir cualquier motor y
-  NO lo restaura, porque `src/utils/self_improvement_system.py` usa la ruta RELATIVA fija
+NO lo restaura, porque `src/utils/self_improvement_system.py` usa la ruta RELATIVA fija
   `data/knowledge_graph.json` y su hilo de aprendizaje la escribe de forma asíncrona: restaurar el CWD antes
-  de que ese hilo terminase haría que la escritura cayese sobre el `data/` real de producción. El `data/`
-  de producción solo se LEE, mediante rutas absolutas. Verificado por hash sha256 que los cuatro ficheros de
-  persistencia de producción quedan byte a byte idénticos tras la sonda.
+de que ese hilo terminase haría que la escritura cayese sobre el `data/` real de producción. El `data/`
+de producción solo se LEE, mediante rutas absolutas. Verificado por hash sha256 que los cuatro ficheros de
+persistencia de producción quedan byte a byte idénticos tras la sonda.
 - HALLAZGO DE PRODUCCIÓN: los dos ficheros de Goal de `data/` tienen todas sus secciones; en `data/` siguen
-  faltando `contextual_adaptation_rules.json` y `contextual_knowledge_base.json` (ausencia de FICHERO, que
-  pertenece a 2.8.8.9.5.1).
+faltando `contextual_adaptation_rules.json` y `contextual_knowledge_base.json` (ausencia de FICHERO, que
+pertenece a 2.8.8.9.5.1).
 ARCHIVOS MODIFICADOS:
 - PRODUCCIÓN: `src/utils/contextual_adaptation_engine.py`.
 - TESTS: `tests/utils/contextual_adaptation_engine/detect_absent_sections_real.py` (nuevo; sonda de runtime,
-  independiente de la suite pytest).
+independiente de la suite pytest).
 - DOCUMENTACIÓN: `README.md`, `prompt_mejoraActual.txt`.
 TESTS Y RESULTADOS:
 - UNITARIOS: NO EJECUTADOS. La creación y ejecución del test pytest de sección ausente corresponde a la hoja
-  2.8.8.9.5.4 ("Crear y ejecutar únicamente tests de almacenamiento/sección ausente"); esta hoja no lo adelanta.
+2.8.8.9.5.4 ("Crear y ejecutar únicamente tests de almacenamiento/sección ausente"); esta hoja no lo adelanta.
 - INTEGRACIÓN: `tests/utils/contextual_adaptation_engine/detect_absent_sections_real.py` — 43 comprobaciones
-  OK / 0 FALLIDAS / TOTAL 43. Cubre el inventario de las secciones esperadas y su origen real, la detección en
-  runtime (sección de DATOS ausente, de METADATA ausente, varias a la vez, sección vacía, formato heredado,
-  fichero ilegible, payload no mapeo, lista sin formato heredado, fichero ausente) y la API de detección.
+OK / 0 FALLIDAS / TOTAL 43. Cubre el inventario de las secciones esperadas y su origen real, la detección en
+runtime (sección de DATOS ausente, de METADATA ausente, varias a la vez, sección vacía, formato heredado,
+fichero ilegible, payload no mapeo, lista sin formato heredado, fichero ausente) y la API de detección.
 - NO REGRESIÓN: suite completa `tests/` — 215 PASSED / 0 FAILED / TOTAL 215, frente a la baseline comparable
-  de 215 PASSED / 0 FAILED de 2.8.8.9.5.1 (esta hoja no añade tests a la suite pytest). 0 regresiones.
+de 215 PASSED / 0 FAILED de 2.8.8.9.5.1 (esta hoja no añade tests a la suite pytest). 0 regresiones.
 VERIFICACIÓN:
 - SINTAXIS: `py_compile` de `src/utils/contextual_adaptation_engine.py` y
   `tests/utils/contextual_adaptation_engine/detect_absent_sections_real.py` — OK.
 - MAIN.PY: OK; `import main` completa sin error.
 - COMPORTAMIENTO / INTEGRACIÓN REAL: verificado en runtime que la detección NO crea ni modifica ficheros de
-  persistencia (sha256 idéntico antes/después), que distingue sección de DATOS ausente de sección de METADATA
-  ausente, que una sección vacía no se reporta como ausente, que el formato heredado se trata correctamente, y
-  que el `data/` de producción NO se modifica al ejecutar la sonda.
+persistencia (sha256 idéntico antes/después), que distingue sección de DATOS ausente de sección de METADATA
+ausente, que una sección vacía no se reporta como ausente, que el formato heredado se trata correctamente, y
+que el `data/` de producción NO se modifica al ejecutar la sonda.
 DISCREPANCIAS: Se mantiene el antecedente de 2.8.8.9.4.6 / 2.8.8.9.5.1: los tests que crean el motor sin
   `data_dir` reescriben `data/knowledge_graph.json` en cada ejecución, porque
   `src/utils/self_improvement_system.py` (l. 161) usa la ruta RELATIVA fija `data/knowledge_graph.json` en
-  lugar de un `data_dir` configurable. Ese fichero pertenece al subsistema del grafo de conocimiento, no a la
-  persistencia de Goal, por lo que NO se ha corregido en esta hoja. La sonda de esta unidad no lo agrava: su
-  CWD temporal hace que su propia escritura caiga en el temporal, y se ha verificado por marca de tiempo que
+lugar de un `data_dir` configurable. Ese fichero pertenece al subsistema del grafo de conocimiento, no a la
+persistencia de Goal, por lo que NO se ha corregido en esta hoja. La sonda de esta unidad no lo agrava: su
+CWD temporal hace que su propia escritura caiga en el temporal, y se ha verificado por marca de tiempo que
   `data/knowledge_graph.json` NO se modifica durante la ejecución de la sonda.
 PENDIENTES: 2.8.8.9.5.4 — crear y ejecutar únicamente tests de almacenamiento/sección ausente.
 ESTADO FINAL: 2.8.8.9.5.3 — IMPLEMENTADA
 
 SIGUIENTE UNIDAD: 2.8.8.9.5.4 — TEST DE AUSENCIA
 
-### REGISTRO DE UNIDAD: 2.8.8.9.5.4
 FECHA: 2026-10-21
 ESTADO: IMPLEMENTADA
 OBJETIVO: Crear y ejecutar únicamente tests de almacenamiento/sección ausente, cerrando con la suite pytest la verificación de la ausencia de datos detectada en 2.8.8.9.5.1 (fichero ausente) y 2.8.8.9.5.2 (sección ausente), y declaradas en 2.8.8.9.5.3.
 TIPO DE TRABAJO: TEST (verificación; no se modifica el motor de producción)
 CAMBIOS / HALLAZGOS:
 - UN ÚNICO MÓDULO, 29 TESTS: `tests/utils/contextual_adaptation_engine/test_absent_storage_and_sections.py`. Es
-  la primera hoja de esta fase que deja de añadir sondas de runtime sueltas y consolida la cobertura en la suite
-  pytest.
+la primera hoja de esta fase que deja de añadir sondas de runtime sueltas y consolida la cobertura en la suite
+pytest.
 - AUSENCIA TOTAL: el motor arranca sin lanzar con el almacenamiento ausente, la carga NO crea los ficheros de
-  persistencia, los valores por defecto son listas vacías (no `None`) y las 10 APIs de lectura no lanzan excepción.
+persistencia, los valores por defecto son listas vacías (no `None`) y las 10 APIs de lectura no lanzan excepción.
 - ALMACENAMIENTO AUSENTE (2.8.8.9.5.1): las cuatro rutas esperadas, las cuatro ausencias informadas con su
   `reason`, la distinción `not_a_file`, el modo de SOLO LECTURA, el almacenamiento parcial y el completo, y la
-  clave `storage` de `get_engine_status()` sin alterar ninguna clave previa.
+clave `storage` de `get_engine_status()` sin alterar ninguna clave previa.
 - SECCIÓN AUSENTE (2.8.8.9.5.2): sección de DATOS y de METADATA ausentes, varias a la vez, sección presente pero
-  VACÍA (no se reporta como ausente), formato heredado (sección de DATOS presente), fichero ilegible y payload no
-  mapeo (ambos en `unreadable`), ficheros ausentes listados aparte en `missing_files`, SOLO LECTURA, y la clave
+VACÍA (no se reporta como ausente), formato heredado (sección de DATOS presente), fichero ilegible y payload no
+mapeo (ambos en `unreadable`), ficheros ausentes listados aparte en `missing_files`, SOLO LECTURA, y la clave
   `storage_sections` de `get_engine_status()` sin alterar ninguna clave previa.
 - RECUPERACIÓN: la escritura recrea el almacenamiento ausente y la sección ausente no impide la carga de los datos
-  presentes.
+presentes.
 - HALLAZGO NUEVO (contaminación de `logs/` de PRODUCCIÓN): `pytest.main.wrap_session` restaura el CWD original
   (`os.chdir(session.startpath)`) en su `finally`, y lo hace ANTES de `pytest_sessionfinish`. Los hilos vivos de
   `AdvancedLogger._log_worker` siguen escribiendo `logs/jarvis_logs.db` con ruta RELATIVA, de modo que al
-  restaurarse el CWD del repo sus escrituras caían en `logs/` de PRODUCCIÓN. Diagnostificado con
+restaurarse el CWD del repo sus escrituras caían en `logs/` de PRODUCCIÓN. Diagnostificado con
   `sys.addaudithook` sobre `sqlite3.connect`: 17.558 conexiones durante la suite, de las que 2 caían en el repo
   (las del final, con el CWD ya restaurado) y las restantes en el temporal. CORREGIDO en `tests/conftest.py` con un
   `pytest_sessionfinish` que devuelve el CWD al sandbox.
 - CORRECCIÓN DEL AISLAMIENTO DE LA SUITE (esta hoja): `tests/conftest.py` ejecuta TODA la sesión en un temporal
   (`_SANDBOX_DIR`), con `data`, `models`, `logs` y `config` dentro, de modo que ninguna ruta relativa resuelta
-  contra el CWD pueda tocar el repo; los argumentos de colección se absolutizan ANTES del cambio de CWD porque
-  pytest los resuelve de forma relativa durante la recolección, que ocurre después del hook. Además
+contra el CWD pueda tocar el repo; los argumentos de colección se absolutizan ANTES del cambio de CWD porque
+pytest los resuelve de forma relativa durante la recolección, que ocurre después del hook. Además
   `logging.raiseExceptions = False` al cerrar la sesión, porque los `__del__` de los singletons de `utils` loguean
-  a un stream de captura ya cerrado (ruido de apagado, no un fallo).
+a un stream de captura ya cerrado (ruido de apagado, no un fallo).
 - AISLAMIENTO DEL MÓDULO: los motores se crean con `data_dir` temporal y, por ambas partes, se parchean
   `_load_config` y `_save_knowledge_graph` de `SelfImprovementSystem` para redirigir sus rutas RELATIVAS
   (`data/knowledge_graph.json`, `data/learning_history.json`, `data/improvement_rules.json`,
   `models/learning_models`) a un temporal. Al importar el módulo también se redirigen las instancias vivas que el
-  paquete `utils` crea en el import (4 `SelfImprovementSystem` y un `AdaptiveLearningEngine` por cada copia del
-  paquete: `utils.*` y `src.utils.*`).
+paquete `utils` crea en el import (4 `SelfImprovementSystem` y un `AdaptiveLearningEngine` por cada copia del
+paquete: `utils.*` y `src.utils.*`).
 - TEST DE GUARDA DE PRODUCCIÓN (3 tests, dentro del mismo módulo): comprueban por sha256 que el módulo NO modifica
-  el `data/` de producción — los 4 ficheros de persistencia y los 4 ficheros de los subsistemas ajenos
+el `data/` de producción — los 4 ficheros de persistencia y los 4 ficheros de los subsistemas ajenos
   (`knowledge_graph.json`, `learning_history.json`, `improvement_rules.json`, `adaptive_performance.json`).
 - HALLAZGO DE PRODUCCIÓN: sin cambios. En `data/` siguen faltando `contextual_adaptation_rules.json` y
   `contextual_knowledge_base.json` (ausencia de FICHERO, de 2.8.8.9.5.1).
@@ -4076,21 +4072,21 @@ ARCHIVOS MODIFICADOS:
 - DOCUMENTACIÓN: `README.md`, `prompt_mejoraActual.txt`.
 TESTS Y RESULTADOS:
 - UNITARIOS: `tests/utils/contextual_adaptation_engine/test_absent_storage_and_sections.py` — 29 PASSED / 0 FAILED /
-  TOTAL 29. Cubre ausencia total, detección de almacenamiento ausente, detección de sección ausente, recuperación y
-  guarda de producción.
+TOTAL 29. Cubre ausencia total, detección de almacenamiento ausente, detección de sección ausente, recuperación y
+guarda de producción.
 - INTEGRACIÓN: el módulo se ejecuta dentro de la suite pytest y comparte el aislamiento global del `conftest.py`.
 - NO REGRESIÓN: suite completa `tests/` — 244 PASSED / 0 FAILED / TOTAL 244, frente a la baseline comparable de
-  215 PASSED / 0 FAILED de 2.8.8.9.5.3 (215 previos + 29 nuevos, 0 tests eliminados). 0 regresiones.
+215 PASSED / 0 FAILED de 2.8.8.9.5.3 (215 previos + 29 nuevos, 0 tests eliminados). 0 regresiones.
 VERIFICACIÓN:
 - SINTAXIS: `py_compile` de `tests/utils/contextual_adaptation_engine/test_absent_storage_and_sections.py` y
   `tests/conftest.py` — OK.
 - MAIN.PY: OK; `import main` completa sin error.
 - COMPORTAMIENTO / INTEGRACIÓN REAL: verificado en runtime que el motor arranca sin lanzar con el almacenamiento
-  ausente, que la carga no crea ficheros, que las lecturas devuelven los tipos declarados, que la detección no
-  escribe, que la escritura recrea el almacenamiento y que la sección ausente no impide cargar los datos presentes.
+ausente, que la carga no crea ficheros, que las lecturas devuelven los tipos declarados, que la detección no
+escribe, que la escritura recrea el almacenamiento y que la sección ausente no impide cargar los datos presentes.
 - AISLAMIENTO: (1) `sys.addaudithook` sobre `sqlite3.connect` y sobre la apertura de `.db` — 17.558 conexiones
-  durante la suite completa, TODAS resueltas en el temporal, 0 en el repo; (2) sha256 de los 8 ficheros vigilados
-  de `data/` de producción idénticos antes y después de la suite; (3) `git status` sin ninguna modificación en
+durante la suite completa, TODAS resueltas en el temporal, 0 en el repo; (2) sha256 de los 8 ficheros vigilados
+de `data/` de producción idénticos antes y después de la suite; (3) `git status` sin ninguna modificación en
   `data/`, `logs/` ni `models/`.
 DISCREPANCIAS: el antecedente de 2.8.8.9.4.6 / 2.8.8.9.5.1 (los tests que creaban el motor sin `data_dir`
 reescribían `data/knowledge_graph.json` en cada ejecución) queda CERRADO a nivel de suite: el `conftest.py` ejecuta
@@ -4102,81 +4098,80 @@ ESTADO FINAL: 2.8.8.9.5.4 - IMPLEMENTADA
 
 SIGUIENTE UNIDAD: 2.8.8.9.6.1 - IDENTIFICAR DATOS INVÁLIDOS
 
-### REGISTRO DE UNIDAD: 2.8.8.9.5.3
 FECHA: 2026-10-21
 ESTADO: IMPLEMENTADA
 OBJETIVO: Definir el comportamiento del motor de adaptación contextual cuando el almacenamiento de persistencia está ausente (2.8.8.9.5.1) o le falta una sección (2.8.8.9.5.2), manteniendo el comportamiento compatible con el sistema existente.
 TIPO DE TRABAJO: DEFINICIÓN + VERIFICACIÓN
 CAMBIOS / HALLAZGOS:
 - PRINCIPIO DECLARADO: la ausencia de datos nunca es un error fatal. El motor arranca, expone valores por
-  defecto seguros, la detección informa de la ausencia y el almacenamiento se recrea en el momento en que
-  alguien escribe.
+defecto seguros, la detección informa de la ausencia y el almacenamiento se recrea en el momento en que
+alguien escribe.
 - IMPLEMENTACIÓN: un contrato declarativo `_NO_DATA_BEHAVIOR` en `src/utils/contextual_adaptation_engine.py` y
-  su accessor `no_data_behavior()`, que devuelve una COPIA profunda. Es de SOLO LECTURA: no crea ficheros, no
-  escribe y no altera el estado del motor. El diff del motor son 94 líneas nuevas y 0 modificadas o
-  eliminadas: el cambio es puramente aditivo y NO altera ningún comportamiento previo.
+su accessor `no_data_behavior()`, que devuelve una COPIA profunda. Es de SOLO LECTURA: no crea ficheros, no
+escribe y no altera el estado del motor. El diff del motor son 94 líneas nuevas y 0 modificadas o
+eliminadas: el cambio es puramente aditivo y NO altera ningún comportamiento previo.
 - CONTENIDO DEL CONTRATO: `version`, `principle` y seis secciones — `startup` (si el arranque lanza, si crea el
   `data_dir`, si crea ficheros de persistencia y los valores por defecto), `read_apis` (las 10 APIs de lectura
-  con su tipo de retorno), `write_apis` (las 5 APIs de escritura con el fichero que crean), `detection` (qué
-  informa la detección y de que no escribe), `recovery` (que escribir recrea el almacenamiento) e `invariants`
+con su tipo de retorno), `write_apis` (las 5 APIs de escritura con el fichero que crean), `detection` (qué
+informa la detección y de que no escribe), `recovery` (que escribir recrea el almacenamiento) e `invariants`
   (4 invariantes: `read_apis_never_raise`, `detection_never_writes`, `defaults_are_empty_not_null`,
   `writes_recreate_missing_storage`).
 - PRECISIÓN DEL ALCANCE: una sección ausente solo puede darse dentro de un fichero EXISTENTE. Con el
-  almacenamiento totalmente ausente, `detect_absent_sections()` no inventa secciones: `absent` va vacío,
+almacenamiento totalmente ausente, `detect_absent_sections()` no inventa secciones: `absent` va vacío,
   `absent_count` es 0, y los 4 ficheros ausentes se listan en `missing_files` (que es la detección de
-  2.8.8.9.5.1). La detección de CORRUPCIÓN (2.8.8.9.6) y el test pytest de ausencia (2.8.8.9.5.4) NO se adelantan
-  aquí.
+2.8.8.9.5.1). La detección de CORRUPCIÓN (2.8.8.9.6) y el test pytest de ausencia (2.8.8.9.5.4) NO se adelantan
+aquí.
 - LA DECLARACIÓN NO SUSTITUYE A LA VERIFICACIÓN: la sonda contrasta el contrato contra el comportamiento
-  OBSERVADO en runtime. Si lo observado se desvía, el contraste falla y el contrato queda obsoleto: es
-  intencional, un contrato que nunca falla no prueba nada.
+OBSERVADO en runtime. Si lo observado se desvía, el contraste falla y el contrato queda obsoleto: es
+intencional, un contrato que nunca falla no prueba nada.
 - HALLAZGO DE LA VERIFICACIÓN POR MUTACIÓN: la sonda tenía DOS comprobaciones VACÍAS, que el harness de
-  mutación reveló y que se han corregido.
+mutación reveló y que se han corregido.
   (1) El arranque se contrastaba contra una EXPECTATIVA FIJA ("no crea ficheros") en vez de contra el valor
-  declarado, de modo que cambiar el contrato no la activaba. Ahora el arranque se OBSERVA y se contrasta con
+declarado, de modo que cambiar el contrato no la activaba. Ahora el arranque se OBSERVA y se contrasta con
   `startup.raises` y `startup.creates_persistence_files`.
   (2) La escritura se comprobaba con "el fichero existe", de modo que un fichero declarado que ya existía por
-  otra escritura daba un falso OK. Ahora cada API de escritura se prueba sobre un motor NUEVO, lo que permite
-  afirmar que lo CREA esa misma llamada.
+otra escritura daba un falso OK. Ahora cada API de escritura se prueba sobre un motor NUEVO, lo que permite
+afirmar que lo CREA esa misma llamada.
 - AISLAMIENTO DE LA VERIFICACIÓN: la sonda trabaja sobre directorios temporales y solo LEE el `data/` de
-  producción mediante rutas absolutas. Verificado por hash sha256 que los cuatro ficheros de persistencia y
+producción mediante rutas absolutas. Verificado por hash sha256 que los cuatro ficheros de persistencia y
   `data/knowledge_graph.json` quedan byte a byte idénticos tras la sonda.
 - HALLAZGO DE PRODUCCIÓN: sin cambios. En `data/` siguen faltando `contextual_adaptation_rules.json` y
   `contextual_knowledge_base.json` (ausencia de FICHERO, que pertenece a 2.8.8.9.5.1).
 ARCHIVOS MODIFICADOS:
 - PRODUCCIÓN: `src/utils/contextual_adaptation_engine.py`.
 - TESTS: `tests/utils/contextual_adaptation_engine/no_data_behavior_real.py` (nuevo; sonda de runtime,
-  independiente de la suite pytest).
+independiente de la suite pytest).
 - DOCUMENTACIÓN: `README.md`, `prompt_mejoraActual.txt`.
 TESTS Y RESULTADOS:
 - UNITARIOS: NO EJECUTADOS. La creación y ejecución del test pytest de almacenamiento/sección ausente
-  corresponde a la hoja 2.8.8.9.5.4 ("Crear y ejecutar únicamente tests de almacenamiento/sección ausente");
-  esta hoja no lo adelanta.
+corresponde a la hoja 2.8.8.9.5.4 ("Crear y ejecutar únicamente tests de almacenamiento/sección ausente");
+esta hoja no lo adelanta.
 - INTEGRACIÓN: `tests/utils/contextual_adaptation_engine/no_data_behavior_real.py` — 77 comprobaciones
-  OK / 0 FALLIDAS / TOTAL 77. Cubre la forma del contrato, la AUSENCIA TOTAL del almacenamiento (arranque,
-  defaults, las 10 APIs de lectura, la detección y la no escritura), la AUSENCIA PARCIAL (una sección ausente
-  dentro de un fichero existente) y la ESCRITURA y RECUPERACIÓN (cada API de escritura crea el fichero que
-  declara, y tras escribir el almacenamiento deja de reportarse como ausente con ficheros JSON válidos).
+OK / 0 FALLIDAS / TOTAL 77. Cubre la forma del contrato, la AUSENCIA TOTAL del almacenamiento (arranque,
+defaults, las 10 APIs de lectura, la detección y la no escritura), la AUSENCIA PARCIAL (una sección ausente
+dentro de un fichero existente) y la ESCRITURA y RECUPERACIÓN (cada API de escritura crea el fichero que
+declara, y tras escribir el almacenamiento deja de reportarse como ausente con ficheros JSON válidos).
 - NO VACUIDAD: `data/temp/nodata_mutation_check.py` — 4/4 mutaciones detectadas (tipo de retorno incorrecto,
   `creates_persistence_files`, fichero creado por una API de escritura y `detection_writes`) y el contrato
-  original pasa. 0 mutaciones no detectadas.
+original pasa. 0 mutaciones no detectadas.
 - NO REGRESIÓN: suite completa `tests/` — 215 PASSED / 0 FAILED / TOTAL 215, frente a la baseline comparable
-  de 215 PASSED / 0 FAILED de 2.8.8.9.5.2 (esta hoja no añade tests a la suite pytest). 0 regresiones.
+de 215 PASSED / 0 FAILED de 2.8.8.9.5.2 (esta hoja no añade tests a la suite pytest). 0 regresiones.
 VERIFICACIÓN:
 - SINTAXIS: `py_compile` de `src/utils/contextual_adaptation_engine.py` y
   `tests/utils/contextual_adaptation_engine/no_data_behavior_real.py` — OK.
 - MAIN.PY: OK; `import main` completa sin error.
 - COMPORTAMIENTO / INTEGRACIÓN REAL: verificado en runtime que el motor arranca sin lanzar con el
-  almacenamiento ausente, que la carga NO crea ficheros de persistencia, que las 10 APIs de lectura devuelven
-  el tipo declarado, que la detección no escribe, que cada API de escritura recrea el almacenamiento, y que el
+almacenamiento ausente, que la carga NO crea ficheros de persistencia, que las 10 APIs de lectura devuelven
+el tipo declarado, que la detección no escribe, que cada API de escritura recrea el almacenamiento, y que el
   `data/` de producción NO se modifica al ejecutar la sonda.
 - AISLAMIENTO: `data/temp/nodata_isolation_check.py` — sha256 de los 4 ficheros de persistencia y de
   `data/knowledge_graph.json` idénticos antes y después de la sonda. 5/5 intactos.
 DISCREPANCIAS: Se mantiene el antecedente de 2.8.8.9.4.6 / 2.8.8.9.5.1: los tests que crean el motor sin
   `data_dir` reescriben `data/knowledge_graph.json` en cada ejecución, porque
   `src/utils/self_improvement_system.py` (l. 161) usa la ruta RELATIVA fija `data/knowledge_graph.json` en
-  lugar de un `data_dir` configurable. Ese fichero pertenece al subsistema del grafo de conocimiento, no a la
-  persistencia de Goal, por lo que NO se ha corregido en esta hoja. La sonda de esta unidad no lo agrava: la
-  sonda pasa SIEMPRE un `data_dir` temporal explícito al motor, y se ha verificado por sha256 que
+lugar de un `data_dir` configurable. Ese fichero pertenece al subsistema del grafo de conocimiento, no a la
+persistencia de Goal, por lo que NO se ha corregido en esta hoja. La sonda de esta unidad no lo agrava: la
+sonda pasa SIEMPRE un `data_dir` temporal explícito al motor, y se ha verificado por sha256 que
   `data/knowledge_graph.json` NO se modifica durante la ejecución de la sonda.
 PENDIENTES: 2.8.8.9.5.4 — crear y ejecutar únicamente tests de almacenamiento/sección ausente.
 ESTADO FINAL: 2.8.8.9.5.3 — IMPLEMENTADA
@@ -4184,7 +4179,6 @@ ESTADO FINAL: 2.8.8.9.5.3 — IMPLEMENTADA
 SIGUIENTE UNIDAD: 2.8.8.9.5.4 — TEST DE AUSENCIA
 
 
-### REGISTRO DE UNIDAD: 2.8.8.9.6.1
 FECHA: 2026-10-21
 ESTADO: IMPLEMENTADA
 OBJETIVO: Determinar que constituye corrupcion segun el formato real de la persistencia del motor de adaptacion contextual, declarando un contrato normativo que la deteccion de 2.8.8.9.6.3 pueda implementar y que la sonda pueda contrastar contra el comportamiento real.
@@ -4214,7 +4208,6 @@ ESTADO FINAL: 2.8.8.9.6.1 - IMPLEMENTADA
 
 SIGUIENTE UNIDAD: 2.8.8.9.6.2 - TEST DE DATOS CORRUPTOS
 
-### REGISTRO DE UNIDAD: 2.8.8.9.6.2
 FECHA: 2026-10-21
 ESTADO: IMPLEMENTADA
 OBJETIVO: Crear unicamente el caso de corrupcion, materializando para cada una de las 27 clases declaradas en 2.8.8.9.6.1 un escenario real de dato corrupto y fijando el CONTRATO de rechazo que la deteccion de 2.8.8.9.6.3 debera satisfacer.
@@ -4244,7 +4237,6 @@ ESTADO FINAL: 2.8.8.9.6.2 - IMPLEMENTADA
 
 SIGUIENTE UNIDAD: 2.8.8.9.6.3 - IMPLEMENTAR DETECCIÓN
 
-### REGISTRO DE UNIDAD: 2.8.8.9.6.3
 FECHA: 2026-10-21
 ESTADO: IMPLEMENTADA
 OBJETIVO: Implementar unicamente la deteccion de corrupcion de los 4 ficheros de persistencia del motor de adaptacion contextual, de modo que el dato que se aparta del FORMATO REAL no se use como si fuera valido, cumpliendo el CONTRATO DE RECHAZO fijado en 2.8.8.9.6.2.
@@ -4277,7 +4269,6 @@ ESTADO FINAL: 2.8.8.9.6.3 - IMPLEMENTADA
 
 SIGUIENTE UNIDAD: 2.8.8.9.7.1 - IDENTIFICAR DATOS RECUPERABLES
 
-### REGISTRO DE UNIDAD: 2.8.8.9.6.4
 FECHA: 2026-10-21
 ESTADO: IMPLEMENTADA
 OBJETIVO: Verificar en runtime que los datos corruptos no se usan como si fueran validos, es decir, que el rechazo de 2.8.8.9.6.3 se produce de hecho y no solo esta declarado, y que es selectivo.
@@ -4313,7 +4304,6 @@ ESTADO FINAL: 2.8.8.9.6.4 - IMPLEMENTADA
 
 SIGUIENTE UNIDAD: 2.8.8.9.7.2 - IMPLEMENTAR RECUPERACIÓN PARCIAL
 
-### REGISTRO DE UNIDAD: 2.8.8.9.7.1
 FECHA: 2026-10-21
 ESTADO: IMPLEMENTADA
 OBJETIVO: Determinar qué datos válidos pueden conservarse cuando una parte está corrupta: declarar el contrato de lo recuperable y medir en runtime cuánto de ese dato se pierde hoy al rechazar una corrupción.
@@ -4349,7 +4339,6 @@ ESTADO FINAL: 2.8.8.9.7.1 - IMPLEMENTADA
 
 SIGUIENTE UNIDAD: 2.8.8.9.7.2 - IMPLEMENTAR RECUPERACIÓN PARCIAL
 
-### REGISTRO DE UNIDAD: 2.8.8.9.7.2
 FECHA: 2026-10-21
 ESTADO: IMPLEMENTADA
 OBJETIVO: Recuperar únicamente los datos que realmente puedan recuperarse cuando una parte está corrupta, aplicando el contrato declarado por 2.8.8.9.7.1, sin inventar datos y sin reescribir el fichero.
@@ -4380,7 +4369,6 @@ ESTADO FINAL: 2.8.8.9.7.2 - IMPLEMENTADA
 
 SIGUIENTE UNIDAD: 2.8.8.9.7.3 - TEST DE RECUPERACIÓN PARCIAL
 
-### REGISTRO DE UNIDAD: 2.8.8.9.7.3
 FECHA: 2026-10-21
 ESTADO: IMPLEMENTADA
 OBJETIVO: Probar únicamente el comportamiento de la recuperación parcial implementado en 2.8.8.9.7.2.
@@ -4407,3 +4395,15 @@ VERIFICACION:
 DISCREPANCIAS: ninguna. La recuperacion implementada en 7.2 cumple lo declarado en 7.1 y el contrato de 6.2 no se relaja.
 PENDIENTES: 2.8.8.9.8.1 - definir el fallback existente.
 ESTADO FINAL: 2.8.8.9.7.3 - IMPLEMENTADA
+### REGISTRO DE UNIDAD: 2.8.8.9.4.6
+### REGISTRO DE UNIDAD: 2.8.8.9.5.1
+### REGISTRO DE UNIDAD: 2.8.8.9.5.2
+### REGISTRO DE UNIDAD: 2.8.8.9.5.4
+### REGISTRO DE UNIDAD: 2.8.8.9.5.3
+### REGISTRO DE UNIDAD: 2.8.8.9.6.1
+### REGISTRO DE UNIDAD: 2.8.8.9.6.2
+### REGISTRO DE UNIDAD: 2.8.8.9.6.3
+### REGISTRO DE UNIDAD: 2.8.8.9.6.4
+### REGISTRO DE UNIDAD: 2.8.8.9.7.1
+### REGISTRO DE UNIDAD: 2.8.8.9.7.2
+### REGISTRO DE UNIDAD: 2.8.8.9.7.3
