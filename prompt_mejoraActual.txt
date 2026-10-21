@@ -1,8 +1,14 @@
 ESTADO PERSISTENTE ACTUAL
 CURRENT_PHASE: 2.8.8
-CURRENT_WORK_UNIT: 2.8.8.9.5.4
+CURRENT_WORK_UNIT: 2.8.8.9.6.1
 CURRENT_WORK_STATUS: EN PROCESO
-LAST_COMPLETED_UNIT: 2.8.8.9.5.3
+LAST_COMPLETED_UNIT: 2.8.8.9.5.4
+
+# COMPLETADO: 2.8.8.9.5.4 - Test de ausencia
+# Fecha: 2026-10-21
+# Archivo modificado: tests/utils/contextual_adaptation_engine/test_absent_storage_and_sections.py (nuevo), tests/conftest.py, README.md, prompt_mejoraActual.txt
+# Resultado: creado y ejecutado el ÚNICO test pytest de almacenamiento/sección ausente, en un único módulo nuevo de 29 tests (`tests/utils/contextual_adaptation_engine/test_absent_storage_and_sections.py`) que cubre la AUSENCIA TOTAL (el motor arranca sin lanzar, la carga NO crea ficheros de persistencia, los valores por defecto no son nulos y las 10 APIs de lectura no lanzan), la DETECCIÓN DE ALMACENAMIENTO AUSENTE (2.8.8.9.5.1: las cuatro rutas esperadas, las cuatro ausencias informadas con su `reason`, la ruta que no es un fichero, el modo de solo lectura, el almacenamiento parcial y completo y las claves nuevas de `get_engine_status()` sin alterar ninguna previa), la DETECCIÓN DE SECCIÓN AUSENTE (2.8.8.9.5.2: sección de DATOS y de METADATA ausentes, varias ausentes a la vez, sección presente pero vacía, formato heredado, fichero ilegible, payload que no es un mapeo, ficheros ausentes listados aparte en `missing_files` y el modo de solo lectura) y la RECUPERACIÓN (la escritura recrea el almacenamiento ausente y la sección ausente no impide cargar los datos presentes); el módulo incorpora además un TEST DE GUARDA propio que comprueba por sha256 que los 4 ficheros de persistencia y los 4 ficheros de los subsistemas ajenos de `data/` de PRODUCCIÓN no cambian al ejecutarse, y aisla por parcheo las rutas RELATIVAS de los subsistemas ajenos (`data/knowledge_graph.json`, `data/learning_history.json`, `data/improvement_rules.json`, `models/learning_models`) que escribían en el `data/` real desde hilos asíncronos
+# Estado real: 29/29 PASSED / 0 FAILED (módulo nuevo), 244 PASSED / 0 FAILED en la suite completa (baseline comparable de 215 de 2.8.8.9.5.3 + 29 tests nuevos, 0 regresiones); el `data/` y el `logs/` de producción NO se modifican (sha256 idéntico en los 8 ficheros vigilados, 0 escrituras en el repo verificadas con `sys.addaudithook` sobre `sqlite3.connect`)
 
 # COMPLETADO: 2.8.8.9.5.3 - Definir comportamiento sin datos
 # Fecha: 2026-10-21
@@ -1386,8 +1392,42 @@ Hoy `learning_results` se escribe verbatim (l. 2475) y no hay ningún contador d
 - HALLAZGO DE PRODUCCIÓN: sin cambios. En `data/` siguen faltando `contextual_adaptation_rules.json` y
   `contextual_knowledge_base.json` (ausencia de FICHERO, de 2.8.8.9.5.1).
 
-2.8.8.9.5.4 — TEST DE AUSENCIA
+2.8.8.9.5.4 — TEST DE AUSENCIA [IMPLEMENTADA]
 - Crear y ejecutar únicamente tests de almacenamiento/sección ausente.
+- TEST PYTEST: `tests/utils/contextual_adaptation_engine/test_absent_storage_and_sections.py` (nuevo) — 29 tests
+  en un ÚNICO módulo, que es lo que pedía la hoja: tests de almacenamiento/sección ausente y NADA más. No se toca
+  el motor de producción en esta hoja: es una hoja de VERIFICACIÓN.
+- AUSENCIA TOTAL (comportamiento sin datos): el motor arranca sin lanzar, la carga NO crea los ficheros de
+  persistencia ausentes, los valores por defecto no son nulos (lista vacía, no `None`) y las 10 APIs de lectura no
+  lanzan excepción.
+- DETECCIÓN DE ALMACENAMIENTO AUSENTE (2.8.8.9.5.1): `expected_storage_paths()` declara las cuatro rutas, la
+  detección informa de las cuatro ausencias con su `reason`, distingue la ruta que no es un fichero, es de SOLO
+  LECTURA, y se contrasta con el almacenamiento parcial y con el completo; `get_engine_status()` expone la
+  detección en la clave `storage` y conserva todas las claves previas.
+- DETECCIÓN DE SECCIÓN AUSENTE (2.8.8.9.5.2): sección de DATOS ausente, sección de METADATA ausente, varias
+  ausentes a la vez en el mismo fichero, sección presente pero VACÍA (no se reporta como ausente), formato heredado
+  (la sección de DATOS se considera presente), fichero ilegible y payload que no es un mapeo (ambos en
+  `unreadable`, no como sección ausente), y los ficheros ausentes listados aparte en `missing_files`; la detección es
+  de SOLO LECTURA y `get_engine_status()` expone el resultado en `storage_sections` sin alterar claves previas.
+- RECUPERACIÓN: la escritura recrea el almacenamiento ausente y la sección ausente no impide la carga de los datos
+  presentes.
+- TEST DE GUARDA DE PRODUCCIÓN (dentro del mismo módulo): 3 tests comprueban por sha256 que el propio módulo NO
+  modifica el `data/` de producción — los 4 ficheros de persistencia y los 4 ficheros de los subsistemas ajenos
+  (`knowledge_graph.json`, `learning_history.json`, `improvement_rules.json`, `adaptive_performance.json`).
+- AISLAMIENTO DEL MÓDULO: los motores se crean con `data_dir` temporal y, además, se parchean por ambas partes
+  (`_load_config` y `_save_knowledge_graph`) las rutas RELATIVAS de `SelfImprovementSystem`, que escribe
+  `data/knowledge_graph.json` desde un hilo asíncrono y contaminaba el `data/` real. Al importar el módulo también
+  se redirigen las instancias vivas que el paquete `utils` crea en el import.
+- AISLAMIENTO DE LA SUITE (corregido en esta hoja): `tests/conftest.py` ejecuta TODA la sesión en un temporal
+  (`_SANDBOX_DIR`), de modo que ninguna ruta relativa resuelta contra el CWD pueda tocar el repo; y
+  `pytest_sessionfinish` vuelve al sandbox porque `pytest.main.wrap_session` restaura el CWD original en su
+  `finally` ANTES de ese hook, con lo que los hilos vivos de `AdvancedLogger` escribían `logs/jarvis_logs.db` en el
+  repo de producción. Verificado con `sys.addaudithook`: 17.558 conexiones `sqlite3.connect` durante la suite, todas
+  resueltas en el temporal, 0 en el repo.
+- HALLAZGO DE PRODUCCIÓN: sin cambios. En `data/` siguen faltando `contextual_adaptation_rules.json` y
+  `contextual_knowledge_base.json` (ausencia de FICHERO, de 2.8.8.9.5.1).
+- ESTADO: 29/29 PASSED en el módulo; 244 PASSED / 0 FAILED en la suite completa (215 de 2.8.8.9.5.3 + 29 nuevos,
+  0 regresiones). La detección de CORRUPCIÓN (2.8.8.9.6) NO se adelanta aquí.
 
 2.8.8.9.6 — DETECCIÓN DE CORRUPCIÓN
 
@@ -3847,6 +3887,83 @@ PENDIENTES: 2.8.8.9.5.4 — crear y ejecutar únicamente tests de almacenamiento
 ESTADO FINAL: 2.8.8.9.5.3 — IMPLEMENTADA
 
 SIGUIENTE UNIDAD: 2.8.8.9.5.4 — TEST DE AUSENCIA
+
+### REGISTRO DE UNIDAD: 2.8.8.9.5.4
+FECHA: 2026-10-21
+ESTADO: IMPLEMENTADA
+OBJETIVO: Crear y ejecutar únicamente tests de almacenamiento/sección ausente, cerrando con la suite pytest la verificación de la ausencia de datos detectada en 2.8.8.9.5.1 (fichero ausente) y 2.8.8.9.5.2 (sección ausente), y declaradas en 2.8.8.9.5.3.
+TIPO DE TRABAJO: TEST (verificación; no se modifica el motor de producción)
+CAMBIOS / HALLAZGOS:
+- UN ÚNICO MÓDULO, 29 TESTS: `tests/utils/contextual_adaptation_engine/test_absent_storage_and_sections.py`. Es
+  la primera hoja de esta fase que deja de añadir sondas de runtime sueltas y consolida la cobertura en la suite
+  pytest.
+- AUSENCIA TOTAL: el motor arranca sin lanzar con el almacenamiento ausente, la carga NO crea los ficheros de
+  persistencia, los valores por defecto son listas vacías (no `None`) y las 10 APIs de lectura no lanzan excepción.
+- ALMACENAMIENTO AUSENTE (2.8.8.9.5.1): las cuatro rutas esperadas, las cuatro ausencias informadas con su
+  `reason`, la distinción `not_a_file`, el modo de SOLO LECTURA, el almacenamiento parcial y el completo, y la
+  clave `storage` de `get_engine_status()` sin alterar ninguna clave previa.
+- SECCIÓN AUSENTE (2.8.8.9.5.2): sección de DATOS y de METADATA ausentes, varias a la vez, sección presente pero
+  VACÍA (no se reporta como ausente), formato heredado (sección de DATOS presente), fichero ilegible y payload no
+  mapeo (ambos en `unreadable`), ficheros ausentes listados aparte en `missing_files`, SOLO LECTURA, y la clave
+  `storage_sections` de `get_engine_status()` sin alterar ninguna clave previa.
+- RECUPERACIÓN: la escritura recrea el almacenamiento ausente y la sección ausente no impide la carga de los datos
+  presentes.
+- HALLAZGO NUEVO (contaminación de `logs/` de PRODUCCIÓN): `pytest.main.wrap_session` restaura el CWD original
+  (`os.chdir(session.startpath)`) en su `finally`, y lo hace ANTES de `pytest_sessionfinish`. Los hilos vivos de
+  `AdvancedLogger._log_worker` siguen escribiendo `logs/jarvis_logs.db` con ruta RELATIVA, de modo que al
+  restaurarse el CWD del repo sus escrituras caían en `logs/` de PRODUCCIÓN. Diagnostificado con
+  `sys.addaudithook` sobre `sqlite3.connect`: 17.558 conexiones durante la suite, de las que 2 caían en el repo
+  (las del final, con el CWD ya restaurado) y las restantes en el temporal. CORREGIDO en `tests/conftest.py` con un
+  `pytest_sessionfinish` que devuelve el CWD al sandbox.
+- CORRECCIÓN DEL AISLAMIENTO DE LA SUITE (esta hoja): `tests/conftest.py` ejecuta TODA la sesión en un temporal
+  (`_SANDBOX_DIR`), con `data`, `models`, `logs` y `config` dentro, de modo que ninguna ruta relativa resuelta
+  contra el CWD pueda tocar el repo; los argumentos de colección se absolutizan ANTES del cambio de CWD porque
+  pytest los resuelve de forma relativa durante la recolección, que ocurre después del hook. Además
+  `logging.raiseExceptions = False` al cerrar la sesión, porque los `__del__` de los singletons de `utils` loguean
+  a un stream de captura ya cerrado (ruido de apagado, no un fallo).
+- AISLAMIENTO DEL MÓDULO: los motores se crean con `data_dir` temporal y, por ambas partes, se parchean
+  `_load_config` y `_save_knowledge_graph` de `SelfImprovementSystem` para redirigir sus rutas RELATIVAS
+  (`data/knowledge_graph.json`, `data/learning_history.json`, `data/improvement_rules.json`,
+  `models/learning_models`) a un temporal. Al importar el módulo también se redirigen las instancias vivas que el
+  paquete `utils` crea en el import (4 `SelfImprovementSystem` y un `AdaptiveLearningEngine` por cada copia del
+  paquete: `utils.*` y `src.utils.*`).
+- TEST DE GUARDA DE PRODUCCIÓN (3 tests, dentro del mismo módulo): comprueban por sha256 que el módulo NO modifica
+  el `data/` de producción — los 4 ficheros de persistencia y los 4 ficheros de los subsistemas ajenos
+  (`knowledge_graph.json`, `learning_history.json`, `improvement_rules.json`, `adaptive_performance.json`).
+- HALLAZGO DE PRODUCCIÓN: sin cambios. En `data/` siguen faltando `contextual_adaptation_rules.json` y
+  `contextual_knowledge_base.json` (ausencia de FICHERO, de 2.8.8.9.5.1).
+ARCHIVOS MODIFICADOS:
+- PRODUCCIÓN: ninguno. `src/utils/contextual_adaptation_engine.py` NO se modifica en esta hoja.
+- TESTS: `tests/utils/contextual_adaptation_engine/test_absent_storage_and_sections.py` (nuevo; 29 tests) y
+  `tests/conftest.py` (sandbox de CWD de toda la sesión, `pytest_sessionfinish` y silenciado del ruido de apagado).
+- DOCUMENTACIÓN: `README.md`, `prompt_mejoraActual.txt`.
+TESTS Y RESULTADOS:
+- UNITARIOS: `tests/utils/contextual_adaptation_engine/test_absent_storage_and_sections.py` — 29 PASSED / 0 FAILED /
+  TOTAL 29. Cubre ausencia total, detección de almacenamiento ausente, detección de sección ausente, recuperación y
+  guarda de producción.
+- INTEGRACIÓN: el módulo se ejecuta dentro de la suite pytest y comparte el aislamiento global del `conftest.py`.
+- NO REGRESIÓN: suite completa `tests/` — 244 PASSED / 0 FAILED / TOTAL 244, frente a la baseline comparable de
+  215 PASSED / 0 FAILED de 2.8.8.9.5.3 (215 previos + 29 nuevos, 0 tests eliminados). 0 regresiones.
+VERIFICACIÓN:
+- SINTAXIS: `py_compile` de `tests/utils/contextual_adaptation_engine/test_absent_storage_and_sections.py` y
+  `tests/conftest.py` — OK.
+- MAIN.PY: OK; `import main` completa sin error.
+- COMPORTAMIENTO / INTEGRACIÓN REAL: verificado en runtime que el motor arranca sin lanzar con el almacenamiento
+  ausente, que la carga no crea ficheros, que las lecturas devuelven los tipos declarados, que la detección no
+  escribe, que la escritura recrea el almacenamiento y que la sección ausente no impide cargar los datos presentes.
+- AISLAMIENTO: (1) `sys.addaudithook` sobre `sqlite3.connect` y sobre la apertura de `.db` — 17.558 conexiones
+  durante la suite completa, TODAS resueltas en el temporal, 0 en el repo; (2) sha256 de los 8 ficheros vigilados
+  de `data/` de producción idénticos antes y después de la suite; (3) `git status` sin ninguna modificación en
+  `data/`, `logs/` ni `models/`.
+DISCREPANCIAS: el antecedente de 2.8.8.9.4.6 / 2.8.8.9.5.1 (los tests que creaban el motor sin `data_dir`
+reescribían `data/knowledge_graph.json` en cada ejecución) queda CERRADO a nivel de suite: el `conftest.py` ejecuta
+toda la sesión en un temporal, de modo que ninguna ruta relativa puede tocar el repo, y este módulo añade además su
+propio parcheo de las rutas relativas de los subsistemas ajenos. La verificación pytest de la ausencia, que era lo
+que quedaba pendiente, es precisamente lo que esta hoja entrega.
+PENDIENTES: 2.8.8.9.6.1 - determinar qué constituye corrupción según el formato real.
+ESTADO FINAL: 2.8.8.9.5.4 - IMPLEMENTADA
+
+SIGUIENTE UNIDAD: 2.8.8.9.6.1 - IDENTIFICAR DATOS INVÁLIDOS
 
 ### REGISTRO DE UNIDAD: 2.8.8.9.5.3
 FECHA: 2026-10-21
