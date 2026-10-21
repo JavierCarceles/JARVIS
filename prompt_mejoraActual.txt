@@ -1,8 +1,14 @@
 ESTADO PERSISTENTE ACTUAL
 CURRENT_PHASE: 2.8.8
-CURRENT_WORK_UNIT: 2.8.8.9.7.1
+CURRENT_WORK_UNIT: 2.8.8.9.7.2
 CURRENT_WORK_STATUS: PENDIENTE
-LAST_COMPLETED_UNIT: 2.8.8.9.6.4
+LAST_COMPLETED_UNIT: 2.8.8.9.7.1
+
+# COMPLETADO: 2.8.8.9.7.1 - Identificar datos recuperables
+# Fecha: 2026-10-21
+# Archivo modificado: src/utils/contextual_adaptation_engine.py, tests/utils/contextual_adaptation_engine/identify_recoverable_real.py (nuevo), tests/utils/contextual_adaptation_engine/test_2_8_8_9_7_1_recoverable.py (nuevo), tests/utils/contextual_adaptation_engine/mutation_check_2_8_8_9_7_1.py (nuevo), README.md, prompt_mejoraActual.txt
+# Resultado: declarado el CONTRATO de lo que es DATO RECUPERABLE y MEDIDO en RUNTIME cuanto de ese dato se pierde hoy al rechazar una corrupcion, sin tocar la DECLARACION de 6.1, ni la DETECCION de 6.3, ni el RECHAZO verificado de 6.4: `recoverable_data()` expone en el motor una declaracion NORMATIVA y DECLARATIVA de las 27 clases de corrupcion, cada una con QUE dato es recuperable, A QUE NIVEL y CON QUE POLITICA; el contrato incluye 7 NIVELES (`fichero`, `bloque`, `seccion`, `grupo`, `fila`, `entrada`, `campo`), 5 POLITICAS (`none`, `preserve_siblings`, `default_the_field`, `keep_valid_elements`, `adapt_container`), un vocabulario cerrado de 4 TOKENS de lo recuperable (`siblings`, `row_fields`, `elements`, `container_values`), el valor por DEFECTO de los 15 campos de una fila de regla segun el FORMATO REAL, la EXCEPCION conservadora de `enabled` (recuperar con `True` ACTIVARIA una regla cuyo estado se desconoce) y la REGLA DE INDEPENDENCIA (dos unidades son independientes si la ruta de una NO es prefijo de la ruta de la otra); el PRINCIPIO es que una corrupcion rechaza SOLO la unidad que corrompe y que la recuperacion NO inventa datos: el campo corrupto toma el valor por DEFECTO del formato y el resto de la unidad se conserva integro; la MEDICION la hace una sonda independiente (`identify_recoverable_real.py`) con sus PROPIOS 27 escenarios y sus PROPIOS instrumentos, que por clase comprueba que el dato corrupto NO llega al estado, que las unidades declaradas recuperables LLEGAN, que el campo corrupto toma su valor por DEFECTO, que lo declarado coincide con lo OBSERVADO y que se respeta la REGLA DE INDEPENDENCIA; el resultado se fija como test pytest permanente (`test_2_8_8_9_7_1_recoverable.py`, 88 tests) y como banco de mutacion (`mutation_check_2_8_8_9_7_1.py`, 6 mutaciones)
+# Estado real: 0 comprobaciones fallidas y 20 HALLAZGOS (dato recuperable perdido) en la sonda, 13 de las 27 clases con dato recuperable PERDIDO en runtime (11 por perder los CAMPOS VALIDOS de la fila corrompida, 7 por perder las unidades INDEPENDIENTES que la acompanan, 1 por perder el VALOR VALIDO de un mapeo reconstruible y 1 por perder los ELEMENTOS validos de un campo de lista), 13 clases ya RECUPERADAS y 1 sin nada recuperable (`knowledge_base.data_not_mapping`), 88 PASSED / 0 FAILED en el modulo de test de 7.1, 471 PASSED / 0 FAILED en la suite completa `tests/utils/contextual_adaptation_engine/` (383 previos + 88 nuevos, 0 regresiones), 6/6 mutaciones detectadas por `mutation_check_2_8_8_9_7_1.py` (las mutaciones del motor se aplican a una COPIA de `src/` en un temporal) y los 4 ficheros de persistencia del `data/` de produccion intactos
 
 # COMPLETADO: 2.8.8.9.6.4 - Verificar rechazo
 # Fecha: 2026-10-21
@@ -4280,5 +4286,41 @@ VERIFICACION:
 - AISLAMIENTO: el `data/` de produccion NO se modifica (la sonda y los tests usan `data_dir` temporal); los 4 ficheros de persistencia de produccion quedan byte a byte iguales (git limpio) y el motor se restaura byte a byte tras el banco de mutacion.
 - COMPORTAMIENTO REAL: sonda ejecutada de forma independiente (`python tests/utils/contextual_adaptation_engine/verify_rejection_real.py`): 0 comprobaciones fallidas, 0 hallazgos, codigo de salida 0.
 DISCREPANCIAS: ninguna. Los 17 tests RED de 6.2 siguen pasando por IMPLEMENTACION de la deteccion de 6.3, no por relajacion del contrato.
-PENDIENTES: 2.8.8.9.7.1 - identificar datos recuperables.
+PENDIENTES: 2.8.8.9.7.2 - implementar recuperacion parcial.
 ESTADO FINAL: 2.8.8.9.6.4 - IMPLEMENTADA
+
+SIGUIENTE UNIDAD: 2.8.8.9.7.2 - IMPLEMENTAR RECUPERACIÓN PARCIAL
+
+### REGISTRO DE UNIDAD: 2.8.8.9.7.1
+FECHA: 2026-10-21
+ESTADO: IMPLEMENTADA
+OBJETIVO: Determinar qué datos válidos pueden conservarse cuando una parte está corrupta: declarar el contrato de lo recuperable y medir en runtime cuánto de ese dato se pierde hoy al rechazar una corrupción.
+TIPO DE TRABAJO: DECLARACIÓN + VERIFICACIÓN
+CAMBIOS / HALLAZGOS:
+- CONTRATO DECLARADO (produccion): `src/utils/contextual_adaptation_engine.py` expone `recoverable_data()`, de SOLO LECTURA, que declara para las 27 clases de corrupcion QUE dato es recuperable, A QUE NIVEL y CON QUE POLITICA. Vocabularios cerrados: 7 NIVELES (`fichero`, `bloque`, `seccion`, `grupo`, `fila`, `entrada`, `campo`), 5 POLITICAS (`none`, `preserve_siblings`, `default_the_field`, `keep_valid_elements`, `adapt_container`) y 4 TOKENS de lo recuperable (`siblings`, `row_fields`, `elements`, `container_values`). El contrato ancla el valor por DEFECTO de los 15 campos de una fila de regla en el FORMATO REAL, declara la EXCEPCION conservadora de `enabled` (el cargador usa `True`, pero recuperar con `True` ACTIVARIA una regla cuyo estado se desconoce) y enuncia la REGLA DE INDEPENDENCIA: dos unidades son independientes si la ruta de una NO es un prefijo de la ruta de la otra.
+- PRINCIPIO: una corrupcion rechaza SOLO la unidad que corrompe; todo lo demas que el FORMATO REAL declara valido y que NO depende de la unidad corrupta debe SOBREVIVIR. La recuperacion NO inventa datos: el campo corrupto toma el valor por DEFECTO del formato y el resto de la unidad se conserva integro.
+- INSTRUMENTO INDEPENDIENTE: la sonda `identify_recoverable_real.py` NO reutiliza el registro de escenarios de "Criterios de corrupcion" ni el de "Verificacion del rechazo": define sus PROPIOS 27 escenarios y sus PROPIOS instrumentos de observacion, de modo que la medicion no comparta puntos ciegos con quien declara.
+- MEDIDO POR CLASE (27): (a) el dato corrupto NO llega al ESTADO OPERATIVO; (b) las unidades declaradas recuperables LLEGAN; (c) el campo corrupto toma su valor por DEFECTO declarado; (d) lo declarado coincide con lo OBSERVADO (nivel, politica, tokens y valores por defecto); (e) se respeta la REGLA DE INDEPENDENCIA (una unidad corrupta no determina el valor de una independiente).
+- HALLAZGO REAL: 13 de las 27 clases PERDER en runtime un dato que el contrato declara recuperable (20 hallazgos). Se reparte en: los CAMPOS VALIDOS de la fila corrompida (11 clases de `adaptation_rules`, 11 hallazgos), las unidades INDEPENDIENTES que acompanan a la unidad corrompida (7 hallazgos: las 2 filas sanas de `execution_count_not_castable`, las 2 de `metadata_not_mapping`, las 2 de `priority_not_castable` y el grupo `idle` de `context_patterns` en `knowledge_base.section_partial`), el VALOR VALIDO de un mapeo reconstruible (`rules_wrong_type`, 1) y los ELEMENTOS validos de un campo de lista (`trigger_invalid_value`, 1). 13 clases se recuperan ya y 1 (`knowledge_base.data_not_mapping`) no tiene nada recuperable.
+- HALLAZGO PROPIO, CORREGIDO: la comprobacion de que el dato corrupto no llega al estado buscaba el SENTINELA de forma LITERAL, de modo que una corrupcion COERCIONADA que el cargador trocea (por ejemplo `list("SENTINELA...")`, que deja los caracteres sueltos en el estado) pasaba inadvertida. Anadida la comprobacion en PROYECCION (solo letras, digitos y guion bajo), que ve la marca troceada. Sin ella, el banco de mutacion detectaba 5 de las 6 corrupciones de campo, no 6.
+- NO VACUO: cuatro CONTROLES (datos sanos, sentinela inexistente, perdida real y fila intacta) exigen que la medicion discrimina, de modo que una sonda que no mirase el estado pasaria todas sus comprobaciones sin comprobar nada.
+- AISLAMIENTO: todos los motores se crean con `data_dir` temporal y la sonda se ejecuta con el CWD en un temporal, de modo que las rutas RELATIVAS de los subsistemas ajenos (`data/knowledge_graph.json`, `data/improvement_rules.json`, `models/...`) caen en el temporal y no en el repo. La sonda incluye ademas un TEST DE GUARDA por sha256 de los 4 ficheros de persistencia de produccion, y se verifico que el `logs/jarvis_logs.db` de produccion queda byte a byte igual al ejecutar la sonda.
+- BANCO DE MUTACION: `mutation_check_2_8_8_9_7_1.py` aplica 6 mutaciones (4 sobre el CONTRATO: una clase de corrupcion sin declarar, el valor por defecto de `enabled` no conservador, la REGLA DE INDEPENDENCIA ausente, un valor por defecto que no respeta el TIPO del formato; 2 sobre el MOTOR: las reglas dejan de detectar la desviacion de formato, una seccion corrupta de la base se aplica al estado) y exige que la sonda falle en cada una: 6/6 detectadas. Las mutaciones del motor se aplican a una COPIA del arbol `src/` en un temporal, de modo que el repositorio nunca se toca.
+- ALCANCE: esta unidad DECLARA el contrato y MIDE la distancia hasta el runtime. NO implementa la recuperacion (eso es 2.8.8.9.7.2): los 20 hallazgos son el INVENTARIO de lo que queda por implementar, no un defecto del motor detectado por esta sonda.
+ARCHIVOS MODIFICADOS:
+- PRODUCCION: `src/utils/contextual_adaptation_engine.py` (nuevo `recoverable_data()` y la declaracion `_RECOVERABLE_DATA`; 286 inserciones y 0 borrados, sin tocar la DETECCION de 6.3 ni la DECLARACION de 6.1).
+- TESTS: `tests/utils/contextual_adaptation_engine/identify_recoverable_real.py` (nuevo; sonda de 7.1, partes A-E), `tests/utils/contextual_adaptation_engine/test_2_8_8_9_7_1_recoverable.py` (nuevo; 88 tests, carga la sonda por RUTA), `tests/utils/contextual_adaptation_engine/mutation_check_2_8_8_9_7_1.py` (nuevo; banco de mutacion).
+- DOCUMENTACION: `README.md`, `prompt_mejoraActual.txt`.
+TESTS Y RESULTADOS:
+- UNITARIOS: `tests/utils/contextual_adaptation_engine/test_2_8_8_9_7_1_recoverable.py` - 88 PASSED / 0 FAILED (3 de forma del contrato, incluida la cobertura de las 27 clases, 27 de dato corrupto que no llega al estado, 27 de medicion coincidente con lo declarado, 27 de lo que cada clase declara recuperable y 4 de no-vacuidad y guarda de produccion).
+- INTEGRACION: suite de `tests/utils/contextual_adaptation_engine/` - 471 PASSED / 0 FAILED, 41 subtests, 0 regresiones (baseline comparable de 383 de 2.8.8.9.6.4 + 88 nuevos).
+- SONDAS: `identify_recoverable_real.py` (7.1) - 0 comprobaciones fallidas, 20 hallazgos (dato recuperable perdido).
+- MUTACION: `mutation_check_2_8_8_9_7_1.py` - 6/6 mutaciones DETECTADA, 0 insensibles.
+VERIFICACION:
+- SINTAXIS: `py_compile` de los 3 ficheros nuevos - OK.
+- NO VACIO: verificado por control con payload valido (4/4) y por mutacion (6/6).
+- AISLAMIENTO: el `data/` de produccion NO se modifica (la sonda y los tests usan `data_dir` temporal); los 4 ficheros de persistencia de produccion quedan byte a byte iguales (git limpio) y el `logs/jarvis_logs.db` queda igual al ejecutar la sonda.
+- COMPORTAMIENTO REAL: sonda ejecutada de forma independiente (`python tests/utils/contextual_adaptation_engine/identify_recoverable_real.py`): 0 comprobaciones fallidas, 20 hallazgos, codigo de salida 0.
+DISCREPANCIAS: ninguna. El contrato de 7.1 no relaja el de 6.2: los 5 efectos inseguros siguen prohibidos y los 3 seguros siguen admitidos.
+PENDIENTES: 2.8.8.9.7.2 - implementar recuperacion parcial.
+ESTADO FINAL: 2.8.8.9.7.1 - IMPLEMENTADA

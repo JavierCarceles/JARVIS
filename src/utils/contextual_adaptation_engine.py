@@ -3521,6 +3521,268 @@ class ContextualAdaptationEngine:
         ],
     }
 
+    # ============================================== DATOS RECUPERABLES (2.8.8.9.7.1)
+    #
+    # La DETECCION de 2.8.8.9.6.3 evita que el dato corrupto se use, pero el
+    # rechazo de una unidad no tiene por que arrastrar a las unidades
+    # INDEPENDIENTES que la acompanan. Este contrato declara, para cada clase
+    # de corrupcion, QUE dato es recuperable, A QUE NIVEL y CON QUE POLITICA.
+    #
+    # La recuperacion NO inventa datos: el campo corrupto toma el valor por
+    # DEFECTO que el FORMATO REAL declara y el resto de la unidad se conserva
+    # integro. La IMPLEMENTACION de esta recuperacion es 2.8.8.9.7.2; esta hoja
+    # DECLARA el contrato y lo CONTRASTA contra el runtime.
+    _RECOVERABLE_DATA: Dict[str, Any] = {
+        "version": "2.8.8.9.7.1",
+        "principle": (
+            "Una corrupcion rechaza SOLO la unidad que corrompe. Todo lo demas que el "
+            "FORMATO REAL declara valido y que NO depende de la unidad corrupta debe "
+            "SOBREVIVIR. La recuperacion NO inventa datos: el campo corrupto toma el valor "
+            "por DEFECTO del formato y el resto de la unidad se conserva integro."
+        ),
+        # NIVELES: la jerarquia de la unidad que se puede recuperar. Un nivel mas
+        # alto contiene a los mas bajos: `campo` esta dentro de `fila`, `fila`
+        # dentro de `bloque`/`seccion`, y todo dentro de `fichero`.
+        "levels": {
+            "fichero": "el fichero de persistencia completo",
+            "bloque": "un bloque de primer nivel del fichero (`rules`, `data`)",
+            "seccion": "una seccion de la base o del fichero (`context_patterns`, `learning_results`...)",
+            "grupo": "un grupo indexado por contexto dentro de una seccion (`context_patterns.<contexto>`)",
+            "fila": "un registro de una lista (`rules[]`, `goal_adaptation_feedback[]`...)",
+            "entrada": "una entrada de un indice (`adaptation_strategies.<strategy_id>`)",
+            "campo": "un campo de un registro",
+        },
+        # POLITICAS: como se recupera (o no) la unidad corrompida.
+        "policies": {
+            "none": "la corrupcion ocupa toda la unidad: el motor no puede leer su contenido y no hay nada que recuperar",
+            "preserve_siblings": "descartar la unidad corrupta y conservar las unidades independientes que la acompanan",
+            "default_the_field": "sustituir el campo corrupto por su valor por defecto del formato y conservar el resto de la unidad",
+            "keep_valid_elements": "conservar los elementos validos del campo y descartar solo los invalidos",
+            "adapt_container": "el contenedor cambio de forma pero su contenido sigue siendo valido: se reconstruye el contenedor",
+        },
+        # TOKENS de lo recuperable: vocabulary cerrado que la sonda usa para
+        # contrastar la declaracion contra lo observado en runtime.
+        "recoverable_tokens": {
+            "siblings": "las unidades independientes que acompanan a la unidad corrompida",
+            "row_fields": "los campos validos de la fila corrompida: la fila se conserva con el campo corrupto por defecto",
+            "elements": "los elementos validos del campo corrompido: se descarta solo el elemento invalido",
+            "container_values": "los valores validos del contenedor corrompido: se reconstruye el contenedor",
+        },
+        # VALOR POR DEFECTO de cada campo de una fila de regla, tal y como lo
+        # declara el FORMATO REAL. Son los valores que el cargador usa cuando
+        # el campo NO aparece, y por tanto los unicos que puede usar la
+        # recuperacion sin inventar nada.
+        "field_defaults": {
+            "name": {"value": "$rule_id", "type": "string",
+                     "note": "el valor por defecto del formato es la propia identidad de la regla"},
+            "description": {"value": "", "type": "string", "note": "valor por defecto del formato"},
+            "adaptation_actions": {"value": [], "type": "list",
+                                   "note": "la regla se conserva pero queda INERTE: no tiene acciones que ejecutar"},
+            "context_triggers": {"value": [], "type": "list",
+                                 "note": "la regla se conserva pero queda INERTE: no dispara en ningun contexto"},
+            "confidence_threshold": {"value": 0.7, "type": "number",
+                                     "note": "valor por defecto del formato: evita el 0.0 sin filtro de confianza"},
+            "priority": {"value": 1, "type": "number", "note": "valor por defecto del formato"},
+            "enabled": {"value": False, "type": "boolean",
+                        "note": "EXCEPCION: el cargador usa True, pero recuperar con True ACTIVARIA una regla cuyo estado se desconoce (severidad critica). Se conserva DESACTIVADA"},
+            "success_rate": {"value": 0.0, "type": "number", "note": "valor por defecto del formato: la regla aparece sin exitos"},
+            "execution_count": {"value": 0, "type": "number", "note": "valor por defecto del formato"},
+            "last_execution": {"value": None, "type": "string|null", "note": "valor por defecto del formato: nunca ejecutada"},
+            "adaptation_score": {"value": 0.0, "type": "number", "note": "valor por defecto del formato"},
+            "constraints": {"value": [], "type": "list", "note": "valor por defecto del formato"},
+            "metadata": {"value": {}, "type": "mapping", "note": "valor por defecto del formato"},
+            "deadline": {"value": None, "type": "any", "note": "valor por defecto del formato"},
+        },
+        # Campos cuyo valor por defecto de RECUPERACION difiere del que usa el
+        # cargador. Solo puede haber EXCEPCIONES conservadoras: un valor por
+        # defecto mas permisivo que el del cargador activaria datos que el
+        # motor no puede saber.
+        "conservative_defaults": ["enabled"],
+        # REGLA DE INDEPENDENCIA: dos unidades son independientes si la ruta de
+        # una NO es un prefijo de la ruta de la otra. La corrupcion de una no
+        # determina el valor de la otra, asi que la otra debe sobrevivir.
+        "independence_rule": (
+            "dos unidades son independientes si la ruta de una NO es un prefijo de la ruta "
+            "de la otra: la corrupcion de una no determina el valor de la otra, de modo que "
+            "la otra debe sobrevivir al rechazo"
+        ),
+        "files": {
+            "adaptation_rules": {
+                "file": "contextual_adaptation_rules.json",
+                "unit_chain": ["fichero", "bloque:rules", "fila:<rule_id>", "campo:<nombre>"],
+                "classes": {
+                    "adaptation_rules.rules_wrong_type": {
+                        "corrupt_unit": "bloque:rules", "level": "bloque", "policy": "adapt_container",
+                        "recovers": ["container_values"],
+                        "condition": "los VALORES del mapeo que sean filas validas por el FORMATO REAL",
+                        "note": "las claves del mapeo NO se usan como identidad: sin `rule_id` propio la fila no se puede registrar"},
+                    "adaptation_rules.row_not_mapping": {
+                        "corrupt_unit": "fila:<indice>", "level": "fila", "policy": "preserve_siblings",
+                        "recovers": ["siblings"],
+                        "note": "una fila que no es un mapeo no contiene ningun dato recuperable"},
+                    "adaptation_rules.row_missing_identity": {
+                        "corrupt_unit": "fila:<indice>", "level": "fila", "policy": "preserve_siblings",
+                        "recovers": ["siblings"],
+                        "note": "sin `rule_id` no hay identidad: la fila no se puede registrar y no se inventa una"},
+                    "adaptation_rules.priority_not_castable": {
+                        "corrupt_unit": "fila:<rule_id>.campo:priority", "level": "campo",
+                        "policy": "default_the_field", "field_default": 1,
+                        "recovers": ["siblings", "row_fields"],
+                        "note": "la conversion a entero es ESTRICTA: el error aborta el FICHERO ENTERO, no solo la fila"},
+                    "adaptation_rules.execution_count_not_castable": {
+                        "corrupt_unit": "fila:<rule_id>.campo:execution_count", "level": "campo",
+                        "policy": "default_the_field", "field_default": 0,
+                        "recovers": ["siblings", "row_fields"],
+                        "note": "la conversion a entero es ESTRICTA: el error aborta el FICHERO ENTERO, no solo la fila"},
+                    "adaptation_rules.metadata_not_mapping": {
+                        "corrupt_unit": "fila:<rule_id>.campo:metadata", "level": "campo",
+                        "policy": "default_the_field", "field_default": {},
+                        "recovers": ["siblings", "row_fields"],
+                        "note": "la conversion a mapeo es ESTRICTA: el error aborta el FICHERO ENTERO, no solo la fila"},
+                    "adaptation_rules.actions_string": {
+                        "corrupt_unit": "fila:<rule_id>.campo:adaptation_actions", "level": "campo",
+                        "policy": "default_the_field", "field_default": [],
+                        "recovers": ["siblings", "row_fields"],
+                        "note": "sin acciones la regla se conserva INERTE: no ejecuta nada pero no se pierde su resto"},
+                    "adaptation_rules.enabled_string": {
+                        "corrupt_unit": "fila:<rule_id>.campo:enabled", "level": "campo",
+                        "policy": "default_the_field", "field_default": False,
+                        "recovers": ["siblings", "row_fields"],
+                        "note": "se conserva DESACTIVADA: activar una regla cuyo estado se desconoce es la desviacion mas grave"},
+                    "adaptation_rules.threshold_not_numeric": {
+                        "corrupt_unit": "fila:<rule_id>.campo:confidence_threshold", "level": "campo",
+                        "policy": "default_the_field", "field_default": 0.7,
+                        "recovers": ["siblings", "row_fields"],
+                        "note": "recuperar con 0.7 conserva el filtro de confianza que el 0.0 eliminaba"},
+                    "adaptation_rules.success_rate_not_numeric": {
+                        "corrupt_unit": "fila:<rule_id>.campo:success_rate", "level": "campo",
+                        "policy": "default_the_field", "field_default": 0.0,
+                        "recovers": ["siblings", "row_fields"],
+                        "note": "la regla se conserva sin exitos: no se inventa ninguna ejecucion"},
+                    "adaptation_rules.triggers_not_list": {
+                        "corrupt_unit": "fila:<rule_id>.campo:context_triggers", "level": "campo",
+                        "policy": "default_the_field", "field_default": [],
+                        "recovers": ["siblings", "row_fields"],
+                        "note": "sin disparadores la regla se conserva INERTE: no se aplica en ningun contexto"},
+                    "adaptation_rules.trigger_invalid_value": {
+                        "corrupt_unit": "fila:<rule_id>.campo:context_triggers[]", "level": "campo",
+                        "policy": "keep_valid_elements",
+                        "recovers": ["siblings", "row_fields", "elements"],
+                        "note": "es la clase mas fina: se descarta SOLO el disparador invalido y la regla sigue funcionando con los demas"},
+                    "adaptation_rules.last_execution_not_iso": {
+                        "corrupt_unit": "fila:<rule_id>.campo:last_execution", "level": "campo",
+                        "policy": "default_the_field", "field_default": None,
+                        "recovers": ["siblings", "row_fields"],
+                        "note": "la regla se conserva como nunca ejecutada"},
+                    "adaptation_rules.name_not_string": {
+                        "corrupt_unit": "fila:<rule_id>.campo:name", "level": "campo",
+                        "policy": "default_the_field", "field_default": "$rule_id",
+                        "recovers": ["siblings", "row_fields"],
+                        "note": "el nombre se recupera con la identidad de la regla"},
+                },
+            },
+            "knowledge_base": {
+                "file": "contextual_knowledge_base.json",
+                "unit_chain": ["fichero", "bloque:data", "seccion:<clave>", "grupo:<contexto>", "entrada:<indice>"],
+                "classes": {
+                    "knowledge_base.data_not_mapping": {
+                        "corrupt_unit": "bloque:data", "level": "bloque", "policy": "none",
+                        "recovers": [],
+                        "note": "el contenido del bloque `data` es opaco para el motor: no hay forma de saber que secciones contiene"},
+                    "knowledge_base.section_not_mapping": {
+                        "corrupt_unit": "seccion:context_patterns", "level": "seccion", "policy": "preserve_siblings",
+                        "recovers": ["siblings"],
+                        "note": "los grupos de la seccion corrupta NO son independientes: estan dentro de ella"},
+                    "knowledge_base.strategies_not_mapping": {
+                        "corrupt_unit": "seccion:adaptation_strategies", "level": "seccion", "policy": "preserve_siblings",
+                        "recovers": ["siblings"],
+                        "note": "las entradas de la seccion corrupta NO son independientes: estan dentro de ella"},
+                    "knowledge_base.unexpected_key": {
+                        "corrupt_unit": "seccion:<clave_desconocida>", "level": "seccion", "policy": "preserve_siblings",
+                        "recovers": ["siblings"],
+                        "note": "una clave que el motor nunca escribe no tiene contenido declarado que recuperar"},
+                    "knowledge_base.section_partial": {
+                        "corrupt_unit": "seccion:context_patterns.grupo:<contexto>", "level": "grupo", "policy": "preserve_siblings",
+                        "recovers": ["siblings"],
+                        "note": "los grupos hermanos de la MISMA seccion son independientes del grupo corrupto"},
+                },
+            },
+            "goal_adaptation_feedback": {
+                "file": "goal_adaptation_feedback.json",
+                "unit_chain": ["fichero", "seccion:<clave>", "fila:<adaptation_id>", "campo:<nombre>"],
+                "classes": {
+                    "goal_adaptation_feedback.section_not_list": {
+                        "corrupt_unit": "seccion:goal_adaptation_feedback", "level": "seccion", "policy": "preserve_siblings",
+                        "recovers": ["siblings"],
+                        "note": "las filas de la seccion corrupta NO son independientes: estan dentro de ella"},
+                    "goal_adaptation_feedback.row_not_mapping": {
+                        "corrupt_unit": "fila:<indice>", "level": "fila", "policy": "preserve_siblings",
+                        "recovers": ["siblings"],
+                        "note": "una fila que no es un mapeo no contiene ningun dato recuperable"},
+                    "goal_adaptation_feedback.history_not_list": {
+                        "corrupt_unit": "seccion:adaptation_history", "level": "seccion", "policy": "preserve_siblings",
+                        "recovers": ["siblings"],
+                        "note": "las entradas del historial corrupto NO son independientes: estan dentro de el"},
+                },
+            },
+            "goal_adaptation_learning_results": {
+                "file": "goal_adaptation_learning_results.json",
+                "unit_chain": ["fichero", "seccion:<clave>", "fila:<adaptation_id>", "entrada:<strategy_id>"],
+                "classes": {
+                    "goal_adaptation_learning_results.learning_results_not_list": {
+                        "corrupt_unit": "seccion:learning_results", "level": "seccion", "policy": "preserve_siblings",
+                        "recovers": ["siblings"],
+                        "note": "las filas de la seccion corrupta NO son independientes: estan dentro de ella"},
+                    "goal_adaptation_learning_results.row_not_mapping": {
+                        "corrupt_unit": "fila:<indice>", "level": "fila", "policy": "preserve_siblings",
+                        "recovers": ["siblings"],
+                        "note": "una fila que no es un mapeo no contiene ningun dato recuperable"},
+                    "goal_adaptation_learning_results.strategies_not_mapping": {
+                        "corrupt_unit": "seccion:adaptation_strategies", "level": "seccion", "policy": "preserve_siblings",
+                        "recovers": ["siblings"],
+                        "note": "las entradas de la seccion corrupta NO son independientes: estan dentro de ella"},
+                    "goal_adaptation_learning_results.strategy_value_not_mapping": {
+                        "corrupt_unit": "entrada:<strategy_id>", "level": "entrada", "policy": "preserve_siblings",
+                        "recovers": ["siblings"],
+                        "note": "una entrada que no es un mapeo no contiene ningun dato recuperable"},
+                    "goal_adaptation_learning_results.strategy_missing_identity": {
+                        "corrupt_unit": "entrada:<strategy_id>", "level": "entrada", "policy": "preserve_siblings",
+                        "recovers": ["siblings"],
+                        "note": "sin EVIDENCIA (confidence, success_rate, last_updated) la entrada no es una estrategia aprendida: no se puede ofrecer con una confianza inventada"},
+                },
+            },
+        },
+        "invariants": [
+            "el dato corrupto nunca llega al estado",
+            "la recuperacion no inventa valores fuera de `field_defaults`",
+            "una unidad que no depende de la unidad corrupta sobrevive",
+            "la unidad corrupta se rechaza en su NIVEL, no en un nivel superior",
+            "la recuperacion no reescribe el fichero: es una operacion de CARGA",
+        ],
+        "reconciliation": [
+            {"unit": "2.8.8.9.7.1",
+             "reason": "esta hoja DECLARA el contrato de lo recuperable y lo CONTRASTA contra el runtime. El runtime todavia NO satisface el contrato en todas las clases: las que se listan en `pending` pierden hoy el dato recuperable y son el trabajo de 2.8.8.9.7.2",
+             "changed": [],
+             "unchanged": ["levels", "policies", "recoverable_tokens", "field_defaults", "independence_rule", "invariants"],
+             "pending": [
+                 "adaptation_rules.priority_not_castable",
+                 "adaptation_rules.execution_count_not_castable",
+                 "adaptation_rules.metadata_not_mapping",
+                 "adaptation_rules.actions_string",
+                 "adaptation_rules.enabled_string",
+                 "adaptation_rules.threshold_not_numeric",
+                 "adaptation_rules.success_rate_not_numeric",
+                 "adaptation_rules.triggers_not_list",
+                 "adaptation_rules.trigger_invalid_value",
+                 "adaptation_rules.last_execution_not_iso",
+                 "adaptation_rules.name_not_string",
+                 "adaptation_rules.rules_wrong_type",
+                 "knowledge_base.section_partial",
+             ],
+             "implementation_owner": "2.8.8.9.7.2"},
+        ],
+    }
+
     def corruption_criteria(self) -> Dict[str, Any]:
         """Contrato DECLARATIVO de los criterios de CORRUPCIÓN (2.8.8.9.6.1).
 
@@ -3539,6 +3801,30 @@ class ContextualAdaptationEngine:
         La IMPLEMENTACIÓN de la detección es 2.8.8.9.6.3.
         """
         return copy.deepcopy(self._CORRUPTION_CRITERIA)
+
+    def recoverable_data(self) -> Dict[str, Any]:
+        """Contrato DECLARATIVO de los DATOS RECUPERABLES (2.8.8.9.7.1).
+
+        Declara, para cada clase de corrupcion de `corruption_criteria()`, QUE
+        dato es recuperable, A QUE NIVEL y CON QUE POLITICA: una corrupcion
+        rechaza SOLO la unidad que corrompe y el resto de las unidades
+        INDEPENDIENTES debe sobrevivir.
+
+        La recuperacion NO inventa datos: el campo corrupto toma el valor por
+        defecto que declara el FORMATO REAL (`field_defaults`), salvo en los
+        campos con un valor por defecto CONSERVADOR declarado
+        (`conservative_defaults`).
+
+        Es de SOLO LECTURA: no crea ficheros, no escribe y no altera el estado
+        del motor. Devuelve una COPIA profunda, de modo que el llamante no
+        pueda mutar el contrato.
+
+        La declaracion NO sustituye a la verificacion: la sonda
+        `tests/utils/contextual_adaptation_engine/identify_recoverable_real.py`
+        contrasta esta declaracion contra lo OBSERVADO en runtime. La
+        IMPLEMENTACION de la recuperacion es 2.8.8.9.7.2.
+        """
+        return copy.deepcopy(self._RECOVERABLE_DATA)
 
     # Integración de evolución arquitectónica
     def set_architecture_manager(self, architecture_manager) -> None:
