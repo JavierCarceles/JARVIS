@@ -1,0 +1,2453 @@
+# JARVIS - Asistente de IA con Planificación Jerárquica
+
+## Arquitectura del Proyecto
+
+Documentación de los ficheros de `src/`: qué hace cada fichero, qué clases define y qué métodos expone.
+
+### 📁 Módulo `src/` - Directorio Principal del Sistema
+
+#### `src/__init__.py` [0 líneas] - Inicialización del Directorio Principal
+- **Descripción**: Módulo raíz del sistema JARVIS que sirve como punto de entrada y organización principal para todos los componentes del sistema. Este archivo está vacío pero establece la estructura del paquete src.
+
+### 🧠 Módulo `src/brain/` - Cerebro Central
+
+#### `src/brain/__init__.py` [10 líneas] - Inicialización del Módulo Cerebro
+- **Descripción**: Módulo cerebro de JARVIS con procesamiento de lenguaje natural y planificación jerárquica.
+
+#### `src/brain/htn_integration.py` [487 líneas] - Integración HTN con Brain
+- **Descripción**: Integra la descomposición jerárquica de objetivos con HTNManager y TaskExecutor, manteniendo compatibilidad con el Brain existente.
+- **Clases principales**:
+  - `HTNIntegrationResult` (dataclass): Resultado estructurado de la integración HTN-Brain con metadatos de ejecución.
+  - `HTNBrainIntegration`: Clase principal que integra interpretación de objetivos, HTN y ejecución de tareas.
+- **Métodos principales**:
+  - `HTNBrainIntegration.__init__(self) -> None`
+  - `HTNBrainIntegration.process_goal_through_htn( self, goal: Goal, current_state: Dict[str, Any], ) -> HTNIntegrationResult`
+  - `HTNBrainIntegration.create_and_execute_htn_goal( self, user_input: str, current_state: Dict[str, Any], ) -> HTNIntegrationResult`
+  - `HTNBrainIntegration.get_integration_statistics(self) -> Dict[str, Any]`: Obtiene estadísticas de la integración HTN-Brain.
+  - `HTNBrainIntegration.enable_integration(self, enabled: bool = True) -> None`: Habilita o deshabilita la integración HTN.
+  - `HTNBrainIntegration.get_htn_insights(self) -> Dict[str, Any]`: Obtiene información agregada del sistema HTN.
+- **Funciones globales**:
+  - `get_htn_integration() -> HTNBrainIntegration`: Obtiene la instancia global de la integración HTN-Brain.
+
+#### `src/brain/llm.py` [1039 líneas] - Cerebro Principal y Comunicación con LLM
+- **Descripción**: Cerebro de JARVIS con interpretación de lenguaje natural, objetivos y sistema HTN. Gestiona la comunicación con el modelo LLM (Ollama) y la conversión de intenciones del usuario en acciones ejecutables.
+- **Clases principales**:
+  - `Brain`: Cerebro de JARVIS con interpretación, objetivos y compatibilidad legacy.
+- **Métodos principales**:
+  - `Brain.__init__(self, model: str = "llama3") -> None`
+  - `Brain.generate_response(self, prompt: str, use_legacy_mode: bool = False) -> str`
+  - `Brain.execute_goal(self, goal_data: Union[Dict[str, Any], "Goal"]) -> Dict[str, Any]`
+  - `Brain.process_intent_to_execution(self, prompt: str) -> Dict[str, Any]`
+  - `Brain.process_with_htn(self, prompt: str) -> Dict[str, Any]`
+  - `Brain.get_htn_insights(self) -> Dict[str, Any]`
+  - `Brain.parse_model_response(self, llm_response: str) -> Optional[Dict[str, Any]]`
+  - `Brain.interpret_intent(self, prompt: str) -> Dict[str, Any]`
+  - `Brain.think(self, prompt: str, use_legacy_execution: bool = False) -> str`
+  - `Brain.process_action_response(self, llm_response: str) -> str`
+  - `Brain.think_with_image(self, prompt: str, image_path: str) -> str`
+  - `Brain.analyze_image(self, image_path: str, analysis_prompt: str) -> str`
+  - `Brain.clear_memory(self) -> None`
+  - `Brain.get_conversation_history(self) -> List[Dict[str, Any]]`
+  - `Brain.get_available_actions(self) -> List[Dict[str, Any]]`
+  - `Brain.get_current_goals(self) -> List[Goal]`
+  - `Brain.get_system_state(self) -> Dict[str, Any]`
+  - `Brain.get_domain_entities(self) -> List[Entity]`
+  - `Brain.create_goal_from_user_input(self, user_input: str) -> Optional[Goal]`
+  - `Brain.get_planner_ready_data(self) -> Dict[str, Any]`
+  - `Brain.register_node(self, node_config: Dict[str, Any]) -> None`
+  - `Brain.register_task(self, task_config: Dict[str, Any]) -> None`
+- **Funciones globales**:
+  - `get_jarvis_context()`
+
+### 👂 Módulo `src/ear/` - Sistema de Escucha
+
+#### `src/ear/__init__.py` [4 líneas] - Inicialización del Módulo Escucha
+- **Descripción**: Módulo de escucha de JARVIS con importación del sistema auditivo.
+
+#### `src/ear/listener.py` [587 líneas] - Sistema de Escucha y Reconocimiento de Voz
+- **Descripción**: Sistema de escucha y reconocimiento de voz para capturar comandos de voz con pipeline de nodos modular y soporte para activación por palabra. Utiliza Whisper para transcripción y procesamiento de audio en tiempo real.
+- **Clases principales**:
+  - `AudioCapabilities` (dataclass): Configuración de capacidades de audio (sample_rate, channels, block_duration, silence_threshold).
+  - `AudioNode`: Nodo base para procesamiento de audio con precondiciones, efectos y coste.
+  - `CalibrationNode`: Nodo para calibración de umbral de detección de voz mediante medición de ruido.
+  - `TranscriptionNode`: Nodo para transcripción de audio a texto usando WhisperModel.
+  - `DetectionNode`: Nodo para detección de voz en cola de audio con threshold configurable.
+  - `RecordingNode`: Nodo para grabación de audio con detección de silencio y timeout.
+  - `Ear`: Clase principal del sistema de escucha con pipeline completo de procesamiento.
+- **Métodos principales**:
+  - `AudioNode.__init__(self, name: str)`
+  - `AudioNode.execute(self, audio_data: np.ndarray) -> Dict[str, Any]`: Ejecuta el procesamiento de audio.
+  - `AudioNode.get_preconditions(self) -> List[str]`: Devuelve las precondiciones necesarias para ejecutar este nodo.
+  - `AudioNode.get_effects(self) -> List[str]`: Devuelve los efectos de ejecutar este nodo.
+  - `AudioNode.get_cost(self) -> float`: Devuelve el coste estimado de ejecutar este nodo.
+  - `CalibrationNode.execute(self, audio_queue: queue.Queue) -> Dict[str, Any]`: Calibra el umbral de detección de voz.
+  - `TranscriptionNode.__init__(self, name: str, model_size: str = "medium", language: str = "es")`
+  - `TranscriptionNode.execute(self, audio: np.ndarray) -> Dict[str, Any]`: Transcribe el audio a texto.
+  - `DetectionNode.execute(self, audio_queue: queue.Queue, threshold: float) -> Dict[str, Any]`: Detecta voz en la cola de audio.
+  - `RecordingNode.execute(self, audio_queue: queue.Queue, threshold: float) -> Dict[str, Any]`: Graba el audio detectado.
+  - `Ear.__init__(self, model_size: str = "medium", language: str = "es")`
+  - `Ear.get_audio_pipeline(self) -> List[AudioNode]`: Devuelve el pipeline de procesamiento de audio.
+  - `Ear.get_pipeline_cost(self) -> float`: Calcula el coste total del pipeline de audio.
+  - `Ear.get_pipeline_preconditions(self) -> List[str]`: Devuelve las precondiciones del pipeline de audio.
+  - `Ear.get_pipeline_effects(self) -> List[str]`: Devuelve los efectos del pipeline de audio.
+  - `Ear.listen(self, activation_word: bool = False) -> Optional[str]`: Escucha el audio del usuario y transcribe usando el pipeline de nodos.
+  - `Ear.callback(indata, frames, time_info, status)`: Callback para captura de audio.
+  - `Ear.process_audio_batch(self, audio_chunks: List[np.ndarray]) -> Optional[str]`: Procesa un lote de audios pregrabados.
+  - `Ear.get_audio_status(self) -> Dict[str, Any]`: Devuelve el estado actual del sistema de audio.
+
+### 👁️ Módulo `src/eyes/` - Sistema de Visión
+
+#### `src/eyes/__init__.py` [5 líneas] - Inicialización del Módulo Visión
+- **Descripción**: Módulo de visión de JARVIS que exporta las clases principales para el sistema de visión y captura de pantalla. Importa `Vision` desde `vision_only` y `ScreenCapture` desde `screen_capture`.
+
+#### `src/eyes/screen.py` [972 líneas] - Captura y Análisis de Pantalla
+- **Descripción**: Captura de pantalla y análisis para JARVIS con arquitectura de planificación. Proporciona captura de pantalla completa y regional, análisis del estado del mundo, detección de aplicaciones activas, verificación básica de elementos UI calibrados e integración con memoria de dominio.
+- **Clases principales**:
+  - `ApplicationState` (Enum): Estados conocidos de una aplicación (CLOSED, OPEN, ACTIVE, MINIMIZED, MAXIMIZED).
+  - `ApplicationInfo` (dataclass): Información de una aplicación detectada con estado, posición, tamaño y elementos visibles.
+  - `WorldState` (dataclass): Estado del mundo usado por las APIs legacy con aplicaciones, monitor activo, elementos calibrados y URLs conocidas.
+  - `ScreenAnalyzer`: Analizador de pantallas integrado con la capa Vision para análisis de aplicaciones y estado del mundo.
+  - `ScreenCapture`: Sistema de captura con geometría delegada a ScreenManager para capturas de monitor, región, elemento y ventana.
+- **Métodos principales**:
+  - `ApplicationInfo.to_dict(self) -> Dict[str, Any]`
+  - `ApplicationInfo.from_dict(cls, data: Optional[Dict[str, Any]]) -> "ApplicationInfo"`
+  - `WorldState.to_dict(self) -> Dict[str, Any]`
+  - `WorldState.from_dict(cls, data: Optional[Dict[str, Any]]) -> "WorldState"`
+  - `ScreenAnalyzer.__init__(self) -> None`
+  - `ScreenAnalyzer.analyze_application_state(self, app_name: str) -> ApplicationInfo`: Analiza una aplicación en todos los monitores disponibles.
+  - `ScreenAnalyzer.build_world_state(self) -> WorldState`: Construye el estado del mundo usando la capa Vision cuando está disponible.
+  - `ScreenCapture.__init__(self) -> None`
+  - `ScreenCapture.capture_monitor( self, monitor_num: int, save_path: Optional[str] = None, ) -> Optional[str]`
+  - `ScreenCapture.capture_region( self, x: int, y: int, width: int, height: int, save_path: Optional[str] = None, ) -> Optional[str]`
+  - `ScreenCapture.capture_element( self, element_coords: Dict[str, Any], save_path: Optional[str] = None, ) -> Optional[str]`
+  - `ScreenCapture.capture_active_window( self, save_path: Optional[str] = None, ) -> Optional[str]`
+  - `ScreenCapture.capture_desktop( self, save_path: Optional[str] = None, ) -> Optional[str]`
+  - `ScreenCapture.get_world_state(self) -> WorldState`
+  - `ScreenCapture.get_application_state(self, app_name: str) -> ApplicationInfo`
+  - `ScreenCapture.check_element_visibility(self, element_name: str) -> bool`: Comprueba visibilidad a partir del estado visual disponible.
+  - `ScreenCapture.clean_temp_files(self, pattern: str = "temp_*.png") -> None`: Elimina capturas temporales del directorio actual.
+- **Funciones globales**:
+  - `capture_screen(filepath: str = "screenshot.png") -> str`: Captura el escritorio virtual completo.
+  - `capture_captcha_area( pantalla: str, region_captcha: Tuple[int, int, int, int], img_captcha_path: str, ) -> bool`
+  - `get_screen_capture() -> ScreenCapture`: Obtiene la instancia global de captura.
+
+#### `src/eyes/screen_capture.py` [350 líneas] - Sistema de Captura de Pantalla
+- **Descripción**: Sistema de captura de pantalla con soporte multi-monitor y captura de regiones. Versión simplificada que no usa ScreenAnalyzer para evitar circular imports con el cerebro principal.
+- **Clases principales**:
+  - `ScreenCapture`: Sistema de captura de pantalla con soporte multipantalla.
+- **Métodos principales**:
+  - `ScreenCapture.__init__(self)`: Inicializa el sistema de captura.
+  - `ScreenCapture.capture_monitor( self, monitor_num: int, save_path: Optional[str] = None, ) -> Optional[str]`
+  - `ScreenCapture.capture_region( self, x: int, y: int, width: int, height: int, save_path: Optional[str] = None, ) -> Optional[str]`
+  - `ScreenCapture.capture_element( self, element_coords: dict, save_path: Optional[str] = None, ) -> Optional[str]`
+  - `ScreenCapture.capture_active_window( self, save_path: Optional[str] = None, ) -> Optional[str]`
+  - `ScreenCapture.get_world_state(self)`: Obtiene el estado actual del mundo.
+  - `ScreenCapture.get_application_state(self, app_name: str)`: Obtiene el estado de una aplicación específica.
+- **Funciones globales**:
+  - `get_screen_capture() -> ScreenCapture`: Obtiene la instancia global del sistema de captura.
+
+#### `src/eyes/vision.py` [922 líneas] - Procesamiento de Visión y Análisis de Imágenes
+- **Descripción**: Visión por computadora usando Qwen3-VL mediante Ollama. La capa de visión es genérica: no contiene coordenadas, offsets, resoluciones ni lógica específica de Chrome u otra aplicación. La geometría de monitores pertenece a ScreenManager y la calibración universal pertenece a UniversalVisualCalibrator / CalibrationManager.
+- **Clases principales**:
+  - `VisionNodeType` (Enum): Tipos de nodos de visión para planificación (SCREEN_ANALYSIS, UI_DETECTION, ELEMENT_VERIFICATION, STATE_VERIFICATION, CALIBRATION_ANALYSIS, APPLICATION_DETECTION).
+  - `VisionNode` (dataclass): Nodo de percepción visual reutilizable por el planificador con ID, tipo, nombre, descripción, precondiciones, efectos y coste.
+  - `UIElement` (BaseModel): Elemento UI detectado por visión con propiedades de tipo, texto, bounding box, centro, interactividad y confianza.
+  - `VisionResponse` (BaseModel): Respuesta estructurada del modelo de visión con lista de elementos UI.
+  - `Vision`: Clase principal del sistema de visión integrado con arquitectura de planificación jerárquica.
+- **Métodos principales**:
+  - `VisionNode.to_dict(self) -> Dict[str, Any]`
+  - `VisionNode.from_dict(cls, data: Dict[str, Any]) -> "VisionNode"`
+  - `VisionNode.get_preconditions(self) -> List[str]`
+  - `VisionNode.get_effects(self) -> List[str]`
+  - `VisionNode.get_cost(self) -> float`
+  - `Vision.__init__(self, model: str = "qwen3-vl:8b") -> None`
+  - `Vision.get_vision_nodes(self) -> List[VisionNode]`
+  - `Vision.get_vision_node(self, node_id: str) -> Optional[VisionNode]`
+  - `Vision.get_nodes_by_type(self, node_type: VisionNodeType) -> List[VisionNode]`
+  - `Vision.get_total_vision_cost(self) -> float`
+  - `Vision.analyze_screen_for_world_state(self) -> WorldState`: Analiza todas las pantallas disponibles y construye un WorldState válido.
+  - `Vision.detect_ui_elements( self, image_path: str, application: Optional[str] = None, ) -> VisionResponse`
+  - `Vision.analyze_image( self, image_path: str, prompt: str, calibration_target: Optional[str] = None, ) -> str`
+  - `Vision.verify_element_visibility( self, element_name: str, application: Optional[str] = None, expected_coords: Optional[Dict[str, Any]] = None, ) -> Dict[str, Any]`
+  - `Vision.verify_action_result( self, expected_state: Dict[str, Any], application: Optional[str] = None, tolerance: float = 0.8, ) -> Dict[str, Any]`
+  - `Vision.detect_application_state(self, app_name: str) -> ApplicationInfo`: Busca una aplicación en todas las pantallas disponibles.
+  - `Vision.get_vision_capabilities(self) -> Dict[str, Any]`
+
+#### `src/eyes/vision_only.py` [438 líneas] - Sistema de Visión Simplificado
+- **Descripción**: Visión por computadora usando Qwen3-VL mediante Ollama. Versión simplificada sin dependencias circulares.
+- **Clases principales**:
+  - `VisionNodeType` (Enum): Tipos de nodos de visión para el planificador (SCREEN_ANALYSIS, UI_DETECTON, ELEMENT_VERIFICATION, STATE_VERIFICATION, CALIBRATION_ANALYSIS, APPLICATION_DETECTION).
+  - `UIElement` (dataclass): Elemento UI detectado por visión con propiedades de nombre, tipo, texto, bounding box, centro, interactividad y confianza.
+  - `VisionResponse` (BaseModel): Respuesta estructurada del modelo de visión con lista de elementos UI.
+  - `Vision`: Clase principal del sistema de visión integrado con arquitectura de planificación jerárquica.
+- **Métodos principales**:
+  - `Vision.__init__( self, model: str = "qwen3-vl:8b", ) -> None`
+  - `Vision.analyze_image(self, image_path: str, prompt: str) -> str`: Analiza una imagen usando el modelo de visión.
+  - `Vision.verify_action_result(self, expected_state: Dict[str, Any], tolerance: float = 0.1) -> Dict[str, Any]`: Verifica si una acción tuvo el resultado esperado visualmente.
+  - `Vision.detect_application_state(self, app_name: str) -> Any`: Detecta el estado de una aplicación específica visualmente.
+  - `Vision.get_vision_capabilities(self) -> Dict[str, Any]`: Devuelve las capacidades de visión disponibles para el planificador.
+  - `Vision.get_total_vision_cost(self) -> float`: Calcula el costo total de las capacidades de visión.
+
+### 🤖 Módulo `src/hands/` - Sistema de Ejecución
+
+#### `src/hands/__init__.py` [30 líneas] - Inicialización del Módulo Ejecución
+- **Descripción**: Módulo principal de ejecución de JARVIS con importación y registro de sistemas de control, calibración, coordenadas y aplicaciones.
+
+#### `src/hands/action_registry.py` [1272 líneas] - Registro y Ejecución de Acciones
+- **Descripción**: Registro centralizado de acciones para JARVIS con sistema de planificación, validación de parámetros y monitoreo.
+- **Clases principales**:
+  - `ActionType` (Enum): Tipos de acciones (APPLICATION, SYSTEM, NAVIGATION, INTERACTION, CALIBRATION)
+  - `ActionInfo` (dataclass): Metadatos y contrato ejecutable de acciones registradas
+  - `ActionRegistry`: Registro y acceso a todas las acciones/capacidades disponibles
+- **Métodos principales**:
+  - `ActionInfo.to_dict(self) -> Dict[str, Any]`: Devuelve metadatos serializables; nunca expone callbacks ejecutables.
+  - `ActionInfo.matches_preconditions(self, state: Any) -> bool`: Comprueba todas las precondiciones declarativas y funcionales.
+  - `ActionInfo.verify_success(self, result: Any = None, *args: Any, **kwargs: Any) -> bool`: Ejecuta el verificador configurado sin invocarlo más de una vez.
+  - `ActionInfo.apply_effects( self, current_state: Dict[str, Any], execution_result: Optional[Dict[str, Any]] = None, ) -> Dict[str, Any]`
+  - `ActionRegistry.__init__(self) -> None`
+  - `ActionRegistry.register_action( self, name: str, description: str, action_type: ActionType = ActionType.APPLICATION, category: str = "general", tags: Optional[List[str]] = None, parameters: Optional[Dict[str, Any]] = None, confidence_threshold: float = 0.8, preconditions: Any = None, effects: Any = None, cost: float = 1.0, dependencies: Optional[List[str]] = None,`
+  - `ActionRegistry.decorator(func: Callable) -> Callable`
+  - `ActionRegistry.register_module(self, module_path: str) -> None`: Importa un módulo y registra sus funciones decoradas una sola vez.
+  - `ActionRegistry.get_action(self, name: str) -> Optional[ActionInfo]`
+  - `ActionRegistry.get_actions_by_category(self, category: str) -> List[ActionInfo]`
+  - `ActionRegistry.get_all_actions(self) -> Dict[str, ActionInfo]`
+  - `ActionRegistry.get_plannable_actions(self) -> Dict[str, ActionInfo]`
+  - `ActionRegistry.get_actions_for_planner(self) -> List[Dict[str, Any]]`
+  - `ActionRegistry.get_actions_for_llama(self) -> List[Dict[str, Any]]`
+  - `ActionRegistry.validate_action(self, action_name: str, parameters: Optional[Dict[str, Any]]) -> bool`: Comprueba presencia, nombres y tipos de parámetros sin ejecutar la acción.
+  - `ActionRegistry.can_execute( self, action_name: str, parameters: Optional[Dict[str, Any]] = None, state: Any = None, check_preconditions: bool = True, ) -> bool`
+  - `ActionRegistry.get_action_cost(self, action_name: str) -> float`
+  - `ActionRegistry.execute_action( self, action_name: str, parameters: Optional[Dict[str, Any]] = None, ) -> Any`
+  - `ActionRegistry.list_actions(self, category: Optional[str] = None) -> List[str]`
+  - `ActionRegistry.get_action_categories(self) -> List[str]`
+  - `ActionRegistry.get_optimization_stats(self) -> Dict[str, Any]`: Devuelve estadísticas del registro a partir de contadores reales.
+  - `ActionRegistry.optimize_logging(self) -> None`: Punto de compatibilidad para configurar logging sin cambiar el contrato.
+- **Funciones globales**:
+  - `get_action_registry() -> ActionRegistry`: Obtiene instancia singleton del registro de acciones
+  - `register_action( name: str, description: str, action_type: ActionType = ActionType.APPLICATION, category: str = "general", tags: Optional[List[str]] = None, parameters: Optional[Dict[str, Any]] = None, confidence_threshold: float = 0.8, preconditions: Any = None, effects: Any = None, cost: float = 1.0, dependencies: Optional[List[str]] = None, capability: Optional[str] = None,`: Decorador de conveniencia para registrar acciones
+  - `register_module(module_path: str) -> None`: Importa módulo y registra sus acciones decoradas
+
+#### `src/hands/application_preflight.py` [894 líneas] - Sistema de Preflight de Aplicaciones
+- **Descripción**: Sistema de verificación previa de aplicaciones antes de su apertura y calibración. Bloquea aplicaciones administrativas/técnicas, resuelve ejecutables, inspecciona manifiestos y detecta requisitos de elevación. No ejecuta aplicaciones ni realiza capturas.
+- **Clases principales**:
+  - `PreflightResult` (dataclass): Resultado estructurado del chequeo preflight con estado de permisos, razonamiento y metadatos.
+  - `ApplicationPreflight`: Clase principal para análisis seguro de aplicaciones sin ejecución.
+- **Métodos principales**:
+  - `PreflightResult.to_dict(self) -> Dict[str, Any]`
+  - `ApplicationPreflight.__init__(self) -> None`
+  - `ApplicationPreflight.check( self, application: Dict[str, Any], ) -> Dict[str, Any]`
+  - `ApplicationPreflight.check_application( self, application: Dict[str, Any], ) -> PreflightResult`
+  - `ApplicationPreflight.is_safe_to_calibrate( self, application: Dict[str, Any], ) -> bool`
+  - `ApplicationPreflight.check_login_state( self, application: Dict[str, Any], ) -> Dict[str, Any]`
+  - `ApplicationPreflight.check_resources( self, application: Dict[str, Any], ) -> Dict[str, Any]`
+  - `ApplicationPreflight.resolve_executable( self, name: str, app_id: str, ) -> Optional[str]`
+  - `ApplicationPreflight.inspect_executable_manifest( self, executable_path: str, ) -> Dict[str, Any]`
+  - `ApplicationPreflight.clear_cache(self) -> None`: Limpia resultados de resolución y manifest.
+- **Funciones globales**:
+  - `get_application_preflight() -> ApplicationPreflight`: Obtiene instancia singleton del sistema de preflight.
+
+#### `src/hands/applications_core.py` [1055 líneas] - Núcleo de Aplicaciones
+- **Descripción**: Sistema de conocimiento estructurado de aplicaciones para planificación jerárquica con capacidades reutilizables, integración con calibración específica y global, soporte para preflight y login, y compatibilidad con comandos legacy.
+- **Clases principales**:
+  - `ApplicationCapability` (Enum): Tipos de capacidades que puede ofrecer una aplicación
+  - `ApplicationState` (Enum): Estados posibles de una aplicación
+  - `UIElement` (dataclass): Elemento UI de una aplicación con coordenadas y calibración
+  - `ApplicationCapabilityDef` (dataclass): Definición de una capacidad de aplicación
+  - `ApplicationKnowledge` (dataclass): Conocimiento estructurado de una aplicación
+  - `ApplicationManager`: Gestor del conocimiento estructurado de aplicaciones
+- **Métodos principales**:
+  - `UIElement.is_calibrated(self) -> bool`: Comprueba si existe información de coordenadas utilizable.
+  - `ApplicationKnowledge.get_capability(self, capability_name: str) -> Optional[ApplicationCapabilityDef]`: Obtiene una capacidad por nombre.
+  - `ApplicationKnowledge.get_ui_element(self, element_name: str) -> Optional[UIElement]`: Obtiene un elemento UI por nombre.
+  - `ApplicationKnowledge.is_capable(self, capability: ApplicationCapability) -> bool`: Comprueba si la aplicación posee una capacidad específica.
+  - `ApplicationKnowledge.get_calibrated_elements(self) -> List[UIElement]`: Obtiene los elementos UI calibrados.
+  - `ApplicationManager.__init__(self) -> None`
+  - `ApplicationManager.register_application(self, app: ApplicationKnowledge) -> bool`: Registra una aplicación en memoria y en el gestor.
+  - `ApplicationManager.get_application(self, app_name: str) -> Optional[ApplicationKnowledge]`: Obtiene una aplicación por nombre o alias.
+  - `ApplicationManager.get_applications_by_type(self, app_type: str) -> List[ApplicationKnowledge]`: Obtiene aplicaciones por tipo.
+  - `ApplicationManager.get_applications_by_capability(self, capability: ApplicationCapability) -> List[ApplicationKnowledge]`: Obtiene aplicaciones con una capacidad determinada.
+  - `ApplicationManager.get_application_capabilities(self, app_name: str) -> Dict[str, Any]`: Obtiene capacidades de una aplicación en formato de planificación.
+  - `ApplicationManager.get_application_ui_elements(self, app_name: str) -> Dict[str, Any]`: Obtiene los elementos UI conocidos de una aplicación.
+- **Funciones globales**:
+  - `get_application_manager() -> ApplicationManager`: Obtiene instancia global del gestor de aplicaciones
+  - `open_application(app_name: str) -> str`: Abre aplicación conocida y valida disponibilidad
+  - `close_application(app_name: str) -> str`: Cierra aplicación por proceso sin afectar otras
+  - `wait_for_application_state(app_name: str, target_state: str, timeout: int = 30) -> str`: Espera a que aplicación alcance estado específico
+  - `calibrate_application_ui( app_name: str, elements: Optional[List[str]] = None, screen: int = 1, ) -> str`: Calibra elementos UI de aplicación específica
+  - `calibrar_aplicaciones(force: bool = False) -> Dict[str, Any]`: Inicia calibración global de aplicaciones soportadas
+  - `calibrate_applications(force: bool = False) -> Dict[str, Any]`: Alias programático de calibrar_aplicaciones
+  - `get_available_commands() -> List[str]`: Obtiene comandos registrados
+  - `navigate_to_url(url: str) -> str`: Abre URL en navegador predeterminado
+  - `abrir_youtube() -> str`: Abre YouTube
+  - `abrir_gmail() -> str`: Abre Gmail
+  - `get_application_knowledge(app_name: str) -> Dict[str, Any]`: Obtiene conocimiento estructurado de aplicación
+  - `get_applications_by_capability(capability_name: str) -> List[str]`: Obtiene aplicaciones que tienen capacidad específica
+  - `register_custom_application(app_config: Dict[str, Any]) -> bool`: Registra aplicación personalizada
+
+#### `src/hands/calibration_manager.py` [2343 líneas] - Gestor Universal de Calibración de Aplicaciones
+- **Descripción**: Sistema coordinador universal de calibración multiaplicación y multimonitor. Gestiona descubrimiento, preflight, apertura segura, preparación de ventanas, captura de monitor y persistencia de coordenadas.
+- **Clases principales**:
+  - `WINDOWPLACEMENT`
+  - `ApplicationType` (Enum): Tipos de aplicaciones soportadas (CHROME, EDGE, FIREFOX, NOTEPAD, CALCULATOR, PAINT, EXPLORER, CMD, SPOTIFY, GENERIC).
+  - `CalibrationPreflightResult` (dataclass): Resultado estructurado del chequeo preflight con permisos, razonamiento y metadatos.
+  - `CalibrationResult` (dataclass): Resultado estructurado de calibración con estado, elementos y datos.
+  - `_WindowStateSnapshot` (dataclass): Instantánea del estado de ventana para restauración.
+  - `CalibrationManager`: Clase principal coordinadora universal de calibración multiaplicación.
+- **Métodos principales**:
+  - `CalibrationPreflightResult.to_dict(self) -> Dict[str, Any]`
+  - `CalibrationResult.get(self, key: str, default: Any = None) -> Any`
+  - `CalibrationResult.to_dict(self) -> Dict[str, Any]`
+  - `CalibrationManager.__init__(self) -> None`
+  - `CalibrationManager.register_calibrator(self, application_name: str, calibrator: Any) -> None`
+  - `CalibrationManager.get_available_applications(self) -> List[str]`
+  - `CalibrationManager.get_supported_applications(self) -> List[str]`
+  - `CalibrationManager.set_preflight_checker(self, checker: Optional[Callable[[Dict[str, str]], Any]]) -> None`
+  - `CalibrationManager.preflight_application(self, application: Any) -> CalibrationPreflightResult`
+  - `CalibrationManager.get_application_calibration_capability(self, application: Any) -> Dict[str, Any]`
+  - `CalibrationManager.discover_applications(self) -> List[Dict[str, str]]`: Descubre aplicaciones GUI sin limitarse a una lista de apps conocidas.
+  - `CalibrationManager.add_application( name: str, app_id: str = "", path: str = "", arguments: str = "", ) -> None`
+  - `CalibrationManager.launch_application(self, application: Dict[str, str]) -> Tuple[Set[int], bool]`: Reutiliza una ventana existente o lanza la aplicación de forma genérica.
+  - `CalibrationManager.move_window_to_monitor( self, window: Any, monitor_number: int, application_name: Optional[str] = None, ) -> bool`
+  - `CalibrationManager.close_application_window(self, window: Any, owned_hwnds: Optional[Set[int]] = None) -> bool`
+  - `CalibrationManager.is_application_calibrated(self, application: Any) -> bool`
+  - `CalibrationManager.calibrate_application( self, application: Any, screen_number: Optional[int] = None ) -> CalibrationResult`
+  - `CalibrationManager.calibrate_all_applications(self, applications: Optional[List[Any]] = None, force: bool = False) -> Dict[str, Any]`
+  - `CalibrationManager.get_calibration_statistics(self) -> Dict[str, Any]`
+- **Funciones globales**:
+  - `get_calibration_manager() -> CalibrationManager`: Obtiene instancia singleton del gestor de calibración.
+
+#### `src/hands/calibrator.py` [1010 líneas] - Fachada y Capacidades de Calibración
+- **Descripción**: Fachada y capacidades de calibración para JARVIS. Mantiene la API histórica de Calibrator y la capa de capacidades jerárquicas, pero delega la calibración real en CalibrationManager.
+- **Clases principales**:
+  - `CalibrationPolicy` (Enum): Políticas de calibración (NEVER, ASK, AUTOMATIC, REQUIRED).
+  - `CalibrationStatus` (Enum): Estados de calibración (UNKNOWN, NOT_CALIBRATED, CALIBRATED, OUTDATED, INVALID).
+  - `CalibrationElement` (dataclass): Elemento de calibración con ID, nombre, aplicación, coordenadas, estado y metadatos.
+  - `CalibrationCapability` (dataclass): Capacidad de calibración con ID, nombre, descripción, elementos soportados y método.
+  - `CalibrationStrategy`: Estrategia abstracta para calibración de elementos.
+  - `UniversalVisualCalibrationStrategy`: Estrategia visual delegada por completo al CalibrationManager.
+  - `KeyboardShortcutStrategy`: Estrategia alternativa basada en atajos de teclado.
+  - `EnhancedCalibrator`: Sistema de capacidades de calibración compatible con el planner.
+  - `Calibrator`: Fachada de compatibilidad para el sistema mejorado.
+- **Métodos principales**:
+  - `CalibrationStrategy.can_calibrate(self, element: CalibrationElement) -> bool`
+  - `CalibrationStrategy.calibrate(self, element: CalibrationElement) -> Dict[str, Any]`
+  - `CalibrationStrategy.get_applicable_applications(self) -> List[str]`
+  - `UniversalVisualCalibrationStrategy.__init__(self) -> None`
+  - `UniversalVisualCalibrationStrategy.can_calibrate(self, element: CalibrationElement) -> bool`
+  - `UniversalVisualCalibrationStrategy.calibrate(self, element: CalibrationElement) -> Dict[str, Any]`
+  - `UniversalVisualCalibrationStrategy.get_applicable_applications(self) -> List[str]`
+  - `KeyboardShortcutStrategy.can_calibrate(self, element: CalibrationElement) -> bool`
+  - `KeyboardShortcutStrategy.calibrate(self, element: CalibrationElement) -> Dict[str, Any]`
+  - `KeyboardShortcutStrategy.get_applicable_applications(self) -> List[str]`
+  - `EnhancedCalibrator.__init__(self) -> None`
+  - `EnhancedCalibrator.get_calibration_capability(self, capability_id: str) -> Optional[CalibrationCapability]`
+  - `EnhancedCalibrator.get_available_capabilities(self) -> List[CalibrationCapability]`
+  - `EnhancedCalibrator.check_element_calibration(self, element_id: str) -> CalibrationStatus`
+  - `EnhancedCalibrator.can_use_element(self, element_id: str, current_state: Dict[str, Any]) -> bool`
+  - `EnhancedCalibrator.calibrate_element_if_needed( self, element_id: str, current_state: Dict[str, Any], ) -> Dict[str, Any]`
+  - `EnhancedCalibrator.register_element(self, element: CalibrationElement) -> None`
+  - `EnhancedCalibrator.get_element_coordinates(self, element_id: str) -> Optional[Dict[str, Tuple[int, int]]]`
+  - `EnhancedCalibrator.create_calibration_node(self, element_id: str) -> Optional["Node"]`
+  - `EnhancedCalibrator.get_calibration_requirements_for_goal(self, goal: "Goal") -> List[str]`
+  - `EnhancedCalibrator.calibrate_applications( self, app_name: Optional[str] = None, force: bool = False, ) -> Dict[str, Any]`
+  - `EnhancedCalibrator.calibrate_chrome_both_screens(self) -> Dict[str, Any]`: Compatibilidad legacy; delega en la misma API de aplicación.
+  - `EnhancedCalibrator.get_calibration_statistics(self) -> Dict[str, Any]`
+  - `Calibrator.__init__(self) -> None`
+  - `Calibrator.calibrate_applications( self, app_name: Optional[str] = None, force: bool = False, ) -> Dict[str, Any]`
+  - `Calibrator.calibrate_chrome_both_screens(self) -> Dict[str, Any]`
+- **Funciones globales**:
+  - `get_enhanced_calibrator() -> EnhancedCalibrator`: Obtiene instancia singleton del calibrador mejorado
+  - `calibrate_chrome_both_screens() -> Dict[str, Any]`: Función global legacy para calibrar Chrome en ambos monitores
+
+#### `src/hands/coordinate_manager.py` [1113 líneas] - Gestor Unificado de Coordenadas
+- **Descripción**: Gestor unificado de coordenadas para JARVIS. Responsabilidades: administrar recursos UI calibrados, proporcionar capacidades de UI al planificador, gestionar estado de calibración, convertir y validar sistemas de coordenadas, leer datos existentes de macros_coords.json, mantener compatibilidad con APIs legacy.
+- **Clases principales**:
+  - `ResourceType` (Enum): Tipos de recursos UI gestionados por el coordinate manager (ELEMENT, REGION, APPLICATION, WINDOW, MONITOR)
+  - `CalibrationStrategy` (Enum): Estrategias de calibración disponibles (VISUAL_DETECTION, WINDOW_DETECTION, SCREEN_CAPTURE, KEYBOARD_SHORTCUT, HOTKEY)
+  - `UIResource` (dataclass): Recurso UI calibrado utilizable por acciones del planificador
+  - `UICapability`: Capacidad UI que puede ser utilizada por una acción
+  - `CoordinateSystem` (Enum): Sistemas de coordenadas soportados por JARVIS (RELATIVE_SCREEN, ABSOLUTE_DESKTOP, WINDOW_RELATIVE)
+  - `BoundingBox` (dataclass): Rectángulo delimitador de un elemento
+  - `ElementInfo` (dataclass): Información de un elemento calibrado (compatibilidad)
+  - `CoordinateManager`: Gestor centralizado de conocimiento UI y coordenadas calibradas
+  - `RECT`
+  - `POINT`
+  - `WINDOWPLACEMENT`
+- **Métodos principales**:
+  - `UIResource.is_usable(self) -> bool`
+  - `UIResource.get_coordinates_for_screen( self, screen_number: int ) -> Optional[Tuple[int, int]]`
+  - `UIResource.get_region_for_screen( self, screen_number: int, ) -> Optional[Tuple[int, int, int, int]]`
+  - `UIResource.get_best_coordinates(self) -> Optional[Tuple[int, int]]`: Devuelve coordenadas del monitor activo o, en su defecto, de cualquier monitor calibrado.
+  - `UIResource.get_alternatives(self) -> List["UIResource"]`
+  - `UIResource.can_use_fallback_strategy(self, strategy_name: str) -> bool`
+  - `UICapability.__init__(self, name: str, description: str, required_resources: List[str])`
+  - `UICapability.can_execute_with_resources(self, available_resources: Set[str]) -> bool`
+  - `BoundingBox.right(self) -> int`
+  - `BoundingBox.bottom(self) -> int`
+  - `BoundingBox.center_x(self) -> int`
+  - `BoundingBox.center_y(self) -> int`
+  - `BoundingBox.center(self) -> Tuple[int, int]`
+  - `BoundingBox.to_dict(self) -> Dict[str, Any]`
+  - `ElementInfo.get_absolute_coordinates(self) -> Tuple[int, int]`
+  - `CoordinateManager.__init__(self) -> None`
+  - `CoordinateManager.macros_coords_path(self) -> Path`
+  - `CoordinateManager.register_ui_resource(self, resource: UIResource) -> bool`
+  - `CoordinateManager.get_ui_resource(self, resource_id: str) -> Optional[UIResource]`
+  - `CoordinateManager.get_available_resources( self, application: Optional[str] = None ) -> List[UIResource]`
+  - `CoordinateManager.find_resources_by_type( self, resource_type: ResourceType, application: Optional[str] = None, ) -> List[UIResource]`
+  - `CoordinateManager.has_resource(self, resource_id: str) -> bool`
+  - `CoordinateManager.get_resource_alternatives(self, resource_id: str) -> List[UIResource]`
+  - `CoordinateManager.get_fallback_strategies(self, resource_id: str) -> List[str]`
+  - `CoordinateManager.get_capabilities_for_resources( self, resource_ids: List[str] ) -> List[UICapability]`
+  - `CoordinateManager.can_execute_capability( self, capability_name: str, resource_ids: List[str] ) -> bool`
+  - `CoordinateManager.get_capability_alternatives(self, capability_name: str) -> List[UICapability]`
+  - `CoordinateManager.get_calibration_strategy( self, application: str, element_type: str, ) -> Optional[CalibrationStrategy]`
+  - `CoordinateManager.is_application_calibrable(self, application: str) -> bool`
+  - `CoordinateManager.can_calibrate_element(self, application: str, element_type: str) -> bool`
+  - `CoordinateManager.get_execution_strategy_for_action( self, action_id: str, resource_id: Optional[str] = None, ) -> Dict[str, Any]`
+  - `CoordinateManager.get_resource_coordinates( self, resource_id: str, screen_number: Optional[int] = None, ) -> Optional[Tuple[int, int]]`
+  - `CoordinateManager.validate_resource_for_action(self, action_id: str, resource_id: str) -> bool`
+  - `CoordinateManager.load_from_macros_coords(self, calibration_data: Dict[str, Any]) -> int`: Carga recursos desde ``calibraciones`` o, para compatibilidad, desde ``legacy_data.macros``.
+  - `CoordinateManager.get_calibrated_coordinate( self, calibration_data: Dict[str, Any], application_name: str, element_name: str, screen_number: Optional[int] = None, ) -> Optional[Tuple[int, int]]`
+  - `CoordinateManager.monitor_number_from_object(monitor: Any) -> Optional[int]`: Extrae un número de monitor sin asumir un atributo concreto.
+  - `CoordinateManager.get_screen_key(self, screen_number: int) -> str`
+  - `CoordinateManager.screen_number_from_key(screen_key: str) -> Optional[int]`
+  - `CoordinateManager.get_screen_number_from_key(self, screen_key: str) -> Optional[int]`
+  - `CoordinateManager.validate_coordinates( self, x: int, y: int, screen_width: int, screen_height: int, ) -> bool`
+  - `CoordinateManager.validate_bounding_box( self, bbox: BoundingBox, screen_width: int, screen_height: int, ) -> bool`
+  - `CoordinateManager.get_window_bounding_box(self, window_title: str) -> Optional[BoundingBox]`: Compatibilidad legacy: obtiene una ventana por título.
+- **Funciones globales**:
+  - `get_coordinate_manager() -> CoordinateManager`: Obtiene la instancia global del gestor de coordenadas
+
+#### `src/hands/executor.py` [1861 líneas] - Ejecutor Mejorado con Planificación Jerárquica
+- **Descripción**: Ejecutor mejorado de JARVIS con arquitectura de planificación jerárquica. Responsabilidades: ejecutar acciones individuales con verificación de precondiciones y efectos, ejecutar planes completos, manejar estado del mundo, soportar replanificación cuando una acción falla, integrarse con el sistema de nodos y objetivos, mantener compatibilidad con acciones legacy.
+- **Clases principales**:
+  - `ExecutionStatus` (Enum): Estados de ejecución de un nodo o plan (PENDING, RUNNING, SUCCESS, FAILED, RETRYING, ALTERNATIVE)
+  - `ExecutionResult` (dataclass): Resultado de ejecución de un nodo o plan con estado, tiempo de ejecución, errores y alternativas
+  - `ExecutionState` (dataclass): Estado actual del mundo para ejecución con timestamps y estados de aplicaciones/UI
+  - `Executor`: Clase principal del sistema de ejecución con soporte para planificación jerárquica y replanificación
+- **Métodos principales**:
+  - `ExecutionResult.to_dict(self) -> Dict[str, Any]`
+  - `ExecutionState.update(self, update_data: Dict[str, Any]) -> None`: Actualiza el estado y fusiona los diccionarios anidados.
+  - `ExecutionState.to_dict(self) -> Dict[str, Any]`: Devuelve una instantánea independiente del estado, incluidos campos extendidos.
+  - `Executor.__init__(self, action_registry: Optional[ActionRegistry] = None)`: Inicializa el ejecutor sin importar Planner durante la carga del módulo.
+  - `Executor.execute_plan( self, plan: List[Dict[str, Any]], plan_id: Optional[str] = None, max_retries: int = 3, timeout_per_node: Optional[float] = None, ) -> ExecutionResult`
+  - `Executor.execute_plan_with_replan( self, plan: List[Dict[str, Any]], goal: Optional[Dict[str, Any]] = None, max_replan_attempts: int = 2, ) -> Dict[str, Any]`
+  - `Executor.execute_action( self, action_name: str, parameters: Optional[Dict[str, Any]] = None, state: Any = None, verify: bool = True, timeout: Optional[float] = None, ) -> Any`
+  - `Executor.invoke() -> Any`
+  - `Executor.can_execute( self, action_name: str, parameters: Optional[Dict[str, Any]] = None, state: Any = None, ) -> bool`
+  - `Executor.process_and_execute(self, llm_response: str) -> str`: Procesa respuesta LLM y ejecuta comando (mantenido para compatibilidad).
+  - `Executor.get_current_state(self) -> ExecutionState`: Obtiene el estado actual del mundo.
+  - `Executor.update_state(self, update_data: Dict[str, Any]) -> None`: Actualiza el estado del mundo.
+  - `Executor.get_action_stats(self) -> Dict[str, Any]`: Obtiene estadísticas de ejecución de acciones.
+  - `Executor.get_learning_insights(self) -> Dict[str, Any]`: Obtiene insights del sistema de aprendizaje (FASE 18).
+  - `Executor.get_action_learning_insights(self, action_name: str) -> Dict[str, Any]`: Obtiene insights específicos de una acción (FASE 18).
+  - `Executor.get_cost_adjustments(self) -> Dict[str, float]`: Obtiene ajustes de coste aprendidos (FASE 18).
+  - `Executor.export_learning_data(self, filepath: str) -> None`: Exporta datos de aprendizaje (FASE 18).
+  - `Executor.import_learning_data(self, filepath: str) -> None`: Importa datos de aprendizaje (FASE 18).
+  - `Executor.clear_learning_data(self) -> None`: Limpia datos de aprendizaje (FASE 18).
+  - `Executor.enable_learning(self, enabled: bool = True) -> None`: Habilita o deshabilita el aprendizaje (FASE 18).
+  - `Executor.list_commands(self) -> List[str]`: Lista todas las acciones conocidas.
+  - `Executor.get_plannable_actions(self) -> Dict[str, ActionInfo]`: Obtiene acciones disponibles para planificación.
+  - `Executor.get_action_info(self, action_name: str) -> Optional[ActionInfo]`: Obtiene información de una acción específica.
+  - `Executor.execute_goal( self, goal: Goal, max_planning_time: float = 30.0, find_alternatives: bool = True, plan_id: Optional[str] = None, enable_learning: bool = True, ) -> Dict[str, Any]`
+  - `Executor.create_goal_from_command(self, command_name: str, parameters: Dict[str, Any]) -> Optional[Goal]`: Crea un objetivo a partir de un comando legacy.
+- **Funciones globales**:
+  - `get_executor() -> Executor`: Obtiene la instancia global del ejecutor
+
+#### `src/hands/keyboard.py` [901 líneas] - Control del Teclado con Capacidades de Planificación
+- **Descripción**: Control del teclado transformado de acciones primitivas a capacidades reutilizables para el sistema de planificación jerárquica de JARVIS. Integrado con el sistema de registro de acciones y soporte para precondiciones, efectos y costes.
+- **Clases principales**:
+  - `KeyModifier` (Enum): Modificadores de tecla soportados (CTRL, ALT, SHIFT, WIN).
+  - `KeyboardCapabilities` (dataclass): Capacidades del teclado para el sistema de planificación.
+  - `KeyboardCapabilitySystem`: Sistema de capacidades del teclado para la planificación jerárquica
+- **Métodos principales**:
+  - `KeyboardCapabilitySystem.__init__(self)`: Inicializar el sistema de capacidades.
+  - `KeyboardCapabilitySystem.get_capabilities_for_context(self, context: Dict[str, Any]) -> List[str]`: Obtener capacidades que se pueden ejecutar con el contexto dado.
+  - `KeyboardCapabilitySystem.can_execute_capability(self, capability_name: str, context: Dict[str, Any]) -> bool`: ¿Se puede ejecutar una capacidad con el contexto dado?
+- **Funciones globales**:
+  - `escribir_texto(texto: str) -> str`: Escribe texto en el campo activo (mantenido por compatibilidad)
+  - `type_text(text: str, field_id: Optional[str] = None) -> bool`
+  - `keyboard_capability( name: str, description: str, preconditions: List[str] = None, effects: List[str] = None, cost: float = 1.0, required_resources: List[str] = None, application: Optional[str] = None, success_checker: Optional[Callable] = None, planner_enabled: bool = True, keyboard_action: str = "basic" )`
+  - `decorator(func: Callable)`
+  - `type_text(text: str, interval: Optional[float] = None, field_id: Optional[str] = None) -> bool`: Escribir texto en el campo activo o en un campo específico.
+  - `press_key(key: str, hold_time: float = 0.1) -> bool`: Presionar una tecla individual.
+  - `execute_hotkey(*keys: str, hold_time: float = 0.1) -> bool`: Ejecutar combinación de teclas (hotkeys).
+  - `copy_text() -> bool`: Copiar texto seleccionado al portapapeles.
+  - `paste_text() -> bool`: Pegar texto desde el portapapeles.
+  - `cut_text() -> bool`: Cortar texto seleccionado al portapapeles.
+  - `select_all_text() -> bool`: Seleccionar todo el texto en el campo activo.
+  - `navigate_tab(forward: bool = True) -> bool`: Navegar entre campos con Tabulador.
+  - `navigate_enter() -> bool`: Confirmar acción con la tecla Enter.
+  - `switch_window() -> bool`: Cambiar a la siguiente ventana con Alt+Tab.
+  - `close_window() -> bool`: Cerrar la ventana activa con Alt+F4.
+  - `open_start_menu() -> bool`: Abrir el menú de inicio de Windows.
+  - `escribir_texto(texto: str, interval: Optional[float] = None) -> str`: Escribe texto en el campo activo (mantenido por compatibilidad)
+  - `presionar_enter() -> str`: Presiona la tecla Enter (mantenido por compatibilidad)
+  - `presionar_tecla(tecla: str) -> str`: Presiona una tecla específica (mantenido por compatibilidad)
+  - `copiar() -> str`: Ejecuta Ctrl+C (Copiar) (mantenido por compatibilidad)
+  - `pegar() -> str`: Ejecuta Ctrl+V (Pegar) (mantenido por compatibilidad)
+  - `cortar() -> str`: Ejecuta Ctrl+X (Cortar) (mantenido por compatibilidad)
+  - `seleccionar_todo() -> str`: Ejecuta Ctrl+A (Seleccionar todo) (mantenido por compatibilidad)
+  - `cambiar_ventana() -> str`: Ejecuta Alt+Tab (Cambiar ventana) (mantenido por compatibilidad)
+  - `cerrar_ventana() -> str`: Ejecuta Alt+F4 (Cerrar ventana) (mantenido por compatibilidad)
+  - `tecla_super() -> str`: Presiona la tecla Windows (Super) (mantenido por compatibilidad)
+  - `abrir_menu_inicio() -> str`: Abre el menú de inicio de Windows (mantenido por compatibilidad)
+  - `get_keyboard_capability_system() -> KeyboardCapabilitySystem`: Obtener la instancia global del sistema de capacidades del teclado.
+
+#### `src/hands/mouse.py` [129 líneas] - Control del Ratón con Capacidades de Planificación
+- **Descripción**: Control básico del ratón para JARVIS con capacidades fundamentales de interacción gráfica. Proporciona funciones esenciales de movimiento, clic y scroll integradas con el sistema de registro de acciones y soporte para planificación jerárquica.
+- **Funciones globales**:
+  - `move_to_position(x: float, y: float, duration: float = 0.1) -> bool`: Mueve el ratón a una posición específica con duración configurable.
+  - `click_element(button: str = "left", wait_after: float = 0.1) -> bool`: Realiza clic con botón específico (left, right, middle) con espera posterior.
+  - `scroll_at_position(x: float, y: float, clicks: int, wait_after: float = 0.1) -> bool`: Realiza scroll en una posición específica con número de clicks configurable.
+  - `register_mouse_capabilities()`: Registra capacidades del ratón en el sistema de acciones.
+
+#### `src/hands/universal_visual_calibrator.py` [915 líneas] - Calibrador Visual Universal
+- **Descripción**: Calibrador visual universal para la arquitectura de planificación jerárquica. Esta capa realiza exclusivamente percepción/calibración visual. No abre ni mueve aplicaciones y no persiste macros_coords.json directamente. El resultado de `calibrate()` utiliza coordenadas absolutas del escritorio virtual y asocia cada elemento al monitor físico real (`s1`, `s2`, ...).
+- **Clases principales**:
+  - `CalibrationPolicy`: Política centralizada de seguridad, no una allowlist de aplicaciones. La calibración visual es universal: una aplicación GUI no bloqueada puede ser analizada. Las aplicaciones peligrosas/protegidas se rechazan aquí y en el preflight del CalibrationManager cuando corresponde.
+  - `UICapability`: Representa un elemento UI calibrado y consumible por acciones con propiedades de nombre, tipo, centro, bounding box, pantalla, confianza y timestamp.
+  - `CalibrationState`: Estado en memoria de los elementos calibrados con soporte para multipantalla (app -> sN -> element -> capability).
+  - `UniversalVisualCalibrator`: Calibrador visual universal integrado con las capas superiores que usa Qwen3-VL para análisis visual y normalización de coordenadas.
+- **Métodos principales**:
+  - `CalibrationPolicy.can_calibrate_application( cls, application_name: str ) -> Tuple[bool, Optional[str]]`
+  - `CalibrationPolicy.can_calibrate_element( cls, element_type: str, confidence: float ) -> Tuple[bool, Optional[str]]`
+  - `UICapability.__init__( self, name: str, element_type: str, center: Tuple[int, int], bbox: Tuple[int, int, int, int], screen: int, confidence: float = 0.8, ) -> None`
+  - `UICapability.to_dict(self) -> Dict[str, Any]`
+  - `CalibrationState.__init__(self) -> None`
+  - `CalibrationState.get_element( self, application: str, element_name: str, monitor_number: Optional[int] = None, ) -> Optional[UICapability]`
+  - `CalibrationState.get_application_elements( self, application: str, monitor_number: Optional[int] = None, ) -> Dict[str, UICapability]`
+  - `CalibrationState.add_element( self, application: str, element: UICapability, monitor_number: Optional[int] = None, ) -> None`
+  - `CalibrationState.is_element_calibrated( self, application: str, element_name: str, monitor_number: Optional[int] = None, ) -> bool`
+  - `CalibrationState.get_calibration_age(self, application: str) -> Optional[float]`
+  - `UniversalVisualCalibrator.__init__(self, memory: Optional[ConversationMemory] = None) -> None`
+  - `UniversalVisualCalibrator.get_ui_capability( self, application: str, element_name: str, monitor_number: int, screenshot_path: str, ) -> Optional[UICapability]`
+  - `UniversalVisualCalibrator.calibrate_application_elements( self, application: str, monitor_number: int, screenshot_path: str, ) -> Dict[str, UICapability]`
+  - `UniversalVisualCalibrator.calibrate( self, application_name: str, monitor_number: int, screenshot_path: str, ) -> Dict[str, Any]`
+- **Funciones globales**:
+  - `get_calibrator( memory: Optional[ConversationMemory] = None, ) -> UniversalVisualCalibrator`: Obtiene instancia singleton del calibrador visual universal.
+  - `get_ui_capability( application: str, element_name: str, monitor_number: int, screenshot_path: str, ) -> Optional[UICapability]`: Función de conveniencia para obtener capacidades UI directamente.
+
+### 🧩 Módulo `src/hands/chrome/` - Acciones de Google Chrome
+
+#### `src/hands/chrome/__init__.py` [75 líneas] - Inicialización del Módulo Chrome
+- **Descripción**: Módulo específico para Google Chrome con sistema de acciones registrado.
+- **Funciones globales**:
+  - `abrir_chrome_action()`: Acción wrapper para abrir Chrome.
+  - `abrir_chrome_pantalla_action(pantalla: int = 1)`: Acción wrapper para abrir Chrome en pantalla específica.
+  - `calibrar_chrome_action()`: Acción wrapper para calibrar Chrome.
+
+#### `src/hands/chrome/chrome.py` [500 líneas] - Funciones Específicas para Google Chrome
+- **Descripción**: Módulo con acciones específicas para Google Chrome que maneja apertura, cierre, movimiento, maximización y calibración del navegador. La lógica universal de calibración, detección de aplicaciones y geometría de monitores pertenece a CalibrationManager y ScreenManager respectivamente.
+- **Funciones globales**:
+  - `abrir_chrome() -> str`: Abre específicamente Google Chrome, sin depender del navegador predeterminado.
+  - `abrir_chrome_pantalla(pantalla: int = 1) -> str`: Abre Chrome en un monitor específico.
+  - `cerrar_chrome() -> str`: Cierra las ventanas de Google Chrome.
+  - `calibrar_chrome(pantalla: int = 0) -> str`: Calibra Chrome usando el flujo universal de aplicaciones.
+  - `mover_chrome_pantalla(pantalla: int) -> str`: Mueve una ventana de Chrome al monitor solicitado.
+  - `maximizar_chrome() -> str`: Maximiza la ventana de Chrome preferentemente la que está en primer plano.
+  - `get_chrome_commands() -> List[str]`: Obtiene los comandos específicos de Chrome.
+  - `get_chrome_action_commands() -> List[str]`: Escanea el módulo y devuelve las funciones registradas como acciones.
+
+#### `src/hands/chrome/chrome_calibrator.py` [56 líneas] - Calibrador Específico para Chrome
+- **Descripción**: Adaptador de compatibilidad para la calibración de Google Chrome. La calibración real se realiza mediante el sistema universal: CalibrationManager -> descubrimiento de aplicación -> apertura/enfoque -> ScreenManager -> detección de monitor real -> captura -> UniversalVisualCalibrator -> Qwen3-VL 8B Instruct -> coordenadas absolutas -> guardado centralizado.
+- **Clases principales**:
+  - `ChromeCalibrator`: Adaptador legacy que usa exactamente el flujo universal.
+- **Métodos principales**:
+  - `ChromeCalibrator.calibrate_chrome(self, monitor_num: int = 0) -> Dict[str, Any]`
+- **Funciones globales**:
+  - `calibrar_chrome() -> str`: Compatibilidad legacy: delega en el flujo universal.
+
+### 🧩 Módulo `src/hands/edge/` - Acciones de Microsoft Edge
+
+#### `src/hands/edge/__init__.py` [3 líneas] - Inicialización del Módulo Edge
+- **Descripción**: Módulo específico para Microsoft Edge con importación del sistema de calibración y funciones específicas de Edge.
+
+#### `src/hands/edge/calibrator_edge.py` [232 líneas] - Calibrador de Compatibilidad para Microsoft Edge
+- **Descripción**: Adaptador de compatibilidad para la calibración de Microsoft Edge. La calibración real se realiza mediante el sistema universal: CalibrationManager -> descubrimiento de aplicación -> apertura/enfoque -> ScreenManager -> detección de monitor real -> captura -> UniversalVisualCalibrator -> Qwen3-VL 8B Instruct -> coordenadas absolutas -> guardado centralizado.
+- **Clases principales**:
+  - `EdgeCalibrator`: Adaptador legacy hacia CalibrationManager con métodos de compatibilidad.
+- **Métodos principales**:
+  - `EdgeCalibrator.__init__(self) -> None`
+  - `EdgeCalibrator.calibrate_edge_both_screens( self, ) -> Dict[str, Any]`
+  - `EdgeCalibrator.calibrate_edge( self, ) -> Dict[str, Any]`
+- **Funciones globales**:
+  - `calibrate_edge() -> str`: Función pública de compatibilidad.
+
+#### `src/hands/edge/edge.py` [553 líneas] - Funciones Específicas para Microsoft Edge
+- **Descripción**: Funciones específicas para Microsoft Edge con apertura, cierre, calibración, movimiento y maximización de ventanas. Utiliza ScreenManager para gestión de monitores y CalibrationManager para calibración universal. La geometría de monitores se obtiene exclusivamente de ScreenManager. Este módulo conserva funciones antiguas por compatibilidad, pero no genera coordenadas artificiales, no asume dos monitores y no utiliza una resolución ni un DPI fijo.
+- **Funciones globales**:
+  - `abrir_edge_pantalla(pantalla: int = 1) -> str`: Abre Microsoft Edge y lo posiciona en la pantalla solicitada.
+  - `abrir_edge_pestana(pantalla: int = 1) -> str`: Abre una nueva pestaña de Edge en la pantalla solicitada.
+  - `get_edge_commands() -> list`: Obtiene los comandos legacy de Edge.
+
+### 🧩 Módulo `src/hands/firefox/` - Acciones de Mozilla Firefox
+
+#### `src/hands/firefox/__init__.py` [3 líneas] - Inicialización del Módulo Firefox
+- **Descripción**: Módulo específico para Mozilla Firefox con sistema de acciones registrado.
+
+#### `src/hands/firefox/calibrator_firefox.py` [226 líneas] - Calibrador de Compatibilidad para Mozilla Firefox
+- **Descripción**: Adaptador de compatibilidad para la calibración de Mozilla Firefox. La calibración real ya NO se realiza mediante lógica específica de Firefox. El flujo oficial es: CalibrationManager -> detección de aplicación -> apertura/enfoque -> ScreenManager -> captura del monitor -> UniversalVisualCalibrator -> Qwen3-VL 8B Instruct -> coordenadas absolutas -> guardado centralizado. Este módulo existe únicamente para mantener compatibilidad con código antiguo que pudiera importar FirefoxCalibrator o calibrate_firefox(). NO detecta coordenadas manualmente, NO calcula offsets de monitores, NO asume dos pantallas, NO asume resoluciones, NO asume DPI, NO genera coordenadas artificiales, NO escribe macros_coords.json directamente.
+- **Clases principales**:
+  - `FirefoxCalibrator`: Adaptador legacy hacia CalibrationManager. No contiene lógica visual específica de Firefox.
+- **Métodos principales**:
+  - `FirefoxCalibrator.__init__(self) -> None`
+  - `FirefoxCalibrator.calibrate_firefox_both_screens( self, ) -> Dict[str, Any]`
+  - `FirefoxCalibrator.calibrate_firefox( self, ) -> Dict[str, Any]`
+- **Funciones globales**:
+  - `calibrate_firefox() -> str`: Función pública de compatibilidad.
+
+#### `src/hands/firefox/firefox.py` [636 líneas] - Funciones Específicas para Mozilla Firefox
+- **Descripción**: Funciones específicas para Mozilla Firefox con apertura, cierre, calibración, movimiento y maximización de ventanas. Utiliza ScreenManager para gestión de monitores y CalibrationManager para calibración universal. La geometría de monitores se obtiene exclusivamente de ScreenManager. Este módulo conserva funciones antiguas por compatibilidad, pero no genera coordenadas artificiales, no asume dos monitores y no utiliza una resolución ni un DPI fijo. La calibración real de aplicaciones debe pasar por el flujo universal: CalibrationManager -> ScreenManager -> UniversalVisualCalibrator -> Qwen3-VL.
+- **Funciones globales**:
+  - `abrir_youtube() -> str`: Abre YouTube en el navegador predeterminado.
+  - `abrir_spotify() -> str`: Abre Spotify Web en el navegador predeterminado.
+  - `abrir_firefox_pantalla(pantalla: int = 1) -> str`: Abre Mozilla Firefox y lo posiciona en la pantalla solicitada.
+  - `abrir_firefox_pestana(pantalla: int = 1) -> str`: Abre una nueva pestaña de Firefox en la pantalla solicitada.
+  - `get_firefox_commands() -> list`: Obtiene los comandos legacy de Firefox.
+
+### 🧩 Módulo `src/hands/planner/` - Planificación Jerárquica
+
+#### `src/hands/planner/__init__.py` [235 líneas] - Inicialización del Módulo de Planificación
+- **Descripción**: Módulo de planificación de JARVIS que evita inicializar componentes pesados durante la importación para prevenir ciclos entre action_registry y los módulos del planner. Los componentes principales se resuelven de forma perezosa cuando se solicitan.
+- **Funciones globales**:
+  - `get_htn_manager() -> Any`: Obtiene instancia singleton del gestor HTN
+  - `get_application_knowledge_integrator() -> Any`: Obtiene instancia global del integrador de conocimiento
+  - `get_applications_by_capability(capability_name: str) -> list[str]`: Busca aplicaciones por capacidad mediante el módulo correspondiente.
+  - `get_application_knowledge(app_name: str) -> dict[str, Any]`: Obtiene las capacidades declaradas de una aplicación.
+  - `get_task_executor() -> Any`: Obtiene instancia global del ejecutor de tareas
+  - `get_learning_system() -> Any`: Obtiene el singleton del sistema de aprendizaje cuando se necesita.
+  - `get_preconditions_effects_manager() -> Any`: Obtiene el singleton del gestor de precondiciones y efectos.
+
+#### `src/hands/planner/application_integration.py` [864 líneas] - Integración de Conocimiento de Aplicaciones
+- **Descripción**: Convierte conocimiento declarativo de aplicaciones en Nodes compatibles con el modelo canónico de planificación, manteniendo separadas planificación y ejecución.
+- **Clases principales**:
+  - `ApplicationKnowledgeIntegrator`: Integrador de conocimiento estructurado de aplicaciones con el planificador
+- **Métodos principales**:
+  - `ApplicationKnowledgeIntegrator.__init__(self) -> None`
+  - `ApplicationKnowledgeIntegrator.convert_application_to_nodes(self, app_name: str) -> List[Node]`: Convierte una aplicación y sus capacidades en Nodes canónicos.
+  - `ApplicationKnowledgeIntegrator.get_applications_by_capability(self, capability: Any) -> List[str]`: Devuelve las aplicaciones que declaran una capacidad.
+  - `ApplicationKnowledgeIntegrator.get_application_capabilities(self, app_name: str) -> Dict[str, Any]`: Obtiene capacidades en formato declarativo, con fallback al catálogo.
+  - `ApplicationKnowledgeIntegrator.get_ui_elements_for_capability( self, app_name: str, capability: Any, ) -> List[str]`
+  - `ApplicationKnowledgeIntegrator.is_application_capable(self, app_name: str, capability: Any) -> bool`: Comprueba una capacidad utilizando el gestor o el catálogo de la app.
+  - `ApplicationKnowledgeIntegrator.register_application_knowledge(self, app_config: Dict[str, Any]) -> bool`: Registra conocimiento mediante la API pública de applications_core.
+- **Funciones globales**:
+  - `get_application_knowledge_integrator() -> ApplicationKnowledgeIntegrator`: Obtiene la instancia global del integrador
+  - `get_applications_by_capability(capability_name: str) -> List[str]`: Compatibilidad legacy usando ApplicationCapability cuando existe
+  - `get_application_knowledge(app_name: str) -> Dict[str, Any]`: Compatibilidad legacy para consultar el conocimiento de una aplicación
+
+#### `src/hands/planner/goal_state_mapper.py` [1485 líneas] - Mapeo de Goal y World State al Grafo de Estados
+- **Descripción**: Mapea objetivos y estado del mundo al grafo de estados para planificación jerárquica, creando relaciones explícitas entre objetivos, capacidades, acciones y estado.
+- **Clases principales**:
+  - `MappingType` (Enum): Tipos de mapeo (GOAL_TO_NODES, STATE_TO_NODES, CAPABILITY_TO_NODES, HYBRID)
+  - `MappingResult` (dataclass): Resultado estructurado de operaciones de mapeo
+  - `GoalStateMapper`: Mapeador principal de objetivos y estado al grafo
+- **Métodos principales**:
+  - `GoalStateMapper.__init__(self, state_graph: StateGraph) -> None`
+  - `GoalStateMapper.map_goal_to_graph( self, goal: Goal, world_state: WorldStateData, ) -> MappingResult`
+  - `GoalStateMapper.map_world_state_to_graph( self, world_state: WorldStateData, ) -> MappingResult`
+  - `GoalStateMapper.map_capabilities_to_graph( self, capabilities: Sequence[str], ) -> MappingResult`
+  - `GoalStateMapper.map_goal_and_world_state_to_graph( self, goal: Goal, world_state: WorldStateData, ) -> MappingResult`
+  - `GoalStateMapper.get_mapping_history(self) -> List[Dict[str, Any]]`: Devuelve una copia del historial de mapeos.
+  - `GoalStateMapper.clear_mapping_history(self) -> None`: Limpia el historial de mapeos.
+
+#### `src/hands/planner/graph.py` [1871 líneas] - Sistema de Grafos de Estados y Búsqueda de Rutas
+- **Descripción**: Sistema avanzado de grafos de estados para planificación con múltiples estrategias de búsqueda, gestión de precondiciones/efectos, caché de rendimiento y serialización completa. Mantiene separación entre planificación y ejecución, simulando transiciones sobre copias de estado para no alterar el estado real durante la búsqueda.
+- **Clases principales**:
+  - `SearchStrategy` (Enum): Estrategias de búsqueda (A_STAR, DIJKSTRA, BFS, DFS, GREEDY) con alias históricos
+  - `GraphNode` (dataclass): Nodo auxiliar de búsqueda con costes (g_cost, h_cost, f_cost) y estado
+  - `GraphEdge` (dataclass): Arista con condiciones, precondiciones, efectos y coste con evaluación robusta
+  - `RouteResult` (dataclass): Resultado estructurado con metadatos, alternativas, estadísticas y estado final
+  - `StateGraph`: Grafo principal con algoritmos de búsqueda, validación, exportación/importación JSON
+  - `GraphBuilder`: Constructores predefinidos para navegación y aplicaciones
+  - `CacheEntry`: Entrada de caché LRU con expiración, acceso y métricas
+  - `PerformanceMetrics`: Métricas acumuladas de búsqueda, caché y rendimiento
+  - `AdvancedStateGraph`: Grafo optimizado con caché inteligente, auto-optimización y estadísticas avanzadas
+- **Métodos principales**:
+  - `GraphEdge.can_traverse(self, current_state: Dict[str, Any]) -> bool`: Indica si se pueden satisfacer todas las condiciones de la arista.
+  - `GraphEdge.apply_effects(self, current_state: Dict[str, Any]) -> Dict[str, Any]`: Aplica efectos a una copia del estado, registrando los fallos reales.
+  - `GraphEdge.get_total_cost(self, current_state: Optional[Dict[str, Any]] = None) -> float`: Calcula coste de transición y sobrecoste declarativo determinista.
+  - `RouteResult.length(self) -> int`
+  - `RouteResult.edge_count(self) -> int`
+  - `RouteResult.to_dict(self) -> Dict[str, Any]`
+  - `StateGraph.__init__(self, heuristic: Optional[Heuristic] = None) -> None`
+  - `StateGraph.graph_revision(self) -> int`: Versión monotónica del grafo, usada para invalidar cachés.
+  - `StateGraph.add_node(self, node: Node) -> None`
+  - `StateGraph.get_node(self, node_id: str) -> Optional[Node]`
+  - `StateGraph.has_node(self, node_id: str) -> bool`
+  - `StateGraph.add_edge( self, source_id: str, target_id: str, cost: float = 1.0, conditions: Optional[List[Any]] = None, transition_type: str = "normal", preconditions: Optional[List[Condition]] = None, effects: Optional[List[Effect]] = None, ) -> bool`
+  - `StateGraph.get_edges_from(self, node_id: str) -> List[GraphEdge]`
+  - `StateGraph.get_edge(self, source_id: str, target_id: str) -> Optional[GraphEdge]`
+  - `StateGraph.find_route( self, start_node_id: str, goal_node_id: str, current_state: Optional[Dict[str, Any]] = None, strategy: SearchStrategy | str = SearchStrategy.A_STAR, max_iterations: int = 1000, find_alternatives: bool = False, alternative_count: int = 3, ) -> RouteResult`
+  - `StateGraph.build_route(self, *args: Any, **kwargs: Any) -> RouteResult`: Alias compatible con las integraciones que usan `build_route`.
+  - `StateGraph.find_path_astar( self, start_node_id: str, goal_node_id: str, current_state: Dict[str, Any], max_iterations: int = 1000, find_alternatives: bool = False, alternative_count: int = 3, ) -> Tuple[List[str], float, List[List[str]]]`
+  - `StateGraph.find_path_dijkstra( self, start_node_id: str, goal_node_id: str, current_state: Dict[str, Any], max_iterations: int = 1000, find_alternatives: bool = False, alternative_count: int = 3, ) -> Tuple[List[str], float, List[List[str]]]`
+  - `StateGraph.find_path_bfs( self, start_node_id: str, goal_node_id: str, current_state: Dict[str, Any], max_iterations: int = 1000, find_alternatives: bool = False, alternative_count: int = 3, ) -> Tuple[List[str], float, List[List[str]]]`
+  - `StateGraph.find_path_dfs( self, start_node_id: str, goal_node_id: str, current_state: Dict[str, Any], max_iterations: int = 1000, find_alternatives: bool = False, alternative_count: int = 3, ) -> Tuple[List[str], float, List[List[str]]]`
+  - `StateGraph.find_path_greedy( self, start_node_id: str, goal_node_id: str, current_state: Dict[str, Any], max_iterations: int = 1000, find_alternatives: bool = False, alternative_count: int = 3, ) -> Tuple[List[str], float, List[List[str]]]`
+  - `StateGraph.get_edges_for_path( self, path: List[str], current_state: Optional[Dict[str, Any]] = None, ) -> List[GraphEdge]`
+  - `StateGraph.apply_path_effects(self, path: List[str], current_state: Dict[str, Any]) -> Dict[str, Any]`
+  - `StateGraph.get_node_path_cost(self, path: List[str]) -> float`
+  - `StateGraph.get_neighbors(self, node_id: str, current_state: Dict[str, Any]) -> List[Tuple[str, float]]`
+  - `StateGraph.add_edge_with_preconditions( self, source_id: str, target_id: str, cost: float = 1.0, transition_type: str = "normal", **kwargs: Any, ) -> bool`
+  - `StateGraph.create_conditional_edge( self, source_id: str, target_id: str, cost: float = 1.0, condition_type: Optional[ConditionType] = None, **condition_params: Any, ) -> bool`
+  - `StateGraph.create_effect_edge( self, source_id: str, target_id: str, cost: float = 1.0, effect_type: Optional[str] = None, **effect_params: Any, ) -> bool`
+  - `StateGraph.validate_graph(self) -> List[str]`
+  - `StateGraph.validate_graph_advanced(self) -> Tuple[List[str], Dict[str, Any]]`
+  - `StateGraph.visit(node_id: str, depth: int) -> bool`
+  - `StateGraph.get_graph_stats(self) -> Dict[str, Any]`
+  - `StateGraph.clear_search_cache(self) -> None`
+  - `StateGraph.export_to_json(self) -> Dict[str, Any]`
+  - `StateGraph.import_from_json(self, data: Dict[str, Any]) -> None`: Importa de manera transaccional: un documento inválido no borra el grafo actual.
+  - `StateGraph.export_graph(self, file_path: str, format: str = "json") -> bool`
+  - `StateGraph.import_graph(self, file_path: str, format: str = "json") -> bool`
+  - `GraphBuilder.build_navigation_graph(nodes: Dict[str, Node]) -> StateGraph`
+  - `GraphBuilder.build_application_graph(nodes: Dict[str, Node]) -> StateGraph`
+  - `CacheEntry.__init__( self, path: List[str], cost: float, state: Dict[str, Any], timestamp: float, final_state: Optional[Dict[str, Any]] = None, strategy: Optional[str] = None, alternative_paths: Optional[List[List[str]]] = None, graph_revision: Optional[int] = None, ) -> None`
+  - `CacheEntry.is_expired(self, max_age_seconds: float = 300) -> bool`
+  - `CacheEntry.increment_access(self) -> None`
+  - `PerformanceMetrics.__init__(self) -> None`
+  - `PerformanceMetrics.record_search(self, success: bool, path_length: int, cost: float, search_time: float, iterations: int) -> None`
+  - `PerformanceMetrics.record_cache_hit(self) -> None`
+  - `PerformanceMetrics.record_cache_miss(self) -> None`
+  - `PerformanceMetrics.get_hit_rate(self) -> float`
+  - `PerformanceMetrics.get_average_search_time(self) -> float`
+  - `PerformanceMetrics.to_dict(self) -> Dict[str, Any]`
+  - `AdvancedStateGraph.__init__(self, heuristic: Optional[Heuristic] = None, cache_size: int = 100, max_cache_age: float = 300) -> None`
+  - `AdvancedStateGraph.find_path_with_strategy( self, start_node_id: str, goal_node_id: str, current_state: Dict[str, Any], strategy: Optional[SearchStrategy | str] = None, max_iterations: int = 1000, find_alternatives: bool = False, alternative_count: int = 3, ) -> Tuple[List[str], float, List[List[str]]]`
+  - `AdvancedStateGraph.find_route( self, start_node_id: str, goal_node_id: str, current_state: Optional[Dict[str, Any]] = None, strategy: Optional[SearchStrategy | str] = None, max_iterations: int = 1000, find_alternatives: bool = False, alternative_count: int = 3, ) -> RouteResult`
+  - `AdvancedStateGraph.build_route(self, *args: Any, **kwargs: Any) -> RouteResult`
+  - `AdvancedStateGraph.get_advanced_stats(self) -> Dict[str, Any]`
+  - `AdvancedStateGraph.optimize_graph_for_performance(self) -> List[str]`: Limpia caché y ajusta su límite sin cambiar semántica de búsqueda.
+
+#### `src/hands/planner/heuristic.py` [893 líneas] - Heurísticas para Algoritmo de Búsqueda A*
+- **Descripción**: Sistema avanzado de heurísticas para A* con caché LRU determinista, serialización robusta, pesos ajustables y fallbacks seguros. Proporciona estimaciones finitas y no negativas, con soporte para objetivos estructurados y compatibilidad con formatos legacy.
+- **Clases principales**:
+  - `HeuristicType` (Enum): Tipos de heurísticas con alias históricos (MANHATTAN, EUCLIDEAN, UNIFORM, ZERO, GOAL_DISTANCE, CAPABILITY_BASED, STATE_SIMILARITY)
+  - `Heuristic`: Heurística principal con caché LRU, pesos, serialización segura y evaluación robusta con copias de estado
+  - `HeuristicFactory`: Factoría para crear heurísticas preconfiguradas (uniform, goal_distance, capability_based, state_similarity, custom)
+- **Métodos principales**:
+  - `Heuristic.__init__( self, heuristic_type: HeuristicType = HeuristicType.GOAL_DISTANCE, weight: float = 1.0, custom_heuristic: Optional[CustomHeuristic] = None, max_cache_size: int = _DEFAULT_CACHE_SIZE, ) -> None`
+  - `Heuristic.estimate_cost( self, node_id: str, current_state: Dict[str, Any], goal: Goal, all_nodes: Dict[str, Node], ) -> float`
+  - `Heuristic.clear_cache(self) -> None`: Limpia la caché de estimaciones heurísticas.
+  - `Heuristic.get_cache_stats(self) -> Dict[str, Any]`: Devuelve estadísticas y configuración de la caché.
+  - `HeuristicFactory.create_uniform_heuristic(weight: float = 1.0) -> Heuristic`: Crea una heurística constante.
+  - `HeuristicFactory.create_goal_distance_heuristic(weight: float = 1.0) -> Heuristic`: Crea una heurística basada en la distancia al objetivo.
+  - `HeuristicFactory.create_capability_based_heuristic(weight: float = 1.0) -> Heuristic`: Crea una heurística basada en capacidades pendientes.
+  - `HeuristicFactory.create_state_similarity_heuristic(weight: float = 1.0) -> Heuristic`: Crea una heurística basada en similitud de estado.
+  - `HeuristicFactory.create_custom_heuristic( heuristic_func: CustomHeuristic, weight: float = 1.0, ) -> Heuristic`
+
+#### `src/hands/planner/htn_manager.py` [1100 líneas] - Gestor de Descomposición Jerárquica de Tareas
+- **Descripción**: Gestor central de reglas HTN y ejecución jerárquica con integración de grafos de estados y estrategias de descomposición.
+- **Clases principales**:
+  - `HTNStatus` (Enum): Estados del gestor HTN (IDLE, DECOMPOSING, EXECUTING, COMPLETED, FAILED, RESTARTING)
+  - `TaskDecompositionStrategy` (Enum): Estrategias de descomposición (SEQUENTIAL, PARALLEL, CONDITIONAL, ITERATIVE)
+  - `TaskExecutionResult` (dataclass): Resultado estructurado de ejecución de tareas con metadatos
+  - `HTNDecompositionRule` (dataclass): Reglas de descomposición con patrones y precondiciones
+  - `HTNManager`: Gestor central de reglas HTN y ejecución jerárquica con integración de grafos
+- **Métodos principales**:
+  - `HTNManager.__init__(self, planner: Optional[Any] = None) -> None`
+  - `HTNManager.initialize_decomposition_rules(self) -> None`
+  - `HTNManager.set_planner(self, planner: Optional[Any]) -> None`
+  - `HTNManager.set_state_graph(self, state_graph: Optional[StateGraph]) -> None`
+  - `HTNManager.enable_graph_decomposition(self, enabled: bool = True, threshold: int = 3) -> None`
+  - `HTNManager.decompose_and_execute( self, goal: Goal, current_state: Dict[str, Any] ) -> TaskExecutionResult`
+  - `HTNManager.load_task_library(self) -> None`
+  - `HTNManager.decompose_goal(self, goal: Goal, current_state: Dict[str, Any]) -> List[Task]`
+  - `HTNManager.execute_goal_hierarchy( self, goal: Goal, current_state: Dict[str, Any] ) -> TaskExecutionResult`
+  - `HTNManager.get_execution_statistics(self) -> Dict[str, Any]`
+  - `HTNManager.get_task_execution_history(self) -> List[Dict[str, Any]]`
+- **Funciones globales**:
+  - `get_htn_manager() -> HTNManager`: Obtiene instancia singleton del gestor HTN
+
+#### `src/hands/planner/learning_system.py` [899 líneas] - Sistema de Aprendizaje para Planificación
+- **Descripción**: Sistema central de registro y aprendizaje de planificación que registra ejecuciones reales, costes, tiempos, rutas y patrones para que el planificador pueda disponer de datos históricos sin mezclar el aprendizaje con la ejecución de acciones.
+- **Clases principales**:
+  - `LearningEventType` (Enum): Tipos de eventos de aprendizaje (ACTION_EXECUTION, PLAN_EXECUTION, NODE_EXECUTION, REPLANIFICATION, ALTERNATIVE_FOUND, GOAL_ACHIEVED, GOAL_FAILED, COST_ADJUSTMENT)
+  - `LearningEvent` (dataclass): Evento estructurado con metadatos de ejecución, timestamp, éxito, tiempo y costes
+  - `LearningStatistics` (dataclass): Estadísticas agregadas de eventos con tasas de éxito, tiempos y patrones
+  - `LearningSystem`: Sistema central de registro y aprendizaje de planificación con memoria persistente
+- **Métodos principales**:
+  - `LearningEvent.to_dict(self) -> Dict[str, Any]`
+  - `LearningEvent.from_dict(cls, data: Dict[str, Any]) -> "LearningEvent"`
+  - `LearningEvent.finite_nonnegative(key: str, default: float = 0.0) -> float`
+  - `LearningSystem.__init__(self, max_memory_size: int = 10000, learning_rate: float = 0.1)`
+  - `LearningSystem.record_action_execution( self, action_name: str, success: bool, execution_time: float, estimated_cost: float, context: Optional[Dict[str, Any]] = None, application: Optional[str] = None, screen_state: Optional[Dict[str, Any]] = None, actual_cost: Optional[float] = None, ) -> None`
+  - `LearningSystem.record_plan_execution( self, plan_id: str, goal_id: str, plan: Sequence[str], success: bool, execution_time: float, total_estimated_cost: float, context: Optional[Dict[str, Any]] = None, actual_cost: Optional[float] = None, ) -> None`
+  - `LearningSystem.record_node_execution( self, node_id: str, success: bool, execution_time: float, estimated_cost: float, context: Optional[Dict[str, Any]] = None, application: Optional[str] = None, actual_cost: Optional[float] = None, ) -> None`
+  - `LearningSystem.record_replanification( self, original_plan: Sequence[str], new_plan: Sequence[str], reason: str, success: bool, execution_time: float, ) -> None`
+  - `LearningSystem.record_goal_result( self, goal_id: str, success: bool, context: Optional[Dict[str, Any]] = None, execution_time: float = 0.0, ) -> None`
+  - `LearningSystem.get_action_insights(self, action_name: str) -> Dict[str, Any]`
+  - `LearningSystem.get_system_insights(self) -> Dict[str, Any]`
+  - `LearningSystem.get_cost_adjustments(self) -> Dict[str, float]`: Devuelve deltas respecto al último coste estimado (no costes absolutos).
+  - `LearningSystem.get_learned_costs(self) -> Dict[str, float]`: Devuelve los costes absolutos aprendidos por acción.
+  - `LearningSystem.get_route_performance(self, goal_id: Optional[str] = None) -> Dict[str, Any]`
+  - `LearningSystem.export_learning_data(self, filepath: str) -> None`
+  - `LearningSystem.import_learning_data(self, filepath: str) -> None`
+  - `LearningSystem.clear_learning_data(self) -> None`
+  - `LearningSystem.enable_learning(self, enabled: bool = True) -> None`
+  - `LearningSystem.enable_cost_learning(self, enabled: bool = True) -> None`
+  - `LearningSystem.enable_pattern_learning(self, enabled: bool = True) -> None`
+  - `LearningSystem.enable_route_learning(self, enabled: bool = True) -> None`
+- **Funciones globales**:
+  - `get_learning_system() -> LearningSystem`: Obtiene instancia singleton del sistema de aprendizaje
+
+#### `src/hands/planner/node.py` [1137 líneas] - Modelo Canónico de Nodos para Planificación Jerárquica
+- **Descripción**: Fuente única de verdad para el sistema de planificación jerárquica de JARVIS. Implementa un modelo de nodos completo con soporte para múltiples niveles del sistema, aprendizaje automático, grafos de estados, y ejecución con replanificación. El sistema soporta desde nodos simples hasta estructuras jerárquicas complejas con dependencias, precondiciones, efectos y gestión de estado.
+- **Clases principales**:
+  - `NodeType` (Enum): Tipos de nodos en el sistema de planificación
+  - `TaskStatus` (Enum): Estados de ejecución de tareas
+  - `Node` (dataclass): Modelo conceptual central para todos los elementos del sistema
+  - `Goal` (dataclass): Objetivos de alto nivel con verificación de logro y estimación de coste
+  - `Task` (dataclass): Tareas jerárquicas con descomposición recursiva y detección de ciclos
+  - `WorldState` (dataclass): Estado del mundo canónico ligero para planificación
+- **Métodos principales**:
+  - `Node.can_execute(self, current_state: Dict[str, Any]) -> bool`: Verifica las precondiciones declarativas, funcionales y de estado del nodo.
+  - `Node.execute(self, **kwargs) -> Dict[str, Any]`: Ejecuta el callback y devuelve el resultado y el estado candidato actualizado.
+  - `Node.record_attempt(record: Dict[str, Any]) -> Dict[str, Any]`
+  - `Node.verify_success(self, result: Any = None, **kwargs) -> bool`: Verifica el éxito mediante el criterio configurado.
+  - `Node.to_dict(self) -> Dict[str, Any]`: Convierte el nodo a un diccionario serializable.
+  - `Node.from_dict(cls, data: Dict[str, Any]) -> "Node"`: Reconstruye un nodo desde datos serializados, sin restaurar callbacks.
+  - `Node.add_edge(self, target_node_id: str, cost: float = 1.0) -> None`: Añade o actualiza una transición saliente y su coste finito no negativo.
+  - `Node.add_in_edge(self, source_node_id: str, cost: float = 1.0) -> None`: Registra una transición entrante; el coste canónico reside en el emisor.
+  - `Node.get_edge_cost(self, target_node_id: str) -> Optional[float]`: Obtiene el coste de una transición.
+  - `Node.get_valid_transitions(self, current_state: Dict[str, Any], all_nodes: Dict[str, "Node"]) -> List[str]`: Devuelve transiciones de salida cuyo nodo destino puede ejecutarse.
+  - `Node.add_precondition_function(self, precond_func: Callable[[Dict[str, Any]], bool]) -> None`: Añade una precondición funcional.
+  - `Node.add_effect_function(self, effect_func: Callable[..., Dict[str, Any]]) -> None`: Añade un efecto funcional.
+  - `Node.set_state_requirement(self, key: str, value: Any) -> None`: Define un requisito de estado.
+  - `Node.set_state_modification(self, key: str, value: Any) -> None`: Define una modificación de estado esperada.
+  - `Node.mark_as_reusable_action(self, category: str) -> None`: Marca el nodo como acción reutilizable.
+  - `Node.get_execution_stats(self) -> Dict[str, Any]`: Devuelve estadísticas agregadas sin fallar ante entradas históricas malformadas.
+  - `Goal.is_achieved(self, current_state: Dict[str, Any]) -> bool`: Comprueba si el estado actual satisface el objetivo conocido.
+  - `Goal.get_required_capabilities(self) -> List[str]`: Obtiene capacidades necesarias para el objetivo preservando el orden.
+  - `Goal.estimate_cost(self, current_state: Dict[str, Any]) -> float`: Estima el coste restante del objetivo.
+  - `Goal.is_expired(self) -> bool`: Indica si se ha superado el deadline válido del objetivo.
+  - `Goal.to_dict(self) -> Dict[str, Any]`: Convierte el objetivo a un diccionario serializable.
+  - `Goal.from_dict(cls, data: Dict[str, Any]) -> "Goal"`: Reconstruye un objetivo desde un diccionario serializado.
+  - `Task.can_execute(self, current_state: Dict[str, Any], all_nodes: Dict[str, Any]) -> bool`: Verifica dependencias y disponibilidad de hijos, evitando ciclos jerárquicos.
+  - `Task.decompose_task(self, all_nodes: Dict[str, Any]) -> List[str]`: Descompone recursivamente la tarea en hojas sin quedar atrapada en ciclos.
+  - `Task.get_execution_plan(self, current_state: Dict[str, Any], all_nodes: Dict[str, Any]) -> List[str]`: Obtiene candidatos ejecutables en el orden declarado y sin recursión cíclica.
+  - `Task.estimate_task_cost(self, current_state: Dict[str, Any], all_nodes: Dict[str, Any]) -> float`: Estima el coste de los hijos ejecutables sin contar ramas cíclicas.
+  - `Task.to_dict(self) -> Dict[str, Any]`: Convierte la tarea a un diccionario serializable.
+  - `Task.from_dict(cls, data: Dict[str, Any]) -> "Task"`: Reconstruye una tarea desde un diccionario serializado.
+  - `WorldState.get(self, key: str, default: Any = None) -> Any`: Obtiene un valor del estado.
+  - `WorldState.set(self, key: str, value: Any) -> None`: Establece un valor evitando retener referencias mutables externas.
+  - `WorldState.update(self, other: Dict[str, Any]) -> None`: Actualiza el estado con otro estado o diccionario.
+  - `WorldState.copy(self) -> "WorldState"`: Devuelve una copia independiente del estado.
+  - `WorldState.to_dict(self) -> Dict[str, Any]`: Convierte el estado a una representación serializable.
+  - `WorldState.from_dict(cls, data: Dict[str, Any]) -> "WorldState"`: Reconstruye el estado desde un diccionario serializado.
+- **Funciones globales**:
+  - `create_action_node( id: str, name: str, application: str, ui_element: Optional[str] = None, cost: float = 1.0, **kwargs, ) -> Node`: Crea nodos de acción reutilizables con categorías
+  - `create_application_node(id: str, name: str, app_name: str, **kwargs) -> Node`: Crea nodos que representan aplicaciones
+  - `create_state_node(id: str, name: str, state_key: str, state_value: Any, **kwargs) -> Node`: Crea nodos de requisito de estado declarativo
+  - `create_condition_node( id: str, name: str, condition_func: Callable[[Dict[str, Any]], bool], **kwargs, ) -> Node`: Crea nodos de condición mediante callbacks
+
+#### `src/hands/planner/optimization.py` [951 líneas] - Sistema de Optimización de Planificación
+- **Descripción**: Sistema avanzado de optimización para el planificador JARVIS con caché LRU de rutas, eliminación de redundancias, selección de alternativas y optimización contextual. Integración completa con LearningSystem para costes aprendidos y persistencia robusta de datos.
+- **Clases principales**:
+  - `OptimizationType` (Enum): Tipos de optimización disponibles (ROUTE_CACHE, COST_LEARNING, REDUNDANCY_REMOVAL, CONTEXT_AWARE, ALTERNATIVE_SELECTION, PERFORMANCE_MONITORING)
+  - `RouteCacheEntry` (dataclass): Entrada del caché de rutas con metadatos de calidad y acceso
+  - `CostLearningData` (dataclass): Dato individual de aprendizaje de coste con contexto y métricas
+  - `ContextData` (dataclass): Datos contextuales usados por la optimización (preferencias, patrones, éxito)
+  - `OptimizationManager`: Gestor principal de optimización sobre el Planner existente
+- **Métodos principales**:
+  - `RouteCacheEntry.to_dict(self) -> Dict[str, Any]`
+  - `RouteCacheEntry.from_dict(cls, data: Dict[str, Any]) -> "RouteCacheEntry"`
+  - `CostLearningData.to_dict(self) -> Dict[str, Any]`
+  - `CostLearningData.from_dict(cls, data: Dict[str, Any]) -> "CostLearningData"`
+  - `OptimizationManager.__init__(self, planner: "Planner", max_cache_size: int = 1000) -> None`
+  - `OptimizationManager.set_learning_system(self, learning_system: Any) -> None`
+  - `OptimizationManager.optimize_planning( self, goal: Goal, current_state: Dict[str, Any], available_nodes: Optional[Dict[str, Node]] = None, max_planning_time: float = 30.0, ) -> "PlanningResult"`
+  - `OptimizationManager.record_route_execution(self, goal_id: str, current_state: Dict[str, Any], success: bool, execution_time: float = 0.0) -> bool`: Actualiza métricas de la ruta cacheada después de observar su ejecución.
+  - `OptimizationManager.strip(value: Any) -> Any`
+  - `OptimizationManager.record_execution_result(self, plan: List[Dict[str, Any]], execution_time: float, success: bool, context: Optional[Dict[str, Any]] = None) -> None`: Registra un resultado observado; este método no ejecuta el plan.
+  - `OptimizationManager.get_optimization_stats(self) -> Dict[str, Any]`
+  - `OptimizationManager.clear_cache(self) -> None`
+  - `OptimizationManager.invalidate_cache_for_goal(self, goal_id: str) -> int`: Invalida las entradas cacheadas de un objetivo tras cambios de dominio.
+  - `OptimizationManager.enable_optimization(self, optimization_type: OptimizationType, enabled: bool = True) -> None`
+  - `OptimizationManager.export_optimization_data(self, filepath: str) -> None`
+  - `OptimizationManager.import_optimization_data(self, filepath: str) -> None`
+
+#### `src/hands/planner/optimization_config.py` [475 líneas] - Configuración del Sistema de Optimización
+- **Descripción**: Configuración tipada y validada del sistema de optimización con modos predefinidos, configuraciones por subsistema y serialización segura.
+- **Clases principales**:
+  - `OptimizationMode` (Enum): Modos de operación del sistema de optimización (AGGRESSIVE, BALANCED, CONSERVATIVE, LEARNING_ONLY)
+  - `RouteCacheConfig` (dataclass): Configuración del caché de rutas con LRU, precarga y compresión
+  - `CostLearningConfig` (dataclass): Configuración del aprendizaje de costes con tasa de aprendizaje y factor de descuento
+  - `RedundancyRemovalConfig` (dataclass): Configuración de eliminación de redundancias con análisis de efectos y alternativas
+  - `ContextAwareConfig` (dataclass): Configuración de optimización basada en contexto con patrones temporales y de usuario
+  - `AlternativeSelectionConfig` (dataclass): Configuración de selección de alternativas con comparación multidimensional
+  - `PerformanceMonitoringConfig` (dataclass): Configuración de monitoreo de rendimiento con detección de cuellos de botella
+  - `OptimizationConfig` (dataclass): Configuración completa del sistema de optimización con validación automática
+- **Métodos principales**:
+  - `OptimizationConfig.get_aggressive_config(cls) -> "OptimizationConfig"`: Obtiene configuración para modo agresivo.
+  - `OptimizationConfig.get_conservative_config(cls) -> "OptimizationConfig"`: Obtiene configuración para modo conservador.
+  - `OptimizationConfig.get_learning_only_config(cls) -> "OptimizationConfig"`: Obtiene configuración para registrar aprendizaje sin aplicar optimizaciones.
+  - `OptimizationConfig.get_optimization_enabled(self) -> Dict[str, bool]`: Devuelve el estado efectivo de cada técnica para el modo actual.
+  - `OptimizationConfig.validate_config(self) -> List[str]`: Valida rangos y coherencia; una lista vacía indica configuración válida.
+  - `OptimizationConfig.finite(name: str, value: Any, *, minimum: Optional[float] = None, maximum: Optional[float] = None, strict_minimum: bool = False) -> None`
+  - `OptimizationConfig.validate_or_raise(self) -> None`: Lanza ValueError si validate_config detecta problemas.
+  - `OptimizationConfig.to_dict(self) -> Dict[str, Any]`: Devuelve una copia serializable de toda la configuración.
+  - `OptimizationConfig.from_dict(cls, config_dict: Dict[str, Any]) -> "OptimizationConfig"`: Construye configuración desde un diccionario parcial o completo.
+
+#### `src/hands/planner/planner.py` [3129 líneas] - Planificador Principal de JARVIS
+- **Descripción**: Planificador central de JARVIS con capacidades avanzadas de planificación jerárquica, integración HTN, optimización de rutas, aprendizaje automático y gestión de recursos UI. Coordina todas las operaciones de planificación y ejecución del sistema.
+- **Clases principales**:
+  - `PlannerStatus` (Enum): Estados del planificador (IDLE, PLANNING, EXECUTING, COMPLETED, FAILED, REPLANNING)
+  - `PlanQuality` (Enum): Calidad de planes (OPTIMAL, SUBOPTIMAL, MINIMAL, UNCERTAIN)
+  - `PlanningResult` (dataclass): Resultado estructurado de planificación con metadatos
+  - `Planner`: Planificador principal con integración HTN, grafos de estados y optimización
+- **Métodos principales**:
+  - `Planner.__init__(self, executor: Any = None) -> None`
+  - `Planner.get_learning_insights(self) -> Dict[str, Any]`
+  - `Planner.get_action_learning_insights(self, action_name: str) -> Dict[str, Any]`
+  - `Planner.get_cost_adjustments(self) -> Dict[str, float]`
+  - `Planner.export_learning_data(self, filepath: str) -> None`
+  - `Planner.import_learning_data(self, filepath: str) -> None`
+  - `Planner.clear_learning_data(self) -> None`
+  - `Planner.enable_learning(self, enabled: bool = True) -> None`
+  - `Planner.initialize_htn_manager(self) -> None`
+  - `Planner.set_htn_manager(self, htn_manager: Any) -> None`
+  - `Planner.plan_with_htn_integration( self, goal: Goal, current_state: Optional[Dict[str, Any]] = None, available_nodes: Optional[Dict[str, Node]] = None, max_planning_time: float = 30.0, use_graph_optimization: bool = True, htn_decomposition_threshold: int = 3, ) -> PlanningResult`
+  - `Planner.set_state_graph(self, state_graph: StateGraph) -> None`
+  - `Planner.get_state_graph(self) -> Optional[StateGraph]`
+  - `Planner.create_graph_from_nodes(self, nodes: Dict[str, Node]) -> StateGraph`
+  - `Planner.integrate_graph_with_htn(self, graph: StateGraph, htn_manager: Any) -> None`
+  - `Planner.validate_graph_integration(self) -> List[str]`
+  - `Planner.get_graph_integration_status(self) -> Dict[str, Any]`
+  - `Planner.configure_astar_planning( self, heuristic_type: HeuristicType = HeuristicType.GOAL_DISTANCE, heuristic_weight: float = 1.0, graph_type: str = "navigation", ) -> None`
+  - `Planner.set_custom_graph(self, graph: StateGraph) -> None`
+  - `Planner.plan( self, goal: Goal, current_state: Optional[Dict[str, Any]] = None, available_nodes: Optional[Dict[str, Node]] = None, max_planning_time: float = 30.0, find_alternatives: bool = True, use_optimization: bool = False, ) -> PlanningResult`
+  - `Planner.validate_ui_resources_for_plan( self, plan: List[Dict[str, Any]], current_state: Dict[str, Any] ) -> Dict[str, Any]`
+  - `Planner.get_optimal_ui_strategy( self, action_id: str, resource_id: Optional[str] = None ) -> Dict[str, Any]`
+  - `Planner.resolve_ui_conflicts( self, plan: List[Dict[str, Any]], current_state: Dict[str, Any] ) -> List[Dict[str, Any]]`
+  - `Planner.check_ui_readiness( self, goal: Goal, current_state: Dict[str, Any], available_nodes: Optional[Dict[str, Node]] = None, ) -> Dict[str, Any]`
+  - `Planner.replan( self, goal: Goal, current_state: Dict[str, Any], failed_plan: List[Dict[str, Any]], failed_node_index: int, ) -> PlanningResult`
+  - `Planner.load_application_knowledge(self) -> None`
+  - `Planner.get_applications_by_capability(self, capability_name: str) -> List[str]`
+  - `Planner.get_application_capabilities(self, app_name: str) -> Dict[str, Any]`
+  - `Planner.find_application_for_goal(self, goal: Goal) -> Optional[str]`
+  - `Planner.build_application_aware_plan( self, goal: Goal, current_state: Dict[str, Any] ) -> PlanningResult`
+  - `Planner.is_application_available(self, app_name: str) -> bool`
+  - `Planner.get_application_ui_requirements( self, app_name: str, capability: str ) -> List[str]`
+  - `Planner.get_planning_stats(self) -> Dict[str, Any]`
+  - `Planner.execute_plan( self, plan: List[Dict[str, Any]], plan_id: Optional[str] = None ) -> Dict[str, Any]`
+  - `Planner.record_execution_result( self, plan: List[Dict[str, Any]], execution_time: float, success: bool, context: Dict[str, Any], ) -> None`
+  - `Planner.get_optimization_stats(self) -> Dict[str, Any]`
+  - `Planner.clear_optimization_cache(self) -> None`
+  - `Planner.enable_optimization(self, optimization_type: str, enabled: bool = True) -> None`
+  - `Planner.export_optimization_data(self, filepath: str) -> None`
+  - `Planner.import_optimization_data(self, filepath: str) -> None`
+  - `Planner.get_optimization_recommendations(self) -> List[str]`
+
+#### `src/hands/planner/planner_integration.py` [1923 líneas] - Integración del StateGraph con el Sistema de Planificación
+- **Descripción**: Puente entre Goal/estado actual y StateGraph. Inicializa y prepara el grafo, construye transiciones de planificación a partir de precondiciones/efectos, resuelve nodos inicial/final sin depender de IDs inventados, obtiene una ruta del StateGraph/AdvancedStateGraph y devuelve un resultado estructurado sin ejecutar acciones reales.
+- **Clases principales**:
+  - `IntegrationMode` (Enum): Modos de integración (GRAPH_ONLY, HTN_PLUS_GRAPH, FULL_INTEGRATION)
+  - `GraphPlanningResult` (dataclass): Resultado estructurado de planificación con grafo
+  - `GraphPlannerIntegration`: Puente entre Goal/estado actual y StateGraph
+- **Métodos principales**:
+  - `GraphPlannerIntegration.__init__( self, use_astar: bool = True, integration_mode: IntegrationMode | str = IntegrationMode.FULL_INTEGRATION, ) -> None`
+  - `GraphPlannerIntegration.initialize_graph( self, nodes: Iterable[Node], edges_config: Optional[List[Dict[str, Any]]] = None, ) -> StateGraph`
+  - `GraphPlannerIntegration.create_plan_with_graph( self, goal: Goal, current_state: Dict[str, Any], available_nodes: Optional[Dict[str, Node]] = None, max_planning_time: float = 30.0, start_node_id: Optional[str] = None, goal_node_id: Optional[str] = None, ) -> GraphPlanningResult`
+  - `GraphPlannerIntegration.get_integration_statistics(self) -> Dict[str, Any]`
+  - `GraphPlannerIntegration.export_graph_state(self, filepath: str) -> bool`
+  - `GraphPlannerIntegration.import_graph_state(self, filepath: str) -> bool`
+  - `GraphPlannerIntegration.validate_graph_consistency(self) -> Dict[str, Any]`
+  - `GraphPlannerIntegration.build_route(self, *args: Any, **kwargs: Any) -> Any`
+
+#### `src/hands/planner/preconditions_effects.py` [1076 líneas] - Sistema Avanzado de Precondiciones y Efectos
+- **Descripción**: Sistema avanzado de precondiciones y efectos para planificación jerárquica con construcción y reutilización de condiciones y efectos, evaluación de precondiciones simples y compuestas, aplicación determinista de efectos sobre estados, e integración con ActionInfo/ActionType del registro central de acciones.
+- **Clases principales**:
+  - `PreconditionsEffectsManager`: Gestor centralizado de precondiciones y efectos con registro y reutilización.
+- **Métodos principales**:
+  - `PreconditionsEffectsManager.__init__(self) -> None`
+  - `PreconditionsEffectsManager.create_condition( self, condition_type: ConditionType, key: Optional[str] = None, expected_value: Any = None, function: Optional[Callable[[State], bool]] = None, description: str = "", parameters: Optional[Dict[str, Any]] = None, ) -> Condition`
+  - `PreconditionsEffectsManager.create_effect( self, effect_type: str, key: Optional[str], value: Any = None, function: Optional[Callable[[State, Dict[str, Any]], State]] = None, description: str = "", parameters: Optional[Dict[str, Any]] = None, cumulative: bool = False, ) -> Effect`
+  - `PreconditionsEffectsManager.create_composite_condition( self, conditions: List[ConditionInput], operator: str = "and", description: str = "", ) -> Condition`
+  - `PreconditionsEffectsManager.verify_action_preconditions( self, action_info: ActionInfo, current_state: State ) -> bool`
+  - `PreconditionsEffectsManager.evaluate_condition( self, condition: ConditionInput, current_state: State ) -> bool`
+  - `PreconditionsEffectsManager.apply_action_effects( self, action_info: ActionInfo, current_state: State, execution_result: Optional[Dict[str, Any]] = None, ) -> State`
+  - `PreconditionsEffectsManager.apply_effect( self, effect: EffectInput, current_state: State, execution_result: Optional[Dict[str, Any]] = None, ) -> State`
+  - `PreconditionsEffectsManager.get_state_requirements_for_action( self, action_info: ActionInfo ) -> Dict[str, Any]`
+  - `PreconditionsEffectsManager.get_state_modifications_from_action( self, action_info: ActionInfo ) -> Dict[str, Any]`
+  - `PreconditionsEffectsManager.create_action_with_preconditions_effects( self, name: str, description: str, preconditions: List[ConditionInput], effects: List[EffectInput], cost: float = 1.0, **kwargs: Any, ) -> ActionInfo`
+- **Funciones globales**:
+  - `get_preconditions_effects_manager() -> PreconditionsEffectsManager`: Obtiene la instancia global del gestor
+  - `create_application_open_condition(app_name: str) -> Condition`: Crea una condición que representa una aplicación abierta
+  - `create_application_active_condition(app_name: str) -> Condition`: Crea una condición que representa una aplicación activa
+  - `create_ui_element_calibrated_condition( app_name: str, element_name: str ) -> Condition`: Crea una condición que representa un elemento UI calibrado
+  - `create_application_open_effect(app_name: str) -> Effect`: Crea un efecto que representa una aplicación abierta
+  - `create_ui_element_calibrate_effect(app_name: str, element_name: str) -> Effect`: Crea un efecto que representa un elemento UI calibrado
+
+#### `src/hands/planner/preconditions_effects_types.py` [821 líneas] - Sistema de Tipos para Precondiciones y Efectos
+- **Descripción**: Sistema avanzado de tipos base para precondiciones y efectos con copias de estado seguras, evaluación robusta y aplicación determinista. Proporciona estructuras de datos fundamentales para definir condiciones que deben cumplirse antes de ejecutar acciones y efectos que modifican el estado tras la ejecución. Evita importaciones circulares con action_registry y mantiene separación entre planificación y ejecución.
+- **Clases principales**:
+  - `ConditionType` (Enum): Tipos de condiciones con aliases históricos (STATE_EQUALS, STATE_EXISTS, STATE_TRUE, STATE_GREATER_THAN, STATE_LESS_THAN, APPLICATION_OPEN, APPLICATION_ACTIVE, UI_ELEMENT_AVAILABLE, UI_ELEMENT_CALIBRATED, CUSTOM_FUNCTION, COMPOSITE_AND, COMPOSITE_OR).
+  - `Condition` (dataclass): Condición robusta con evaluación segura, soporte para funciones personalizadas y condiciones compuestas con protección contra ciclos.
+  - `Effect` (dataclass): Efecto determinista que devuelve nuevos estados sin mutar el original, soportando múltiples tipos como state_set, state_increment, state_decrement, state_append, state_remove, application_open/close/activate, ui_element_calibrate/focus, custom_function, composite.
+- **Métodos principales**:
+  - `Condition.evaluate(self, state: State) -> bool`: Evalúa la condición contra el estado actual sin mutarlo.
+  - `Effect.apply( self, state: State, execution_result: Optional[Dict[str, Any]] = None, ) -> State`
+
+#### `src/hands/planner/task_executor.py` [1097 líneas] - Ejecutor de Tareas para HTN
+- **Descripción**: Convierte tareas HTN en unidades ejecutables y delega la ejecución real en las capacidades registradas o en el executor principal de JARVIS. El módulo no simula ejecuciones exitosas: cuando no existe una capacidad real disponible, la tarea termina en FAILED.
+- **Clases principales**:
+  - `TaskExecutorStatus` (Enum): Estados del ejecutor de tareas (IDLE, PREPARING, EXECUTING, COMPLETED, FAILED, RETRYING)
+  - `TaskExecutionMode` (Enum): Modos de ejecución (SEQUENTIAL, PARALLEL, CONDITIONAL, FALLBACK)
+  - `TaskExecutionConfig` (dataclass): Configuración de ejecución con reintentos, timeout y paralelismo
+  - `TaskExecutor`: Ejecutor principal de tareas HTN integrado con las capacidades reales de JARVIS
+- **Métodos principales**:
+  - `TaskExecutor.__init__(self, config: Optional[TaskExecutionConfig] = None)`
+  - `TaskExecutor.execute_task(self, task: Task, current_state: Dict[str, Any]) -> TaskExecutionResult`: Prepara y ejecuta una tarea individual.
+  - `TaskExecutor.execute_task_with_retry( self, task: Task, current_state: Dict[str, Any] ) -> TaskExecutionResult`
+  - `TaskExecutor.execute_task_hierarchy( self, tasks: List[Task], current_state: Dict[str, Any], mode: TaskExecutionMode = TaskExecutionMode.SEQUENTIAL, ) -> List[TaskExecutionResult]`
+  - `TaskExecutor.explicit(**kwargs: Any) -> Dict[str, Any]`
+  - `TaskExecutor.callback(**kwargs: Any) -> Dict[str, Any]`
+  - `TaskExecutor.check_custom(result: Any, **kwargs: Any) -> bool`
+  - `TaskExecutor.success_criteria(result: Any, **kwargs: Any) -> bool`
+  - `TaskExecutor.run_isolated(task: Task) -> Tuple[TaskExecutionResult, Dict[str, Any]]`
+  - `TaskExecutor.get_execution_statistics(self) -> Dict[str, Any]`
+- **Funciones globales**:
+  - `get_htn_manager() -> Any`: Obtiene el HTN Manager mediante importación diferida
+  - `get_application_knowledge_integrator() -> Any`: Obtiene el integrador de conocimiento de aplicaciones
+  - `get_executor() -> Any`: Obtiene el executor principal de JARVIS mediante importación diferida
+  - `get_action_registry() -> Any`: Obtiene el registro central de acciones mediante importación diferida
+  - `get_task_executor() -> TaskExecutor`: Obtiene instancia singleton del ejecutor de tareas
+
+### 🧩 Módulo `src/hands/windows/` - Acciones de Windows
+
+#### `src/hands/windows/__init__.py` [3 líneas] - Inicialización del Módulo Windows
+- **Descripción**: Módulo específico para aplicaciones de Windows. Archivo de inicialización del paquete Windows que contiene solo la documentación del módulo.
+
+#### `src/hands/windows/calibrator_windows.py` [260 líneas] - Calibrador Específico para Windows
+- **Descripción**: Adaptador de compatibilidad para la calibración de aplicaciones Windows. La calibración real se realiza mediante el sistema universal: CalibrationManager -> descubrimiento de aplicación -> apertura/enfoque -> ScreenManager -> detección de monitor real -> captura -> UniversalVisualCalibrator -> Qwen3-VL 8B Instruct -> coordenadas absolutas -> guardado centralizado.
+- **Clases principales**:
+  - `WindowsCalibrator`: Adaptador legacy que usa exactamente el flujo universal.
+- **Métodos principales**:
+  - `WindowsCalibrator.__init__(self) -> None`
+  - `WindowsCalibrator.get_calibration_prompt( self, app_name: str, ) -> str`
+  - `WindowsCalibrator.calibrate_app_both_screens( self, app_name: str, ) -> Dict[str, Any]`
+  - `WindowsCalibrator.calibrate_app( self, app_name: str, ) -> Dict[str, Any]`
+- **Funciones globales**:
+  - `calibrate_app( app_name: str, ) -> str`
+
+#### `src/hands/windows/windows.py` [678 líneas] - Funciones Específicas para Windows
+- **Descripción**: Funciones auxiliares para aplicaciones de Windows. La geometría de monitores y las coordenadas se obtienen exclusivamente mediante ScreenManager. La calibración universal de aplicaciones NO utiliza coordenadas manuales ni tablas específicas por aplicación. Flujo oficial de calibración: CalibrationManager -> aplicación -> ventana -> ScreenManager -> monitor real -> captura -> UniversalVisualCalibrator -> Qwen3-VL -> coordenadas absolutas Este módulo mantiene utilidades y APIs legacy para compatibilidad. La calibración universal no debe depender de funciones específicas de Notepad, Calculator, Paint, Explorer o CMD.
+- **Funciones globales**:
+  - `actualizar_api_key_riot() -> str`: Abre Riot Developer Portal y solicita un análisis visual.
+  - `get_windows_commands() -> list`: Devuelve las funciones públicas/legacy asociadas a Windows.
+
+### 🗃️ Módulo `src/memory/` - Sistema de Memoria y Planificación
+
+#### `src/memory/__init__.py` [78 líneas] - Inicialización del Módulo Memoria
+- **Descripción**: Módulo de memoria mejorado para soportar planificación jerárquica con separación de memoria conversacional y conocimiento permanente, gestión de entidades de dominio, estado del mundo explícito y soporte para planificación jerárquica.
+
+#### `src/memory/conversation.py` [1129 líneas] - Memoria de Conversaciones y Sistema de Planificación
+- **Descripción**: Memoria de conversaciones y sistema de planificación jerárquica. Transforma el sistema de texto→comando→función a intención→objetivo→plan→ejecución. Incluye: modelo de nodos, nodos jerárquicos, memoria de dominio, comandos de alto nivel y compatibilidad con el sistema legacy.
+- **Clases principales**:
+  - `NodeType` (Enum): Tipos de nodos en el sistema de planificación (INTENTION, GOAL, TASK, ACTION, CONDITION, STATE, RESOURCE, APPLICATION, UI_ELEMENT, RESULT, PLAN).
+  - `TaskStatus` (Enum): Estado de ejecución de tareas (PENDING, EXECUTING, COMPLETED, FAILED, ABORTED).
+  - `Node` (dataclass): Modelo básico de nodo para memoria.
+  - `Goal` (dataclass): Modelo básico de objetivo para memoria.
+  - `Task` (dataclass): Tarea jerárquica.
+  - `Task` (dataclass): Tarea jerárquica.
+  - `DomainMemory`: Memoria de conocimiento del dominio.
+  - `ConversationMemory`: Sistema de memoria transformado para planificación jerárquica.
+- **Métodos principales**:
+  - `Task.can_execute(self, current_state: Dict[str, Any], all_nodes: Dict[str, Node]) -> bool`: Verifica si la tarea puede ejecutarse.
+  - `DomainMemory.__init__(self)`
+  - `DomainMemory.load_domain_knowledge(self) -> None`: Carga conocimiento del dominio desde archivos.
+  - `DomainMemory.load_user_preferences(self) -> None`: Carga preferencias del usuario desde archivo persistente.
+  - `DomainMemory.save_user_preferences(self) -> bool`: Guarda preferencias del usuario de forma persistente.
+  - `DomainMemory.get_entity(self, entity_name: str) -> Optional[Entity]`: Obtiene una entidad por nombre o alias.
+  - `DomainMemory.get_application_capabilities(self, app_name: str) -> List[str]`: Obtiene capacidades de una aplicación.
+  - `DomainMemory.get_capability_definition(self, category: str, capability: str) -> Optional[Dict[str, Any]]`: Obtiene definición detallada de una capacidad.
+  - `DomainMemory.record_user_interaction(self, user_input: str, entity_used: Optional[str], action_taken: str, success: bool) -> None`
+  - `DomainMemory.get_user_preferences(self) -> Dict[str, Any]`: Obtiene preferencias del usuario.
+  - `DomainMemory.get_preferred_entities(self, entity_type: Optional[str] = None) -> List[Entity]`: Obtiene entidades preferidas por el usuario.
+  - `DomainMemory.get_preferred_application(self, action_type: str) -> Optional[str]`: Obtiene aplicación preferida para un tipo de acción.
+  - `DomainMemory.add_knowledge_update(self, update_type: str, content: Dict[str, Any]) -> None`: Añade actualización de conocimiento para persistencia futura.
+  - `DomainMemory.get_suggested_entities(self, partial_name: str, limit: int = 5) -> List[Entity]`: Obtiene sugerencias de entidades basadas en nombre parcial y preferencias.
+  - `DomainMemory.reason_about_entities(self, context: Dict[str, Any]) -> Dict[str, Any]`: Realiza razonamiento básico sobre entidades basado en contexto y preferencias.
+  - `ConversationMemory.__init__(self)`
+  - `ConversationMemory.parse_user_input(self, user_input: str) -> Optional[Goal]`: Transforma entrada de usuario en objetivo (FASE 15).
+  - `ConversationMemory.create_plan_from_goal(self, goal: Goal) -> Optional[List[str]]`: Crea un plan a partir de un objetivo (FASE 6, 7).
+  - `ConversationMemory.update_world_state(self, state_update: Dict[str, Any]) -> None`: Actualiza el estado del mundo.
+  - `ConversationMemory.add_user_message(self, user_text: str) -> None`: Añade mensaje de usuario a la memoria conversacional (compatibilidad).
+  - `ConversationMemory.get_current_state(self) -> Dict[str, Any]`: Obtiene estado actual del mundo.
+  - `ConversationMemory.create_node(self, node_config: Dict[str, Any]) -> Node`: Crea un nodo en el sistema de planificación.
+  - `ConversationMemory.create_task(self, task_config: Dict[str, Any]) -> Task`: Crea una tarea jerárquica.
+  - `ConversationMemory.get_applicable_nodes(self, current_state: Dict[str, Any]) -> List[Node]`: Obtiene nodos aplicables en el estado actual.
+  - `ConversationMemory.get_alias(self, transcribed_text: str) -> Optional[str]`: Método de compatibilidad para aliases antiguos.
+  - `ConversationMemory.record_command_usage(self, user_input: str, command_executed: str, success: bool = True) -> None`: Registra uso de comando para análisis predictivo (compatibilidad).
+  - `ConversationMemory.save_conversation( self, user_text: str, assistant_text: str, goal: Optional[Goal] = None, plan: Optional[List[str]] = None, execution_result: Optional[Dict[str, Any]] = None, ) -> bool`
+  - `ConversationMemory.get_conversation_history(self) -> List[Dict[str, Any]]`: Obtiene historial con información de planificación.
+  - `ConversationMemory.clear_history(self) -> bool`: Borra historial de conversaciones.
+  - `ConversationMemory.clear_predictive_data(self) -> bool`: Borra datos predictivos.
+  - `ConversationMemory.get_learning_insights(self) -> Dict[str, Any]`: Obtiene insights de aprendizaje del nuevo sistema.
+  - `ConversationMemory.save_domain_knowledge_persistence(self) -> bool`: Guarda el estado completo del conocimiento de dominio para persistencia.
+  - `ConversationMemory.load_domain_knowledge_persistence(self) -> bool`: Carga conocimiento de dominio persistido.
+
+#### `src/memory/entity_resolver.py` [825 líneas] - Sistema de Resolución Avanzada de Entidades
+- **Descripción**: Sistema avanzado de resolución de entidades para la memoria de dominio. Implementa resolución de entidades con contexto, manejo de ambigüedades, búsqueda semántica e integración con HTN y Goals.
+- **Clases principales**:
+  - `EntityResolutionResult` (dataclass): Resultado de la resolución de entidad con entidad, confianza, método de resolución, alternativas, contexto usado y timestamp.
+  - `ResolutionContext` (dataclass): Contexto para resolución de entidades con historial conversacional, intención actual, entidades recientes, preferencias de usuario y información de sesión.
+  - `EntityResolver`: Sistema avanzado de resolución de entidades con búsqueda exacta, difusa, por propiedades y aprendizaje continuo.
+- **Métodos principales**:
+  - `EntityResolver.__init__(self, memory_manager: Optional[MemoryManager] = None)`
+  - `EntityResolver.resolve_entity(self, entity_reference: str, context: Optional[ResolutionContext] = None, entity_type: Optional[str] = None) -> EntityResolutionResult`
+  - `EntityResolver.resolve_entities_batch(self, entity_references: List[str], context: Optional[ResolutionContext] = None) -> List[EntityResolutionResult]`
+  - `EntityResolver.get_entity_suggestions(self, partial_text: str, entity_type: Optional[str] = None, limit: int = 5) -> List[Entity]`
+  - `EntityResolver.resolve_url(self, url_input: str, context: Optional[ResolutionContext] = None) -> EntityResolutionResult`
+  - `EntityResolver.extract_urls_from_text(self, text: str) -> List[str]`: Extrae todas las URLs de un texto.
+  - `EntityResolver.get_url_suggestions(self, partial_url: str, limit: int = 5) -> List[Entity]`
+  - `EntityResolver.learn_from_resolution(self, result: EntityResolutionResult, user_feedback: Optional[bool] = None) -> None`
+  - `EntityResolver.set_user_preference(self, entity_id: str, preference_type: str, preference_value: Any, context: Optional[Dict[str, Any]] = None) -> bool`
+  - `EntityResolver.get_user_preferences_for_entity(self, entity_id: str) -> List[UserPreference]`: Obtiene todas las preferencias del usuario para una entidad específica.
+  - `EntityResolver.get_preferred_entities(self, preference_type: str = None) -> List[Entity]`: Obtiene entidades preferidas por el usuario.
+  - `EntityResolver.set_entity_attribute(self, entity_id: str, attribute_name: str, attribute_value: Any, attribute_type: str = "string", source: str = "resolver", metadata: Optional[Dict[str, Any]] = None) -> bool`
+  - `EntityResolver.get_entity_attributes(self, entity_id: str) -> List[EntityAttribute]`: Obtiene todos los atributos extendidos de una entidad.
+  - `EntityResolver.get_entities_with_attribute(self, attribute_name: str, attribute_value: Any) -> List[Entity]`: Busca entidades que tienen un atributo específico.
+  - `EntityResolver.learn_entity_interaction(self, entity_id: str, interaction_type: str, success: bool = True, metadata: Optional[Dict[str, Any]] = None) -> bool`
+
+#### `src/memory/prediction.py` [1081 líneas] - Memoria Predictiva Mejorada
+- **Descripción**: Memoria predictiva mejorada para sistema de planificación jerárquica. Integra predicciones con el nuevo sistema de intenciones y objetivos. Cubre memoria de dominio mejorada, comandos de alto nivel, compatibilidad, optimización y aprendizaje.
+- **Clases principales**:
+  - `PredictionResult` (dataclass): Resultado de predicción para planificación con goal predicho, confianza, razonamiento, alternativas, probabilidad de ejecución, coste estimado y tasa de éxito histórica.
+  - `ExecutionMetrics` (dataclass): Métricas de ejecución para aprendizaje con goal_id, éxito, tiempo de ejecución, coste real, timestamp, contexto, mensaje de error y replanificaciones.
+  - `EnhancedPredictionMemory`: Clase principal de memoria predictiva mejorada que integra predicciones de objetivos, aprendizaje de rutas exitosas, optimización de costes y compatibilidad con sistema legacy.
+  - `LASTINPUTINFO`
+  - `PredictionMemory`: Clase legacy para compatibilidad que wrapper sobre EnhancedPredictionMemory.
+- **Métodos principales**:
+  - `EnhancedPredictionMemory.__init__(self, filepath: str = "data/prediction_memory.json") -> None`
+  - `EnhancedPredictionMemory.predict_goal_from_input(self, user_input: str, current_state: Dict[str, Any]) -> PredictionResult`: Predice objetivo basado en entrada de usuario (FASE 15).
+  - `EnhancedPredictionMemory.record_goal_execution(self, goal: Goal, success: bool, execution_time: float, actual_cost: float, context: Dict[str, Any], error_message: Optional[str] = None, replanifications: int = 0) -> None`
+  - `EnhancedPredictionMemory.get_goal_prediction_history(self, goal_type: Optional[str] = None) -> List[Dict[str, Any]]`: Obtiene historial de predicciones de goals.
+  - `EnhancedPredictionMemory.get_cached_path(self, goal_type: str, target: str) -> Optional[Dict[str, Any]]`: Obtiene ruta cacheada para goal específico.
+  - `EnhancedPredictionMemory.get_cost_estimation(self, goal_type: str) -> float`: Obtiene estimación de coste para tipo de goal.
+  - `EnhancedPredictionMemory.get_success_rate(self, goal_type: str) -> float`: Obtiene tasa de éxito para tipo de goal.
+  - `EnhancedPredictionMemory.record_command(self, command: str, success: bool = True, source: str = "voice") -> Dict[str, Any]`: Método legacy para registrar comandos (FASE 16).
+  - `PredictionMemory.__init__(self, filepath: str = "data/prediction_memory.json")`
+- **Funciones globales**:
+  - `get_enhanced_prediction_memory() -> EnhancedPredictionMemory`: Obtiene instancia singleton de memoria predictiva mejorada.
+  - `get_prediction_memory() -> PredictionMemory`: Función singleton legacy para compatibilidad.
+
+#### `src/memory/storage.py` [1984 líneas] - Sistema de Almacenamiento Mejorado
+- **Descripción**: Sistema de almacenamiento mejorado para soportar planificación jerárquica con manejo avanzado de memoria, caché y persistencia. Implementa estado del mundo, memoria de dominio avanzada, soporte para planes y ejecuciones, estadísticas de aprendizaje y manejo avanzado de caché para rendimiento.
+- **Clases principales**:
+  - `MemoryType` (Enum): Tipos de memoria en el sistema mejorado (CONVERSATIONAL, DOMAIN_KNOWLEDGE, ENTITIES, APPLICATIONS, STATE, PLANS, EXECUTIONS, LEARNING_STATS, RELATIONSHIPS, PREFERENCES).
+  - `Entity` (dataclass): Entidad mejorada para memoria de dominio con id, type, name, properties, metadata, aliases, confidence y tags.
+  - `ConversationalMemory` (dataclass): Memoria conversacional mejorada con id, message, response, timestamp, context, intent, entities, confidence, execution_time y success.
+  - `WorldState` (dataclass): Estado del mundo mejorado con timestamp, applications, ui_elements, system_info, constraints, last_actions y active_goals.
+  - `Plan` (dataclass): Plan de ejecución con id, goal, nodes, created_at, updated_at, status, execution_time, success, cost y heuristic_value.
+  - `ExecutionRecord` (dataclass): Registro de ejecución para aprendizaje con id, plan_id, action_name, parameters, start_time, end_time, success, execution_time, error, retries, alternatives_tried y context.
+  - `LearningStat` (dataclass): Estadística de aprendizaje con action_name, total_executions, successful_executions, average_execution_time, success_rate y last_updated.
+  - `UserPreference` (dataclass): Preferencia de usuario con user_id, preference_type, preference_key, preference_value, confidence, created_at, updated_at, context y usage_count.
+  - `EntityAttribute` (dataclass): Atributo extendido de entidad con entity_id, attribute_name, attribute_value, attribute_type, source, confidence, created_at, updated_at y metadata.
+  - `MemoryStorage`: Interfaz abstracta para almacenamiento de memoria con métodos save, load y exists.
+  - `JSONStorage`: Almacenamiento en archivos JSON con manejo avanzado, caché y procesamiento inteligente de datos según tipo de memoria.
+  - `MemoryManager`: Gestor de memoria mejorado con caché, soporte completo para arquitectura y métodos específicos para cada tipo de memoria.
+- **Métodos principales**:
+  - `Entity.to_dict(self) -> Dict[str, Any]`: Convierte a diccionario.
+  - `Entity.from_dict(cls, data: Dict[str, Any]) -> "Entity"`: Crea desde diccionario.
+  - `Entity.matches_query(self, query: str) -> bool`: Verifica si la entidad coincide con una búsqueda.
+  - `ConversationalMemory.to_dict(self) -> Dict[str, Any]`: Convierte a diccionario.
+  - `ConversationalMemory.from_dict(cls, data: Dict[str, Any]) -> "ConversationalMemory"`: Crea desde diccionario.
+  - `WorldState.to_dict(self) -> Dict[str, Any]`: Convierte a diccionario.
+  - `WorldState.from_dict(cls, data: Dict[str, Any]) -> "WorldState"`: Crea desde diccionario.
+  - `WorldState.get_application_state(self, app_name: str) -> Dict[str, Any]`: Obtiene el estado de una aplicación específica.
+  - `WorldState.get_ui_element_state(self, element_name: str) -> Dict[str, Any]`: Obtiene el estado de un elemento UI específico.
+  - `Plan.to_dict(self) -> Dict[str, Any]`: Convierte a diccionario.
+  - `Plan.from_dict(cls, data: Dict[str, Any]) -> "Plan"`: Crea desde diccionario.
+  - `ExecutionRecord.to_dict(self) -> Dict[str, Any]`: Convierte a diccionario.
+  - `ExecutionRecord.from_dict(cls, data: Dict[str, Any]) -> "ExecutionRecord"`: Crea desde diccionario.
+  - `LearningStat.update(self, success: bool, execution_time: float) -> None`: Actualiza estadísticas con nueva ejecución.
+  - `UserPreference.to_dict(self) -> Dict[str, Any]`: Convierte a diccionario.
+  - `UserPreference.from_dict(cls, data: Dict[str, Any]) -> "UserPreference"`: Crea desde diccionario.
+  - `EntityAttribute.to_dict(self) -> Dict[str, Any]`: Convierte a diccionario.
+  - `EntityAttribute.from_dict(cls, data: Dict[str, Any]) -> "EntityAttribute"`: Crea desde diccionario.
+  - `MemoryStorage.save(self, data: Any, memory_type: MemoryType) -> bool`: Guarda datos.
+  - `MemoryStorage.load(self, memory_type: MemoryType) -> Any`: Carga datos.
+  - `MemoryStorage.exists(self, memory_type: MemoryType) -> bool`: Verifica si existe.
+  - `JSONStorage.__init__(self, base_path: Union[str, Path])`
+  - `JSONStorage.get_file_path(self, memory_type: MemoryType) -> Path`: Obtiene la ruta del archivo para un tipo de memoria.
+  - `JSONStorage.save(self, data: Any, memory_type: MemoryType) -> bool`: Guarda datos en archivo JSON con manejo inteligente.
+  - `JSONStorage.load(self, memory_type: MemoryType) -> Any`: Carga datos desde archivo JSON.
+  - `JSONStorage.exists(self, memory_type: MemoryType) -> bool`: Verifica si el archivo existe.
+  - `MemoryManager.__init__(self, storage_path: Optional[Union[str, Path]] = None)`
+  - `MemoryManager.save_entity(self, entity: Entity) -> bool`: Guarda una entidad en la memoria de dominio.
+  - `MemoryManager.get_entity(self, entity_id: str) -> Optional[Entity]`: Obtiene una entidad por su ID.
+  - `MemoryManager.get_entities_by_type(self, entity_type: str) -> List[Entity]`: Obtiene todas las entidades de un tipo específico.
+  - `MemoryManager.find_entities( self, query: str = "", entity_type: Optional[str] = None, ) -> List[Entity]`
+  - `MemoryManager.find_entities_by_property( self, property_name: str, property_value: Any, ) -> List[Entity]`
+  - `MemoryManager.add_conversational_memory( self, message: str, response: str, context: Optional[Dict[str, Any]] = None, intent: Optional[str] = None, entities: Optional[List[str]] = None, success: Optional[bool] = None, execution_time: float = 0.0, confidence: float = 1.0, ) -> bool`
+  - `MemoryManager.get_conversational_memory( self, limit: int = 50, intent: Optional[str] = None, ) -> List[ConversationalMemory]`
+  - `MemoryManager.save_world_state( self, state: Union[WorldState, Dict[str, Any]], ) -> bool`
+  - `MemoryManager.get_world_state(self) -> WorldState`: Obtiene el estado actual del mundo.
+  - `MemoryManager.update_world_state(self, key: str, value: Any) -> bool`: Actualiza una propiedad del estado del mundo.
+  - `MemoryManager.save_plan(self, plan: Plan) -> bool`: Guarda un plan.
+  - `MemoryManager.get_plan(self, plan_id: str) -> Optional[Plan]`: Obtiene un plan por su ID.
+  - `MemoryManager.save_execution_record( self, record: ExecutionRecord, ) -> bool`
+  - `MemoryManager.update_learning_stats( self, action_name: str, success: bool, execution_time: float, ) -> bool`
+  - `MemoryManager.get_learning_stats( self, action_name: Optional[str] = None, ) -> Union[LearningStat, Dict[str, LearningStat]]`
+  - `MemoryManager.clear_memory( self, memory_type: Optional[MemoryType] = None, ) -> bool`
+  - `MemoryManager.get_memory_stats(self) -> Dict[str, Any]`: Obtiene estadísticas detalladas de la memoria.
+  - `MemoryManager.save_user_preference( self, preference: UserPreference, ) -> bool`
+  - `MemoryManager.get_user_preference( self, user_id: str, preference_type: str, preference_key: str, ) -> Optional[UserPreference]`
+  - `MemoryManager.get_user_preferences( self, user_id: str, preference_type: Optional[str] = None, ) -> List[UserPreference]`
+  - `MemoryManager.update_user_preference( self, user_id: str, preference_type: str, preference_key: str, value: Any, context: Optional[Dict[str, Any]] = None, ) -> bool`
+  - `MemoryManager.learn_user_preference( self, user_id: str, entity_id: str, interaction_type: str, success: bool = True, ) -> bool`
+  - `MemoryManager.save_entity_attribute( self, attribute: EntityAttribute, ) -> bool`
+  - `MemoryManager.get_entity_attribute( self, entity_id: str, attribute_name: str, ) -> Optional[EntityAttribute]`
+  - `MemoryManager.get_entity_attributes( self, entity_id: str, ) -> List[EntityAttribute]`
+  - `MemoryManager.update_entity_attribute( self, entity_id: str, attribute_name: str, value: Any, attribute_type: str = "string", source: str = "system", metadata: Optional[Dict[str, Any]] = None, ) -> bool`
+  - `MemoryManager.get_entities_by_attribute( self, attribute_name: str, attribute_value: Any, ) -> List[Entity]`
+  - `MemoryManager.export_memory( self, export_path: Union[str, Path], ) -> bool`
+- **Funciones globales**:
+  - `get_memory_manager() -> MemoryManager`: Obtiene la instancia global del gestor de memoria.
+  - `save_entity(entity: Entity) -> bool`: Guarda una entidad.
+  - `get_entity(entity_id: str) -> Optional[Entity]`: Obtiene una entidad.
+  - `get_entities_by_type(entity_type: str) -> List[Entity]`: Obtiene entidades.
+  - `find_entities( query: str = "", entity_type: Optional[str] = None, ) -> List[Entity]`
+  - `add_conversational_memory( message: str, response: str, **kwargs, ) -> bool`
+  - `get_world_state() -> WorldState`: Obtiene el estado del mundo.
+  - `update_world_state(key: str, value: Any) -> bool`: Actualiza el estado del mundo.
+  - `save_plan(plan: Plan) -> bool`: Guarda un plan.
+  - `get_plan(plan_id: str) -> Optional[Plan]`: Obtiene un plan.
+  - `update_learning_stats( action_name: str, success: bool, execution_time: float, ) -> bool`
+  - `resolve_entity_to_url(entity: Entity) -> Optional[str]`: Resuelve una entidad a una URL.
+  - `get_entity_attributes(entity: Entity) -> Dict[str, Any]`: Obtiene atributos extendidos de una entidad.
+  - `create_goal_from_entity( entity: Entity, user_input: str, ) -> Optional[Dict[str, Any]]`
+  - `verify_entity_integrity( entity: Entity, ) -> Dict[str, Any]`
+
+### 🗣️ Módulo `src/mouth/` - Sistema de Voz
+
+#### `src/mouth/__init__.py` [4 líneas] - Inicialización del Módulo Voz
+- **Descripción**: Módulo principal de voz de JARVIS con importación del sistema de síntesis de voz.
+
+#### `src/mouth/speaker.py` [680 líneas] - Sistema de Síntesis de Voz
+- **Descripción**: Sistema de síntesis de voz usando motor Kokoro ONNX. Controla la generación y reproducción de audio con múltiples voces y capacidades de tokenización.
+- **Clases principales**:
+  - `Mouth`: Clase principal que gestiona la síntesis de voz con capacidades de inicialización, gestión de voces, tokenización y síntesis.
+- **Métodos principales**:
+  - `Mouth.__init__(self)`: Inicializa el motor de síntesis de voz.
+  - `Mouth.get_available_voices(self) -> List[str]`: Devuelve los IDs de voz disponibles en models/voices.
+  - `Mouth.has_voice( self, voice_id: str, ) -> bool`
+  - `Mouth.set_voice( self, voice_id: str, ) -> bool`
+  - `Mouth.get_current_voice(self) -> str`: Devuelve el ID de la voz actualmente activa.
+  - `Mouth.speak( self, text: str, voice_id: Optional[str] = None, output_file: str = "output.wav", ) -> Optional[str]`
+  - `Mouth.speak_async( self, text: str, voice_id: Optional[str] = None, output_file: str = "output.wav", )`
+
+### 🛠️ Módulo `src/tools/` - Sistema de Herramientas
+
+#### `src/tools/__init__.py` [30 líneas] - Inicialización del Módulo Herramientas
+- **Descripción**: Paquete de herramientas de Jarvis que expone las clases y funciones principales del sistema de ejecución y registro de acciones para facilitar sus imports desde otros módulos.
+
+#### `src/tools/executor.py` [559 líneas] - Fachada de Ejecución Unificada
+- **Descripción**: Fachada unificada para ejecutar acciones registradas. Mantiene compatibilidad con el formato histórico [CMD:...], pero utiliza ActionRegistry como fuente única de verdad para localizar y ejecutar acciones.
+- **Clases principales**:
+  - `UnifiedExecutor`: Fachada unificada para ejecutar acciones registradas con compatibilidad legacy.
+- **Métodos principales**:
+  - `UnifiedExecutor.__init__(self) -> None`: Inicializa la fachada de ejecución.
+  - `UnifiedExecutor.process_and_execute( self, llm_response: str, state: Any = None, ) -> str`
+  - `UnifiedExecutor.execute_action( self, action_name: str, parameters: Optional[Dict[str, Any]] = None, state: Any = None, verify_success: bool = True, ) -> Any`
+  - `UnifiedExecutor.can_execute( self, action_name: str, parameters: Optional[Dict[str, Any]] = None, state: Any = None, ) -> bool`
+  - `UnifiedExecutor.execute_plan_step( self, action_name: str, parameters: Optional[Dict[str, Any]] = None, state: Any = None, ) -> Any`
+  - `UnifiedExecutor.get_command_suggestions( self, user_input: str, context: str = "", ) -> List[Dict[str, Any]]`
+  - `UnifiedExecutor.get_command_history(self) -> List[Dict[str, Any]]`: Obtiene una copia del historial de comandos.
+  - `UnifiedExecutor.clear_command_history(self) -> None`: Limpia el historial de comandos.
+  - `UnifiedExecutor.list_available_commands( self, planner_only: bool = False, ) -> List[Dict[str, Any]]`
+  - `UnifiedExecutor.get_command_info( self, command_name: str, ) -> Dict[str, Any]`
+  - `UnifiedExecutor.get_action_cost(self, action_name: str) -> float`: Obtiene el coste declarado de una acción para el planificador.
+  - `UnifiedExecutor.get_plannable_commands(self) -> List[Dict[str, Any]]`: Obtiene las acciones habilitadas para planificación.
+- **Funciones globales**:
+  - `get_executor() -> UnifiedExecutor`: Obtiene la instancia global del ejecutor unificado.
+  - `process_and_execute( llm_response: str, ) -> str`: Función de compatibilidad para código existente que delega en la instancia global.
+
+#### `src/tools/os_info.py` [533 líneas] - Información del Sistema para Jarvis
+- **Descripción**: Información del sistema para Jarvis con arquitectura de planificación. Proporciona información estructurada del sistema para construir el estado del mundo y soportar la planificación jerárquica. Recoge: uso de CPU y memoria, estado del disco, información de ventanas y aplicaciones, recursos del sistema y contexto para planificación.
+- **Clases principales**:
+  - `SystemHealth` (Enum): Estados de salud del sistema (EXCELLENT, GOOD, WARNING, CRITICAL).
+  - `ApplicationWindow` (dataclass): Información de una ventana de aplicación con title, process_name, handle, position, size, is_visible, is_minimized, is_maximized, monitor y método to_dict.
+  - `SystemResources` (dataclass): Recursos del sistema con cpu_percent, ram_total_gb, ram_used_percent, disk_free_gb, disk_total_gb, disk_used_percent, battery_percent, battery_power_plugged, system_health, timestamp y método to_dict.
+  - `SystemContext` (dataclass): Contexto completo del sistema para planificación con resources, active_windows, focused_window, running_processes, system_time, uptime_seconds y método to_dict.
+- **Métodos principales**:
+  - `ApplicationWindow.to_dict(self) -> Dict[str, Any]`: Convierte a diccionario.
+  - `SystemResources.to_dict(self) -> Dict[str, Any]`: Convierte a diccionario.
+  - `SystemContext.to_dict(self) -> Dict[str, Any]`: Convierte a diccionario para estado del mundo.
+- **Funciones globales**:
+  - `get_system_stats() -> Dict[str, Any]`: Lee el estado de CPU, memoria RAM y disco.
+  - `get_battery_info() -> Optional[Dict[str, Any]]`: Obtiene información de la batería.
+  - `get_open_windows() -> List[ApplicationWindow]`: Obtiene información detallada de ventanas visibles.
+  - `get_focused_window() -> Optional[ApplicationWindow]`: Obtiene la ventana actualmente enfocada.
+  - `get_running_processes() -> List[str]`: Obtiene lista de procesos en ejecución.
+  - `get_system_resources() -> SystemResources`: Obtiene recursos del sistema con estado de salud.
+  - `get_jarvis_system_context() -> str`: Empaqueta la información del sistema en un texto para el contexto de Jarvis (mantenido para compatibilidad).
+  - `get_system_context() -> SystemContext`: Obtiene el contexto completo del sistema para planificación.
+
+#### `src/tools/registry.py` [1072 líneas] - Registro Unificado de Acciones
+- **Descripción**: Registro unificado de acciones para Jarvis mediante decoradores que combina registro básico de acciones (compatibilidad legacy) con metadatos avanzados para planificación. Implementa un sistema de registro que reemplaza la duplicidad entre herramientas simples y sistemas completos.
+- **Clases principales**:
+  - `ActionType` (Enum): Tipos de acciones disponibles (APPLICATION, SYSTEM, NAVIGATION, INTERACTION, CALIBRATION).
+  - `ActionInfo` (dataclass): Metadatos completos de una acción ejecutable y planificable con propiedades como nombre, descripción, tipo, parámetros, precondiciones, efectos, coste, dependencias, etc.
+  - `ActionRegistry`: Clase principal que gestiona el registro unificado de acciones, manteniendo compatibilidad legacy con metadatos avanzados para planificación.
+- **Métodos principales**:
+  - `ActionInfo.to_dict(self) -> Dict[str, Any]`: Devuelve una representación serializable de los metadatos.
+  - `ActionInfo.matches_preconditions(self, state: Any) -> bool`: Comprueba las precondiciones de la acción contra un estado.
+  - `ActionInfo.verify_success(self, result: Any = None, *args: Any, **kwargs: Any) -> bool`: Comprueba el éxito de la acción mediante su verificador opcional.
+  - `ActionRegistry.__init__(self) -> None`: Inicializa el registro de acciones.
+  - `ActionRegistry.register_action( self, name: str, description: str, action_type: ActionType = ActionType.APPLICATION, category: str = "general", tags: Optional[List[str]] = None, parameters: Optional[Dict[str, Any]] = None, confidence_threshold: float = 0.8, preconditions: Any = None, effects: Any = None, cost: float = 1.0, dependencies: Optional[List[str]] = None,`
+  - `ActionRegistry.decorator(func: Callable) -> Callable`
+  - `ActionRegistry.get_action( self, name: str, ) -> Optional[ActionInfo]`
+  - `ActionRegistry.get_available_actions( self, action_type: Optional[ActionType] = None, ) -> List[Dict[str, Any]]`
+  - `ActionRegistry.get_actions_for_planner(self) -> List[Dict[str, Any]]`: Genera metadatos serializables de las acciones para el planificador.
+  - `ActionRegistry.get_plannable_actions(self) -> Dict[str, ActionInfo]`: Obtiene las acciones habilitadas para la capa de planificación.
+  - `ActionRegistry.get_actions_by_category(self, category: str) -> List[ActionInfo]`: Obtiene todas las acciones de una categoría.
+  - `ActionRegistry.list_all_actions(self) -> Dict[str, List[str]]`: Lista todas las acciones organizadas por tipo.
+  - `ActionRegistry.get_action_names_by_type( self, action_type: ActionType, ) -> List[str]`
+  - `ActionRegistry.register_module(self, module_path: str) -> None`: Registra todas las acciones decoradas de un módulo.
+  - `ActionRegistry.get_action_suggestions( self, partial_name: str, limit: int = 5, ) -> List[str]`
+  - `ActionRegistry.validate_action( self, action_name: str, parameters: Dict[str, Any], ) -> bool`
+  - `ActionRegistry.can_execute( self, action_name: str, parameters: Optional[Dict[str, Any]] = None, state: Any = None, check_preconditions: bool = True, ) -> bool`
+  - `ActionRegistry.get_action_cost(self, action_name: str) -> float`: Obtiene el coste declarado de una acción.
+  - `ActionRegistry.execute_action( self, action_name: str, parameters: Optional[Dict[str, Any]] = None, ) -> Any`
+  - `ActionRegistry.execute_action_legacy( self, name: str, *args: Any, **kwargs: Any, ) -> Any`
+  - `ActionRegistry.validate_parameters( self, name: str, parameters: Dict[str, Any], ) -> bool`
+  - `ActionRegistry.clear_actions(self) -> None`: Limpia todas las acciones registradas.
+- **Funciones globales**:
+  - `get_action_registry() -> ActionRegistry`: Obtiene la instancia global única del registro de acciones.
+  - `register_action( name: str, description: str, action_type: ActionType = ActionType.APPLICATION, category: str = "general", tags: Optional[List[str]] = None, parameters: Optional[Dict[str, Any]] = None, confidence_threshold: float = 0.8, preconditions: Any = None, effects: Any = None, cost: float = 1.0, dependencies: Optional[List[str]] = None, capability: Optional[str] = None,`: Atajo para registrar una acción usando la instancia global (versión completa).
+  - `register_action_legacy( name: str, description: str, action_type: ActionType = ActionType.SYSTEM, parameters: Optional[Dict[str, Any]] = None, confidence_threshold: float = 0.8, ) -> Callable[[Callable[..., Any]], Callable[..., Any]]`: Atajo para registrar una acción usando la instancia global (versión legacy simplificada).
+  - `get_available_actions( action_type: Optional[ActionType] = None, ) -> List[Dict[str, Any]]`: Atajo para obtener las acciones disponibles desde el registro global.
+  - `get_action( name: str, ) -> Optional[ActionInfo]`: Atajo para obtener una acción desde el registro global.
+
+### 🗂️ Módulo `src/utils/` - Utilidades del Sistema
+
+#### `src/utils/__init__.py` [333 líneas] - Sistema de Optimización Completo
+- **Descripción**: Paquete principal de utilidades de Jarvis que integra todos los sistemas de optimización, aprendizaje automático, monitoreo y automejora. Proporciona una interfaz unificada para el sistema de optimización completo con componentes principales de performance optimization, self-improvement, adaptive learning y orchestration.
+- **Clases principales**:
+  - `OptimizationSystem`: Sistema completo de optimización y automejora que integra todos los componentes con inicialización, gestión de estado, optimización manual/automática, exportación de reportes, recomendaciones y optimización de emergencia.
+- **Métodos principales**:
+  - `OptimizationSystem.__init__(self, config_path: str = None)`: Inicializar el sistema de optimización completo Args: config_path: Ruta al archivo de configuración
+  - `OptimizationSystem.get_system_status(self) -> dict`: Obtener estado completo del sistema de optimización Returns: dict: Estado completo del sistema
+  - `OptimizationSystem.optimize_system(self, strategy: OptimizationStrategy, level: OptimizationLevel = OptimizationLevel.MODERATE) -> dict`: Optimizar el sistema manualmente Args: strategy: Estrategia de optimización level: Nivel de optimización Returns: dict: Resultado de la optimización
+  - `OptimizationSystem.start_auto_optimization(self)`: Iniciar optimización automática
+  - `OptimizationSystem.stop_auto_optimization(self)`: Detener optimización automática
+  - `OptimizationSystem.export_system_report(self, filepath: str)`: Exportar reporte completo del sistema Args: filepath: Ruta del archivo de reporte
+  - `OptimizationSystem.get_optimization_recommendations(self) -> list`: Obtener recomendaciones de optimización del sistema Returns: list: Lista de recomendaciones
+  - `OptimizationSystem.emergency_optimization(self)`: Optimización de emergencia para situaciones críticas
+- **Funciones globales**:
+  - `get_system_status() -> dict`: Obtiene estado del sistema de optimización.
+  - `optimize_system(strategy: OptimizationStrategy, level: OptimizationLevel = OptimizationLevel.MODERATE) -> dict`: Optimiza el sistema manualmente.
+  - `start_auto_optimization()`: Inicia optimización automática.
+  - `stop_auto_optimization()`: Detiene optimización automática.
+  - `get_optimization_recommendations() -> list`: Obtiene recomendaciones de optimización.
+  - `emergency_optimization()`: Realiza optimización de emergencia.
+
+#### `src/utils/adaptive_learning_engine.py` [1269 líneas] - Motor de Aprendizaje Adaptativo
+- **Descripción**: Motor de aprendizaje adaptativo con deep learning y optimización de hiperparámetros. Sistema avanzado que automatiza el entrenamiento, optimización y evaluación de modelos de machine learning para mejorar continuamente el rendimiento del sistema JARVIS.
+- **Clases principales**:
+  - `LearningTask` (Enum): Tipos de tareas de aprendizaje (HYPERPARAMETER_OPTIMIZATION, MODEL_TRAINING, FEATURE_SELECTION, ARCHITECTURE_SEARCH, KNOWLEDGE_TRANSFER, ONLINE_LEARNING, BATCH_LEARNING, REINFORCEMENT_LEARNING)
+  - `NeuralArchitecture` (Enum): Arquitecturas neuronales disponibles (MLP, CNN, LSTM, TRANSFORMER, ATTENTION, RESNET, GAN)
+  - `LearningTaskConfig` (dataclass): Configuración completa de tareas de aprendizaje con hiperparámetros, datos y métricas
+  - `ModelPerformance` (dataclass): Registro estructurado de rendimiento de modelos con métricas detalladas
+  - `AdaptiveLearningEngine`: Clase principal del motor de aprendizaje con integración completa de modelos, optimización y monitoreo
+  - `LSTMModel`
+- **Métodos principales**:
+  - `AdaptiveLearningEngine.__init__(self, config_path: str = None)`
+  - `AdaptiveLearningEngine.get_learning_engine_status(self) -> Dict[str, Any]`: Obtener estado del motor de aprendizaje
+  - `AdaptiveLearningEngine.add_learning_task(self, task_config: LearningTaskConfig)`: Añadir tarea de aprendizaje
+  - `AdaptiveLearningEngine.get_model_info(self, model_name: str) -> Optional[Dict[str, Any]]`: Obtener información de un modelo
+  - `AdaptiveLearningEngine.export_learning_report(self, filepath: str)`: Exportar reporte de aprendizaje
+  - `AdaptiveLearningEngine.stop_learning_engine(self)`: Detener motor de aprendizaje
+  - `AdaptiveLearningEngine.start_learning_engine(self)`: Iniciar motor de aprendizaje
+  - `LSTMModel.__init__(self, config)`
+  - `LSTMModel.forward(self, x)`
+
+#### `src/utils/advanced_logger.py` [1577 líneas] - Sistema Avanzado de Logging y Análisis de Patrones
+- **Descripción**: Sistema avanzado de logging y análisis de patrones para Jarvis con capacidades de machine learning, detección de anomalías, métricas en tiempo real y almacenamiento persistente. Integración con sistema de logging existente y capacidades predictivas.
+- **Clases principales**:
+  - `LogLevel` (Enum): Niveles de log extendidos (DEBUG, INFO, WARNING, ERROR, CRITICAL, SUCCESS, PERFORMANCE)
+  - `LogCategory` (Enum): Categorías de logs para análisis (SYSTEM, APPLICATION, NETWORK, PERFORMANCE, SECURITY, BUSINESS, DEBUG, ERROR)
+  - `PatternType` (Enum): Tipos de patrones detectables (ERROR_SPIKE, PERFORMANCE_DEGRADATION, ANOMALY, TREND, CYCLE, CORRELATION)
+  - `LogEntry` (dataclass): Estructura de entrada de log enriquecida con timestamp, nivel, categoría, mensaje, contexto y metadatos
+  - `LogAnalyzer`: Analizador de logs avanzado con machine learning y detección de patrones complejos
+  - `AdvancedLogger`: Logger avanzado con capacidades de análisis y patrón detection
+  - `JsonFormatter`: Formateador JSON mejorado para logs estructurados
+  - `StatisticalAnomalyDetector`: Detector de anomalías usando métodos estadísticos
+  - `PatternRecognizer`: Reconocedor de patrones usando métodos de secuencia
+  - `AdvancedLogMetrics`: Métricas avanzadas de logging y análisis de rendimiento
+- **Métodos principales**:
+  - `LogEntry.to_dict(self) -> Dict[str, Any]`: Convertir a diccionario para almacenamiento.
+  - `LogEntry.from_dict(cls, data: Dict[str, Any]) -> 'LogEntry'`: Crear desde diccionario.
+  - `LogAnalyzer.__init__(self, window_size: int = 1000, pattern_threshold: float = 0.8, ml_enabled: bool = True, anomaly_detection: bool = True)`
+  - `LogAnalyzer.analyze_log_entry(self, entry: LogEntry) -> List[Dict[str, Any]]`: Analizar una entrada de log y detectar patrones con ML.
+  - `LogAnalyzer.get_statistics(self) -> Dict[str, Any]`: Obtener estadísticas del analizador.
+  - `AdvancedLogger.__init__(self, name: str, level: int = logging.INFO, log_dir: str = "logs", db_path: str = "logs/jarvis_logs.db", ml_enabled: bool = True, anomaly_detection: bool = True)`
+  - `AdvancedLogger.log(self, _level: LogLevel, category: LogCategory = None, message: str = None, **kwargs) -> None`
+  - `AdvancedLogger.log_simple(self, message: str, level: str = "INFO", category: str = "SYSTEM", **kwargs) -> None`: Interfaz simple de logging compatible con código existente.
+  - `AdvancedLogger.debug(self, message: str, *args: Any, category: LogCategory = LogCategory.DEBUG, **kwargs) -> None`: Log de nivel DEBUG.
+  - `AdvancedLogger.info(self, message: str, *args: Any, category: LogCategory = LogCategory.SYSTEM, **kwargs) -> None`: Log de nivel INFO.
+  - `AdvancedLogger.warning(self, message: str, *args: Any, category: LogCategory = LogCategory.SYSTEM, **kwargs) -> None`: Log de nivel WARNING.
+  - `AdvancedLogger.error(self, message: str, *args: Any, category: LogCategory = LogCategory.ERROR, **kwargs) -> None`: Log de nivel ERROR.
+  - `AdvancedLogger.exception(self, message: str, *args: Any, category: LogCategory = LogCategory.ERROR, **kwargs) -> None`: Log de nivel ERROR incluyendo la excepción activa.
+  - `AdvancedLogger.critical(self, message: str, *args: Any, category: LogCategory = LogCategory.ERROR, **kwargs) -> None`: Log de nivel CRITICAL.
+  - `AdvancedLogger.success(self, message: str, *args: Any, category: LogCategory = LogCategory.SYSTEM, **kwargs) -> None`: Log de nivel SUCCESS.
+  - `AdvancedLogger.performance(self, message: str, *args: Any, category: LogCategory = LogCategory.PERFORMANCE, **kwargs) -> None`: Log de nivel PERFORMANCE.
+  - `AdvancedLogger.log_with_trace(self, message: str, category: LogCategory = LogCategory.SYSTEM, trace_id: str = None, **kwargs) -> None`
+  - `AdvancedLogger.log_with_span(self, message: str, category: LogCategory = LogCategory.SYSTEM, span_id: str = None, parent_span_id: str = None, **kwargs) -> None`
+  - `AdvancedLogger.query_logs(self, start_time: datetime = None, end_time: datetime = None, level: LogLevel = None, category: LogCategory = None, module: str = None, limit: int = 100) -> List[LogEntry]`
+  - `AdvancedLogger.get_patterns(self, acknowledged: bool = None, limit: int = 50) -> List[Dict[str, Any]]`: Obtener patrones detectados.
+  - `AdvancedLogger.acknowledge_pattern(self, pattern_id: int) -> None`: Marcar patrón como reconocido.
+  - `AdvancedLogger.get_statistics(self) -> Dict[str, Any]`: Obtener estadísticas del sistema de logging.
+  - `AdvancedLogger.export_logs(self, start_time: datetime = None, end_time: datetime = None, format: str = 'json') -> str`
+  - `AdvancedLogger.shutdown(self) -> None`: Detener el logger de forma graceful.
+  - `AdvancedLogger.add_custom_filter(self, filter_name: str, filter_func: callable) -> None`: Añadir filtro personalizado.
+  - `AdvancedLogger.add_custom_formatter(self, formatter_name: str, formatter: logging.Formatter) -> None`: Añadir formateador personalizado.
+  - `AdvancedLogger.add_custom_handler(self, handler: logging.Handler) -> None`: Añadir handler personalizado.
+  - `AdvancedLogger.log_with_metrics(self, level: LogLevel, category: LogCategory, message: str, metrics: Dict[str, float] = None, **kwargs) -> None`
+  - `AdvancedLogger.log_with_context(self, level: LogLevel, category: LogCategory, message: str, context: Dict[str, Any] = None, **kwargs) -> None`
+  - `AdvancedLogger.log_batch(self, entries: List[Dict[str, Any]]) -> None`: Logear múltiples entradas de forma eficiente.
+  - `AdvancedLogger.search_logs(self, query: str, start_time: datetime = None, end_time: datetime = None, limit: int = 100) -> List[LogEntry]`
+  - `AdvancedLogger.get_real_time_metrics(self) -> Dict[str, Any]`: Obtener métricas en tiempo real.
+  - `AdvancedLogger.set_alert_threshold(self, pattern_type: str, threshold: Dict[str, Any]) -> None`: Establecer umbral de alerta para un tipo de patrón.
+  - `AdvancedLogger.get_alerts(self, active_only: bool = True) -> List[Dict[str, Any]]`: Obtener alertas activas.
+  - `AdvancedLogger.acknowledge_alert(self, alert_id: str) -> None`: Marcar alerta como reconocida.
+  - `AdvancedLogger.export_analytics(self, start_time: datetime = None, end_time: datetime = None, format: str = 'json') -> str`
+  - `AdvancedLogger.log_context(self, context: Dict[str, Any])`: Context manager para logging con contexto temporal.
+  - `AdvancedLogger.log_with_trace_context(self, message: str, trace_data: Dict[str, Any] = None, **kwargs)`: Log con contexto de trazado distribuido.
+  - `JsonFormatter.format(self, record: logging.LogRecord) -> str`: Formatear log record como JSON.
+  - `StatisticalAnomalyDetector.__init__(self, window_size: int = 100, threshold: float = 2.0)`
+  - `StatisticalAnomalyDetector.add_data_point(self, metric_name: str, value: float) -> bool`: Añadir punto de datos y detectar anomalía.
+  - `PatternRecognizer.__init__(self, min_pattern_length: int = 3, max_pattern_length: int = 10)`
+  - `PatternRecognizer.add_log_sequence(self, category: str, level: LogLevel, module: str) -> Optional[Dict[str, Any]]`: Añadir secuencia de logs y detectar patrones.
+  - `AdvancedLogMetrics.__init__(self)`
+  - `AdvancedLogMetrics.add_metric(self, name: str, value: float, tags: Dict[str, Any] = None) -> None`: Añadir métrica con análisis de tendencias.
+  - `AdvancedLogMetrics.get_trend_analysis(self, metric_name: str, window_size: int = 100) -> Dict[str, Any]`: Análisis de tendencias para una métrica.
+- **Funciones globales**:
+  - `get_advanced_logger(name: str, level: int = logging.INFO, log_dir: str = "logs", db_path: str = "logs/jarvis_logs.db") -> AdvancedLogger`: Obtener un logger avanzado
+
+#### `src/utils/alert_system.py` [620 líneas] - Sistema de Alertas Integrado
+- **Descripción**: Sistema unificado de alertas que coordina diferentes sistemas de monitoreo, gestiona notificaciones y acciones con soporte multiple severidad y estado.
+- **Clases principales**:
+  - `AlertSeverity` (Enum): Severidad de las alertas (INFO, WARNING, CRITICAL, EMERGENCY)
+  - `AlertStatus` (Enum): Estado de las alertas (OPEN, ACKNOWLEDGED, RESOLVED, SUPPRESSED)
+  - `AlertRule` (dataclass): Regla de alerta configurada con condición, severidad y acciones
+  - `AlertAction` (dataclass): Acción a realizar ante una alerta (email, webhook, log, command)
+  - `Alert` (dataclass): Alerta generada por el sistema con timestamp y estado
+  - `AlertSystem`: Sistema de alertas integrado para JARVIS con monitoreo y gestión
+- **Métodos principales**:
+  - `AlertRule.to_dict(self) -> Dict[str, Any]`: Convierte la regla a un diccionario.
+  - `AlertAction.to_dict(self) -> Dict[str, Any]`: Convierte la acción a un diccionario.
+  - `Alert.to_dict(self) -> Dict[str, Any]`: Convierte la alerta a un diccionario.
+  - `AlertSystem.__init__(self)`: Inicializa el sistema de alertas.
+  - `AlertSystem.start_monitoring(self) -> None`: Inicia el monitoreo de alertas.
+  - `AlertSystem.stop_monitoring(self) -> None`: Detiene el monitoreo de alertas.
+  - `AlertSystem.acknowledge_alert(self, alert_id: str, acknowledged_by: str) -> bool`: Acepta una alerta.
+  - `AlertSystem.resolve_alert(self, alert_id: str, resolved_by: str) -> bool`: Resuelve una alerta.
+  - `AlertSystem.get_alerts(self, severity: Optional[AlertSeverity] = None, status: Optional[AlertStatus] = None, source: Optional[str] = None, limit: Optional[int] = None) -> List[Alert]`
+  - `AlertSystem.get_alert_statistics(self) -> Dict[str, Any]`: Obtiene estadísticas de alertas.
+  - `AlertSystem.add_alert_callback(self, callback: Callable[[Alert], None]) -> None`: Agrega un callback para recibir alertas.
+  - `AlertSystem.add_acknowledgement_callback(self, callback: Callable[[Alert], None]) -> None`: Agrega un callback para recibir aceptaciones de alertas.
+  - `AlertSystem.add_resolution_callback(self, callback: Callable[[Alert], None]) -> None`: Agrega un callback para recibir resoluciones de alertas.
+  - `AlertSystem.add_alert_rule(self, rule: AlertRule) -> None`: Agrega una regla de alerta.
+  - `AlertSystem.add_alert_action(self, action: AlertAction) -> None`: Agrega una acción de alerta.
+  - `AlertSystem.export_alerts(self, filepath: str, severity: Optional[AlertSeverity] = None, status: Optional[AlertStatus] = None, source: Optional[str] = None) -> None`
+  - `AlertSystem.clear_resolved_alerts(self) -> None`: Limpia alertas resueltas.
+- **Funciones globales**:
+  - `get_alert_system() -> AlertSystem`: Obtiene la instancia global del sistema de alertas.
+  - `start_alert_monitoring() -> None`: Inicia el monitoreo de alertas global.
+  - `stop_alert_monitoring() -> None`: Detiene el monitoreo de alertas global.
+
+#### `src/utils/app_utils.py` [1030 líneas] - Utilidades para Aplicaciones
+- **Descripción**: Utilidades comunes para aplicaciones y automatización. La geometría de monitores procede exclusivamente de ScreenManager. La detección visual de elementos se realiza mediante Vision/Qwen3-VL. Este módulo no genera coordenadas ficticias.
+- **Clases principales**:
+  - `AppManager`: Gestor general de aplicaciones.
+- **Métodos principales**:
+  - `AppManager.__init__(self) -> None`
+  - `AppManager.open_app( self, app_name: str, screen_num: int = 1, ) -> bool`
+  - `AppManager.close_app( self, app_name: str, ) -> bool`
+  - `AppManager.move_window_to_screen( self, window_title: str, screen_num: int = 1, ) -> bool`
+  - `AppManager.center_window( self, window_title: str, ) -> bool`
+  - `AppManager.verify_app_open( self, app_name: str, ) -> bool`
+- **Funciones globales**:
+  - `get_app_manager() -> AppManager`: Obtiene una instancia del gestor de aplicaciones.
+  - `analyze_elements_in_screenshot( screenshot_path: str, app_name: str, ) -> List[Dict[str, Any]]`: Analiza captura mediante Vision/Qwen3-VL para detectar elementos interactivos (botones, campos, menús, enlaces, pestañas, checkboxes, radios, selectores, iconos interactivos, controles visibles).
+  - `open_app_on_screen( app_name: str, screen_num: int = 1, ) -> bool`: Abre aplicación en monitor (compatibilidad).
+  - `close_app( app_name: str, ) -> bool`: Cierra aplicación (compatibilidad).
+  - `move_window_to_screen( window_title: str, screen_num: int = 1, ) -> bool`: Mueve ventana a monitor (compatibilidad).
+  - `center_window( window_title: str, ) -> bool`: Centra ventana dentro de su monitor actual (compatibilidad).
+
+#### `src/utils/architectural_evolution_manager.py` [10766 líneas] - Gestor de Evolución Arquitectónica
+- **Descripción**: Sistema avanzado de gestión de evolución arquitectónica que permite a JARVIS modificar sus estructuras internas, componentes y flujos de trabajo de forma controlada y segura con gestión de riesgos y rollback automático.
+- **Clases principales**:
+  - `EvolutionStatus` (Enum): Estados del ciclo de vida de propuestas (PENDING, VALIDATING, APPROVED, REJECTED, EXECUTING, COMPLETED, FAILED, ROLLING_BACK, ROLLED_BACK)
+  - `ChangeType` (Enum): Tipos de cambios arquitectónicos (COMPONENT_ADDITION, COMPONENT_REMOVAL, COMPONENT_MODIFICATION, INTERFACE_ADDITION, INTERFACE_REMOVAL, INTERFACE_MODIFICATION, FLOW_MODIFICATION, CONFIGURATION_CHANGE, INTEGRATION_ADDITION, INTEGRATION_REMOVAL)
+  - `RiskLevel` (Enum): Niveles de riesgo (LOW, MEDIUM, HIGH, CRITICAL)
+  - `ComponentInfo` (dataclass): Información detallada de componentes del sistema
+  - `InterfaceInfo` (dataclass): Información de interfaces entre componentes
+  - `ArchitecturalChange` (dataclass): Representación estructurada de cambios arquitectónicos
+  - `EvolutionProposal` (dataclass): Propuestas completas de evolución con múltiples cambios
+  - `ArchitecturalEvolutionManager`: Clase principal de gestión evolutiva del sistema
+- **Métodos principales**:
+  - `ArchitecturalEvolutionManager.__init__(self, config: Optional[Dict[str, Any]] = None, logger: Optional[AdvancedLogger] = None, performance_optimizer: Optional[PerformanceOptimizer] = None, self_improvement_system: Optional[SelfImprovementSystem] = None, adaptive_learning_engine: Optional[AdaptiveLearningEngine] = None, pattern_analyzer: Optional[PatternAnalyzer] = None)`
+  - `ArchitecturalEvolutionManager.get_component_info(self, component_name: str) -> Optional[ComponentInfo]`: Obtiene información detallada de un componente específico.
+  - `ArchitecturalEvolutionManager.list_components(self, component_type: Optional[str] = None) -> List[ComponentInfo]`: Lista todos los componentes del sistema, filtrados por tipo opcional.
+  - `ArchitecturalEvolutionManager.get_component_dependencies(self, component_name: str) -> List[str]`: Obtiene las dependencias de un componente específico.
+  - `ArchitecturalEvolutionManager.get_component_interfaces(self, component_name: str) -> List[str]`: Obtiene las interfaces de un componente específico.
+  - `ArchitecturalEvolutionManager.get_available_operations(self) -> List[str]`: Obtiene las operaciones de modificación arquitectónica soportadas.
+  - `ArchitecturalEvolutionManager.validate_component_existence(self, component_name: str) -> bool`: Verifica si un componente existe en la arquitectura actual.
+  - `ArchitecturalEvolutionManager.get_architecture_state(self) -> Dict[str, Any]`: Obtiene el estado actual de la arquitectura del sistema.
+  - `ArchitecturalEvolutionManager.get_proposal_input_requirements(self) -> Dict[str, Any]`: Define la entrada mínima requerida para una propuesta de evolución.
+  - `ArchitecturalEvolutionManager.get_proposal_output_requirements(self) -> Dict[str, Any]`: Define la salida mínima esperada de una propuesta de evolución.
+  - `ArchitecturalEvolutionManager.get_proposal_states(self) -> List[EvolutionStatus]`: Define los estados posibles de una propuesta de evolución.
+  - `ArchitecturalEvolutionManager.validate_proposal_contract(self, proposal_data: Dict[str, Any]) -> Tuple[bool, List[str]]`: Valida que una propuesta cumple con el contrato mínimo.
+  - `ArchitecturalEvolutionManager.register_component(self, component: ComponentInfo) -> bool`: Registra un nuevo componente en la arquitectura.
+  - `ArchitecturalEvolutionManager.update_component_status(self, component_name: str, status: str) -> bool`: Actualiza el estado de un componente.
+  - `ArchitecturalEvolutionManager.get_interface_info(self, interface_name: str) -> Optional[InterfaceInfo]`: Obtiene información detallada de una interfaz específica.
+  - `ArchitecturalEvolutionManager.register_interface(self, interface: InterfaceInfo) -> bool`: Registra una nueva interfaz en la arquitectura.
+  - `ArchitecturalEvolutionManager.get_architecture_inspection_report(self) -> Dict[str, Any]`: Genera un reporte completo de inspección de la arquitectura actual.
+  - `ArchitecturalEvolutionManager.validate_compatibility_with_existing_apis(self, proposal: EvolutionProposal) -> Tuple[bool, List[str]]`: Verifica la compatibilidad de una propuesta con APIs existentes.
+  - `ArchitecturalEvolutionManager.get_minimum_proposal_input(self) -> Dict[str, Any]`: Define la entrada mínima requerida para una propuesta (2.8.2.1.6).
+  - `ArchitecturalEvolutionManager.get_minimum_proposal_output(self) -> Dict[str, Any]`: Define la salida mínima esperada de una propuesta (2.8.2.1.7).
+  - `ArchitecturalEvolutionManager.get_proposal_states(self) -> List[str]`: Define los estados posibles de una propuesta (2.8.2.1.8).
+  - `ArchitecturalEvolutionManager.run_minimum_tests(self) -> Dict[str, Any]`: Ejecuta tests mínimos del contrato (2.8.2.1.10).
+  - `ArchitecturalEvolutionManager.test_application_methods(self) -> Dict[str, Any]`: Tests de la aplicación controlada (2.8.2.5.7).
+  - `ArchitecturalEvolutionManager.prepare_change(self, change: ArchitecturalChange) -> Tuple[bool, List[str]]`: Prepara el cambio antes de su aplicación (2.8.2.5.1).
+  - `ArchitecturalEvolutionManager.apply_change(self, change: ArchitecturalChange) -> Tuple[bool, Dict[str, Any]]`: Aplica un único cambio verificable (2.8.2.5.2).
+  - `ArchitecturalEvolutionManager.detect_application_failure(self, change: ArchitecturalChange, execution_result: Dict[str, Any]) -> Tuple[bool, List[str]]`: Detecta fallo durante la aplicación del cambio (2.8.2.5.3).
+  - `ArchitecturalEvolutionManager.register_application_result(self, change: ArchitecturalChange, execution_result: Dict[str, Any]) -> bool`: Registra el resultado de la aplicación del cambio (2.8.2.5.4).
+  - `ArchitecturalEvolutionManager.verify_change_structure(self, change: ArchitecturalChange) -> Tuple[bool, List[str]]`: Verifica la estructura resultante después de aplicar el cambio (2.8.2.5.5).
+  - `ArchitecturalEvolutionManager.verify_no_side_effects(self, change: ArchitecturalChange) -> Tuple[bool, List[str]]`: Verifica que no se modificaron componentes ajenos al cambio (2.8.2.5.6).
+  - `ArchitecturalEvolutionManager.test_application_methods(self) -> Dict[str, Any]`: Tests de la aplicación controlada (2.8.2.5.7).
+  - `ArchitecturalEvolutionManager.validate_component_dependencies(self, change: ArchitecturalChange) -> Tuple[bool, List[str]]`: Verificar dependencias del componente (2.8.2.4.1).
+  - `ArchitecturalEvolutionManager.validate_component_apis(self, change: ArchitecturalChange) -> Tuple[bool, List[str]]`: Verificar APIs utilizadas por el componente (2.8.2.4.2).
+  - `ArchitecturalEvolutionManager.validate_required_capabilities(self, change: ArchitecturalChange) -> Tuple[bool, List[str]]`: Verificar que el cambio no elimina una capacidad requerida (2.8.2.4.3).
+  - `ArchitecturalEvolutionManager.validate_state_compatibility(self, change: ArchitecturalChange) -> Tuple[bool, List[str]]`: Verificar compatibilidad con State (2.8.2.4.4).
+  - `ArchitecturalEvolutionManager.validate_planner_executor_compatibility(self, change: ArchitecturalChange) -> Tuple[bool, List[str]]`: Verificar compatibilidad con Planner/Executor cuando afecte al flujo (2.8.2.4.5).
+  - `ArchitecturalEvolutionManager.validate_known_interfaces(self, change: ArchitecturalChange) -> Tuple[bool, List[str]]`: Verificar que el cambio no rompe interfaces conocidas (2.8.2.4.6).
+  - `ArchitecturalEvolutionManager.validate_change_rejectability(self, change: ArchitecturalChange) -> Tuple[bool, List[str]]`: Rechazar cambios que no puedan validarse (2.8.2.4.7).
+  - `ArchitecturalEvolutionManager.validate_proposal_previa(self, proposal: EvolutionProposal) -> Tuple[bool, Dict[str, Any]]`: Validación previa completa de una propuesta de evolución.
+  - `ArchitecturalEvolutionManager.test_validation_previa_methods(self) -> Dict[str, Any]`: Ejecuta tests de validación previa (2.8.2.4.8).
+  - `ArchitecturalEvolutionManager.execute_syntax_check(self, change: ArchitecturalChange) -> Tuple[bool, List[str]]`: Ejecuta comprobación sintáctica (2.8.2.6.1).
+  - `ArchitecturalEvolutionManager.execute_component_tests(self, change: ArchitecturalChange) -> Tuple[bool, List[str]]`: Ejecuta tests del componente afectado (2.8.2.6.2).
+  - `ArchitecturalEvolutionManager.check_direct_integrations(self, change: ArchitecturalChange) -> Tuple[bool, List[str]]`: Comprueba integraciones directas (2.8.2.6.3).
+  - `ArchitecturalEvolutionManager.check_configuration_state(self, change: ArchitecturalChange) -> Tuple[bool, List[str]]`: Comprueba estado de configuración (2.8.2.6.4).
+  - `ArchitecturalEvolutionManager.check_application_startup(self, change: ArchitecturalChange) -> Tuple[bool, List[str]]`: Comprueba que la aplicación sigue arrancando si el cambio lo requiere (2.8.2.6.5).
+  - `ArchitecturalEvolutionManager.register_real_evidence(self, change: ArchitecturalChange, verification_results: Dict[str, Any]) -> bool`: Registra evidencia real (2.8.2.6.6).
+  - `ArchitecturalEvolutionManager.test_post_verification_methods(self) -> Dict[str, Any]`: Tests de verificación posterior (2.8.2.6.7).
+  - `ArchitecturalEvolutionManager.process_adaptation_need(self, adaptation_need: Dict[str, Any]) -> Optional[EvolutionProposal]`: Procesa una necesidad de adaptación y la convierte en una propuesta (2.8.2.3.1).
+  - `ArchitecturalEvolutionManager.validate_adaptation_need(self, adaptation_need: Dict[str, Any]) -> bool`: Valida que una necesidad de adaptación tenga el formato correcto.
+  - `ArchitecturalEvolutionManager.create_concrete_proposal(self, adaptation_need: Dict[str, Any]) -> Optional[EvolutionProposal]`: Traduce una necesidad de adaptación a una propuesta concreta (2.8.2.3.2).
+  - `ArchitecturalEvolutionManager.validate_change_in_proposal_scope(self, change: ArchitecturalChange, proposal: EvolutionProposal) -> bool`: Valida que un cambio esté dentro del scope de la propuesta (2.8.2.3.3).
+  - `ArchitecturalEvolutionManager.is_change_type_compatible_with_proposal(self, change_type: ChangeType, proposal: EvolutionProposal) -> bool`: Verifica si un tipo de cambio es compatible con una propuesta.
+  - `ArchitecturalEvolutionManager.is_change_type_supported(self, change_type: ChangeType) -> bool`: Verifica si un tipo de cambio es soportado por el sistema (2.8.2.3.5).
+  - `ArchitecturalEvolutionManager.validate_change_type(self, change_type_str: str) -> ChangeType`: Valida y convierte un string a tipo de cambio soportado.
+  - `ArchitecturalEvolutionManager.validate_change_in_proposal_scope_method(self, change: ArchitecturalChange, proposal: EvolutionProposal) -> bool`: Método público para validar que un cambio está dentro del scope de la propuesta.
+  - `ArchitecturalEvolutionManager.get_current_change_representation(self) -> Dict[str, Any]`: Identifica cómo se representa actualmente un cambio de arquitectura (2.8.2.2.1).
+  - `ArchitecturalEvolutionManager.create_minimal_change_representation(self, change_type: ChangeType, component_affected: str, description: str, rationale: str) -> ArchitecturalChange`
+  - `ArchitecturalEvolutionManager.associate_change_with_component(self, change: ArchitecturalChange) -> bool`: Asocia el cambio con su componente afectado (2.8.2.2.3).
+  - `ArchitecturalEvolutionManager.associate_context_with_change(self, change: ArchitecturalChange, context: Dict[str, Any]) -> bool`: Asocia motivo/contexto solo si existe soporte real (2.8.2.2.4).
+  - `ArchitecturalEvolutionManager.associate_constraints_with_change(self, change: ArchitecturalChange, constraints: List[str]) -> bool`: Asocia restricciones existentes al cambio (2.8.2.2.5).
+  - `ArchitecturalEvolutionManager.associate_risk_with_change(self, change: ArchitecturalChange, risk_level: RiskLevel, risk_details: Optional[Dict[str, Any]] = None) -> bool`
+  - `ArchitecturalEvolutionManager.associate_reversibility_with_change(self, change: ArchitecturalChange, is_reversible: bool, rollback_plan: Optional[str] = None) -> bool`
+  - `ArchitecturalEvolutionManager.verify_change_serialization(self, change: ArchitecturalChange) -> Tuple[bool, Optional[str]]`: Verifica serialización del cambio arquitectónico (2.8.2.2.8).
+  - `ArchitecturalEvolutionManager.serialize_change_to_json(self, change: ArchitecturalChange) -> str`: Serializa un cambio arquitectónico a formato JSON.
+  - `ArchitecturalEvolutionManager.deserialize_change_from_json(self, json_str: str) -> ArchitecturalChange`: Deserializa un cambio arquitectónico desde formato JSON.
+  - `ArchitecturalEvolutionManager.test_change_representation_methods(self) -> Dict[str, Any]`: Ejecuta tests de representación de cambios (2.8.2.2.9).
+  - `ArchitecturalEvolutionManager.detect_when_rollback_is_needed(self, change: ArchitecturalChange, execution_result: Dict[str, Any]) -> bool`: Detecta cuándo un cambio debe revertirse (2.8.2.7.1).
+  - `ArchitecturalEvolutionManager.recover_previous_version(self, change: ArchitecturalChange) -> bool`: Recupera la versión previa de un componente o sistema (2.8.2.7.2).
+  - `ArchitecturalEvolutionManager.avoid_partial_rollback(self, change: ArchitecturalChange) -> bool`: Evita rollback parcial asegurando que todas las operaciones se reviertan completamente (2.8.2.7.3).
+  - `ArchitecturalEvolutionManager.verify_state_after_rollback(self, change: ArchitecturalChange) -> Dict[str, Any]`: Verifica el estado del sistema después del rollback (2.8.2.7.4).
+  - `ArchitecturalEvolutionManager.register_rollback_reason(self, change: ArchitecturalChange, reason: str, details: Optional[Dict[str, Any]] = None)`: Registra el motivo del rollback (2.8.2.7.5).
+  - `ArchitecturalEvolutionManager.test_rollback_methods(self) -> Dict[str, Any]`: Ejecuta tests de rollback (2.8.2.7.6).
+  - `ArchitecturalEvolutionManager.execute_syntax_check(self, change: ArchitecturalChange) -> Tuple[bool, List[str]]`: Ejecuta comprobación sintáctica del cambio aplicado (2.8.2.6.1).
+  - `ArchitecturalEvolutionManager.execute_component_tests(self, change: ArchitecturalChange) -> Tuple[bool, Dict[str, Any]]`: Ejecuta tests del componente afectado (2.8.2.6.2).
+  - `ArchitecturalEvolutionManager.check_direct_integrations(self, change: ArchitecturalChange) -> Tuple[bool, List[str]]`: Comprobar integraciones directas (2.8.2.6.3).
+  - `ArchitecturalEvolutionManager.check_configuration_state(self, change: ArchitecturalChange) -> Tuple[bool, Dict[str, Any]]`: Comprobar estado de configuración (2.8.2.6.4).
+  - `ArchitecturalEvolutionManager.check_application_startup(self, change: ArchitecturalChange) -> Tuple[bool, List[str]]`: Comprobar que la aplicación sigue arrancando si el cambio lo requiere (2.8.2.6.5).
+  - `ArchitecturalEvolutionManager.register_verification_evidence(self, change: ArchitecturalChange, verification_results: Dict[str, Any]) -> bool`: Registrar evidencia real de verificación (2.8.2.6.6).
+  - `ArchitecturalEvolutionManager.test_post_verification_methods(self) -> Dict[str, Any]`: Tests de verificación posterior (2.8.2.6.7).
+  - `ArchitecturalEvolutionManager.dfs(current_component)`
+  - `ArchitecturalEvolutionManager.dfs(node)`
+  - `ArchitecturalEvolutionManager.detect_rollback_need(self, change: ArchitecturalChange, execution_result: Dict[str, Any]) -> Tuple[bool, str]`: Detecta cuándo un cambio debe revertirse basado en el resultado de ejecución.
+  - `ArchitecturalEvolutionManager.create_backup_for_rollback(self, change: ArchitecturalChange) -> Dict[str, Any]`: Crea una copia de seguridad de los componentes afectados antes de aplicar un cambio.
+  - `ArchitecturalEvolutionManager.perform_rollback(self, change: ArchitecturalChange, backup_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]`: Realiza el rollback de un cambio arquitectónico.
+  - `ArchitecturalEvolutionManager.verify_rollback_success(self, change: ArchitecturalChange, rollback_result: Dict[str, Any]) -> Tuple[bool, List[str]]`: Verifica que el rollback se realizó correctamente.
+  - `ArchitecturalEvolutionManager.register_rollback_reason(self, change: ArchitecturalChange, reason: str, additional_info: Optional[Dict[str, Any]] = None)`: Registra el motivo por el cual se realizó un rollback.
+  - `ArchitecturalEvolutionManager.test_rollback_mechanism(self) -> Dict[str, Any]`: Prueba el mecanismo de rollback con un cambio de prueba.
+  - `ArchitecturalEvolutionManager.test_rollback_failure_scenarios(self) -> Dict[str, Any]`: Prueba escenarios de fallo durante el rollback.
+  - `ArchitecturalEvolutionManager.execute_syntax_check(self, component_name: str = None) -> Dict[str, Any]`: Ejecuta comprobación sintáctica del componente afectado.
+  - `ArchitecturalEvolutionManager.execute_component_tests(self, component_name: str) -> Dict[str, Any]`: Ejecuta tests del componente afectado.
+  - `ArchitecturalEvolutionManager.check_direct_integrations(self, component_name: str) -> Dict[str, Any]`: Comprueba integraciones directas del componente afectado.
+  - `ArchitecturalEvolutionManager.check_configuration_state(self) -> Dict[str, Any]`: Comprueba estado de configuración del sistema.
+  - `ArchitecturalEvolutionManager.check_application_startup(self, component_name: str = None) -> Dict[str, Any]`: Comprueba que la aplicación sigue arrancando si el cambio lo requiere.
+  - `ArchitecturalEvolutionManager.register_real_evidence(self, verification_id: str, evidence_data: Dict[str, Any]) -> bool`: Registra evidencia real de la verificación.
+  - `ArchitecturalEvolutionManager.execute_post_verification_tests(self) -> Dict[str, Any]`: Ejecuta tests de verificación posterior completos.
+  - `ArchitecturalEvolutionManager.connect_contextual_adaptation_engine(self, contextual_engine, integration_config: Optional[Dict[str, Any]] = None) -> bool`
+  - `ArchitecturalEvolutionManager.connect_self_improvement_system(self, self_improvement_system, integration_config: Optional[Dict[str, Any]] = None) -> bool`
+  - `ArchitecturalEvolutionManager.reuse_existing_configuration(self, config_path: Optional[str] = None) -> Dict[str, Any]`: Reutiliza mecanismos existentes de configuración.
+  - `ArchitecturalEvolutionManager.avoid_double_evolution_logic(self) -> bool`: Evita doble lógica de evolución entre sistemas conectados.
+  - `ArchitecturalEvolutionManager.propagate_result(self, result: Dict[str, Any], source_system: str, target_systems: Optional[List[str]] = None) -> bool`
+  - `ArchitecturalEvolutionManager.run_integration_tests(self) -> Dict[str, Any]`: Ejecuta tests de integración entre sistemas.
+  - `ArchitecturalEvolutionManager.identify_persistence_locations(self) -> Dict[str, Any]`: Identifica dónde se persisten reglas/cambios (2.8.2.9.1).
+  - `ArchitecturalEvolutionManager.persist_evolution(self, evolution: Union[ArchitecturalChange, EvolutionProposal]) -> Tuple[bool, str]`: Persiste una evolución válida (2.8.2.9.2).
+  - `ArchitecturalEvolutionManager.recover_evolution(self, evolution_id: str) -> Optional[Union[ArchitecturalChange, EvolutionProposal]]`: Recupera una evolución persistida (2.8.2.9.3).
+  - `ArchitecturalEvolutionManager.handle_corrupted_or_missing_data(self, evolution_id: str) -> Dict[str, Any]`: Maneja datos corruptos o ausentes (2.8.2.9.4).
+  - `ArchitecturalEvolutionManager.prevent_duplicates(self, evolution: Union[ArchitecturalChange, EvolutionProposal]) -> Tuple[bool, str]`: Evita duplicados en la persistencia (2.8.2.9.5).
+  - `ArchitecturalEvolutionManager.maintain_change_traceability(self, change: ArchitecturalChange) -> bool`: Mantiene trazabilidad de cambios (2.8.2.9.6).
+  - `ArchitecturalEvolutionManager.run_persistence_and_audit_tests(self) -> Dict[str, Any]`: Ejecuta tests de persistencia y auditoría (2.8.2.9.7).
+  - `ArchitecturalEvolutionManager.run_unit_tests(self) -> Dict[str, Any]`: Ejecuta tests unitarios del ArchitecturalEvolutionManager.
+  - `ArchitecturalEvolutionManager.run_integration_tests(self) -> Dict[str, Any]`: Ejecuta tests de integración con sistemas conectados.
+  - `ArchitecturalEvolutionManager.verify_real_system_functionality(self) -> Dict[str, Any]`: Realiza verificación real del sistema en ejecución.
+  - `ArchitecturalEvolutionManager.update_documentation(self) -> Dict[str, Any]`: Actualiza la documentación del sistema.
+  - `ArchitecturalEvolutionManager.mark_completion(self) -> Dict[str, Any]`: Marca la tarea 2.8.2.10 como completada y verifica que todas las hojas estén completas.
+  - `ArchitecturalEvolutionManager.run_closure_tests(self) -> Dict[str, Any]`: Ejecuta todos los tests de cierre de forma coordinada.
+
+#### `src/utils/circuit_breaker.py` [197 líneas] - Patrón Circuit Breaker para Resiliencia
+- **Descripción**: Implementación del patrón circuit breaker para proporcionar resiliencia contra fallos en cascada y proteger servicios dependientes.
+- **Clases principales**:
+  - `CircuitState` (Enum): Estados del circuit breaker (CLOSED, OPEN, HALF_OPEN).
+  - `CircuitBreakerConfig` (dataclass): Configuración para el circuit breaker con umbral de fallos, tiempo de recuperación, excepciones esperadas, timeout y llamadas máximas en estado medio abierto.
+  - `CircuitBreaker`: Implementación principal del circuit breaker con protección contra timeouts, manejo de estados y estadísticas.
+  - `CircuitBreakerOpenError`: Excepción lanzada cuando el circuito está abierto.
+  - `CircuitBreakerManager`: Gestor de múltiples circuit breakers con operaciones globales.
+- **Métodos principales**:
+  - `CircuitBreaker.__init__(self, name: str, config: CircuitBreakerConfig = None)`
+  - `CircuitBreaker.call(self, func: Callable, *args, **kwargs) -> Any`: Execute function with circuit breaker protection
+  - `CircuitBreaker.force_open(self)`: Force circuit breaker to open state
+  - `CircuitBreaker.force_close(self)`: Force circuit breaker to closed state
+  - `CircuitBreaker.get_state(self) -> CircuitState`: Get current circuit breaker state
+  - `CircuitBreaker.get_stats(self) -> Dict`: Get circuit breaker statistics
+  - `CircuitBreakerManager.__init__(self)`
+  - `CircuitBreakerManager.get_breaker(self, name: str, config: CircuitBreakerConfig = None) -> CircuitBreaker`: Get or create circuit breaker
+  - `CircuitBreakerManager.get_all_stats(self) -> Dict[str, Dict]`: Get statistics for all circuit breakers
+  - `CircuitBreakerManager.reset_all(self)`: Reset all circuit breakers
+  - `CircuitBreakerManager.cleanup_stale(self, max_age_hours: int = 24)`: Clean up stale circuit breakers
+- **Funciones globales**:
+  - `circuit_breaker(name: str, config: CircuitBreakerConfig = None)`: Decorador para protección fácil con circuit breaker.
+  - `decorator(func)`
+  - `wrapper(*args, **kwargs)`
+
+#### `src/utils/config.py` [1348 líneas] - Configuración Centralizada
+- **Descripción**: Gestión centralizada de configuración del sistema JARVIS con configuración unificada para todos los componentes, validación automática, sistema de herencia de configuraciones, gestión de perfiles de usuario e integración con sistema de calibración.
+- **Clases principales**:
+  - `SystemConfig` (dataclass): Configuración general del sistema Jarvis (nombre, versión, modo debug, sistema de coordenadas)
+  - `LoggingConfig` (dataclass): Configuración del sistema de logging (nivel, formato, archivo)
+  - `KeyboardConfig` (dataclass): Configuración de teclas de atajo (fail-safe, pausa entre acciones)
+  - `VoiceConfig` (dataclass): Configuración de voz (voz por defecto, modelos, tokenizador)
+  - `MemoryConfig` (dataclass): Configuración de memoria (archivos de historial, aliases, longitud máxima)
+  - `PredictiveConfig` (dataclass): Configuración del sistema predictivo (aprendizaje, umbrales, memoria)
+  - `MonitorConfig` (dataclass): Configuración compatible de monitores (geometría, DPI, sistema de coordenadas)
+  - `ScreenConfig` (dataclass): Configuración auxiliar de pantallas (multi-monitor, calidad, límites)
+  - `TimeoutConfig` (dataclass): Configuración de timeouts (llamadas, captura, clics, escritura)
+  - `CalibrationConfig` (dataclass): Configuración del sistema de calibración (intentos, confianza, coordenadas)
+  - `ChromeConfig` (dataclass): Configuración de Google Chrome para aperturas automáticas
+  - `Config` (dataclass): Configuración principal del sistema que agrupa todas las subconfiguraciones
+- **Métodos principales**:
+  - `MonitorConfig.right(self) -> int`: Coordenada X final del monitor.
+  - `MonitorConfig.bottom(self) -> int`: Coordenada Y final del monitor.
+  - `ScreenConfig.monitor_count(self) -> int`: Número de monitores configurados en el JSON.
+  - `ScreenConfig.get_monitor( self, monitor_id: int, ) -> Optional[MonitorConfig]`
+  - `ScreenConfig.get_primary_monitor( self, ) -> Optional[MonitorConfig]`
+- **Funciones globales**:
+  - `load_saved_voice_preference() -> Optional[str]`: Carga la última voz seleccionada por el usuario.
+  - `save_voice_preference( voice_id: str, ) -> bool`
+  - `load_config() -> Config`: Carga la configuración desde config/config.json.
+  - `get_project_root() -> Path`: Retorna la ruta raíz del proyecto.
+  - `get_config_path() -> Path`: Retorna la ruta del archivo de configuración.
+  - `get_models_path() -> Path`: Retorna la ruta al directorio de modelos.
+  - `get_voices_path() -> Path`: Retorna la ruta al directorio de voces.
+  - `get_macros_coords_path() -> Path`: Retorna la ruta al archivo de coordenadas de macros.
+  - `get_voice_preference_path() -> Path`: Retorna la ruta de la preferencia persistente de voz.
+  - `get_system_config() -> SystemConfig`: Retorna la configuración general del sistema.
+  - `get_logging_config() -> LoggingConfig`: Retorna la configuración de logging.
+  - `get_keyboard_config() -> KeyboardConfig`: Retorna la configuración del teclado.
+  - `get_voice_config() -> VoiceConfig`: Retorna la configuración de voz.
+  - `get_memory_config() -> MemoryConfig`: Retorna la configuración de memoria.
+  - `get_screen_config() -> ScreenConfig`: Retorna la configuración auxiliar de pantallas.
+  - `get_timeout_config() -> TimeoutConfig`: Retorna la configuración de timeouts.
+  - `get_predictive_config() -> PredictiveConfig`: Retorna la configuración predictiva.
+  - `get_calibration_config() -> CalibrationConfig`: Retorna la configuración de calibración.
+  - `get_chrome_config() -> ChromeConfig`: Retorna la configuración de Chrome.
+  - `get_element_types() -> Dict[str, Dict[str, Any]]`: Retorna los tipos de elementos configurados.
+  - `get_monitors() -> List[MonitorConfig]`: Retorna los monitores definidos en config.json.
+  - `get_monitor_config( monitor_id: int, ) -> Optional[MonitorConfig]`
+  - `get_primary_monitor_config() -> Optional[MonitorConfig]`: Retorna el monitor principal definido en el JSON.
+  - `get_monitor_count() -> int`: Retorna el número de monitores definidos en el JSON.
+
+#### `src/utils/contextual_adaptation_audit.py` [444 líneas] - Auditoría del Sistema de Adaptación Contextual
+- **Descripción**: Sistema avanzado de auditoría para el objetivo real de autoevolución y adaptación contextual. Evalúa componentes existentes, identifica brechas del sistema, genera hallazgos detallados y proporciona recomendaciones para mejorar la arquitectura de adaptación contextual del sistema JARVIS.
+- **Clases principales**:
+  - `ComponentStatus` (dataclass): Estado detallado de un componente del sistema con información de implementación, funcionalidad, dependencias, nivel de integración y capacidades
+  - `AuditFinding` (dataclass): Hallazgo estructurado de auditoría con categoría, severidad, componente, descripción, evidencia, recomendación e impacto
+  - `SystemGap` (dataclass): Brecha identificada en el sistema con área, componente faltante, funcionalidad requerida, prioridad, esfuerzo estimado y dependencias
+  - `ContextualAdaptationAuditor`: Sistema principal de auditoría contextual con evaluación de componentes, detección de brechas y generación de reportes
+- **Métodos principales**:
+  - `ContextualAdaptationAuditor.__init__(self)`
+  - `ContextualAdaptationAuditor.audit_existing_components(self) -> None`: Auditar componentes existentes relacionados con adaptación y evolución
+  - `ContextualAdaptationAuditor.identify_system_gaps(self) -> None`: Identificar brechas en el sistema de autoevolución contextual
+  - `ContextualAdaptationAuditor.generate_audit_report(self) -> Dict[str, Any]`: Generar reporte completo de auditoría
+  - `ContextualAdaptationAuditor.save_audit_report(self, output_path: str = None) -> str`: Guardar reporte de auditoría a archivo
+- **Funciones globales**:
+  - `main()`: Ejecuta auditoría completa del sistema de adaptación contextual con reporte final
+
+#### `src/utils/contextual_adaptation_engine.py` [3283 líneas] - Motor de Adaptación Contextual
+- **Descripción**: Motor de adaptación contextual que permite a JARVIS evolucionar y adaptarse automáticamente a diferentes entornos, condiciones de uso y requerimientos cambiantes.
+- **Clases principales**:
+  - `_NP`
+  - `ContextType` (Enum)
+  - `AdaptationLevel` (Enum)
+  - `ContextualFactor` (Enum)
+  - `ContextSnapshot` (dataclass)
+  - `AdaptationRule` (dataclass)
+  - `KnowledgeTransfer` (dataclass)
+  - `TransferEvaluation`: Evaluación de una transferencia.
+  - `AdaptationResult` (dataclass)
+  - `_AdaptationHistoryEntry`: Mantiene compatibilidad con el historial legado que se lee por atributo.
+  - `ContextualAdaptationEngine`: Motor de adaptación contextual y transferencia de conocimiento de JARVIS.
+- **Métodos principales**:
+  - `_NP.mean(v): return sum(v) / len(v) if v else 0.0`
+  - `_NP.std(v)`
+  - `ContextSnapshot.to_dict(self) -> Dict[str, Any]`
+  - `AdaptationRule.to_dict(self) -> Dict[str, Any]`
+  - `KnowledgeTransfer.to_dict(self) -> Dict[str, Any]`
+  - `AdaptationResult.to_dict(self) -> Dict[str, Any]`
+  - `_AdaptationHistoryEntry.to_dict(self): return dict(self)`
+  - `ContextualAdaptationEngine.__init__(self, config_path: Optional[str] = None, data_dir: Optional[str] = None)`
+  - `ContextualAdaptationEngine.capture_context_snapshot(self) -> ContextSnapshot`
+  - `ContextualAdaptationEngine.analyze_contextual_patterns(self, snapshot: ContextSnapshot) -> List[AdaptationRule]`
+  - `ContextualAdaptationEngine.execute_adaptation(self, snapshot: ContextSnapshot, rules: List[AdaptationRule]) -> AdaptationResult`
+  - `ContextualAdaptationEngine.transfer_knowledge(self, source_context: ContextType, target_context: ContextType, knowledge_type: str, transfer_strategy: str = "adaptive", include_patterns: bool = True, include_strategies: bool = True, include_baselines: bool = True, include_metrics: bool = True) -> Optional[KnowledgeTransfer]`
+  - `ContextualAdaptationEngine.get_transfer_confidence(self, transfer_id: str, result: Optional[Dict[str, Any]] = None) -> Optional[float]`: Obtener una confianza acotada usando primero la transferencia viva y después el historial persistido.
+  - `ContextualAdaptationEngine.register_feedback( self, transfer_id: str, feedback_data: Dict[str, Any], result: Optional[Dict[str, Any]] = None, ) -> bool`
+  - `ContextualAdaptationEngine.register_transfer_feedback( self, transfer_id: str, success: bool, feedback_score: float = 0.0, feedback_comments: str = "", **kwargs: Any, ) -> Dict[str, Any]`
+  - `ContextualAdaptationEngine.adjust_transfer_confidence(self, transfer_id: str, adjustment_factor: Optional[float] = None, feedback_success: Optional[bool] = None, feedback_score: Optional[float] = None, reason: Optional[str] = None) -> bool`
+  - `ContextualAdaptationEngine.evaluate_transfer_result( self, transfer: Any, execution_result: Optional[Dict[str, Any]] = None, ) -> TransferEvaluation`
+  - `ContextualAdaptationEngine.knowledge_transaptors(self) -> Dict[str, KnowledgeTransfer]`: Alias de `knowledge_transfers` para los consumidores que expected este nombre.
+  - `ContextualAdaptationEngine.get_knowledge_transfer_objects( self, context_type: Optional[ContextType] = None, knowledge_type: Optional[str] = None, min_efficiency: float = 0.0, ) -> List[KnowledgeTransfer]`
+  - `ContextualAdaptationEngine.get_knowledge_transfers( self, context_type: Optional[ContextType] = None, knowledge_type: Optional[str] = None, min_efficiency: float = 0.0, *, as_objects: bool = False, ) -> List[Any]`
+  - `ContextualAdaptationEngine.batch_knowledge_transfer(self, transfer_requests: List[Dict[str, Any]]) -> List[Optional[KnowledgeTransfer]]`
+  - `ContextualAdaptationEngine.auto_transfer_knowledge(self, target_context: ContextType, knowledge_types: Optional[List[str]] = None, min_compatibility: float = .6, max_transfers: int = 10) -> List[KnowledgeTransfer]`
+  - `ContextualAdaptationEngine.transfer_knowledge_with_feedback(self, source_context: ContextType, target_context: ContextType, knowledge_type: str, feedback_callback: Optional[Callable] = None) -> Optional[KnowledgeTransfer]`
+  - `ContextualAdaptationEngine.notify(payload)`
+  - `ContextualAdaptationEngine.get_transfer_recommendations(self, target_context: ContextType, max_recommendations: int = 5, min_efficiency: float = .6) -> List[Dict[str, Any]]`
+  - `ContextualAdaptationEngine.record_resource_allocation(self, allocation_data: Dict[str, Any]) -> None`
+  - `ContextualAdaptationEngine.add_adaptation_rule(self, rule: AdaptationRule) -> bool`
+  - `ContextualAdaptationEngine.remove_adaptation_rule(self, rule_id: str) -> bool`
+  - `ContextualAdaptationEngine.enable_rule(self, rule_id: str) -> bool`
+  - `ContextualAdaptationEngine.disable_rule(self, rule_id: str) -> bool`
+  - `ContextualAdaptationEngine.get_adaptation_rule(self, rule_id: str) -> Optional[AdaptationRule]: return self.adaptation_rules.get(rule_id)`
+  - `ContextualAdaptationEngine.get_adaptation_rules(self) -> List[Dict[str, Any]]: return [r.to_dict() for r in self.list_adaptation_rules()]`
+  - `ContextualAdaptationEngine.list_adaptation_rules(self, enabled_only: bool = False) -> List[AdaptationRule]`
+  - `ContextualAdaptationEngine.save_adaptation_rules(self) -> bool: return self._save_adaptation_rules()`
+  - `ContextualAdaptationEngine.load_adaptation_rules(self) -> bool`
+  - `ContextualAdaptationEngine.save_knowledge_base(self) -> bool`
+  - `ContextualAdaptationEngine.load_knowledge_base(self) -> bool`
+  - `ContextualAdaptationEngine.save_all_data(self) -> bool: return self._save_adaptation_rules() and self.save_knowledge_base()`
+  - `ContextualAdaptationEngine.load_all_data(self) -> bool: return self.load_adaptation_rules() and self.load_knowledge_base()`
+  - `ContextualAdaptationEngine.backup_data(self, backup_dir: Optional[str] = None) -> bool`
+  - `ContextualAdaptationEngine.export_adaptation_history(self, export_file: Optional[str] = None) -> bool`
+  - `ContextualAdaptationEngine.integrate_with_performance_optimizer(self) -> Dict[str, Any]`
+  - `ContextualAdaptationEngine.integrate_with_self_improvement_system(self) -> Dict[str, Any]`
+  - `ContextualAdaptationEngine.integrate_with_adaptive_learning_engine(self) -> Dict[str, Any]`
+  - `ContextualAdaptationEngine.integrate_with_pattern_analyzer(self) -> Dict[str, Any]`
+  - `ContextualAdaptationEngine.set_meta_learning_system(self, meta_learning_system) -> bool`
+  - `ContextualAdaptationEngine.integrate_with_meta_learning_system(self, meta_learning_system=None) -> Dict[str, Any]`
+  - `ContextualAdaptationEngine.full_system_integration(self) -> Dict[str, Any]`
+  - `ContextualAdaptationEngine.get_integration_status(self) -> Dict[str, Any]`
+  - `ContextualAdaptationEngine.update_system_configs(self) -> Dict[str, Any]`
+  - `ContextualAdaptationEngine.get_available_strategies(self, context: ContextType) -> List[Dict[str, Any]]`
+  - `ContextualAdaptationEngine.generate_strategy_candidates(self, target_context: ContextType, max_candidates: int = 5, min_confidence: float = .5) -> List[Dict[str, Any]]`
+  - `ContextualAdaptationEngine.validate_candidate_strategy(self, candidate: Dict[str, Any]) -> Tuple[bool, List[str]]`: Validar estructura y rangos de un candidato de estrategia.
+  - `ContextualAdaptationEngine.evaluate_candidate_strategy( self, candidate: Dict[str, Any], target_context: ContextType, ) -> Dict[str, Any]`
+  - `ContextualAdaptationEngine.select_strategy(self, evaluated_strategies: List[Dict[str, Any]], current_strategy: Optional[Dict[str, Any]] = None) -> Dict[str, Any]`
+  - `ContextualAdaptationEngine.compare_strategies(self, strategy1: Dict[str, Any], strategy2: Dict[str, Any]) -> Dict[str, Any]`
+  - `ContextualAdaptationEngine.apply_strategy(self, strategy: Dict[str, Any], target_context: ContextType) -> Dict[str, Any]`
+  - `ContextualAdaptationEngine.represent_adaptation(self, original_goal, context_snapshot, adaptation_rules)`: Crear una copia adaptada del Goal; acepta objetos y diccionarios.
+  - `ContextualAdaptationEngine.create_goal_adaptation_proposal(self, original_goal, context_snapshot, adaptation_rules) -> Dict[str, Any]`
+  - `ContextualAdaptationEngine.validate_adapted_goal(self, original_goal, adapted_goal, current_state, available_capabilities) -> Dict[str, Any]`: Validar estructura, intención, capacidades, precondiciones y resolubilidad del Goal adaptado.
+  - `ContextualAdaptationEngine.expected_storage_paths(self) -> Dict[str, str]`: Rutas del almacenamiento de persistencia que el motor espera encontrar.
+  - `ContextualAdaptationEngine.detect_absent_storage(self) -> Dict[str, Any]`: Detecta que parte del almacenamiento esperado falta en disco.
+  - `ContextualAdaptationEngine.expected_storage_sections(self) -> Dict[str, Dict[str, str]]`: Secciones de primer nivel que el motor espera en cada fichero de persistencia.
+  - `ContextualAdaptationEngine.detect_absent_sections(self) -> Dict[str, Any]`: Detecta secciones ausentes dentro de los ficheros de persistencia existentes.
+  - `ContextualAdaptationEngine.no_data_behavior(self) -> Dict[str, Any]`: Contrato DECLARATIVO del comportamiento del motor SIN DATOS (2.8.8.9.5.3).
+  - `ContextualAdaptationEngine.corruption_criteria(self) -> Dict[str, Any]`: Contrato DECLARATIVO de los criterios de CORRUPCIÓN (2.8.8.9.6.1).
+  - `ContextualAdaptationEngine.set_architecture_manager(self, architecture_manager) -> None`
+  - `ContextualAdaptationEngine.update_architecture_state(self, architecture_state: Dict[str, Any]) -> None`
+  - `ContextualAdaptationEngine.update_components(self, components: List[Dict[str, Any]]) -> None`
+  - `ContextualAdaptationEngine.process_architectural_result(self, architectural_result: Dict[str, Any]) -> Dict[str, Any]`
+  - `ContextualAdaptationEngine.process_evidence_registration(self, verification_id: str, evidence_record: Dict[str, Any]) -> Dict[str, Any]`
+  - `ContextualAdaptationEngine.on_proposal_created(self, proposal) -> Dict[str, Any]`
+  - `ContextualAdaptationEngine.start_contextual_adaptation_loop(self) -> None`
+  - `ContextualAdaptationEngine.loop()`
+  - `ContextualAdaptationEngine.stop_contextual_adaptation_loop(self) -> None`
+  - `ContextualAdaptationEngine.get_adaptation_summary(self) -> Dict[str, Any]`
+  - `ContextualAdaptationEngine.value(row, name, default=None): return getattr(row, name, row.get(name, default) if isinstance(row, dict) else default)`
+  - `ContextualAdaptationEngine.get_context_insights(self) -> Dict[str, Any]`
+  - `ContextualAdaptationEngine.get_engine_status(self) -> Dict[str, Any]`
+- **Funciones globales**:
+  - `main() -> None`: Demo del motor de adaptación contextual
+
+#### `src/utils/dynamic_resource_allocator.py` [1336 líneas] - Asignador Dinámico de Recursos
+- **Descripción**: Sistema avanzado de asignación de recursos dinámica según contexto con priorización, detección de conflictos, preemption, gestión de recursos del sistema (CPU, memoria, disco, red), integración con PerformanceMonitor y PerformanceOptimizer, soporte para trabajo diferido y notificación de cambios. Implementa modelo de asignación con solicitudes, asignaciones y disponibilidad de recursos.
+- **Clases principales**:
+  - `ResourceType` (Enum): Tipos de recursos gestionables
+  - `ResourcePriority` (Enum): Prioridades de recurso
+  - `AllocationStatus` (Enum): Estados de asignación
+  - `ResourceRequest` (dataclass): Solicitud de recurso con validación, contexto y prioridad
+  - `ResourceAllocation` (dataclass): Asignación de recurso con estado, cantidad usada y metadatos
+  - `ResourceAvailability` (dataclass): Disponibilidad de recurso con verificación de satisfacción
+  - `DynamicResourceAllocator`: Sistema principal de asignación con bucle de monitoreo
+- **Métodos principales**:
+  - `ResourceRequest.validate(self) -> tuple[bool, List[str]]`: Validar la solicitud.
+  - `ResourceRequest.to_dict(self) -> Dict[str, Any]`: Convertir a diccionario.
+  - `ResourceAllocation.to_dict(self) -> Dict[str, Any]`: Convertir a diccionario.
+  - `ResourceAvailability.can_satisfy(self, request_amount: Optional[float]) -> bool`: Verificar si el recurso puede satisfacer la solicitud.
+  - `DynamicResourceAllocator.__init__(self, monitor: Optional[PerformanceMonitor] = None, optimizer: Optional[PerformanceOptimizer] = None)`
+  - `DynamicResourceAllocator.register_resource(self, resource_type: ResourceType, available: bool = True, available_amount: Optional[float] = None, maximum: Optional[float] = None, unit: str = "%") -> None`
+  - `DynamicResourceAllocator.create_request(self, request_id: str, resource_type: ResourceType, amount: Optional[float] = None, context: Optional[Dict[str, Any]] = None, priority: ResourcePriority = ResourcePriority.MEDIUM, required: bool = True) -> ResourceRequest`
+  - `DynamicResourceAllocator.allocate(self, request: ResourceRequest) -> Optional[ResourceAllocation]`: Asignar un recurso.
+  - `DynamicResourceAllocator.get_conflicts(self, request: ResourceRequest) -> List[tuple]`: Identificar conflictos reales con asignaciones existentes.
+  - `DynamicResourceAllocator.defer_request(self, request: ResourceRequest) -> str`: Aplazar una solicitud cuando no hay recurso disponible.
+  - `DynamicResourceAllocator.get_pending_requests(self) -> List[ResourceRequest]`: Obtener solicitudes diferidas.
+  - `DynamicResourceAllocator.process_deferred(self) -> List[str]`: Intentar asignar solicitudes diferidas.
+  - `DynamicResourceAllocator.release(self, allocation_id: str) -> bool`: Liberar una asignación.
+  - `DynamicResourceAllocator.get_availability(self, resource_type: ResourceType) -> Optional[ResourceAvailability]`: Obtener disponibilidad de un recurso.
+  - `DynamicResourceAllocator.get_allocation(self, allocation_id: str) -> Optional[ResourceAllocation]`: Obtener una asignación.
+  - `DynamicResourceAllocator.get_all_allocations(self) -> List[ResourceAllocation]`: Obtener todas las asignaciones.
+  - `DynamicResourceAllocator.update_usage(self, allocation_id: str, used_amount: float) -> bool`: Actualizar el uso real de una asignación.
+  - `DynamicResourceAllocator.cleanup(self) -> None`: Limpieza de recursos.
+  - `DynamicResourceAllocator.update_system_resources(self) -> None`: Actualizar recursos del sistema desde PerformanceMonitor.
+  - `DynamicResourceAllocator.update_execution_resources(self, registry_size: int = 0) -> None`: Actualizar recursos de ejecución.
+  - `DynamicResourceAllocator.update_thread_pool_resources(self, max_workers: int = 4) -> None`: Actualizar recursos de pool de hilos.
+  - `DynamicResourceAllocator.update_storage_resources(self, cache_size: int = 0) -> None`: Actualizar recursos de almacenamiento.
+  - `DynamicResourceAllocator.connect_context(self, context: Dict[str, Any]) -> bool`: Conectar con el contexto actual.
+  - `DynamicResourceAllocator.adjust_allocation_for_context(self, allocation_id: str) -> bool`: Ajustar una asignación usando solo datos disponibles en el contexto.
+  - `DynamicResourceAllocator.adjust_all_allocations_for_context(self) -> Dict[str, bool]`: Ajustar todas las asignaciones usando datos disponibles del contexto.
+  - `DynamicResourceAllocator.recalculate_on_context_change(self, new_context: Dict[str, Any]) -> Dict[str, Any]`: Recalcular asignaciones cuando el contexto cambia.
+  - `DynamicResourceAllocator.set_contextual_adaptation_engine(self, engine: ContextualAdaptationEngine) -> None`: Conectar con el ContextualAdaptationEngine.
+  - `DynamicResourceAllocator.get_contextual_adaptation_engine(self) -> Optional[ContextualAdaptationEngine]`: Obtener la instancia conectada de ContextualAdaptationEngine.
+  - `DynamicResourceAllocator.set_performance_optimizer(self, optimizer: PerformanceOptimizer) -> None`: Conectar con el PerformanceOptimizer.
+  - `DynamicResourceAllocator.get_performance_optimizer(self) -> Optional[PerformanceOptimizer]`: Obtener la instancia conectada de PerformanceOptimizer.
+  - `DynamicResourceAllocator.notify_allocation_to_contextual_engine(self, allocation: ResourceAllocation) -> None`: Notificar una asignación al ContextualAdaptationEngine.
+  - `DynamicResourceAllocator.request_optimization_from_performance_optimizer(self, optimization_request: Dict[str, Any]) -> Optional[Dict[str, Any]]`: Solicitar optimización al PerformanceOptimizer.
+  - `DynamicResourceAllocator.get_resource_allocation_status_for_planner(self) -> Dict[str, Any]`: Obtener estado de asignación de recursos para el Planner/Executor.
+  - `DynamicResourceAllocator.integrate_with_planner_executor(self, planner_context: Dict[str, Any]) -> Dict[str, Any]`: Integrar completamente con Planner/Executor mediante contratos existentes.
+
+#### `src/utils/error_dashboard.py` [592 líneas] - Dashboard de Recuperación de Errores
+- **Descripción**: Dashboard visual para monitoreo y gestión de operaciones de recuperación de errores. Proporciona interfaz para visualizar errores activos, historial de recuperación, estado del sistema y alertas con actualización en tiempo real y caché de datos.
+- **Clases principales**:
+  - `DashboardView` (Enum): Tipos de vistas del dashboard (OVERVIEW, ACTIVE_ERRORS, RECOVERY_HISTORY, SYSTEM_HEALTH, ALERTS)
+  - `ErrorSeverity` (Enum): Niveles de severidad de errores (LOW, MEDIUM, HIGH, CRITICAL)
+  - `ErrorRecoveryDashboard`: Clase principal del dashboard para monitoreo de recuperación de errores
+- **Métodos principales**:
+  - `ErrorRecoveryDashboard.__init__(self, db_path: str = "data/error_dashboard.db", update_interval: float = 5.0)`
+  - `ErrorRecoveryDashboard.start_dashboard(self)`: Start the dashboard update thread
+  - `ErrorRecoveryDashboard.stop_dashboard(self)`: Stop the dashboard update thread
+  - `ErrorRecoveryDashboard.get_dashboard_data(self, view: DashboardView = None) -> Dict`: Get dashboard data for specified view
+  - `ErrorRecoveryDashboard.get_dashboard_views(self) -> List[Dict]`: Get available dashboard views
+  - `ErrorRecoveryDashboard.refresh_data(self)`: Force refresh of all cached data
+  - `ErrorRecoveryDashboard.log_view_access(self, view_name: str)`: Log dashboard view access
+  - `ErrorRecoveryDashboard.get_view_statistics(self) -> Dict`: Get dashboard view access statistics
+- **Funciones globales**:
+  - `get_error_dashboard()`: Obtiene instancia singleton del dashboard de errores
+  - `start_error_dashboard()`: Inicia el dashboard de errores
+  - `stop_error_dashboard()`: Detiene el dashboard de errores
+
+#### `src/utils/error_recovery.py` [522 líneas] - Sistema de Recuperación de Errores
+- **Descripción**: Sistema avanzado de detección, registro y recuperación de errores para JARVIS con estrategias automáticas, estadísticas detalladas y persistencia en base de datos SQLite.
+- **Clases principales**:
+  - `ErrorSeverity` (Enum): Error severity levels
+  - `ErrorType` (Enum): Error categories
+  - `RecoveryStrategy` (Enum): Recovery strategy types
+  - `ErrorRecoveryManager`: Gestor principal de recuperación de errores con base de datos SQLite y estrategias integradas
+- **Métodos principales**:
+  - `ErrorRecoveryManager.__init__(self, db_path: str = "data/error_recovery.db")`
+  - `ErrorRecoveryManager.get_error_recovery_manager()`: Get a singleton instance of ErrorRecoveryManager
+  - `ErrorRecoveryManager.register_strategy(self, name: str, strategy_func: Callable)`: Register a recovery strategy
+  - `ErrorRecoveryManager.register_handler(self, error_type: str, handler_func: Callable)`: Register an error handler for specific error types
+  - `ErrorRecoveryManager.log_error(self, error_type: ErrorType, severity: ErrorSeverity, component: str, error_message: str, stack_trace: str = None, additional_data: Dict = None)`
+  - `ErrorRecoveryManager.recover_from_error(self, error_id: int, strategy: RecoveryStrategy = None, max_retries: int = None, retry_delay: float = None) -> bool`
+  - `ErrorRecoveryManager.get_error_statistics(self, days: int = 7) -> Dict`: Get error statistics for the specified number of days
+  - `ErrorRecoveryManager.get_active_errors(self) -> List[Dict]`: Get list of active (unrecovered) errors
+  - `ErrorRecoveryManager.cleanup_old_errors(self, days: int = 30)`: Clean up old error records
+- **Funciones globales**:
+  - `get_error_recovery_manager()`: Obtiene instancia singleton del gestor de recuperación de errores
+  - `start_error_recovery()`: Inicia el sistema de recuperación de errores
+  - `stop_error_recovery()`: Detiene el sistema de recuperación de errores
+
+#### `src/utils/get_coords.py` [456 líneas] - Calibrador Manual de Riot API
+- **Descripción**: Calibrador manual de la macro riot_api. Registra coordenadas absolutas del escritorio y las guarda asociadas al monitor real (s1, s2, ...). La topología, posición y resolución de los monitores se obtienen de config/config.json mediante ScreenManager. Este módulo es específico de la calibración manual de la macro riot_api. No modifica otras macros ni otras calibraciones existentes.
+- **Funciones globales**:
+  - `imprimir_resultados( datos: Dict[str, object], screen_key: Optional[str] = None, ) -> None`
+  - `gestionar_json( nuevos_datos: Dict[str, object], screen_key: str, ruta_json: Optional[Path] = None, ) -> bool`
+  - `calibrar_api_key_riot_macro( screen_number: Optional[int] = None, ) -> bool`
+  - `calibrarApiKeyRiotMacro( screen_number: Optional[int] = None, ) -> bool`
+
+#### `src/utils/health_checker.py` [498 líneas] - Sistema de Verificación de Salud
+- **Descripción**: Sistema avanzado de verificación de salud para JARVIS con monitoreo continuo de componentes críticos, detección de problemas, generación de reportes y capacidad de adaptación.
+- **Clases principales**:
+  - `HealthStatus` (Enum): Estados de salud de un componente (HEALTHY, WARNING, CRITICAL, UNKNOWN)
+  - `HealthCheck` (dataclass): Resultado estructurado de una verificación de salud con timestamp, mensaje y detalles
+  - `HealthCheckConfig` (dataclass): Configuración completa para verificaciones de salud con umbrales, tiempos de espera y componentes a monitorizar
+  - `HealthChecker`: Sistema principal de verificación de salud con monitoreo periódico, historial y callbacks de notificación
+- **Métodos principales**:
+  - `HealthCheck.to_dict(self) -> Dict[str, Any]`: Convierte el resultado a un diccionario serializable.
+  - `HealthCheckConfig.to_dict(self) -> Dict[str, Any]`: Convierte la configuración a un diccionario.
+  - `HealthChecker.__init__(self, config: Optional[HealthCheckConfig] = None)`: Inicializa el verificador de salud.
+  - `HealthChecker.start_health_checks(self) -> None`: Inicia las verificaciones periódicas de salud.
+  - `HealthChecker.stop_health_checks(self) -> None`: Detiene las verificaciones de salud.
+  - `HealthChecker.perform_comprehensive_health_check(self) -> List[HealthCheck]`: Realiza una verificación completa de salud de todos los componentes.
+  - `HealthChecker.check_component_health(self, component_name: str) -> HealthCheck`: Verifica la salud de un componente específico.
+  - `HealthChecker.check_system_health(self) -> HealthCheck`: Verifica la salud general del sistema.
+  - `HealthChecker.add_health_change_callback(self, callback: Callable[[HealthCheck], None]) -> None`: Agrega un callback para recibir notificaciones de cambios de salud.
+  - `HealthChecker.remove_health_change_callback(self, callback: Callable[[HealthCheck], None]) -> None`: Remueve un callback de notificaciones de salud.
+  - `HealthChecker.get_health_status(self, component_name: Optional[str] = None) -> Union[HealthCheck, List[HealthCheck]]`: Obtiene el estado de salud de un componente o todos los componentes.
+  - `HealthChecker.get_health_summary(self) -> Dict[str, Any]`: Obtiene un resumen del estado de salud actual.
+  - `HealthChecker.get_component_health_history(self, component_name: str, limit: Optional[int] = None) -> List[HealthCheck]`: Obtiene el historial de salud de un componente específico.
+  - `HealthChecker.export_health_report(self, filepath: str, include_history: bool = False) -> None`: Exporta un reporte de salud a un archivo JSON.
+  - `HealthChecker.clear_history(self) -> None`: Limpia el historial de verificaciones de salud.
+  - `HealthChecker.is_component_healthy(self, component_name: str) -> bool`: Verifica si un componente está saludable.
+  - `HealthChecker.get_unhealthy_components(self) -> List[str]`: Obtiene una lista de componentes no saludables.
+- **Funciones globales**:
+  - `get_health_checker() -> HealthChecker`: Obtiene instancia global del verificador de salud
+  - `start_health_checks() -> None`: Inicia verificaciones globales
+  - `stop_health_checks() -> None`: Detiene verificaciones globales
+
+#### `src/utils/health_monitor.py` [418 líneas] - Sistema de Monitoreo de Salud
+- **Descripción**: Sistema avanzado de monitoreo de salud para JARVIS con detección proactiva de errores, métricas en tiempo real, almacenamiento persistente y capacidades de alerta. Proporciona monitoreo continuo de componentes críticos del sistema con umbrales configurables y recuperación automática.
+- **Clases principales**:
+  - `HealthStatus` (Enum): Health status levels
+  - `ComponentType` (Enum): System component types
+  - `HealthMetric`: Métrica individual de salud con valor, umbral y estado
+  - `HealthMonitor`: Sistema principal de monitoreo de salud con base de datos SQLite
+- **Métodos principales**:
+  - `HealthMetric.__init__(self, name: str, value: float, threshold: float, component: ComponentType, metric_type: str = "gauge")`
+  - `HealthMetric.is_healthy(self) -> bool`: Check if metric is within healthy bounds
+  - `HealthMetric.get_status(self) -> HealthStatus`: Get health status based on value
+  - `HealthMonitor.__init__(self, db_path: str = "data/health_monitor.db", check_interval: float = 30.0)`
+  - `HealthMonitor.register_metric(self, name: str, threshold: float, component: ComponentType, metric_type: str = "gauge")`
+  - `HealthMonitor.register_health_callback(self, component: ComponentType, callback: Callable)`: Register callback for health status changes
+  - `HealthMonitor.check_metric(self, name: str, value: float) -> HealthMetric`: Check a specific metric
+  - `HealthMonitor.check_all_metrics(self) -> Dict[str, HealthMetric]`: Check all registered metrics
+  - `HealthMonitor.start_monitoring(self)`: Start continuous health monitoring
+  - `HealthMonitor.stop_monitoring(self)`: Stop continuous health monitoring
+  - `HealthMonitor.get_current_health(self) -> Dict[str, Any]`: Get current health status
+  - `HealthMonitor.get_health_history(self, hours: int = 24) -> List[Dict]`: Get health history for specified hours
+  - `HealthMonitor.get_active_alerts(self) -> List[Dict]`: Get list of active (unresolved) alerts
+  - `HealthMonitor.resolve_alert(self, alert_id: int)`: Resolve a specific alert
+  - `HealthMonitor.cleanup_old_data(self, days: int = 30)`: Clean up old health data
+- **Funciones globales**:
+  - `get_health_monitor()`: Obtiene instancia singleton del monitor de salud
+  - `start_health_monitoring()`: Inicia monitoreo de salud global
+  - `stop_health_monitoring()`: Detiene monitoreo de salud global
+
+#### `src/utils/jarvis_logging_system.py` [487 líneas] - Sistema Avanzado de Logging para JARVIS
+- **Descripción**: Sistema unificado de logging avanzado para JARVIS con capacidades predictivas, dashboard interactivo, análisis de patrones y gestión de alertas. Integración completa con machine learning para detección de anomalías y optimización continua del sistema.
+- **Clases principales**:
+  - `JarvisLoggingSystem`: Clase principal del sistema de logging avanzado con integración completa de predictores, dashboard y gestión de alertas
+- **Métodos principales**:
+  - `JarvisLoggingSystem.__init__(self, config: Dict[str, Any] = None)`
+  - `JarvisLoggingSystem.start(self) -> None`: Iniciar el sistema de logging avanzado.
+  - `JarvisLoggingSystem.stop(self) -> None`: Detener el sistema de logging avanzado.
+  - `JarvisLoggingSystem.register_event_callback(self, event_type: str, callback) -> None`: Registrar callback para evento específico.
+  - `JarvisLoggingSystem.log(self, message: str, level: LogLevel = LogLevel.INFO, category: LogCategory = LogCategory.SYSTEM, **kwargs) -> None`
+  - `JarvisLoggingSystem.log_error(self, message: str, **kwargs) -> None`: Loggear error.
+  - `JarvisLoggingSystem.log_warning(self, message: str, **kwargs) -> None`: Loggear warning.
+  - `JarvisLoggingSystem.log_info(self, message: str, **kwargs) -> None`: Loggear info.
+  - `JarvisLoggingSystem.log_debug(self, message: str, **kwargs) -> None`: Loggear debug.
+  - `JarvisLoggingSystem.log_performance(self, message: str, **kwargs) -> None`: Loggear métrica de rendimiento.
+  - `JarvisLoggingSystem.log_with_trace(self, message: str, trace_id: str = None, **kwargs) -> None`: Loggear con trace ID.
+  - `JarvisLoggingSystem.log_with_span(self, message: str, span_id: str = None, parent_span_id: str = None, **kwargs) -> None`
+  - `JarvisLoggingSystem.get_logs(self, start_time: datetime = None, end_time: datetime = None, level: LogLevel = None, category: LogCategory = None, module: str = None, limit: int = 100) -> List[LogEntry]`
+  - `JarvisLoggingSystem.get_statistics(self) -> Dict[str, Any]`: Obtener estadísticas del sistema de logging.
+  - `JarvisLoggingSystem.get_predictions(self) -> Dict[str, Any]`: Obtener predicciones actuales.
+  - `JarvisLoggingSystem.get_alerts(self) -> List[Dict[str, Any]]`: Obtener alertas activas.
+  - `JarvisLoggingSystem.acknowledge_alert(self, alert_id: str) -> None`: Reconocer alerta.
+  - `JarvisLoggingSystem.resolve_alert(self, alert_id: str) -> None`: Resolver alerta.
+  - `JarvisLoggingSystem.export_logs(self, start_time: datetime = None, end_time: datetime = None, format: str = 'json') -> str`
+  - `JarvisLoggingSystem.export_predictions(self, format: str = 'json') -> str`: Exportar datos de predicción.
+  - `JarvisLoggingSystem.get_dashboard_url(self) -> Optional[str]`: Obtener URL del dashboard.
+  - `JarvisLoggingSystem.train_models(self) -> Dict[str, Any]`: Entrenar modelos predictivos manualmente.
+  - `JarvisLoggingSystem.analyze_trends(self, days: int = 7) -> Dict[str, Any]`: Analizar tendencias.
+  - `JarvisLoggingSystem.get_patterns(self, acknowledged: bool = None, limit: int = 50) -> List[Dict[str, Any]]`: Obtener patrones detectados.
+- **Funciones globales**:
+  - `get_jarvis_logger() -> JarvisLoggingSystem`: Obtener instancia del sistema de logging de JARVIS
+  - `log_jarvis(message: str, level: LogLevel = LogLevel.INFO, category: LogCategory = LogCategory.SYSTEM, **kwargs) -> None`: Loggear mensaje en el sistema de logging de JARVIS
+  - `log_jarvis_error(message: str, **kwargs) -> None`: Loggear error en el sistema de logging de JARVIS
+  - `log_jarvis_warning(message: str, **kwargs) -> None`: Loggear warning en el sistema de logging de JARVIS
+  - `log_jarvis_info(message: str, **kwargs) -> None`: Loggear información en el sistema de logging de JARVIS
+  - `log_jarvis_performance(message: str, **kwargs) -> None`: Loggear métrica de rendimiento en el sistema de logging de JARVIS
+
+#### `src/utils/log_analytics.py` [966 líneas] - Sistema Avanzado de Análisis de Logs
+- **Descripción**: Sistema avanzado de análisis de logs para Jarvis con capacidades de business intelligence, detección de patrones, análisis de tendencias, correlaciones y métricas de rendimiento con visualizaciones integradas.
+- **Clases principales**:
+  - `AnalyticsType` (Enum): Tipos de análisis (SUMMARY, TREND, PATTERN, CORRELATION, ANOMALY, PERFORMANCE, ERROR_ANALYSIS, BUSINESS_INTELLIGENCE, REAL_TIME)
+  - `TimeGranularity` (Enum): Granularidad temporal (MINUTE, HOUR, DAY, WEEK, MONTH)
+  - `AnalyticsResult` (dataclass): Resultado estructurado de análisis con timestamp, tipo, datos, insights, recomendaciones y visualizaciones
+  - `LogAnalyticsEngine`: Motor principal de análisis de logs con capacidades avanzadas de procesamiento, detección de patrones y generación de informes
+  - `LogAnalytics`: Wrapper que proporciona interfaz simplificada para el motor de análisis
+- **Métodos principales**:
+  - `AnalyticsResult.to_dict(self) -> Dict[str, Any]`: Convertir a diccionario.
+  - `LogAnalyticsEngine.__init__(self, db_path: str = "logs/analytics.db")`
+  - `LogAnalyticsEngine.generate_summary_analytics(self, start_time: datetime = None, end_time: datetime = None) -> AnalyticsResult`
+  - `LogAnalyticsEngine.generate_trend_analytics(self, start_time: datetime = None, end_time: datetime = None, granularity: TimeGranularity = TimeGranularity.HOUR) -> AnalyticsResult`
+  - `LogAnalyticsEngine.generate_pattern_analytics(self, start_time: datetime = None, end_time: datetime = None) -> AnalyticsResult`
+  - `LogAnalyticsEngine.generate_correlation_analytics(self, start_time: datetime = None, end_time: datetime = None) -> AnalyticsResult`
+  - `LogAnalyticsEngine.generate_performance_analytics(self, start_time: datetime = None, end_time: datetime = None) -> AnalyticsResult`
+  - `LogAnalyticsEngine.get_analytics_history(self, analytics_type: AnalyticsType = None, limit: int = 50) -> List[AnalyticsResult]`
+  - `LogAnalyticsEngine.export_analytics(self, start_time: datetime = None, end_time: datetime = None, format: str = 'json') -> str`
+  - `LogAnalytics.__init__(self, db_path: str = "logs/analytics.db")`
+  - `LogAnalytics.get_analytics_summary(self) -> Dict[str, Any]`: Obtener resumen de análisis.
+  - `LogAnalytics.generate_summary_analytics(self, start_time: datetime = None, end_time: datetime = None) -> AnalyticsResult`: Generar análisis resumen.
+  - `LogAnalytics.generate_trend_analytics(self, start_time: datetime = None, end_time: datetime = None, granularity: TimeGranularity = TimeGranularity.HOUR) -> AnalyticsResult`
+  - `LogAnalytics.generate_pattern_analytics(self, start_time: datetime = None, end_time: datetime = None) -> AnalyticsResult`: Generar análisis de patrones.
+  - `LogAnalytics.generate_correlation_analytics(self, start_time: datetime = None, end_time: datetime = None) -> AnalyticsResult`: Generar análisis de correlaciones.
+  - `LogAnalytics.generate_performance_analytics(self, start_time: datetime = None, end_time: datetime = None) -> AnalyticsResult`: Generar análisis de rendimiento.
+  - `LogAnalytics.get_analytics_history(self, analytics_type: AnalyticsType = None, limit: int = 50) -> List[AnalyticsResult]`: Obtener historial de análisis.
+  - `LogAnalytics.export_analytics(self, start_time: datetime = None, end_time: datetime = None, format: str = 'json') -> str`: Exportar resultados de análisis.
+
+#### `src/utils/log_dashboard.py` [887 líneas] - Dashboard Interactivo de Logs
+- **Descripción**: Dashboard interactivo para monitoreo y gestión de logs de Jarvis con visualización en tiempo real, widgets personalizables, alertas, análisis de métricas y múltiples vistas (overview, real_time, analytics, patterns, predictions, performance, alerts, settings). Basado en Flask y SocketIO con integración de Plotly para gráficos interactivos y almacenamiento persistente en SQLite.
+- **Clases principales**:
+  - `DashboardView` (Enum): Vistas del dashboard (OVERVIEW, REAL_TIME, ANALYTICS, PATTERNS, PREDICTIONS, PERFORMANCE, ALERTS, SETTINGS)
+  - `DashboardWidget` (Enum): Tipos de widgets (METRIC_CARD, LINE_CHART, BAR_CHART, PIE_CHART, HEATMAP, TABLE, LOG_VIEWER, ALERT_LIST)
+  - `WidgetConfig` (dataclass): Configuración de widgets con ID, tipo, título, fuente de datos, intervalo de refresco, posición y opciones
+  - `DashboardAlert` (dataclass): Alertas con ID, título, mensaje, severidad, timestamp, acknowledged, source y metadata
+  - `RealTimeDataStreamer`: Flujo de datos en tiempo real con subscriptores y buffering circular
+  - `LogDashboard`: Dashboard principal de logs con servidor Flask, SocketIO y actualización periódica
+- **Métodos principales**:
+  - `WidgetConfig.to_dict(self) -> Dict[str, Any]`: Convertir a diccionario.
+  - `DashboardAlert.to_dict(self) -> Dict[str, Any]`: Convertir a diccionario.
+  - `RealTimeDataStreamer.__init__(self, max_points: int = 1000)`
+  - `RealTimeDataStreamer.add_data_point(self, stream_name: str, data: Dict[str, Any]) -> None`: Añadir punto de datos a un flujo.
+  - `RealTimeDataStreamer.get_stream_data(self, stream_name: str, limit: int = None) -> List[Dict[str, Any]]`: Obtener datos de un flujo.
+  - `RealTimeDataStreamer.subscribe_to_stream(self, stream_name: str, callback: callable) -> None`: Suscribirse a un flujo de datos.
+  - `RealTimeDataStreamer.unsubscribe_from_stream(self, stream_name: str, callback: callable) -> None`: Desuscribirse de un flujo de datos.
+  - `LogDashboard.__init__(self, db_path: str = "logs/dashboard.db", port: int = 5000, host: str = "localhost")`
+  - `LogDashboard.dashboard()`: Página principal del dashboard.
+  - `LogDashboard.get_widgets()`: Obtener widgets del dashboard.
+  - `LogDashboard.create_widget()`: Crear nuevo widget.
+  - `LogDashboard.delete_widget(widget_id)`: Eliminar widget.
+  - `LogDashboard.get_alerts()`: Obtener alertas.
+  - `LogDashboard.acknowledge_alert(alert_id)`: Marcar alerta como reconocida.
+  - `LogDashboard.get_stream_data(stream_name)`: Obtener datos de un flujo.
+  - `LogDashboard.get_analytics(analytics_type)`: Obtener análisis de datos.
+  - `LogDashboard.handle_connect()`: Manejar conexión WebSocket.
+  - `LogDashboard.handle_disconnect()`: Manejar desconexión WebSocket.
+  - `LogDashboard.handle_subscribe(data)`: Manejar suscripción a datos en tiempo real.
+  - `LogDashboard.add_alert(self, alert: DashboardAlert) -> None`: Añadir alerta al dashboard.
+  - `LogDashboard.start(self) -> None`: Iniciar el dashboard.
+  - `LogDashboard.run(self) -> None`: Iniciar el dashboard (alias de start()).
+  - `LogDashboard.stop(self) -> None`: Detener el dashboard.
+  - `LogDashboard.get_dashboard_url(self) -> Optional[str]`: Obtener la URL del dashboard (usa el puerto realmente asignado).
+
+#### `src/utils/log_integration.py` [810 líneas] - Sistema de Integración de Logs
+- **Descripción**: Sistema completo de integración de logs desde múltiples fuentes con normalización, transformación y almacenamiento persistente. Soporta múltiples formatos (JSON, TEXT, CSV, SYSLOG, NGINX, APACHE) y fuentes de logs (APPLICATION, SYSTEM, DATABASE, NETWORK, SECURITY, PERFORMANCE, THIRD_PARTY, CUSTOM).
+- **Clases principales**:
+  - `LogSource` (Enum): Fuentes de logs soportadas (APPLICATION, SYSTEM, DATABASE, NETWORK, SECURITY, PERFORMANCE, THIRD_PARTY, CUSTOM)
+  - `LogFormat` (Enum): Formatos de logs soportados (JSON, TEXT, CSV, SYSLOG, NGINX, APACHE, CUSTOM)
+  - `IntegrationStatus` (Enum): Estados de integración (ACTIVE, INACTIVE, ERROR, PAUSED)
+  - `LogSourceConfig` (dataclass): Configuración de una fuente de logs con id, nombre, tipo, formato, connection_string, enabled, batch_size, timeout, retry_count, tags, metadata
+  - `LogIntegration` (dataclass): Integración de logs con id, config, status, last_sync, total_processed, error_count, last_error, performance_metrics
+  - `LogNormalizer`: Normalizador de logs para diferentes formatos
+  - `LogCollector`: Colector de logs desde múltiples fuentes con procesamiento concurrente
+  - `LogTransformer`: Transformador de logs para diferentes destinos
+  - `LogIntegrationSystem`: Sistema completo de integración de logs con base de datos SQLite
+  - `LogIntegrator`: Wrapper para LogIntegrationSystem con interfaz simplificada
+- **Métodos principales**:
+  - `LogSourceConfig.to_dict(self) -> Dict[str, Any]`: Convertir a diccionario.
+  - `LogIntegration.to_dict(self) -> Dict[str, Any]`: Convertir a diccionario.
+  - `LogNormalizer.__init__(self)`
+  - `LogNormalizer.normalize_log( self, raw_log: str, format_type: LogFormat, source_config: LogSourceConfig ) -> Dict[str, Any]`
+  - `LogCollector.__init__(self, max_workers: int = 5)`
+  - `LogCollector.add_integration(self, integration: LogIntegration) -> None`: Añadir integración de logs.
+  - `LogCollector.remove_integration(self, integration_id: str) -> None`: Remover integración de logs.
+  - `LogCollector.start_collection(self) -> None`: Iniciar recolección de logs.
+  - `LogCollector.stop_collection(self) -> None`: Detener recolección de logs.
+  - `LogCollector.get_integration_status(self) -> Dict[str, Any]`: Obtener estado de todas las integraciones.
+  - `LogCollector.get_collection_metrics(self) -> Dict[str, Any]`: Obtener métricas de recolección.
+  - `LogTransformer.__init__(self)`
+  - `LogTransformer.add_destination(self, name: str, config: Dict[str, Any]) -> None`: Añadir destino de logs.
+  - `LogTransformer.add_transform_rule(self, rule: Dict[str, Any]) -> None`: Añadir regla de transformación.
+  - `LogTransformer.transform_log( self, log_data: Dict[str, Any], destination: str ) -> Dict[str, Any]`
+  - `LogIntegrationSystem.__init__(self, db_path: str = "logs/integration.db")`
+  - `LogIntegrationSystem.add_log_source(self, config: LogSourceConfig) -> None`: Añadir fuente de logs.
+  - `LogIntegrationSystem.remove_log_source(self, integration_id: str) -> None`: Remover fuente de logs.
+  - `LogIntegrationSystem.start(self) -> None`: Iniciar sistema de integración.
+  - `LogIntegrationSystem.stop(self) -> None`: Detener sistema de integración.
+  - `LogIntegrationSystem.get_system_status(self) -> Dict[str, Any]`: Obtener estado del sistema.
+  - `LogIntegrator.__init__(self, db_path: str = "logs/integration.db")`
+  - `LogIntegrator.add_log_source(self, config: LogSourceConfig) -> None`: Añadir fuente de logs.
+  - `LogIntegrator.remove_log_source(self, integration_id: str) -> None`: Remover fuente de logs.
+  - `LogIntegrator.start(self) -> None`: Iniciar sistema de integración.
+  - `LogIntegrator.stop(self) -> None`: Detener sistema de integración.
+  - `LogIntegrator.get_system_status(self) -> Dict[str, Any]`: Obtener estado del sistema.
+
+#### `src/utils/log_predictor.py` [749 líneas] - Sistema Predictivo de Logs con Machine Learning
+- **Descripción**: Sistema predictivo de logs para JARVIS con machine learning y análisis de tendencias. Analiza entradas de log, extrae métricas, entrena modelos de regresión (Linear Regression, Random Forest, Gradient Boosting) para series temporales y un clasificador de fallos, y almacena las predicciones en SQLite.
+- **Clases principales**:
+  - `PredictionType` (Enum): Tipos de predicciones (ERROR_RATE, RESPONSE_TIME, THROUGHPUT, RESOURCE_USAGE, SYSTEM_HEALTH, FAILURE_PROBABILITY)
+  - `PredictionConfidence` (Enum): Niveles de confianza (LOW, MEDIUM, HIGH, CRITICAL)
+  - `Prediction` (dataclass): Estructura de predicción con valor, confianza, horizonte temporal, modelo usado y acciones sugeridas
+  - `TimeSeriesPredictor`: Predictor de series temporales con selección automática del mejor modelo por MAE
+  - `FailurePredictor`: Predictor de fallos del sistema con RandomForestClassifier balanceado
+  - `LogPredictor`: Sistema predictivo de logs integrado (series temporales + fallos + persistencia)
+- **Métodos principales**:
+  - `Prediction.to_dict(self) -> Dict[str, Any]`: Convertir a diccionario.
+  - `TimeSeriesPredictor.__init__(self, max_history: int = 10000)`
+  - `TimeSeriesPredictor.add_data_point(self, metric_name: str, value: float, timestamp: datetime = None, features: Dict[str, Any] = None) -> None`
+  - `TimeSeriesPredictor.predict(self, metric_name: str, time_horizon: timedelta, features: Dict[str, Any] = None) -> Optional[Prediction]`
+  - `FailurePredictor.__init__(self)`
+  - `FailurePredictor.add_system_metrics(self, timestamp: datetime, metrics: Dict[str, float]) -> None`: Añadir métricas del sistema para predicción de fallos.
+  - `FailurePredictor.predict_failure_probability(self, time_horizon: timedelta) -> Optional[Prediction]`: Predecir probabilidad de fallo.
+  - `LogPredictor.__init__(self, db_path: str = "logs/predictions.db")`
+  - `LogPredictor.add_log_data(self, log_entry: Dict[str, Any]) -> None`: Añadir datos de log para predicción.
+  - `LogPredictor.generate_predictions(self, time_horizon: timedelta = timedelta(hours=1)) -> List[Prediction]`: Generar predicciones para todas las métricas.
+  - `LogPredictor.update_prediction_accuracy(self, prediction_id: str, actual_value: float) -> None`: Actualizar precisión de predicción con valor real.
+  - `LogPredictor.get_predictions_by_type(self, prediction_type: PredictionType, limit: int = 50) -> List[Prediction]`
+  - `LogPredictor.get_active_predictions(self) -> List[Prediction]`: Obtener predicciones activas (recientes).
+  - `LogPredictor.get_prediction_statistics(self) -> Dict[str, Any]`: Obtener estadísticas de predicciones.
+  - `LogPredictor.export_predictions(self, start_time: datetime = None, end_time: datetime = None, format: str = 'json') -> str`
+  - `LogPredictor.add_prediction_result(self, predictions: List[Prediction]) -> None`: Agregar resultado de predicción al historial.
+  - `LogPredictor.train_models(self) -> Dict[str, Any]`: Entrenar todos los modelos predictivos.
+  - `LogPredictor.get_predictions(self) -> List[Prediction]`: Obtener predicciones activas.
+  - `LogPredictor.last_training(self) -> Optional[datetime]`: Obtener tiempo de último entrenamiento.
+
+#### `src/utils/logger.py` [180 líneas] - Sistema de Logging Estructurado
+- **Descripción**: Sistema de logging estructurado para Jarvis con soporte para JSON y mejores prácticas de Python 2024.
+- **Clases principales**:
+  - `StructuredLogger`: Logger estructurado con soporte para JSON y mejores prácticas
+  - `JsonFormatter`: Formateador que convierte logs a JSON
+- **Métodos principales**:
+  - `StructuredLogger.__init__(self, name: str, level: int = logging.INFO)`
+  - `StructuredLogger.debug(self, message: str, *args, **kwargs) -> None`: Log de nivel DEBUG.
+  - `StructuredLogger.info(self, message: str, *args, **kwargs) -> None`: Log de nivel INFO.
+  - `StructuredLogger.warning(self, message: str, *args, **kwargs) -> None`: Log de nivel WARNING.
+  - `StructuredLogger.error(self, message: str, *args, **kwargs) -> None`: Log de nivel ERROR.
+  - `StructuredLogger.critical(self, message: str, *args, **kwargs) -> None`: Log de nivel CRITICAL.
+  - `JsonFormatter.format(self, record: logging.LogRecord) -> str`: Formatear un log record como JSON.
+- **Funciones globales**:
+  - `get_logger(name: str, level: int = logging.INFO) -> StructuredLogger`: Obtener un logger estructurado
+
+#### `src/utils/meta_learning_system.py` [2401 líneas] - Sistema de Metaprendizaje
+- **Descripción**: Sistema de metaprendizaje que observa el comportamiento de los sistemas de aprendizaje existentes (adaptive_learning_engine, self_improvement_system, performance_optimizer, pattern_analyzer y log_analytics), captura experiencias de aprendizaje, las analiza por niveles de metaprendizaje y genera insights accionables sobre selección de estrategias, adaptación de parámetros, optimización contextual, abstracción de conocimiento y ajuste de la tasa de aprendizaje.
+- **Clases principales**:
+  - `MetaLearningLevel` (Enum): Niveles de metaprendizaje (STRATEGY_SELECTION, PARAMETER_ADAPTATION, CONTEXTUAL_OPTIMIZATION, KNOWLEDGE_ABSTRACTION, LEARNING_RATE_ADJUSTMENT)
+  - `MetaLearningResult` (Enum): Resultados del metaprendizaje (IMPROVEMENT_DETECTED, DEGRADATION_DETECTED, NO_CHANGE, INSUFFICIENT_DATA, CONFLICTING_SIGNALS)
+  - `LearningExperience` (dataclass): Experiencia de aprendizaje (sistema, tipo de tarea, contexto, estrategia, parámetros, resultado, métricas de éxito, confianza y metadata)
+  - `LearningEvaluation` (dataclass): Evaluación de una estrategia con evidencia disponible (muestras, tasa de éxito, confianza, consistencia, suficiencia de evidencia, patrón estable, veredicto e indicadores)
+  - `MetaRuleStatus` (Enum): Resultado de evaluar/aplicar una meta-regla sobre una regla de aprendizaje
+  - `MetaRule` (dataclass): Meta-regla: una regla que actúa sobre otra regla de aprendizaje existente.
+  - `MetaRuleApplication` (dataclass): Registro de una aplicación de meta-regla, con estado previo para poder revertir
+  - `MetaLearningInsight` (dataclass): Insight generado (nivel, descripción, confianza, evidencias, recomendación, impacto, validación y estado de aplicación)
+  - `MetaLearningSystem`: Sistema principal con cola y hilo de procesamiento asíncrono
+- **Métodos principales**:
+  - `MetaRule.is_valid(self) -> bool`
+  - `MetaLearningSystem.__init__(self, config_path: str = None)`
+  - `MetaLearningSystem.capture_learning_experience(self, learning_system: str, task_type: str, context: Dict[str, Any], strategy: str, parameters: Dict[str, Any], outcome: Dict[str, Any], success_metrics: Dict[str, float], confidence_score: float) -> str`
+  - `MetaLearningSystem.capture_structured_experience(self, learning_system: str, task_type: str, context_features: Dict[str, Any], action_taken: Dict[str, Any], strategy_applied: str, strategy_parameters: Dict[str, Any], execution_result: Dict[str, Any], performance_metrics: Dict[str, float], contextual_factors: Dict[str, Any] = None) -> str`
+  - `MetaLearningSystem.capture_experience_with_context(self, learning_system: str, task_type: str, environment_context: Dict[str, Any], user_context: Dict[str, Any], system_context: Dict[str, Any], action_executed: Dict[str, Any], strategy_info: Dict[str, Any], outcome_data: Dict[str, Any], learning_value: float) -> str`
+  - `MetaLearningSystem.get_learning_success_indicators(self) -> Dict[str, Any]`: Identifica los indicadores de éxito realmente disponibles en las experiencias capturadas, sin inventar métricas nuevas.
+  - `MetaLearningSystem.evaluate_learning_strategy(self, learning_system: str, task_type: str, strategy: Optional[str] = None, experiences: Optional[List[LearningExperience]] = None) -> LearningEvaluation`
+  - `MetaLearningSystem.get_learning_evaluations(self, learning_system: Optional[str] = None, task_type: Optional[str] = None) -> List[LearningEvaluation]`
+  - `MetaLearningSystem.analyze_learning_patterns(self) -> List[MetaLearningInsight]`: Analiza patrones en las experiencias de aprendizaje para generar insights Returns: Lista de insights generados
+  - `MetaLearningSystem.apply_meta_learning_insights(self, insights: List[MetaLearningInsight]) -> Dict[str, Any]`: Aplica insights de metaprendizaje a los sistemas de aprendizaje Args: insights: Lista de insights a aplicar Returns: Resultado de la aplicación
+  - `MetaLearningSystem.get_security_limits(self) -> Dict[str, Any]`: Límites de seguridad normalizados desde la configuración real
+  - `MetaLearningSystem.reset_auto_change_cycle(self) -> None`: Reinicia el contador de cambios automáticos del ciclo actual
+  - `MetaLearningSystem.get_shared_components(self) -> List[str]`: Componentes cuyo motor es una instancia compartida (2.8.3.6)
+  - `MetaLearningSystem.get_security_decisions(self) -> List[Dict[str, Any]]`: Decisiones de seguridad registradas
+  - `MetaLearningSystem.get_security_status(self) -> Dict[str, Any]`: Estado de seguridad: límites, pendientes y decisiones por resultado
+  - `MetaLearningSystem.check_insight_security(self, insight: MetaLearningInsight) -> Tuple[bool, str]`: Decide si un insight puede aplicarse automáticamente.
+  - `MetaLearningSystem.check_meta_rule_security(self, meta_rule: MetaRule) -> Tuple[bool, str]`: Decide si una meta-regla puede aplicarse automáticamente
+  - `MetaLearningSystem.auto_apply_insights(self, insights: List[MetaLearningInsight]) -> Dict[str, Any]`: Aplica insights de forma automática y limitada (2.8.3.7.1).
+  - `MetaLearningSystem.auto_apply_meta_rules(self) -> Dict[str, Any]`: Aplica las meta-reglas registradas de forma automática y limitada
+  - `MetaLearningSystem.get_meta_learning_metrics(self) -> Dict[str, Any]`: Obtiene métricas del sistema de metaprendizaje
+  - `MetaLearningSystem.save_meta_learning_data(self) -> bool`: Guarda datos de metaprendizaje
+  - `MetaLearningSystem.load_meta_learning_data(self, file_path: str) -> bool`: Carga datos de metaprendizaje desde archivo
+  - `MetaLearningSystem.start_meta_learning_process(self)`: Inicia el proceso asíncrono de metaprendizaje
+  - `MetaLearningSystem.stop_meta_learning_process(self)`: Detiene el proceso asíncrono de metaprendizaje
+  - `MetaLearningSystem.validate_meta_learning_insights(self, insight_ids: List[str]) -> Dict[str, bool]`: Valida insights específicos
+  - `MetaLearningSystem.get_recommendations(self, system_type: str = None, task_type: str = None) -> List[str]`: Obtiene recomendaciones basadas en insights de metaprendizaje Args: system_type: Filtrar por tipo de sistema (opcional) task_type: Filtrar por tipo de tarea (opcional) Returns: Lista de recomendaciones
+  - `MetaLearningSystem.get_learning_rules(self) -> List[Any]`: Devuelve las ImprovementRule reales del SelfImprovementSystem
+  - `MetaLearningSystem.get_meta_rules(self) -> List[MetaRule]`: Devuelve las meta-reglas registradas
+  - `MetaLearningSystem.add_meta_rule(self, meta_rule: MetaRule) -> MetaRuleStatus`: Registra una meta-regla si su contrato es válido y no está duplicada
+  - `MetaLearningSystem.apply_meta_rule(self, meta_rule: MetaRule) -> MetaRuleApplication`: Aplica una meta-regla sobre la ImprovementRule objetivo.
+  - `MetaLearningSystem.verify_meta_rule_application(self, application: MetaRuleApplication) -> bool`: Verifica que el estado real de la regla coincide con el estado aplicado
+  - `MetaLearningSystem.revert_meta_rule_application(self, application: MetaRuleApplication) -> bool`: Revierte una aplicación de meta-regla restaurando el estado previo completo.
+  - `MetaLearningSystem.get_meta_rule_history(self) -> List[MetaRuleApplication]`
+  - `MetaLearningSystem.get_meta_learning_state(self) -> Dict[str, Any]`: Estado serializable del metaprendizaje (experiencias, meta-reglas e historial)
+  - `MetaLearningSystem.save_meta_learning_state(self, file_path: str = None) -> bool`: Guarda el estado de metaprendizaje en un archivo estable.
+  - `MetaLearningSystem.load_meta_learning_state(self, file_path: str) -> bool`: Recupera el estado de metaprendizaje.
+  - `MetaLearningSystem.connect_component(self, component: str, engine: Any) -> Dict[str, Any]`: Conecta una instancia real de un motor de aprendizaje existente.
+  - `MetaLearningSystem.connect_adaptive_learning_engine(self, engine: Any) -> Dict[str, Any]`: Integra con AdaptiveLearningEngine (2.8.3.6.1)
+  - `MetaLearningSystem.connect_self_improvement_system(self, system: Any) -> Dict[str, Any]`: Integra con SelfImprovementSystem (2.8.3.6.2)
+  - `MetaLearningSystem.connect_contextual_adaptation_engine(self, engine: Any) -> Dict[str, Any]`: Integra con ContextualAdaptationEngine (2.8.3.6.3).
+  - `MetaLearningSystem.get_integration_status(self) -> Dict[str, Any]`: Estado de integración y comprobación de motores duplicados (2.8.3.6.4).
+
+#### `src/utils/metrics_collector.py` [592 líneas] - Sistema de Recolección de Métricas
+- **Descripción**: Sistema de recolección de métricas para JARVIS con almacenamiento persistente en SQLite, recolección en hilo daemon con buffer por lotes, limpieza por retención, copias de seguridad y exportación a JSON.
+- **Clases principales**:
+  - `MetricData` (dataclass): Datos de una métrica individual con timestamp, nombre, valor, tags y metadata
+  - `MetricConfig` (dataclass): Configuración de base de datos, retención, recolección y métricas predeterminadas
+  - `MetricsCollector`: Recolector principal de métricas con buffer en memoria y persistencia
+- **Métodos principales**:
+  - `MetricData.to_dict(self) -> Dict[str, Any]`: Convierte los datos de la métrica a un diccionario.
+  - `MetricData.from_dict(cls, data: Dict[str, Any]) -> 'MetricData'`: Crea una instancia de MetricData desde un diccionario.
+  - `MetricConfig.to_dict(self) -> Dict[str, Any]`: Convierte la configuración a un diccionario.
+  - `MetricsCollector.__init__(self, config: Optional[MetricConfig] = None)`: Inicializa el recolector de métricas.
+  - `MetricsCollector.start_collection(self) -> None`: Inicia la recolección continua de métricas.
+  - `MetricsCollector.stop_collection(self) -> None`: Detiene la recolección de métricas.
+  - `MetricsCollector.add_metric(self, metric_name: str, value: Union[float, int, str, bool], tags: Optional[Dict[str, str]] = None, metadata: Optional[Dict[str, Any]] = None) -> None`
+  - `MetricsCollector.get_metrics(self, metric_name: Optional[str] = None, start_time: Optional[datetime] = None, end_time: Optional[datetime] = None, limit: Optional[int] = None, tags: Optional[Dict[str, str]] = None) -> List[MetricData]`
+  - `MetricsCollector.get_metric_statistics(self, metric_name: str, start_time: Optional[datetime] = None, end_time: Optional[datetime] = None) -> Dict[str, Any]`
+  - `MetricsCollector.get_metric_names(self) -> List[str]`: Obtiene todos los nombres de métricas disponibles.
+  - `MetricsCollector.cleanup_old_metrics(self) -> None`: Limpia métricas antiguas según la configuración de retención.
+  - `MetricsCollector.backup_metrics(self) -> str`: Realiza una copia de seguridad de la base de datos de métricas.
+  - `MetricsCollector.export_metrics(self, filepath: str, metric_name: Optional[str] = None, start_time: Optional[datetime] = None, end_time: Optional[datetime] = None) -> None`
+  - `MetricsCollector.get_collector_status(self) -> Dict[str, Any]`: Obtiene el estado actual del recolector de métricas.
+  - `MetricsCollector.clear_all_metrics(self) -> None`: Elimina todas las métricas de la base de datos.
+- **Funciones globales**:
+  - `get_metrics_collector() -> MetricsCollector`: Obtiene la instancia global del recolector de métricas
+  - `start_metrics_collection() -> None`: Inicia la recolección de métricas globales
+  - `stop_metrics_collection() -> None`: Detiene la recolección de métricas globales
+
+#### `src/utils/monitoring_dashboard.py` [417 líneas] - Dashboard Unificado de Monitoreo
+- **Descripción**: Dashboard unificado para visualizar y gestionar todo el sistema de monitoreo de JARVIS (rendimiento, salud, métricas y alertas). Actualiza los datos periódicamente en un hilo daemon, mantiene historial y notifica a los callbacks registrados.
+- **Clases principales**:
+  - `DashboardConfig` (dataclass): Configuración del dashboard (intervalo de actualización, límites de alertas/métricas mostradas, flags de visualización y umbrales de alerta)
+  - `DashboardData` (dataclass): Snapshot de los datos del dashboard en un instante (timestamp, métricas, estado de salud, alertas recientes, resumen del sistema)
+  - `MonitoringDashboard`: Dashboard unificado de monitoreo (hilo de actualización, historial, callbacks y export de reportes)
+- **Métodos principales**:
+  - `DashboardConfig.to_dict(self) -> Dict[str, Any]`: Convierte la configuración a un diccionario.
+  - `DashboardData.to_dict(self) -> Dict[str, Any]`: Convierte los datos del dashboard a un diccionario.
+  - `MonitoringDashboard.__init__(self, config: Optional[DashboardConfig] = None, performance_monitor: Optional[PerformanceMonitor] = None, health_checker: Optional[HealthChecker] = None, metrics_collector: Optional[MetricsCollector] = None)`
+  - `MonitoringDashboard.start_dashboard(self) -> None`: Inicia el dashboard de monitoreo.
+  - `MonitoringDashboard.stop_dashboard(self) -> None`: Detiene el dashboard de monitoreo.
+  - `MonitoringDashboard.get_dashboard_data(self) -> Optional[DashboardData]`: Obtiene los datos actuales del dashboard.
+  - `MonitoringDashboard.get_dashboard_history(self, limit: Optional[int] = None) -> List[DashboardData]`: Obtiene el historial del dashboard.
+  - `MonitoringDashboard.add_update_callback(self, callback: Callable[[DashboardData], None]) -> None`: Agrega un callback para recibir actualizaciones del dashboard.
+  - `MonitoringDashboard.remove_update_callback(self, callback: Callable[[DashboardData], None]) -> None`: Remueve un callback de actualizaciones del dashboard.
+  - `MonitoringDashboard.export_dashboard_report(self, filepath: str, include_history: bool = False) -> None`: Exporta un reporte del dashboard a un archivo JSON.
+  - `MonitoringDashboard.get_system_health_score(self) -> float`: Calcula un puntaje de salud del sistema (0-100).
+  - `MonitoringDashboard.get_critical_metrics(self) -> List[str]`: Obtiene métricas críticas que requieren atención.
+  - `MonitoringDashboard.get_unhealthy_components(self) -> List[str]`: Obtiene componentes no saludables.
+  - `MonitoringDashboard.clear_dashboard_history(self) -> None`: Limpia el historial del dashboard.
+- **Funciones globales**:
+  - `get_monitoring_dashboard() -> MonitoringDashboard`: Obtiene instancia singleton del dashboard de monitoreo
+  - `start_monitoring_dashboard() -> None`: Inicia el dashboard de monitoreo global
+  - `stop_monitoring_dashboard() -> None`: Detiene el dashboard de monitoreo global
+
+#### `src/utils/optimization_orchestrator.py` [892 líneas] - Orquestador de Optimización
+- **Descripción**: Orquestador de optimización que coordina todos los sistemas de optimización (performance_optimizer, self_improvement_system, adaptive_learning_engine, pattern_analyzer y log_analytics). Gestiona una cola de trabajos con prioridad, los agrupa por compatibilidad de recursos y los ejecuta en modos secuencial, paralelo, coordinado u optimizado, adaptando el modo dinámicamente.
+- **Clases principales**:
+  - `OrchestrationMode` (Enum): Modos de orquestación (COORDINATED, SEQUENTIAL, PARALLEL, ADAPTIVE, OPTIMIZED)
+  - `OptimizationPriority` (Enum): Prioridades de optimización (CRITICAL, HIGH, MEDIUM, LOW, BACKGROUND)
+  - `OptimizationJob` (dataclass): Trabajo de optimización con prioridad, estrategias, dependencias, recursos, estado y resultado
+  - `OrchestrationMetrics` (dataclass): Métricas de orquestación (trabajos por estado, duración media, eficiencia, utilización, tasa de éxito)
+  - `OptimizationOrchestrator`: Orquestador principal con bucle de orquestación en hilo daemon
+- **Métodos principales**:
+  - `OptimizationOrchestrator.__init__(self, config_path: str = None)`
+  - `OptimizationOrchestrator.get_orchestration_status(self) -> Dict[str, Any]`: Obtener estado de orquestación
+  - `OptimizationOrchestrator.add_custom_optimization_job(self, job: OptimizationJob)`: Añadir trabajo de optimización personalizado
+  - `OptimizationOrchestrator.get_job_status(self, job_id: str) -> Optional[Dict[str, Any]]`: Obtener estado de un trabajo específico
+  - `OptimizationOrchestrator.cancel_job(self, job_id: str) -> bool`: Cancelar un trabajo
+  - `OptimizationOrchestrator.export_orchestration_report(self, filepath: str)`: Exportar reporte de orquestación
+  - `OptimizationOrchestrator.stop_orchestration(self)`: Detener orquestación
+  - `OptimizationOrchestrator.start_orchestration(self)`: Iniciar orquestación
+
+#### `src/utils/pattern_analyzer.py` [650 líneas] - Analizador Avanzado de Patrones con Machine Learning
+- **Descripción**: Analizador avanzado de patrones para JARVIS con machine learning y detección de anomalías. Analiza logs para detectar picos de errores, degradación de rendimiento, anomalías (estadísticas y Isolation Forest), tendencias, ciclos, correlaciones, bursts y changepoints, manteniendo historial de patrones.
+- **Clases principales**:
+  - `PatternType` (Enum): Tipos de patrones detectables (ERROR_SPIKE, PERFORMANCE_DEGRADATION, ANOMALY, TREND, CYCLE, CORRELATION, SEASONAL, BURST, CHANGEPONT)
+  - `PatternSeverity` (Enum): Severidad de patrones (LOW, MEDIUM, HIGH, CRITICAL)
+  - `Pattern` (dataclass): Estructura de patrón detectado con tipo, severidad, confianza, datos, componentes afectados y acciones sugeridas
+  - `TimeSeriesAnalyzer`: Analizador de series temporales con StandardScaler e Isolation Forest
+  - `PatternDetector`: Detector de patrones con múltiples algoritmos
+  - `PatternAnalyzer`: Wrapper de `PatternDetector` que proporciona la interfaz esperada
+- **Métodos principales**:
+  - `Pattern.to_dict(self) -> Dict[str, Any]`: Convertir a diccionario.
+  - `TimeSeriesAnalyzer.__init__(self, window_size: int = 1000)`
+  - `TimeSeriesAnalyzer.add_data_point(self, metric_name: str, value: float, timestamp: datetime = None) -> None`: Añadir punto de datos a la serie temporal.
+  - `TimeSeriesAnalyzer.detect_anomalies(self, metric_name: str, window_size: int = 100) -> List[Dict[str, Any]]`: Detectar anomalías en una serie temporal.
+  - `PatternDetector.__init__(self)`
+  - `PatternDetector.analyze_logs(self, logs: List[Dict[str, Any]]) -> List[Pattern]`: Analizar logs y detectar patrones.
+  - `PatternDetector.get_patterns_by_type(self, pattern_type: PatternType, limit: int = 50) -> List[Pattern]`
+  - `PatternDetector.get_active_patterns(self) -> List[Pattern]`: Obtener patrones activos.
+  - `PatternDetector.acknowledge_pattern(self, pattern_id: str) -> None`: Marcar patrón como reconocido.
+  - `PatternDetector.get_pattern_statistics(self) -> Dict[str, Any]`: Obtener estadísticas de patrones.
+  - `PatternAnalyzer.__init__(self)`
+  - `PatternAnalyzer.get_pattern_analysis(self) -> Dict[str, Any]`: Obtener análisis completo de patrones.
+  - `PatternAnalyzer.analyze_logs(self, logs: List[Dict[str, Any]]) -> List[Pattern]`: Analizar logs y detectar patrones.
+  - `PatternAnalyzer.get_patterns_by_type(self, pattern_type: PatternType, limit: int = 50) -> List[Pattern]`: Obtener patrones por tipo.
+  - `PatternAnalyzer.get_active_patterns(self) -> List[Pattern]`: Obtener patrones activos.
+  - `PatternAnalyzer.acknowledge_pattern(self, pattern_id: str) -> None`: Marcar patrón como reconocido.
+  - `PatternAnalyzer.get_pattern_statistics(self) -> Dict[str, Any]`: Obtener estadísticas de patrones.
+
+#### `src/utils/performance_monitor.py` [856 líneas] - Sistema de Monitoreo de Rendimiento
+- **Descripción**: Sistema avanzado de monitoreo de rendimiento para JARVIS con recolección de métricas, análisis de tendencias, detección de anomalías y alertas inteligentes. Incluye colector de métricas del sistema, analizador predictivo con Isolation Forest y sistema de alertas con reglas personalizables.
+- **Clases principales**:
+  - `MetricType` (Enum): Tipos de métricas (CPU, MEMORY, DISK, NETWORK, PROCESS, DATABASE, APPLICATION, CUSTOM)
+  - `AlertSeverity` (Enum): Severidad de alertas (INFO, WARNING, ERROR, CRITICAL)
+  - `PerformanceMetric` (dataclass): Estructura de métrica de rendimiento con valor, unidad, timestamp y metadatos
+  - `PerformanceAlert` (dataclass): Estructura de alerta con severidad, mensaje y estado
+  - `PerformanceCollector`: Colector de métricas del sistema usando psutil
+  - `PerformanceAnalyzer`: Analizador con detección de anomalías (Isolation Forest) y análisis de tendencias
+  - `PerformanceMonitor`: Monitor principal con recolección, análisis y alertas
+  - `AlertRule` (dataclass): Regla de alerta con condición, umbral y cooldown
+- **Métodos principales**:
+  - `PerformanceMetric.to_dict(self) -> Dict[str, Any]`: Convertir a diccionario.
+  - `PerformanceAlert.to_dict(self) -> Dict[str, Any]`: Convertir a diccionario.
+  - `PerformanceCollector.__init__(self, collection_interval: int = 10, max_history: int = 10000)`
+  - `PerformanceCollector.start_collection(self) -> None`: Iniciar recolección de métricas.
+  - `PerformanceCollector.stop_collection(self) -> None`: Detener recolección de métricas.
+  - `PerformanceCollector.get_metric_history(self, name: str, hours: int = 24) -> List[PerformanceMetric]`: Obtener historial de una métrica.
+  - `PerformanceCollector.get_latest_metrics(self) -> Dict[str, PerformanceMetric]`: Obtener las métricas más recientes.
+  - `PerformanceCollector.get_metric_statistics(self, name: str, hours: int = 24) -> Dict[str, float]`: Obtener estadísticas de una métrica.
+  - `PerformanceAnalyzer.__init__(self, window_size: int = 1000)`
+  - `PerformanceAnalyzer.train_anomaly_detector(self, metric_name: str, history: List[PerformanceMetric]) -> None`: Entrenar detector de anomalías para una métrica.
+  - `PerformanceAnalyzer.detect_anomalies(self, metric_name: str, current_value: float) -> Dict[str, Any]`: Detectar anomalías en una métrica.
+  - `PerformanceAnalyzer.analyze_trends(self, metric_name: str, history: List[PerformanceMetric]) -> Dict[str, Any]`: Analizar tendencias en una métrica.
+  - `PerformanceMonitor.__init__(self, db_path: str = "logs/performance.db")`
+  - `PerformanceMonitor.start_monitoring(self) -> None`: Iniciar monitoreo de rendimiento.
+  - `PerformanceMonitor.stop_monitoring(self) -> None`: Detener monitoreo de rendimiento.
+  - `PerformanceMonitor.add_alert_rule(self, rule: 'AlertRule') -> None`: Añadir regla de alerta.
+  - `PerformanceMonitor.remove_alert_rule(self, rule_id: str) -> None`: Eliminar regla de alerta.
+  - `PerformanceMonitor.get_alerts(self, severity: AlertSeverity = None, acknowledged: bool = None, limit: int = 100) -> List[PerformanceAlert]`
+  - `PerformanceMonitor.acknowledge_alert(self, alert_id: str) -> None`: Marcar alerta como reconocida.
+  - `PerformanceMonitor.resolve_alert(self, alert_id: str) -> None`: Marcar alerta como resuelta.
+  - `PerformanceMonitor.get_performance_summary(self) -> Dict[str, Any]`: Obtener resumen del rendimiento.
+  - `PerformanceMonitor.export_performance_data(self, start_time: datetime = None, end_time: datetime = None, format: str = 'json') -> str`
+
+#### `src/utils/performance_optimizer.py` [1099 líneas] - Optimizador de Rendimiento con Machine Learning
+- **Descripción**: Optimizador de rendimiento con machine learning y optimización predictiva. Monitoriza el sistema mediante PerformanceMonitor, PatternAnalyzer y LogAnalytics, calcula una puntuación de eficiencia, analiza tendencias, identifica oportunidades de optimización (CPU, memoria, disco, tiempo de respuesta y tasa de errores), genera y ejecuta acciones con comando de ejecución y rollback, y actualiza modelos ML con la mejora real obtenida.
+- **Clases principales**:
+  - `OptimizationStrategy` (Enum): Estrategias de optimización (CPU_OPTIMIZATION, MEMORY_OPTIMIZATION, DISK_OPTIMIZATION, NETWORK_OPTIMIZATION, PROCESS_OPTIMIZATION, CACHE_OPTIMIZATION, THREAD_POOL_OPTIMIZATION, ALGORITHM_OPTIMIZATION, RESOURCE_ALLOCATION, LOAD_BALANCING)
+  - `OptimizationLevel` (Enum): Niveles de optimización (BASIC, MODERATE, AGGRESSIVE, CRITICAL)
+  - `OptimizationMetrics` (dataclass): Métricas de optimización (CPU, memoria, disco, red, tiempo de respuesta, throughput, tasa de errores, eficiencia, ganancia y timestamp)
+  - `OptimizationAction` (dataclass): Acción de optimización con estrategia, nivel, mejora esperada, confianza, prioridad, recursos, comandos de ejecución/rollback y estado de resultado
+  - `PerformanceOptimizer`: Optimizador principal con bucle de optimización en hilo y cola de acciones
+- **Métodos principales**:
+  - `PerformanceOptimizer.__init__(self, config_path: str = None)`
+  - `PerformanceOptimizer.get_optimization_status(self) -> Dict[str, Any]`: Obtener estado actual de optimización
+  - `PerformanceOptimizer.get_optimization_history(self, limit: int = 100) -> List[Dict[str, Any]]`: Obtener historial de optimización
+  - `PerformanceOptimizer.get_current_actions(self) -> List[Dict[str, Any]]`: Obtener acciones en curso
+  - `PerformanceOptimizer.add_custom_optimization_action(self, action: OptimizationAction)`: Añadir acción de optimización personalizada
+  - `PerformanceOptimizer.stop_optimization(self)`: Detener optimización
+  - `PerformanceOptimizer.start_optimization(self)`: Iniciar optimización
+  - `PerformanceOptimizer.optimize_system(self, strategy: OptimizationStrategy, level: OptimizationLevel = OptimizationLevel.MODERATE) -> OptimizationAction`: Optimizar sistema manualmente
+  - `PerformanceOptimizer.get_optimization_recommendations(self) -> List[Dict[str, Any]]`: Obtener recomendaciones de optimización
+  - `PerformanceOptimizer.export_optimization_report(self, filepath: str)`: Exportar reporte de optimización
+  - `PerformanceOptimizer.optimize_resources(self, optimization_request: Dict[str, Any]) -> Dict[str, Any]`: Optimizar recursos basado en solicitud contextual.
+
+#### `src/utils/recovery_strategies.py` [514 líneas] - Estrategias de Recuperación
+- **Descripción**: Sistema de estrategias de recuperación para los distintos tipos de fallos de JARVIS. Define acciones de recuperación parametrizables (base de datos, sistema de ficheros, procesos, memoria y red), un gestor central con registro de acciones, ejecución en hilos, persistencia SQLite del historial y estadísticas, y funciones factoría para crear acciones comunes.
+- **Clases principales**:
+  - `RecoveryType` (Enum): Tipos de recuperación (AUTOMATIC, SEMI_AUTOMATIC, MANUAL)
+  - `RecoveryStatus` (Enum): Estados de la recuperación (PENDING, IN_PROGRESS, COMPLETED, FAILED, CANCELLED)
+  - `RecoveryAction`: Clase base de acción de recuperación con gestión de estado, tiempos, resultado y error
+  - `DatabaseRecoveryAction`: Restaura la base de datos desde backup o repara la base de datos corrompida
+  - `FilesystemRecoveryAction`: Restaura un fichero desde backup o lo recrea vacío
+  - `ProcessRecoveryAction`: Reinicia un proceso ejecutando un comando
+  - `MemoryRecoveryAction`: Termina un proceso por PID o limpia la caché de memoria del sistema
+  - `NetworkRecoveryAction`: Reinicia una interfaz de red o vacía la caché DNS
+  - `RecoveryManager`: Gestor central de recuperaciones con persistencia SQLite, hilos y estadísticas
+- **Métodos principales**:
+  - `RecoveryAction.__init__(self, name: str, description: str, recovery_type: RecoveryType)`
+  - `RecoveryAction.execute(self) -> bool`: Execute the recovery action
+  - `RecoveryAction.cancel(self)`: Cancel the recovery action
+  - `RecoveryAction.get_duration(self) -> Optional[float]`: Get execution duration in seconds
+  - `DatabaseRecoveryAction.__init__(self, db_path: str, backup_path: str = None)`
+  - `FilesystemRecoveryAction.__init__(self, file_path: str, backup_path: str = None)`
+  - `ProcessRecoveryAction.__init__(self, process_name: str, command: str)`
+  - `MemoryRecoveryAction.__init__(self, process_id: int = None)`
+  - `NetworkRecoveryAction.__init__(self, interface: str = None)`
+  - `RecoveryManager.__init__(self, db_path: str = "data/recovery_manager.db")`
+  - `RecoveryManager.register_recovery_action(self, action: RecoveryAction)`: Register a recovery action
+  - `RecoveryManager.execute_recovery(self, action_name: str, component: str, error_type: str, additional_data: Dict = None) -> bool`
+  - `RecoveryManager.execute_recovery_thread()`
+  - `RecoveryManager.get_recovery_history(self, days: int = 7) -> List[Dict]`: Get recovery history for specified days
+  - `RecoveryManager.get_recovery_statistics(self, days: int = 7) -> Dict`: Get recovery statistics
+  - `RecoveryManager.get_active_recoveries(self) -> List[Dict]`: Get list of active recoveries
+  - `RecoveryManager.cancel_recovery(self, action_name: str)`: Cancel an active recovery
+  - `RecoveryManager.get_available_actions(self) -> List[Dict]`: Get list of available recovery actions
+  - `RecoveryManager.cleanup_old_history(self, days: int = 30)`: Clean up old recovery history
+  - `RecoveryManager.setup_default_actions(self)`: Setup default recovery actions
+- **Funciones globales**:
+  - `create_database_recovery_action(db_path: str, backup_path: str = None) -> DatabaseRecoveryAction`: Crear `DatabaseRecoveryAction`
+  - `create_filesystem_recovery_action(file_path: str, backup_path: str = None) -> FilesystemRecoveryAction`: Crear `FilesystemRecoveryAction`
+  - `create_process_recovery_action(process_name: str, command: str) -> ProcessRecoveryAction`: Crear `ProcessRecoveryAction`
+  - `create_memory_recovery_action(process_id: int = None) -> MemoryRecoveryAction`: Crear `MemoryRecoveryAction`
+  - `get_recovery_manager()`: Obtener la instancia singleton de `RecoveryManager`
+  - `create_network_recovery_action(interface: str = None) -> NetworkRecoveryAction`: Crear `NetworkRecoveryAction`
+
+#### `src/utils/screen_manager.py` [1958 líneas] - Gestor de Pantallas
+- **Descripción**: Gestor unificado de pantallas y configuración del sistema Jarvis con detección nativa de Windows, gestión multi-monitor, Chrome integration y capturas de pantalla avanzadas.
+- **Clases principales**:
+  - `RECT`
+  - `MONITORINFOEXW`
+  - `POINT`
+  - `WINDOWPLACEMENT`
+  - `ScreenSetupType` (Enum): Tipos de configuración de pantalla (SINGLE, DUAL_HORIZONTAL, DUAL_VERTICAL, ULTRAWIDE, UNKNOWN)
+  - `MonitorInfo` (dataclass): Información física/lógica de un monitor en el escritorio virtual
+  - `ScreenManager`: Gestor centralizado de topología, ventanas y capturas
+- **Métodos principales**:
+  - `MonitorInfo.center_x(self) -> int`
+  - `MonitorInfo.center_y(self) -> int`
+  - `MonitorInfo.center(self) -> Tuple[int, int]`
+  - `MonitorInfo.screen_key(self) -> str`
+  - `MonitorInfo.contains_point(self, x: int, y: int) -> bool`
+  - `MonitorInfo.contains_window(self, window: Any) -> bool`
+  - `MonitorInfo.to_dict(self) -> Dict[str, Any]`
+  - `ScreenManager.__init__(self) -> None`
+  - `ScreenManager.refresh_monitors(self) -> bool`
+  - `ScreenManager.get_monitor(self, monitor_num: int) -> Optional[MonitorInfo]`
+  - `ScreenManager.get_primary_monitor(self) -> Optional[MonitorInfo]`
+  - `ScreenManager.get_monitor_by_point(self, x: int, y: int) -> Optional[MonitorInfo]`
+  - `ScreenManager.get_monitor_for_window(self, window: Any) -> Optional[MonitorInfo]`: Obtiene el monitor físico de una ventana, incluso minimizada.
+  - `ScreenManager.get_foreground_window(self) -> Optional[Any]`
+  - `ScreenManager.get_foreground_monitor(self) -> Optional[MonitorInfo]`
+  - `ScreenManager.get_active_monitor(self) -> Optional[MonitorInfo]`
+  - `ScreenManager.get_alternate_monitor( self, monitor_num: Optional[int] = None, ) -> Optional[MonitorInfo]`
+  - `ScreenManager.get_chrome_windows(self) -> List[Any]`: Enumera ventanas reales de Chrome evitando depender del orden que devuelva pygetwindow.
+  - `ScreenManager.get_chrome_window_on_monitor( self, monitor_num: int, prefer_foreground: bool = True, ) -> Optional[Any]`
+  - `ScreenManager.get_chrome_monitor( self, prefer_foreground: bool = True, ) -> Optional[MonitorInfo]`
+  - `ScreenManager.get_calibration_monitor(self) -> Optional[MonitorInfo]`
+  - `ScreenManager.is_window_minimized(self, window: Any) -> bool`: Indica si una ventana está minimizada según Win32.
+  - `ScreenManager.prepare_window_for_calibration(self, window: Any) -> Optional[MonitorInfo]`: Restaura/maximiza cualquier ventana y devuelve su monitor real.
+  - `ScreenManager.move_window_to_monitor( self, window_title: str, monitor_num: int, ) -> bool`
+  - `ScreenManager.open_chrome_calibration_tab(self, monitor_num: int) -> bool`
+  - `ScreenManager.open_chrome_on_monitor(self, monitor_num: int) -> bool`
+  - `ScreenManager.capture_monitor(self, monitor_num: int) -> Optional[str]`: Captura exactamente el rectángulo físico del monitor.
+  - `ScreenManager.close_chrome(self) -> bool`: Cierra Chrome como acción explícita del usuario.
+  - `ScreenManager.move_window_to_screen( self, window_title: str, screen_num: int = 1, ) -> bool`
+- **Funciones globales**:
+  - `get_screen_manager() -> ScreenManager`: Obtiene instancia singleton del gestor de pantallas
+  - `get_monitor_info(monitor_num: int) -> Optional[MonitorInfo]`: Obtiene información del monitor especificado
+  - `get_monitor_setup() -> Dict[str, Any]`: Obtiene configuración actual de monitores
+
+#### `src/utils/self_improvement_system.py` [1261 líneas] - Sistema de Automejora
+- **Descripción**: Sistema de automejora con aprendizaje continuo y optimización adaptativa. Integra PerformanceOptimizer, PatternAnalyzer, LogAnalytics y LogPredictor, ejecuta un bucle de aprendizaje en hilo, recoge datos del sistema, extrae características, entrena modelos de machine learning, identifica oportunidades de mejora, ejecuta reglas de mejora, actualiza un grafo de conocimiento y exporta reportes de aprendizaje.
+- **Clases principales**:
+  - `LearningMode` (Enum): Modos de aprendizaje (PASSIVE_LEARNING, ACTIVE_LEARNING, REINFORCEMENT_LEARNING, TRANSFER_LEARNING, FEDERATED_LEARNING)
+  - `ImprovementType` (Enum): Tipos de mejora (PERFORMANCE_IMPROVEMENT, ERROR_REDUCTION, EFFICIENCY_GAIN, RESOURCE_OPTIMIZATION, USER_EXPERIENCE, FEATURE_ENHANCEMENT, ALGORITHM_OPTIMIZATION, ARCHITECTURE_IMPROVEMENT)
+  - `LearningSession` (dataclass): Sesión de aprendizaje (session_id, modo, inicio/fin, duración, puntos de datos, mejoras realizadas, tasa de éxito, confianza, tasas de aprendizaje y exploración, métricas)
+  - `ImprovementRule` (dataclass): Regla de mejora (rule_id, nombre, descripción, condición, acción, prioridad, habilitación, tasa de éxito, ejecuciones, última ejecución y puntuación de mejora)
+  - `KnowledgeGraph` (dataclass): Nodo del grafo de conocimiento (node_id, tipo, propiedades, conexiones, confianza y última actualización)
+  - `SelfImprovementSystem`: Sistema principal con colas de aprendizaje/mejora, modelos de aprendizaje e hilo de ejecución
+- **Métodos principales**:
+  - `SelfImprovementSystem.__init__(self, config_path: str = None)`
+  - `SelfImprovementSystem.get_learning_status(self) -> Dict[str, Any]`: Obtener estado actual de aprendizaje
+  - `SelfImprovementSystem.get_learning_history(self, limit: int = 50) -> List[Dict[str, Any]]`: Obtener historial de aprendizaje
+  - `SelfImprovementSystem.add_improvement_rule(self, rule: ImprovementRule)`: Añadir regla de mejora personalizada
+  - `SelfImprovementSystem.remove_improvement_rule(self, rule_id: str)`: Eliminar regla de mejora
+  - `SelfImprovementSystem.enable_learning_mode(self, mode: LearningMode)`: Habilitar modo de aprendizaje
+  - `SelfImprovementSystem.disable_learning_mode(self, mode: LearningMode)`: Deshabilitar modo de aprendizaje
+  - `SelfImprovementSystem.perform_active_learning(self)`: Realizar aprendizaje activo
+  - `SelfImprovementSystem.export_learning_report(self, filepath: str)`: Exportar reporte de aprendizaje
+  - `SelfImprovementSystem.stop_learning(self)`: Detener aprendizaje
+  - `SelfImprovementSystem.start_learning(self)`: Iniciar aprendizaje

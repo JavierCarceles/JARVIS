@@ -1,8 +1,14 @@
 ESTADO PERSISTENTE ACTUAL
 CURRENT_PHASE: 2.8.8
-CURRENT_WORK_UNIT: 2.8.8.9.6.2
+CURRENT_WORK_UNIT: 2.8.8.9.6.3
 CURRENT_WORK_STATUS: EN PROCESO
-LAST_COMPLETED_UNIT: 2.8.8.9.6.1
+LAST_COMPLETED_UNIT: 2.8.8.9.6.2
+
+# COMPLETADO: 2.8.8.9.6.2 - Test de datos corruptos
+# Fecha: 2026-10-21
+# Archivo modificado: tests/utils/contextual_adaptation_engine/test_corrupt_data.py (nuevo), README.md, prompt_mejoraActual.txt
+# Resultado: creado y ejecutado el ÚNICO test pytest de datos corruptos, en un único módulo nuevo de 86 tests (`tests/utils/contextual_adaptation_engine/test_corrupt_data.py`) que MATERIALIZA el CASO DE CORRUPCIÓN de las 27 clases declaradas en 2.8.8.9.6.1 y fija el CONTRATO DE RECHAZO; cada clase se construye con el FORMATO REAL declarado (payload sano + UNA desviación) sobre un `data/` temporal por parámetro, con `data_dir` propio, de modo que el `data/` de producción no se toca; el contrato exige que para las 27 clases no aparezca NINGUNO de los 5 efectos que SÍ usan el dato corrupto (`value_coerced`, `state_contaminated`, `read_api_raises`, `write_api_breaks`, `corruption_persisted`), admitiendo los 3 efectos seguros (`silently_ignored`, `record_dropped`, `rejected_whole_file`); el módulo incorpora un TEST DE GUARDA propio (sha256 de los 4 ficheros de persistencia y de los 4 ficheros de subsistemas ajenos del `data/` de PRODUCCIÓN) y un CONTROL de no vacío (los MISMOS ficheros con payload VÁLIDO no producen ningún efecto inseguro, de modo que el contrato discrimina el dato corrupto del dato sano)
+# Estado real: 69 PASSED / 17 FAILED en el módulo (los 17 FAILED son el CONTRATO PENDIENTE previsto para la detección de 2.8.8.9.6.3 y la verificación del rechazo de 2.8.8.9.6.4, NO un defecto del test) y 313 PASSED / 17 FAILED en la suite completa (baseline comparable de 244 de 2.8.8.9.6.1 + 86 tests nuevos, 0 regresiones); el `data/` y el `logs/` de producción NO se modifican (sha256 idéntico en los 8 ficheros vigilados)
 
 # COMPLETADO: 2.8.8.9.6.1 - Identificar datos invalidos
 # Fecha: 2026-10-21
@@ -1454,14 +1460,44 @@ Hoy `learning_results` se escribe verbatim (l. 2475) y no hay ningún contador d
 - ALCANCE: esta hoja DECLARA y VERIFICA los criterios de corrupcion; NO los detecta. El test de datos corruptos es 2.8.8.9.6.2, la IMPLEMENTACION de la deteccion es 2.8.8.9.6.3 y la verificacion del rechazo es 2.8.8.9.6.4.
 - HALLAZGO DE PRODUCCION: sin cambios. En `data/` siguen faltando `contextual_adaptation_rules.json` y `contextual_knowledge_base.json` (ausencia de FICHERO, de 2.8.8.9.5.1).
 
-2.8.8.9.6.2 — TEST DE DATOS CORRUPTOS
+2.8.8.9.6.2 — TEST DE DATOS CORRUPTOS [IMPLEMENTADA]
 - Crear únicamente el caso de corrupción.
+- Módulo: `tests/utils/contextual_adaptation_engine/test_corrupt_data.py` (86 tests, 69 PASSED / 17 FAILED).
+- CONTRATO A CUMPLIR (fijado en 2.8.8.9.6.2): para las 27 clases de corrupción declaradas en
+  2.8.8.9.6.1, el dato corrupto NO debe producir ninguno de los 5 efectos que lo usan como si
+  fuera válido: `value_coerced`, `state_contaminated`, `read_api_raises`, `write_api_breaks` y
+  `corruption_persisted`. Sí se admiten los 3 efectos seguros: `silently_ignored`,
+  `record_dropped` y `rejected_whole_file`.
+- CASO MATERIALIZADO: cada clase se construye con el formato real declarado (payload sano + UNA
+  desviación) sobre un `data/` temporal por parámetro, con `data_dir` propio. El `data/` de
+  producción NO se toca; el módulo incorpora un TEST DE GUARDA por sha256 de los 8 ficheros
+  vigilados y un CONTROL de no vacío (los MISMOS ficheros con payload VÁLIDO no producen ningún
+  efecto inseguro).
+- TESTS QUE DEBEN PASAR AL TERMINAR 2.8.8.9.6.3 (hoy FAILED por diseño), todos en
+  `test_el_dato_corrupto_no_se_usa_como_si_fuera_valido`:
+  `adaptation_rules.actions_string`, `adaptation_rules.enabled_string`,
+  `adaptation_rules.last_execution_not_iso`, `adaptation_rules.name_not_string`,
+  `adaptation_rules.success_rate_not_numeric`, `adaptation_rules.threshold_not_numeric`,
+  `adaptation_rules.trigger_invalid_value`, `adaptation_rules.triggers_not_list`,
+  `goal_adaptation_feedback.row_not_mapping`, `goal_adaptation_feedback.section_not_list`,
+  `goal_adaptation_learning_results.learning_results_not_list`,
+  `goal_adaptation_learning_results.row_not_mapping`,
+  `goal_adaptation_learning_results.strategy_missing_identity`,
+  `knowledge_base.section_not_mapping`, `knowledge_base.section_partial`,
+  `knowledge_base.strategies_not_mapping`, `knowledge_base.unexpected_key`.
 
 2.8.8.9.6.3 — IMPLEMENTAR DETECCIÓN
 - Implementar únicamente la detección de corrupción.
+- CONTRATO A CUMPLIR (fijado en 2.8.8.9.6.2): los 17 tests RED del módulo
+  `tests/utils/contextual_adaptation_engine/test_corrupt_data.py` deben pasar. La detección debe
+  ser de SOLO LECTURA (como la de 2.8.8.9.5.1/5.2) y no puede crear ficheros.
 
 2.8.8.9.6.4 — VERIFICAR RECHAZO
 - Comprobar que los datos corruptos no se usan como si fueran válidos.
+- CONTRATO A CUMPLIR (fijado en 2.8.8.9.6.2): los 17 tests RED del módulo
+  `tests/utils/contextual_adaptation_engine/test_corrupt_data.py` deben seguir pasando, y el resto
+  del módulo (69 tests) no debe romperse. Ninguno de los 5 efectos inseguros puede aparecer en el
+  estado del motor tras cargar un fichero corrupto.
 
 2.8.8.9.7 — RECUPERACIÓN PARCIAL
 
@@ -4096,3 +4132,33 @@ PENDIENTES: 2.8.8.9.6.2 - crear unicamente el caso de corrupcion.
 ESTADO FINAL: 2.8.8.9.6.1 - IMPLEMENTADA
 
 SIGUIENTE UNIDAD: 2.8.8.9.6.2 - TEST DE DATOS CORRUPTOS
+
+### REGISTRO DE UNIDAD: 2.8.8.9.6.2
+FECHA: 2026-10-21
+ESTADO: IMPLEMENTADA
+OBJETIVO: Crear unicamente el caso de corrupcion, materializando para cada una de las 27 clases declaradas en 2.8.8.9.6.1 un escenario real de dato corrupto y fijando el CONTRATO de rechazo que la deteccion de 2.8.8.9.6.3 debera satisfacer.
+TIPO DE TRABAJO: CREACION DE CASO + CONTRATO
+CAMBIOS / HALLAZGOS:
+- CASO MATERIALIZADO, NO SIMULADO: cada clase se construye con el FORMATO REAL declarado en 2.8.8.9.6.1 (payload sano + UNA desviacion) y se escribe en un `data/` TEMPORAL por parametro, con `data_dir` propio del motor. No se monkeypatchea el motor ni se falsea su comportamiento: se le da el fichero corrupto real y se observa que hace.
+- CONTRATO DE RECHAZO: `test_el_dato_corrupto_no_se_usa_como_si_fuera_valido` exige, para las 27 clases, que no aparezca NINGUNO de los 5 efectos que SI usan el dato corrupto (`value_coerced`, `state_contaminated`, `read_api_raises`, `write_api_breaks`, `corruption_persisted`). Los 3 efectos seguros (`silently_ignored`, `record_dropped`, `rejected_whole_file`) si se admiten. El criterio es el del contrato declarado, no una lista escrita a mano en el test.
+- CONTROL DE NO VACIO: `test_el_control_con_payload_valido_no_muestra_efectos_inseguros` comprueba que los MISMOS ficheros de persistencia con payload VALIDO no producen ningun efecto inseguro. Sin este control, un contrato que marcara todo como inseguro pasaria sin probar nada.
+- NO VACIO VERIFICADO POR MUTACION: se muto el motor para que el dato corrupto NO llegara al estado y se comprobo que el test cambia de fallo a PASS. El contrato discrimina; no es un test que falla siempre.
+- EXCEPCION TRATADA COMO FALLO: si el observador del propio test lanza, el test falla con el nombre de la excepcion, en lugar de tragarsela por el `except` que convierte una excepcion en un efecto desconocido.
+- AISLAMIENTO: `data/` de produccion intacto (sha256 de los 4 ficheros de persistencia y de los 4 ficheros de subsistemas ajenos), verificado por el TEST DE GUARDA del propio modulo.
+ARCHIVOS MODIFICADOS:
+- TESTS: `tests/utils/contextual_adaptation_engine/test_corrupt_data.py` (nuevo; modulo unico de 86 tests).
+- DOCUMENTACION: `README.md`, `prompt_mejoraActual.txt`.
+- PRODUCCION: NINGUNO. Esta hoja no implementa la deteccion: no toca `src/`.
+TESTS Y RESULTADOS:
+- UNITARIOS: `tests/utils/contextual_adaptation_engine/test_corrupt_data.py` - 69 PASSED / 17 FAILED (86 tests).
+- INTEGRACION: suite completa `pytest tests` - 313 PASSED / 17 FAILED / TOTAL 330, frente a la baseline comparable de 244 PASSED / 0 FAILED de 2.8.8.9.6.1 (esta hoja anade 86 tests y 0 regresiones).
+- NO REGRESION: los 244 tests previos siguen pasando; los 17 FAILED son TODOS del modulo nuevo. Las sondas de 2.8.8.9.5.1, 2.8.8.9.5.2, 2.8.8.9.5.3 y 2.8.8.9.6.1 siguen en 0 fallos.
+VERIFICACION:
+- SINTAXIS: `py_compile` del modulo nuevo - OK.
+- NO VACIO: verificado por mutacion (el test pasa cuando el motor deja de usar el dato corrupto) y por control con payload valido.
+- AISLAMIENTO: `git status` sin ninguna modificacion en `data/`, `logs/` ni `models/` tras ejecutar el modulo y la suite completa.
+DISCREPANCIAS: los 17 tests FAILED son el CONTRATO PENDIENTE previsto por esta hoja, NO un defecto del test. Corresponden a 8 clases de `adaptation_rules`, 4 de `knowledge_base`, 2 de `goal_adaptation_feedback` y 3 de `goal_adaptation_learning_results`. Se enumeran por nombre en la hoja 2.8.8.9.6.3 del ROADMAP para que la deteccion los trate uno a uno.
+PENDIENTES: 2.8.8.9.6.3 - implementar unicamente la deteccion de corrupcion.
+ESTADO FINAL: 2.8.8.9.6.2 - IMPLEMENTADA
+
+SIGUIENTE UNIDAD: 2.8.8.9.6.3 - IMPLEMENTAR DETECCIÓN

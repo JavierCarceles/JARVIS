@@ -3361,6 +3361,15 @@
   - Hallazgo de la verificacion: el contraste corrigio tres expectativas - `adaptation_rules.priority_not_castable` y `adaptation_rules.execution_count_not_castable` abortan el FICHERO ENTERO (el `ValueError` de la conversion no se captura), `goal_adaptation_learning_results.row_not_mapping` PROPAGA la corrupcion al disco al guardar, y `goal_adaptation_learning_results.strategy_missing_identity` llega al estado con una confianza INVENTADA (el contrato de identidad de la estrategia se exige al guardar pero no al cargar)
   - Alcance: esta unidad DECLARA y VERIFICA los criterios de corrupcion; NO los detecta. El test de datos corruptos, la deteccion y la verificacion del rechazo quedan fuera de esta unidad
   - Resultado: 27/27 clases contrastadas declarado vs observado con 0 comprobaciones fallidas, 244 PASSED / 0 FAILED en la suite completa (baseline comparable de 244 del "Test de ausencia", 0 tests nuevos y 0 regresiones)
+- **Test de datos corruptos**:
+  - `tests/utils/contextual_adaptation_engine/test_corrupt_data.py`: modulo UNICO de 86 tests que MATERIALIZA el caso de corrupcion para las 27 clases declaradas en "Criterios de corrupcion" y fija el CONTRATO de rechazo
+  - CASO DE CORRUPCION: cada clase se construye con el formato real declarado en 6.1 (payload sano + UNA desviacion) y se materializa en un `data/` temporal por parametro; el motor se construye con `data_dir` propio, de modo que el `data/` de produccion no se toca
+  - CONTRATO DE RECHAZO: `test_el_dato_corrupto_no_se_usa_como_si_fuera_valido` exige, para las 27 clases, que ninguno de los 5 efectos que SI usan el dato corrupto aparezca (`value_coerced`, `state_contaminated`, `read_api_raises`, `write_api_breaks`, `corruption_persisted`). Los 3 efectos seguros (`silently_ignored`, `record_dropped`, `rejected_whole_file`) si admitidos
+  - TEST DE GUARDA propio: comprueba por sha256 que los 4 ficheros de persistencia y los 4 ficheros de subsistemas ajenos del `data/` de PRODUCCION no cambian al ejecutarse el modulo
+  - CONTROL DE NO VACIO: `test_el_control_con_payload_valido_no_muestra_efectos_inseguros` comprueba que los MISMOS ficheros de persistencia con payload VALIDO no producen ningun efecto inseguro; sin el, el contrato no distinguiria el dato corrupto del dato sano
+  - NO VACIO VERIFICADO POR MUTACION: al mutar el motor para que el dato corrupto NO llegue al estado, el test pasa (hoy falla); el contrato discrimina y no es un test que falla siempre
+  - Alcance: esta unidad CREA el caso y el contrato; NO implementa la deteccion. Los 17 tests RED son el contrato previsto para la deteccion (6.3) y la verificacion del rechazo (6.4)
+  - Resultado: 69 PASSED / 17 FAILED en el modulo (los 17 FAILED son el contrato pendiente de 6.3/6.4, por diseno) y 313 PASSED / 17 FAILED en la suite completa (baseline comparable de 244 del "Criterios de corrupcion" + 86 nuevos, 0 regresiones)
 - **Métodos de feedback y confianza**:
   - `get_transfer_confidence`: Obtener confianza existente para una transferencia específica (0.0-1.0)
   - `register_transfer_feedback`: Registrar feedback de una transferencia completada con éxito, puntuación y comentarios
