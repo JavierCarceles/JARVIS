@@ -115,6 +115,35 @@ def materializar(ficheros, data_dir):
                          else json.dumps(contenido, ensure_ascii=False))
 
 
+def _entrada_serializable(entrada):
+    """Serializa una entrada de historial sin depender de su tipo concreto.
+
+    El historial mezcla entradas de PERSISTENCIA (mapeos) y RESULTADOS de
+    ejecucion (objetos con `to_dict()`): la sonda no puede suponer una de las
+    dos formas, de modo que serializa la que encuentre y, si no encuentra
+    ninguna, conserva la representacion textual en lugar de fallar.
+    """
+    if isinstance(entrada, dict): return dict(entrada)
+    to_dict = getattr(entrada, "to_dict", None)
+    if callable(to_dict):
+        try: return dict(to_dict())
+        except Exception: pass
+    return {"repr": repr(entrada)}
+
+
+def firma_datos(motor):
+    """Firma de los DATOS que la persistencia aporta al estado del motor.
+
+    Es SOLO el estado de los datos (reglas y base de conocimiento), sin el
+    historial: el historial lo produce el propio ciclo de ejecucion, de modo
+    que incluirlo mediria lo que hace la sonda y no lo que hace la carga.
+    """
+    return json.dumps({
+        "adaptation_rules": sorted(motor.adaptation_rules or {}),
+        "knowledge_base": motor.knowledge_base,
+    }, sort_keys=True, default=str)
+
+
 def firma_estado(motor):
     """Firma del ESTADO OPERATIVO del motor.
 
@@ -126,7 +155,8 @@ def firma_estado(motor):
     return json.dumps({
         "adaptation_rules": sorted(motor.adaptation_rules or {}),
         "knowledge_base": motor.knowledge_base,
-        "adaptation_history": [dict(entrada) for entrada in (motor.adaptation_history or [])],
+        "adaptation_history": [_entrada_serializable(entrada)
+                               for entrada in (motor.adaptation_history or [])],
     }, sort_keys=True, default=str)
 
 
@@ -218,6 +248,17 @@ def _observar(modo, corruptos):
 
         estado_igual_a_fresco = firma_perdida == firma_fresco
 
+        # CARGA VERAZ: el retorno de la carga refleja lo que OCURRIO.
+        # Se mide ANTES del ciclo de ejecucion, porque el ciclo escribe en la
+        # base de conocimiento y en el historial: medido despues, un exito
+        # FALSO de la carga quedaria tapado por lo que el propio ciclo produce.
+        carga = motor.load_all_data()
+        # Si tras la carga el estado de DATOS sigue siendo el de los defaults,
+        # no se ha cargado ninguna unidad de datos: la carga no puede declarar
+        # exito.
+        cargo_algo = firma_datos(motor) != firma_datos(fresco)
+        carga_veraz = (carga is False) or cargo_algo
+
         # OPERACION CONTINUA: el ciclo completo debe funcionar con los defaults.
         try:
             instantanea = motor.capture_context_snapshot()
@@ -246,13 +287,6 @@ def _observar(modo, corruptos):
                      + estado["storage"]["absent_count"]
                      + estado["storage_sections"]["absent_count"])
         perdida_visible_en_status = anomalias > 0
-
-        # CARGA VERAZ: el retorno de la carga refleja lo que OCURRIO.
-        carga = motor.load_all_data()
-        # Si tras la carga el estado sigue siendo el de los defaults, no se ha
-        # cargado ninguna unidad de datos: la carga no puede declarar exito.
-        cargo_algo = firma_estado(motor) != firma_fresco
-        carga_veraz = (carga is False) or cargo_algo
 
         # RESPALDO CUBRE LOS CUATRO: el backup copia los cuatro ficheros. La
         # unidad de cobertura es la CLAVE de persistencia que declara el
