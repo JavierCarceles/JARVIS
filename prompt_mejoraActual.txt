@@ -4,113 +4,6 @@ CURRENT_WORK_UNIT: 2.8.8.9.8.2
 CURRENT_WORK_STATUS: PENDIENTE
 LAST_COMPLETED_UNIT: 2.8.8.9.8.1
 
-# COMPLETADO: 2.8.8.9.8.1 - Definir fallback existente
-# Fecha: 2026-10-21
-# Archivo modificado: src/utils/contextual_adaptation_engine.py, tests/utils/contextual_adaptation_engine/identify_fallback_real.py (nuevo), tests/utils/contextual_adaptation_engine/test_2_8_8_9_8_1_total_loss_fallback.py (nuevo), tests/utils/contextual_adaptation_engine/mutation_check_2_8_8_9_8_1.py (nuevo), README.md, prompt_mejoraActual.txt
-# Resultado: declarado el CONTRATO del FALLBACK por CORRUPCION TOTAL y MEDIDO en RUNTIME cuanto de ese fallback existe hoy, sin tocar la DECLARACION de 6.1, ni la DETECCION de 6.3, ni la RECUPERACION de 7.2: `total_loss_fallback()` expone en el motor una declaracion NORMATIVA y DECLARATIVA del comportamiento real ante la perdida TOTAL de los datos de persistencia, con el PRINCIPIO de que JARVIS DEBE poder seguir operando, la DEFINICION OPERATIVA de lo que es perdida total (los cuatro ficheros existen pero NINGUNO aporta una sola unidad de datos utilizable) y su NEGACION (un fichero que aporta datos utilizables NO es perdida total), un vocabulario CERRADO de 4 MODOS de perdida total (`unreadable_file`, `non_mapping_root`, `list_root_without_valid_rows`, `empty_mapping_root`), 5 CAPAS de fallback (lo que el motor REALMENTE ofrece hoy) y 7 INVARIANTES, cada uno con su enunciado, su CAPA y su veredicto `satisfied`; la medicion la hace una sonda independiente (`identify_fallback_real.py`) con sus PROPIOS 4 escenarios de perdida total y sus PROPIOS instrumentos de observacion, que contrasta la DECLARACION contra lo OBSERVADO en runtime invariante a invariante, con un VINCULO explicito entre cada invariante del contrato y el observador que lo mide, de modo que un contrato que nunca falla no pasa inadvertido; el resultado se fija como test pytest permanente (`test_2_8_8_9_8_1_total_loss_fallback.py`, 15 tests) y como banco de mutacion (`mutation_check_2_8_8_9_8_1.py`, 12 mutaciones)
-# Estado real: 0 comprobaciones fallidas en la sonda y una DETERMINACION con 3 invariantes PENDIENTES, 15 PASSED / 0 FAILED en el modulo de test de 8.1, 632 PASSED / 0 FAILED en la suite completa `tests/` (617 previos + 15 nuevos, 0 regresiones), 12/12 mutaciones detectadas por `mutation_check_2_8_8_9_8_1.py` (las mutaciones del motor se aplican a una COPIA de `src/` en un temporal) y los ficheros de produccion intactos (sha256 identico antes y despues de ejecutar el modulo)
-
-# COMPLETADO: 2.8.8.9.7.3 - Test de recuperacion parcial
-# Fecha: 2026-10-21
-# Archivo modificado: tests/utils/contextual_adaptation_engine/test_2_8_8_9_7_2_recovery_partial.py (nuevo), tests/utils/contextual_adaptation_engine/mutation_check_2_8_8_9_7_2.py (nuevo), README.md, prompt_mejoraActual.txt
-# Resultado: creado y ejecutado el UNICO test pytest de la RECUPERACION PARCIAL, en un unico modulo nuevo de 139 tests (`tests/utils/contextual_adaptation_engine/test_2_8_8_9_7_2_recovery_partial.py`) que comprueba la IMPLEMENTACION de la recuperacion y no su declaracion: la API `recovery_report()` expone un INFORME bien formado (`recoveries`, `count` y `files`, con el numero coincidiendo con la lista), la API es de SOLO LECTURA (no crea ficheros, no altera el estado y devuelve una COPIA defensiva, de modo que mutar lo devuelto no filtra al motor), sin corrupcion NO hay nada que recuperar (CONTROL de no-vacuo), la recuperacion se REGISTRA en la UNIDAD que corrompe con la POLITICA que el contrato declara para esa clase, el valor por DEFECTO que ocupa el lugar del dato corrupto es el DECLARADO y no uno inventado, el ESTADO guarda ese valor por defecto, lo que el contrato declara RECUPERABLE LLEGA al estado y el INFORME no contiene el dato corrupto; el modulo reutiliza de la sonda de 7.1 sus ESCENARIOS y sus OBSERVADORES (no su codigo de salida), cargada por RUTA, de modo que la medicion y la implementacion no comparten puntos ciegos; el resultado se fija ademas como banco de mutacion (`mutation_check_2_8_8_9_7_2.py`, 9 mutaciones)
-# Estado real: 139 PASSED / 0 FAILED en el modulo de test de 7.3 (9 funciones de test parametrizadas sobre las 13 clases con dato recuperable y las 13 politicas, mas los controles de no-vacuo y la guarda de produccion), 617 PASSED / 0 FAILED en la suite completa `tests/` (0 regresiones), 9/9 mutaciones detectadas por `mutation_check_2_8_8_9_7_2.py` (las mutaciones del motor se aplican a una COPIA de `src/` en un temporal) y los ficheros de produccion intactos (sha256 identico antes y despues de ejecutar el modulo)
-
-# COMPLETADO: 2.8.8.9.7.2 - Implementar recuperacion parcial
-# Fecha: 2026-10-21
-# Archivo modificado: src/utils/contextual_adaptation_engine.py, tests/utils/contextual_adaptation_engine/test_2_8_8_9_7_2_recovery_partial.py (nuevo), tests/utils/contextual_adaptation_engine/mutation_check_2_8_8_9_7_2.py (nuevo), README.md, prompt_mejoraActual.txt
-# Resultado: IMPLEMENTADA la RECUPERACION PARCIAL en el motor, aplicando el CONTRATO declarado por 2.8.8.9.7.1, sin tocar la DECLARACION de 6.1, ni la DETECCION de 6.3, ni el RECHAZO verificado de 6.4: seis metodos nuevos en `src/utils/contextual_adaptation_engine.py` que hacen que una corrupcion rechace SOLO la unidad que corrompe y que todo lo demas que el FORMATO REAL declara valido SOBREVIVA. `_valor_por_defecto_de_recuperacion` toma el valor por DEFECTO del campo del CONTRATO declarado, sin inventar datos, y resuelve `$rule_id` con la identidad de la propia regla; `_recuperar_fila_de_regla` rechaza SOLO el CAMPO que corrompe (ese campo toma su valor por defecto y el resto de la fila sobrevive intacto, de modo que los campos de conversion ESTRICTA ya no abortan el FICHERO entero); `_recuperar_contenedor_de_reglas` reconstruye el contenedor `rules` con los valores que sean filas validas por el FORMATO REAL, sin usar las claves como identidad; `_recuperar_grupos_de_base` descarta SOLO el grupo que se aparta del formato y conserva sus HERMANOS, que son unidades independientes; `_registrar_recuperacion` anota en el informe lo recuperado, en la UNIDAD que corrompe y con la POLITICA aplicada; y `recovery_report` expone el INFORME de lo recuperado como API publica de SOLO LECTURA, con COPIA defensiva. Se aplican las 5 POLITICAS del contrato segun el NIVEL de la unidad: `default_the_field`, `keep_valid_elements`, `adapt_container`, `preserve_siblings` y `none`
-# Estado real: los 20 HALLAZGOS de 7.1 (dato recuperable perdido en runtime) quedan RESUELTOS: el modulo de 7.3 mide la MISMA condicion que la sonda de 7.1 (la unidad declarada recuperable esta PRESENTE en el estado) y la exige para las 27 clases con 0 fallos, de modo que las 13 clases que perdian datos recuperables los CONSERVAN; 139 PASSED / 0 FAILED en el modulo de test, 617 PASSED / 0 FAILED en la suite completa `tests/` (0 regresiones), 9/9 mutaciones detectadas y los ficheros de produccion intactos
-
-# COMPLETADO: 2.8.8.9.7.1 - Identificar datos recuperables
-# Fecha: 2026-10-21
-# Archivo modificado: src/utils/contextual_adaptation_engine.py, tests/utils/contextual_adaptation_engine/identify_recoverable_real.py (nuevo), tests/utils/contextual_adaptation_engine/test_2_8_8_9_7_1_recoverable.py (nuevo), tests/utils/contextual_adaptation_engine/mutation_check_2_8_8_9_7_1.py (nuevo), README.md, prompt_mejoraActual.txt
-# Resultado: declarado el CONTRATO de lo que es DATO RECUPERABLE y MEDIDO en RUNTIME cuanto de ese dato se pierde hoy al rechazar una corrupcion, sin tocar la DECLARACION de 6.1, ni la DETECCION de 6.3, ni el RECHAZO verificado de 6.4: `recoverable_data()` expone en el motor una declaracion NORMATIVA y DECLARATIVA de las 27 clases de corrupcion, cada una con QUE dato es recuperable, A QUE NIVEL y CON QUE POLITICA; el contrato incluye 7 NIVELES (`fichero`, `bloque`, `seccion`, `grupo`, `fila`, `entrada`, `campo`), 5 POLITICAS (`none`, `preserve_siblings`, `default_the_field`, `keep_valid_elements`, `adapt_container`), un vocabulario cerrado de 4 TOKENS de lo recuperable (`siblings`, `row_fields`, `elements`, `container_values`), el valor por DEFECTO de los 15 campos de una fila de regla segun el FORMATO REAL, la EXCEPCION conservadora de `enabled` (recuperar con `True` ACTIVARIA una regla cuyo estado se desconoce) y la REGLA DE INDEPENDENCIA (dos unidades son independientes si la ruta de una NO es prefijo de la ruta de la otra); el PRINCIPIO es que una corrupcion rechaza SOLO la unidad que corrompe y que la recuperacion NO inventa datos: el campo corrupto toma el valor por DEFECTO del formato y el resto de la unidad se conserva integro; la MEDICION la hace una sonda independiente (`identify_recoverable_real.py`) con sus PROPIOS 27 escenarios y sus PROPIOS instrumentos, que por clase comprueba que el dato corrupto NO llega al estado, que las unidades declaradas recuperables LLEGAN, que el campo corrupto toma su valor por DEFECTO, que lo declarado coincide con lo OBSERVADO y que se respeta la REGLA DE INDEPENDENCIA; el resultado se fija como test pytest permanente (`test_2_8_8_9_7_1_recoverable.py`, 88 tests) y como banco de mutacion (`mutation_check_2_8_8_9_7_1.py`, 6 mutaciones)
-# Estado real: 0 comprobaciones fallidas y 20 HALLAZGOS (dato recuperable perdido) en la sonda, 13 de las 27 clases con dato recuperable PERDIDO en runtime (11 por perder los CAMPOS VALIDOS de la fila corrompida, 7 por perder las unidades INDEPENDIENTES que la acompanan, 1 por perder el VALOR VALIDO de un mapeo reconstruible y 1 por perder los ELEMENTOS validos de un campo de lista), 13 clases ya RECUPERADAS y 1 sin nada recuperable (`knowledge_base.data_not_mapping`), 88 PASSED / 0 FAILED en el modulo de test de 7.1, 471 PASSED / 0 FAILED en la suite completa `tests/utils/contextual_adaptation_engine/` (383 previos + 88 nuevos, 0 regresiones), 6/6 mutaciones detectadas por `mutation_check_2_8_8_9_7_1.py` (las mutaciones del motor se aplican a una COPIA de `src/` en un temporal) y los 4 ficheros de persistencia del `data/` de produccion intactos
-
-# COMPLETADO: 2.8.8.9.6.4 - Verificar rechazo
-# Fecha: 2026-10-21
-# Archivo modificado: tests/utils/contextual_adaptation_engine/verify_rejection_real.py (nuevo), tests/utils/contextual_adaptation_engine/test_2_8_8_9_6_4_rejection_runtime.py (nuevo), tests/utils/contextual_adaptation_engine/mutation_check_2_8_8_9_6_4.py (nuevo), README.md, prompt_mejoraActual.txt
-# Resultado: verificado en RUNTIME que el dato corrupto NO se usa como si fuera valido, sin tocar el motor: una sonda independiente (`verify_rejection_real.py`) define sus PROPIOS 27 escenarios, con un SENTINELA propio incrustado en el punto exacto que se corrompe, y sus PROPIOS instrumentos de observacion (escaneo del estado operativo, escaneo del disco y ejercicio de las APIs), de modo que el rechazo se comprueba con un instrumento que NO comparte puntos ciegos con el que lo declara; por clase se exige que el motor ARRANQUE con el fichero corrupto, que el contenido corrupto siga PRESENTE en disco (la corrupcion es CONTENIDO, no AUSENCIA), que el dato corrupto NO llegue al estado operativo, que NINGUNA API de lectura ni de escritura lance, que NINGUNA devuelva el dato corrupto, que la corrupcion se DETECTE y se REPORTE por su clase, y que al escribir el dato corrupto NO llegue al estado ni se PERSISTA en disco; el rechazo se exige ademas SELECTIVO, contrastando cada escenario contra un motor de REFERENCIA sin ficheros corruptos, de modo que el contenido sano que la corrupcion no destruye sobrevive y lo que si destruye queda en el valor por DEFECTO; el resultado se fija como test pytest permanente (`test_2_8_8_9_6_4_rejection_runtime.py`, 60 tests) y como banco de mutacion (`mutation_check_2_8_8_9_6_4.py`, 3 mutaciones)
-# Estado real: 0 comprobaciones fallidas y 0 hallazgos en la sonda, 60 PASSED / 0 FAILED en el modulo de test de 6.4, 383 PASSED / 0 FAILED en la suite completa `tests/utils/contextual_adaptation_engine/` (323 previos + 60 nuevos, 0 regresiones), 3/3 mutaciones detectadas por `mutation_check_2_8_8_9_6_4.py` (el motor se restaura byte a byte tras el banco) y los 4 ficheros de persistencia del `data/` de produccion intactos (git limpio)
-
-# COMPLETADO: 2.8.8.9.6.3 - Implementar deteccion
-# Fecha: 2026-10-21
-# Archivo modificado: src/utils/contextual_adaptation_engine.py, tests/utils/contextual_adaptation_engine/detect_corruption_real.py (nuevo), tests/utils/contextual_adaptation_engine/corruption_criteria_real.py, tests/utils/contextual_adaptation_engine/mutation_check_2_8_8_9_6_3.py (nuevo), tests/utils/contextual_adaptation_engine/test_corrupt_data.py, README.md, prompt_mejoraActual.txt
-# Resultado: implementada la DETECCION de la corrupcion en los 4 ficheros de persistencia del motor de adaptacion contextual, sin tocar la DECLARACION de 6.1 ni el CONTRATO de 6.2: cuatro metodos nuevos en `src/utils/contextual_adaptation_engine.py` (_cumple_tipo, _desviaciones_de_regla, _fila_valida y _seccion_de_conocimiento_valida) deciden, sobre el FORMATO REAL que el propio motor escribe y sabe leer, que una fila, una seccion o un campo se aparta de ese formato; la deteccion se aplica en los 4 cargadores reales (`load_adaptation_rules`, `load_knowledge_base`, `_load_goal_adaptation_feedback` y `_load_goal_adaptation_learning_results`) y su resultado es EXCLUYENTE: el dato que se aparta del formato NO llega al estado ni se persiste, con tres efectos seguros admitidos (la fila se descarta, la seccion se ignora o el fichero entero se aborta); la deteccion es de SOLO LECTURA, no crea ficheros y no altera las APIs publicas; en paralelo se REFUERZO la sonda de 6.1, cuyos observadores de reglas solo miraban si una clave concreta faltaba o estaba y no comprobaban que el contenido corrupto NO hubiera llegado al estado, de modo que un "dato corrupto usado como valido" podia pasar inadvertido
-# Estado real: 86 PASSED / 0 FAILED en `test_corrupt_data.py` (los 17 tests RED del contrato de 6.2 pasan ya), 323 PASSED / 0 FAILED en la suite completa `tests/utils/contextual_adaptation_engine/` (0 regresiones), 0 comprobaciones fallidas en las sondas de 6.1 y de 6.3, y 11/11 mutaciones detectadas por `mutation_check_2_8_8_9_6_3.py` (cada mutacion desactiva UNA pieza de la deteccion y exige que la sonda falle; se aplica a una COPIA de `src/` en un temporal, de modo que el repositorio nunca se toca)
-
-# COMPLETADO: 2.8.8.9.6.2 - Test de datos corruptos
-# Fecha: 2026-10-21
-# Archivo modificado: tests/utils/contextual_adaptation_engine/test_corrupt_data.py (nuevo), README.md, prompt_mejoraActual.txt
-# Resultado: creado y ejecutado el ÚNICO test pytest de datos corruptos, en un único módulo nuevo de 86 tests (`tests/utils/contextual_adaptation_engine/test_corrupt_data.py`) que MATERIALIZA el CASO DE CORRUPCIÓN de las 27 clases declaradas en 2.8.8.9.6.1 y fija el CONTRATO DE RECHAZO; cada clase se construye con el FORMATO REAL declarado (payload sano + UNA desviación) sobre un `data/` temporal por parámetro, con `data_dir` propio, de modo que el `data/` de producción no se toca; el contrato exige que para las 27 clases no aparezca NINGUNO de los 5 efectos que SÍ usan el dato corrupto (`value_coerced`, `state_contaminated`, `read_api_raises`, `write_api_breaks`, `corruption_persisted`), admitiendo los 3 efectos seguros (`silently_ignored`, `record_dropped`, `rejected_whole_file`); el módulo incorpora un TEST DE GUARDA propio (sha256 de los 4 ficheros de persistencia y de los 4 ficheros de subsistemas ajenos del `data/` de PRODUCCIÓN) y un CONTROL de no vacío (los MISMOS ficheros con payload VÁLIDO no producen ningún efecto inseguro, de modo que el contrato discrimina el dato corrupto del dato sano)
-# Estado real: 69 PASSED / 17 FAILED en el módulo (los 17 FAILED son el CONTRATO PENDIENTE previsto para la detección de 2.8.8.9.6.3 y la verificación del rechazo de 2.8.8.9.6.4, NO un defecto del test) y 313 PASSED / 17 FAILED en la suite completa (baseline comparable de 244 de 2.8.8.9.6.1 + 86 tests nuevos, 0 regresiones); el `data/` y el `logs/` de producción NO se modifican (sha256 idéntico en los 8 ficheros vigilados)
-
-# COMPLETADO: 2.8.8.9.6.1 - Identificar datos invalidos
-# Fecha: 2026-10-21
-# Archivo modificado: src/utils/contextual_adaptation_engine.py, tests/utils/contextual_adaptation_engine/corruption_criteria_real.py (nuevo), README.md, prompt_mejoraActual.txt
-# Resultado: declarado el CONTRATO de lo que constituye CORRUPCION segun el FORMATO REAL de la persistencia: `corruption_criteria()` expone en el motor una declaracion NORMATIVA y DECLARATIVA de las 27 clases de corrupcion que el motor puede encontrar en sus 4 ficheros de persistencia (`adaptation_rules`, `knowledge_base`, `goal_adaptation_feedback`, `goal_adaptation_learning_results`), cada una con su `target`, `violation`, `severity`, `expected` (efectos observables) y `reason` anclado en el codigo real; el contrato incluye la FRONTERA explicita con la AUSENCIA (lo que ya detectan 2.8.8.9.5.1 y 2.8.8.9.5.2 NO es corrupcion), un vocabulario cerrado de 8 efectos, 4 severidades y 4 violaciones, el FORMATO REAL de cada fichero con su escritor y su cargador, y 5 invariantes; es de SOLO LECTURA, devuelve una COPIA profunda y no crea ficheros; la DECLARACION se contrasta contra el comportamiento OBSERVADO en runtime mediante la sonda `corruption_criteria_real.py`, de modo que un contrato que nunca falla no pasa inadvertido
-# Estado real: 27/27 clases contrastadas declarado vs observado, 0 comprobaciones fallidas (sonda de runtime); las sondas de 2.8.8.9.5.1, 2.8.8.9.5.2 y 2.8.8.9.5.3 siguen en 0 fallos y la suite completa en 244 PASSED / 0 FAILED (baseline comparable de 244 de 2.8.8.9.5.4, 0 tests nuevos y 0 regresiones); el `data/` de produccion NO se modifica (sin escrituras en `data/`, `logs/` ni `models/`)
-
-# COMPLETADO: 2.8.8.9.5.4 - Test de ausencia
-# Fecha: 2026-10-21
-# Archivo modificado: tests/utils/contextual_adaptation_engine/test_absent_storage_and_sections.py (nuevo), tests/conftest.py, README.md, prompt_mejoraActual.txt
-# Resultado: creado y ejecutado el ÚNICO test pytest de almacenamiento/sección ausente, en un único módulo nuevo de 29 tests (`tests/utils/contextual_adaptation_engine/test_absent_storage_and_sections.py`) que cubre la AUSENCIA TOTAL (el motor arranca sin lanzar, la carga NO crea ficheros de persistencia, los valores por defecto no son nulos y las 10 APIs de lectura no lanzan), la DETECCIÓN DE ALMACENAMIENTO AUSENTE (2.8.8.9.5.1: las cuatro rutas esperadas, las cuatro ausencias informadas con su `reason`, la ruta que no es un fichero, el modo de solo lectura, el almacenamiento parcial y completo y las claves nuevas de `get_engine_status()` sin alterar ninguna previa), la DETECCIÓN DE SECCIÓN AUSENTE (2.8.8.9.5.2: sección de DATOS y de METADATA ausentes, varias ausentes a la vez, sección presente pero vacía, formato heredado, fichero ilegible, payload que no es un mapeo, ficheros ausentes listados aparte en `missing_files` y el modo de solo lectura) y la RECUPERACIÓN (la escritura recrea el almacenamiento ausente y la sección ausente no impide cargar los datos presentes); el módulo incorpora además un TEST DE GUARDA propio que comprueba por sha256 que los 4 ficheros de persistencia y los 4 ficheros de los subsistemas ajenos de `data/` de PRODUCCIÓN no cambian al ejecutarse, y aisla por parcheo las rutas RELATIVAS de los subsistemas ajenos (`data/knowledge_graph.json`, `data/learning_history.json`, `data/improvement_rules.json`, `models/learning_models`) que escribían en el `data/` real desde hilos asíncronos
-# Estado real: 29/29 PASSED / 0 FAILED (módulo nuevo), 244 PASSED / 0 FAILED en la suite completa (baseline comparable de 215 de 2.8.8.9.5.3 + 29 tests nuevos, 0 regresiones); el `data/` y el `logs/` de producción NO se modifican (sha256 idéntico en los 8 ficheros vigilados, 0 escrituras en el repo verificadas con `sys.addaudithook` sobre `sqlite3.connect`)
-
-# COMPLETADO: 2.8.8.9.5.3 - Definir comportamiento sin datos
-# Fecha: 2026-10-21
-# Archivo modificado: src/utils/contextual_adaptation_engine.py, tests/utils/contextual_adaptation_engine/no_data_behavior_real.py (nuevo), README.md, prompt_mejoraActual.txt
-# Resultado: implementado el CONTRATO DECLARATIVO del comportamiento del motor SIN DATOS: `no_data_behavior()` expone en el motor una declaracion NORMATIVA de lo que el motor hace cuando el almacenamiento de persistencia esta AUSENTE (2.8.8.9.5.1) o le falta una SECCION (2.8.8.9.5.2), con el principio de que la ausencia de datos nunca es un error fatal, y seis secciones: `startup` (si el arranque lanza, si crea el `data_dir`, si crea ficheros de persistencia y los valores por defecto), `read_apis` (las 10 APIs de lectura con su tipo de retorno), `write_apis` (las 5 APIs de escritura con el fichero que crean), `detection` (que informa la deteccion y de que no escribe), `recovery` (que el almacenamiento se recrea al escribir) e `invariants` (4 invariantes); es de SOLO LECTURA, devuelve una COPIA profunda y no altera el comportamiento existente; la DECLARACION se contrasta contra el comportamiento OBSERVADO en runtime mediante la sonda `no_data_behavior_real.py`, de modo que un contrato que nunca falla no pasa inadvertido
-# Estado real: 77/77 comprobaciones OK (sonda de runtime), 4/4 mutaciones detectadas, 215 PASSED / 0 FAILED en la suite completa (baseline comparable de 215 de 2.8.8.9.5.2, 0 tests nuevos y 0 regresiones); el `data/` de produccion NO se modifica por la sonda (sha256 identico)
-
-# COMPLETADO: 2.8.8.9.5.2 - Detectar seccion ausente
-# Fecha: 2026-10-21
-# Archivo modificado: src/utils/contextual_adaptation_engine.py, tests/utils/contextual_adaptation_engine/detect_absent_sections_real.py (nuevo), README.md, prompt_mejoraActual.txt
-# Resultado: implementado el rastreo de la SECCION AUSENTE dentro de los ficheros de persistencia del motor de adaptacion contextual: `expected_storage_sections()` declara las secciones de primer nivel que el motor espera en cada fichero, con su origen real y su clase (`data` = la consume un cargador real; `metadata` = informativa), y `detect_absent_sections()` las compara con el contenido de los ficheros EXISTENTES en modo SOLO LECTURA, informando `path`, `reason` y `kind` por seccion ausente; los ficheros ausentes se listan en `missing_files` (deteccion de 2.8.8.9.5.1) y los ilegibles en `unreadable` (corrupcion de 2.8.8.9.6); `get_engine_status()` expone el resultado en la clave nueva `storage_sections` sin alterar ninguna clave previa
-# Estado real: 43/43 comprobaciones OK (sonda de runtime), 215 PASSED / 0 FAILED en la suite completa (baseline comparable de 215 de 2.8.8.9.5.1, 0 tests nuevos y 0 regresiones); el `data/` de produccion NO se modifica por la sonda
-
-# COMPLETADO: 2.8.8.9.5.1 - Detectar almacenamiento ausente
-# Fecha: 2026-10-21
-# Archivo modificado: src/utils/contextual_adaptation_engine.py, tests/utils/contextual_adaptation_engine/detect_absent_storage_real.py (nuevo), README.md, prompt_mejoraActual.txt
-# Resultado: implementado el rastreo del almacenamiento de persistencia AUSENTE del motor de adaptacion contextual: `expected_storage_paths()` devuelve las 4 rutas que el motor espera encontrar (`goal_adaptation_feedback.json`, `goal_adaptation_learning_results.json`, `contextual_adaptation_rules.json`, `contextual_knowledge_base.json`, cada una con su origen real en el motor) y `detect_absent_storage()` las compara con el disco en modo SOLO LECTURA, distinguiendo `file_not_found` de `not_a_file`; `get_engine_status()` expone el resultado en la clave nueva `storage` sin alterar ninguna clave previa
-# Estado real: 27/27 comprobaciones OK (sonda de runtime), 215 PASSED / 0 FAILED en la suite completa (baseline comparable de 215 de 2.8.8.9.4.6, 0 tests nuevos y 0 regresiones); el `data/` de produccion NO se modifica por la sonda
-
-# COMPLETADO: 2.8.8.9.4.6 - Corregir fallo de patrones
-# Fecha: 2026-10-20
-# Archivo modificado: tests/utils/contextual_adaptation_engine/test_goal_adaptation_feedback.py, tests/utils/contextual_adaptation_engine/test_goal_adaptation_production_data_clean.py (nuevo), data/goal_adaptation_feedback.json, data/goal_adaptation_learning_results.json, README.md, prompt_mejoraActual.txt
-# Resultado: corregida la contaminacion de los ficheros de persistencia de Goal de `data/`, que contenian EXCLUSIVAMENTE datos de test (38 artefactos retirados: 18 registros + 18 entradas de historial `test_adaptation_001`, la fila `test_load_001` con el patron `pattern_001` y la estrategia `strategy_001`); causa activa corregida (el test de feedback creaba el motor sin `data_dir` y escribia en el `data/` real en cada ejecucion de la suite); nuevo test de guarda de 3 tests que impide la recontaminacion (artefactos de test, reescritura de produccion y falta de `data_dir` por chequeo estatico)
-# Estado real: 3 PASSED / 0 FAILED (test de guarda), 2/2 mutaciones detectadas, 215 PASSED / 0 FAILED en la suite completa (212 previos + 3 nuevos); `data/` ya no se modifica durante la suite
-
-# COMPLETADO: 2.8.8.9.4.5 - Verificar patrones tras reinicio
-# Fecha: 2026-10-20
-# Archivo modificado: tests/utils/contextual_adaptation_engine/verify_pattern_restart_real.py (nuevo), README.md, prompt_mejoraActual.txt
-# Resultado: verificacion en runtime de la recuperacion de patrones tras reiniciar el motor (15/15 comprobaciones OK); los patrones validados se recuperan con el conjunto canonico completo de 7 campos, las estructuras anidadas intactas, las filas de resultados de aprendizaje con sus metricas de convergencia y estrategias conservadas, estabilidad ante un segundo reinicio y conservacion de lo recuperado tras un nuevo ciclo de aprendizaje; la carga no reescribe el fichero persistido
-# Estado real: 9 PASSED / 0 FAILED (test de verificacion de reinicio), 5/5 mutaciones detectadas, 212 PASSED / 0 FAILED en la suite completa (203 previos + 9 nuevos)
-
-# COMPLETADO: 2.8.8.9.4.4 - Implementar carga de patrones
-# Fecha: 2026-10-20
-# Archivo modificado: src/utils/contextual_adaptation_engine.py, tests/utils/contextual_adaptation_engine/test_goal_adaptation_pattern_load.py (nuevo), tests/utils/contextual_adaptation_engine/test_load_goal_adaptation_feedback.py, README.md, prompt_mejoraActual.txt
-# Resultado: `_load_goal_adaptation_learning_results()` ya no restaura `learning_results` verbatim; aplica el mismo contrato de DATOS CRITICOS (item 5) que el guardado y recupera unicamente los patrones validados (confidence >= umbral configurado en el motor y minimo de 3 observaciones similares por identidad `pattern_type` + `context`); las filas de resultados de aprendizaje se conservan integras para no romper la restauracion de estrategias (2.8.8.9.3)
-# Estado real: 9 PASSED / 0 FAILED (test de carga de patrones) y 203 PASSED / 0 FAILED en la suite completa (194 previos + 9 nuevos)
-
-REGLA DE LECTURA DEL ESTADO
-CURRENT_WORK_UNIT es la única unidad que se debe trabajar en el siguiente chat.
-LAST_COMPLETED_UNIT ya está terminada: no volver a implementarla ni verificarla salvo que exista una regresión, una discrepancia real o una solicitud explícita.
-CURRENT_PHASE solo indica la fase actual y no sustituye a CURRENT_WORK_UNIT.
-
-REGLA DE ACTUALIZACIÓN DEL ESTADO
-1. Al empezar CURRENT_WORK_UNIT -> CURRENT_WORK_STATUS: EN PROCESO.
-2. Al completar CURRENT_WORK_UNIT -> mover esa unidad a LAST_COMPLETED_UNIT.
-3. Después de completarla -> CURRENT_WORK_UNIT pasa a la siguiente hoja pendiente.
-4. Después de completar una fase/sub-fase/sub-sub-fase...  -> CURRENT_PHASE pasa a la siguiente fase y CURRENT_WORK_UNIT pasa a su primera hoja pendiente.
-5. Si una hoja se divide en hijas -> CURRENT_WORK_UNIT pasa a la primera hija pendiente; no marcar la hoja padre como completada hasta completar todas sus hijas.
-6. No cambiar LAST_COMPLETED_UNIT al iniciar una unidad; solo cambiarlo cuando la unidad quede realmente completada y verificada.
-7. No usar README, roadmap ni historial para decidir la unidad actual si contradicen este bloque.
-
-REGLA DE CONTINUIDAD
-La posición de trabajo es exclusivamente la indicada en este bloque. Trabajar solo CURRENT_WORK_UNIT. No reabrir LAST_COMPLETED_UNIT ni ninguna unidad anterior ya cerrada. No avanzar a otra unidad hasta completar CURRENT_WORK_UNIT.
-
 PROMPT MAESTRO JARVIS — AUTOMEJORA INCREMENTAL
 
 OBJETIVO
@@ -123,9 +16,12 @@ REGLAS MAESTRAS
 1. La posición actual SOLO sale del bloque de estado persistente. El roadmap no indica la fase actual.
 2. Un chat de SuperComplete trabaja UNA sola unidad hoja. No adelantar la siguiente unidad.
 3. Una unidad hoja debe caber razonablemente en un chat. Si no, dividirla antes de seguir y registrar las hijas.
-4. Al empezar una unidad: EN PROCESO. Al terminar: IMPLEMENTADA. Incompleta: PARCIALMENTE IMPLEMENTADA. Sin trabajo: NO IMPLEMENTADA. Solo una hoja puede estar EN PROCESO.
+4. CURRENT_WORK_STATUS describe exclusivamente la unidad indicada por CURRENT_WORK_UNIT. Al comenzar a trabajar esa unidad, cambiarlo a EN PROCESO y guardar el prompt antes de modificar código. Mientras no se haya empezado, mantenerlo en PENDIENTE. Si el trabajo queda incompleto, conservar la unidad activa y reflejar PARCIALMENTE IMPLEMENTADA cuando corresponda. Una unidad terminada se registra como IMPLEMENTADA en su registro y pasa a LAST_COMPLETED_UNIT; nunca dejar CURRENT_WORK_STATUS en IMPLEMENTADA mientras CURRENT_WORK_UNIT apunte a la siguiente unidad pendiente. Solo una hoja puede estar EN PROCESO.
 5. No avanzar hasta completar la hoja activa. Una fase solo se IMPLEMENTA cuando todas sus hojas están completas y main.py queda OK.
-6. README.md es el mapa documental. prompt_mejoraActual.txt es la memoria operativa. El código real y los tests son la fuente de verdad técnica. El README documenta únicamente el código: por fichero, con su descripción, clases, métodos, dependencias y comportamiento. El README NO contiene fases, subfases, hojas, unidades, IDs de mejora, historial de avance, logs de tests ni estado del proyecto: ese seguimiento vive solo en prompt_mejoraActual.txt. No reintroducirlo. En concreto, en el README NO escribir: el número de unidad ni referencias a hojas o subfases ("esta unidad", "la hoja siguiente", "6.1", "7.2"); comparaciones entre unidades ("eso es X", "eso es la hoja siguiente"); ni resultados de ejecución de tests (líneas "Resultado:", "N PASSED / 0 FAILED", "N/N detectadas", "0 comprobaciones fallidas", "0 regresiones"). En el README SÍ escribir: qué hace cada fichero, sus APIs y contratos, cuántos tests o comprobaciones contiene y cómo se aísla. El README describe el código; el seguimiento de la unidad va en este prompt.
+6. README.md es la documentación técnica del proyecto; prompt_mejoraActual.txt es la memoria operativa y el seguimiento del trabajo. El código actual y los tests son la fuente de verdad técnica.
+   Al actualizar el README, documentar únicamente código nuevo o modificado que realmente se haya implementado y necesite documentación, en el apartado correspondiente y de forma independiente del trabajo que lo originó. Se puede explicar qué hace una clase, método, API, contrato o dependencia, cómo se utiliza y qué comportamiento real tiene. No documentar como novedad código preexistente que solo se haya inspeccionado. No añadir entradas solo para dejar constancia de que se trabajó en algo; si no hay código nuevo o modificado que deba documentarse, no modificar el README por rutina.
+   El README NO debe incluir fases, subfases, hojas, unidades, IDs de mejora, referencias numéricas al roadmap, frases como «esta unidad» o «la hoja siguiente», comparaciones con otras unidades, motivos relacionados con el plan de trabajo, historial de avance, fechas de ejecución, estado del proyecto ni referencias a commits o a Git. Tampoco debe registrar resultados de ejecuciones de tests (por ejemplo, «N PASSED / 0 FAILED», «N/N detectadas», «0 comprobaciones fallidas» o «0 regresiones»).
+   Cuando resulte útil para documentar los propios archivos de tests, puede describir su finalidad, cobertura estática y aislamiento, pero no convertir el README en un registro de ejecución. No crear apartados históricos o de fases ni reintroducir este tipo de información. El README explica el código por sí mismo; el seguimiento de la unidad pertenece exclusivamente a este prompt.
 7. No auditar todo el repositorio. Leer README + estado y abrir solo los archivos necesarios para la unidad activa. En archivos grandes, localizar primero clase/método/símbolo y ampliar solo si hace falta.
 8. No crear trabajo para rellenar una lista: no inventar funcionalidades, fases, subfases, archivos, clases, métodos, coordenadas, offsets, tests, métricas o resultados.
 9. Las coordenadas/puntos de UI son datos de percepción/calibración. No son inteligencia ni reglas de decisión.
@@ -135,6 +31,10 @@ REGLAS MAESTRAS
 13. No duplicar implementaciones: reutilizar lo que ya existe.
 14. No inventar APIs. Adaptar el trabajo a las interfaces reales del repositorio.
 15. Para el análisis y la búsqueda de archivos del proyecto, usar siempre `limit=2000`.
+16. GIT Y VERSIONADO:
+   - No usar historial de commits, mensajes de commit, `git log`, `git show`, `git blame`, objetos de commits ni ficheros internos de `.git` como documentación, evidencia del comportamiento actual o fuente de verdad. No abrir ni interpretar archivos internos de `.git` (por ejemplo, `HEAD`, `config`, `logs`, `objects`, `refs` o `index`). La verdad técnica debe obtenerse del código actual, los tests y la documentación técnica del proyecto.
+   - No crear commits por iniciativa propia ni realizar operaciones de escritura o cambio de historial/estado de Git (`commit`, `amend`, `push`, `reset`, `rebase`, `cherry-pick`, `revert`, cambios de rama, `stash` u otras equivalentes). Solo ejecutar una acción de versionado si el usuario la solicita expresamente.
+   - Los comandos de consulta local como `git status` o `git diff` pueden utilizarse únicamente si hacen falta para comprobar cambios actuales o proteger trabajo existente; nunca para reconstruir historia, documentar el proyecto o decidir qué unidad corresponde.
 
 TESTS
 - TEST CORRECTO + FALLA -> CORREGIR CÓDIGO.
@@ -148,21 +48,41 @@ La unidad ejecutable siempre es la hoja más profunda definida.
 Si una hoja resulta demasiado grande: dividirla, conservar trazabilidad padre -> hijas y continuar en un chat nuevo.
 
 FLUJO DE CADA CHAT
-1. Leer prompt_mejoraActual.txt.
-2. Leer TODO README.md.
-3. Determinar la primera unidad hoja no completada o la unidad indicada por el estado.
-4. Marcarla EN PROCESO y guardar el prompt antes de modificar código.
-5. Leer solo el código necesario.
-6. Implementar exclusivamente esa unidad.
+1. Leer prompt_mejoraActual.txt y tomar el bloque ESTADO PERSISTENTE ACTUAL como única referencia de continuidad.
+2. Leer TODO README.md, respetando la regla maestra de documentación independiente del roadmap.
+3. Usar CURRENT_WORK_UNIT como objetivo obligatorio del chat. No elegir otra unidad a partir del README, registros históricos, Git ni memoria de chats anteriores.
+4. Comprobar CURRENT_WORK_STATUS:
+   - Si es PENDIENTE, esta es la unidad que debe comenzar este chat: cambiar su estado a EN PROCESO y guardar prompt_mejoraActual.txt antes de modificar código.
+   - Si ya es EN PROCESO, continuar esa misma unidad; no reiniciarla ni elegir otra.
+   - Si es PARCIALMENTE IMPLEMENTADA, continuar esa misma unidad y resolver sus pendientes.
+   - Si el estado o el identificador se contradicen, no adivinar ni saltar de unidad: contrastar el propio prompt y el roadmap estrictamente necesario, registrar la discrepancia y conservar la unidad indicada por el bloque persistente salvo que se demuestre un error concreto.
+5. Leer solo el código necesario para CURRENT_WORK_UNIT.
+6. Implementar exclusivamente esa unidad hoja. No adelantar trabajo de unidades posteriores.
 7. Ejecutar los tests pertinentes.
-8. Si fallan y el test es correcto, corregir código.
+8. Si fallan y el test es correcto, corregir código; no debilitar los tests.
 9. Verificar comportamiento real y compatibilidad.
-10. Actualizar estado, README cuando corresponda y prompt.
-11. Cerrar el chat antes de abrir el siguiente. Nunca abrir el siguiente prematuramente.
+10. Cerrar la unidad actual y actualizar de forma coherente su registro y el bloque de estado, siguiendo obligatoriamente la TRANSICIÓN DE UNIDAD Y CONTINUIDAD.
+11. Cerrar el chat al acabar la unidad. No empezar, inspeccionar ni implementar la unidad siguiente en ese mismo chat.
 
 CIERRE DE UNIDAD
-Registrar: objetivo, archivos modificados/nuevos, tests y resultado real, main.py si aplica, estado final y pendientes.
-No declarar IMPLEMENTADA una unidad si quedan pendientes pertenecientes a ella.
+Registrar una sola vez la unidad trabajada con el formato canónico: objetivo, archivos modificados/nuevos, tests y resultados reales, verificaciones, discrepancias, pendientes y estado final.
+No declarar IMPLEMENTADA una unidad si quedan pendientes pertenecientes a ella. Si no se ha completado, no avanzar el puntero a otra unidad: mantener CURRENT_WORK_UNIT en la unidad incompleta y dejar sus pendientes claramente registrados.
+
+TRANSICIÓN DE UNIDAD Y CONTINUIDAD (OBLIGATORIA)
+La unidad completada y la siguiente unidad pendiente son dos cosas distintas. Al cerrar una unidad, dejar el estado preparado para que el siguiente chat sepa con precisión qué debe trabajar, pero SIN marcar como iniciada una unidad en la que todavía no se ha trabajado.
+
+Cuando CURRENT_WORK_UNIT termina realmente y queda verificada:
+1. Completar y guardar el registro canónico de esa unidad con ESTADO: IMPLEMENTADA y ESTADO FINAL: <ID> — IMPLEMENTADA. No duplicar el cierre en otro lugar.
+2. Asignar LAST_COMPLETED_UNIT al ID que acaba de completarse.
+3. Buscar en el roadmap la siguiente hoja pendiente real, respetando el orden y la jerarquía definidos. No usar la numeración por intuición ni inventar una hoja.
+4. Asignar CURRENT_WORK_UNIT a esa siguiente hoja pendiente y actualizar CURRENT_PHASE para que corresponda a la fase de dicha hoja cuando proceda.
+5. Dejar CURRENT_WORK_STATUS: PENDIENTE. No marcar la siguiente hoja EN PROCESO, no abrirla, no inspeccionar sus archivos, no ejecutar sus tests ni empezar a implementarla durante el chat que acaba de cerrar la unidad anterior.
+6. Guardar prompt_mejoraActual.txt con los cuatro campos persistentes coherentes: CURRENT_PHASE, CURRENT_WORK_UNIT, CURRENT_WORK_STATUS y LAST_COMPLETED_UNIT.
+7. Finalizar el chat. La única instrucción de trabajo para el siguiente chat será la unidad consignada en CURRENT_WORK_UNIT.
+
+Al comenzar el siguiente chat, la IA debe leer este estado y trabajar CURRENT_WORK_UNIT, aunque el registro de la unidad anterior sea lo último añadido al historial. Si CURRENT_WORK_STATUS es PENDIENTE, debe cambiarlo a EN PROCESO y guardar el prompt ANTES de modificar código. No debe volver a trabajar LAST_COMPLETED_UNIT ni escoger otra unidad porque parezca más lógica.
+
+Si la unidad actual se divide en hijas, CURRENT_WORK_UNIT pasa a la primera hija pendiente y CURRENT_WORK_STATUS queda PENDIENTE si esa hija aún no se ha empezado. La unidad padre no se marca IMPLEMENTADA hasta que todas sus hijas estén completadas. Si una unidad queda parcial o bloqueada, se mantiene como CURRENT_WORK_UNIT, se registra PARCIALMENTE IMPLEMENTADA y sus pendientes, y no se avanza a la siguiente hoja. Si se completa la última hoja de una fase, actualizar CURRENT_PHASE y CURRENT_WORK_UNIT a la primera hoja pendiente siguiente definida en el roadmap, dejando su estado PENDIENTE. Nunca dejar CURRENT_WORK_UNIT apuntando a una unidad ya completada ni marcar EN PROCESO una unidad que no se ha empezado.
 
 FORMATO CANÓNICO OBLIGATORIO PARA REGISTROS DE UNIDAD
 Todos los registros de ejecución deben utilizar exactamente estos campos, en este orden y con estas etiquetas. No alternar entre párrafos libres, listas de checks y formatos diferentes para registrar el mismo tipo de dato.
@@ -202,7 +122,7 @@ REGLAS DE ESCRITURA DEL REGISTRO
 
 CIERRE DE FASE
 1. Todas las hojas IMPLEMENTADA.
-2. Actualizar README.
+2. Revisar el README únicamente para documentar código nuevo o modificado que lo necesite, conforme a la regla maestra 6; nunca registrar en él el cierre de la fase ni el avance del roadmap.
 3. Comprobar main.py.
 4. Si OK -> PHASE_X_MAIN_START=OK y fase IMPLEMENTADA.
 5. Si ERROR -> fase EN PROCESO y corregir.
@@ -823,12 +743,6 @@ DISCREPANCIAS: El registro global original declara 2.8.7.3-2.8.7.8 implementadas
 PENDIENTES: Completar los recuentos de tests solo si se vuelven a ejecutar y verificar; no inferirlos.
 ESTADO FINAL: 2.8.7.8 — IMPLEMENTADA
 
-### REGISTRO DE UNIDAD: 2.8.7.3
-### REGISTRO DE UNIDAD: 2.8.7.4
-### REGISTRO DE UNIDAD: 2.8.7.5
-### REGISTRO DE UNIDAD: 2.8.7.6
-### REGISTRO DE UNIDAD: 2.8.7.7
-### REGISTRO DE UNIDAD: 2.8.7.8
 ## REGISTROS DE IMPLEMENTACIÓN — ADAPTACIÓN DE GOAL
 
 FECHA: NO REGISTRADA
@@ -3406,8 +3320,6 @@ FASE 20 — AUTOMEJORA CONTINUA
 20.13.5 Mantener trazabilidad completa.
 20.13.6 Cerrar FASE 20 únicamente cuando el ciclo completo esté verificado.
 
-### REGISTRO DE UNIDAD: 2.8.8.7
-### REGISTRO DE UNIDAD: 2.8.8.8
 ## HISTORIAL DE EJECUCIÓN — FORMATO NORMALIZADO
 
 FECHA: NO REGISTRADA
@@ -3587,7 +3499,7 @@ TESTS Y RESULTADOS:
 VERIFICACIÓN:
 - SINTAXIS: NO REGISTRADA EN ESTE CIERRE.
 - MAIN.PY: NO APLICA EXPRESAMENTE EN ESTE CIERRE.
-- COMPORTAMIENTO / INTEGRACIÓN REAL: `data/goal_adaptation_learning_results.json` se verificó idéntico a `git show HEAD:`; no se perdieron datos reales.
+- COMPORTAMIENTO / INTEGRACIÓN REAL: se comprobó que `data/goal_adaptation_learning_results.json` conservaba los datos reales; no se produjo pérdida de datos.
 DISCREPANCIAS:
 - El registro de 2.8.8.9.3.5 había atribuido los tres fallos al test. La evidencia posterior mostró que `failure_count` es un contador opcional: `_update_adaptive_strategies()` usa `strategy.get("failure_count", 0) + 1`, y la migración de datos heredados admite su ausencia. Por eso se corrigió el código y no el test.
 - El árbol inicial no señalaba 2.8.8.9.3.2 y 2.8.8.9.3.3 como implementadas, aunque ambas quedaron verificadas por el test de persistencia y el filtrado del guardado. Con esta hoja, la subfase 2.8.8.9.3 quedó cerrada.
@@ -3653,28 +3565,12 @@ DISCREPANCIAS: NINGUNA REGISTRADA. Los cinco fallos son el contrato pendiente pr
 PENDIENTES: 2.8.8.9.4.3 — implementar guardado de patrones; después, continuar únicamente con las hojas pendientes de 2.8.8.9.4.
 ESTADO FINAL: 2.8.8.9.4.2 — IMPLEMENTADA
 
-SIGUIENTE UNIDAD: 2.8.8.9.4.3 — IMPLEMENTAR GUARDADO DE PATRONES
-
 AUTOMEJORA FUTURA
 No iniciar una nueva mejora automáticamente al terminar una fase o todo el roadmap. Solo crear un nuevo ciclo cuando el usuario lo solicite explícitamente.
 Nunca resetear versión ni depender del chat anterior.
 
 REGLA FINAL
 La IA debe pensar y resolver; el prompt solo fija límites y continuidad. No sustituir razonamiento por listas. No inventar trabajo para tener algo que hacer. No afirmar que algo funciona porque esté escrito en README o en un prompt: verificarlo cuando sea relevante.
-### REGISTRO DE UNIDAD: 2.8.8.9.2.4
-### REGISTRO DE UNIDAD: 2.8.8.9.2.5
-### REGISTRO DE UNIDAD: 2.8.8.9.2.6
-### REGISTRO DE UNIDAD: 2.8.8.9.3.1
-### REGISTRO DE UNIDAD: 2.8.8.9.3.2
-### REGISTRO DE UNIDAD: 2.8.8.9.3.5
-### REGISTRO DE UNIDAD: 2.8.8.9.3.6
-### REGISTRO DE UNIDAD: 2.8.8.9.4.1
-### REGISTRO DE UNIDAD: 2.8.8.9.4.2
-### REGISTRO DE UNIDAD: 2.8.8.9.4.3
-### REGISTRO DE UNIDAD: 2.8.8.9.4.4
-### REGISTRO DE UNIDAD: 2.8.8.9.4.5
-### REGISTRO DE UNIDAD: 2.8.8.9.4.6
-### REGISTRO DE UNIDAD: 2.8.8.9.5.1
 ## CONTINUIDAD OPERATIVA
 
 REGISTRO DE UNIDAD: 2.8.8.9.4.3
@@ -3728,8 +3624,6 @@ VERIFICACIÓN:
 DISCREPANCIAS: `tests/utils/contextual_adaptation_engine/test_load_goal_adaptation_feedback.py::test_carga_resultados_aprendizaje` fallaba tras el cambio porque su fixture persistía un patrón de UNA sola observación, que el item 5 de DATOS CRÍTICOS ya no considera validado. Se actualizó el fixture para persistir 3 observaciones similares del mismo patrón y se reforzó la aserción (3 patrones recuperados con sus `pattern_id`); no se eliminó ni se debilitó ninguna comprobación. Motivo: cambio legítimo de contrato (2.8.8.9.4.4).
 PENDIENTES: 2.8.8.9.4.5 — verificar los patrones tras el reinicio.
 ESTADO FINAL: 2.8.8.9.4.4 — IMPLEMENTADA
-
-SIGUIENTE UNIDAD: 2.8.8.9.4.5 — VERIFICAR PATRONES TRAS REINICIO
 
 REGISTRO DE UNIDAD: 2.8.8.9.4.5
 FECHA: 2026-10-20
@@ -3792,8 +3686,6 @@ validados, estrategias restauradas). Verificado en runtime que ni el test ni el 
 DISCREPANCIAS: NINGUNA REGISTRADA.
 PENDIENTES: 2.8.8.9.4.6 — corregir fallo de patrones (unicamente fallos de esta subhoja).
 ESTADO FINAL: 2.8.8.9.4.5 — IMPLEMENTADA
-
-SIGUIENTE UNIDAD: 2.8.8.9.4.6 — CORREGIR FALLO DE PATRONES
 
 FECHA: 2026-10-20
 ESTADO: IMPLEMENTADA
@@ -3875,8 +3767,6 @@ persistencia de patrones de Goal, por lo que NO se ha corregido en esta hoja.
 PENDIENTES: 2.8.8.9.5.1 — detectar almacenamiento ausente.
 ESTADO FINAL: 2.8.8.9.4.6 — IMPLEMENTADA
 
-SIGUIENTE UNIDAD: 2.8.8.9.5.1 — DETECTAR ALMACENAMIENTO AUSENTE
-
 FECHA: 2026-10-21
 ESTADO: IMPLEMENTADA
 OBJETIVO: Detectar exclusivamente la ausencia del almacenamiento de persistencia esperado por el motor de adaptación contextual.
@@ -3949,8 +3839,6 @@ modificación de `src/` y en ambos casos el fichero queda modificado), de modo q
 detección no agrava la discrepancia.
 PENDIENTES: 2.8.8.9.5.2 — detectar sección ausente.
 ESTADO FINAL: 2.8.8.9.5.1 — IMPLEMENTADA
-
-SIGUIENTE UNIDAD: 2.8.8.9.5.2 — DETECTAR SECCIÓN AUSENTE
 
 FECHA: 2026-10-21
 ESTADO: IMPLEMENTADA
@@ -4032,9 +3920,7 @@ persistencia de Goal, por lo que NO se ha corregido en esta hoja. La sonda de es
 CWD temporal hace que su propia escritura caiga en el temporal, y se ha verificado por marca de tiempo que
   `data/knowledge_graph.json` NO se modifica durante la ejecución de la sonda.
 PENDIENTES: 2.8.8.9.5.4 — crear y ejecutar únicamente tests de almacenamiento/sección ausente.
-ESTADO FINAL: 2.8.8.9.5.3 — IMPLEMENTADA
-
-SIGUIENTE UNIDAD: 2.8.8.9.5.4 — TEST DE AUSENCIA
+ESTADO FINAL: 2.8.8.9.5.2 — IMPLEMENTADA
 
 FECHA: 2026-10-21
 ESTADO: IMPLEMENTADA
@@ -4109,8 +3995,6 @@ propio parcheo de las rutas relativas de los subsistemas ajenos. La verificació
 que quedaba pendiente, es precisamente lo que esta hoja entrega.
 PENDIENTES: 2.8.8.9.6.1 - determinar qué constituye corrupción según el formato real.
 ESTADO FINAL: 2.8.8.9.5.4 - IMPLEMENTADA
-
-SIGUIENTE UNIDAD: 2.8.8.9.6.1 - IDENTIFICAR DATOS INVÁLIDOS
 
 FECHA: 2026-10-21
 ESTADO: IMPLEMENTADA
@@ -4190,9 +4074,6 @@ sonda pasa SIEMPRE un `data_dir` temporal explícito al motor, y se ha verificad
 PENDIENTES: 2.8.8.9.5.4 — crear y ejecutar únicamente tests de almacenamiento/sección ausente.
 ESTADO FINAL: 2.8.8.9.5.3 — IMPLEMENTADA
 
-SIGUIENTE UNIDAD: 2.8.8.9.5.4 — TEST DE AUSENCIA
-
-
 FECHA: 2026-10-21
 ESTADO: IMPLEMENTADA
 OBJETIVO: Determinar que constituye corrupcion segun el formato real de la persistencia del motor de adaptacion contextual, declarando un contrato normativo que la deteccion de 2.8.8.9.6.3 pueda implementar y que la sonda pueda contrastar contra el comportamiento real.
@@ -4220,8 +4101,6 @@ DISCREPANCIAS: el contraste corrigio tres expectativas de la redaccion inicial. 
 PENDIENTES: 2.8.8.9.6.2 - crear unicamente el caso de corrupcion.
 ESTADO FINAL: 2.8.8.9.6.1 - IMPLEMENTADA
 
-SIGUIENTE UNIDAD: 2.8.8.9.6.2 - TEST DE DATOS CORRUPTOS
-
 FECHA: 2026-10-21
 ESTADO: IMPLEMENTADA
 OBJETIVO: Crear unicamente el caso de corrupcion, materializando para cada una de las 27 clases declaradas en 2.8.8.9.6.1 un escenario real de dato corrupto y fijando el CONTRATO de rechazo que la deteccion de 2.8.8.9.6.3 debera satisfacer.
@@ -4248,8 +4127,6 @@ VERIFICACION:
 DISCREPANCIAS: los 17 tests FAILED son el CONTRATO PENDIENTE previsto por esta hoja, NO un defecto del test. Corresponden a 8 clases de `adaptation_rules`, 4 de `knowledge_base`, 2 de `goal_adaptation_feedback` y 3 de `goal_adaptation_learning_results`. Se enumeran por nombre en la hoja 2.8.8.9.6.3 del ROADMAP para que la deteccion los trate uno a uno.
 PENDIENTES: 2.8.8.9.6.3 - implementar unicamente la deteccion de corrupcion.
 ESTADO FINAL: 2.8.8.9.6.2 - IMPLEMENTADA
-
-SIGUIENTE UNIDAD: 2.8.8.9.6.3 - IMPLEMENTAR DETECCIÓN
 
 FECHA: 2026-10-21
 ESTADO: IMPLEMENTADA
@@ -4280,8 +4157,6 @@ VERIFICACION:
 DISCREPANCIAS: ninguna. Los 17 tests RED de 6.2 pasan por IMPLEMENTACION de la deteccion, no por relajacion del contrato: los 5 efectos inseguros siguen prohibidos y los 3 seguros siguen admitidos.
 PENDIENTES: 2.8.8.9.6.4 - verificar el rechazo.
 ESTADO FINAL: 2.8.8.9.6.3 - IMPLEMENTADA
-
-SIGUIENTE UNIDAD: 2.8.8.9.7.1 - IDENTIFICAR DATOS RECUPERABLES
 
 FECHA: 2026-10-21
 ESTADO: IMPLEMENTADA
@@ -4316,8 +4191,6 @@ DISCREPANCIAS: ninguna. Los 17 tests RED de 6.2 siguen pasando por IMPLEMENTACIO
 PENDIENTES: 2.8.8.9.7.2 - implementar recuperacion parcial.
 ESTADO FINAL: 2.8.8.9.6.4 - IMPLEMENTADA
 
-SIGUIENTE UNIDAD: 2.8.8.9.7.2 - IMPLEMENTAR RECUPERACIÓN PARCIAL
-
 FECHA: 2026-10-21
 ESTADO: IMPLEMENTADA
 OBJETIVO: Determinar qué datos válidos pueden conservarse cuando una parte está corrupta: declarar el contrato de lo recuperable y medir en runtime cuánto de ese dato se pierde hoy al rechazar una corrupción.
@@ -4351,8 +4224,6 @@ DISCREPANCIAS: ninguna. El contrato de 7.1 no relaja el de 6.2: los 5 efectos in
 PENDIENTES: 2.8.8.9.7.2 - implementar recuperacion parcial.
 ESTADO FINAL: 2.8.8.9.7.1 - IMPLEMENTADA
 
-SIGUIENTE UNIDAD: 2.8.8.9.7.2 - IMPLEMENTAR RECUPERACIÓN PARCIAL
-
 FECHA: 2026-10-21
 ESTADO: IMPLEMENTADA
 OBJETIVO: Recuperar únicamente los datos que realmente puedan recuperarse cuando una parte está corrupta, aplicando el contrato declarado por 2.8.8.9.7.1, sin inventar datos y sin reescribir el fichero.
@@ -4381,8 +4252,6 @@ DISCREPANCIAS: ninguna. El contrato de 7.1 no se relaja: lo declarado sigue sien
 PENDIENTES: 2.8.8.9.7.3 - test de recuperacion parcial.
 ESTADO FINAL: 2.8.8.9.7.2 - IMPLEMENTADA
 
-SIGUIENTE UNIDAD: 2.8.8.9.7.3 - TEST DE RECUPERACIÓN PARCIAL
-
 FECHA: 2026-10-21
 ESTADO: IMPLEMENTADA
 OBJETIVO: Probar únicamente el comportamiento de la recuperación parcial implementado en 2.8.8.9.7.2.
@@ -4409,8 +4278,6 @@ VERIFICACION:
 DISCREPANCIAS: ninguna. La recuperacion implementada en 7.2 cumple lo declarado en 7.1 y el contrato de 6.2 no se relaja.
 PENDIENTES: 2.8.8.9.8.1 - definir el fallback existente.
 ESTADO FINAL: 2.8.8.9.7.3 - IMPLEMENTADA
-
-SIGUIENTE UNIDAD: 2.8.8.9.8.2 - IMPLEMENTAR FALLBACK
 
 FECHA: 2026-10-21
 ESTADO: IMPLEMENTADA
@@ -4439,19 +4306,6 @@ VERIFICACIÓN:
 - MAIN.PY: NO APLICA (hoja de inspeccion sobre el motor de adaptacion contextual; no toca el arranque de la aplicacion).
 - COMPORTAMIENTO / INTEGRACIÓN REAL: la sonda se ejecuta de forma independiente (`python tests/utils/contextual_adaptation_engine/identify_fallback_real.py`): 0 comprobaciones fallidas sobre los 4 modos de perdida total. El modulo se ejecuta de forma independiente (`python -m pytest tests/utils/contextual_adaptation_engine/test_2_8_8_9_8_1_total_loss_fallback.py`): 15 PASSED / 0 FAILED, codigo de salida 0.
 - AISLAMIENTO: el `data/` de produccion NO se modifica (sha256 de los 8 ficheros vigilados identico antes y despues de ejecutar el modulo) y el banco de mutacion nunca toca el `src/` del repositorio (verificado con `git diff`).
-DISCREPANCIAS: El README escrito en esta unidad incumPIA la regla maestra 6: incluia referencias de fase (numeros de unidad, "esta unidad", "la hoja siguiente" y referencias numericas a las hojas 6.1, 6.2, 7.1 y 7.2) y resultados de ejecucion de tests (lineas "Resultado:", "N PASSED / 0 FAILED", "N/N detectadas", "0 comprobaciones fallidas"). RESOLUCION (2026-10-21, commit 9bd1e3a): purgado del README todo eso, tambien en las unidades anteriores; se conservan las descripciones de los ficheros (APIs, contratos, invariantes, numero de tests o comprobaciones que contienen y su aislamiento) y el seguimiento completo de las unidades vive solo en este prompt. La DECLARACION de 6.1, la DETECCION de 6.3 y la RECUPERACION de 7.2 no se relajan: esta hoja solo anade el CONTRATO del fallback y su medicion.
+DISCREPANCIAS: Se corrigió la documentación del README que mezclaba descripciones técnicas con referencias al trabajo interno y resultados de ejecución. RESOLUCIÓN (2026-10-21): se retiraron esas referencias y se conservaron descripciones técnicas independientes de los ficheros (APIs, contratos, invariantes y pruebas, cuando corresponde). El seguimiento detallado permanece en este prompt; el README describe únicamente el código.
 PENDIENTES: 2.8.8.9.8.2 - implementar el fallback (los tres invariantes PENDIENTES: `loss_visible_in_status`, `load_result_is_truthful` y `backup_covers_all_persistence`).
 ESTADO FINAL: 2.8.8.9.8.1 - IMPLEMENTADA
-### REGISTRO DE UNIDAD: 2.8.8.9.4.6
-### REGISTRO DE UNIDAD: 2.8.8.9.5.1
-### REGISTRO DE UNIDAD: 2.8.8.9.5.2
-### REGISTRO DE UNIDAD: 2.8.8.9.5.4
-### REGISTRO DE UNIDAD: 2.8.8.9.5.3
-### REGISTRO DE UNIDAD: 2.8.8.9.6.1
-### REGISTRO DE UNIDAD: 2.8.8.9.6.2
-### REGISTRO DE UNIDAD: 2.8.8.9.6.3
-### REGISTRO DE UNIDAD: 2.8.8.9.6.4
-### REGISTRO DE UNIDAD: 2.8.8.9.7.1
-### REGISTRO DE UNIDAD: 2.8.8.9.7.2
-### REGISTRO DE UNIDAD: 2.8.8.9.7.3
-### REGISTRO DE UNIDAD: 2.8.8.9.8.1
