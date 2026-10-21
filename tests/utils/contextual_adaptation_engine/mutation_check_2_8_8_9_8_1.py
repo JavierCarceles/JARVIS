@@ -20,10 +20,13 @@ Las piezas que se rompen son de dos generos:
   - el MOTOR deja de ofrecer una de las CAPAS de fallback que el contrato
     declara: el invariante correspondiente tiene que dejar de cumplirse.
 
-La ultima mutacion es la MAS IMPORTANTE: amplia el respaldo a los cuatro
-ficheros de persistencia, es decir, IMPLEMENTA una de las piezas que 2.8.8.9.8.2
-tiene que implementar. Si la medicion no la viera, la hoja 8.1 no habria
-determinado nada util.
+La ultima mutacion ya no IMPLEMENTA una pieza pendiente: desde 2.8.8.9.8.2 el
+fallback esta IMPLEMENTADO, de modo que las mutaciones del MOTOR lo ROMPEN (el
+respaldo vuelve a cubrir dos ficheros, el estado agregado deja de contar lo
+ilegible, la carga declara siempre VERDADERO) y las de la DECLARACION lo
+CONTRADICEN (una CAPA que no existe, un invariante que declara otra CAPA).
+La medicion tiene que VER cada rotura: si no la viera, el fallback
+implementado no estaria verificado.
 
 AISLAMIENTO: la mutacion se aplica a una COPIA del arbol `src/` en un
 directorio temporal. El `src/` del repositorio NO se toca nunca, ni siquiera
@@ -70,14 +73,10 @@ MUTACIONES = [
      '            "files_not_overwritten_renombrado": {',
      {"test_el_contrato_del_fallback_esta_bien_formado"}),
 
-    ("contrato: un invariante PENDIENTE se declara SATISFECHO",
-     '                "layer": "detection_available", "satisfied": False,\n'
-     '            },\n'
-     '            "load_result_is_truthful": {',
-     '                "layer": "detection_available", "satisfied": True,\n'
-     '            },\n'
-     '            "load_result_is_truthful": {',
-     {"test_el_contrato_del_fallback_esta_bien_formado"}),
+    ("contrato: un invariante declara una CAPA que no existe",
+     '"layer": "full_backup", "satisfied": True,',
+     '"layer": "full_backup_inexistente", "satisfied": True,',
+     {"test_todo_invariante_declara_capa_enunciado_y_veredicto"}),
 
     ("contrato: un invariante SATISFECHO se declara PENDIENTE",
      '"layer": "defaults_in_memory", "satisfied": True,',
@@ -85,9 +84,9 @@ MUTACIONES = [
      {"test_el_contrato_del_fallback_esta_bien_formado"}),
 
     ("contrato: una CAPA declarada deja de existir",
-     '"partial_backup": "',
-     '"partial_backup_renombrada": "',
-     {"test_el_contrato_del_fallback_esta_bien_formado"}),
+     '"full_backup": "',
+     '"full_backup_renombrada": "',
+     {"test_todo_invariante_declara_capa_enunciado_y_veredicto"}),
 
     ("contrato: la version del contrato cambia",
      '"version": "2.8.8.9.8.1",',
@@ -110,25 +109,25 @@ MUTACIONES = [
      "confidence, time.time()-started, False,",
      {"test_los_invariantes_declarados_satisfechos_se_cumplen_en_todo_modo"}),
 
-    ("motor: la carga DECLARA siempre FALSO",
-     "def load_all_data(self) -> bool: return self.load_adaptation_rules() and self.load_knowledge_base()",
-     "def load_all_data(self) -> bool: self.load_adaptation_rules(); self.load_knowledge_base(); return False",
-     {"test_la_determinacion_no_es_vacia"}),
+    ("motor: la carga DECLARA siempre VERDADERO",
+     "        return self._unidades_obtenidas() > 0",
+     "        return True",
+     {"test_los_invariantes_declarados_satisfechos_se_cumplen_en_todo_modo"}),
 
     ("motor: la carga SOBREESCRIBE los ficheros corruptos",
      "            if loaded: self.adaptation_rules = loaded\n            return True",
      "            if loaded: self.adaptation_rules = loaded\n            self.save_adaptation_rules()\n            return True",
      {"test_los_invariantes_declarados_satisfechos_se_cumplen_en_todo_modo"}),
 
-    ("motor: el respaldo se AMPLIA a los cuatro ficheros de persistencia",
-     '            for configured, name in ((self.config.get("adaptation_rules_file"), "adaptation_rules"), (self.config.get("knowledge_base_file"), "knowledge_base")):',
-     '            for configured, name in ((self.config.get("adaptation_rules_file"), "adaptation_rules"), (self.config.get("knowledge_base_file"), "knowledge_base"), (None, "goal_adaptation_feedback"), (None, "goal_adaptation_learning_results")):',
-     {"test_la_determinacion_no_es_vacia"}),
+    ("motor: el respaldo vuelve a cubrir SOLO dos ficheros de persistencia",
+     "        for name, path in self.expected_storage_paths().items():",
+     "        for name, path in list(self.expected_storage_paths().items())[:2]:",
+     {"test_los_invariantes_declarados_satisfechos_se_cumplen_en_todo_modo"}),
 
-    ("motor: el estado agregado cuenta lo ILEGIBLE como anomalia",
-     '"corruption": {"corrupted": corruption["corrupted"], "corruption_count": corruption["corruption_count"]}}',
-     '"corruption": {"corrupted": corruption["corrupted"], "corruption_count": corruption["corruption_count"] + len(corruption["unreadable"])}}',
-     {"test_la_determinacion_no_es_vacia"}),
+    ("motor: el estado agregado deja de contar lo ILEGIBLE como anomalia",
+     '"corruption_count": anomalias,',
+     '"corruption_count": corruption["corruption_count"],',
+     {"test_los_invariantes_declarados_satisfechos_se_cumplen_en_todo_modo"}),
 ]
 
 

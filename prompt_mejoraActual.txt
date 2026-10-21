@@ -1,8 +1,8 @@
 ESTADO PERSISTENTE ACTUAL
 CURRENT_PHASE: 2.8.8
-CURRENT_WORK_UNIT: 2.8.8.9.8.2
+CURRENT_WORK_UNIT: 2.8.8.9.8.3
 CURRENT_WORK_STATUS: PENDIENTE
-LAST_COMPLETED_UNIT: 2.8.8.9.8.1
+LAST_COMPLETED_UNIT: 2.8.8.9.8.2
 
 PROMPT MAESTRO JARVIS — AUTOMEJORA INCREMENTAL
 
@@ -1524,8 +1524,18 @@ mutaciones detectadas y los 4 ficheros de persistencia del `data/` de produccion
 - RESULTADO: 0 comprobaciones fallidas en la sonda, 15 PASSED / 0 FAILED en el modulo, 632 PASSED / 0 FAILED en la suite completa `tests/` (0 regresiones), 12/12 mutaciones detectadas y los ficheros de produccion intactos.
 - ALCANCE: esta hoja DECLARA y MIDE. NO implementa el fallback: los tres invariantes PENDIENTES son el INVENTARIO de lo que queda por implementar.
 
-2.8.8.9.8.2 — IMPLEMENTAR FALLBACK
+2.8.8.9.8.2 — IMPLEMENTAR FALLBACK [IMPLEMENTADA]
 - Implementar únicamente el fallback necesario.
+- IMPLEMENTACIÓN (producción): `src/utils/contextual_adaptation_engine.py` implementa las TRES piezas que 8.1 dejó PENDIENTES. La CARGA DECLARA lo que ocurrió: `load_all_data()` lleva la CUENTA de las unidades de datos obtenidas de la persistencia (`_unidades_cargadas`, con los auxiliares `_hay_que_cargar()` y `_unidades_obtenidas()`) y devuelve FALSO cuando los ficheros EXISTEN pero NO aportan ninguna unidad utilizable, en lugar de devolver VERDADERO y hacer CREER al consumidor que los datos están cargados; con el almacenamiento AUSENTE devuelve VERDADERO, porque no había nada que cargar. El ESTADO AGREGADO declara la pérdida: `get_engine_status()` cuenta los ficheros ILEGIBLES como anomalías de la persistencia y expone el desglose en `corruption.unreadable` y `corruption.unreadable_count`. El RESPALDO cubre TODA la persistencia: `backup_data()` copia los CUATRO ficheros que declara `expected_storage_paths()` (reglas, base de conocimiento, feedback y resultados de aprendizaje), por la CLAVE de persistencia y no por el nombre del fichero, y es una COPIA: no altera el contenido de los ficheros de origen, que quedan intactos para su diagnóstico.
+- CONTRATO (producción): los tres invariantes pasan a `satisfied: True` (`loss_visible_in_status`, `load_result_is_truthful` y `backup_covers_all_persistence`), `pending` queda VACÍO, la CAPA `partial_backup` se renombra a `full_backup` (el respaldo ya no es parcial) y se añade la entrada de RECONCILIACIÓN de la hoja, que declara lo cambiado, lo que queda igual y los tres invariantes resueltos.
+- NO SE INVENTA NADA: el fallback NO fabrica reglas a partir de un fichero roto ni sustituye datos por otros: el estado por defecto es el que el motor declara en CÓDIGO, y los ficheros corruptos NO se reescriben.
+- HALLAZGO REAL: la ruta `except` del cargador y la sentencia `if loaded:` SALTAN el punto en el que la carga cuenta las unidades, de modo que un fichero ILEGIBLE nunca llega a esa cuenta. Por eso la comprobación de que la carga declara el fracaso usa ficheros que PARSEAN y no aportan nada (raíz de mapeo vacía), y no un fichero ilegible: con un fichero ilegible el fracaso lo declara el CARGADOR y la CUENTA de unidades no se comprobaría nunca.
+- HALLAZGO REAL: el estado agregado contaba por separado las anomalías de FORMATO y las de LECTURA, y las de LECTURA no sumaban al total. Una pérdida TOTAL de los cuatro ficheros se presentarse como un estado limpio: los ficheros ilegibles son anomalías TANTO como las desviaciones de formato.
+- Test pytest permanente: `tests/utils/contextual_adaptation_engine/test_2_8_8_9_8_2_total_loss_fallback_implemented.py` (12 tests, 12 PASSED / 0 FAILED). Aísla cada pieza con un ESCENARIO propio: ficheros que PARSEAN sin aportar unidades (fracaso de la carga), ficheros ilegibles con el resto sanos (cuenta de anomalías), y ficheros que PARSEAN (no sobrescritura).
+- BANCO DE MUTACIÓN: `tests/utils/contextual_adaptation_engine/mutation_check_2_8_8_9_8_2.py` aplica 10 mutaciones (4 sobre la CARGA: declara siempre VERDADERO, declara siempre FALSO, INVENTA una regla a partir del fichero roto y SOBREESCRIBE los ficheros corruptos; 1 sobre el ESTADO AGREGADO: deja de contar lo ILEGIBLE como anomalía; 2 sobre el RESPALDO: vuelve a cubrir solo dos ficheros y ALTERA el fichero de origen; 3 sobre el CONTRATO: declara un invariante PENDIENTE, la entrada de la hoja declara un invariante PENDIENTE y la entrada deja de declarar un invariante RESUELTO) y exige que el test permanente falle en cada una, con los tests concretos que deben fallar identificados: 10/10 DETECTADA, 0 insensibles. Las mutaciones se aplican a una COPIA del árbol `src/` en un temporal, de modo que el repositorio nunca se toca. El banco ejecuta primero una LÍNEA BASE sin mutar: si esa no pasa, el arnés no demuestra nada.
+- AISLAMIENTO: todos los motores se crean con `data_dir` temporal, la sesión se ejecuta dentro del sandbox de CWD de `tests/conftest.py` y el módulo incluye un TEST DE GUARDA por sha256 de los ficheros de producción vigilados.
+- RESULTADO: 12 PASSED / 0 FAILED en el módulo, 644 PASSED / 0 FAILED en la suite completa `tests/` (0 regresiones), 10/10 mutaciones detectadas y los ficheros de producción intactos.
+- ALCANCE: IMPLEMENTA el fallback. NO adelanta las hojas 8.3 (test de corrupción total) ni 8.4 (verificación de no sobrescritura indebida): la no sobrescritura, que ya era el comportamiento real del motor, queda COMPROBADA por el test permanente de esta hoja, pero la verificación propia de 8.4 sigue pendiente como hoja.
 
 2.8.8.9.8.3 — TEST DE CORRUPCIÓN TOTAL
 - Verificar que JARVIS puede continuar sin datos válidos.
@@ -4309,3 +4319,34 @@ VERIFICACIÓN:
 DISCREPANCIAS: Se corrigió la documentación del README que mezclaba descripciones técnicas con referencias al trabajo interno y resultados de ejecución. RESOLUCIÓN (2026-10-21): se retiraron esas referencias y se conservaron descripciones técnicas independientes de los ficheros (APIs, contratos, invariantes y pruebas, cuando corresponde). El seguimiento detallado permanece en este prompt; el README describe únicamente el código.
 PENDIENTES: 2.8.8.9.8.2 - implementar el fallback (los tres invariantes PENDIENTES: `loss_visible_in_status`, `load_result_is_truthful` y `backup_covers_all_persistence`).
 ESTADO FINAL: 2.8.8.9.8.1 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 2.8.8.9.8.2
+FECHA: 2026-10-21
+ESTADO: IMPLEMENTADA
+OBJETIVO: Implementar el fallback por corrupción total que la hoja 2.8.8.9.8.1 dejó PENDIENTE: que el estado agregado declare la pérdida, que la carga declare lo que ocurrió y que el respaldo cubra toda la persistencia.
+TIPO DE TRABAJO: IMPLEMENTACIÓN
+CAMBIOS / HALLAZGOS:
+- PRODUCCIÓN (CARGA): `load_all_data()` deja de devolver el resultado de un `and` entre cargadores y DECLARA lo que ocurrió: lleva la CUENTA de las unidades de datos obtenidas de la persistencia (`self._unidades_cargadas`, inicializado en el constructor y actualizado por `load_adaptation_rules()` y `load_knowledge_base()`), con los auxiliares `_hay_que_cargar()` (¿hay AL MENOS UNO de los ficheros que esta carga LEE?) y `_unidades_obtenidas()` (unidades de datos utilizables obtenidas). Devuelve FALSO cuando los ficheros EXISTEN pero NO aportan ninguna unidad utilizable; con el almacenamiento AUSENTE devuelve VERDADERO, porque no había nada que cargar.
+- PRODUCCIÓN (ESTADO AGREGADO): `get_engine_status()` cuenta los ficheros ILEGIBLES como anomalías de la persistencia (`anomalias = corruption["corruption_count"] + ilegibles`) y expone el desglose en `corruption.unreadable` y `corruption.unreadable_count`. Es ADITIVO: no altera ninguna clave previa.
+- PRODUCCIÓN (RESPALDO): `backup_data()` copia los CUATRO ficheros de persistencia que declara `expected_storage_paths()` (reglas, base de conocimiento, feedback y resultados de aprendizaje), iterating por la CLAVE de persistencia y no por el nombre del fichero. Sigue siendo una COPIA: no altera el contenido de los ficheros de origen.
+- PRODUCCIÓN (CONTRATO): `total_loss_fallback()` pasa a declarar los siete invariantes SATISFECHOS, con `pending` VACÍO; la CAPA `partial_backup` se renombra a `full_backup`; se añade la entrada de RECONCILIACIÓN de la hoja con lo cambiado, lo que queda igual, lo pendiente (vacío) y los tres invariantes resueltos.
+- HALLAZGO REAL: la ruta `except` del cargador y la sentencia `if loaded:` SALTAN el punto en el que la carga cuenta las unidades, de modo que un fichero ILEGIBLE nunca llega a esa cuenta. El fallo lo declara el CARGADOR, no la CUENTA: una comprobación hecha solo con ficheros ilegibles no distinguiría un `return True` de un `return False` en la cuenta de unidades.
+- HALLAZGO REAL: el estado agregado contaba por separado las anomalías de FORMATO y las de LECTURA, y las de LECTURA no sumaban al TOTAL. Una pérdida TOTAL de los cuatro ficheros se presentarse como un estado limpio, porque el total de anomalías era el de las desviaciones de formato, no el de la pérdida.
+- NO SE INVENTA NADA: el fallback NO fabrica reglas a partir de un fichero roto ni sustituye datos por otros. El estado por defecto es el que el motor declara en CÓDIGO, y los ficheros corruptos NO se reescriben.
+ARCHIVOS MODIFICADOS:
+- PRODUCCIÓN: `src/utils/contextual_adaptation_engine.py` (`_unidades_cargadas`, `_hay_que_cargar()`, `_unidades_obtenidas()`, `load_all_data()`, `backup_data()`, `get_engine_status()`, `_TOTAL_LOSS_FALLBACK`).
+- TESTS: `tests/utils/contextual_adaptation_engine/test_2_8_8_9_8_2_total_loss_fallback_implemented.py` (nuevo; 12 tests), `tests/utils/contextual_adaptation_engine/mutation_check_2_8_8_9_8_2.py` (nuevo; banco de mutación).
+- DOCUMENTACIÓN: `README.md` (sección «Fallback por corrupción total»: capacidad `full_backup`, los siete invariantes satisfechos, la implementación en producción y los ficheros de test y banco propios), `prompt_mejoraActual.txt`.
+TESTS Y RESULTADOS:
+- UNITARIOS: `tests/utils/contextual_adaptation_engine/test_2_8_8_9_8_2_total_loss_fallback_implemented.py` - 12 PASSED / 0 FAILED (2 de la carga: declara el fracaso y no reescribe los ficheros corruptos; 3 del estado agregado: declara la pérdida, cuenta los ilegibles y no declara anomalías con datos sanos; 2 del respaldo: cubre los cuatro ficheros y no altera su contenido; 1 del estado por defecto tras la pérdida; 1 de la reconciliación del contrato; 1 de la guarda de producción; 2 de la ausencia de datos).
+- INTEGRACIÓN: suite completa `tests/` - 644 PASSED / 0 FAILED, 41 subtests.
+- NO REGRESIÓN: 644 PASSED / 0 FAILED con baseline comparable de 632 PASSED / 0 FAILED (632 previos + 12 nuevos, 0 regresiones).
+- MUTACIÓN: `mutation_check_2_8_8_9_8_2.py` - 10/10 mutaciones DETECTADA, 0 insensibles, cada una con los tests concretos que deben fallar identificados. LÍNEA BASE: el banco ejecuta primero el test permanente SIN mutar y exige que pase; si no pasara, el arnés no demostraría nada.
+VERIFICACIÓN:
+- SINTAXIS: OK (`py_compile` sobre el motor, `main.py`, el test permanente y el banco de mutación).
+- MAIN.PY: NO APLICA (la hoja no toca el arranque de la aplicación: `main.py` no referencia el motor de adaptación contextual ni sus APIs modificadas).
+- COMPORTAMIENTO / INTEGRACIÓN REAL: el módulo se ejecuta de forma independiente (`python -m pytest tests/utils/contextual_adaptation_engine/test_2_8_8_9_8_2_total_loss_fallback_implemented.py`): 12 PASSED / 0 FAILED, código de salida 0. El banco se ejecuta de forma independiente (`python tests/utils/contextual_adaptation_engine/mutation_check_2_8_8_9_8_2.py`): LÍNEA BASE OK y 10/10 DETECTADA, código de salida 0.
+- AISLAMIENTO: el `data/` de producción NO se modifica (sha256 de los ficheros vigilados idéntico antes y después de ejecutar el módulo) y el banco de mutación nunca toca el `src/` del repositorio, que se aplica solo sobre una COPIA en un temporal.
+DISCREPANCIAS: la README describía el fallback como DECLARADO y NO implementado, con tres invariantes PENDIENTES y la capacidad `partial_backup`. RESOLUCIÓN (2026-10-21): la README describe ahora el comportamiento real del código tras la implementación (los siete invariantes satisfechos, `full_backup`, la implementación en producción y los ficheros de test y banco propios), sin referencias al roadmap ni a resultados de ejecución.
+PENDIENTES: 2.8.8.9.8.3 - test de corrupción total (verificar que JARVIS puede continuar sin datos válidos). 2.8.8.9.8.4 - verificar no sobrescritura indebida (la no sobrescritura, que ya era el comportamiento real del motor, queda COMPROBADA por el test permanente de esta hoja, pero la verificación propia de la hoja sigue pendiente).
+ESTADO FINAL: 2.8.8.9.8.2 - IMPLEMENTADA

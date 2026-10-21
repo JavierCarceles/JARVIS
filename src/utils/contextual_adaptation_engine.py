@@ -286,6 +286,11 @@ class ContextualAdaptationEngine:
         # recuperado de un fichero corrupto y con que POLITICA lo ha hecho.
         # La recuperación NO reescribe el fichero: es una operacion de CARGA.
         self._recovery_report: List[Dict[str, Any]] = []
+        # UNIDADES de datos que la última carga ha OBTENIDO de la persistencia
+        # (2.8.8.9.8.2): el fallback DECLARA lo que OCURRIÓ, no lo que se
+        # supone. Una carga que no obtiene ninguna unidad NO puede declarar
+        # un exito.
+        self._unidades_cargadas: Dict[str, int] = {"adaptation_rules": 0, "knowledge_base": 0}
         self.adaptation_level = AdaptationLevel.MINIMAL
         self.is_adapting = False
         self.adaptation_queue: queue.Queue = queue.Queue()
@@ -1739,6 +1744,7 @@ class ContextualAdaptationEngine:
 
     def load_adaptation_rules(self) -> bool:
         path = self._resolve_path(self.config.get("adaptation_rules_file"), "contextual_adaptation_rules.json")
+        self._unidades_cargadas["adaptation_rules"] = 0
         if not os.path.isfile(path): return True
         try:
             with open(path, "r", encoding="utf-8") as handle: payload = json.load(handle)
@@ -1776,6 +1782,10 @@ class ContextualAdaptationEngine:
                 try: last = datetime.fromisoformat(last) if last else None
                 except (ValueError, TypeError): last = None
                 loaded[row["rule_id"]] = AdaptationRule(row["rule_id"], row.get("name", row["rule_id"]), row.get("description", ""), row.get("condition_pattern", ""), list(row.get("adaptation_actions", [])), triggers, self._safe_float(row.get("confidence_threshold", .7)), int(row.get("priority", 1)), bool(row.get("enabled", True)), self._safe_float(row.get("success_rate", 0.)), int(row.get("execution_count", 0)), last, self._safe_float(row.get("adaptation_score", 0.)), list(row.get("constraints", [])), dict(row.get("metadata", {})), row.get("deadline"))
+            # FALLBACK por CORRUPCIÓN TOTAL (2.8.8.9.8.2): se REGISTRA lo que
+            # la carga ha OBTENIDO, para que la carga aggregate pueda DECIR lo
+            # que ocurrio en lugar de suponerlo.
+            self._unidades_cargadas["adaptation_rules"] = len(loaded)
             if loaded: self.adaptation_rules = loaded
             return True
         except Exception as exc: self.logger.error("Error cargando reglas: %s", exc); return False
@@ -1796,16 +1806,17 @@ class ContextualAdaptationEngine:
 
     def load_knowledge_base(self) -> bool:
         path = self._resolve_path(self.config.get("knowledge_base_file"), "contextual_knowledge_base.json")
+        self._unidades_cargadas["knowledge_base"] = 0
         if not os.path.isfile(path): return True
         try:
             with open(path, "r", encoding="utf-8") as handle: payload = json.load(handle)
             data = payload.get("data", payload) if isinstance(payload, dict) else {}
+            validas: Dict[str, Any] = {}
             if isinstance(data, dict):
                 # DETECCIÓN DE CORRUPCIÓN (2.8.8.9.6.3): solo se aplican las
                 # secciones que respetan el FORMATO REAL. Una clave que el motor
                 # nunca escribe o una sección corrupta NO llegan al estado: la
                 # base conserva sus valores por defecto.
-                validas: Dict[str, Any] = {}
                 for clave, valor in data.items():
                     if not self._seccion_de_conocimiento_valida(clave, valor):
                         # RECUPERACIÓN PARCIAL (2.8.8.9.7.2): puede que la
@@ -1826,18 +1837,64 @@ class ContextualAdaptationEngine:
                         self.knowledge_base.setdefault(key, {}).setdefault(ctx.value, default.copy())
                 self.knowledge_base.setdefault("integration_records", [])
                 self.knowledge_base.setdefault("transfer_efficiency", {})
+            # FALLBACK por CORRUPCIÓN TOTAL (2.8.8.9.8.2): se REGISTRA lo que
+            # la carga ha OBTENIDO, para que la carga aggregate pueda DECIR lo
+            # que ocurrio en lugar de suponerlo.
+            self._unidades_cargadas["knowledge_base"] = len(validas)
             return True
         except Exception as exc: self.logger.error("Error cargando knowledge base: %s", exc); return False
 
     def save_all_data(self) -> bool: return self._save_adaptation_rules() and self.save_knowledge_base()
-    def load_all_data(self) -> bool: return self.load_adaptation_rules() and self.load_knowledge_base()
+
+    def load_all_data(self) -> bool:
+        """Carga TODA la persistencia que lee esta carga y DECLARA lo que ocurrio.
+
+        FALLBACK por CORRUPCION TOTAL (2.8.8.9.8.2): devuelve FALSO cuando los
+        ficheros de persistencia EXISTEN pero NO aportan ninguna unidad de datos
+        utilizable. Declarar un exito que no ocurrio haria CREER al consumidor
+        que los datos estan cargados, cuando el motor esta operando con los
+        defaults del codigo: el fallback NO inventa datos y TAMPOCO declara una
+        carga que no ha ocurrido.
+
+        Con el almacenamiento AUSENTE (2.8.8.9.5.1) devuelve VERDADERO: no
+        habia nada que cargar y el estado por defecto es el declarado.
+        """
+        reglas_ok = self.load_adaptation_rules()
+        base_ok = self.load_knowledge_base()
+        if not (reglas_ok and base_ok): return False
+        if not self._hay_que_cargar(): return True
+        return self._unidades_obtenidas() > 0
+
+    def _hay_que_cargar(self) -> bool:
+        """Hay AL MENOS UNO de los ficheros de persistencia que esta carga LEE.
+
+        La carga aggregate lee el fichero de REGLAS y el de la BASE DE
+        CONOCIMIENTO: el de feedback y el de resultados de aprendizaje tienen
+        sus PROPIOS cargadores.
+        """
+        rutas = self.expected_storage_paths()
+        return any(os.path.isfile(rutas.get(clave, "")) for clave in ("adaptation_rules", "knowledge_base"))
+
+    def _unidades_obtenidas(self) -> int:
+        """Unidades de datos utilizables que la ultima carga ha OBTENIDO."""
+        return sum(self._unidades_cargadas.values())
 
     def backup_data(self, backup_dir: Optional[str] = None) -> bool:
+        """Respalda los CUATRO ficheros de persistencia (2.8.8.9.8.2).
+
+        El respaldo cubre TODA la persistencia que el motor declara en
+        `expected_storage_paths()`: reglas, base de conocimiento, feedback y
+        resultados de aprendizaje. Un respaldo que solo cubre una parte deja
+        sin copia justo lo que se necesita recuperar cuando la perdida es
+        TOTAL.
+
+        El respaldo es una COPIA: no modifica el fichero de origen, de modo que
+        su contenido sigue intacto para su diagnostico.
+        """
         try:
             backup_dir = backup_dir or os.path.join(self.data_dir, "backups"); os.makedirs(backup_dir, exist_ok=True)
             stamp = datetime.now().strftime("%Y%m%d_%H%M%S"); copied = False
-            for configured, name in ((self.config.get("adaptation_rules_file"), "adaptation_rules"), (self.config.get("knowledge_base_file"), "knowledge_base")):
-                path = self._resolve_path(configured, f"{name}.json")
+            for name, path in self.expected_storage_paths().items():
                 if os.path.isfile(path): shutil.copy2(path, os.path.join(backup_dir, f"{name}_backup_{stamp}.json")); copied = True
             return copied
         except Exception as exc: self.logger.error("Error creando backup: %s", exc); return False
@@ -4008,9 +4065,9 @@ class ContextualAdaptationEngine:
     # reconoce, que INVARIANTES deben cumplirse para que JARVIS pueda seguir
     # operando, y que queda PENDIENTE.
     #
-    # NO lo implementa: la IMPLEMENTACION del fallback que falta es 2.8.8.9.8.2.
-    # Su valor es que puede contrastarse de forma automatica contra el
-    # comportamiento OBSERVADO en runtime, mediante la sonda
+    # NO lo implementa: la IMPLEMENTACION del fallback es 2.8.8.9.8.2, que ya
+    # esta hecha. Su valor es que puede contrastarse de forma automatica
+    # contra el comportamiento OBSERVADO en runtime, mediante la sonda
     # `tests/utils/contextual_adaptation_engine/identify_fallback_real.py`.
     # Si lo observado se desvia, el contraste falla y el contrato queda
     # obsoleto: es intencional, un contrato que nunca falla no prueba nada.
@@ -4048,7 +4105,7 @@ class ContextualAdaptationEngine:
             "continuity_of_operation": "el ciclo de captura, analisis y ejecucion sigue funcionando con los defaults",
             "non_destructive_load": "la carga NO reescribe los ficheros corruptos: su contenido queda intacto en disco",
             "detection_available": "las APIs de deteccion (`detect_corruption`, `detect_absent_sections`) informan de la perdida",
-            "partial_backup": "`backup_data()` copia el fichero de reglas y el de la base de conocimiento",
+            "full_backup": "`backup_data()` copia los CUATRO ficheros de persistencia: reglas, base de conocimiento, feedback y resultados de aprendizaje",
         },
         # INVARIANTES: lo que el fallback DEBE garantizar en cada modo de perdida
         # total. Cada uno declara a que CAPA pertenece y si el runtime lo
@@ -4072,24 +4129,20 @@ class ContextualAdaptationEngine:
             },
             "loss_visible_in_status": {
                 "statement": "el estado AGREGADO del motor (`get_engine_status()`) informa de la perdida total: declara al menos una anomalia",
-                "layer": "detection_available", "satisfied": False,
+                "layer": "detection_available", "satisfied": True,
             },
             "load_result_is_truthful": {
                 "statement": "`load_all_data()` devuelve FALSO cuando la perdida total impidio cargar datos: no declara un exito que no ocurrio",
-                "layer": "detection_available", "satisfied": False,
+                "layer": "detection_available", "satisfied": True,
             },
             "backup_covers_all_persistence": {
                 "statement": "`backup_data()` respalda los CUATRO ficheros de persistencia, no solo dos",
-                "layer": "partial_backup", "satisfied": False,
+                "layer": "full_backup", "satisfied": True,
             },
         },
         # PENDIENTE: los invariantes que el runtime NO satisface hoy. La
         # IMPLEMENTACION de estos es 2.8.8.9.8.2.
-        "pending": [
-            "loss_visible_in_status",
-            "load_result_is_truthful",
-            "backup_covers_all_persistence",
-        ],
+        "pending": [],
         "reconciliation": [
             {"unit": "2.8.8.9.8.1",
              "reason": "esta hoja DECLARA el contrato del FALLBACK por corrupcion total y lo CONTRASTA contra el runtime. La DETERMINACION que hizo queda aqui: el motor NO ofrece hoy un fallback COMPLETO, porque el estado agregado no informa de la perdida, la carga declara un exito que no ocurrio y el respaldo solo cubre dos de los cuatro ficheros. Los tres invariantes que fallan estan en `pending`",
@@ -4101,6 +4154,13 @@ class ContextualAdaptationEngine:
                  "backup_covers_all_persistence",
              ],
              "resolved": [],
+             "implementation_owner": "2.8.8.9.8.2"},
+            {"unit": "2.8.8.9.8.2",
+             "reason": "el FALLBACK por corrupcion total queda IMPLEMENTADO: el estado AGREGADO declara la perdida (los ficheros ilegibles se cuentan como anomalia), la carga DECLARA lo que ocurrio (`load_all_data()` devuelve FALSO cuando la persistencia existe pero no aporta ninguna unidad de datos) y el RESPALDO cubre los CUATRO ficheros de persistencia. El runtime satisface los siete invariantes en los cuatro modos de perdida total y no queda ninguno pendiente",
+             "changed": ["invariants.loss_visible_in_status", "invariants.load_result_is_truthful", "invariants.backup_covers_all_persistence", "fallback_layers.partial_backup -> fallback_layers.full_backup"],
+             "unchanged": ["principle", "definition", "loss_modes", "invariants.state_equals_fresh_defaults", "invariants.operation_continues", "invariants.files_not_overwritten", "invariants.loss_is_detectable"],
+             "pending": [],
+             "resolved": ["loss_visible_in_status", "load_result_is_truthful", "backup_covers_all_persistence"],
              "implementation_owner": "2.8.8.9.8.2"},
         ],
     }
@@ -4166,8 +4226,9 @@ class ContextualAdaptationEngine:
 
         La declaración NO sustituye a la verificación: la sonda
         `tests/utils/contextual_adaptation_engine/identify_fallback_real.py`
-        contrasta esta declaración contra lo OBSERVADO en runtime. La
-        IMPLEMENTACIÓN del fallback que falta es 2.8.8.9.8.2.
+        contrasta esta declaración contra lo OBSERVADO en runtime. El fallback
+        está IMPLEMENTADO desde 2.8.8.9.8.2: no queda ningún invariante
+        pendiente.
         """
         return copy.deepcopy(self._TOTAL_LOSS_FALLBACK)
 
@@ -4239,6 +4300,14 @@ class ContextualAdaptationEngine:
         storage = self.detect_absent_storage()
         sections = self.detect_absent_sections()
         corruption = self.detect_corruption()
+        # FALLBACK por CORRUPCIÓN TOTAL (2.8.8.9.8.2): el estado AGREGADO
+        # declara las anomalías de la persistencia. Un fichero ILEGIBLE es una
+        # anomalía TANTO como una desviación de formato: si no se cuenta, una
+        # pérdida TOTAL de los cuatro ficheros se presentaría como un estado
+        # limpio. El desglose queda a la vista (`corrupted` e `unreadable`):
+        # lo que se cuenta es el TOTAL de anomalías, no su causa.
+        ilegibles = len(corruption["unreadable"])
+        anomalias = corruption["corruption_count"] + ilegibles
         return {"adaptation_enabled": self.config.get("adaptation_enabled", True), "is_adapting": self.is_adapting,
             "current_context": self.current_context.context_type.value if self.current_context else None, "adaptation_level": self.adaptation_level.value,
             "total_snapshots": len(self.context_snapshots), "total_rules": len(self.adaptation_rules),
@@ -4247,7 +4316,8 @@ class ContextualAdaptationEngine:
             "knowledge_base_stats": {"context_patterns": len(self.knowledge_base.get("context_patterns", {})), "adaptation_strategies": len(self.knowledge_base.get("adaptation_strategies", {})), "transfer_efficiency": len(self.knowledge_base.get("transfer_efficiency", {}))},
             "storage": {"absent": storage["absent"], "absent_count": storage["absent_count"]},
             "storage_sections": {"absent": sections["absent"], "absent_count": sections["absent_count"]},
-            "corruption": {"corrupted": corruption["corrupted"], "corruption_count": corruption["corruption_count"]}}
+            "corruption": {"corrupted": corruption["corrupted"], "corruption_count": anomalias,
+                           "unreadable": corruption["unreadable"], "unreadable_count": ilegibles}}
 
     # Persistencia adicional y helpers
     @staticmethod

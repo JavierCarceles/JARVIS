@@ -16,8 +16,9 @@ contrato declarado:
   - todo invariante declarado SATISFECHO se cumple en TODOS los modos de
     perdida total, y todo invariante declarado PENDIENTE falla de VERDAD en al
     menos un modo: la declaracion y el runtime no pueden discrepar;
-  - la determinacion NO es vacia: hay invariantes pendientes y el motor
-    EFFECTIVAMENTE no los cumple (si no, la hoja no habria determinado nada);
+  - la determinacion esta AL DIA: lo que el contrato declara PENDIENTE es
+    EXACTAMENTE lo que el runtime no satisface, y la medicion sigue
+    discriminando (con una perdida REAL se ve la perdida);
   - la medicion NO es vacia: con datos sanos no se declara ninguna perdida y
     con una perdida real se declara.
 
@@ -241,15 +242,21 @@ def test_la_perdida_es_detectable_y_el_estado_es_continuo_en_todo_modo(tabla, mo
         f"en el modo `{modo}` el estado NO es el de los defaults del codigo")
 
 
-def test_la_determinacion_no_es_vacia(sonda, contrato, deteccion):
-    """La DETERMINACION identifica algo: hay invariantes pendientes y fallan.
+def test_la_determinacion_refleja_el_runtime(sonda, contrato, deteccion):
+    """La DETERMINACION esta AL DIA: lo PENDIENTE es lo que el runtime NO cumple.
 
-    La hoja no puede declarar que el fallback esta completo y que a la vez el
-    runtime no lo cumpla: una de las dos tiene que hablar. Y lo que habla tiene
-    que ser el RUNTIME: el CONTROL de la sonda ve una perdida REAL.
+    2.8.8.9.8.1 determino que faltaban tres invariantes y 2.8.8.9.8.2 los ha
+    IMPLEMENTADO: la determinacion queda vacia porque el runtime los satisface
+    a todos, no porque la medicion haya dejado de mirar.
+
+    Por eso este test NO exige que haya invariantes pendientes: exigirlo
+    solo seria cierto mientras el fallback NO estuviera implementado, y
+    convertiria una implementacion correcta en un test rojo. Lo que exige es
+    que lo DECLARADO y lo MEDIDO coincidan y que el CONTROL de la sonda siga
+    viendo una perdida REAL: si la medicion dejara de discriminar, este test
+    lo veria.
     """
     pendientes = set(contrato.get("pending") or [])
-    assert pendientes, "no hay ningun invariante pendiente: la determinacion seria vacia"
     assert set(deteccion) == pendientes, (
         f"pendientes declarados={sorted(pendientes)} "
         f"medidos={sorted(deteccion)}")
