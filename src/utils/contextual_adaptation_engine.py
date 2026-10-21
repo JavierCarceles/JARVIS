@@ -52,6 +52,58 @@ except Exception:
     Planner = PlannerStatus = None
 
 
+# ==================================================== FORMATO REAL (2.8.8.8.9.6.3)
+# Comprobadores de los tipos que declara el FORMATO REAL de la persistencia en
+# `ContextualAdaptationEngine._CORRUPTION_CRITERIA` (`real_format.record.fields`).
+# Son la MISMA fuente de verdad que usa la vía de carga para descartar lo que se
+# aparta del formato, de modo que el formato declarado y el comportamiento real
+# no puedan divergir.
+_TIPO_COMPROBABLE = {
+    "string": lambda value: isinstance(value, str),
+    "number": lambda value: isinstance(value, (int, float)) and not isinstance(value, bool),
+    "list": lambda value: isinstance(value, list),
+    "mapping": lambda value: isinstance(value, dict),
+    "boolean": lambda value: isinstance(value, bool),
+    "string|null": lambda value: value is None or isinstance(value, str),
+    "any": lambda value: True,
+}
+
+
+def _cumple_tipo(value: Any, tipo: str) -> bool:
+    """Comprobar que un valor respeta el tipo declarado en el FORMATO REAL."""
+    comprobador = _TIPO_COMPROBABLE.get(tipo)
+    return True if comprobador is None else bool(comprobador(value))
+
+
+def _tipo_de_valor(value: Any) -> str:
+    """Tipo declarado en el FORMATO REAL que corresponde a un valor concreto."""
+    if isinstance(value, bool): return "boolean"
+    if isinstance(value, (int, float)): return "number"
+    if isinstance(value, str): return "string"
+    if isinstance(value, list): return "list"
+    if isinstance(value, dict): return "mapping"
+    return "any"
+
+
+def _casa_target(declarado: str, observados: List[str]) -> bool:
+    """Comprobar si un `target` declarado casa con algún target observado.
+
+    El `target` declarado puede llevar un marcador de comodín (`<contexto>`,
+    `<strategy_id>`, `<clave_desconocida>`). En ese caso casa con un target
+    observado con el MISMO numero de segmentos, porque el comodín ocupa un
+    unico segmento (p. ej. `data.context_patterns.<contexto>`).
+    """
+    if declarado in observados: return True
+    if ".<" not in declarado: return False
+    base = declarado.split(".<")[0]
+    segmentos_declarados = len(declarado.split("."))
+    for observado in observados:
+        if not observado.startswith(base + "."): continue
+        if len(observado.split(".")) != segmentos_declarados: continue
+        return True
+    return False
+
+
 class ContextType(Enum):
     DEVELOPMENT = "development"
     PRODUCTION = "production"
@@ -298,6 +350,11 @@ class ContextualAdaptationEngine:
             for key, default in (("context_patterns", []), ("success_patterns", []),
                                  ("performance_baselines", {}), ("adaptation_strategies", [])):
                 self.knowledge_base[key].setdefault(ctx.value, default.copy())
+        # Vocabulario de la base de conocimiento: las claves que el motor
+        # escribe y el tipo que admite cada una. Es la referencia del FORMATO
+        # REAL que usa la deteccion de corrupcion (2.8.8.9.6.3) para saber que
+        # clave es conocida y que tipo debe tener su contenido.
+        self._valores_por_defecto: Dict[str, Any] = copy.deepcopy(self.knowledge_base)
 
     # Captura y análisis contextual
     def capture_context_snapshot(self) -> ContextSnapshot:
@@ -1431,6 +1488,108 @@ class ContextualAdaptationEngine:
             os.replace(tmp, path); return True
         except Exception as exc: self.logger.error("Error guardando reglas: %s", exc); return False
 
+    # ============================================== DETECCIÓN DE CORRUPCIÓN (2.8.8.9.6.3)
+    #
+    # El FORMATO REAL de cada fichero de persistencia está declarado en
+    # `_CORRUPTION_CRITERIA` (`real_format`). Estas comprobaciones comparan el
+    # contenido que se carga con ese formato: lo que se aparta de él NO llega
+    # al estado del motor.
+    #
+    # La REACCIÓN al desvío depende de la CONVERSIÓN REAL que el cargador hace
+    # del campo afectado:
+    #   - conversión ESTRICTA (`int(...)`, `dict(...)`): el valor inválido lanza
+    #     `ValueError` y aborta la carga del fichero entero. Es el comportamiento
+    #     real del cargador, observado en 2.8.8.9.6.1.
+    #   - conversión COERCIVA (`list(...)`, `bool(...)`, `float(...)`): el valor
+    #     inválido se deformaría al llegar al estado, así que la fila se
+    #     descarta ANTES de construirla.
+    _CAMPOS_ESTRICTOS_DE_REGLA = ("priority", "execution_count", "metadata")
+
+    # EVIDENCIA de una estrategia aprendida (2.8.8.9.2.1): sin `confidence`,
+    # `success_rate` y `last_updated` la entrada no es una estrategia aprendida
+    # y no puede ofrecerse con una confianza inventada. El `strategy_id` no es
+    # obligatorio aquí porque en el índice plano lo aporta la propia clave.
+    _EVIDENCIA_DE_ESTRATEGIA = ("confidence", "success_rate", "last_updated")
+
+    def _campos_de_formato(self, clave: str) -> Dict[str, str]:
+        """Campos del FORMATO REAL de las filas de un fichero de persistencia."""
+        formato = (self._CORRUPTION_CRITERIA.get("files", {}).get(clave, {}) or {}).get("real_format", {}) or {}
+        return dict((formato.get("record", {}) or {}).get("fields", {}) or {})
+
+    def _desviaciones_de_regla(self, row: Dict[str, Any]) -> List[Tuple[str, str]]:
+        """Desviaciones de una fila de regla respecto del FORMATO REAL.
+
+        Devuelve pares `(campo, violacion)` con el campo que se aparta del
+        formato y la violacion del vocabulario declarado (`wrong_type` o
+        `invalid_value`). Los campos de conversión ESTRICTA no se comprueban
+        aquí: su desvío lo aborta el propio constructor de la regla.
+        """
+        desviaciones: List[Tuple[str, str]] = []
+        for nombre, tipo in self._campos_de_formato("adaptation_rules").items():
+            if nombre not in row: continue
+            if nombre in self._CAMPOS_ESTRICTOS_DE_REGLA: continue
+            valor = row[nombre]
+            if not _cumple_tipo(valor, tipo):
+                desviaciones.append((nombre, "wrong_type")); continue
+            if nombre == "context_triggers":
+                if any(self._coerce_context(trigger) is None for trigger in valor):
+                    desviaciones.append(("context_triggers[]", "invalid_value"))
+            elif nombre == "last_execution" and valor is not None:
+                try: datetime.fromisoformat(str(valor))
+                except (TypeError, ValueError): desviaciones.append((nombre, "invalid_value"))
+        return desviaciones
+
+    def _fila_valida(self, fila: Any, clave: str) -> bool:
+        """Comprobar que una fila de persistencia respeta el FORMATO REAL.
+
+        Una fila es válida si es un diccionario, si tiene el campo que la
+        identifica y si los campos declarados que PRESENTA tienen el tipo que
+        el formato exige. Un campo que no aparece no es una desviación: el
+        formato no lo declara obligatorio.
+        """
+        if not isinstance(fila, dict): return False
+        formato = (self._CORRUPTION_CRITERIA.get("files", {}).get(clave, {}) or {}).get("real_format", {}) or {}
+        registro = formato.get("record", {}) or {}
+        identidad = registro.get("identity")
+        if identidad and not fila.get(identidad): return False
+        for nombre, tipo in (registro.get("fields", {}) or {}).items():
+            if nombre not in fila: continue
+            if not _cumple_tipo(fila[nombre], tipo): return False
+        return True
+
+    def _estrategia_aprendida_valida(self, entrada: Any) -> bool:
+        """Comprobar que una entrada de estrategia aprendida aporta EVIDENCIA."""
+        if not isinstance(entrada, dict): return False
+        for campo in self._EVIDENCIA_DE_ESTRATEGIA:
+            if entrada.get(campo) is None: return False
+        if not _cumple_tipo(entrada.get("confidence"), "number"): return False
+        if not _cumple_tipo(entrada.get("success_rate"), "number"): return False
+        return True
+
+    def _seccion_de_conocimiento_valida(self, clave: str, valor: Any) -> bool:
+        """Comprobar que una sección de la base respeta el FORMATO REAL.
+
+        Una sección es válida si la clave es una de las que el motor escribe y
+        si su contenido tiene el tipo que ese motor produce. En las secciones
+        indexadas por contexto, el valor de cada contexto debe respetar
+        también el tipo que el motor produce para ese contexto.
+        """
+        por_defecto = self._valores_por_defecto.get(clave)
+        if por_defecto is None: return False
+        tipo = _tipo_de_valor(por_defecto)
+        if not _cumple_tipo(valor, tipo): return False
+        if tipo != "mapping": return True
+        muestra = next(iter(por_defecto.values()), None)
+        if isinstance(muestra, (list, dict)):
+            for sub in valor.values():
+                if not isinstance(sub, type(muestra)): return False
+        if clave == "adaptation_strategies":
+            for entradas in valor.values():
+                if not isinstance(entradas, list): return False
+                for entrada in entradas:
+                    if not isinstance(entrada, dict): return False
+        return True
+
     def load_adaptation_rules(self) -> bool:
         path = self._resolve_path(self.config.get("adaptation_rules_file"), "contextual_adaptation_rules.json")
         if not os.path.isfile(path): return True
@@ -1440,6 +1599,13 @@ class ContextualAdaptationEngine:
             loaded = {}
             for row in rows if isinstance(rows, list) else []:
                 if not isinstance(row, dict) or not row.get("rule_id"): continue
+                # DETECCIÓN DE CORRUPCIÓN (2.8.8.9.6.3): una fila que se aparta
+                # del FORMATO REAL no llega al estado. Se descarta la fila y el
+                # resto del fichero se carga con normalidad.
+                desviaciones = self._desviaciones_de_regla(row)
+                if desviaciones:
+                    self.logger.warning("Regla descartada: se aparta del formato real (%s)", row.get("rule_id"))
+                    continue
                 triggers = [ctx for raw in row.get("context_triggers", []) if (ctx := self._coerce_context(raw)) is not None]
                 last = row.get("last_execution")
                 try: last = datetime.fromisoformat(last) if last else None
@@ -1470,7 +1636,17 @@ class ContextualAdaptationEngine:
             with open(path, "r", encoding="utf-8") as handle: payload = json.load(handle)
             data = payload.get("data", payload) if isinstance(payload, dict) else {}
             if isinstance(data, dict):
-                self.knowledge_base.update(data)
+                # DETECCIÓN DE CORRUPCIÓN (2.8.8.9.6.3): solo se aplican las
+                # secciones que respetan el FORMATO REAL. Una clave que el motor
+                # nunca escribe o una sección corrupta NO llegan al estado: la
+                # base conserva sus valores por defecto.
+                validas: Dict[str, Any] = {}
+                for clave, valor in data.items():
+                    if not self._seccion_de_conocimiento_valida(clave, valor):
+                        self.logger.warning("Seccion de la base de conocimiento descartada: %s", clave)
+                        continue
+                    validas[clave] = valor
+                self.knowledge_base.update(validas)
                 for ctx in ContextType:
                     for key, default in (("context_patterns", []), ("success_patterns", []), ("performance_baselines", {}), ("adaptation_strategies", [])):
                         self.knowledge_base.setdefault(key, {}).setdefault(ctx.value, default.copy())
@@ -2366,6 +2542,11 @@ class ContextualAdaptationEngine:
             if isinstance(value, dict):
                 if not value: continue
                 entry = copy.deepcopy(value)
+                # DETECCIÓN DE CORRUPCIÓN (2.8.8.9.6.3): una entrada sin
+                # EVIDENCIA no es una estrategia aprendida (2.8.8.9.2.1) y no
+                # se restaura: ofrecerla con una confianza inventada sería usar
+                # el dato corrupto como si fuera válido.
+                if not self._estrategia_aprendida_valida(entry): continue
                 flat.setdefault(str(entry.get("strategy_id") or key), entry)
                 continue
             if not isinstance(value, list): continue
@@ -2374,6 +2555,7 @@ class ContextualAdaptationEngine:
                 normalized = copy.deepcopy(entry)
                 sid = str(normalized.get("strategy_id") or f"strategy_{key}_{position}")
                 normalized.setdefault("strategy_id", sid)
+                if not self._estrategia_aprendida_valida(normalized): continue
                 flat.setdefault(sid, normalized)
         return flat
 
@@ -2598,9 +2780,16 @@ class ContextualAdaptationEngine:
         if not os.path.isfile(path): return
         try:
             with open(path, "r", encoding="utf-8") as handle: payload = json.load(handle)
-            self.knowledge_base["goal_adaptation_feedback"] = payload.get("goal_adaptation_feedback", [])
+            if not isinstance(payload, dict): return
+            # DETECCIÓN DE CORRUPCIÓN (2.8.8.9.6.3): la sección corrupta NO
+            # llega al estado y las filas que no son filas válidas se
+            # descartan; el resto del fichero se carga con normalidad.
+            rows = payload.get("goal_adaptation_feedback", None)
+            if isinstance(rows, list):
+                self.knowledge_base["goal_adaptation_feedback"] = [row for row in rows if self._fila_valida(row, "goal_adaptation_feedback")]
             history = payload.get("adaptation_history", [])
-            if history: self.adaptation_history = [_AdaptationHistoryEntry(row) for row in history if isinstance(row, dict)]
+            if isinstance(history, list) and history:
+                self.adaptation_history = [_AdaptationHistoryEntry(row) for row in history if isinstance(row, dict)]
         except Exception as exc: self.logger.error("Error cargando feedback Goal: %s", exc)
 
     def _load_goal_adaptation_learning_results(self) -> None:
@@ -2613,8 +2802,15 @@ class ContextualAdaptationEngine:
             # el mismo filtro de validación que el guardado, de modo que solo
             # se recuperan los patrones validados (confianza >= umbral y mínimo
             # de observaciones similares).
-            loaded_results = payload.get("learning_results", self.knowledge_base.get("learning_results", []))
-            self.knowledge_base["learning_results"] = self._recover_learning_patterns(loaded_results)
+            # DETECCIÓN DE CORRUPCIÓN (2.8.8.9.6.3): una sección que no es una
+            # lista NO llega al estado y las filas que no son filas válidas se
+            # descartan; el resto del fichero se carga con normalidad.
+            loaded_results = payload.get("learning_results", None)
+            if isinstance(loaded_results, list):
+                filas = [row for row in loaded_results if self._fila_valida(row, "goal_adaptation_learning_results")]
+                self.knowledge_base["learning_results"] = self._recover_learning_patterns(filas)
+            elif loaded_results is None:
+                self.knowledge_base["learning_results"] = self._recover_learning_patterns(self.knowledge_base.get("learning_results", []))
             # El contexto exacto con el que se aprendieron las estrategias solo
             # consta en `updated_strategies` de cada resultado de aprendizaje, así
             # que se restaura primero; el índice plano completa las que falten.
@@ -2736,6 +2932,175 @@ class ContextualAdaptationEngine:
         absent_count = sum(len(sections_missing) for sections_missing in absent.values())
         return {"expected": sections, "checked": checked, "absent": absent, "absent_count": absent_count,
                 "has_absent": bool(absent), "missing_files": missing_files, "unreadable": unreadable}
+
+    # Detección de corrupción (2.8.8.9.6.3)
+    #
+    # La CORRUPCIÓN es la DESVIACIÓN del FORMATO REAL declarado en
+    # `_CORRUPTION_CRITERIA` (2.8.8.9.6.1) en un contenido que está PRESENTE.
+    # La AUSENCIA (2.8.8.9.5.1) y la ILEGIBILIDAD (2.8.8.9.5.2) son otros
+    # fenómenos: NO se reclasifican como corrupción y se listan aparte, igual
+    # que en `detect_absent_sections`.
+    #
+    # `detect_corruption()` es de SOLO LECTURA: lee los ficheros existentes y
+    # NO crea ficheros ni altera el estado del motor.
+    def detect_corruption(self) -> Dict[str, Any]:
+        """Detecta la corrupción del contenido en los ficheros de persistencia.
+
+        Operacion de SOLO LECTURA: no crea ficheros ni altera el estado del
+        motor. Solo se examinan los ficheros que EXISTEN y son LEGIBLES.
+
+        Por cada fichero se informan las CLASES de corrupción DETECTADAS (las
+        declaradas en `corruption_criteria()`), con su `id`, `target`,
+        `violation`, `severity` y la `location` donde se ha encontrado la
+        desviación. Los ficheros ausentes se listan en `missing_files` y los
+        ilegibles en `unreadable`: su detección es la de 2.8.8.9.5.1/5.2.
+        """
+        paths = self.expected_storage_paths()
+        corrupted: Dict[str, List[Dict[str, Any]]] = {}
+        missing_files: List[str] = []
+        unreadable: Dict[str, Any] = {}
+        checked: List[str] = []
+        for name, path in paths.items():
+            if not os.path.isfile(path):
+                missing_files.append(name); continue
+            try:
+                with open(path, "r", encoding="utf-8") as handle: payload = json.load(handle)
+            except Exception:
+                unreadable[name] = {"path": path, "reason": "unreadable_file"}; continue
+            detections = self._detect_corruption_in(name, payload)
+            if detections: corrupted[name] = detections
+            checked.append(name)
+        corruption_count = sum(len(items) for items in corrupted.values())
+        return {"expected": paths, "checked": checked, "corrupted": corrupted, "corruption_count": corruption_count,
+                "has_corruption": bool(corrupted), "missing_files": missing_files, "unreadable": unreadable}
+
+    def _deteccion(self, class_id: str, location: str) -> Dict[str, Any]:
+        """Desviación detectada, con los datos de la clase declarada."""
+        for spec in (self._CORRUPTION_CRITERIA.get("files", {}) or {}).values():
+            for clase in spec.get("corruptions", []) or []:
+                if clase.get("id") == class_id:
+                    return {"id": class_id, "target": clase.get("target"), "violation": clase.get("violation"),
+                            "severity": clase.get("severity"), "location": location}
+        return {"id": class_id, "target": None, "violation": None, "severity": None, "location": location}
+
+    def _detect_corruption_in(self, name: str, payload: Any) -> List[Dict[str, Any]]:
+        """Desviaciones detectadas en un fichero de persistencia."""
+        detector = {"adaptation_rules": self._detect_corruption_rules,
+                    "knowledge_base": self._detect_corruption_knowledge_base,
+                    "goal_adaptation_feedback": self._detect_corruption_feedback,
+                    "goal_adaptation_learning_results": self._detect_corruption_learning_results}.get(name)
+        return list(detector(payload)) if detector else []
+
+    @staticmethod
+    def _es_convertible_a_entero(value: Any) -> bool:
+        """Comprobar si `int(value)` no lanza, como hace el cargador real."""
+        try: int(value); return True
+        except (TypeError, ValueError): return False
+
+    @staticmethod
+    def _es_marca_iso(value: Any) -> bool:
+        """Comprobar si una marca de tiempo se puede leer como ISO."""
+        try: datetime.fromisoformat(str(value)); return True
+        except (TypeError, ValueError): return False
+
+    def _detect_corruption_rules(self, payload: Any) -> List[Dict[str, Any]]:
+        """Desviaciones del FORMATO REAL de `contextual_adaptation_rules.json`."""
+        detections: List[Dict[str, Any]] = []
+        rows = payload.get("rules", []) if isinstance(payload, dict) else payload
+        if not isinstance(rows, list):
+            return [self._deteccion("adaptation_rules.rules_wrong_type", "rules")]
+        for index, row in enumerate(rows):
+            location = f"rules[{index}]"
+            if not isinstance(row, dict):
+                detections.append(self._deteccion("adaptation_rules.row_not_mapping", location)); continue
+            if not row.get("rule_id"):
+                detections.append(self._deteccion("adaptation_rules.row_missing_identity", f"{location}.rule_id"))
+            if "adaptation_actions" in row and not isinstance(row["adaptation_actions"], list):
+                detections.append(self._deteccion("adaptation_rules.actions_string", f"{location}.adaptation_actions"))
+            if "enabled" in row and not isinstance(row["enabled"], bool):
+                detections.append(self._deteccion("adaptation_rules.enabled_string", f"{location}.enabled"))
+            if "confidence_threshold" in row and not _cumple_tipo(row["confidence_threshold"], "number"):
+                detections.append(self._deteccion("adaptation_rules.threshold_not_numeric", f"{location}.confidence_threshold"))
+            if "success_rate" in row and not _cumple_tipo(row["success_rate"], "number"):
+                detections.append(self._deteccion("adaptation_rules.success_rate_not_numeric", f"{location}.success_rate"))
+            if "context_triggers" in row and not isinstance(row["context_triggers"], list):
+                detections.append(self._deteccion("adaptation_rules.triggers_not_list", f"{location}.context_triggers"))
+            else:
+                for position, trigger in enumerate(row.get("context_triggers", []) or []):
+                    if self._coerce_context(trigger) is None:
+                        detections.append(self._deteccion("adaptation_rules.trigger_invalid_value",
+                                                           f"{location}.context_triggers[{position}]"))
+            if row.get("last_execution") is not None and not self._es_marca_iso(row["last_execution"]):
+                detections.append(self._deteccion("adaptation_rules.last_execution_not_iso", f"{location}.last_execution"))
+            if "name" in row and not isinstance(row["name"], str):
+                detections.append(self._deteccion("adaptation_rules.name_not_string", f"{location}.name"))
+            if "priority" in row and not self._es_convertible_a_entero(row["priority"]):
+                detections.append(self._deteccion("adaptation_rules.priority_not_castable", f"{location}.priority"))
+            if "execution_count" in row and not self._es_convertible_a_entero(row["execution_count"]):
+                detections.append(self._deteccion("adaptation_rules.execution_count_not_castable", f"{location}.execution_count"))
+            if "metadata" in row and not isinstance(row["metadata"], dict):
+                detections.append(self._deteccion("adaptation_rules.metadata_not_mapping", f"{location}.metadata"))
+        return detections
+
+    def _detect_corruption_knowledge_base(self, payload: Any) -> List[Dict[str, Any]]:
+        """Desviaciones del FORMATO REAL de `contextual_knowledge_base.json`."""
+        detections: List[Dict[str, Any]] = []
+        data = payload.get("data", payload) if isinstance(payload, dict) else {}
+        if not isinstance(data, dict):
+            return [self._deteccion("knowledge_base.data_not_mapping", "data")]
+        for clave, valor in data.items():
+            location = f"data.{clave}"
+            if clave not in self._valores_por_defecto:
+                detections.append(self._deteccion("knowledge_base.unexpected_key", location)); continue
+            esperado = self._valores_por_defecto[clave]
+            if not _cumple_tipo(valor, _tipo_de_valor(esperado)):
+                detections.append(self._deteccion(
+                    "knowledge_base.strategies_not_mapping" if clave == "adaptation_strategies" else "knowledge_base.section_not_mapping",
+                    location)); continue
+            if isinstance(esperado, dict) and isinstance(valor, dict):
+                for contexto, sub in valor.items():
+                    if contexto not in esperado or not _cumple_tipo(sub, _tipo_de_valor(esperado[contexto])):
+                        detections.append(self._deteccion("knowledge_base.section_partial", f"{location}.{contexto}"))
+        return detections
+
+    def _detect_corruption_feedback(self, payload: Any) -> List[Dict[str, Any]]:
+        """Desviaciones del FORMATO REAL de `goal_adaptation_feedback.json`."""
+        detections: List[Dict[str, Any]] = []
+        if not isinstance(payload, dict): return detections
+        rows = payload.get("goal_adaptation_feedback", [])
+        if not isinstance(rows, list):
+            detections.append(self._deteccion("goal_adaptation_feedback.section_not_list", "goal_adaptation_feedback"))
+        else:
+            for index, row in enumerate(rows):
+                if not isinstance(row, dict):
+                    detections.append(self._deteccion("goal_adaptation_feedback.row_not_mapping", f"goal_adaptation_feedback[{index}]"))
+        history = payload.get("adaptation_history", [])
+        if not isinstance(history, list):
+            detections.append(self._deteccion("goal_adaptation_feedback.history_not_list", "adaptation_history"))
+        return detections
+
+    def _detect_corruption_learning_results(self, payload: Any) -> List[Dict[str, Any]]:
+        """Desviaciones del FORMATO REAL de `goal_adaptation_learning_results.json`."""
+        detections: List[Dict[str, Any]] = []
+        if not isinstance(payload, dict): return detections
+        rows = payload.get("learning_results", [])
+        if not isinstance(rows, list):
+            detections.append(self._deteccion("goal_adaptation_learning_results.learning_results_not_list", "learning_results"))
+        else:
+            for index, row in enumerate(rows):
+                if not isinstance(row, dict):
+                    detections.append(self._deteccion("goal_adaptation_learning_results.row_not_mapping", f"learning_results[{index}]"))
+        strategies = payload.get("adaptation_strategies", {})
+        if not isinstance(strategies, dict):
+            detections.append(self._deteccion("goal_adaptation_learning_results.strategies_not_mapping", "adaptation_strategies"))
+            return detections
+        for strategy_id, entrada in strategies.items():
+            location = f"adaptation_strategies.{strategy_id}"
+            if not isinstance(entrada, (dict, list)):
+                detections.append(self._deteccion("goal_adaptation_learning_results.strategy_value_not_mapping", location)); continue
+            if isinstance(entrada, dict) and not self._estrategia_aprendida_valida(entrada):
+                detections.append(self._deteccion("goal_adaptation_learning_results.strategy_missing_identity", location))
+        return detections
 
     # Comportamiento SIN DATOS (2.8.8.9.5.3)
     #
@@ -2866,6 +3231,42 @@ class ContextualAdaptationEngine:
             "motor sabe leer. La AUSENCIA de datos es otro fenómeno (2.8.8.9.5.1 y 2.8.8.9.5.2) "
             "y no se considera corrupción."
         ),
+        # CRITERIO DE LECTURA del contrato: cada clase declara TRES cosas
+        # distintas y no deben confundirse entre si.
+        #   - `severity`  clasifica la DESVIACION: lo que el dato corrupto
+        #                 significaria si se leyera como valido. Es una propiedad
+        #                 de la clase de corrupcion y NO cambia con la deteccion.
+        #   - `expected`  describe el EFECTO OBSERVABLE en el motor: lo que el
+        #                 dato corrupto produce en el estado una vez aplicada la
+        #                 deteccion de 2.8.8.9.6.3.
+        #   - `reason`    ancla la clase en el codigo real: que hace ahora el
+        #                 cargador y que haria SIN la deteccion.
+        "criterio_de_lectura": {
+            "severity": "clasifica la DESVIACION por si misma (su gravedad intrinseca), no el efecto que el cargador produce sobre ella",
+            "expected": "es el EFECTO OBSERVABLE en el motor despues de la deteccion de 2.8.8.9.6.3: es lo que la sonda contrasta contra el runtime",
+            "reason": "ancla la clase en el codigo real: que hace el cargador con el dato corrupto y que haria si la deteccion no existiera",
+        },
+        # REGISTRO de reconciliaciones del contrato. La `version` identifica la
+        # hoja que DECLARO el contrato; cada vez que la realidad del runtime
+        # cambia (y el contraste de la sonda deja de pasar) queda aqui la
+        # conciliacion que la vuelve a hacer coincidir con lo observado.
+        "reconciliation": [
+            {"unit": "2.8.8.9.6.3",
+             "reason": "la deteccion de corrupcion cambio lo que el cargador hace con el dato corrupto: el contraste por clase de la sonda de 2.8.8.9.6.1 paso a fallar en 17 clases, que son exactamente las clases cuyo efecto observable cambio",
+             "changed": ["expected", "reason"],
+             "unchanged": ["severity", "violation", "target", "real_format", "boundary", "invariants"],
+             "classes": ["adaptation_rules.actions_string", "adaptation_rules.enabled_string",
+                         "adaptation_rules.last_execution_not_iso", "adaptation_rules.name_not_string",
+                         "adaptation_rules.success_rate_not_numeric", "adaptation_rules.threshold_not_numeric",
+                         "adaptation_rules.trigger_invalid_value", "adaptation_rules.triggers_not_list",
+                         "goal_adaptation_feedback.row_not_mapping", "goal_adaptation_feedback.section_not_list",
+                         "goal_adaptation_learning_results.learning_results_not_list",
+                         "goal_adaptation_learning_results.row_not_mapping",
+                         "goal_adaptation_learning_results.strategy_missing_identity",
+                         "knowledge_base.section_not_mapping", "knowledge_base.section_partial",
+                         "knowledge_base.strategies_not_mapping", "knowledge_base.unexpected_key"],
+             "vocabulary": ["silently_ignored", "record_dropped"]},
+        ],
         # Frontera con 2.8.8.9.5.1/5.2: lo que ya está detectado como ausencia
         # o ilegibilidad NO se declara aquí como corrupción.
         "boundary": {
@@ -2887,8 +3288,8 @@ class ContextualAdaptationEngine:
         # que no está aquí es un contrato mal formado.
         "effect_vocabulary": {
             "rejected_whole_file": "el cargador aborta el fichero entero: avisa por log, devuelve False y se pierden también las filas válidas del mismo fichero",
-            "silently_ignored": "el cargador descarta la corrupción sin avisar: el contenido afectado no llega al estado y no queda rastro",
-            "record_dropped": "la fila inválida se descarta y el resto de las filas del mismo fichero sí se carga",
+            "silently_ignored": "el cargador descarta la corrupción: el CONTENIDO afectado (sección, clave o colección) no llega al estado y el motor conserva sus valores por defecto",
+            "record_dropped": "el cargador descarta la corrupción: la FILA inválida no llega al estado y el resto de las filas del mismo fichero sí se carga",
             "value_coerced": "la corrupción llega al estado con un valor DISTINTO del declarado, por conversión silenciosa",
             "state_contaminated": "la corrupción llega al estado TAL CUAL, contaminando la base de conocimiento",
             "read_api_raises": "una API pública de LECTURA lanza excepción con el fichero corrupto",
@@ -2959,36 +3360,36 @@ class ContextualAdaptationEngine:
                      "reason": "`dict(...)` sobre un valor que no es diccionario lanza ValueError y aborta la carga de TODO el fichero"},
                     {"id": "adaptation_rules.actions_string", "target": "rules[].adaptation_actions",
                      "violation": "wrong_type", "severity": "high",
-                     "expected": ["value_coerced"],
-                     "reason": "`list(...)` sobre una cadena la trocea en caracteres: las acciones quedan corruptas y se ejecutan"},
+                     "expected": ["record_dropped"],
+                     "reason": "la fila se aparta del FORMATO REAL y se descarta: la regla no llega al estado y el resto del fichero se carga; sin la deteccion, `list(\"abc\")` troceaba las acciones en caracteres y el motor las ejecutaba"},
                     {"id": "adaptation_rules.enabled_string", "target": "rules[].enabled",
                      "violation": "wrong_type", "severity": "critical",
-                     "expected": ["value_coerced"],
-                     "reason": "`bool(\"false\")` es True: una regla desactivada queda activada y el motor la aplica"},
+                     "expected": ["record_dropped"],
+                     "reason": "la fila se aparta del FORMATO REAL y se descarta: la regla desactivada no llega al estado; sin la deteccion, `bool(\"false\")` la activaba e invertia la decision de adaptacion"},
                     {"id": "adaptation_rules.threshold_not_numeric", "target": "rules[].confidence_threshold",
                      "violation": "invalid_value", "severity": "high",
-                     "expected": ["value_coerced"],
-                     "reason": "el umbral no numérico se degrada a 0.0: la regla pasa a aplicarse sin filtro de confianza"},
+                     "expected": ["record_dropped"],
+                     "reason": "la fila se aparta del FORMATO REAL y se descarta: la regla no llega al estado y el resto del fichero se carga; sin la deteccion, el umbral no numerico se degradaba a 0.0 y la regla se aplicaba sin filtro de confianza"},
                     {"id": "adaptation_rules.success_rate_not_numeric", "target": "rules[].success_rate",
                      "violation": "invalid_value", "severity": "medium",
-                     "expected": ["value_coerced"],
-                     "reason": "la tasa de éxito no numérica se degrada a 0.0 y falsea la evaluación de la regla"},
+                     "expected": ["record_dropped"],
+                     "reason": "la fila se aparta del FORMATO REAL y se descarta: la regla no llega al estado y el resto del fichero se carga; sin la deteccion, la tasa no numerica se degradaba a 0.0 y falseaba la evaluacion de la regla"},
                     {"id": "adaptation_rules.triggers_not_list", "target": "rules[].context_triggers",
                      "violation": "wrong_type", "severity": "high",
-                     "expected": ["value_coerced"],
-                     "reason": "una cadena de disparadores se recorre carácter a carácter y ninguno es un contexto válido: la regla nunca dispara"},
+                     "expected": ["record_dropped"],
+                     "reason": "la fila se aparta del FORMATO REAL y se descarta: la regla no llega al estado y el resto del fichero se carga; sin la deteccion, la cadena se recorria caracter a caracter y la regla nunca disparaba"},
                     {"id": "adaptation_rules.trigger_invalid_value", "target": "rules[].context_triggers[]",
                      "violation": "invalid_value", "severity": "medium",
-                     "expected": ["value_coerced"],
-                     "reason": "un disparador fuera de `ContextType` se filtra en silencio y la regla pierde ese disparador"},
+                     "expected": ["record_dropped"],
+                     "reason": "la fila se aparta del FORMATO REAL y se descarta: la regla no llega al estado y el resto del fichero se carga; sin la deteccion, el disparador fuera de `ContextType` se filtraba en silencio y la regla perdia ese disparador"},
                     {"id": "adaptation_rules.last_execution_not_iso", "target": "rules[].last_execution",
                      "violation": "invalid_value", "severity": "low",
-                     "expected": ["value_coerced"],
-                     "reason": "una marca de tiempo no ISO se degrada a None: tolerancia deliberada del cargador"},
+                     "expected": ["record_dropped"],
+                     "reason": "la fila se aparta del FORMATO REAL y se descarta: la regla no llega al estado y el resto del fichero se carga; sin la deteccion, la marca no ISO se degradaba a None, tolerancia deliberada del cargador"},
                     {"id": "adaptation_rules.name_not_string", "target": "rules[].name",
                      "violation": "wrong_type", "severity": "medium",
-                     "expected": ["state_contaminated"],
-                     "reason": "el nombre no se valida: el valor corrupto se conserva tal cual en la regla"},
+                     "expected": ["record_dropped"],
+                     "reason": "la fila se aparta del FORMATO REAL y se descarta: la regla no llega al estado y el resto del fichero se carga; sin la deteccion, el nombre no se validaba y el valor corrupto se conservaba tal cual en la regla"},
                 ],
             },
             "knowledge_base": {
@@ -3019,20 +3420,20 @@ class ContextualAdaptationEngine:
                      "reason": "si `data` no es un diccionario el cargador se salta el bloque entero: la base queda con sus valores por defecto y sin aviso"},
                     {"id": "knowledge_base.section_not_mapping", "target": "data.context_patterns",
                      "violation": "wrong_type", "severity": "high",
-                     "expected": ["state_contaminated", "rejected_whole_file"],
-                     "reason": "el `update` aplica el valor corrupto y el `setdefault` posterior revienta: la base queda contaminada y la carga se aborta"},
+                     "expected": ["silently_ignored"],
+                     "reason": "la seccion que no es diccionario se descarta: no llega al estado y la base conserva sus valores por defecto; el resto de las secciones del mismo fichero si se carga"},
                     {"id": "knowledge_base.strategies_not_mapping", "target": "data.adaptation_strategies",
                      "violation": "wrong_type", "severity": "critical",
-                     "expected": ["state_contaminated", "rejected_whole_file", "read_api_raises"],
-                     "reason": "el mapa de estrategias corrupto rompe `get_available_strategies`, que hace `.get` sobre un valor que no es diccionario"},
+                     "expected": ["silently_ignored"],
+                     "reason": "el mapa de estrategias que no es diccionario se descarta: no llega al estado y la base conserva sus valores por defecto; sin la deteccion, `get_available_strategies` rompia al hacer `.get` sobre un valor que no era diccionario"},
                     {"id": "knowledge_base.unexpected_key", "target": "data.<clave_desconocida>",
                      "violation": "unexpected_key", "severity": "low",
-                     "expected": ["state_contaminated"],
-                     "reason": "el `update` copia cualquier clave del payload a la base de conocimiento, aunque el motor nunca la escriba"},
+                     "expected": ["silently_ignored"],
+                     "reason": "una clave que el motor nunca escribe no se aplica: no llega al estado y el resto de la base se carga con normalidad"},
                     {"id": "knowledge_base.section_partial", "target": "data.context_patterns.<contexto>",
                      "violation": "wrong_type", "severity": "medium",
-                     "expected": ["state_contaminated"],
-                     "reason": "los contextos que faltan se rellenan, pero los que están con valor corrupto se conservan tal cual"},
+                     "expected": ["silently_ignored"],
+                     "reason": "una seccion con un contexto que no es lista se descarta entera: no llega al estado y la base conserva sus valores por defecto"},
                 ],
             },
             "goal_adaptation_feedback": {
@@ -3058,12 +3459,12 @@ class ContextualAdaptationEngine:
                 "corruptions": [
                     {"id": "goal_adaptation_feedback.section_not_list", "target": "goal_adaptation_feedback",
                      "violation": "wrong_type", "severity": "critical",
-                     "expected": ["state_contaminated", "write_api_breaks"],
-                     "reason": "el valor se copia tal cual a la base de conocimiento y `_capture_feedback` revienta al hacer `.append` sobre él"},
+                     "expected": ["silently_ignored"],
+                     "reason": "la seccion que no es lista no llega al estado: la base conserva su lista vacia y la escritura posterior ya no revienta; sin la deteccion, el valor se copiaba tal cual y `_capture_feedback` reventaba al hacer `.append` sobre el"},
                     {"id": "goal_adaptation_feedback.row_not_mapping", "target": "goal_adaptation_feedback[]",
                      "violation": "wrong_type", "severity": "medium",
-                     "expected": ["state_contaminated"],
-                     "reason": "la fila no es un diccionario: se copia tal cual a la base de conocimiento sin validar"},
+                     "expected": ["record_dropped"],
+                     "reason": "la fila que no es un diccionario se descarta: no llega al estado y el resto de las filas del mismo fichero si se carga"},
                     {"id": "goal_adaptation_feedback.history_not_list", "target": "adaptation_history",
                      "violation": "wrong_type", "severity": "high",
                      "expected": ["silently_ignored"],
@@ -3090,12 +3491,12 @@ class ContextualAdaptationEngine:
                 "corruptions": [
                     {"id": "goal_adaptation_learning_results.learning_results_not_list", "target": "learning_results",
                      "violation": "wrong_type", "severity": "critical",
-                     "expected": ["state_contaminated", "corruption_persisted"],
-                     "reason": "el valor se copia tal cual y al guardar sus claves se escriben como filas: la corrupción se propaga al disco"},
+                     "expected": ["silently_ignored"],
+                     "reason": "la seccion que no es lista no llega al estado: la base conserva su lista vacia y al guardar ya no se escribe la corrupcion; sin la deteccion, el valor se copiaba tal cual y sus claves se escribian como filas, propagando la corrupcion al disco"},
                     {"id": "goal_adaptation_learning_results.row_not_mapping", "target": "learning_results[]",
                      "violation": "wrong_type", "severity": "high",
-                     "expected": ["state_contaminated", "corruption_persisted"],
-                     "reason": "el filtro de validación conserva las filas que no son diccionario y se vuelven a escribir"},
+                     "expected": ["record_dropped"],
+                     "reason": "la fila que no es un diccionario se descarta: no llega al estado y el resto de las filas del mismo fichero si se carga; sin la deteccion, el filtro conservaba la fila y se volvia a escribir"},
                     {"id": "goal_adaptation_learning_results.strategies_not_mapping", "target": "adaptation_strategies",
                      "violation": "wrong_type", "severity": "high",
                      "expected": ["silently_ignored"],
@@ -3106,8 +3507,8 @@ class ContextualAdaptationEngine:
                      "reason": "una entrada que no es diccionario ni lista se ignora en el aplanado y esa estrategia no se restaura"},
                     {"id": "goal_adaptation_learning_results.strategy_missing_identity", "target": "adaptation_strategies.<strategy_id>",
                      "violation": "missing_identity", "severity": "critical",
-                     "expected": ["state_contaminated", "value_coerced"],
-                     "reason": "el contrato de identidad de 2.8.8.9.2.1 se exige al GUARDAR pero no al CARGAR: la estrategia sin evidencia se ofrece con confianza inventada"},
+                     "expected": ["silently_ignored"],
+                     "reason": "una estrategia sin evidencia no se restaura: no llega al estado y no se ofrece con una confianza inventada; sin la deteccion, el contrato de identidad de 2.8.8.9.2.1 se exigia al GUARDAR pero no al CARGAR"},
                 ],
             },
         },
@@ -3206,6 +3607,7 @@ class ContextualAdaptationEngine:
     def get_engine_status(self) -> Dict[str, Any]:
         storage = self.detect_absent_storage()
         sections = self.detect_absent_sections()
+        corruption = self.detect_corruption()
         return {"adaptation_enabled": self.config.get("adaptation_enabled", True), "is_adapting": self.is_adapting,
             "current_context": self.current_context.context_type.value if self.current_context else None, "adaptation_level": self.adaptation_level.value,
             "total_snapshots": len(self.context_snapshots), "total_rules": len(self.adaptation_rules),
@@ -3213,7 +3615,8 @@ class ContextualAdaptationEngine:
             "active_modes": {"lightweight": self._lightweight_mode, "offline": self._offline_mode, "performance": self._performance_mode, "recovery": self._recovery_mode, "safe": self._safe_mode},
             "knowledge_base_stats": {"context_patterns": len(self.knowledge_base.get("context_patterns", {})), "adaptation_strategies": len(self.knowledge_base.get("adaptation_strategies", {})), "transfer_efficiency": len(self.knowledge_base.get("transfer_efficiency", {}))},
             "storage": {"absent": storage["absent"], "absent_count": storage["absent_count"]},
-            "storage_sections": {"absent": sections["absent"], "absent_count": sections["absent_count"]}}
+            "storage_sections": {"absent": sections["absent"], "absent_count": sections["absent_count"]},
+            "corruption": {"corrupted": corruption["corrupted"], "corruption_count": corruption["corruption_count"]}}
 
     # Persistencia adicional y helpers
     @staticmethod

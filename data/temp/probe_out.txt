@@ -1,0 +1,342 @@
+﻿
+SONDA DE CRITERIOS DE CORRUPCION (2.8.8.9.6.1)
+
+== PARTE A: FORMA DEL CONTRATO DECLARADO ==
+  [OK  ] `corruption_criteria()` devuelve un diccionario :: dict
+  [OK  ] El contrato declara su version :: '2.8.8.9.6.1'
+  [OK  ] El contrato declara un principio
+  [OK  ] El contrato declara la seccion `boundary`
+  [OK  ] El contrato declara la seccion `effect_vocabulary`
+  [OK  ] El contrato declara la seccion `severity_vocabulary`
+  [OK  ] El contrato declara la seccion `violation_vocabulary`
+  [OK  ] El contrato declara la seccion `files`
+  [OK  ] El contrato declara la seccion `invariants`
+  [OK  ] El contrato declara la frontera con 2.8.8.9.5.1/5.2
+  [OK  ] Todo caso de la frontera tiene due±o (2.8.8.9.5.1/5.2)
+  [OK  ] `files` es un diccionario no vacio
+  [OK  ] `files.adaptation_rules` declara fichero, escritor y cargador
+  [OK  ] `files.adaptation_rules.real_format` declara el formato real
+  [OK  ] `files.adaptation_rules.corruptions` es una lista no vacia
+  [OK  ] `files.knowledge_base` declara fichero, escritor y cargador
+  [OK  ] `files.knowledge_base.real_format` declara el formato real
+  [OK  ] `files.knowledge_base.corruptions` es una lista no vacia
+  [OK  ] `files.goal_adaptation_feedback` declara fichero, escritor y cargador
+  [OK  ] `files.goal_adaptation_feedback.real_format` declara el formato real
+  [OK  ] `files.goal_adaptation_feedback.corruptions` es una lista no vacia
+  [OK  ] `files.goal_adaptation_learning_results` declara fichero, escritor y cargador
+  [OK  ] `files.goal_adaptation_learning_results.real_format` declara el formato real
+  [OK  ] `files.goal_adaptation_learning_results.corruptions` es una lista no vacia
+  [OK  ] La clase `adaptation_rules.rules_wrong_type` apunta a una seccion del formato real :: target=rules 
+secciones=['last_updated', 'rules', 'total_rules', 'version']
+  [OK  ] La clase `adaptation_rules.row_not_mapping` apunta a una seccion del formato real :: target=rules[] 
+secciones=['last_updated', 'rules', 'total_rules', 'version']
+  [OK  ] La clase `adaptation_rules.row_missing_identity` apunta a una seccion del formato real :: 
+target=rules[].rule_id secciones=['last_updated', 'rules', 'total_rules', 'version']
+  [OK  ] La clase `adaptation_rules.priority_not_castable` apunta a una seccion del formato real :: 
+target=rules[].priority secciones=['last_updated', 'rules', 'total_rules', 'version']
+  [OK  ] La clase `adaptation_rules.execution_count_not_castable` apunta a una seccion del formato real :: 
+target=rules[].execution_count secciones=['last_updated', 'rules', 'total_rules', 'version']
+  [OK  ] La clase `adaptation_rules.metadata_not_mapping` apunta a una seccion del formato real :: 
+target=rules[].metadata secciones=['last_updated', 'rules', 'total_rules', 'version']
+  [OK  ] La clase `adaptation_rules.actions_string` apunta a una seccion del formato real :: 
+target=rules[].adaptation_actions secciones=['last_updated', 'rules', 'total_rules', 'version']
+  [OK  ] La clase `adaptation_rules.enabled_string` apunta a una seccion del formato real :: target=rules[].enabled 
+secciones=['last_updated', 'rules', 'total_rules', 'version']
+  [OK  ] La clase `adaptation_rules.threshold_not_numeric` apunta a una seccion del formato real :: 
+target=rules[].confidence_threshold secciones=['last_updated', 'rules', 'total_rules', 'version']
+  [OK  ] La clase `adaptation_rules.success_rate_not_numeric` apunta a una seccion del formato real :: 
+target=rules[].success_rate secciones=['last_updated', 'rules', 'total_rules', 'version']
+  [OK  ] La clase `adaptation_rules.triggers_not_list` apunta a una seccion del formato real :: 
+target=rules[].context_triggers secciones=['last_updated', 'rules', 'total_rules', 'version']
+  [OK  ] La clase `adaptation_rules.trigger_invalid_value` apunta a una seccion del formato real :: 
+target=rules[].context_triggers[] secciones=['last_updated', 'rules', 'total_rules', 'version']
+  [OK  ] La clase `adaptation_rules.last_execution_not_iso` apunta a una seccion del formato real :: 
+target=rules[].last_execution secciones=['last_updated', 'rules', 'total_rules', 'version']
+  [OK  ] La clase `adaptation_rules.name_not_string` apunta a una seccion del formato real :: target=rules[].name 
+secciones=['last_updated', 'rules', 'total_rules', 'version']
+  [OK  ] La clase `knowledge_base.data_not_mapping` apunta a una seccion del formato real :: target=data 
+secciones=['adaptation_history', 'context_snapshots', 'data', 'knowledge_transfers', 'last_updated', 'version']
+  [OK  ] La clase `knowledge_base.section_not_mapping` apunta a una seccion del formato real :: 
+target=data.context_patterns secciones=['adaptation_history', 'context_snapshots', 'data', 'knowledge_transfers', 
+'last_updated', 'version']
+  [OK  ] La clase `knowledge_base.strategies_not_mapping` apunta a una seccion del formato real :: 
+target=data.adaptation_strategies secciones=['adaptation_history', 'context_snapshots', 'data', 'knowledge_transfers', 
+'last_updated', 'version']
+  [OK  ] La clase `knowledge_base.unexpected_key` apunta a una seccion del formato real :: 
+target=data.<clave_desconocida> secciones=['adaptation_history', 'context_snapshots', 'data', 'knowledge_transfers', 
+'last_updated', 'version']
+  [OK  ] La clase `knowledge_base.section_partial` apunta a una seccion del formato real :: 
+target=data.context_patterns.<contexto> secciones=['adaptation_history', 'context_snapshots', 'data', 
+'knowledge_transfers', 'last_updated', 'version']
+  [OK  ] La clase `goal_adaptation_feedback.section_not_list` apunta a una seccion del formato real :: 
+target=goal_adaptation_feedback secciones=['adaptation_history', 'goal_adaptation_feedback', 'last_updated']
+  [OK  ] La clase `goal_adaptation_feedback.row_not_mapping` apunta a una seccion del formato real :: 
+target=goal_adaptation_feedback[] secciones=['adaptation_history', 'goal_adaptation_feedback', 'last_updated']
+  [OK  ] La clase `goal_adaptation_feedback.history_not_list` apunta a una seccion del formato real :: 
+target=adaptation_history secciones=['adaptation_history', 'goal_adaptation_feedback', 'last_updated']
+  [OK  ] La clase `goal_adaptation_learning_results.learning_results_not_list` apunta a una seccion del formato real 
+:: target=learning_results secciones=['adaptation_strategies', 'last_updated', 'learning_results']
+  [OK  ] La clase `goal_adaptation_learning_results.row_not_mapping` apunta a una seccion del formato real :: 
+target=learning_results[] secciones=['adaptation_strategies', 'last_updated', 'learning_results']
+  [OK  ] La clase `goal_adaptation_learning_results.strategies_not_mapping` apunta a una seccion del formato real :: 
+target=adaptation_strategies secciones=['adaptation_strategies', 'last_updated', 'learning_results']
+  [OK  ] La clase `goal_adaptation_learning_results.strategy_value_not_mapping` apunta a una seccion del formato real 
+:: target=adaptation_strategies.<strategy_id> secciones=['adaptation_strategies', 'last_updated', 'learning_results']
+  [OK  ] La clase `goal_adaptation_learning_results.strategy_missing_identity` apunta a una seccion del formato real 
+:: target=adaptation_strategies.<strategy_id> secciones=['adaptation_strategies', 'last_updated', 'learning_results']
+  [OK  ] El vocabulario de efectos es no vacio
+  [OK  ] El vocabulario de severidad es no vacio
+  [OK  ] El vocabulario de violaciones es no vacio
+  [OK  ] La clase `adaptation_rules.rules_wrong_type` declara target, violation, severity y expected
+  [OK  ] La clase `adaptation_rules.rules_wrong_type` usa un efecto declarado :: efectos=['silently_ignored']
+  [OK  ] La clase `adaptation_rules.rules_wrong_type` usa una severidad declarada :: 'medium'
+  [OK  ] La clase `adaptation_rules.rules_wrong_type` usa una violacion declarada :: 'wrong_type'
+  [OK  ] La clase `adaptation_rules.row_not_mapping` declara target, violation, severity y expected
+  [OK  ] La clase `adaptation_rules.row_not_mapping` usa un efecto declarado :: efectos=['record_dropped']
+  [OK  ] La clase `adaptation_rules.row_not_mapping` usa una severidad declarada :: 'medium'
+  [OK  ] La clase `adaptation_rules.row_not_mapping` usa una violacion declarada :: 'wrong_type'
+  [OK  ] La clase `adaptation_rules.row_missing_identity` declara target, violation, severity y expected
+  [OK  ] La clase `adaptation_rules.row_missing_identity` usa un efecto declarado :: efectos=['record_dropped']
+  [OK  ] La clase `adaptation_rules.row_missing_identity` usa una severidad declarada :: 'medium'
+  [OK  ] La clase `adaptation_rules.row_missing_identity` usa una violacion declarada :: 'missing_identity'
+  [OK  ] La clase `adaptation_rules.priority_not_castable` declara target, violation, severity y expected
+  [OK  ] La clase `adaptation_rules.priority_not_castable` usa un efecto declarado :: efectos=['rejected_whole_file']
+  [OK  ] La clase `adaptation_rules.priority_not_castable` usa una severidad declarada :: 'high'
+  [OK  ] La clase `adaptation_rules.priority_not_castable` usa una violacion declarada :: 'invalid_value'
+  [OK  ] La clase `adaptation_rules.execution_count_not_castable` declara target, violation, severity y expected
+  [OK  ] La clase `adaptation_rules.execution_count_not_castable` usa un efecto declarado :: 
+efectos=['rejected_whole_file']
+  [OK  ] La clase `adaptation_rules.execution_count_not_castable` usa una severidad declarada :: 'high'
+  [OK  ] La clase `adaptation_rules.execution_count_not_castable` usa una violacion declarada :: 'invalid_value'
+  [OK  ] La clase `adaptation_rules.metadata_not_mapping` declara target, violation, severity y expected
+  [OK  ] La clase `adaptation_rules.metadata_not_mapping` usa un efecto declarado :: efectos=['rejected_whole_file']
+  [OK  ] La clase `adaptation_rules.metadata_not_mapping` usa una severidad declarada :: 'high'
+  [OK  ] La clase `adaptation_rules.metadata_not_mapping` usa una violacion declarada :: 'wrong_type'
+  [OK  ] La clase `adaptation_rules.actions_string` declara target, violation, severity y expected
+  [OK  ] La clase `adaptation_rules.actions_string` usa un efecto declarado :: efectos=['record_dropped']
+  [OK  ] La clase `adaptation_rules.actions_string` usa una severidad declarada :: 'high'
+  [OK  ] La clase `adaptation_rules.actions_string` usa una violacion declarada :: 'wrong_type'
+  [OK  ] La clase `adaptation_rules.enabled_string` declara target, violation, severity y expected
+  [OK  ] La clase `adaptation_rules.enabled_string` usa un efecto declarado :: efectos=['record_dropped']
+  [OK  ] La clase `adaptation_rules.enabled_string` usa una severidad declarada :: 'critical'
+  [OK  ] La clase `adaptation_rules.enabled_string` usa una violacion declarada :: 'wrong_type'
+  [OK  ] La clase `adaptation_rules.threshold_not_numeric` declara target, violation, severity y expected
+  [OK  ] La clase `adaptation_rules.threshold_not_numeric` usa un efecto declarado :: efectos=['record_dropped']
+  [OK  ] La clase `adaptation_rules.threshold_not_numeric` usa una severidad declarada :: 'high'
+  [OK  ] La clase `adaptation_rules.threshold_not_numeric` usa una violacion declarada :: 'invalid_value'
+  [OK  ] La clase `adaptation_rules.success_rate_not_numeric` declara target, violation, severity y expected
+  [OK  ] La clase `adaptation_rules.success_rate_not_numeric` usa un efecto declarado :: efectos=['record_dropped']
+  [OK  ] La clase `adaptation_rules.success_rate_not_numeric` usa una severidad declarada :: 'medium'
+  [OK  ] La clase `adaptation_rules.success_rate_not_numeric` usa una violacion declarada :: 'invalid_value'
+  [OK  ] La clase `adaptation_rules.triggers_not_list` declara target, violation, severity y expected
+  [OK  ] La clase `adaptation_rules.triggers_not_list` usa un efecto declarado :: efectos=['record_dropped']
+  [OK  ] La clase `adaptation_rules.triggers_not_list` usa una severidad declarada :: 'high'
+  [OK  ] La clase `adaptation_rules.triggers_not_list` usa una violacion declarada :: 'wrong_type'
+  [OK  ] La clase `adaptation_rules.trigger_invalid_value` declara target, violation, severity y expected
+  [OK  ] La clase `adaptation_rules.trigger_invalid_value` usa un efecto declarado :: efectos=['record_dropped']
+  [OK  ] La clase `adaptation_rules.trigger_invalid_value` usa una severidad declarada :: 'medium'
+  [OK  ] La clase `adaptation_rules.trigger_invalid_value` usa una violacion declarada :: 'invalid_value'
+  [OK  ] La clase `adaptation_rules.last_execution_not_iso` declara target, violation, severity y expected
+  [OK  ] La clase `adaptation_rules.last_execution_not_iso` usa un efecto declarado :: efectos=['record_dropped']
+  [OK  ] La clase `adaptation_rules.last_execution_not_iso` usa una severidad declarada :: 'low'
+  [OK  ] La clase `adaptation_rules.last_execution_not_iso` usa una violacion declarada :: 'invalid_value'
+  [OK  ] La clase `adaptation_rules.name_not_string` declara target, violation, severity y expected
+  [OK  ] La clase `adaptation_rules.name_not_string` usa un efecto declarado :: efectos=['record_dropped']
+  [OK  ] La clase `adaptation_rules.name_not_string` usa una severidad declarada :: 'medium'
+  [OK  ] La clase `adaptation_rules.name_not_string` usa una violacion declarada :: 'wrong_type'
+  [OK  ] La clase `knowledge_base.data_not_mapping` declara target, violation, severity y expected
+  [OK  ] La clase `knowledge_base.data_not_mapping` usa un efecto declarado :: efectos=['silently_ignored']
+  [OK  ] La clase `knowledge_base.data_not_mapping` usa una severidad declarada :: 'high'
+  [OK  ] La clase `knowledge_base.data_not_mapping` usa una violacion declarada :: 'wrong_type'
+  [OK  ] La clase `knowledge_base.section_not_mapping` declara target, violation, severity y expected
+  [OK  ] La clase `knowledge_base.section_not_mapping` usa un efecto declarado :: efectos=['silently_ignored']
+  [OK  ] La clase `knowledge_base.section_not_mapping` usa una severidad declarada :: 'high'
+  [OK  ] La clase `knowledge_base.section_not_mapping` usa una violacion declarada :: 'wrong_type'
+  [OK  ] La clase `knowledge_base.strategies_not_mapping` declara target, violation, severity y expected
+  [OK  ] La clase `knowledge_base.strategies_not_mapping` usa un efecto declarado :: efectos=['silently_ignored']
+  [OK  ] La clase `knowledge_base.strategies_not_mapping` usa una severidad declarada :: 'critical'
+  [OK  ] La clase `knowledge_base.strategies_not_mapping` usa una violacion declarada :: 'wrong_type'
+  [OK  ] La clase `knowledge_base.unexpected_key` declara target, violation, severity y expected
+  [OK  ] La clase `knowledge_base.unexpected_key` usa un efecto declarado :: efectos=['silently_ignored']
+  [OK  ] La clase `knowledge_base.unexpected_key` usa una severidad declarada :: 'low'
+  [OK  ] La clase `knowledge_base.unexpected_key` usa una violacion declarada :: 'unexpected_key'
+  [OK  ] La clase `knowledge_base.section_partial` declara target, violation, severity y expected
+  [OK  ] La clase `knowledge_base.section_partial` usa un efecto declarado :: efectos=['silently_ignored']
+  [OK  ] La clase `knowledge_base.section_partial` usa una severidad declarada :: 'medium'
+  [OK  ] La clase `knowledge_base.section_partial` usa una violacion declarada :: 'wrong_type'
+  [OK  ] La clase `goal_adaptation_feedback.section_not_list` declara target, violation, severity y expected
+  [OK  ] La clase `goal_adaptation_feedback.section_not_list` usa un efecto declarado :: efectos=['silently_ignored']
+  [OK  ] La clase `goal_adaptation_feedback.section_not_list` usa una severidad declarada :: 'critical'
+  [OK  ] La clase `goal_adaptation_feedback.section_not_list` usa una violacion declarada :: 'wrong_type'
+  [OK  ] La clase `goal_adaptation_feedback.row_not_mapping` declara target, violation, severity y expected
+  [OK  ] La clase `goal_adaptation_feedback.row_not_mapping` usa un efecto declarado :: efectos=['record_dropped']
+  [OK  ] La clase `goal_adaptation_feedback.row_not_mapping` usa una severidad declarada :: 'medium'
+  [OK  ] La clase `goal_adaptation_feedback.row_not_mapping` usa una violacion declarada :: 'wrong_type'
+  [OK  ] La clase `goal_adaptation_feedback.history_not_list` declara target, violation, severity y expected
+  [OK  ] La clase `goal_adaptation_feedback.history_not_list` usa un efecto declarado :: efectos=['silently_ignored']
+  [OK  ] La clase `goal_adaptation_feedback.history_not_list` usa una severidad declarada :: 'high'
+  [OK  ] La clase `goal_adaptation_feedback.history_not_list` usa una violacion declarada :: 'wrong_type'
+  [OK  ] La clase `goal_adaptation_learning_results.learning_results_not_list` declara target, violation, severity y 
+expected
+  [OK  ] La clase `goal_adaptation_learning_results.learning_results_not_list` usa un efecto declarado :: 
+efectos=['silently_ignored']
+  [OK  ] La clase `goal_adaptation_learning_results.learning_results_not_list` usa una severidad declarada :: 
+'critical'
+  [OK  ] La clase `goal_adaptation_learning_results.learning_results_not_list` usa una violacion declarada :: 
+'wrong_type'
+  [OK  ] La clase `goal_adaptation_learning_results.row_not_mapping` declara target, violation, severity y expected
+  [OK  ] La clase `goal_adaptation_learning_results.row_not_mapping` usa un efecto declarado :: 
+efectos=['record_dropped']
+  [OK  ] La clase `goal_adaptation_learning_results.row_not_mapping` usa una severidad declarada :: 'high'
+  [OK  ] La clase `goal_adaptation_learning_results.row_not_mapping` usa una violacion declarada :: 'wrong_type'
+  [OK  ] La clase `goal_adaptation_learning_results.strategies_not_mapping` declara target, violation, severity y 
+expected
+  [OK  ] La clase `goal_adaptation_learning_results.strategies_not_mapping` usa un efecto declarado :: 
+efectos=['silently_ignored']
+  [OK  ] La clase `goal_adaptation_learning_results.strategies_not_mapping` usa una severidad declarada :: 'high'
+  [OK  ] La clase `goal_adaptation_learning_results.strategies_not_mapping` usa una violacion declarada :: 'wrong_type'
+  [OK  ] La clase `goal_adaptation_learning_results.strategy_value_not_mapping` declara target, violation, severity y 
+expected
+  [OK  ] La clase `goal_adaptation_learning_results.strategy_value_not_mapping` usa un efecto declarado :: 
+efectos=['silently_ignored']
+  [OK  ] La clase `goal_adaptation_learning_results.strategy_value_not_mapping` usa una severidad declarada :: 'medium'
+  [OK  ] La clase `goal_adaptation_learning_results.strategy_value_not_mapping` usa una violacion declarada :: 
+'wrong_type'
+  [OK  ] La clase `goal_adaptation_learning_results.strategy_missing_identity` declara target, violation, severity y 
+expected
+  [OK  ] La clase `goal_adaptation_learning_results.strategy_missing_identity` usa un efecto declarado :: 
+efectos=['silently_ignored']
+  [OK  ] La clase `goal_adaptation_learning_results.strategy_missing_identity` usa una severidad declarada :: 
+'critical'
+  [OK  ] La clase `goal_adaptation_learning_results.strategy_missing_identity` usa una violacion declarada :: 
+'missing_identity'
+  [OK  ] Los identificadores de clase son unicos :: 27 clases, 27 unicas
+  [OK  ] `corruption_criteria()` devuelve una COPIA defensiva
+  [OK  ] `corruption_criteria()` no crea ficheros
+
+== PARTE B: CONTRASTE POR CLASE (DECLARADO vs OBSERVADO) ==
+  [OK  ] `adaptation_rules.rules_wrong_type`: lo observado coincide con lo declarado :: declarado=['silently_ignored'] 
+observado=['silently_ignored']
+  [OK  ] `adaptation_rules.row_not_mapping`: lo observado coincide con lo declarado :: declarado=['record_dropped'] 
+observado=['record_dropped']
+  [OK  ] `adaptation_rules.row_missing_identity`: lo observado coincide con lo declarado :: 
+declarado=['record_dropped'] observado=['record_dropped']
+  [OK  ] `adaptation_rules.priority_not_castable`: lo observado coincide con lo declarado :: 
+declarado=['rejected_whole_file'] observado=['rejected_whole_file']
+  [OK  ] `adaptation_rules.execution_count_not_castable`: lo observado coincide con lo declarado :: 
+declarado=['rejected_whole_file'] observado=['rejected_whole_file']
+  [OK  ] `adaptation_rules.metadata_not_mapping`: lo observado coincide con lo declarado :: 
+declarado=['rejected_whole_file'] observado=['rejected_whole_file']
+  [OK  ] `adaptation_rules.actions_string`: lo observado coincide con lo declarado :: declarado=['record_dropped'] 
+observado=['record_dropped']
+  [OK  ] `adaptation_rules.enabled_string`: lo observado coincide con lo declarado :: declarado=['record_dropped'] 
+observado=['record_dropped']
+  [OK  ] `adaptation_rules.threshold_not_numeric`: lo observado coincide con lo declarado :: 
+declarado=['record_dropped'] observado=['record_dropped']
+  [OK  ] `adaptation_rules.success_rate_not_numeric`: lo observado coincide con lo declarado :: 
+declarado=['record_dropped'] observado=['record_dropped']
+  [OK  ] `adaptation_rules.triggers_not_list`: lo observado coincide con lo declarado :: declarado=['record_dropped'] 
+observado=['record_dropped']
+  [OK  ] `adaptation_rules.trigger_invalid_value`: lo observado coincide con lo declarado :: 
+declarado=['record_dropped'] observado=['record_dropped']
+  [OK  ] `adaptation_rules.last_execution_not_iso`: lo observado coincide con lo declarado :: 
+declarado=['record_dropped'] observado=['record_dropped']
+  [OK  ] `adaptation_rules.name_not_string`: lo observado coincide con lo declarado :: declarado=['record_dropped'] 
+observado=['record_dropped']
+  [OK  ] `knowledge_base.data_not_mapping`: lo observado coincide con lo declarado :: declarado=['silently_ignored'] 
+observado=['silently_ignored']
+  [OK  ] `knowledge_base.section_not_mapping`: lo observado coincide con lo declarado :: 
+declarado=['silently_ignored'] observado=['silently_ignored']
+  [OK  ] `knowledge_base.strategies_not_mapping`: lo observado coincide con lo declarado :: 
+declarado=['silently_ignored'] observado=['silently_ignored']
+  [OK  ] `knowledge_base.unexpected_key`: lo observado coincide con lo declarado :: declarado=['silently_ignored'] 
+observado=['silently_ignored']
+  [OK  ] `knowledge_base.section_partial`: lo observado coincide con lo declarado :: declarado=['silently_ignored'] 
+observado=['silently_ignored']
+  [OK  ] `goal_adaptation_feedback.section_not_list`: lo observado coincide con lo declarado :: 
+declarado=['silently_ignored'] observado=['silently_ignored']
+  [OK  ] `goal_adaptation_feedback.row_not_mapping`: lo observado coincide con lo declarado :: 
+declarado=['record_dropped'] observado=['record_dropped']
+  [OK  ] `goal_adaptation_feedback.history_not_list`: lo observado coincide con lo declarado :: 
+declarado=['silently_ignored'] observado=['silently_ignored']
+  [OK  ] `goal_adaptation_learning_results.learning_results_not_list`: lo observado coincide con lo declarado :: 
+declarado=['silently_ignored'] observado=['silently_ignored']
+  [OK  ] `goal_adaptation_learning_results.row_not_mapping`: lo observado coincide con lo declarado :: 
+declarado=['record_dropped'] observado=['record_dropped']
+  [OK  ] `goal_adaptation_learning_results.strategies_not_mapping`: lo observado coincide con lo declarado :: 
+declarado=['silently_ignored'] observado=['silently_ignored']
+  [OK  ] `goal_adaptation_learning_results.strategy_value_not_mapping`: lo observado coincide con lo declarado :: 
+declarado=['silently_ignored'] observado=['silently_ignored']
+  [OK  ] `goal_adaptation_learning_results.strategy_missing_identity`: lo observado coincide con lo declarado :: 
+declarado=['silently_ignored'] observado=['silently_ignored']
+
+== PARTE C: COBERTURA ==
+  [OK  ] Toda clase declarada tiene caso en la sonda
+  [OK  ] Todo caso de la sonda esta declarado en el contrato
+  [OK  ] `adaptation_rules.rules_wrong_type`: el contenido corrupto esta PRESENTE (no es ausencia) :: seccion=rules 
+ausentes=[]
+  [OK  ] `adaptation_rules.row_not_mapping`: el contenido corrupto esta PRESENTE (no es ausencia) :: seccion=rules 
+ausentes=[]
+  [OK  ] `adaptation_rules.row_missing_identity`: el contenido corrupto esta PRESENTE (no es ausencia) :: 
+seccion=rules ausentes=[]
+  [OK  ] `adaptation_rules.priority_not_castable`: el contenido corrupto esta PRESENTE (no es ausencia) :: 
+seccion=rules ausentes=[]
+  [OK  ] `adaptation_rules.execution_count_not_castable`: el contenido corrupto esta PRESENTE (no es ausencia) :: 
+seccion=rules ausentes=[]
+  [OK  ] `adaptation_rules.metadata_not_mapping`: el contenido corrupto esta PRESENTE (no es ausencia) :: 
+seccion=rules ausentes=[]
+  [OK  ] `adaptation_rules.actions_string`: el contenido corrupto esta PRESENTE (no es ausencia) :: seccion=rules 
+ausentes=[]
+  [OK  ] `adaptation_rules.enabled_string`: el contenido corrupto esta PRESENTE (no es ausencia) :: seccion=rules 
+ausentes=[]
+  [OK  ] `adaptation_rules.threshold_not_numeric`: el contenido corrupto esta PRESENTE (no es ausencia) :: 
+seccion=rules ausentes=[]
+  [OK  ] `adaptation_rules.success_rate_not_numeric`: el contenido corrupto esta PRESENTE (no es ausencia) :: 
+seccion=rules ausentes=[]
+  [OK  ] `adaptation_rules.triggers_not_list`: el contenido corrupto esta PRESENTE (no es ausencia) :: seccion=rules 
+ausentes=[]
+  [OK  ] `adaptation_rules.trigger_invalid_value`: el contenido corrupto esta PRESENTE (no es ausencia) :: 
+seccion=rules ausentes=[]
+  [OK  ] `adaptation_rules.last_execution_not_iso`: el contenido corrupto esta PRESENTE (no es ausencia) :: 
+seccion=rules ausentes=[]
+  [OK  ] `adaptation_rules.name_not_string`: el contenido corrupto esta PRESENTE (no es ausencia) :: seccion=rules 
+ausentes=[]
+  [OK  ] `knowledge_base.data_not_mapping`: el contenido corrupto esta PRESENTE (no es ausencia) :: seccion=data 
+ausentes=[]
+  [OK  ] `knowledge_base.section_not_mapping`: el contenido corrupto esta PRESENTE (no es ausencia) :: seccion=data 
+ausentes=[]
+  [OK  ] `knowledge_base.strategies_not_mapping`: el contenido corrupto esta PRESENTE (no es ausencia) :: seccion=data 
+ausentes=[]
+  [OK  ] `knowledge_base.unexpected_key`: el contenido corrupto esta PRESENTE (no es ausencia) :: seccion=data 
+ausentes=[]
+  [OK  ] `knowledge_base.section_partial`: el contenido corrupto esta PRESENTE (no es ausencia) :: seccion=data 
+ausentes=[]
+  [OK  ] `goal_adaptation_feedback.section_not_list`: el contenido corrupto esta PRESENTE (no es ausencia) :: 
+seccion=goal_adaptation_feedback ausentes=[]
+  [OK  ] `goal_adaptation_feedback.row_not_mapping`: el contenido corrupto esta PRESENTE (no es ausencia) :: 
+seccion=goal_adaptation_feedback ausentes=[]
+  [OK  ] `goal_adaptation_feedback.history_not_list`: el contenido corrupto esta PRESENTE (no es ausencia) :: 
+seccion=adaptation_history ausentes=[]
+  [OK  ] `goal_adaptation_learning_results.learning_results_not_list`: el contenido corrupto esta PRESENTE (no es 
+ausencia) :: seccion=learning_results ausentes=[]
+  [OK  ] `goal_adaptation_learning_results.row_not_mapping`: el contenido corrupto esta PRESENTE (no es ausencia) :: 
+seccion=learning_results ausentes=[]
+  [OK  ] `goal_adaptation_learning_results.strategies_not_mapping`: el contenido corrupto esta PRESENTE (no es 
+ausencia) :: seccion=adaptation_strategies ausentes=[]
+  [OK  ] `goal_adaptation_learning_results.strategy_value_not_mapping`: el contenido corrupto esta PRESENTE (no es 
+ausencia) :: seccion=adaptation_strategies ausentes=[]
+  [OK  ] `goal_adaptation_learning_results.strategy_missing_identity`: el contenido corrupto esta PRESENTE (no es 
+ausencia) :: seccion=adaptation_strategies ausentes=[]
+
+== PARTE D: INVARIANTES ==
+  [OK  ] `corruption_is_never_absence`
+  [OK  ] `every_corruption_declares_target_violation_severity_and_effects`
+  [OK  ] `every_expected_effect_belongs_to_the_effect_vocabulary`
+  [OK  ] `every_corruption_is_covered_by_the_runtime_probe`
+  [OK  ] `detection_is_read_only`
+
+== RESUMEN ==
+  Comprobaciones fallidas: 0
+  Hallazgos registrados: 0
+
+

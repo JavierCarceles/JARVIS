@@ -53,6 +53,15 @@ VALID_RULE = {"rule_id": "ok1", "name": "valida", "description": "d", "condition
                "execution_count": 3, "last_execution": "2024-01-01T00:00:00",
                "adaptation_score": .4, "constraints": [], "metadata": {}, "deadline": None}
 
+# Fila VALIDA de feedback: sirve de Hermano SANO en el mismo fichero que la fila
+# corrupta, para poder observar que la corrupta se descarta y la valida se carga.
+VALID_FB_ROW = {"adaptation_id": "fb_ok", "success": True,
+                "timestamp": "2024-01-01T00:00:00"}
+
+# Fila VALIDA de resultados de aprendizaje (mismo proposito que VALID_FB_ROW).
+VALID_LR_ROW = {"adaptation_id": "lr_ok", "updated_strategies": {},
+                "convergence_metrics": {}, "learned_patterns": []}
+
 
 def check(label, condition, detail=""):
     status = "OK  " if condition else "FALLO"
@@ -122,11 +131,34 @@ def lr_files(**payload):
 
 
 # ---------------------------------------------------------------- observadores
+def _ids_de_reglas(engine):
+    """Identificadores de las reglas que hay en el estado del motor."""
+    return set(engine.adaptation_rules or {})
+
+
+def _regla_corrupta_en_estado(engine, regla_id):
+    """El contenido corrupto llego al estado como si fuera una regla valida."""
+    return regla_id in _ids_de_reglas(engine)
+
+
+def _valor_que_no_es_regla(engine):
+    """Alguna entrada del estado no es una regla construida por el motor.
+
+    Una fila corrupta que no es un diccionario no puede convertirse en regla:
+    si llega al estado, se ve aqui.
+    """
+    from utils.contextual_adaptation_engine import AdaptationRule
+    return any(not isinstance(valor, AdaptationRule)
+               for valor in (engine.adaptation_rules or {}).values())
+
+
 def obs_rules_ignored(engine):
     """Ninguna regla del fichero llega al motor y el cargador no reporta fallo."""
     from utils.contextual_adaptation_engine import ContextualAdaptationEngine  # noqa: F401
     efectos = set()
-    if "ok1" not in engine.adaptation_rules and engine.load_adaptation_rules() is not False:
+    if _regla_corrupta_en_estado(engine, "basura") or _valor_que_no_es_regla(engine):
+        efectos.add("state_contaminated")
+    elif "ok1" not in engine.adaptation_rules and engine.load_adaptation_rules() is not False:
         efectos.add("silently_ignored")
     return efectos
 
@@ -134,7 +166,9 @@ def obs_rules_ignored(engine):
 def obs_rules_record_dropped(engine):
     """La fila inválida se descarta y la válida del mismo fichero sí se carga."""
     efectos = set()
-    if "ok1" in engine.adaptation_rules and "bad1" not in engine.adaptation_rules:
+    if _regla_corrupta_en_estado(engine, "basura") or _valor_que_no_es_regla(engine):
+        efectos.add("state_contaminated")
+    elif "ok1" in engine.adaptation_rules:
         efectos.add("record_dropped")
     if engine.load_adaptation_rules() is False:
         efectos.add("rejected_whole_file")
@@ -144,7 +178,9 @@ def obs_rules_record_dropped(engine):
 def obs_rules_rejected(engine):
     """La carga del fichero entero se aborta: también se pierde la fila válida."""
     efectos = set()
-    if "ok1" not in engine.adaptation_rules:
+    if _regla_corrupta_en_estado(engine, "bad1"):
+        efectos.add("state_contaminated")
+    elif "ok1" not in engine.adaptation_rules:
         efectos.add("rejected_whole_file")
     return efectos
 
@@ -153,145 +189,148 @@ def _regla(engine):
     return engine.adaptation_rules.get("bad1")
 
 
+def _obs_regla_corrupta(engine, efecto_fuga):
+    """Observador comun de una FILA de regla corrupta (2.8.8.9.6.3).
+
+    - Si la fila corrupta NO llega al estado y la fila valida del mismo
+      fichero SI, el efecto OBSERVADO es `record_dropped`: el cargador la
+      descarta y el resto del fichero se carga.
+    - Si la fila corrupta vuelve a llegar al estado, el efecto OBSERVADO es el
+      efecto INSEGURO de la clase (`efecto_fuga`): la corrupcion se ha usado
+      como si fuera valida. Es la regresion que la deteccion de 2.8.8.9.6.3
+      impide, y por eso el observador sigue mirandolo.
+    """
+    if _regla(engine) is not None:
+        return {efecto_fuga}
+    if "ok1" in engine.adaptation_rules:
+        return {"record_dropped"}
+    return set()
+
+
 def obs_enabled_string(engine):
-    """El fichero decía `enabled: "false"`; el motor acaba con la regla ACTIVADA."""
-    efectos = set()
-    regla = _regla(engine)
-    if regla is not None and regla.enabled is True:
-        efectos.add("value_coerced")
-    return efectos
+    """`enabled: "false"`: la fila se descarta y la regla no llega al estado."""
+    return _obs_regla_corrupta(engine, "value_coerced")
 
 
 def obs_actions_string(engine):
-    """El fichero decía `adaptation_actions: "abc"`; el motor lo trocea."""
-    efectos = set()
-    regla = _regla(engine)
-    if regla is not None and list(regla.adaptation_actions) == ["a", "b", "c"]:
-        efectos.add("value_coerced")
-    return efectos
+    """`adaptation_actions: "abc"`: la fila se descarta y la regla no llega."""
+    return _obs_regla_corrupta(engine, "value_coerced")
 
 
 def obs_threshold_not_numeric(engine):
-    """El umbral ilegible se degrada a 0.0."""
-    efectos = set()
-    regla = _regla(engine)
-    if regla is not None and regla.confidence_threshold == 0.0:
-        efectos.add("value_coerced")
-    return efectos
+    """`confidence_threshold: "abc"`: la fila se descarta y la regla no llega."""
+    return _obs_regla_corrupta(engine, "value_coerced")
 
 
 def obs_success_rate_not_numeric(engine):
-    """La tasa de éxito ilegible se degrada a 0.0."""
-    efectos = set()
-    regla = _regla(engine)
-    if regla is not None and regla.success_rate == 0.0:
-        efectos.add("value_coerced")
-    return efectos
+    """`success_rate: "abc"`: la fila se descarta y la regla no llega."""
+    return _obs_regla_corrupta(engine, "value_coerced")
 
 
 def obs_triggers_not_list(engine):
-    """Una cadena de disparadores deja la regla sin ningún disparador."""
-    efectos = set()
-    regla = _regla(engine)
-    if regla is not None and list(regla.context_triggers) == []:
-        efectos.add("value_coerced")
-    return efectos
+    """`context_triggers: "production"`: la fila se descarta y la regla no llega."""
+    return _obs_regla_corrupta(engine, "value_coerced")
 
 
 def obs_trigger_invalid_value(engine):
-    """Un disparador fuera de `ContextType` se filtra en silencio."""
-    efectos = set()
-    regla = _regla(engine)
-    if regla is not None and list(regla.context_triggers) == []:
-        efectos.add("value_coerced")
-    return efectos
+    """`context_triggers: ["NO_EXISTE"]`: la fila se descarta y la regla no llega."""
+    return _obs_regla_corrupta(engine, "value_coerced")
 
 
 def obs_last_execution_not_iso(engine):
-    """Una marca de tiempo ilegible se degrada a None."""
-    efectos = set()
-    regla = _regla(engine)
-    if regla is not None and regla.last_execution is None:
-        efectos.add("value_coerced")
-    return efectos
+    """`last_execution: "no-es-iso"`: la fila se descarta y la regla no llega."""
+    return _obs_regla_corrupta(engine, "value_coerced")
 
 
 def obs_name_not_string(engine):
-    """El nombre corrupto se conserva tal cual en la regla."""
-    efectos = set()
-    regla = _regla(engine)
-    if regla is not None and isinstance(regla.name, dict):
-        efectos.add("state_contaminated")
-    return efectos
+    """`name: {"x": 1}`: la fila se descarta y la regla no llega al estado."""
+    return _obs_regla_corrupta(engine, "state_contaminated")
+
+
+def _kb_intacta(engine):
+    """La base conserva sus valores por defecto: ninguna sección corrupta llegó al estado."""
+    kb = engine.knowledge_base
+    return (isinstance(kb.get("context_patterns"), dict)
+            and len(kb.get("context_patterns", {})) == 9
+            and isinstance(kb.get("adaptation_strategies"), dict))
 
 
 def obs_kb_ignored(engine):
     """La base conserva sus valores por defecto y el cargador no reporta fallo."""
     efectos = set()
-    kb = engine.knowledge_base
-    intacta = (isinstance(kb.get("context_patterns"), dict)
-               and len(kb.get("context_patterns", {})) == 9
-               and isinstance(kb.get("adaptation_strategies"), dict))
-    if intacta and engine.load_knowledge_base() is not False:
+    if any(valor == [1, 2] for valor in engine.knowledge_base.values()):
+        efectos.add("state_contaminated")
+    elif engine.load_knowledge_base() is not False and _kb_intacta(engine):
         efectos.add("silently_ignored")
     return efectos
 
 
 def obs_kb_section_not_mapping(engine):
-    """La sección corrupta queda en la base y la carga se aborta."""
+    """La sección corrupta se descarta: la base conserva sus valores por defecto."""
     efectos = set()
     if engine.knowledge_base.get("context_patterns") == "corrupto":
         efectos.add("state_contaminated")
-    if engine.load_knowledge_base() is False:
-        efectos.add("rejected_whole_file")
+    elif engine.load_knowledge_base() is not False and _kb_intacta(engine):
+        efectos.add("silently_ignored")
     return efectos
 
 
 def obs_kb_strategies_not_mapping(engine):
-    """El mapa de estrategias corrupto rompe la API pública de lectura."""
+    """El mapa de estrategias corrupto se descarta y la API de lectura no rompe."""
     from utils.contextual_adaptation_engine import ContextType
     efectos = set()
     if engine.knowledge_base.get("adaptation_strategies") == "corrupto":
         efectos.add("state_contaminated")
-    if engine.load_knowledge_base() is False:
-        efectos.add("rejected_whole_file")
+    elif engine.load_knowledge_base() is not False and _kb_intacta(engine):
+        efectos.add("silently_ignored")
     if raises(lambda: engine.get_available_strategies(ContextType.PRODUCTION)):
         efectos.add("read_api_raises")
     return efectos
 
 
 def obs_kb_unexpected_key(engine):
-    """La clave desconocida entra en la base de conocimiento."""
+    """La clave que el motor nunca escribe no se aplica a la base."""
     efectos = set()
     if "clave_desconocida" in engine.knowledge_base:
         efectos.add("state_contaminated")
+    elif engine.load_knowledge_base() is not False and _kb_intacta(engine):
+        efectos.add("silently_ignored")
     return efectos
 
 
 def obs_kb_section_partial(engine):
-    """El contexto corrupto se conserva; los que faltan se rellenan."""
+    """La sección con un contexto que no es lista se descarta entera."""
     efectos = set()
     patrones = engine.knowledge_base.get("context_patterns")
     if isinstance(patrones, dict) and patrones.get("production") == "no-lista":
         efectos.add("state_contaminated")
+    elif engine.load_knowledge_base() is not False and _kb_intacta(engine):
+        efectos.add("silently_ignored")
     return efectos
 
 
 def obs_fb_section_not_list(engine):
-    """La sección corrupta queda en la base y la escritura posterior revienta."""
+    """La sección corrupta no llega al estado: la base conserva su lista vacía."""
     efectos = set()
-    if engine.knowledge_base.get("goal_adaptation_feedback") == "corrupto":
+    filas = engine.knowledge_base.get("goal_adaptation_feedback")
+    if filas == "corrupto" or (isinstance(filas, list) and filas):
         efectos.add("state_contaminated")
+    elif filas == []:
+        efectos.add("silently_ignored")
     if raises(lambda: engine._capture_feedback({"adaptation_id": "a1"})):
         efectos.add("write_api_breaks")
     return efectos
 
 
 def obs_fb_row_not_mapping(engine):
-    """La fila no válida se copia tal cual a la base."""
+    """La fila no válida se descarta y la válida del mismo fichero sí se carga."""
     efectos = set()
-    if engine.knowledge_base.get("goal_adaptation_feedback") == ["basura"]:
+    filas = engine.knowledge_base.get("goal_adaptation_feedback")
+    if isinstance(filas, list) and "basura" in filas:
         efectos.add("state_contaminated")
+    elif isinstance(filas, list) and any(
+            isinstance(f, dict) and f.get("adaptation_id") == "fb_ok" for f in filas):
+        efectos.add("record_dropped")
     return efectos
 
 
@@ -304,10 +343,13 @@ def obs_fb_history_not_list(engine):
 
 
 def obs_lr_results_not_list(engine):
-    """El valor corrupto queda en la base y al guardar se propaga al disco."""
+    """La sección corrupta no llega al estado y al guardar no se propaga al disco."""
     efectos = set()
-    if engine.knowledge_base.get("learning_results") == {"k": "v"}:
+    resultados = engine.knowledge_base.get("learning_results")
+    if resultados == {"k": "v"} or (isinstance(resultados, list) and resultados):
         efectos.add("state_contaminated")
+    elif resultados == []:
+        efectos.add("silently_ignored")
     engine._save_goal_adaptation_learning_results()
     ruta = os.path.join(engine.data_dir, LR)
     if os.path.isfile(ruta):
@@ -319,10 +361,14 @@ def obs_lr_results_not_list(engine):
 
 
 def obs_lr_row_not_mapping(engine):
-    """La fila no válida se conserva y se vuelve a escribir."""
+    """La fila no válida se descarta y la válida del mismo fichero sí se carga."""
     efectos = set()
-    if engine.knowledge_base.get("learning_results") == ["basura"]:
+    filas = engine.knowledge_base.get("learning_results")
+    if isinstance(filas, list) and "basura" in filas:
         efectos.add("state_contaminated")
+    elif isinstance(filas, list) and any(
+            isinstance(f, dict) and f.get("adaptation_id") == "lr_ok" for f in filas):
+        efectos.add("record_dropped")
     engine._save_goal_adaptation_learning_results()
     ruta = os.path.join(engine.data_dir, LR)
     if os.path.isfile(ruta):
@@ -333,12 +379,17 @@ def obs_lr_row_not_mapping(engine):
     return efectos
 
 
+def _sin_estrategias_restauradas(engine):
+    """El índice de estrategias quedó vacío: no se restauró ninguna estrategia aprendida."""
+    estrategias = engine.knowledge_base.get("adaptation_strategies")
+    return (isinstance(estrategias, dict) and estrategias and all(
+            isinstance(v, list) and not v for v in estrategias.values()))
+
+
 def obs_lr_strategies_ignored(engine):
     """No se restaura ninguna estrategia aprendida, sin aviso."""
     efectos = set()
-    estrategias = engine.knowledge_base.get("adaptation_strategies")
-    if isinstance(estrategias, dict) and estrategias and all(
-            isinstance(v, list) and not v for v in estrategias.values()):
+    if _sin_estrategias_restauradas(engine):
         efectos.add("silently_ignored")
     return efectos
 
@@ -346,15 +397,13 @@ def obs_lr_strategies_ignored(engine):
 def obs_lr_strategy_value_not_mapping(engine):
     """La entrada con valor inválido no se restaura."""
     efectos = set()
-    estrategias = engine.knowledge_base.get("adaptation_strategies")
-    if isinstance(estrategias, dict) and estrategias and all(
-            isinstance(v, list) and not v for v in estrategias.values()):
+    if _sin_estrategias_restauradas(engine):
         efectos.add("silently_ignored")
     return efectos
 
 
 def obs_lr_strategy_missing_identity(engine):
-    """La estrategia sin evidencia se restaura y se ofrece con confianza inventada."""
+    """La estrategia sin evidencia no se restaura ni se ofrece con confianza inventada."""
     from utils.contextual_adaptation_engine import ContextType
     efectos = set()
     estrategias = engine.knowledge_base.get("adaptation_strategies")
@@ -363,6 +412,8 @@ def obs_lr_strategy_missing_identity(engine):
     disponibles = engine.get_available_strategies(ContextType.IDLE)
     if disponibles and disponibles[0].get("confidence") == 0.5:
         efectos.add("value_coerced")
+    elif not disponibles and _sin_estrategias_restauradas(engine):
+        efectos.add("silently_ignored")
     return efectos
 
 
@@ -372,7 +423,7 @@ def obs_lr_strategy_missing_identity(engine):
 CASES = {
     "adaptation_rules.rules_wrong_type": {
         "files": lambda: {RF: {"version": "2.0", "last_updated": "x", "total_rules": 1,
-                               "rules": {"a": 1}}},
+                               "rules": {"basura": 1}}},
         "present": "rules", "observe": obs_rules_ignored},
     "adaptation_rules.row_not_mapping": {
         "files": lambda: rules_files_raw([dict(VALID_RULE), "basura"]),
@@ -435,7 +486,7 @@ CASES = {
         "files": lambda: fb_files(goal_adaptation_feedback="corrupto"),
         "present": "goal_adaptation_feedback", "observe": obs_fb_section_not_list},
     "goal_adaptation_feedback.row_not_mapping": {
-        "files": lambda: fb_files(goal_adaptation_feedback=["basura"]),
+        "files": lambda: fb_files(goal_adaptation_feedback=[dict(VALID_FB_ROW), "basura"]),
         "present": "goal_adaptation_feedback", "observe": obs_fb_row_not_mapping},
     "goal_adaptation_feedback.history_not_list": {
         "files": lambda: fb_files(adaptation_history={"a": 1}),
@@ -445,7 +496,7 @@ CASES = {
         "files": lambda: lr_files(learning_results={"k": "v"}),
         "present": "learning_results", "observe": obs_lr_results_not_list},
     "goal_adaptation_learning_results.row_not_mapping": {
-        "files": lambda: lr_files(learning_results=["basura"]),
+        "files": lambda: lr_files(learning_results=[dict(VALID_LR_ROW), "basura"]),
         "present": "learning_results", "observe": obs_lr_row_not_mapping},
     "goal_adaptation_learning_results.strategies_not_mapping": {
         "files": lambda: lr_files(adaptation_strategies="corrupto"),

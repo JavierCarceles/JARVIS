@@ -30,14 +30,14 @@ CONTRATO QUE ESTE MODULO FIJA
    al estado (`silently_ignored`, `rejected_whole_file`, `record_dropped`) de los
    efectos en los que SI llega (valor coercionado, estado contaminado), rompe
    una API de lectura o de escritura, o se propaga al disco. Este modulo exige
-   que el segundo grupo NO aparezca: es el contrato pendiente de 2.8.8.9.6.3
-   (deteccion en la via de carga) y 2.8.8.9.6.4 (verificacion del rechazo).
+   que el segundo grupo NO aparezca: es el contrato de 2.8.8.9.6.3 (deteccion en
+   la via de carga) verificado por 2.8.8.9.6.4.
 
    La exigencia se formula sobre el EFECTO ("el dato corrupto no llega al
    estado"), no sobre el nombre exacto del efecto ni sobre la severidad, para
    que el test siga siendo valido cuando 2.8.8.9.6.3 cambie la forma concreta
-   del efecto. Los 17 casos que hoy fallan son el contrato PENDIENTE previsto
-   por esta hoja: los cumple 2.8.8.9.6.3.
+   del efecto. Los 17 casos que exigian la deteccion de 2.8.8.9.6.3 se cumplen
+   con la deteccion implementada en la via de carga.
 
 AISLAMIENTO
 Todos los motores se crean con `data_dir` temporal (`tmp_path`), asi que el
@@ -217,10 +217,11 @@ def test_el_caso_de_corrupcion_no_se_reescribe_al_cargar(clase_id, tmp_path):
 def test_el_dato_corrupto_no_se_usa_como_si_fuera_valido(clase_id, tmp_path):
     """El contenido corrupto no puede llegar al estado ni propagarse.
 
-    Es el CONTRATO PENDIENTE de 2.8.8.9.6.3 (deteccion) y 2.8.8.9.6.4
-    (verificacion del rechazo). Hoy el motor coacciona valores, contamina el
-    estado, rompe APIs de lectura y de escritura y escribe la corrupcion de
-    nuevo en disco: esos casos fallan por diseno hasta que se implementen.
+    Es el CONTRATO de 2.8.8.9.6.3 (deteccion en la via de carga) verificado por
+    2.8.8.9.6.4. Con la deteccion implementada, el motor descarta la fila o la
+    seccion corrupta en lugar de coercionar el valor, contaminar el estado,
+    romper una API de lectura o de escritura o escribir la corrupcion de nuevo
+    en disco.
     """
     caso = CASES[clase_id]
     motor = _motor_con_caso(caso, tmp_path)
