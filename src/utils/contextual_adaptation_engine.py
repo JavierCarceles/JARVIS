@@ -2831,6 +2831,314 @@ class ContextualAdaptationEngine:
         """
         return copy.deepcopy(self._NO_DATA_BEHAVIOR)
 
+    # Criterios de CORRUPCIÓN (2.8.8.9.6.1)
+    #
+    # Contrato NORMATIVO y DECLARATIVO de qué constituye CORRUPCIÓN según el
+    # FORMATO REAL de la persistencia.
+    #
+    # El "formato real" es el que producen y leen los escritores y cargadores
+    # reales del motor: `_save_adaptation_rules`/`load_adaptation_rules`,
+    # `save_knowledge_base`/`load_knowledge_base`,
+    # `_save_goal_adaptation_feedback`/`_load_goal_adaptation_feedback` y
+    # `_save_goal_adaptation_learning_results`/`_load_goal_adaptation_learning_results`.
+    # No es un formato idealizado: es el que el motor acepta hoy al leer.
+    #
+    # La CORRUPCIÓN es una DESVIACIÓN de ese formato en un contenido que está
+    # PRESENTE. NO es la AUSENCIA de fichero (2.8.8.9.5.1), NO es la AUSENCIA
+    # de una sección (2.8.8.9.5.2) y NO es un fichero ILEGIBLE o con raíz no
+    # mapeable (también 2.8.8.9.5.2, `unreadable`). Esa frontera queda
+    # declarada en `boundary` para que la detección de 2.8.8.9.6.3 no duplique
+    # lo que 2.8.8.9.5.1/5.2 ya detectan.
+    #
+    # Este contrato NO implementa la detección: la DECLARA. La detección es
+    # 2.8.8.9.6.3. Su valor es que puede contrastarse de forma automática contra
+    # el comportamiento OBSERVADO en runtime, mediante la sonda
+    # `tests/utils/contextual_adaptation_engine/corruption_criteria_real.py`.
+    # Si lo observado se desvía, el contraste falla y el contrato queda
+    # obsoleto: es intencional, un contrato que nunca falla no prueba nada.
+    #
+    # Es de SOLO LECTURA: no crea ficheros ni modifica el estado del motor.
+    _CORRUPTION_CRITERIA: Dict[str, Any] = {
+        "version": "2.8.8.9.6.1",
+        "principle": (
+            "La corrupción es la desviación del FORMATO REAL de la persistencia en un contenido "
+            "que está PRESENTE: el dato existe, pero no es el que el motor escribe ni el que el "
+            "motor sabe leer. La AUSENCIA de datos es otro fenómeno (2.8.8.9.5.1 y 2.8.8.9.5.2) "
+            "y no se considera corrupción."
+        ),
+        # Frontera con 2.8.8.9.5.1/5.2: lo que ya está detectado como ausencia
+        # o ilegibilidad NO se declara aquí como corrupción.
+        "boundary": {
+            "corruption_is": "contenido presente que se aparta del formato real",
+            "detection_owner": "2.8.8.9.6.3",
+            "not_corruption": [
+                {"case": "missing_file", "owner": "2.8.8.9.5.1",
+                 "reason": "el fichero no existe: no hay contenido que pueda estar corrupto"},
+                {"case": "missing_section", "owner": "2.8.8.9.5.2",
+                 "reason": "la sección no está en el fichero: no hay contenido que pueda estar corrupto"},
+                {"case": "unreadable_file", "owner": "2.8.8.9.5.2",
+                 "reason": "el JSON no se puede parsear: no hay contenido que pueda estar corrupto"},
+                {"case": "root_not_a_mapping", "owner": "2.8.8.9.5.2",
+                 "reason": "la raíz del payload no es un diccionario: el formato real exige un diccionario"},
+            ],
+        },
+        # Efectos OBSERVABLES con los que se describe el daño real de cada
+        # clase de corrupción. El vocabulario es cerrado: un efecto declarado
+        # que no está aquí es un contrato mal formado.
+        "effect_vocabulary": {
+            "rejected_whole_file": "el cargador aborta el fichero entero: avisa por log, devuelve False y se pierden también las filas válidas del mismo fichero",
+            "silently_ignored": "el cargador descarta la corrupción sin avisar: el contenido afectado no llega al estado y no queda rastro",
+            "record_dropped": "la fila inválida se descarta y el resto de las filas del mismo fichero sí se carga",
+            "value_coerced": "la corrupción llega al estado con un valor DISTINTO del declarado, por conversión silenciosa",
+            "state_contaminated": "la corrupción llega al estado TAL CUAL, contaminando la base de conocimiento",
+            "read_api_raises": "una API pública de LECTURA lanza excepción con el fichero corrupto",
+            "write_api_breaks": "una escritura posterior sobre el estado contaminado lanza excepción",
+            "corruption_persisted": "al guardar, la corrupción se escribe en el fichero y se propaga al disco",
+        },
+        "severity_vocabulary": {
+            "critical": "rompe una API del motor o invierte la semántica de una decisión de adaptación",
+            "high": "provoca pérdida silenciosa de datos o deja el estado incoherente",
+            "medium": "degrada el dato afectado sin romper el motor",
+            "low": "el motor lo tolera por diseño; solo afecta a la información",
+        },
+        "violation_vocabulary": {
+            "wrong_type": "el valor existe pero con un tipo distinto del que exige el formato real",
+            "invalid_value": "el tipo es correcto pero el valor no es admisible en el campo",
+            "missing_identity": "a la fila le falta el campo que la identifica",
+            "unexpected_key": "el contenido trae una clave que el motor nunca escribe",
+        },
+        "files": {
+            "adaptation_rules": {
+                "file": "contextual_adaptation_rules.json",
+                "writer": "_save_adaptation_rules",
+                "loader": "load_adaptation_rules",
+                "real_format": {
+                    "root": "mapping",
+                    "legacy_roots": ["list"],
+                    "sections": {"version": "string", "last_updated": "string",
+                                 "total_rules": "number", "rules": "list"},
+                    "record": {
+                        "container": "rules",
+                        "type": "mapping",
+                        "identity": "rule_id",
+                        "fields": {
+                            "rule_id": "string", "name": "string", "description": "string",
+                            "condition_pattern": "string", "adaptation_actions": "list",
+                            "context_triggers": "list", "confidence_threshold": "number",
+                            "priority": "number", "enabled": "boolean", "success_rate": "number",
+                            "execution_count": "number", "last_execution": "string|null",
+                            "adaptation_score": "number", "constraints": "list",
+                            "metadata": "mapping", "deadline": "any",
+                        },
+                    },
+                },
+                "corruptions": [
+                    {"id": "adaptation_rules.rules_wrong_type", "target": "rules",
+                     "violation": "wrong_type", "severity": "medium",
+                     "expected": ["silently_ignored"],
+                     "reason": "el cargador solo admite `rules` como lista; con otro tipo no carga ninguna regla y no avisa"},
+                    {"id": "adaptation_rules.row_not_mapping", "target": "rules[]",
+                     "violation": "wrong_type", "severity": "medium",
+                     "expected": ["record_dropped"],
+                     "reason": "la fila no es un diccionario: el cargador la descarta y carga el resto"},
+                    {"id": "adaptation_rules.row_missing_identity", "target": "rules[].rule_id",
+                     "violation": "missing_identity", "severity": "medium",
+                     "expected": ["record_dropped"],
+                     "reason": "la fila no tiene `rule_id`: sin identidad no se puede registrar y se descarta"},
+                    {"id": "adaptation_rules.priority_not_castable", "target": "rules[].priority",
+                     "violation": "invalid_value", "severity": "high",
+                     "expected": ["rejected_whole_file"],
+                     "reason": "la conversión a entero lanza ValueError y aborta la carga de TODO el fichero, no solo de la fila"},
+                    {"id": "adaptation_rules.execution_count_not_castable", "target": "rules[].execution_count",
+                     "violation": "invalid_value", "severity": "high",
+                     "expected": ["rejected_whole_file"],
+                     "reason": "la conversión a entero lanza ValueError y aborta la carga de TODO el fichero"},
+                    {"id": "adaptation_rules.metadata_not_mapping", "target": "rules[].metadata",
+                     "violation": "wrong_type", "severity": "high",
+                     "expected": ["rejected_whole_file"],
+                     "reason": "`dict(...)` sobre un valor que no es diccionario lanza ValueError y aborta la carga de TODO el fichero"},
+                    {"id": "adaptation_rules.actions_string", "target": "rules[].adaptation_actions",
+                     "violation": "wrong_type", "severity": "high",
+                     "expected": ["value_coerced"],
+                     "reason": "`list(...)` sobre una cadena la trocea en caracteres: las acciones quedan corruptas y se ejecutan"},
+                    {"id": "adaptation_rules.enabled_string", "target": "rules[].enabled",
+                     "violation": "wrong_type", "severity": "critical",
+                     "expected": ["value_coerced"],
+                     "reason": "`bool(\"false\")` es True: una regla desactivada queda activada y el motor la aplica"},
+                    {"id": "adaptation_rules.threshold_not_numeric", "target": "rules[].confidence_threshold",
+                     "violation": "invalid_value", "severity": "high",
+                     "expected": ["value_coerced"],
+                     "reason": "el umbral no numérico se degrada a 0.0: la regla pasa a aplicarse sin filtro de confianza"},
+                    {"id": "adaptation_rules.success_rate_not_numeric", "target": "rules[].success_rate",
+                     "violation": "invalid_value", "severity": "medium",
+                     "expected": ["value_coerced"],
+                     "reason": "la tasa de éxito no numérica se degrada a 0.0 y falsea la evaluación de la regla"},
+                    {"id": "adaptation_rules.triggers_not_list", "target": "rules[].context_triggers",
+                     "violation": "wrong_type", "severity": "high",
+                     "expected": ["value_coerced"],
+                     "reason": "una cadena de disparadores se recorre carácter a carácter y ninguno es un contexto válido: la regla nunca dispara"},
+                    {"id": "adaptation_rules.trigger_invalid_value", "target": "rules[].context_triggers[]",
+                     "violation": "invalid_value", "severity": "medium",
+                     "expected": ["value_coerced"],
+                     "reason": "un disparador fuera de `ContextType` se filtra en silencio y la regla pierde ese disparador"},
+                    {"id": "adaptation_rules.last_execution_not_iso", "target": "rules[].last_execution",
+                     "violation": "invalid_value", "severity": "low",
+                     "expected": ["value_coerced"],
+                     "reason": "una marca de tiempo no ISO se degrada a None: tolerancia deliberada del cargador"},
+                    {"id": "adaptation_rules.name_not_string", "target": "rules[].name",
+                     "violation": "wrong_type", "severity": "medium",
+                     "expected": ["state_contaminated"],
+                     "reason": "el nombre no se valida: el valor corrupto se conserva tal cual en la regla"},
+                ],
+            },
+            "knowledge_base": {
+                "file": "contextual_knowledge_base.json",
+                "writer": "save_knowledge_base",
+                "loader": "load_knowledge_base",
+                "real_format": {
+                    "root": "mapping",
+                    "legacy_roots": [],
+                    "sections": {"version": "string", "last_updated": "string",
+                                 "context_snapshots": "number", "adaptation_history": "number",
+                                 "knowledge_transfers": "number", "data": "mapping"},
+                    "record": {
+                        "container": "data",
+                        "type": "mapping",
+                        "identity": None,
+                        "fields": {
+                            "context_patterns": "mapping", "success_patterns": "mapping",
+                            "performance_baselines": "mapping", "adaptation_strategies": "mapping",
+                            "integration_records": "list", "transfer_efficiency": "mapping",
+                        },
+                    },
+                },
+                "corruptions": [
+                    {"id": "knowledge_base.data_not_mapping", "target": "data",
+                     "violation": "wrong_type", "severity": "high",
+                     "expected": ["silently_ignored"],
+                     "reason": "si `data` no es un diccionario el cargador se salta el bloque entero: la base queda con sus valores por defecto y sin aviso"},
+                    {"id": "knowledge_base.section_not_mapping", "target": "data.context_patterns",
+                     "violation": "wrong_type", "severity": "high",
+                     "expected": ["state_contaminated", "rejected_whole_file"],
+                     "reason": "el `update` aplica el valor corrupto y el `setdefault` posterior revienta: la base queda contaminada y la carga se aborta"},
+                    {"id": "knowledge_base.strategies_not_mapping", "target": "data.adaptation_strategies",
+                     "violation": "wrong_type", "severity": "critical",
+                     "expected": ["state_contaminated", "rejected_whole_file", "read_api_raises"],
+                     "reason": "el mapa de estrategias corrupto rompe `get_available_strategies`, que hace `.get` sobre un valor que no es diccionario"},
+                    {"id": "knowledge_base.unexpected_key", "target": "data.<clave_desconocida>",
+                     "violation": "unexpected_key", "severity": "low",
+                     "expected": ["state_contaminated"],
+                     "reason": "el `update` copia cualquier clave del payload a la base de conocimiento, aunque el motor nunca la escriba"},
+                    {"id": "knowledge_base.section_partial", "target": "data.context_patterns.<contexto>",
+                     "violation": "wrong_type", "severity": "medium",
+                     "expected": ["state_contaminated"],
+                     "reason": "los contextos que faltan se rellenan, pero los que están con valor corrupto se conservan tal cual"},
+                ],
+            },
+            "goal_adaptation_feedback": {
+                "file": "goal_adaptation_feedback.json",
+                "writer": "_save_goal_adaptation_feedback",
+                "loader": "_load_goal_adaptation_feedback",
+                "real_format": {
+                    "root": "mapping",
+                    "legacy_roots": [],
+                    "sections": {"goal_adaptation_feedback": "list",
+                                 "adaptation_history": "list", "last_updated": "string"},
+                    "record": {
+                        "container": "goal_adaptation_feedback",
+                        "type": "mapping",
+                        "identity": "adaptation_id",
+                        "fields": {"adaptation_id": "string", "success": "boolean",
+                                   "original_goal_id": "any", "adapted_goal_id": "any",
+                                   "adaptation_context": "mapping", "execution_result": "mapping",
+                                   "verification_result": "mapping", "improvement_analysis": "mapping",
+                                   "timestamp": "string"},
+                    },
+                },
+                "corruptions": [
+                    {"id": "goal_adaptation_feedback.section_not_list", "target": "goal_adaptation_feedback",
+                     "violation": "wrong_type", "severity": "critical",
+                     "expected": ["state_contaminated", "write_api_breaks"],
+                     "reason": "el valor se copia tal cual a la base de conocimiento y `_capture_feedback` revienta al hacer `.append` sobre él"},
+                    {"id": "goal_adaptation_feedback.row_not_mapping", "target": "goal_adaptation_feedback[]",
+                     "violation": "wrong_type", "severity": "medium",
+                     "expected": ["state_contaminated"],
+                     "reason": "la fila no es un diccionario: se copia tal cual a la base de conocimiento sin validar"},
+                    {"id": "goal_adaptation_feedback.history_not_list", "target": "adaptation_history",
+                     "violation": "wrong_type", "severity": "high",
+                     "expected": ["silently_ignored"],
+                     "reason": "un historial que no es lista se recorre por claves y se descarta entero: el historial se pierde sin aviso"},
+                ],
+            },
+            "goal_adaptation_learning_results": {
+                "file": "goal_adaptation_learning_results.json",
+                "writer": "_save_goal_adaptation_learning_results",
+                "loader": "_load_goal_adaptation_learning_results",
+                "real_format": {
+                    "root": "mapping",
+                    "legacy_roots": [],
+                    "sections": {"learning_results": "list",
+                                 "adaptation_strategies": "mapping", "last_updated": "string"},
+                    "record": {
+                        "container": "learning_results",
+                        "type": "mapping",
+                        "identity": "adaptation_id",
+                        "fields": {"adaptation_id": "string", "updated_strategies": "mapping",
+                                   "convergence_metrics": "mapping", "learned_patterns": "list"},
+                    },
+                },
+                "corruptions": [
+                    {"id": "goal_adaptation_learning_results.learning_results_not_list", "target": "learning_results",
+                     "violation": "wrong_type", "severity": "critical",
+                     "expected": ["state_contaminated", "corruption_persisted"],
+                     "reason": "el valor se copia tal cual y al guardar sus claves se escriben como filas: la corrupción se propaga al disco"},
+                    {"id": "goal_adaptation_learning_results.row_not_mapping", "target": "learning_results[]",
+                     "violation": "wrong_type", "severity": "high",
+                     "expected": ["state_contaminated", "corruption_persisted"],
+                     "reason": "el filtro de validación conserva las filas que no son diccionario y se vuelven a escribir"},
+                    {"id": "goal_adaptation_learning_results.strategies_not_mapping", "target": "adaptation_strategies",
+                     "violation": "wrong_type", "severity": "high",
+                     "expected": ["silently_ignored"],
+                     "reason": "el aplanador devuelve un índice vacío y no se restaura ninguna estrategia aprendida, sin aviso"},
+                    {"id": "goal_adaptation_learning_results.strategy_value_not_mapping", "target": "adaptation_strategies.<strategy_id>",
+                     "violation": "wrong_type", "severity": "medium",
+                     "expected": ["silently_ignored"],
+                     "reason": "una entrada que no es diccionario ni lista se ignora en el aplanado y esa estrategia no se restaura"},
+                    {"id": "goal_adaptation_learning_results.strategy_missing_identity", "target": "adaptation_strategies.<strategy_id>",
+                     "violation": "missing_identity", "severity": "critical",
+                     "expected": ["state_contaminated", "value_coerced"],
+                     "reason": "el contrato de identidad de 2.8.8.9.2.1 se exige al GUARDAR pero no al CARGAR: la estrategia sin evidencia se ofrece con confianza inventada"},
+                ],
+            },
+        },
+        "invariants": [
+            "corruption_is_never_absence",
+            "every_corruption_declares_target_violation_severity_and_effects",
+            "every_expected_effect_belongs_to_the_effect_vocabulary",
+            "every_corruption_is_covered_by_the_runtime_probe",
+            "detection_is_read_only",
+        ],
+    }
+
+    def corruption_criteria(self) -> Dict[str, Any]:
+        """Contrato DECLARATIVO de los criterios de CORRUPCIÓN (2.8.8.9.6.1).
+
+        Declara qué constituye corrupción según el FORMATO REAL de la
+        persistencia: para cada fichero, el formato que el motor escribe y
+        sabe leer, y las clases de desviación respecto de ese formato, con el
+        efecto observable que cada una provoca y su severidad.
+
+        Es de SOLO LECTURA: no crea ficheros, no escribe y no altera el estado
+        del motor. Devuelve una COPIA profunda, de modo que el llamante no pueda
+        mutar el contrato de la clase.
+
+        La declaración NO sustituye a la verificación: la sonda
+        `tests/utils/contextual_adaptation_engine/corruption_criteria_real.py`
+        contrasta esta declaración contra el comportamiento OBSERVADO en runtime.
+        La IMPLEMENTACIÓN de la detección es 2.8.8.9.6.3.
+        """
+        return copy.deepcopy(self._CORRUPTION_CRITERIA)
+
     # Integración de evolución arquitectónica
     def set_architecture_manager(self, architecture_manager) -> None:
         self.architecture_manager = architecture_manager

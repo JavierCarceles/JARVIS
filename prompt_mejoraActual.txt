@@ -1,8 +1,14 @@
 ESTADO PERSISTENTE ACTUAL
 CURRENT_PHASE: 2.8.8
-CURRENT_WORK_UNIT: 2.8.8.9.6.1
+CURRENT_WORK_UNIT: 2.8.8.9.6.2
 CURRENT_WORK_STATUS: EN PROCESO
-LAST_COMPLETED_UNIT: 2.8.8.9.5.4
+LAST_COMPLETED_UNIT: 2.8.8.9.6.1
+
+# COMPLETADO: 2.8.8.9.6.1 - Identificar datos invalidos
+# Fecha: 2026-10-21
+# Archivo modificado: src/utils/contextual_adaptation_engine.py, tests/utils/contextual_adaptation_engine/corruption_criteria_real.py (nuevo), README.md, prompt_mejoraActual.txt
+# Resultado: declarado el CONTRATO de lo que constituye CORRUPCION segun el FORMATO REAL de la persistencia: `corruption_criteria()` expone en el motor una declaracion NORMATIVA y DECLARATIVA de las 27 clases de corrupcion que el motor puede encontrar en sus 4 ficheros de persistencia (`adaptation_rules`, `knowledge_base`, `goal_adaptation_feedback`, `goal_adaptation_learning_results`), cada una con su `target`, `violation`, `severity`, `expected` (efectos observables) y `reason` anclado en el codigo real; el contrato incluye la FRONTERA explicita con la AUSENCIA (lo que ya detectan 2.8.8.9.5.1 y 2.8.8.9.5.2 NO es corrupcion), un vocabulario cerrado de 8 efectos, 4 severidades y 4 violaciones, el FORMATO REAL de cada fichero con su escritor y su cargador, y 5 invariantes; es de SOLO LECTURA, devuelve una COPIA profunda y no crea ficheros; la DECLARACION se contrasta contra el comportamiento OBSERVADO en runtime mediante la sonda `corruption_criteria_real.py`, de modo que un contrato que nunca falla no pasa inadvertido
+# Estado real: 27/27 clases contrastadas declarado vs observado, 0 comprobaciones fallidas (sonda de runtime); las sondas de 2.8.8.9.5.1, 2.8.8.9.5.2 y 2.8.8.9.5.3 siguen en 0 fallos y la suite completa en 244 PASSED / 0 FAILED (baseline comparable de 244 de 2.8.8.9.5.4, 0 tests nuevos y 0 regresiones); el `data/` de produccion NO se modifica (sin escrituras en `data/`, `logs/` ni `models/`)
 
 # COMPLETADO: 2.8.8.9.5.4 - Test de ausencia
 # Fecha: 2026-10-21
@@ -1431,8 +1437,22 @@ Hoy `learning_results` se escribe verbatim (l. 2475) y no hay ningún contador d
 
 2.8.8.9.6 — DETECCIÓN DE CORRUPCIÓN
 
-2.8.8.9.6.1 — IDENTIFICAR DATOS INVÁLIDOS
+2.8.8.9.6.1 — IDENTIFICAR DATOS INVÁLIDOS [IMPLEMENTADA]
 - Determinar qué constituye corrupción según el formato real.
+
+- PRINCIPIO DECLARADO: la corrupcion es la DESVIACION del FORMATO REAL de la persistencia en un contenido que esta PRESENTE: el dato existe, pero no es el que el motor escribe ni el que el motor sabe leer. La AUSENCIA de datos es otro fenomeno (2.8.8.9.5.1 y 2.8.8.9.5.2) y NO se considera corrupcion.
+- FORMATO REAL: el formato que producen y leen los escritores y cargadores reales del motor (`_save_adaptation_rules`/`load_adaptation_rules`, `save_knowledge_base`/`load_knowledge_base`, `_save_goal_adaptation_feedback`/`_load_goal_adaptation_feedback`, `_save_goal_adaptation_learning_results`/`_load_goal_adaptation_learning_results`). No es un formato idealizado: es el que el motor acepta hoy al leer.
+- IMPLEMENTACION: un contrato declarativo `_CORRUPTION_CRITERIA` en `src/utils/contextual_adaptation_engine.py` y su accessor `corruption_criteria()`, que devuelve una COPIA profunda (`copy.deepcopy`). Es de SOLO LECTURA: no crea ficheros, no escribe y no altera el estado del motor. El diff del motor son 308 lineas nuevas y 0 modificadas o eliminadas: el cambio es puramente aditivo.
+- CONTENIDO DEL CONTRATO: `version`, `principle`, `boundary`, `effect_vocabulary` (8 efectos observables), `severity_vocabulary` (4 severidades), `violation_vocabulary` (4 violaciones), `files` (los 4 ficheros de persistencia, con su escritor, su cargador, su `real_format` y sus clases de corrupcion) e `invariants` (5 invariantes).
+- FRONTERA CON LA AUSENCIA: `boundary` declara explicitamente lo que NO es corrupcion, con el dueno de su deteccion: `missing_file` (2.8.8.9.5.1, el fichero no existe: no hay contenido que pueda estar corrupto), `missing_section` (2.8.8.9.5.2), `unreadable_file` (2.8.8.9.5.2, el JSON no se puede parsear) y `root_not_a_mapping` (2.8.8.9.5.2, la raiz del payload no es un diccionario). La deteccion de corrupcion es de 2.8.8.9.6.3, de modo que no se duplique lo que 2.8.8.9.5.1 y 2.8.8.9.5.2 ya detectan.
+- CLASES DE CORRUPCION DECLARADAS: 27, repartidas en `adaptation_rules` (14), `knowledge_base` (5), `goal_adaptation_feedback` (3) y `goal_adaptation_learning_results` (5). Cada una declara `id`, `target`, `violation`, `severity`, `expected` (efectos observables) y `reason` anclado en el codigo real.
+- VOCABULARIO CERRADO: 8 efectos observables (`rejected_whole_file`, `silently_ignored`, `record_dropped`, `value_coerced`, `state_contaminated`, `read_api_raises`, `write_api_breaks`, `corruption_persisted`), 4 severidades (`critical`, `high`, `medium`, `low`) y 4 violaciones (`wrong_type`, `invalid_value`, `missing_identity`, `unexpected_key`). Un efecto declarado fuera del vocabulario es un contrato mal formado.
+- LA DECLARACION NO SUSTITUYE A LA VERIFICACION: la sonda `tests/utils/contextual_adaptation_engine/corruption_criteria_real.py` contrasta el contrato contra el comportamiento OBSERVADO en runtime. Si lo observado se desvía, el contraste falla y el contrato queda obsoleto: es intencional, un contrato que nunca falla no prueba nada.
+- RUNTIME: `tests/utils/contextual_adaptation_engine/corruption_criteria_real.py` - 0 comprobaciones fallidas. Cuatro partes: (A) FORMA del contrato - toda clase declara `target`, `violation`, `severity` y `expected`, todo efecto pertenece al vocabulario, los identificadores son unicos, `corruption_criteria()` devuelve una copia defensiva y no crea ficheros; (B) CONTRASTE POR CLASE - las 27 clases declaradas se comparan una a una con el efecto OBSERVADO en runtime; (C) COBERTURA CRUZADA - toda clase declarada tiene caso en la sonda y todo caso de la sonda esta declarado, mas la invariante `corruption_is_never_absence` (el contenido corrupto esta PRESENTE, no ausente); (D) INVARIANTES - 5 invariantes. Es independiente de la suite pytest, solo LEE el `data/` de produccion mediante rutas absolutas y trabaja sobre directorios temporales.
+- HALLAZGOS DEL CONTRASTE: el contraste corrigio tres expectativas que la redaccion inicial daba por buenas. (1) `adaptation_rules.priority_not_castable` y `adaptation_rules.execution_count_not_castable` NO son un `record_dropped` sino un `rejected_whole_file`: el `ValueError` de la conversion a entero no se captura y aborta el fichero ENTERO, perdiendose tambien las filas validas. (2) `goal_adaptation_learning_results.row_not_mapping` es `corruption_persisted`: el filtro de validacion conserva las filas que no son diccionario y la corrupcion se vuelve a escribir al disco. (3) `goal_adaptation_learning_results.strategy_missing_identity` es `value_coerced`: el contrato de identidad de 2.8.8.9.2.1 se exige al GUARDAR pero no al CARGAR, y la estrategia sin evidencia se ofrece con una confianza INVENTADA.
+- AISLAMIENTO: la sonda NO modifica el `data/` de produccion. Verificado con `git status` (sin ninguna modificacion en `data/`, `logs/` ni `models/`).
+- ALCANCE: esta hoja DECLARA y VERIFICA los criterios de corrupcion; NO los detecta. El test de datos corruptos es 2.8.8.9.6.2, la IMPLEMENTACION de la deteccion es 2.8.8.9.6.3 y la verificacion del rechazo es 2.8.8.9.6.4.
+- HALLAZGO DE PRODUCCION: sin cambios. En `data/` siguen faltando `contextual_adaptation_rules.json` y `contextual_knowledge_base.json` (ausencia de FICHERO, de 2.8.8.9.5.1).
 
 2.8.8.9.6.2 — TEST DE DATOS CORRUPTOS
 - Crear únicamente el caso de corrupción.
@@ -4045,3 +4065,34 @@ PENDIENTES: 2.8.8.9.5.4 — crear y ejecutar únicamente tests de almacenamiento
 ESTADO FINAL: 2.8.8.9.5.3 — IMPLEMENTADA
 
 SIGUIENTE UNIDAD: 2.8.8.9.5.4 — TEST DE AUSENCIA
+
+
+### REGISTRO DE UNIDAD: 2.8.8.9.6.1
+FECHA: 2026-10-21
+ESTADO: IMPLEMENTADA
+OBJETIVO: Determinar que constituye corrupcion segun el formato real de la persistencia del motor de adaptacion contextual, declarando un contrato normativo que la deteccion de 2.8.8.9.6.3 pueda implementar y que la sonda pueda contrastar contra el comportamiento real.
+TIPO DE TRABAJO: DEFINICION + VERIFICACION
+CAMBIOS / HALLAZGOS:
+- PRINCIPIO DECLARADO: la corrupcion es la DESVIACION del FORMATO REAL de la persistencia en un contenido que esta PRESENTE. La AUSENCIA (2.8.8.9.5.1 y 2.8.8.9.5.2) es otro fenomeno y no se considera corrupcion. El contrato lo hace explicito con una seccion `boundary` que declara los cuatro casos que NO son corrupcion y el dueno de su deteccion.
+- FORMATO REAL: se tomo el formato de los escritores y cargadores reales del motor, no un formato idealizado. Los cuatro ficheros cubiertos son `contextual_adaptation_rules.json`, `contextual_knowledge_base.json`, `data/goal_adaptation_feedback.json` y `data/goal_adaptation_learning_results.json`.
+- IMPLEMENTACION: contrato declarativo `_CORRUPTION_CRITERIA` y accessor `corruption_criteria()` en `src/utils/contextual_adaptation_engine.py`. Devuelve una COPIA profunda. Es de SOLO LECTURA: no crea ficheros, no escribe y no altera el estado del motor. El diff son 308 lineas nuevas y 0 modificadas o eliminadas.
+- CONTENIDO DEL CONTRATO: `version`, `principle`, `boundary`, `effect_vocabulary` (8 efectos), `severity_vocabulary` (4 severidades), `violation_vocabulary` (4 violaciones), `files` (los 4 ficheros con escritor, cargador, `real_format` y clases de corrupcion) e `invariants` (5 invariantes).
+- 27 CLASES DE CORRUPCION DECLARADAS: 14 en `adaptation_rules`, 5 en `knowledge_base`, 3 en `goal_adaptation_feedback` y 5 en `goal_adaptation_learning_results`. Cada una con `id`, `target`, `violation`, `severity`, `expected` y `reason` anclado en el codigo real.
+- LA DECLARACION NO SUSTITUYE A LA VERIFICACION: la sonda contrasta el contrato contra el comportamiento OBSERVADO en runtime; un contrato que nunca falla no prueba nada.
+ARCHIVOS MODIFICADOS:
+- PRODUCCION: `src/utils/contextual_adaptation_engine.py`.
+- TESTS: `tests/utils/contextual_adaptation_engine/corruption_criteria_real.py` (nuevo; sonda de runtime, independiente de la suite pytest).
+- DOCUMENTACION: `README.md`, `prompt_mejoraActual.txt`.
+TESTS Y RESULTADOS:
+- UNITARIOS: NO EJECUTADOS como tests pytest nuevos. La creacion y ejecucion del test pytest de datos corruptos corresponde a la hoja 2.8.8.9.6.2; esta hoja no lo adelanta.
+- INTEGRACION: `tests/utils/contextual_adaptation_engine/corruption_criteria_real.py` - 0 comprobaciones FALLIDAS. Las 27 clases declaradas se contrastan una a una contra el efecto observado en runtime, y todas coinciden. Ademas comprueba la FORMA del contrato (target, violation, severity y expected en toda clase, efectos del vocabulario, identificadores unicos, copia defensiva y que consultarlo NO crea ficheros), la COBERTURA CRUZADA (todo declarado tiene caso en la sonda y viceversa) y la invariante `corruption_is_never_absence` (el contenido corrupto esta PRESENTE, no ausente).
+- NO REGRESION: suite completa `pytest tests` - 244 PASSED / 0 FAILED / TOTAL 244, frente a la baseline comparable de 244 PASSED / 0 FAILED de 2.8.8.9.5.4 (esta hoja no anade tests a la suite pytest). Las sondas de 2.8.8.9.5.1, 2.8.8.9.5.2 y 2.8.8.9.5.3 siguen en 0 fallos. 0 regresiones.
+VERIFICACION:
+- SINTAXIS: `py_compile` de `src/utils/contextual_adaptation_engine.py` y `tests/utils/contextual_adaptation_engine/corruption_criteria_real.py` - OK.
+- COMPORTAMIENTO / INTEGRACION REAL: verificado en runtime que las 27 clases declaradas se corresponden con el comportamiento real del motor, que la deteccion de 2.8.8.9.5.1/5.2 NO se duplica aqui y que consultar el contrato no escribe nada.
+- AISLAMIENTO: `git status` sin ninguna modificacion en `data/`, `logs/` ni `models/`. La sonda trabaja sobre directorios temporales y lee el `data/` de produccion mediante rutas absolutas.
+DISCREPANCIAS: el contraste corrigio tres expectativas de la redaccion inicial. (1) `adaptation_rules.priority_not_castable` y `adaptation_rules.execution_count_not_castable` abortan el FICHERO ENTERO (`rejected_whole_file`), no solo la fila, porque el `ValueError` de la conversion no se captura. (2) `goal_adaptation_learning_results.row_not_mapping` PROPAGA la corrupcion al disco (`corruption_persisted`) porque el filtro de validacion conserva las filas que no son diccionario. (3) `goal_adaptation_learning_results.strategy_missing_identity` llega al estado con una confianza INVENTADA (`value_coerced`), porque el contrato de identidad de 2.8.8.9.2.1 se exige al GUARDAR pero no al CARGAR. Ninguna de las tres es un defecto de esta hoja: son hallazgos declarados para que la deteccion de 2.8.8.9.6.3 los trate.
+PENDIENTES: 2.8.8.9.6.2 - crear unicamente el caso de corrupcion.
+ESTADO FINAL: 2.8.8.9.6.1 - IMPLEMENTADA
+
+SIGUIENTE UNIDAD: 2.8.8.9.6.2 - TEST DE DATOS CORRUPTOS
