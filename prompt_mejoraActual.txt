@@ -1,8 +1,14 @@
 ESTADO PERSISTENTE ACTUAL
 CURRENT_PHASE: 2.8.8
-CURRENT_WORK_UNIT: 2.8.8.9.6.3
+CURRENT_WORK_UNIT: 2.8.8.9.6.4
 CURRENT_WORK_STATUS: EN PROCESO
-LAST_COMPLETED_UNIT: 2.8.8.9.6.2
+LAST_COMPLETED_UNIT: 2.8.8.9.6.3
+
+# COMPLETADO: 2.8.8.9.6.3 - Implementar deteccion
+# Fecha: 2026-10-21
+# Archivo modificado: src/utils/contextual_adaptation_engine.py, tests/utils/contextual_adaptation_engine/detect_corruption_real.py (nuevo), tests/utils/contextual_adaptation_engine/corruption_criteria_real.py, tests/utils/contextual_adaptation_engine/mutation_check_2_8_8_9_6_3.py (nuevo), tests/utils/contextual_adaptation_engine/test_corrupt_data.py, README.md, prompt_mejoraActual.txt
+# Resultado: implementada la DETECCION de la corrupcion en los 4 ficheros de persistencia del motor de adaptacion contextual, sin tocar la DECLARACION de 6.1 ni el CONTRATO de 6.2: cuatro metodos nuevos en `src/utils/contextual_adaptation_engine.py` (_cumple_tipo, _desviaciones_de_regla, _fila_valida y _seccion_de_conocimiento_valida) deciden, sobre el FORMATO REAL que el propio motor escribe y sabe leer, que una fila, una seccion o un campo se aparta de ese formato; la deteccion se aplica en los 4 cargadores reales (`load_adaptation_rules`, `load_knowledge_base`, `_load_goal_adaptation_feedback` y `_load_goal_adaptation_learning_results`) y su resultado es EXCLUYENTE: el dato que se aparta del formato NO llega al estado ni se persiste, con tres efectos seguros admitidos (la fila se descarta, la seccion se ignora o el fichero entero se aborta); la deteccion es de SOLO LECTURA, no crea ficheros y no altera las APIs publicas; en paralelo se REFUERZO la sonda de 6.1, cuyos observadores de reglas solo miraban si una clave concreta faltaba o estaba y no comprobaban que el contenido corrupto NO hubiera llegado al estado, de modo que un "dato corrupto usado como valido" podia pasar inadvertido
+# Estado real: 86 PASSED / 0 FAILED en `test_corrupt_data.py` (los 17 tests RED del contrato de 6.2 pasan ya), 323 PASSED / 0 FAILED en la suite completa `tests/utils/contextual_adaptation_engine/` (0 regresiones), 0 comprobaciones fallidas en las sondas de 6.1 y de 6.3, y 11/11 mutaciones detectadas por `mutation_check_2_8_8_9_6_3.py` (cada mutacion desactiva UNA pieza de la deteccion y exige que la sonda falle; se aplica a una COPIA de `src/` en un temporal, de modo que el repositorio nunca se toca)
 
 # COMPLETADO: 2.8.8.9.6.2 - Test de datos corruptos
 # Fecha: 2026-10-21
@@ -1486,11 +1492,28 @@ Hoy `learning_results` se escribe verbatim (l. 2475) y no hay ningún contador d
   `knowledge_base.section_not_mapping`, `knowledge_base.section_partial`,
   `knowledge_base.strategies_not_mapping`, `knowledge_base.unexpected_key`.
 
-2.8.8.9.6.3 — IMPLEMENTAR DETECCIÓN
+2.8.8.9.6.3 — IMPLEMENTAR DETECCIÓN [IMPLEMENTADA]
 - Implementar únicamente la detección de corrupción.
 - CONTRATO A CUMPLIR (fijado en 2.8.8.9.6.2): los 17 tests RED del módulo
   `tests/utils/contextual_adaptation_engine/test_corrupt_data.py` deben pasar. La detección debe
   ser de SOLO LECTURA (como la de 2.8.8.9.5.1/5.2) y no puede crear ficheros.
+- IMPLEMENTADO: cuatro helpers de validación sobre el FORMATO REAL en
+  `src/utils/contextual_adaptation_engine.py` (`_cumple_tipo`, `_desviaciones_de_regla`,
+  `_fila_valida`, `_seccion_de_conocimiento_valida`), aplicados en los 4 cargadores reales
+  (`load_adaptation_rules`, `load_knowledge_base`, `_load_goal_adaptation_feedback`,
+  `_load_goal_adaptation_learning_results`). El dato que se aparta del formato NO llega al
+  estado ni se persiste; se admiten los 3 efectos seguros (`record_dropped`, `silently_ignored`,
+  `rejected_whole_file`). La detección es de SOLO LECTURA y no crea ficheros.
+- HALLAZGO DE LA VERIFICACIÓN: los observadores de la sonda de 2.8.8.9.6.1 solo comprobaban si
+  una clave concreta faltaba o estaba, y NO que el contenido corrupto hubiera dejado de llegar
+  al estado. Reforzados con marcadores distinguibles y con la exigencia de estado vacío donde el
+  fichero no declara filas; sin este refuerzo el banco de mutación daba falsos negativos.
+- BANCO DE MUTACIÓN: `tests/utils/contextual_adaptation_engine/mutation_check_2_8_8_9_6_3.py`
+  aplica 11 mutaciones (una por pieza de la detección) sobre una COPIA de `src/` en un temporal y
+  exige que la sonda falle en cada una: 11/11 detectadas. El repositorio nunca se modifica.
+- RESULTADO: 86 PASSED / 0 FAILED en `test_corrupt_data.py` (los 17 RED de 6.2 pasan), 323
+  PASSED / 0 FAILED en la suite de `tests/utils/contextual_adaptation_engine/`, 0 comprobaciones
+  fallidas en las sondas de 6.1 y 6.3, 0 regresiones.
 
 2.8.8.9.6.4 — VERIFICAR RECHAZO
 - Comprobar que los datos corruptos no se usan como si fueran válidos.
@@ -4162,3 +4185,36 @@ PENDIENTES: 2.8.8.9.6.3 - implementar unicamente la deteccion de corrupcion.
 ESTADO FINAL: 2.8.8.9.6.2 - IMPLEMENTADA
 
 SIGUIENTE UNIDAD: 2.8.8.9.6.3 - IMPLEMENTAR DETECCIÓN
+
+### REGISTRO DE UNIDAD: 2.8.8.9.6.3
+FECHA: 2026-10-21
+ESTADO: IMPLEMENTADA
+OBJETIVO: Implementar unicamente la deteccion de corrupcion de los 4 ficheros de persistencia del motor de adaptacion contextual, de modo que el dato que se aparta del FORMATO REAL no se use como si fuera valido, cumpliendo el CONTRATO DE RECHAZO fijado en 2.8.8.9.6.2.
+TIPO DE TRABAJO: IMPLEMENTACION DE DETECCION
+CAMBIOS / HALLAZGOS:
+- DETECCION SOBRE EL FORMATO REAL, NO IDEALIZADO: los cuatro helpers nuevos deciden contra el formato que el propio motor escribe y sabe leer, leyendo el FORMATO REAL desde la declaracion de 2.8.8.9.6.1 (`_CORRUPTION_CRITERIA["files"][clave]["real_format"]`) y no contra una lista escrita a mano. `_cumple_tipo` distingue los tipos admitidos por cada campo; `_desviaciones_de_regla` enumera, campo a campo, en que se aparta una regla; `_fila_valida` exige que una fila sea un mapeo con los campos obligatorios y del tipo declarado; `_seccion_de_conocimiento_valida` exige que una seccion de la base sea del tipo que la base declara y que no contenga claves desconocidas.
+- APLICADA EN LOS 4 CARGADORES REALES: `load_adaptation_rules`, `load_knowledge_base`, `_load_goal_adaptation_feedback` y `_load_goal_adaptation_learning_results`. La deteccion es EXCLUYENTE: lo que se aparta del formato NO llega al estado ni se persiste. Se admiten los 3 efectos seguros del contrato (`record_dropped`, `silently_ignored`, `rejected_whole_file`).
+- SOLO LECTURA: la deteccion no crea ficheros, no escribe y no altera las APIs publicas. No se anade ninguna API nueva: es una hoja de IMPLEMENTACION, no de DECLARACION.
+- LOS 3 HALLAZGOS DE 6.1, TRATADOS UNO A UNO: (1) `adaptation_rules.priority_not_castable` y `execution_count_not_castable` ya abortaban el FICHERO ENTERO y ahora lo abortan de forma EXPLICITA, sin depender de que el `ValueError` de la conversion se propague. (2) `goal_adaptation_learning_results.row_not_mapping` ya no PROPAGA la corrupcion al disco: la fila que no es un mapeo se descarta antes de guardar. (3) `goal_adaptation_learning_results.strategy_missing_identity` ya no llega al estado con una confianza INVENTADA: una estrategia sin evidencia se descarta al cargar, igual que al guardar.
+- HALLAZGO PROPIO, CORREGIDO: los observadores de la sonda de 2.8.8.9.6.1 solo miraban si una clave concreta (`ok1`/`bad1`) faltaba o estaba, y NO comprobaban que el contenido corrupto hubiera DEJADO de llegar al estado. Con esos observadores, una deteccion que dejara pasar el dato corrupto podia dar el visto bueno. Reforzados con marcadores distinguibles (`basura`), con la comprobacion de que toda entrada del estado sea una `AdaptationRule` realmente construida, y con la exigencia de estado VACIO en las secciones cuyo fichero no declara filas. Es una correccion del test, no un debilitamiento: la sonda pasa a exigir MAS, no menos.
+- PRIMERA MUTACION INEFECTIVA, CORREGIDA: la primera version del banco mutaba la deteccion colocandola DESPUES de la guarda `isinstance`, de modo que no cambia nada y el banco daba un falso verde. Corregida para que cada mutacion desactive de verdad una pieza de la deteccion.
+- AISLAMIENTO DEL BANCO DE MUTACION: las mutaciones se aplican a una COPIA del arbol `src/` en un directorio temporal, no al repositorio. Se descarto mutar el fichero en sitio porque una ejecucion interrumpida dejo el motor mutado y hubo que restaurarlo. Ahora no hay estado que restaurar.
+- Deteccion y CRITERIOS separados: la sonda de 6.1 contrasta lo DECLARADO contra lo OBSERVADO; al reforzar sus observadores, la sonda de 6.1 sigue en 0 fallos y la de 6.3 tambien, de modo que el refuerzo no ha falseado ninguna expectativa.
+ARCHIVOS MODIFICADOS:
+- PRODUCCION: `src/utils/contextual_adaptation_engine.py` (4 helpers nuevos y su aplicacion en los 4 cargadores reales).
+- TESTS: `tests/utils/contextual_adaptation_engine/detect_corruption_real.py` (nuevo; sonda de 6.3, partes A-D), `tests/utils/contextual_adaptation_engine/mutation_check_2_8_8_9_6_3.py` (nuevo; banco de mutacion), `tests/utils/contextual_adaptation_engine/corruption_criteria_real.py` (observadores reforzados), `tests/utils/contextual_adaptation_engine/test_corrupt_data.py` (contrato de 6.2, ahora en verde).
+- DOCUMENTACION: `README.md`, `prompt_mejoraActual.txt`.
+TESTS Y RESULTADOS:
+- UNITARIOS: `tests/utils/contextual_adaptation_engine/test_corrupt_data.py` - 86 PASSED / 0 FAILED (los 17 RED de 2.8.8.9.6.2 pasan ya).
+- INTEGRACION: suite de `tests/utils/contextual_adaptation_engine/` - 323 PASSED / 0 FAILED, 41 subtests, 0 regresiones.
+- SONDAS: `corruption_criteria_real.py` (6.1) - 0 comprobaciones fallidas, 0 hallazgos. `detect_corruption_real.py` (6.3) - 0 comprobaciones fallidas, 0 hallazgos.
+- MUTACION: `mutation_check_2_8_8_9_6_3.py` - 11/11 mutaciones DETECTADA, 0 insensibles.
+VERIFICACION:
+- SINTAXIS: `py_compile` de los ficheros tocados - OK.
+- NO VACIO: verificado por mutacion (11/11) y por control con payload valido.
+- AISLAMIENTO: el `data/` de produccion NO se modifica (la sonda y los tests usan `data_dir` temporal); el banco de mutacion no toca el `src/` del repositorio.
+DISCREPANCIAS: ninguna. Los 17 tests RED de 6.2 pasan por IMPLEMENTACION de la deteccion, no por relajacion del contrato: los 5 efectos inseguros siguen prohibidos y los 3 seguros siguen admitidos.
+PENDIENTES: 2.8.8.9.6.4 - verificar el rechazo.
+ESTADO FINAL: 2.8.8.9.6.3 - IMPLEMENTADA
+
+SIGUIENTE UNIDAD: 2.8.8.9.6.4 - VERIFICAR RECHAZO
