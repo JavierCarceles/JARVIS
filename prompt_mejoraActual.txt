@@ -1,8 +1,14 @@
 ESTADO PERSISTENTE ACTUAL
 CURRENT_PHASE: 2.8.8
-CURRENT_WORK_UNIT: 2.8.8.9.6.4
-CURRENT_WORK_STATUS: EN PROCESO
-LAST_COMPLETED_UNIT: 2.8.8.9.6.3
+CURRENT_WORK_UNIT: 2.8.8.9.7.1
+CURRENT_WORK_STATUS: PENDIENTE
+LAST_COMPLETED_UNIT: 2.8.8.9.6.4
+
+# COMPLETADO: 2.8.8.9.6.4 - Verificar rechazo
+# Fecha: 2026-10-21
+# Archivo modificado: tests/utils/contextual_adaptation_engine/verify_rejection_real.py (nuevo), tests/utils/contextual_adaptation_engine/test_2_8_8_9_6_4_rejection_runtime.py (nuevo), tests/utils/contextual_adaptation_engine/mutation_check_2_8_8_9_6_4.py (nuevo), README.md, prompt_mejoraActual.txt
+# Resultado: verificado en RUNTIME que el dato corrupto NO se usa como si fuera valido, sin tocar el motor: una sonda independiente (`verify_rejection_real.py`) define sus PROPIOS 27 escenarios, con un SENTINELA propio incrustado en el punto exacto que se corrompe, y sus PROPIOS instrumentos de observacion (escaneo del estado operativo, escaneo del disco y ejercicio de las APIs), de modo que el rechazo se comprueba con un instrumento que NO comparte puntos ciegos con el que lo declara; por clase se exige que el motor ARRANQUE con el fichero corrupto, que el contenido corrupto siga PRESENTE en disco (la corrupcion es CONTENIDO, no AUSENCIA), que el dato corrupto NO llegue al estado operativo, que NINGUNA API de lectura ni de escritura lance, que NINGUNA devuelva el dato corrupto, que la corrupcion se DETECTE y se REPORTE por su clase, y que al escribir el dato corrupto NO llegue al estado ni se PERSISTA en disco; el rechazo se exige ademas SELECTIVO, contrastando cada escenario contra un motor de REFERENCIA sin ficheros corruptos, de modo que el contenido sano que la corrupcion no destruye sobrevive y lo que si destruye queda en el valor por DEFECTO; el resultado se fija como test pytest permanente (`test_2_8_8_9_6_4_rejection_runtime.py`, 60 tests) y como banco de mutacion (`mutation_check_2_8_8_9_6_4.py`, 3 mutaciones)
+# Estado real: 0 comprobaciones fallidas y 0 hallazgos en la sonda, 60 PASSED / 0 FAILED en el modulo de test de 6.4, 383 PASSED / 0 FAILED en la suite completa `tests/utils/contextual_adaptation_engine/` (323 previos + 60 nuevos, 0 regresiones), 3/3 mutaciones detectadas por `mutation_check_2_8_8_9_6_4.py` (el motor se restaura byte a byte tras el banco) y los 4 ficheros de persistencia del `data/` de produccion intactos (git limpio)
 
 # COMPLETADO: 2.8.8.9.6.3 - Implementar deteccion
 # Fecha: 2026-10-21
@@ -1515,12 +1521,36 @@ Hoy `learning_results` se escribe verbatim (l. 2475) y no hay ningún contador d
   PASSED / 0 FAILED en la suite de `tests/utils/contextual_adaptation_engine/`, 0 comprobaciones
   fallidas en las sondas de 6.1 y 6.3, 0 regresiones.
 
-2.8.8.9.6.4 — VERIFICAR RECHAZO
+2.8.8.9.6.4 — VERIFICAR RECHAZO [IMPLEMENTADA]
 - Comprobar que los datos corruptos no se usan como si fueran válidos.
 - CONTRATO A CUMPLIR (fijado en 2.8.8.9.6.2): los 17 tests RED del módulo
   `tests/utils/contextual_adaptation_engine/test_corrupt_data.py` deben seguir pasando, y el resto
   del módulo (69 tests) no debe romperse. Ninguno de los 5 efectos inseguros puede aparecer en el
   estado del motor tras cargar un fichero corrupto.
+- VERIFICADO: la sonda `tests/utils/contextual_adaptation_engine/verify_rejection_real.py` (0
+  comprobaciones fallidas, 0 hallazgos) define sus PROPIOS 27 escenarios, con un SENTINELA propio
+  incrustado en el punto exacto que se corrompe, y sus PROPIOS instrumentos de observacion; por
+  clase exige arranque sin lanzar, contenido corrupto PRESENTE en disco, ausencia de fuga al
+  estado operativo, ninguna API de lectura o de escritura rota, ninguna devolucion del dato
+  corrupto, deteccion reportada por su clase y ninguna persistencia del dato corrupto al escribir.
+- SELECTIVIDAD DEL RECHAZO: cada escenario declara su ALCANCE (`fila`, `contenedor` o `fichero`) y
+  de el se DERIVA si el contenido sano que acompana a la corrupcion debe sobrevivir; el contraste
+  se hace contra un motor de REFERENCIA sin ficheros corruptos, de modo que lo que la corrupcion
+  destruye tiene que quedar en el valor por DEFECTO.
+- HALLAZGOS DE LA VERIFICACION, CORREGIDOS: (1) la comprobacion de deteccion se ejecutaba DESPUES
+  de las APIs de escritura, que sanean el fichero y hacen desaparecer la corrupcion del disco: se
+  movio ANTES, mientras el fichero corrupto sigue presente. (2) el informe de deteccion NOMBRA la
+  desviacion, de modo que su `location` puede contener el identificador de la clave o de la fila
+  corrupta: eso es INFORMAR, no USAR, asi que la comprobacion de "no devuelve el dato corrupto"
+  ignora las `location` y la deteccion se exige por su clase en un bloque aparte.
+- BANCO DE MUTACION: `tests/utils/contextual_adaptation_engine/mutation_check_2_8_8_9_6_4.py`
+  aplica 3 mutaciones al motor (M1: `_desviaciones_de_regla` no detecta ninguna desviacion; M2:
+  `_seccion_de_conocimiento_valida` acepta cualquier seccion; M3: `detect_corruption` no informa de
+  nada) y exige que el test falle en cada una: 3/3 detectadas. El motor se restaura byte a byte.
+- RESULTADO: 0 comprobaciones fallidas en la sonda, 60 PASSED / 0 FAILED en
+  `test_2_8_8_9_6_4_rejection_runtime.py`, 383 PASSED / 0 FAILED en la suite de
+  `tests/utils/contextual_adaptation_engine/` (323 previos + 60 nuevos, 0 regresiones), 3/3
+  mutaciones detectadas y los 4 ficheros de persistencia del `data/` de produccion intactos.
 
 2.8.8.9.7 — RECUPERACIÓN PARCIAL
 
@@ -4217,4 +4247,38 @@ DISCREPANCIAS: ninguna. Los 17 tests RED de 6.2 pasan por IMPLEMENTACION de la d
 PENDIENTES: 2.8.8.9.6.4 - verificar el rechazo.
 ESTADO FINAL: 2.8.8.9.6.3 - IMPLEMENTADA
 
-SIGUIENTE UNIDAD: 2.8.8.9.6.4 - VERIFICAR RECHAZO
+SIGUIENTE UNIDAD: 2.8.8.9.7.1 - IDENTIFICAR DATOS RECUPERABLES
+
+### REGISTRO DE UNIDAD: 2.8.8.9.6.4
+FECHA: 2026-10-21
+ESTADO: IMPLEMENTADA
+OBJETIVO: Verificar en runtime que los datos corruptos no se usan como si fueran validos, es decir, que el rechazo de 2.8.8.9.6.3 se produce de hecho y no solo esta declarado, y que es selectivo.
+TIPO DE TRABAJO: VERIFICACIÓN
+CAMBIOS / HALLAZGOS:
+- INSTRUMENTO INDEPENDIENTE: la sonda `verify_rejection_real.py` NO reutiliza el registro de escenarios ni los observadores de 2.8.8.9.6.1: define sus PROPIOS 27 escenarios (con un SENTINELA propio incrustado en el punto exacto que se corrompe) y sus PROPIOS instrumentos de observacion (escaneo del estado operativo, escaneo del disco y ejercicio de las APIs). El rechazo se comprueba con un instrumento que no comparte puntos ciegos con el que lo declara, de modo que un fallo de rechazo no pueda esconderse tras un fallo del observador.
+- EXIGIDO POR CLASE (27): el motor ARRANCA con el fichero corrupto; el contenido corrupto sigue PRESENTE en disco (la corrupcion es CONTENIDO, no AUSENCIA, y no puede reportarse como fichero ni como seccion ausente); el dato corrupto NO llega al ESTADO OPERATIVO (reglas, base de conocimiento, historial, instantaneas y estrategias ofrecidas); NINGUNA API de lectura ni de escritura lanza; NINGUNA devuelve el dato corrupto; la corrupcion se DETECTA y se REPORTA por su clase; y al escribir, el dato corrupto NO llega al estado ni se PERSISTE en disco.
+- SELECTIVIDAD DEL RECHAZO: un rechazo que se limitara a no propagar la corrupcion, pero perdiera datos sanos, tambien es un rechazo incorrecto. Cada escenario declara su ALCANCE (`fila`, `contenedor` o `fichero`) y de el se DERIVA si el contenido sano que acompana a la corrupcion debe sobrevivir; el contraste se hace contra un motor de REFERENCIA sin ficheros corruptos, de modo que lo que la corrupcion destruye tiene que quedar en el valor por DEFECTO.
+- ALCANCE DEL MODELO PROPIO CONTRASTADO CON EL DECLARADO: el `alcance` de cada escenario se contrasta con el efecto que el motor declara en `corruption_criteria()` (`record_dropped`, `silently_ignored`, `rejected_whole_file`); ademas se exige que ningun efecto declarado sea uno de los que CONSUMEN el dato corrupto (`value_coerced`, `state_contaminated`, `read_api_raises`, `write_api_breaks`, `corruption_persisted`).
+- HALLAZGO PROPIO, CORREGIDO: la comprobacion de deteccion se ejecutaba DESPUES de las APIs de escritura, que sanean el fichero y hacen desaparecer la corrupcion del disco, de modo que la deteccion salia vacia por un artefacto del propio instrumento. Movida ANTES, mientras el fichero corrupto sigue presente.
+- HALLAZGO PROPIO, CORREGIDO: el informe de deteccion NOMBRA la desviacion encontrada, de modo que su `location` puede contener el identificador de la clave o de la fila corrupta (3 clases afectadas: `knowledge_base.unexpected_key`, `goal_adaptation_learning_results.strategy_missing_identity` y `goal_adaptation_learning_results.strategy_value_not_mapping`). Eso es INFORMAR, no USAR: la comprobacion de "no devuelve el dato corrupto" pasa a ignorar las `location` (`_sin_ubicaciones`) y la deteccion se exige por su clase en un bloque aparte. No se relaja el contrato: se distingue el dato USADO del dato NOMBRADO.
+- NO VACUO: cuatro CONTROLES con el sentinela como dato VALIDO (regla sana, seccion sana, fila de feedback sana y fila de aprendizaje sana) exigen que el sentinela SI llega al estado y que la API de lectura lo ofrece; sin ellos, una sonda que no mirase el estado pasaria todas sus comprobaciones sin comprobar nada.
+- AISLAMIENTO: todos los motores se crean con `data_dir` temporal y la sonda se ejecuta con el CWD en un temporal, de modo que las rutas RELATIVAS de los subsistemas ajenos (`data/knowledge_graph.json`, `data/improvement_rules.json`, `models/...`) caen en el temporal y no en el repo. La sonda incluye ademas un TEST DE GUARDA por sha256 de los 4 ficheros de persistencia de produccion.
+- BANCO DE MUTACION: `mutation_check_2_8_8_9_6_4.py` aplica 3 mutaciones al motor en sitio (M1: `_desviaciones_de_regla` no detecta ninguna desviacion; M2: `_seccion_de_conocimiento_valida` acepta cualquier seccion; M3: `detect_corruption` no informa de nada) y exige que el test falle en cada una: 3/3 detectadas. El motor se restaura byte a byte al terminar.
+- NO SE TOCA EL MOTOR: esta hoja es de VERIFICACION. `src/utils/contextual_adaptation_engine.py` no se modifica; el rechazo verificado es el que 2.8.8.9.6.3 ya implemento.
+ARCHIVOS MODIFICADOS:
+- PRODUCCION: NO APLICA (hoja de verificacion; el motor no se modifica).
+- TESTS: `tests/utils/contextual_adaptation_engine/verify_rejection_real.py` (nuevo; sonda de 6.4, partes A-E), `tests/utils/contextual_adaptation_engine/test_2_8_8_9_6_4_rejection_runtime.py` (nuevo; 60 tests, carga la sonda por RUTA), `tests/utils/contextual_adaptation_engine/mutation_check_2_8_8_9_6_4.py` (nuevo; banco de mutacion).
+- DOCUMENTACION: `README.md`, `prompt_mejoraActual.txt`.
+TESTS Y RESULTADOS:
+- UNITARIOS: `tests/utils/contextual_adaptation_engine/test_2_8_8_9_6_4_rejection_runtime.py` - 60 PASSED / 0 FAILED (27 de rechazo en runtime, 27 de selectividad, 1 de cobertura del contrato declarado, 4 controles de no-vacuidad y 1 test de guarda de produccion).
+- INTEGRACION: suite de `tests/utils/contextual_adaptation_engine/` - 383 PASSED / 0 FAILED, 41 subtests, 0 regresiones (baseline comparable de 323 de 2.8.8.9.6.3 + 60 nuevos).
+- SONDAS: `verify_rejection_real.py` (6.4) - 0 comprobaciones fallidas, 0 hallazgos.
+- MUTACION: `mutation_check_2_8_8_9_6_4.py` - 3/3 mutaciones DETECTADA, 0 insensibles.
+VERIFICACION:
+- SINTAXIS: `py_compile` de los 3 ficheros nuevos - OK.
+- NO VACIO: verificado por control con payload valido (4/4) y por mutacion (3/3).
+- AISLAMIENTO: el `data/` de produccion NO se modifica (la sonda y los tests usan `data_dir` temporal); los 4 ficheros de persistencia de produccion quedan byte a byte iguales (git limpio) y el motor se restaura byte a byte tras el banco de mutacion.
+- COMPORTAMIENTO REAL: sonda ejecutada de forma independiente (`python tests/utils/contextual_adaptation_engine/verify_rejection_real.py`): 0 comprobaciones fallidas, 0 hallazgos, codigo de salida 0.
+DISCREPANCIAS: ninguna. Los 17 tests RED de 6.2 siguen pasando por IMPLEMENTACION de la deteccion de 6.3, no por relajacion del contrato.
+PENDIENTES: 2.8.8.9.7.1 - identificar datos recuperables.
+ESTADO FINAL: 2.8.8.9.6.4 - IMPLEMENTADA
