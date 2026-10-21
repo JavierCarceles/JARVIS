@@ -3997,6 +3997,114 @@ class ContextualAdaptationEngine:
         ],
     }
 
+    # ============================================== FALLBACK por CORRUPCION TOTAL (2.8.8.9.8.1)
+    #
+    # La CORRUPCION TOTAL es la perdida de TODOS los datos de persistencia a la
+    # vez: los cuatro ficheros de persistencia EXISTEN pero NINGUNO aporta una
+    # sola unidad de datos utilizable al estado del motor.
+    #
+    # Este contrato DECLARA el comportamiento REAL que el motor ofrece HOY ante
+    # esa perdida: que capas de fallback existen, que MODOS de perdida total
+    # reconoce, que INVARIANTES deben cumplirse para que JARVIS pueda seguir
+    # operando, y que queda PENDIENTE.
+    #
+    # NO lo implementa: la IMPLEMENTACION del fallback que falta es 2.8.8.9.8.2.
+    # Su valor es que puede contrastarse de forma automatica contra el
+    # comportamiento OBSERVADO en runtime, mediante la sonda
+    # `tests/utils/contextual_adaptation_engine/identify_fallback_real.py`.
+    # Si lo observado se desvia, el contraste falla y el contrato queda
+    # obsoleto: es intencional, un contrato que nunca falla no prueba nada.
+    #
+    # Es de SOLO LECTURA: no crea ficheros ni modifica el estado del motor.
+    _TOTAL_LOSS_FALLBACK: Dict[str, Any] = {
+        "version": "2.8.8.9.8.1",
+        "principle": (
+            "Ante la perdida TOTAL de datos de persistencia JARVIS DEBE poder seguir "
+            "operando. El motor conserva su estado por DEFECTO en memoria, el ciclo de "
+            "captura-analisis-ejecucion continua, los ficheros corruptos NO se reescriben "
+            "(su contenido sigue intacto para su diagnostico), y la perdida se REPORTA de "
+            "forma que el consumidor puede saber que esta usando defaults en lugar de "
+            "datos reales. El fallback NO inventa datos: el estado por defecto es el que el "
+            "motor declara en CODIGO, no un dato inventado a partir del fichero roto."
+        ),
+        # QUE ES UNA PERDIDA TOTAL: la definicion operativa, para que la sonda y el
+        # runtime no midan cosas distintas.
+        "definition": {
+            "total_loss": "los cuatro ficheros de persistencia existen pero NINGUNO aporta una sola unidad de datos utilizable al estado del motor",
+            "not_total_loss": "un fichero que aporta datos utilizables NO es perdida total, aunque los demas esten perdidos: la perdida es TOTAL solo si TODOS han perdido sus datos",
+        },
+        # MODOS de perdida total: la FORMA en que la perdida se produce. Es un
+        # vocabulario CERRADO: la sonda mide estos cuatro modos y ninguno mas.
+        "loss_modes": {
+            "unreadable_file": "el contenido del fichero no se puede parsear como JSON",
+            "non_mapping_root": "el JSON se parsea pero su raiz no es un mapeo",
+            "list_root_without_valid_rows": "la raiz es una lista que no aporta ninguna fila valida",
+            "empty_mapping_root": "la raiz es un mapeo vacio: el fichero no aporta ninguna seccion de datos",
+        },
+        # CAPAS de fallback: lo que el motor REALMENTE ofrece hoy. Cada capa es
+        # una propiedad OBSERVABLE del runtime, no una intencion.
+        "fallback_layers": {
+            "defaults_in_memory": "el estado por DEFECTO del motor sobrevive a la perdida total porque los cargadores no vacian el estado cuando no pueden cargar",
+            "continuity_of_operation": "el ciclo de captura, analisis y ejecucion sigue funcionando con los defaults",
+            "non_destructive_load": "la carga NO reescribe los ficheros corruptos: su contenido queda intacto en disco",
+            "detection_available": "las APIs de deteccion (`detect_corruption`, `detect_absent_sections`) informan de la perdida",
+            "partial_backup": "`backup_data()` copia el fichero de reglas y el de la base de conocimiento",
+        },
+        # INVARIANTES: lo que el fallback DEBE garantizar en cada modo de perdida
+        # total. Cada uno declara a que CAPA pertenece y si el runtime lo
+        # SATISFACE hoy. Los que no se satisfacen estan en `pending`.
+        "invariants": {
+            "state_equals_fresh_defaults": {
+                "statement": "tras la perdida total el estado del motor es IDENTICO al de un motor recien creado sin ficheros: solo valen los defaults del codigo",
+                "layer": "defaults_in_memory", "satisfied": True,
+            },
+            "operation_continues": {
+                "statement": "tras la perdida total el motor puede capturar, analizar y ejecutar, y la ejecucion termina con exito",
+                "layer": "continuity_of_operation", "satisfied": True,
+            },
+            "files_not_overwritten": {
+                "statement": "tras la perdida total los ficheros corruptos conservan su contenido byte a byte: la carga no los reescribe",
+                "layer": "non_destructive_load", "satisfied": True,
+            },
+            "loss_is_detectable": {
+                "statement": "la perdida total es DETECTABLE por las APIs de deteccion: alguna de ellas informa de los ficheros o secciones afectados",
+                "layer": "detection_available", "satisfied": True,
+            },
+            "loss_visible_in_status": {
+                "statement": "el estado AGREGADO del motor (`get_engine_status()`) informa de la perdida total: declara al menos una anomalia",
+                "layer": "detection_available", "satisfied": False,
+            },
+            "load_result_is_truthful": {
+                "statement": "`load_all_data()` devuelve FALSO cuando la perdida total impidio cargar datos: no declara un exito que no ocurrio",
+                "layer": "detection_available", "satisfied": False,
+            },
+            "backup_covers_all_persistence": {
+                "statement": "`backup_data()` respalda los CUATRO ficheros de persistencia, no solo dos",
+                "layer": "partial_backup", "satisfied": False,
+            },
+        },
+        # PENDIENTE: los invariantes que el runtime NO satisface hoy. La
+        # IMPLEMENTACION de estos es 2.8.8.9.8.2.
+        "pending": [
+            "loss_visible_in_status",
+            "load_result_is_truthful",
+            "backup_covers_all_persistence",
+        ],
+        "reconciliation": [
+            {"unit": "2.8.8.9.8.1",
+             "reason": "esta hoja DECLARA el contrato del FALLBACK por corrupcion total y lo CONTRASTA contra el runtime. La DETERMINACION que hizo queda aqui: el motor NO ofrece hoy un fallback COMPLETO, porque el estado agregado no informa de la perdida, la carga declara un exito que no ocurrio y el respaldo solo cubre dos de los cuatro ficheros. Los tres invariantes que fallan estan en `pending`",
+             "changed": [],
+             "unchanged": ["principle", "definition", "loss_modes", "fallback_layers", "invariants"],
+             "pending": [
+                 "loss_visible_in_status",
+                 "load_result_is_truthful",
+                 "backup_covers_all_persistence",
+             ],
+             "resolved": [],
+             "implementation_owner": "2.8.8.9.8.2"},
+        ],
+    }
+
     def corruption_criteria(self) -> Dict[str, Any]:
         """Contrato DECLARATIVO de los criterios de CORRUPCIÓN (2.8.8.9.6.1).
 
@@ -4039,6 +4147,29 @@ class ContextualAdaptationEngine:
         IMPLEMENTACION de la recuperacion es 2.8.8.9.7.2.
         """
         return copy.deepcopy(self._RECOVERABLE_DATA)
+
+    def total_loss_fallback(self) -> Dict[str, Any]:
+        """Contrato DECLARATIVO del FALLBACK por CORRUPCIÓN TOTAL (2.8.8.9.8.1).
+
+        Declara el comportamiento REAL que el motor ofrece HOY ante la pérdida
+        TOTAL de los datos de persistencia: qué MODOS de pérdida total
+        reconoce, qué CAPAS de fallback existen, qué INVARIANTES deben cumplirse
+        para que JARVIS pueda seguir operando, y cuáles de esos invariantes
+        quedan PENDIENTES.
+
+        El fallback NO inventa datos: el estado por defecto es el que el motor
+        declara en CÓDIGO, no un dato inventado a partir del fichero roto.
+
+        Es de SOLO LECTURA: no crea ficheros, no escribe y no altera el estado
+        del motor. Devuelve una COPIA profunda, de modo que el llamante no pueda
+        mutar el contrato.
+
+        La declaración NO sustituye a la verificación: la sonda
+        `tests/utils/contextual_adaptation_engine/identify_fallback_real.py`
+        contrasta esta declaración contra lo OBSERVADO en runtime. La
+        IMPLEMENTACIÓN del fallback que falta es 2.8.8.9.8.2.
+        """
+        return copy.deepcopy(self._TOTAL_LOSS_FALLBACK)
 
     # Integración de evolución arquitectónica
     def set_architecture_manager(self, architecture_manager) -> None:
