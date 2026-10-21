@@ -185,8 +185,46 @@ def obs_rules_rejected(engine):
     return efectos
 
 
+def obs_rules_container_rebuilt(engine):
+    """El CONTENEDOR `rules` cambió de forma y se RECONSTRUYE (2.8.8.9.7.2).
+
+    - Si el contenido corrupto llega al estado, el efecto es el INSEGURO.
+    - Si el contenedor se reconstruye con los valores válidos, la corrupción se
+      ha rechazado en el CONTENEDOR y las filas válidas sobreviven: el efecto
+      es `value_recovered`.
+    - Si no llega ninguna regla y el cargador no falla, el efecto es
+      `silently_ignored`.
+    """
+    efectos = set()
+    if _regla_corrupta_en_estado(engine, "basura") or _valor_que_no_es_regla(engine):
+        efectos.add("state_contaminated")
+    elif "ok2" in engine.adaptation_rules:
+        efectos.add("value_recovered")
+    elif engine.load_adaptation_rules() is not False:
+        efectos.add("silently_ignored")
+    return efectos
+
+
 def _regla(engine):
     return engine.adaptation_rules.get("bad1")
+
+
+# Valor por DEFECTO del FORMATO REAL de cada campo de regla: es el valor que
+# ocupa el lugar del dato corrupto cuando la corrupción se rechaza en el nivel
+# del CAMPO (2.8.8.9.7.2). El observador los tiene PROPIOS: no los pide al
+# motor, para no medir el motor con el motor.
+VALOR_RECUPERADO = {
+    "priority": 1,
+    "execution_count": 0,
+    "metadata": {},
+    "adaptation_actions": [],
+    "enabled": False,
+    "confidence_threshold": 0.7,
+    "success_rate": 0.0,
+    "context_triggers": [],
+    "last_execution": None,
+    "name": "bad1",
+}
 
 
 def _obs_regla_corrupta(engine, efecto_fuga):
@@ -207,44 +245,85 @@ def _obs_regla_corrupta(engine, efecto_fuga):
     return set()
 
 
+def _obs_campo_de_regla(engine, campo, efecto_fuga):
+    """Observador comun de una corrupcion de CAMPO de una fila de regla.
+
+    - Si la fila corrupta llega al estado y el campo conserva el valor
+      CORRUPTO, el efecto OBSERVADO es el INSEGURO de la clase (`efecto_fuga`):
+      la corrupcion se ha usado como si fuera valida.
+    - Si la fila corrupta llega al estado con el campo en su valor por
+      DEFECTO, la corrupcion se ha RECUPERADO: el dato sano sobrevive y el
+      corrupto no. El efecto OBSERVADO es `value_recovered`.
+    - Si la fila corrupta NO llega al estado, la unidad se ha descartado
+      entera: el efecto es `record_dropped` (o `rejected_whole_file` si lo que
+      se perdio fue el fichero entero).
+    """
+    regla = _regla(engine)
+    if regla is None:
+        if "ok1" in engine.adaptation_rules:
+            return {"record_dropped"}
+        if engine.load_adaptation_rules() is False:
+            return {"rejected_whole_file"}
+        return set()
+    datos = regla.to_dict() if hasattr(regla, "to_dict") else dict(regla)
+    if datos.get(campo) == VALOR_RECUPERADO[campo]:
+        return {"value_recovered"}
+    return {efecto_fuga}
+
+
 def obs_enabled_string(engine):
-    """`enabled: "false"`: la fila se descarta y la regla no llega al estado."""
-    return _obs_regla_corrupta(engine, "value_coerced")
+    """`enabled: "false"`: la regla llega con el campo por DEFECTO (desactivada)."""
+    return _obs_campo_de_regla(engine, "enabled", "value_coerced")
 
 
 def obs_actions_string(engine):
-    """`adaptation_actions: "abc"`: la fila se descarta y la regla no llega."""
-    return _obs_regla_corrupta(engine, "value_coerced")
+    """`adaptation_actions: "abc"`: la regla llega con el campo por DEFECTO (inerte)."""
+    return _obs_campo_de_regla(engine, "adaptation_actions", "value_coerced")
 
 
 def obs_threshold_not_numeric(engine):
-    """`confidence_threshold: "abc"`: la fila se descarta y la regla no llega."""
-    return _obs_regla_corrupta(engine, "value_coerced")
+    """`confidence_threshold: "abc"`: la regla llega con el campo por DEFECTO (0.7)."""
+    return _obs_campo_de_regla(engine, "confidence_threshold", "value_coerced")
 
 
 def obs_success_rate_not_numeric(engine):
-    """`success_rate: "abc"`: la fila se descarta y la regla no llega."""
-    return _obs_regla_corrupta(engine, "value_coerced")
+    """`success_rate: "abc"`: la regla llega con el campo por DEFECTO (0.0)."""
+    return _obs_campo_de_regla(engine, "success_rate", "value_coerced")
 
 
 def obs_triggers_not_list(engine):
-    """`context_triggers: "production"`: la fila se descarta y la regla no llega."""
-    return _obs_regla_corrupta(engine, "value_coerced")
+    """`context_triggers: "production"`: la regla llega con el campo por DEFECTO."""
+    return _obs_campo_de_regla(engine, "context_triggers", "value_coerced")
 
 
 def obs_trigger_invalid_value(engine):
-    """`context_triggers: ["NO_EXISTE"]`: la fila se descarta y la regla no llega."""
-    return _obs_regla_corrupta(engine, "value_coerced")
+    """`context_triggers: ["NO_EXISTE"]`: solo se descarta el disparador invalido."""
+    return _obs_campo_de_regla(engine, "context_triggers", "value_coerced")
 
 
 def obs_last_execution_not_iso(engine):
-    """`last_execution: "no-es-iso"`: la fila se descarta y la regla no llega."""
-    return _obs_regla_corrupta(engine, "value_coerced")
+    """`last_execution: "no-es-iso"`: la regla llega con el campo por DEFECTO (None)."""
+    return _obs_campo_de_regla(engine, "last_execution", "value_coerced")
 
 
 def obs_name_not_string(engine):
-    """`name: {"x": 1}`: la fila se descarta y la regla no llega al estado."""
-    return _obs_regla_corrupta(engine, "state_contaminated")
+    """`name: {"x": 1}`: la regla llega con el campo por DEFECTO (su identidad)."""
+    return _obs_campo_de_regla(engine, "name", "state_contaminated")
+
+
+def obs_priority_not_castable(engine):
+    """`priority: "abc"`: la regla llega con el campo por DEFECTO (1)."""
+    return _obs_campo_de_regla(engine, "priority", "rejected_whole_file")
+
+
+def obs_execution_count_not_castable(engine):
+    """`execution_count: "abc"`: la regla llega con el campo por DEFECTO (0)."""
+    return _obs_campo_de_regla(engine, "execution_count", "rejected_whole_file")
+
+
+def obs_metadata_not_mapping(engine):
+    """`metadata: "texto"`: la regla llega con el campo por DEFECTO ({})."""
+    return _obs_campo_de_regla(engine, "metadata", "rejected_whole_file")
 
 
 def _kb_intacta(engine):
@@ -253,6 +332,24 @@ def _kb_intacta(engine):
     return (isinstance(kb.get("context_patterns"), dict)
             and len(kb.get("context_patterns", {})) == 9
             and isinstance(kb.get("adaptation_strategies"), dict))
+
+
+# MARCADOR del grupo HERMANO sano del escenario `section_partial`: permite
+# distinguir "el grupo corrupto se ha descartado y su hermano sobrevive" de
+# "la sección entera se ha descartado". El motor lo conserva tal cual porque
+# un grupo sano es un dato VALIDO.
+GRUPO_HERMANO_SANO = "GRUPO_HERMANO_SANO"
+
+
+def _grupo_hermano_vivo(engine):
+    """El grupo HERMANO sano del grupo corrupto ha sobrevivido a la carga."""
+    patrones = engine.knowledge_base.get("context_patterns")
+    if not isinstance(patrones, dict):
+        return False
+    idle = patrones.get("idle")
+    return isinstance(idle, list) and any(
+        isinstance(entrada, dict) and entrada.get("patron") == GRUPO_HERMANO_SANO
+        for entrada in idle)
 
 
 def obs_kb_ignored(engine):
@@ -299,12 +396,22 @@ def obs_kb_unexpected_key(engine):
 
 
 def obs_kb_section_partial(engine):
-    """La sección con un contexto que no es lista se descarta entera."""
+    """El GRUPO (contexto) corrupto se descarta y los grupos HERMANOS sobreviven.
+
+    - Si el grupo corrupto llega al estado, el efecto OBSERVADO es el INSEGURO:
+      la corrupción se ha usado como si fuera válida.
+    - Si el grupo se ha descartado y su HERMANO sano sobrevive, la corrupción se
+      ha RECUPERADO: el dato sano sobrevive y el corrupto no. El efecto es
+      `value_recovered`.
+    - Si no llega nada y el cargador no falla, el efecto es `silently_ignored`.
+    """
     efectos = set()
     patrones = engine.knowledge_base.get("context_patterns")
     if isinstance(patrones, dict) and patrones.get("production") == "no-lista":
         efectos.add("state_contaminated")
-    elif engine.load_knowledge_base() is not False and _kb_intacta(engine):
+    elif _grupo_hermano_vivo(engine):
+        efectos.add("value_recovered")
+    elif engine.load_knowledge_base() is not False:
         efectos.add("silently_ignored")
     return efectos
 
@@ -423,8 +530,9 @@ def obs_lr_strategy_missing_identity(engine):
 CASES = {
     "adaptation_rules.rules_wrong_type": {
         "files": lambda: {RF: {"version": "2.0", "last_updated": "x", "total_rules": 1,
-                               "rules": {"basura": 1}}},
-        "present": "rules", "observe": obs_rules_ignored},
+                               "rules": {"basura": 1,
+                                         "ok2": dict(VALID_RULE, rule_id="ok2")}}},
+        "present": "rules", "observe": obs_rules_container_rebuilt},
     "adaptation_rules.row_not_mapping": {
         "files": lambda: rules_files_raw([dict(VALID_RULE), "basura"]),
         "present": "rules", "observe": obs_rules_record_dropped},
@@ -433,13 +541,13 @@ CASES = {
         "present": "rules", "observe": obs_rules_record_dropped},
     "adaptation_rules.priority_not_castable": {
         "files": lambda: rules_files(priority="abc"),
-        "present": "rules", "observe": obs_rules_rejected},
+        "present": "rules", "observe": obs_priority_not_castable},
     "adaptation_rules.execution_count_not_castable": {
         "files": lambda: rules_files(execution_count="abc"),
-        "present": "rules", "observe": obs_rules_rejected},
+        "present": "rules", "observe": obs_execution_count_not_castable},
     "adaptation_rules.metadata_not_mapping": {
         "files": lambda: rules_files(metadata="texto"),
-        "present": "rules", "observe": obs_rules_rejected},
+        "present": "rules", "observe": obs_metadata_not_mapping},
     "adaptation_rules.actions_string": {
         "files": lambda: rules_files(adaptation_actions="abc"),
         "present": "rules", "observe": obs_actions_string},
@@ -479,7 +587,9 @@ CASES = {
         "files": lambda: kb_files(clave_desconocida=1),
         "present": "data", "observe": obs_kb_unexpected_key},
     "knowledge_base.section_partial": {
-        "files": lambda: kb_files(context_patterns={"production": "no-lista"}),
+        "files": lambda: kb_files(context_patterns={
+            "production": "no-lista",
+            "idle": [{"patron": GRUPO_HERMANO_SANO}]}),
         "present": "data", "observe": obs_kb_section_partial},
 
     "goal_adaptation_feedback.section_not_list": {

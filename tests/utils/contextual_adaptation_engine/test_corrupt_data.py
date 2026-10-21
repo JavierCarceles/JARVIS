@@ -27,17 +27,19 @@ CONTRATO QUE ESTE MODULO FIJA
    (2.8.8.9.5.2). Es la frontera declarada en 2.8.8.9.6.1.
 2. El dato corrupto NO se usa como si fuera valido. El vocabulario de efectos
    de 2.8.8.9.6.1 separa los efectos en los que el contenido afectado NO llega
-   al estado (`silently_ignored`, `rejected_whole_file`, `record_dropped`) de los
-   efectos en los que SI llega (valor coercionado, estado contaminado), rompe
-   una API de lectura o de escritura, o se propaga al disco. Este modulo exige
-   que el segundo grupo NO aparezca: es el contrato de 2.8.8.9.6.3 (deteccion en
-   la via de carga) verificado por 2.8.8.9.6.4.
+   al estado (`silently_ignored`, `rejected_whole_file`, `record_dropped`,
+   `value_recovered`) de los efectos en los que SI llega (valor coercionado,
+   estado contaminado), rompe una API de lectura o de escritura, o se propaga al
+   disco. Este modulo exige que el segundo grupo NO aparezca: es el contrato de
+   2.8.8.9.6.3 (deteccion en la via de carga) verificado por 2.8.8.9.6.4.
 
    La exigencia se formula sobre el EFECTO ("el dato corrupto no llega al
    estado"), no sobre el nombre exacto del efecto ni sobre la severidad, para
    que el test siga siendo valido cuando 2.8.8.9.6.3 cambie la forma concreta
    del efecto. Los 17 casos que exigian la deteccion de 2.8.8.9.6.3 se cumplen
-   con la deteccion implementada en la via de carga.
+   con la deteccion implementada en la via de carga, y los 13 casos de
+   RECUPERACION (2.8.8.9.7.2) se cumplen con la recuperacion en el nivel de
+   la UNIDAD que corrompe.
 
 AISLAMIENTO
 Todos los motores se crean con `data_dir` temporal (`tmp_path`), asi que el
@@ -86,10 +88,11 @@ SONDA = _cargar_sonda()
 CASES = SONDA.CASES
 
 # Efectos del vocabulario de 2.8.8.9.6.1 en los que el contenido corrupto NO
-# llega al estado: la fila se descarta, el fichero se rechaza o la seccion se
-# ignora. El dato corrupto, en estos casos, no se usa como si fuera valido.
+# llega al estado: la fila se descarta, el fichero se rechaza, la seccion se
+# ignora o la UNIDAD que corrompe se RECUPERA con su valor por defecto. El
+# dato corrupto, en estos casos, no se usa como si fuera valido.
 EFECTOS_QUE_NO_USAN_EL_DATO_CORRUPTO = frozenset({
-    "silently_ignored", "rejected_whole_file", "record_dropped"})
+    "silently_ignored", "rejected_whole_file", "record_dropped", "value_recovered"})
 
 # Efectos en los que el dato corrupto SI llega al estado o se propaga: se
 # coacciona a otro valor, se contamina el estado, se rompe una API de lectura o

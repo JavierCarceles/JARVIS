@@ -225,22 +225,30 @@ def test_la_clase_declara_lo_que_se_puede_recuperar(sonda, contrato, clase_id):
 
 
 def test_la_determinacion_no_es_vacia(sonda, contrato, medicion):
-    """La DETERMINACION identifica algo: hay clases pendientes y hay perdida.
+    """La DETERMINACION identifica algo: la perdida medida y la declarada.
 
-    Sin este control, una hoja que midiera "no se pierde nada" pasaria todos
-    sus controles sin haber determinado nada.
+    La hoja no puede medir "no se pierde nada" y declarar a la vez que no hay
+    nada pendiente: una de las dos tiene que hablar. Con la RECUPERACION
+    implementada, la determinacion esta COMPLETA (no queda ninguna clase
+    pendiente) y lo que demuestra que la medicion NO es vacua es que el
+    CONTROL de la sonda ve una perdida REAL.
     """
     recuperable, declaradas = contrato
     pendientes = sonda.clases_pendientes(recuperable)
-    assert pendientes, "la declaracion no marca ninguna clase como pendiente"
     assert pendientes <= set(declaradas), (
         f"clases pendientes que no existen: {sorted(pendientes - set(declaradas))}")
-    perdidas_reales = set()
-    for clase_id in pendientes:
-        perdidas_reales.update(u["etiqueta"] for u in sonda.perdidas_de(declaradas[clase_id],
-                                                                        medicion[clase_id]))
-    assert perdidas_reales, (
-        "las clases pendientes declared no pierden nada: la determinacion es vacia")
+    # La perdida MEDIDA y la DECLARADA tienen que COINCIDIR: la determinacion
+    # no puede decir una cosa y el motor hacer otra.
+    medidas = {clase_id for clase_id in declaradas
+               if sonda.perdidas_de(declaradas[clase_id], medicion[clase_id])}
+    assert medidas == pendientes, (
+        f"clases con perdida medida={sorted(medidas)} "
+        f"clases declaradas pendientes={sorted(pendientes)}")
+    # Y la medicion NO es vacua: el control de la sonda ve una perdida REAL.
+    fallos = sonda.control_de_no_vacio("perdida real")
+    assert not fallos, (
+        "el control de perdida real no ve la perdida: la medicion no discrimina\n  - "
+        + "\n  - ".join(fallos))
 
 
 def test_la_determinacion_cubre_todas_las_clases_con_dato_recuperable(sonda, contrato, medicion):

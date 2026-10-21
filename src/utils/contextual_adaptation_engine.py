@@ -282,6 +282,10 @@ class ContextualAdaptationEngine:
         self.adaptation_history: List[Any] = []
         self.proposals: Dict[str, Dict[str, Any]] = {}
         self.current_context: Optional[ContextSnapshot] = None
+        # INFORME de RECUPERACIÓN (2.8.8.9.7.2): lo que el cargador ha
+        # recuperado de un fichero corrupto y con que POLITICA lo ha hecho.
+        # La recuperación NO reescribe el fichero: es una operacion de CARGA.
+        self._recovery_report: List[Dict[str, Any]] = []
         self.adaptation_level = AdaptationLevel.MINIMAL
         self.is_adapting = False
         self.adaptation_queue: queue.Queue = queue.Queue()
@@ -1539,6 +1543,149 @@ class ContextualAdaptationEngine:
                 except (TypeError, ValueError): desviaciones.append((nombre, "invalid_value"))
         return desviaciones
 
+    # ==================================================== RECUPERACIÓN (2.8.8.9.7.2)
+    # La corrupción se rechaza SOLO en la UNIDAD que corrompe (el campo, el
+    # grupo o el contenedor) y el resto de las unidades INDEPENDIENTES
+    # sobrevive. La recuperación NO inventa datos: el campo corrupto toma el
+    # valor por DEFECTO que declara el FORMATO REAL (`field_defaults`).
+    def _desviaciones_estrictas_de_regla(self, row: Dict[str, Any]) -> List[Tuple[str, str]]:
+        """Desviaciones de los campos de conversión ESTRICTA de una fila de regla.
+
+        Los campos de conversión ESTRICTA (`_CAMPOS_ESTRICTOS_DE_REGLA`) no se
+        comprueban en `_desviaciones_de_regla`: su desvío lo abortaba el propio
+        constructor de la regla, y por eso abortaba el FICHERO entero. Aquí se
+        comprueban con SU criterio (el valor tiene que ser convertible al tipo
+        que el constructor exige), de modo que la corrupción se pueda RECUPERAR
+        en el nivel del CAMPO en vez de perder el fichero.
+        """
+        desviaciones: List[Tuple[str, str]] = []
+        for nombre in self._CAMPOS_ESTRICTOS_DE_REGLA:
+            if nombre not in row: continue
+            valor = row[nombre]
+            if nombre == "metadata":
+                if not isinstance(valor, dict): desviaciones.append((nombre, "wrong_type"))
+            elif not self._es_convertible_a_entero(valor):
+                desviaciones.append((nombre, "invalid_value"))
+        return desviaciones
+
+    def _valor_por_defecto_de_recuperacion(self, campo: str, regla_id: Any = None) -> Any:
+        """Valor por DEFECTO de RECUPERACIÓN de un campo de regla.
+
+        Lo toma del CONTRATO declarado (`field_defaults`): es el único valor que
+        la recuperación puede usar sin inventar datos. `$rule_id` se resuelve
+        con la identidad de la propia regla.
+        """
+        declarado = (self._RECOVERABLE_DATA.get("field_defaults", {}) or {}).get(campo) or {}
+        valor = declarado.get("value")
+        if valor == "$rule_id": return regla_id
+        return copy.deepcopy(valor)
+
+    def _recuperar_fila_de_regla(self, row: Dict[str, Any],
+                                 desviaciones: List[Tuple[str, str]]) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
+        """RECUPERA la fila de regla corrupta en el NIVEL del CAMPO.
+
+        La corrupción se rechaza SOLO en el campo que la corrompe: ese campo
+        toma el valor por DEFECTO que declara el FORMATO REAL y el resto de la
+        fila sobrevive intacto. Los campos de conversión ESTRICTA (que antes
+        abortaban el FICHERO entero) se sustituyen aquí por su valor por
+        defecto, de modo que la unidad que se rechaza es el CAMPO y no el
+        fichero.
+
+        Devuelve `(fila_recuperada, recuperaciones)`.
+        """
+        recuperada = dict(row)
+        recuperaciones: List[Dict[str, Any]] = []
+        formato = self._campos_de_formato("adaptation_rules")
+        for campo_bruto, violacion in desviaciones:
+            campo = campo_bruto.split("[", 1)[0]
+            if campo not in formato or campo not in recuperada: continue
+            valor = recuperada[campo]
+            if campo == "context_triggers" and isinstance(valor, list):
+                # `keep_valid_elements`: se conservan los disparadores validos y
+                # se descarta SOLO el invalido.
+                nuevo = [bruto for bruto in valor if self._coerce_context(bruto) is not None]
+                politica = "keep_valid_elements"
+            else:
+                # `default_the_field`: el campo toma su valor por DEFECTO.
+                nuevo = self._valor_por_defecto_de_recuperacion(campo, recuperada.get("rule_id"))
+                politica = "default_the_field"
+            recuperaciones.append({"campo": campo, "violacion": violacion,
+                                   "politica": politica, "valor": nuevo})
+            recuperada[campo] = nuevo
+        return recuperada, recuperaciones
+
+    def _recuperar_contenedor_de_reglas(self, rows: Any) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        """RECONSTRUYE el contenedor `rules` con los valores que sean filas válidas.
+
+        El contenedor cambió de FORMA (un mapeo en vez de una lista) pero su
+        contenido puede seguir siendo válido: se toma cada VALOR del mapeo que
+        sea una fila válida por el FORMATO REAL. Las claves NO se usan como
+        identidad: sin `rule_id` propio la fila no se puede registrar.
+
+        Devuelve `(filas, recuperaciones)`.
+        """
+        filas: List[Dict[str, Any]] = []
+        recuperaciones: List[Dict[str, Any]] = []
+        if not isinstance(rows, dict): return filas, recuperaciones
+        for clave, valor in rows.items():
+            if not self._fila_valida(valor, "adaptation_rules"): continue
+            filas.append(valor)
+            recuperaciones.append({"clave": clave, "politica": "adapt_container",
+                                    "rule_id": valor.get("rule_id")})
+        return filas, recuperaciones
+
+    def _recuperar_grupos_de_base(self, clave: str, valor: Any) -> Tuple[Any, List[Dict[str, Any]]]:
+        """RECUPERA los GRUPOS sanos de una sección con un grupo corrupto.
+
+        El grupo que se aparta del FORMATO REAL se descarta y sus HERMANOS
+        sobreviven: son unidades independientes (la ruta del grupo no es un
+        prefijo de la ruta de su hermano). Devuelve `(valor, recuperaciones)`;
+        `valor` es None cuando la sección no se puede recuperar.
+        """
+        por_defecto = self._valores_por_defecto.get(clave)
+        if por_defecto is None or not isinstance(valor, dict): return None, []
+        muestra = next(iter(por_defecto.values()), None)
+        if not isinstance(muestra, (list, dict)): return None, []
+        tipo_grupo = _tipo_de_valor(muestra)
+        recuperaciones: List[Dict[str, Any]] = []
+        recuperado: Dict[str, Any] = {}
+        for grupo, contenido in valor.items():
+            if not _cumple_tipo(contenido, tipo_grupo):
+                recuperaciones.append({"grupo": grupo, "politica": "preserve_siblings",
+                                       "motivo": "el grupo se aparta del formato real"})
+                continue
+            if clave == "adaptation_strategies" and tipo_grupo == "list":
+                saneado = [entrada for entrada in contenido if isinstance(entrada, dict)]
+                if len(saneado) != len(contenido):
+                    recuperaciones.append({"grupo": grupo, "politica": "preserve_siblings",
+                                           "motivo": "las entradas que no son mapeo se descartan"})
+                recuperado[grupo] = saneado
+                continue
+            recuperado[grupo] = contenido
+        if not recuperaciones: return None, []
+        return recuperado, recuperaciones
+
+    def _registrar_recuperacion(self, fichero: str, unidad: str,
+                                 recuperaciones: List[Dict[str, Any]]) -> None:
+        """Anota en el INFORME de recuperación lo que se ha recuperado."""
+        for recuperacion in recuperaciones:
+            self._recovery_report.append({"fichero": fichero, "unidad": unidad,
+                                           "timestamp": datetime.now().isoformat(),
+                                           **recuperacion})
+
+    def recovery_report(self) -> Dict[str, Any]:
+        """INFORME de lo que el cargador ha RECUPERADO (2.8.8.9.7.2).
+
+        Es de SOLO LECTURA: no crea ficheros, no escribe y no altera el estado
+        del motor. Devuelve una COPIA de lo recuperado en las cargas, con la
+        UNIDAD recupera, la POLITICA aplicada y el valor por DEFECTO que ha
+        ocupado el lugar del dato corrupto.
+        """
+        return {"recoveries": copy.deepcopy(self._recovery_report),
+                "count": len(self._recovery_report),
+                "files": sorted({str(item.get("fichero")) for item in self._recovery_report})}
+
+
     def _fila_valida(self, fila: Any, clave: str) -> bool:
         """Comprobar que una fila de persistencia respeta el FORMATO REAL.
 
@@ -1596,6 +1743,15 @@ class ContextualAdaptationEngine:
         try:
             with open(path, "r", encoding="utf-8") as handle: payload = json.load(handle)
             rows = payload.get("rules", []) if isinstance(payload, dict) else payload
+            if not isinstance(rows, list):
+                # RECUPERACIÓN PARCIAL (2.8.8.9.7.2): el CONTENEDOR `rules`
+                # cambió de FORMA, pero su contenido puede seguir siendo válido:
+                # se RECONSTRUYE con los valores que sean filas válidas por el
+                # FORMATO REAL. Las claves NO se usan como identidad.
+                rows, recuperadas = self._recuperar_contenedor_de_reglas(rows)
+                if recuperadas:
+                    self._registrar_recuperacion("adaptation_rules", "bloque:rules", recuperadas)
+                    self.logger.warning("Contenedor de reglas reconstruido: cambio de forma")
             loaded = {}
             for row in rows if isinstance(rows, list) else []:
                 if not isinstance(row, dict) or not row.get("rule_id"): continue
@@ -1603,9 +1759,18 @@ class ContextualAdaptationEngine:
                 # del FORMATO REAL no llega al estado. Se descarta la fila y el
                 # resto del fichero se carga con normalidad.
                 desviaciones = self._desviaciones_de_regla(row)
+                desviaciones.extend(self._desviaciones_estrictas_de_regla(row))
                 if desviaciones:
-                    self.logger.warning("Regla descartada: se aparta del formato real (%s)", row.get("rule_id"))
-                    continue
+                    # RECUPERACIÓN PARCIAL (2.8.8.9.7.2): la corrupción se
+                    # rechaza SOLO en el CAMPO que la corrompe: ese campo toma
+                    # su valor por DEFECTO y el resto de la fila sobrevive.
+                    fila, recuperadas = self._recuperar_fila_de_regla(row, desviaciones)
+                    if not recuperadas:
+                        self.logger.warning("Regla descartada: se aparta del formato real (%s)", row.get("rule_id"))
+                        continue
+                    self._registrar_recuperacion("adaptation_rules", f"fila:{row.get('rule_id')}", recuperadas)
+                    self.logger.warning("Regla recuperada: campo corrupto por defecto (%s)", row.get("rule_id"))
+                    row = fila
                 triggers = [ctx for raw in row.get("context_triggers", []) if (ctx := self._coerce_context(raw)) is not None]
                 last = row.get("last_execution")
                 try: last = datetime.fromisoformat(last) if last else None
@@ -1643,8 +1808,17 @@ class ContextualAdaptationEngine:
                 validas: Dict[str, Any] = {}
                 for clave, valor in data.items():
                     if not self._seccion_de_conocimiento_valida(clave, valor):
-                        self.logger.warning("Seccion de la base de conocimiento descartada: %s", clave)
-                        continue
+                        # RECUPERACIÓN PARCIAL (2.8.8.9.7.2): puede que la
+                        # sección sea válida y lo que se aparta del FORMATO
+                        # REAL sea un GRUPO (un contexto) de su interior: el
+                        # grupo corrupto se descarta y sus HERMANOS sobreviven.
+                        recuperado, recuperadas = self._recuperar_grupos_de_base(clave, valor)
+                        if not recuperadas:
+                            self.logger.warning("Seccion de la base de conocimiento descartada: %s", clave)
+                            continue
+                        self._registrar_recuperacion("knowledge_base", f"seccion:{clave}", recuperadas)
+                        self.logger.warning("Seccion de la base recuperada: grupo corrupto descartado (%s)", clave)
+                        valor = recuperado
                     validas[clave] = valor
                 self.knowledge_base.update(validas)
                 for ctx in ContextType:
@@ -3266,6 +3440,23 @@ class ContextualAdaptationEngine:
                          "knowledge_base.section_not_mapping", "knowledge_base.section_partial",
                          "knowledge_base.strategies_not_mapping", "knowledge_base.unexpected_key"],
              "vocabulary": ["silently_ignored", "record_dropped"]},
+            {"unit": "2.8.8.9.7.2",
+             "reason": "la RECUPERACION PARCIAL cambio lo que el cargador hace con el dato corrupto: la corrupcion se rechaza ahora SOLO en la unidad que corrompe (el campo, el grupo o el contenedor) y el resto de las unidades independientes sobrevive. El contraste por clase de la sonda de 2.8.8.9.6.1 paso a fallar en 13 clases, que son exactamente las clases cuyo efecto observable cambio",
+             "changed": ["expected", "reason", "effect_vocabulary"],
+             "unchanged": ["severity", "violation", "target", "real_format", "boundary", "invariants"],
+             "classes": ["adaptation_rules.actions_string", "adaptation_rules.enabled_string",
+                         "adaptation_rules.execution_count_not_castable",
+                         "adaptation_rules.last_execution_not_iso",
+                         "adaptation_rules.metadata_not_mapping",
+                         "adaptation_rules.name_not_string",
+                         "adaptation_rules.priority_not_castable",
+                         "adaptation_rules.rules_wrong_type",
+                         "adaptation_rules.success_rate_not_numeric",
+                         "adaptation_rules.threshold_not_numeric",
+                         "adaptation_rules.trigger_invalid_value",
+                         "adaptation_rules.triggers_not_list",
+                         "knowledge_base.section_partial"],
+             "vocabulary": ["value_recovered"]},
         ],
         # Frontera con 2.8.8.9.5.1/5.2: lo que ya está detectado como ausencia
         # o ilegibilidad NO se declara aquí como corrupción.
@@ -3290,6 +3481,7 @@ class ContextualAdaptationEngine:
             "rejected_whole_file": "el cargador aborta el fichero entero: avisa por log, devuelve False y se pierden también las filas válidas del mismo fichero",
             "silently_ignored": "el cargador descarta la corrupción: el CONTENIDO afectado (sección, clave o colección) no llega al estado y el motor conserva sus valores por defecto",
             "record_dropped": "el cargador descarta la corrupción: la FILA inválida no llega al estado y el resto de las filas del mismo fichero sí se carga",
+            "value_recovered": "el cargador RECUPERA la corrupción: se rechaza SOLO la UNIDAD que corrompe (el campo, el grupo o el contenedor), esa unidad toma el valor por DEFECTO del formato y el resto de las unidades independientes sobrevive. El dato corrupto no llega al estado",
             "value_coerced": "la corrupción llega al estado con un valor DISTINTO del declarado, por conversión silenciosa",
             "state_contaminated": "la corrupción llega al estado TAL CUAL, contaminando la base de conocimiento",
             "read_api_raises": "una API pública de LECTURA lanza excepción con el fichero corrupto",
@@ -3336,8 +3528,8 @@ class ContextualAdaptationEngine:
                 "corruptions": [
                     {"id": "adaptation_rules.rules_wrong_type", "target": "rules",
                      "violation": "wrong_type", "severity": "medium",
-                     "expected": ["silently_ignored"],
-                     "reason": "el cargador solo admite `rules` como lista; con otro tipo no carga ninguna regla y no avisa"},
+                     "expected": ["value_recovered"],
+                     "reason": "el CONTENEDOR `rules` cambio de forma y se RECONSTRUYE con los valores que sean filas validas por el FORMATO REAL: las claves no se usan como identidad y el resto de las filas se carga con normalidad"},
                     {"id": "adaptation_rules.row_not_mapping", "target": "rules[]",
                      "violation": "wrong_type", "severity": "medium",
                      "expected": ["record_dropped"],
@@ -3348,48 +3540,48 @@ class ContextualAdaptationEngine:
                      "reason": "la fila no tiene `rule_id`: sin identidad no se puede registrar y se descarta"},
                     {"id": "adaptation_rules.priority_not_castable", "target": "rules[].priority",
                      "violation": "invalid_value", "severity": "high",
-                     "expected": ["rejected_whole_file"],
-                     "reason": "la conversión a entero lanza ValueError y aborta la carga de TODO el fichero, no solo de la fila"},
+                     "expected": ["value_recovered"],
+                     "reason": "la corrupcion se rechaza SOLO en el CAMPO `priority`: toma su valor por DEFECTO y el resto de la fila y del fichero sobrevive; sin la deteccion, la conversion a entero lanzaba ValueError y abortaba la carga de TODO el fichero"},
                     {"id": "adaptation_rules.execution_count_not_castable", "target": "rules[].execution_count",
                      "violation": "invalid_value", "severity": "high",
-                     "expected": ["rejected_whole_file"],
-                     "reason": "la conversión a entero lanza ValueError y aborta la carga de TODO el fichero"},
+                     "expected": ["value_recovered"],
+                     "reason": "la corrupcion se rechaza SOLO en el CAMPO `execution_count`: toma su valor por DEFECTO y el resto de la fila y del fichero sobrevive; sin la deteccion, la conversion a entero lanzaba ValueError y abortaba la carga de TODO el fichero"},
                     {"id": "adaptation_rules.metadata_not_mapping", "target": "rules[].metadata",
                      "violation": "wrong_type", "severity": "high",
-                     "expected": ["rejected_whole_file"],
-                     "reason": "`dict(...)` sobre un valor que no es diccionario lanza ValueError y aborta la carga de TODO el fichero"},
+                     "expected": ["value_recovered"],
+                     "reason": "la corrupcion se rechaza SOLO en el CAMPO `metadata`: toma su valor por DEFECTO y el resto de la fila y del fichero sobrevive; sin la deteccion, `dict(...)` sobre un valor que no es diccionario lanzaba ValueError y abortaba la carga de TODO el fichero"},
                     {"id": "adaptation_rules.actions_string", "target": "rules[].adaptation_actions",
                      "violation": "wrong_type", "severity": "high",
-                     "expected": ["record_dropped"],
-                     "reason": "la fila se aparta del FORMATO REAL y se descarta: la regla no llega al estado y el resto del fichero se carga; sin la deteccion, `list(\"abc\")` troceaba las acciones en caracteres y el motor las ejecutaba"},
+                     "expected": ["value_recovered"],
+                     "reason": "la corrupcion se rechaza SOLO en el CAMPO `adaptation_actions`: la regla se conserva INERTE (sin acciones) y el resto de la fila y del fichero sobrevive; sin la deteccion, `list(\"abc\")` troceaba las acciones en caracteres y el motor las ejecutaba"},
                     {"id": "adaptation_rules.enabled_string", "target": "rules[].enabled",
                      "violation": "wrong_type", "severity": "critical",
-                     "expected": ["record_dropped"],
-                     "reason": "la fila se aparta del FORMATO REAL y se descarta: la regla desactivada no llega al estado; sin la deteccion, `bool(\"false\")` la activaba e invertia la decision de adaptacion"},
+                     "expected": ["value_recovered"],
+                     "reason": "la corrupcion se rechaza SOLO en el CAMPO `enabled`: la regla se conserva DESACTIVADA (su estado se desconoce) y el resto de la fila y del fichero sobrevive; sin la deteccion, `bool(\"false\")` la activaba e invertia la decision de adaptacion"},
                     {"id": "adaptation_rules.threshold_not_numeric", "target": "rules[].confidence_threshold",
                      "violation": "invalid_value", "severity": "high",
-                     "expected": ["record_dropped"],
-                     "reason": "la fila se aparta del FORMATO REAL y se descarta: la regla no llega al estado y el resto del fichero se carga; sin la deteccion, el umbral no numerico se degradaba a 0.0 y la regla se aplicaba sin filtro de confianza"},
+                     "expected": ["value_recovered"],
+                     "reason": "la corrupcion se rechaza SOLO en el CAMPO `confidence_threshold`: conserva su valor por DEFECTO (0.7) y el resto de la fila y del fichero sobrevive; sin la deteccion, el umbral no numerico se degradaba a 0.0 y la regla se aplicaba sin filtro de confianza"},
                     {"id": "adaptation_rules.success_rate_not_numeric", "target": "rules[].success_rate",
                      "violation": "invalid_value", "severity": "medium",
-                     "expected": ["record_dropped"],
-                     "reason": "la fila se aparta del FORMATO REAL y se descarta: la regla no llega al estado y el resto del fichero se carga; sin la deteccion, la tasa no numerica se degradaba a 0.0 y falseaba la evaluacion de la regla"},
+                     "expected": ["value_recovered"],
+                     "reason": "la corrupcion se rechaza SOLO en el CAMPO `success_rate`: la regla se conserva sin exitos (0.0) y el resto de la fila y del fichero sobrevive; sin la deteccion, la tasa no numerica se degradaba a 0.0 y falseaba la evaluacion de la regla"},
                     {"id": "adaptation_rules.triggers_not_list", "target": "rules[].context_triggers",
                      "violation": "wrong_type", "severity": "high",
-                     "expected": ["record_dropped"],
-                     "reason": "la fila se aparta del FORMATO REAL y se descarta: la regla no llega al estado y el resto del fichero se carga; sin la deteccion, la cadena se recorria caracter a caracter y la regla nunca disparaba"},
+                     "expected": ["value_recovered"],
+                     "reason": "la corrupcion se rechaza SOLO en el CAMPO `context_triggers`: la regla se conserva INERTE (sin disparadores) y el resto de la fila y del fichero sobrevive; sin la deteccion, la cadena se recorria caracter a caracter y la regla nunca disparaba"},
                     {"id": "adaptation_rules.trigger_invalid_value", "target": "rules[].context_triggers[]",
                      "violation": "invalid_value", "severity": "medium",
-                     "expected": ["record_dropped"],
-                     "reason": "la fila se aparta del FORMATO REAL y se descarta: la regla no llega al estado y el resto del fichero se carga; sin la deteccion, el disparador fuera de `ContextType` se filtraba en silencio y la regla perdia ese disparador"},
+                     "expected": ["value_recovered"],
+                     "reason": "la corrupcion se rechaza SOLO en el DISPARADOR invalido: se conservan los disparadores validos y el resto de la fila y del fichero sobrevive; sin la deteccion, el disparador fuera de `ContextType` se filtraba en silencio y la regla perdia ese disparador"},
                     {"id": "adaptation_rules.last_execution_not_iso", "target": "rules[].last_execution",
                      "violation": "invalid_value", "severity": "low",
-                     "expected": ["record_dropped"],
-                     "reason": "la fila se aparta del FORMATO REAL y se descarta: la regla no llega al estado y el resto del fichero se carga; sin la deteccion, la marca no ISO se degradaba a None, tolerancia deliberada del cargador"},
+                     "expected": ["value_recovered"],
+                     "reason": "la corrupcion se rechaza SOLO en el CAMPO `last_execution`: la regla se conserva como nunca ejecutada y el resto de la fila y del fichero sobrevive; sin la deteccion, la marca no ISO se degradaba a None, tolerancia deliberada del cargador"},
                     {"id": "adaptation_rules.name_not_string", "target": "rules[].name",
                      "violation": "wrong_type", "severity": "medium",
-                     "expected": ["record_dropped"],
-                     "reason": "la fila se aparta del FORMATO REAL y se descarta: la regla no llega al estado y el resto del fichero se carga; sin la deteccion, el nombre no se validaba y el valor corrupto se conservaba tal cual en la regla"},
+                     "expected": ["value_recovered"],
+                     "reason": "la corrupcion se rechaza SOLO en el CAMPO `name`: la regla se conserva con su propia identidad y el resto de la fila y del fichero sobrevive; sin la deteccion, el nombre no se validaba y el valor corrupto se conservaba tal cual en la regla"},
                 ],
             },
             "knowledge_base": {
@@ -3432,8 +3624,8 @@ class ContextualAdaptationEngine:
                      "reason": "una clave que el motor nunca escribe no se aplica: no llega al estado y el resto de la base se carga con normalidad"},
                     {"id": "knowledge_base.section_partial", "target": "data.context_patterns.<contexto>",
                      "violation": "wrong_type", "severity": "medium",
-                     "expected": ["silently_ignored"],
-                     "reason": "una seccion con un contexto que no es lista se descarta entera: no llega al estado y la base conserva sus valores por defecto"},
+                     "expected": ["value_recovered"],
+                     "reason": "la corrupcion se rechaza SOLO en el GRUPO (contexto) que se aparta del formato real: ese grupo se descarta y los grupos HERMANOS de la misma seccion sobreviven; antes se descartaba la seccion entera"},
                 ],
             },
             "goal_adaptation_feedback": {
@@ -3761,10 +3953,32 @@ class ContextualAdaptationEngine:
         ],
         "reconciliation": [
             {"unit": "2.8.8.9.7.1",
-             "reason": "esta hoja DECLARA el contrato de lo recuperable y lo CONTRASTA contra el runtime. El runtime todavia NO satisface el contrato en todas las clases: las que se listan en `pending` pierden hoy el dato recuperable y son el trabajo de 2.8.8.9.7.2",
+             "reason": "esta hoja DECLARA el contrato de lo recuperable y lo CONTRASTA contra el runtime. La DETERMINACION que hizo queda aqui: las clases que perdian el dato recuperable eran las que se listan en `pending`, y 2.8.8.9.7.2 las ha implementado",
              "changed": [],
              "unchanged": ["levels", "policies", "recoverable_tokens", "field_defaults", "independence_rule", "invariants"],
-             "pending": [
+             "pending": [],
+             "resolved": [
+                 "adaptation_rules.priority_not_castable",
+                 "adaptation_rules.execution_count_not_castable",
+                 "adaptation_rules.metadata_not_mapping",
+                 "adaptation_rules.actions_string",
+                 "adaptation_rules.enabled_string",
+                 "adaptation_rules.threshold_not_numeric",
+                 "adaptation_rules.success_rate_not_numeric",
+                 "adaptation_rules.triggers_not_list",
+                 "adaptation_rules.trigger_invalid_value",
+                 "adaptation_rules.last_execution_not_iso",
+                 "adaptation_rules.name_not_string",
+                 "adaptation_rules.rules_wrong_type",
+                 "knowledge_base.section_partial",
+             ],
+             "implementation_owner": "2.8.8.9.7.2"},
+            {"unit": "2.8.8.9.7.2",
+             "reason": "la RECUPERACION PARCIAL implementa el contrato declarado: la corrupcion se rechaza SOLO en la unidad que corrompe y el resto de las unidades independientes sobrevive. El runtime ya satisface el contrato en las 27 clases y no queda ninguna pendiente",
+             "changed": [],
+             "unchanged": ["levels", "policies", "recoverable_tokens", "field_defaults", "independence_rule", "invariants"],
+             "pending": [],
+             "resolved": [
                  "adaptation_rules.priority_not_castable",
                  "adaptation_rules.execution_count_not_castable",
                  "adaptation_rules.metadata_not_mapping",

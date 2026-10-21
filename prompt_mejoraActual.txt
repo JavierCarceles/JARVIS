@@ -1,8 +1,20 @@
 ESTADO PERSISTENTE ACTUAL
 CURRENT_PHASE: 2.8.8
-CURRENT_WORK_UNIT: 2.8.8.9.7.2
+CURRENT_WORK_UNIT: 2.8.8.9.8.1
 CURRENT_WORK_STATUS: PENDIENTE
-LAST_COMPLETED_UNIT: 2.8.8.9.7.1
+LAST_COMPLETED_UNIT: 2.8.8.9.7.3
+
+# COMPLETADO: 2.8.8.9.7.3 - Test de recuperacion parcial
+# Fecha: 2026-10-21
+# Archivo modificado: tests/utils/contextual_adaptation_engine/test_2_8_8_9_7_2_recovery_partial.py (nuevo), tests/utils/contextual_adaptation_engine/mutation_check_2_8_8_9_7_2.py (nuevo), README.md, prompt_mejoraActual.txt
+# Resultado: creado y ejecutado el UNICO test pytest de la RECUPERACION PARCIAL, en un unico modulo nuevo de 139 tests (`tests/utils/contextual_adaptation_engine/test_2_8_8_9_7_2_recovery_partial.py`) que comprueba la IMPLEMENTACION de la recuperacion y no su declaracion: la API `recovery_report()` expone un INFORME bien formado (`recoveries`, `count` y `files`, con el numero coincidiendo con la lista), la API es de SOLO LECTURA (no crea ficheros, no altera el estado y devuelve una COPIA defensiva, de modo que mutar lo devuelto no filtra al motor), sin corrupcion NO hay nada que recuperar (CONTROL de no-vacuo), la recuperacion se REGISTRA en la UNIDAD que corrompe con la POLITICA que el contrato declara para esa clase, el valor por DEFECTO que ocupa el lugar del dato corrupto es el DECLARADO y no uno inventado, el ESTADO guarda ese valor por defecto, lo que el contrato declara RECUPERABLE LLEGA al estado y el INFORME no contiene el dato corrupto; el modulo reutiliza de la sonda de 7.1 sus ESCENARIOS y sus OBSERVADORES (no su codigo de salida), cargada por RUTA, de modo que la medicion y la implementacion no comparten puntos ciegos; el resultado se fija ademas como banco de mutacion (`mutation_check_2_8_8_9_7_2.py`, 9 mutaciones)
+# Estado real: 139 PASSED / 0 FAILED en el modulo de test de 7.3 (9 funciones de test parametrizadas sobre las 13 clases con dato recuperable y las 13 politicas, mas los controles de no-vacuo y la guarda de produccion), 617 PASSED / 0 FAILED en la suite completa `tests/` (0 regresiones), 9/9 mutaciones detectadas por `mutation_check_2_8_8_9_7_2.py` (las mutaciones del motor se aplican a una COPIA de `src/` en un temporal) y los ficheros de produccion intactos (sha256 identico antes y despues de ejecutar el modulo)
+
+# COMPLETADO: 2.8.8.9.7.2 - Implementar recuperacion parcial
+# Fecha: 2026-10-21
+# Archivo modificado: src/utils/contextual_adaptation_engine.py, tests/utils/contextual_adaptation_engine/test_2_8_8_9_7_2_recovery_partial.py (nuevo), tests/utils/contextual_adaptation_engine/mutation_check_2_8_8_9_7_2.py (nuevo), README.md, prompt_mejoraActual.txt
+# Resultado: IMPLEMENTADA la RECUPERACION PARCIAL en el motor, aplicando el CONTRATO declarado por 2.8.8.9.7.1, sin tocar la DECLARACION de 6.1, ni la DETECCION de 6.3, ni el RECHAZO verificado de 6.4: seis metodos nuevos en `src/utils/contextual_adaptation_engine.py` que hacen que una corrupcion rechace SOLO la unidad que corrompe y que todo lo demas que el FORMATO REAL declara valido SOBREVIVA. `_valor_por_defecto_de_recuperacion` toma el valor por DEFECTO del campo del CONTRATO declarado, sin inventar datos, y resuelve `$rule_id` con la identidad de la propia regla; `_recuperar_fila_de_regla` rechaza SOLO el CAMPO que corrompe (ese campo toma su valor por defecto y el resto de la fila sobrevive intacto, de modo que los campos de conversion ESTRICTA ya no abortan el FICHERO entero); `_recuperar_contenedor_de_reglas` reconstruye el contenedor `rules` con los valores que sean filas validas por el FORMATO REAL, sin usar las claves como identidad; `_recuperar_grupos_de_base` descarta SOLO el grupo que se aparta del formato y conserva sus HERMANOS, que son unidades independientes; `_registrar_recuperacion` anota en el informe lo recuperado, en la UNIDAD que corrompe y con la POLITICA aplicada; y `recovery_report` expone el INFORME de lo recuperado como API publica de SOLO LECTURA, con COPIA defensiva. Se aplican las 5 POLITICAS del contrato segun el NIVEL de la unidad: `default_the_field`, `keep_valid_elements`, `adapt_container`, `preserve_siblings` y `none`
+# Estado real: los 20 HALLAZGOS de 7.1 (dato recuperable perdido en runtime) quedan RESUELTOS: el modulo de 7.3 mide la MISMA condicion que la sonda de 7.1 (la unidad declarada recuperable esta PRESENTE en el estado) y la exige para las 27 clases con 0 fallos, de modo que las 13 clases que perdian datos recuperables los CONSERVAN; 139 PASSED / 0 FAILED en el modulo de test, 617 PASSED / 0 FAILED en la suite completa `tests/` (0 regresiones), 9/9 mutaciones detectadas y los ficheros de produccion intactos
 
 # COMPLETADO: 2.8.8.9.7.1 - Identificar datos recuperables
 # Fecha: 2026-10-21
@@ -1563,11 +1575,21 @@ Hoy `learning_results` se escribe verbatim (l. 2475) y no hay ningún contador d
 2.8.8.9.7.1 — IDENTIFICAR DATOS RECUPERABLES
 - Determinar qué datos válidos pueden conservarse cuando una parte está corrupta.
 
-2.8.8.9.7.2 — IMPLEMENTAR RECUPERACIÓN PARCIAL
+2.8.8.9.7.2 — IMPLEMENTAR RECUPERACIÓN PARCIAL [IMPLEMENTADA]
 - Recuperar únicamente los datos que realmente puedan recuperarse.
+- PRINCIPIO: una corrupcion rechaza SOLO la unidad que corrompe; todo lo demas que el FORMATO REAL declara valido y que NO depende de la unidad corrupta debe SOBREVIVIR. La recuperacion NO inventa datos: el campo corrupto toma el valor por DEFECTO del formato y el resto de la unidad se conserva integro.
+- IMPLEMENTACION: seis metodos nuevos en `src/utils/contextual_adaptation_engine.py`, aplicados en los cargadores reales (`load_adaptation_rules` y `load_knowledge_base`): `_valor_por_defecto_de_recuperacion` (el valor por DEFECTO del CONTRATO declarado; `$rule_id` se resuelve con la identidad de la propia regla), `_recuperar_fila_de_regla` (se rechaza SOLO el CAMPO que corrompe y el resto de la fila sobrevive), `_recuperar_contenedor_de_reglas` (se reconstruye el contenedor `rules` con sus filas validas), `_recuperar_grupos_de_base` (se descarta SOLO el grupo corrupto y sus HERMANOS sobreviven), `_registrar_recuperacion` (anota lo recuperado en la UNIDAD que corrompe) y `recovery_report` (API publica de SOLO LECTURA, con COPIA defensiva).
+- POLITICAS APLICADAS: las 5 del contrato segun el NIVEL de la unidad: `default_the_field`, `keep_valid_elements`, `adapt_container`, `preserve_siblings` y `none`.
+- HALLAZGO: los 20 HALLAZGOS de 2.8.8.9.7.1 (dato recuperable perdido en runtime) quedan RESUELTOS; las 13 clases que perdian datos recuperables los CONSERVAN.
+- ALCANCE: no relaja el contrato de 2.8.8.9.6.2: los 5 efectos inseguros siguen prohibidos y los 3 seguros siguen admitidos. La prueba permanente de este comportamiento es 2.8.8.9.7.3.
 
-2.8.8.9.7.3 — TEST DE RECUPERACIÓN PARCIAL
+2.8.8.9.7.3 — TEST DE RECUPERACIÓN PARCIAL [IMPLEMENTADA]
 - Probar únicamente este comportamiento.
+- Módulo: `tests/utils/contextual_adaptation_engine/test_2_8_8_9_7_2_recovery_partial.py` (139 tests, 139 PASSED / 0 FAILED). Reutiliza de la sonda de 2.8.8.9.7.1 sus ESCENARIOS y sus OBSERVADORES (no su codigo de salida), cargada por RUTA.
+- QUÉ COMPRUEBA: que la API `recovery_report()` devuelve un INFORME bien formado (`recoveries`, `count` y `files`); que la API es de SOLO LECTURA y devuelve una COPIA defensiva; que sin corrupcion NO hay nada que recuperar (CONTROL de no-vacuo); que la recuperacion se REGISTRA en la UNIDAD que corrompe con la POLITICA declarada; que el valor por DEFECTO que ocupa el lugar del dato corrupto es el DECLARADO; que el ESTADO guarda ese valor por defecto; que lo declarado recuperable LLEGA al estado; y que el INFORME no contiene el dato corrupto.
+- BANCO DE MUTACIÓN: `tests/utils/contextual_adaptation_engine/mutation_check_2_8_8_9_7_2.py` aplica 9 mutaciones (2 sobre la DETECCION de la unidad que corrompe, 5 sobre la RECUPERACION en el nivel de la UNIDAD y 2 sobre el INFORME) y exige que los tests de 7.1 y 7.2 fallen en cada una: 9/9 detectadas. Las mutaciones del motor se aplican a una COPIA del arbol `src/` en un temporal, de modo que el repositorio nunca se toca. El banco ejecuta primero una LINEA BASE sin mutar: si esa no pasa, el arnes no demuestra nada.
+- AISLAMIENTO: todos los motores se crean con `data_dir` temporal y el modulo incluye un TEST DE GUARDA por sha256 de los ficheros de produccion vigilados.
+- RESULTADO: 139 PASSED / 0 FAILED en el modulo, 617 PASSED / 0 FAILED en la suite completa `tests/` (0 regresiones), 9/9 mutaciones detectadas y los ficheros de produccion intactos.
 
 2.8.8.9.8 — FALLBACK POR CORRUPCIÓN TOTAL
 
@@ -4324,3 +4346,64 @@ VERIFICACION:
 DISCREPANCIAS: ninguna. El contrato de 7.1 no relaja el de 6.2: los 5 efectos inseguros siguen prohibidos y los 3 seguros siguen admitidos.
 PENDIENTES: 2.8.8.9.7.2 - implementar recuperacion parcial.
 ESTADO FINAL: 2.8.8.9.7.1 - IMPLEMENTADA
+
+SIGUIENTE UNIDAD: 2.8.8.9.7.2 - IMPLEMENTAR RECUPERACIÓN PARCIAL
+
+### REGISTRO DE UNIDAD: 2.8.8.9.7.2
+FECHA: 2026-10-21
+ESTADO: IMPLEMENTADA
+OBJETIVO: Recuperar únicamente los datos que realmente puedan recuperarse cuando una parte está corrupta, aplicando el contrato declarado por 2.8.8.9.7.1, sin inventar datos y sin reescribir el fichero.
+TIPO DE TRABAJO: IMPLEMENTACIÓN
+CAMBIOS / HALLAZGOS:
+- PRINCIPIO APLICADO: una corrupcion rechaza SOLO la unidad que corrompe; todo lo demas que el FORMATO REAL declara valido y que NO depende de la unidad corrupta debe SOBREVIVIR. La recuperacion NO inventa datos: el campo corrupto toma el valor por DEFECTO del formato y el resto de la unidad se conserva integro.
+- IMPLEMENTACION (produccion): seis metodos nuevos en `src/utils/contextual_adaptation_engine.py`, aplicados en los cargadores reales (`load_adaptation_rules` y `load_knowledge_base`): `_valor_por_defecto_de_recuperacion` (toma el valor por DEFECTO del campo del CONTRATO declarado, sin inventar datos; `$rule_id` se resuelve con la identidad de la propia regla), `_recuperar_fila_de_regla` (rechaza SOLO el CAMPO que corrompe: ese campo toma su valor por defecto y el resto de la fila sobrevive intacto, de modo que los campos de conversion ESTRICTA ya no abortan el FICHERO entero), `_recuperar_contenedor_de_reglas` (reconstruye el contenedor `rules` con los valores que sean filas validas por el FORMATO REAL, sin usar las claves como identidad), `_recuperar_grupos_de_base` (descarta SOLO el grupo que se aparta del formato y conserva sus HERMANOS, que son unidades independientes), `_registrar_recuperacion` (anota en el informe lo recuperado, en la UNIDAD que corrompe y con la POLITICA aplicada) y `recovery_report` (API publica de SOLO LECTURA que expone el INFORME con COPIA defensiva).
+- POLITICAS APLICADAS: las 5 del contrato segun el NIVEL de la unidad: `default_the_field` (el campo corrupto toma su valor por DEFECTO), `keep_valid_elements` (se conservan los disparadores validos y se descarta SOLO el invalido), `adapt_container` (se reconstruye el contenedor con sus filas validas), `preserve_siblings` (se conservan los grupos hermanos del grupo corrupto) y `none` (no hay nada recuperable).
+- INFORME: `recovery_report()` devuelve `recoveries` (la lista de lo recuperado, con `fichero`, `unidad`, `campo`/`grupo`/`clave`, `politica` y `valor`), `count` y `files`. Es de SOLO LECTURA: no crea ficheros, no escribe, no altera el estado del motor y devuelve una COPIA DEFENSIVA, de modo que mutar lo devuelto no filtra al motor.
+- HALLAZGO REAL: los 20 HALLAZGOS de 2.8.8.9.7.1 (dato recuperable perdido en runtime) quedan RESUELTOS. El modulo de 7.3 mide la MISMA condicion que la sonda de 7.1 (la unidad declarada recuperable esta PRESENTE en el estado) y la exige para las 27 clases con 0 fallos: las 13 clases que perdian datos recuperables los CONSERVAN.
+- ALCANCE: no relaja el contrato de 2.8.8.9.6.2: los 5 efectos inseguros siguen prohibidos y los 3 seguros siguen admitidos. La DECLARACION de 6.1, la DETECCION de 6.3 y el RECHAZO verificado de 6.4 no se tocan.
+ARCHIVOS MODIFICADOS:
+- PRODUCCION: `src/utils/contextual_adaptation_engine.py` (seis metodos nuevos: cinco privados de recuperacion y la API publica `recovery_report`, mas el enganche en los dos cargadores reales).
+- TESTS: `tests/utils/contextual_adaptation_engine/test_2_8_8_9_7_2_recovery_partial.py` (nuevo; 139 tests, carga la sonda de 7.1 por RUTA), `tests/utils/contextual_adaptation_engine/mutation_check_2_8_8_9_7_2.py` (nuevo; banco de mutacion).
+- DOCUMENTACION: `README.md`, `prompt_mejoraActual.txt`.
+TESTS Y RESULTADOS:
+- UNITARIOS: `tests/utils/contextual_adaptation_engine/test_2_8_8_9_7_2_recovery_partial.py` - 139 PASSED / 0 FAILED.
+- INTEGRACION: suite completa `tests/` - 617 PASSED / 0 FAILED, 41 subtests, 0 regresiones.
+- MUTACION: `mutation_check_2_8_8_9_7_2.py` - 9/9 mutaciones DETECTADA, 0 insensibles, cada una con los tests concretos que deben fallar identificados.
+VERIFICACION:
+- SINTAXIS: el modulo se importa y se ejecuta correctamente dentro de la suite, sin fallo de importacion.
+- NO VACIO: verificado por el CONTROL de no-vacuo del modulo (sin corrupcion NO hay nada que recuperar: un informe siempre lleno no probaria nada) y por mutacion (9/9).
+- AISLAMIENTO: todos los motores se crean con `data_dir` temporal; el `data/` de produccion NO se modifica (sha256 de `data/knowledge_graph.json` identico antes y despues de ejecutar el modulo de 7.2) y el banco de mutacion aplica las mutaciones a una COPIA del arbol `src/` en un temporal, de modo que el repositorio nunca se toca.
+- COMPORTAMIENTO REAL: la recuperacion se observa en RUNTIME sobre los 27 escenarios de la sonda de 7.1 (cargada por RUTA): el modulo mide la misma condicion que la sonda y la exige para las 27 clases con 0 fallos.
+DISCREPANCIAS: ninguna. El contrato de 7.1 no se relaja: lo declarado sigue siendo lo exigido, y la recuperacion no inventa ningun dato.
+PENDIENTES: 2.8.8.9.7.3 - test de recuperacion parcial.
+ESTADO FINAL: 2.8.8.9.7.2 - IMPLEMENTADA
+
+SIGUIENTE UNIDAD: 2.8.8.9.7.3 - TEST DE RECUPERACIÓN PARCIAL
+
+### REGISTRO DE UNIDAD: 2.8.8.9.7.3
+FECHA: 2026-10-21
+ESTADO: IMPLEMENTADA
+OBJETIVO: Probar únicamente el comportamiento de la recuperación parcial implementado en 2.8.8.9.7.2.
+TIPO DE TRABAJO: VERIFICACIÓN
+CAMBIOS / HALLAZGOS:
+- MODULO UNICO: `tests/utils/contextual_adaptation_engine/test_2_8_8_9_7_2_recovery_partial.py` (139 tests, 9 funciones de test). Reutiliza de la sonda `identify_recoverable_real.py` sus ESCENARIOS y sus OBSERVADORES (no su codigo de salida), cargada por RUTA porque es un script independiente de la suite pytest: la medicion y la implementacion no comparten puntos ciegos.
+- QUE COMPRUEBA: (a) la API `recovery_report()` devuelve un INFORME bien formado (`recoveries`, `count` y `files`, con el numero coincidiendo con la lista); (b) la API es de SOLO LECTURA: no crea ficheros, no altera el estado del motor y devuelve una COPIA defensiva, de modo que mutar lo devuelto no filtra al motor; (c) CONTROL de no-vacuo: sin corrupcion NO hay nada que recuperar; (d) la recuperacion se REGISTRA en la UNIDAD que corrompe, con la POLITICA que el contrato declara para esa clase; (e) el valor por DEFECTO que ocupa el lugar del dato corrupto es el DECLARADO, no uno inventado; (f) el ESTADO guarda ese valor por DEFECTO; (g) lo que el contrato declara RECUPERABLE LLEGA al estado (la unidad independiente de la unidad corrupta sobrevive); (h) el INFORME no contiene el dato corrupto.
+- BANCO DE MUTACION: `mutation_check_2_8_8_9_7_2.py` aplica 9 mutaciones sobre una COPIA del arbol `src/` en un temporal y exige que los tests de 7.1 y 7.2 fallen en cada una: 2 sobre la DETECCION de la unidad que corrompe (los campos de conversion ESTRICTA dejan de detectarse, el grupo corrupto de la base se aplica al estado), 5 sobre la RECUPERACION en el nivel de la UNIDAD (el campo corrupto conserva su valor, la fila se descarta entera, se pierden los disparadores validos, el contenedor no se reconstruye, la seccion se descarta entera) y 2 sobre el INFORME (lo recuperado no se informa, el informe no es una copia defensiva). Cada mutacion nombra los tests que deben fallar y el banco verifica que fallan: 9/9 DETECTADA, 0 insensibles.
+- LINEA BASE: el banco ejecuta primero la suite SIN mutar y exige que pase. Si la linea base no pasara, el arnes no demostraria nada y todas las mutaciones se darian por detectadas.
+- AISLAMIENTO: todos los motores se crean con `data_dir` temporal y la sesion completa se ejecuta dentro del sandbox de CWD de `tests/conftest.py`, de modo que las rutas RELATIVAS de los subsistemas ajenos (`data/knowledge_graph.json`, `data/improvement_rules.json`, `models/...`) caen en el temporal y no en el repo. El propio modulo incluye un TEST DE GUARDA que comprueba por sha256 que los ficheros de produccion vigilados no cambian.
+ARCHIVOS MODIFICADOS:
+- PRODUCCION: NO APLICA (hoja de verificacion; el motor no se modifica).
+- TESTS: `tests/utils/contextual_adaptation_engine/test_2_8_8_9_7_2_recovery_partial.py` (nuevo; 139 tests), `tests/utils/contextual_adaptation_engine/mutation_check_2_8_8_9_7_2.py` (nuevo; banco de mutacion).
+- DOCUMENTACION: `README.md`, `prompt_mejoraActual.txt`.
+TESTS Y RESULTADOS:
+- UNITARIOS: `tests/utils/contextual_adaptation_engine/test_2_8_8_9_7_2_recovery_partial.py` - 139 PASSED / 0 FAILED (9 de comportamiento de la recuperacion, parametrizados sobre las 13 clases con dato recuperable y las 13 politicas, mas los controles de no-vacuo y la guarda de produccion).
+- INTEGRACION: suite completa `tests/` - 617 PASSED / 0 FAILED, 41 subtests, 0 regresiones.
+- MUTACION: `mutation_check_2_8_8_9_7_2.py` - 9/9 mutaciones DETECTADA, 0 insensibles.
+VERIFICACION:
+- SINTAXIS: el modulo se importa y se ejecuta correctamente dentro de la suite, sin fallo de importacion.
+- NO VACIO: verificado por el CONTROL de no-vacuo (sin corrupcion no hay nada que recuperar) y por mutacion (9/9).
+- AISLAMIENTO: el `data/` de produccion NO se modifica (sha256 de `data/knowledge_graph.json` identico antes y despues de ejecutar el modulo) y el banco de mutacion nunca toca el `src/` del repositorio.
+- COMPORTAMIENTO REAL: el modulo se ejecuta de forma independiente (`python -m pytest tests/utils/contextual_adaptation_engine/test_2_8_8_9_7_2_recovery_partial.py`): 139 PASSED / 0 FAILED, codigo de salida 0.
+DISCREPANCIAS: ninguna. La recuperacion implementada en 7.2 cumple lo declarado en 7.1 y el contrato de 6.2 no se relaja.
+PENDIENTES: 2.8.8.9.8.1 - definir el fallback existente.
+ESTADO FINAL: 2.8.8.9.7.3 - IMPLEMENTADA

@@ -661,42 +661,62 @@ def clases_pendientes(recuperable):
 
 
 # ---------------------------------------------------------------- Parte D
+# Los CONTROLES de no-vacuidad de la medicion. Cada uno se puede ejecutar por
+# separado y devuelve las etiquetas de las comprobaciones que han fallado, de
+# modo que la suite pytest pueda exigir el resultado control a control.
+CONTROLES_NO_VACIO = ("datos sanos", "perdida real", "fila intacta")
+
+
+def control_de_no_vacio(nombre):
+    """Ejecuta UN control de no-vacuidad. Devuelve las etiquetas fallidas."""
+    desde = len(FAILURES)
+
+    if nombre == "datos sanos":
+        # D1: con datos SANOS, la medicion no declara ninguna perdida.
+        sana = _reglas([dict(REGLA, rule_id="rr_sano_1"), dict(REGLA, rule_id="rr_sano_3")])
+        observado = medir({"id": "control", "files": sana, "marca": "MARCA_INEXISTENTE",
+                           "unidades": [unidad_regla("fila `rr_sano_1`", "siblings", "rr_sano_1"),
+                                        unidad_regla("fila `rr_sano_3`", "siblings", "rr_sano_3")]})
+        check("CONTROL `datos sanos`: NO se declara ninguna perdida",
+              all(u["presente"] for u in observado["unidades"]),
+              str([u["etiqueta"] for u in observado["unidades"] if not u["presente"]]))
+        check("CONTROL `datos sanos`: el sentinela inexistente no aparece en el estado",
+              not observado["corrupto_en_estado"])
+
+    elif nombre == "perdida real":
+        # D2: con una perdida REAL, la medicion la declara. Se usa el BLOQUE
+        # `data` de la base de conocimiento: su contenido es opaco para el
+        # motor, asi que no es recuperable y se pierde ENTERO. Es la unica
+        # perdida que el contrato declara REAL, y sirve para comprobar que el
+        # instrumento la ve (las que la RECUPERACION arregla ya no son
+        # perdidas).
+        marca_control = marca("knowledge_base.data_not_mapping")
+        ancho = _base([{"context_patterns": {"production": [{"patron": marca_control}]}}])
+        observado = medir({"id": "control", "files": ancho, "marca": marca_control,
+                           "unidades": [unidad_seccion("contenido del bloque `data`", "siblings",
+                                                       "context_patterns", marca_control)]})
+        check("CONTROL `perdida real`: la medicion DECLARA la unidad perdida",
+              not observado["unidades"][0]["presente"],
+              "el instrumento no ve la perdida: la medicion no discrimina")
+
+    elif nombre == "fila intacta":
+        # D3: el instrumento distingue "la fila existe" de "la fila no existe",
+        # de modo que la perdida a NIVEL DE CAMPO se puede ver.
+        intacta = _reglas([dict(REGLA, rule_id="rr_corrupto")])
+        observado = medir({"id": "control", "files": intacta, "marca": "MARCA_INEXISTENTE",
+                           "unidades": [unidad_regla("fila intacta", "row_fields", "rr_corrupto",
+                                                     {k: v for k, v in REGLA.items() if k != "rule_id"})]})
+        check("CONTROL `fila intacta`: la fila y sus campos validos se observan",
+              all(u["presente"] for u in observado["unidades"]),
+              "el instrumento no ve una fila valida: no puede medir su perdida")
+
+    return FAILURES[desde:]
+
+
 def parte_d_no_vacio():
     print("\n== PARTE D: NO VACUO (la medicion discrimina) ==")
-
-    # D1: con datos SANOS, la medicion no declara ninguna perdida.
-    clase_id = "adaptation_rules.row_not_mapping"
-    sana = _reglas([dict(REGLA, rule_id="rr_sano_1"), dict(REGLA, rule_id="rr_sano_3")])
-    observado = medir({"id": "control", "files": sana, "marca": "MARCA_INEXISTENTE",
-                       "unidades": [unidad_regla("fila `rr_sano_1`", "siblings", "rr_sano_1"),
-                                    unidad_regla("fila `rr_sano_3`", "siblings", "rr_sano_3")]})
-    check("CONTROL `datos sanos`: NO se declara ninguna perdida",
-          all(u["presente"] for u in observado["unidades"]),
-          str([u["etiqueta"] for u in observado["unidades"] if not u["presente"]]))
-    check("CONTROL `datos sanos`: el sentinela inexistente no aparece en el estado",
-          not observado["corrupto_en_estado"])
-
-    # D2: con una perdida REAL, la medicion la declara. Se ensancha la
-    # corrupcion hasta que el contenedor entero se pierde.
-    clave = "adaptation_rules.rules_wrong_type"
-    marca_control = marca(clave)
-    ancho = _reglas({"clave_1": dict(REGLA, rule_id="rr_sano_1"),
-                     "clave_2": {"marca": marca_control}})
-    observado = medir({"id": "control", "files": ancho, "marca": marca_control,
-                       "unidades": [unidad_regla("valor valido del mapeo `rules`", "container_values", "rr_sano_1")]})
-    check("CONTROL `perdida real`: la medicion DECLARA la unidad perdida",
-          not observado["unidades"][0]["presente"],
-          "el instrumento no ve la perdida: la medicion no discrimina")
-
-    # D3: el instrumento distingue "la fila existe" de "la fila no existe", de
-    # modo que la perdida a NIVEL DE CAMPO se puede ver.
-    intacta = _reglas([dict(REGLA, rule_id="rr_corrupto")])
-    observado = medir({"id": "control", "files": intacta, "marca": "MARCA_INEXISTENTE",
-                       "unidades": [unidad_regla("fila intacta", "row_fields", "rr_corrupto",
-                                                 {k: v for k, v in REGLA.items() if k != "rule_id"})]})
-    check("CONTROL `fila intacta`: la fila y sus campos validos se observan",
-          all(u["presente"] for u in observado["unidades"]),
-          "el instrumento no ve una fila valida: no puede medir su perdida")
+    for nombre in CONTROLES_NO_VACIO:
+        control_de_no_vacio(nombre)
 
 
 # ---------------------------------------------------------------- Parte E

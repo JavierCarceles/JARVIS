@@ -134,108 +134,125 @@ def escenarios():
     """Escenarios PROPIOS de 2.8.8.9.6.4, con el sentinela en el punto corrupto.
 
     Cada entrada declara:
-      - `alcance`:  que destruye la corrupcion ("fila", "contenedor" o "fichero").
+      - `alcance`:  la UNIDAD que la corrupcion destruye ("bloque", "seccion",
+        "grupo", "fila", "entrada" o "campo").
+      - `politica`: COMO se rechaza esa unidad ("adapt_container",
+        "preserve_siblings", "default_the_field", "keep_valid_elements" o
+        "none").
       - `hermano`:  el contenido SANO que acompana a la corrupcion y donde vive.
-      - `unidad`:   que seccion se descarta y con que valor debe quedar.
+      - `unidad`:   que unidad se descarta y con que valor debe quedar.
       - `files`:    el fichero corrupto tal y como se escribe en disco.
+
+    El SENTINELA se incrusta en el PUNTO EXACTO que se corrompe: en el CAMPO
+    cuando la corrupcion es de campo, en la CLAVE o en el ELEMENTO cuando la
+    corrupcion es de seccion, grupo o entrada. Asi el sentinela no puede
+    llegar al estado por una via INOCUA (por ejemplo, como identidad de la
+    fila, que es un dato VALIDO del formato).
     """
     tabla = {}
 
-    def anota(clase_id, alcance, hermano, unidad, ficheros):
-        tabla[clase_id] = {"id": clase_id, "alcance": alcance, "hermano": hermano,
-                           "unidad": unidad, "files": ficheros}
+    def anota(clase_id, alcance, politica, hermano, unidad, ficheros):
+        tabla[clase_id] = {"id": clase_id, "alcance": alcance, "politica": politica,
+                           "hermano": hermano, "unidad": unidad, "files": ficheros}
 
     # --- adaptation_rules: el contenedor es la lista `rules` ---------------
-    anota("adaptation_rules.rules_wrong_type", "contenedor", None, ("reglas",),
-          _reglas({sentinela("adaptation_rules.rules_wrong_type"): 1}))
-    anota("adaptation_rules.row_not_mapping", "fila", ("regla", "ok1", "mismo"), None,
+    anota("adaptation_rules.rules_wrong_type", "bloque", "adapt_container", None, None,
+          _reglas({sentinela("adaptation_rules.rules_wrong_type"): 1,
+                   "ok2": dict(REGLA_SANA, rule_id="ok2")}))
+    anota("adaptation_rules.row_not_mapping", "fila", "preserve_siblings",
+          ("regla", "ok1", "mismo"), None,
           _reglas([dict(REGLA_SANA), sentinela("adaptation_rules.row_not_mapping")]))
-    anota("adaptation_rules.row_missing_identity", "fila", ("regla", "ok1", "mismo"), None,
+    anota("adaptation_rules.row_missing_identity", "fila", "preserve_siblings",
+          ("regla", "ok1", "mismo"), None,
           _reglas([dict(REGLA_SANA), {"name": sentinela("adaptation_rules.row_missing_identity")}]))
-    for clase_id, campo, valor in (
-            ("adaptation_rules.priority_not_castable", "priority", "abc"),
-            ("adaptation_rules.execution_count_not_castable", "execution_count", "abc"),
-            ("adaptation_rules.metadata_not_mapping", "metadata", "texto")):
-        anota(clase_id, "fichero", ("regla", "ok1", "mismo"), ("reglas",),
-              _reglas([dict(REGLA_SANA), dict(REGLA_SANA, rule_id=sentinela(clase_id),
-                                              **{campo: valor})]))
-    for clase_id, campo, valor in (
-            ("adaptation_rules.actions_string", "adaptation_actions", "abc"),
-            ("adaptation_rules.enabled_string", "enabled", "false"),
-            ("adaptation_rules.threshold_not_numeric", "confidence_threshold", "abc"),
-            ("adaptation_rules.success_rate_not_numeric", "success_rate", "abc"),
-            ("adaptation_rules.triggers_not_list", "context_triggers", "production"),
-            ("adaptation_rules.trigger_invalid_value", "context_triggers", None),
-            ("adaptation_rules.last_execution_not_iso", "last_execution", "no-es-iso"),
-            ("adaptation_rules.name_not_string", "name", None)):
-        fila = dict(REGLA_SANA, rule_id=sentinela(clase_id))
-        if campo == "context_triggers" and valor is None:
-            fila[campo] = [sentinela(clase_id)]
-        elif valor is None:
-            fila[campo] = {sentinela(clase_id): 1}
-        else:
-            fila[campo] = valor
-        anota(clase_id, "fila", ("regla", "ok1", "mismo"), None, _reglas([dict(REGLA_SANA), fila]))
+    # CAMPOS: el SENTINELA va EN EL CAMPO que se corrompe y la identidad de la
+    # fila es SANA, para que el sentinela no pueda llegar al estado por una via
+    # inocente. El valor por DEFECTO es el que declara el FORMATO REAL.
+    for clase_id, campo, forma, defecto in (
+            ("adaptation_rules.priority_not_castable", "priority", "texto", 1),
+            ("adaptation_rules.execution_count_not_castable", "execution_count", "texto", 0),
+            ("adaptation_rules.metadata_not_mapping", "metadata", "texto", {}),
+            ("adaptation_rules.actions_string", "adaptation_actions", "texto", []),
+            ("adaptation_rules.enabled_string", "enabled", "texto", False),
+            ("adaptation_rules.threshold_not_numeric", "confidence_threshold", "texto", 0.7),
+            ("adaptation_rules.success_rate_not_numeric", "success_rate", "texto", 0.0),
+            ("adaptation_rules.triggers_not_list", "context_triggers", "texto", []),
+            ("adaptation_rules.last_execution_not_iso", "last_execution", "texto", None),
+            ("adaptation_rules.name_not_string", "name", "mapeo", "bad1")):
+        fila = dict(REGLA_SANA, rule_id="bad1")
+        fila[campo] = (sentinela(clase_id) if forma == "texto"
+                       else {sentinela(clase_id): 1})
+        anota(clase_id, "campo", "default_the_field", ("regla", "ok1", "mismo"),
+              ("campo", "bad1", campo, defecto), _reglas([dict(REGLA_SANA), fila]))
+    # El disparador invalido: se conserva el VALIDO y se descarta el invalido.
+    anota("adaptation_rules.trigger_invalid_value", "campo", "keep_valid_elements",
+          ("regla", "ok1", "mismo"), ("campo", "bad1", "context_triggers", ["production"]),
+          _reglas([dict(REGLA_SANA),
+                   dict(REGLA_SANA, rule_id="bad1",
+                        context_triggers=["production",
+                                          sentinela("adaptation_rules.trigger_invalid_value")])]))
 
     # --- knowledge_base: el contenedor es el bloque `data` ------------------
-    anota("knowledge_base.data_not_mapping", "contenedor", None, ("base",),
+    anota("knowledge_base.data_not_mapping", "bloque", "none", None, ("base",),
           _base([sentinela("knowledge_base.data_not_mapping")]))
-    anota("knowledge_base.section_not_mapping", "contenedor",
+    anota("knowledge_base.section_not_mapping", "seccion", "preserve_siblings",
           ("seccion", "success_patterns", "otro", marca_sana("knowledge_base.section_not_mapping")),
           ("seccion", "context_patterns"),
           _base({"context_patterns": sentinela("knowledge_base.section_not_mapping"),
                  "success_patterns": {"production": [{"patron": marca_sana("knowledge_base.section_not_mapping")}]}}))
-    anota("knowledge_base.strategies_not_mapping", "contenedor",
+    anota("knowledge_base.strategies_not_mapping", "seccion", "preserve_siblings",
           ("seccion", "success_patterns", "otro", marca_sana("knowledge_base.strategies_not_mapping")),
           ("seccion", "adaptation_strategies"),
           _base({"adaptation_strategies": sentinela("knowledge_base.strategies_not_mapping"),
                  "success_patterns": {"production": [{"patron": marca_sana("knowledge_base.strategies_not_mapping")}]}}))
-    anota("knowledge_base.unexpected_key", "contenedor",
+    anota("knowledge_base.unexpected_key", "seccion", "preserve_siblings",
           ("seccion", "success_patterns", "otro", marca_sana("knowledge_base.unexpected_key")),
           ("clave", None, sentinela("knowledge_base.unexpected_key")),
           _base({sentinela("knowledge_base.unexpected_key"): 1,
                  "success_patterns": {"production": [{"patron": marca_sana("knowledge_base.unexpected_key")}]}}))
-    anota("knowledge_base.section_partial", "contenedor",
-          ("seccion", "success_patterns", "otro", marca_sana("knowledge_base.section_partial")),
-          ("seccion", "context_patterns"),
-          _base({"context_patterns": {"production": sentinela("knowledge_base.section_partial")},
+    anota("knowledge_base.section_partial", "grupo", "preserve_siblings",
+          ("seccion", "context_patterns", "otro", marca_sana("knowledge_base.section_partial")),
+          ("grupo", "context_patterns", "production"),
+          _base({"context_patterns": {
+                     "production": sentinela("knowledge_base.section_partial"),
+                     "idle": [{"patron": marca_sana("knowledge_base.section_partial")}]},
                  "success_patterns": {"production": [{"patron": marca_sana("knowledge_base.section_partial")}]}}))
 
     # --- goal_adaptation_feedback: secciones `goal_adaptation_feedback` y
     #     `adaptation_history` ----------------------------------------------
-    anota("goal_adaptation_feedback.section_not_list", "contenedor",
+    anota("goal_adaptation_feedback.section_not_list", "seccion", "preserve_siblings",
           ("historial", "hb_ok", "otro"), ("seccion", "goal_adaptation_feedback"),
           _feedback(goal_adaptation_feedback={sentinela("goal_adaptation_feedback.section_not_list"): 1},
                     adaptation_history=[dict(HISTORIAL_SANO)]))
-    anota("goal_adaptation_feedback.row_not_mapping", "fila",
+    anota("goal_adaptation_feedback.row_not_mapping", "fila", "preserve_siblings",
           ("fila_feedback", "fb_ok", "mismo"), None,
           _feedback(goal_adaptation_feedback=[dict(FILA_FB_SANA),
                                               sentinela("goal_adaptation_feedback.row_not_mapping")]))
-    anota("goal_adaptation_feedback.history_not_list", "contenedor",
+    anota("goal_adaptation_feedback.history_not_list", "seccion", "preserve_siblings",
           ("fila_feedback", "fb_ok", "otro"), ("historial",),
           _feedback(goal_adaptation_feedback=[dict(FILA_FB_SANA)],
                     adaptation_history={sentinela("goal_adaptation_feedback.history_not_list"): 1}))
 
     # --- goal_adaptation_learning_results: secciones `learning_results` y
     #     `adaptation_strategies` ------------------------------------------
-    anota("goal_adaptation_learning_results.learning_results_not_list", "contenedor",
+    anota("goal_adaptation_learning_results.learning_results_not_list", "seccion", "preserve_siblings",
           ("estrategia", "st_ok", "otro"), ("seccion", "learning_results"),
           _aprendizaje(learning_results={sentinela("goal_adaptation_learning_results.learning_results_not_list"): 1},
                        adaptation_strategies={"st_ok": dict(ESTRATEGIA_SANA)}))
-    anota("goal_adaptation_learning_results.row_not_mapping", "fila",
+    anota("goal_adaptation_learning_results.row_not_mapping", "fila", "preserve_siblings",
           ("fila_lr", "lr_ok", "mismo"), None,
           _aprendizaje(learning_results=[dict(FILA_LR_SANA),
                                          sentinela("goal_adaptation_learning_results.row_not_mapping")]))
-    anota("goal_adaptation_learning_results.strategies_not_mapping", "contenedor",
+    anota("goal_adaptation_learning_results.strategies_not_mapping", "seccion", "preserve_siblings",
           ("fila_lr", "lr_ok", "otro"), ("seccion", "adaptation_strategies"),
           _aprendizaje(learning_results=[dict(FILA_LR_SANA)],
                        adaptation_strategies=sentinela("goal_adaptation_learning_results.strategies_not_mapping")))
-    anota("goal_adaptation_learning_results.strategy_value_not_mapping", "contenedor",
+    anota("goal_adaptation_learning_results.strategy_value_not_mapping", "entrada", "preserve_siblings",
           ("fila_lr", "lr_ok", "otro"),
           ("clave", "adaptation_strategies", sentinela("goal_adaptation_learning_results.strategy_value_not_mapping")),
           _aprendizaje(learning_results=[dict(FILA_LR_SANA)],
                        adaptation_strategies={sentinela("goal_adaptation_learning_results.strategy_value_not_mapping"): "basura"}))
-    anota("goal_adaptation_learning_results.strategy_missing_identity", "contenedor",
+    anota("goal_adaptation_learning_results.strategy_missing_identity", "entrada", "preserve_siblings",
           ("fila_lr", "lr_ok", "otro"),
           ("clave", "adaptation_strategies", sentinela("goal_adaptation_learning_results.strategy_missing_identity")),
           _aprendizaje(learning_results=[dict(FILA_LR_SANA)],
@@ -353,7 +370,7 @@ def hermano_presente(motor, hermano):
 
 
 def unidad_intacta(motor, motor_ref, unidad):
-    """La seccion descartada por la corrupcion conserva el valor por defecto."""
+    """La unidad descartada por la corrupcion conserva el valor por defecto."""
     if unidad is None:
         return True
     tipo = unidad[0]
@@ -363,6 +380,27 @@ def unidad_intacta(motor, motor_ref, unidad):
         return firma_base(motor) == firma_base(motor_ref)
     if tipo == "historial":
         return firma_historial(motor) == firma_historial(motor_ref)
+    if tipo == "campo":
+        # La corrupcion se rechaza en el CAMPO: el campo toma su valor por
+        # DEFECTO y la fila sobrevive con el resto de sus campos intactos.
+        rule_id, campo, esperado = unidad[1], unidad[2], unidad[3]
+        regla = (motor.adaptation_rules or {}).get(rule_id)
+        if regla is None:
+            return False
+        datos = regla.to_dict() if hasattr(regla, "to_dict") else dict(regla)
+        if datos.get(campo) != esperado:
+            return False
+        # La IDENTIDAD de la fila es la de la regla sana salvo en `rule_id`:
+        # se compara el resto de los campos con los de la regla de referencia.
+        return all(datos.get(otro) == REGLA_SANA[otro]
+                   for otro in ("description", "condition_pattern",
+                                "adaptation_score", "constraints", "deadline"))
+    if tipo == "grupo":
+        # La corrupcion se rechaza en el GRUPO: el grupo toma su valor por
+        # DEFECTO (la lista vacia) y sus grupos HERMANOS sobreviven.
+        seccion, grupo = unidad[1], unidad[2]
+        valores = motor.knowledge_base.get(seccion) or {}
+        return valores.get(grupo) == []
     if tipo == "seccion":
         return (motor.knowledge_base.get(unidad[1])
                 == motor_ref.knowledge_base.get(unidad[1]))
@@ -385,17 +423,34 @@ def hermano_debe_sobrevivir(alcance, hermano):
     """DERIVA, desde el modelo propio de 6.4, si el contenido sano sobrevive."""
     if hermano is None:
         return None
-    if alcance == "fila":
+    if alcance in ("campo", "grupo", "fila"):
         return True
-    if alcance == "contenedor":
+    if alcance in ("bloque", "seccion", "entrada"):
         return hermano[2] == "otro"
     return False
 
 
-def efecto_del_alcance(alcance):
-    """El efecto declarado que le corresponde a un alcance, en el vocabulario."""
-    return {"fila": "record_dropped", "contenedor": "silently_ignored",
-            "fichero": "rejected_whole_file"}[alcance]
+def efecto_del_alcance(alcance, politica=None):
+    """El efecto declarado que le corresponde a un ALCANCE y una POLITICA.
+
+    El efecto depende de la UNIDAD que se rechaza, no solo de la politica: un
+    CAMPO o un GRUPO se recuperan (la unidad corrupta toma su valor por
+    defecto y el resto sobrevive), una FILA se descarta y una SECCION o una
+    ENTRADA se ignoran con su seccion.
+    """
+    if alcance == "campo":
+        return "value_recovered"
+    if alcance == "grupo":
+        return "value_recovered"
+    if alcance == "fila":
+        return "record_dropped"
+    if alcance in ("seccion", "entrada"):
+        return "silently_ignored"
+    if alcance == "bloque":
+        return "value_recovered" if politica == "adapt_container" else "silently_ignored"
+    if alcance == "fichero":
+        return "rejected_whole_file"
+    raise KeyError(alcance)
 
 
 def ficheros_del_disco(data_dir):
@@ -443,16 +498,18 @@ def parte_a_contrato(motor_ref):
           sorted(tabla) == sorted(declaradas),
           f"propias={len(tabla)} declaradas={len(declaradas)}")
 
-    # El modelo propio (alcance) tiene que ser COHERENTE con el efecto que el
-    # motor declara para cada clase: un alcance de "fila" exige `record_dropped`,
-    # uno de "contenedor" exige `silently_ignored` y uno de "fichero" exige
-    # `rejected_whole_file`.
+    # El modelo propio (alcance + politica) tiene que ser COHERENTE con el
+    # efecto que el motor declara para cada clase: un alcance de "campo" o de
+    # "grupo" exige `value_recovered`, uno de "fila" exige `record_dropped`,
+    # uno de "seccion" o de "entrada" exige `silently_ignored` y uno de
+    # "fichero" exige `rejected_whole_file`.
     incoherentes = []
     for clase_id, escenario in sorted(tabla.items()):
-        esperado = efecto_del_alcance(escenario["alcance"])
+        esperado = efecto_del_alcance(escenario["alcance"], escenario["politica"])
         declarados = set(declaradas.get(clase_id, {}).get("expected", []))
         if declarados != {esperado}:
             incoherentes.append(f"{clase_id}: alcance={escenario['alcance']} "
+                                 f"politica={escenario['politica']} "
                                  f"esperado={esperado} declarados={sorted(declarados)}")
     check("El ALCANCE del modelo propio concuerda con el efecto declarado",
           not incoherentes, "; ".join(incoherentes))
@@ -460,8 +517,9 @@ def parte_a_contrato(motor_ref):
     # El vocabulario de efectos es el cerrado de 2.8.8.9.6.1 y esta hoja solo
     # admite los efectos que NO usan el dato corrupto.
     vocabulario = set(contrato["effect_vocabulary"])
-    seguros = {"silently_ignored", "record_dropped", "rejected_whole_file"}
-    check("El vocabulario de efectos incluye los tres efectos de rechazo",
+    seguros = {"silently_ignored", "record_dropped", "rejected_whole_file",
+               "value_recovered"}
+    check("El vocabulario de efectos incluye los cuatro efectos de rechazo",
           seguros <= vocabulario, f"vocabulario={sorted(vocabulario)}")
     # Ningun efecto declarado puede ser uno de los que CONSUMEN el dato
     # corrupto: esos serian "el motor se trago la basura".
@@ -475,9 +533,15 @@ def parte_a_contrato(motor_ref):
     check("Ningun efecto declarado por el motor consume el dato corrupto",
           not filtrados, "; ".join(filtrados))
     check("Todo alcance del modelo propio deriva a un efecto que NO usa el dato corrupto",
-          efecto_del_alcance("fila") in seguros
-          and efecto_del_alcance("contenedor") in seguros
-          and efecto_del_alcance("fichero") in seguros)
+          all(efecto_del_alcance(alcance, politica) in seguros
+              for alcance, politica in (("campo", "default_the_field"),
+                                        ("grupo", "preserve_siblings"),
+                                        ("fila", "preserve_siblings"),
+                                        ("seccion", "preserve_siblings"),
+                                        ("entrada", "preserve_siblings"),
+                                        ("bloque", "adapt_container"),
+                                        ("bloque", "none"),
+                                        ("fichero", "none"))))
     return tabla
 
 
@@ -638,7 +702,7 @@ def selectividad_de_una_clase(clase_id, escenario, motor_ref):
               f"alcance={escenario['alcance']} observado={observed}")
 
         if alcance_afecta_a_unidad(escenario):
-            check(f"`{clase_id}`: la seccion descartada conserva el VALOR POR DEFECTO",
+            check(f"`{clase_id}`: la unidad descartada conserva el VALOR POR DEFECTO",
                   unidad_intacta(motor, motor_ref, escenario["unidad"]),
                   str(escenario["unidad"]))
     finally:
@@ -653,8 +717,8 @@ def parte_c_selectividad(tabla, motor_ref):
 
 
 def alcance_afecta_a_unidad(escenario):
-    """La seccion descartada solo se comprueba cuando el alcance no es de fila."""
-    return escenario["alcance"] != "fila" and escenario["unidad"] is not None
+    """La unidad descartada se comprueba siempre que el alcance la declara."""
+    return escenario["unidad"] is not None
 
 
 # ---------------------------------------------------------------- Parte D
