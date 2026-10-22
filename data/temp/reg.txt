@@ -1,0 +1,40 @@
+REGISTRO DE UNIDAD: 2.8.8.9.11.2
+FECHA: 2026-10-22
+ESTADO: IMPLEMENTADA
+OBJETIVO: Definir que datos pueden olvidarse, usando unicamente datos que el sistema ya pueda identificar como descartables.
+TIPO DE TRABAJO: DEFINICION
+CAMBIOS / HALLAZGOS:
+- El sistema NO posee un mecanismo dedicado de olvido/expiration (constatado en 2.8.8.9.11.1). Solo existen dos formas de descarte ya soportadas: eliminacion manual por identidad (remove_adaptation_rule(rule_id), persistida) y truncamiento por limite de tamano en memoria y en disco.
+- DATOS QUE PUEDEN OLVIDARSE (identificables como descartables por mecanismos existentes):
+  1. Reglas de adaptacion cuyo rule_id se pasa a remove_adaptation_rule: identificables por identidad explicita; el sistema ya las elimina y persiste el resultado.
+  2. Entradas de adaptation_history que exceden el limite de 1000 (del self.adaptation_history[:-1000]): identificables por posicion (las mas antiguas) y ya descartadas automaticamente.
+  3. Registros de feedback de Goal que exceden el limite de 1000: identificables por posicion y ya truncados en _save_goal_adaptation_feedback.
+  4. Filas de learning_results que exceden el limite de 500 (del rows[:-500]): identificables por posicion y ya truncadas en _save_goal_adaptation_learning_results.
+  5. context_snapshots que exceden max_context_snapshots (1000): identificables por posicion y ya truncados.
+  6. knowledge_transfers que exceden el limite de 200: identificables por posicion y ya truncados.
+  7. Patrones/entradas que exceden los limites de 50/100: identificables por posicion y ya truncados.
+  8. Reglas con confidence por debajo de confidence_threshold (0.7): ya filtradas al guardar (no se persisten); identificables por metrica existente.
+  9. Estrategias aprendidas con confidence < confidence_threshold: ya filtradas al guardar; identificables por metrica existente.
+  10. Patrones de aprendizaje no validados (confianza < 0.7 o menos de 3 observaciones similares): ya filtrados al cargar/guardar; identificables por metricas existentes.
+- DATOS QUE NO PUEDEN OLVIDARSE CON LOS MECANISMOS ACTUALES (no identificables como descartables sin inventar criterio):
+  - Entradas antiguas por edad (no hay campo de expiracion ni timestamp de caducidad).
+  - Entradas por baja utilidad/valor (no hay metrica de uso/valor mas alla de success_rate/confidence, ya usadas).
+  - Entradas por duplicado o redundancia (no hay detector de duplicados mas alla de la identidad por rule_id).
+- CONCLUSION: el unico olvido implementable sin inventar mecanismo nuevo es el que ya existe (eliminacion manual por id + truncamiento por limite de tamano + filtrado por umbral de confianza/validacion). Cualquier olvido por edad o utilidad requeriria un mecanismo nuevo, que pertenece a 2.8.8.9.11.3 y debe justificarse alli.
+ARCHIVOS MODIFICADOS:
+- PRODUCCION: NO APLICA (hoja de definicion; no se modifica codigo).
+- TESTS: NO APLICA.
+- DOCUMENTACION: prompt_mejoraActual.txt.
+TESTS Y RESULTADOS:
+- UNITARIOS: NO EJECUTADOS (sin cambios de codigo).
+- INTEGRACION: NO APLICA.
+- NO REGRESION: NO EJECUTADA.
+VERIFICACION:
+- SINTAXIS: NO APLICA.
+- MAIN.PY: NO APLICA.
+- COMPORTAMIENTO / INTEGRACION REAL: La definicion se basa en mecanismos verificados en el codigo (remove_adaptation_rule, truncamientos y filtros de confianza/validacion ya implementados y testeados en unidades anteriores).
+DISCREPANCIAS: NINGUNA REGISTRADA.
+PENDIENTES: 2.8.8.9.11.3 - implementar olvido (unicamente el mecanismo necesario, si se justifica).
+ESTADO FINAL: 2.8.8.9.11.2 - IMPLEMENTADA
+"""
+filePath: c:\Users\FO TARDA\Documents\VSC_JC\JARVIS\data\temp\reg.txt
