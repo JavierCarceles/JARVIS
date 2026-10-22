@@ -164,6 +164,7 @@ def test_limite_persistencia_feedback(engine, monkeypatch):
     # Se aísla el I/O a disco: el objetivo es validar la lógica de recorte,
     # no el rendimiento de escritura.
     monkeypatch.setattr(engine, "_save_goal_adaptation_feedback", lambda: None)
+    monkeypatch.setattr(engine, "_save_goal_adaptation_learning_results", lambda: None)
 
     for index in range(1005):
         engine._capture_goal_adaptation_feedback(
