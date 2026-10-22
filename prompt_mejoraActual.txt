@@ -1,8 +1,8 @@
 ESTADO PERSISTENTE ACTUAL
 CURRENT_PHASE: 2.8.8
-CURRENT_WORK_UNIT: 2.8.8.9.8.4
-CURRENT_WORK_STATUS: EN PROCESO
-LAST_COMPLETED_UNIT: 2.8.8.9.8.3
+CURRENT_WORK_UNIT: 2.8.8.9.8.4.2
+CURRENT_WORK_STATUS: PENDIENTE
+LAST_COMPLETED_UNIT: 2.8.8.9.8.4.1
 
 PROMPT MAESTRO JARVIS — AUTOMEJORA INCREMENTAL
 
@@ -1540,8 +1540,26 @@ mutaciones detectadas y los 4 ficheros de persistencia del `data/` de produccion
 2.8.8.9.8.3 — TEST DE CORRUPCIÓN TOTAL
 - Verificar que JARVIS puede continuar sin datos válidos.
 
-2.8.8.9.8.4 — VERIFICAR NO SOBRESCRITURA INDEBIDA
+2.8.8.9.8.4 — VERIFICAR NO SOBRESCRITURA INDEBIDA [PARCIALMENTE IMPLEMENTADA]
 - Comprobar que la recuperación no destruye datos válidos todavía recuperables.
+- VERIFICACIÓN (runtime, sondas `tests/utils/contextual_adaptation_engine/probe_2_8_8_9_8_4_hallazgos.py`, `..._hallazgos2.py` y `..._h3_integridad.py`): la NO-REESCRITURA de los ficheros originales está COMPROBADA (sha256 idéntico antes y después de cargar ficheros corruptos). La NO DESTRUCCIÓN de datos válidos NO se cumple: se han encontrado 4 defectos REALES, con excepción y con pérdida medibles de datos sanos.
+- HALLAZGO H1 (PÉRDIDA DE DATOS SANOS): `src/utils/contextual_adaptation_engine.py:1652` — `_recuperar_grupos_de_base` llama `por_defecto.values()` sobre el valor por defecto de la sección; si ese defecto es de tipo LISTA (`learning_results`, `goal_adaptation_feedback`) lanza `AttributeError: 'list' object has no attribute 'values'`. La excepción aborta TODO `load_knowledge_base` (`except` de `:1845`): el fichero devuelve `False`, `unidades_cargadas['knowledge_base']` queda en 0 y las secciones SANAS del mismo fichero se PIERDEN (`context_patterns.production` queda `[]` en vez de `[{"patron": "sano"}]`).
+- HALLAZGO E1/E2/E3 (SOBRESCRITURA INDEBIDA): `src/utils/contextual_adaptation_engine.py:1763,1784` — una fila con `rule_id` no-string (p. ej. `111`) se registra con la identidad INVENTADA `None`; dos filas así COLISIONAN y la SEGUNDA SOBREESCRIBE a la primera (2 filas en el fichero → 1 regla en el estado, la segunda). La misma fila por la vía de CONTENEDOR (`:1757`) se DESCARTA, así que las dos vías se contradicen. El contrato declarado `adaptation_rules.row_missing_identity` dice "sin `rule_id` no hay identidad: la fila no se puede registrar y no se inventa una": el runtime hace lo contrario.
+- HALLAZGO E5/D2 (VALOR INVENTADO): `condition_pattern` está en el FORMATO REAL pero NO en `field_defaults` de `_RECOVERABLE_DATA`: al corromperse, la recuperación le asigna `None` (informe: `"campo": "condition_pattern", "valor": null`) cuando el cargador usa `""` (`row.get("condition_pattern", "")`). La recuperación seSalta el valor por defecto real.
+- HALLAZGO D3 (SOBRESCRITURA INDEBIDA): `src/utils/contextual_adaptation_engine.py:3020` — `_load_goal_adaptation_feedback` ASIGNA la lista completa del fichero de feedback sobre la sección `goal_adaptation_feedback` de la base: el feedback SANO de la base (`fb_kb`) se DESTRUYE y solo sobrevive el del fichero (`fb_fichero`). Contraste: si la sección del fichero de feedback no es lista (D4), el dato sano de la base sí sobrevive → la regla es inconsistente según la forma de la corrupción.
+- Hojas hijas (una por defecto): 2.8.8.9.8.4.1 (H1), 2.8.8.9.8.4.2 (E1/E2/E3), 2.8.8.9.8.4.3 (E5/D2), 2.8.8.9.8.4.4 (D3).
+
+2.8.8.9.8.4.1 — CORREGIR EXCEPCIÓN EN SECCIONES DE TIPO LISTA [PENDIENTE]
+- Que `_recuperar_grupos_de_base` no launches excepción cuando el valor por defecto de la sección es una lista, y que la corrupción de una sección no aborte la carga de las secciones sanas del mismo fichero.
+
+2.8.8.9.8.4.2 — CORREGIR IDENTIDAD INVENTADA Y COLISIÓN DE REGLAS [PENDIENTE]
+- Que una fila de regla sin `rule_id` válido no se registre con identidad inventada ni colisione con otra fila, y que la vía de LISTA y la de CONTENEDOR se comporten igual.
+
+2.8.8.9.8.4.3 — DECLARAR EL VALOR POR DEFECTO DE `condition_pattern` [PENDIENTE]
+- Que `field_defaults` declare el valor por defecto que usa el cargador (`""`) para `condition_pattern`, de modo que la recuperación no le asigne `None`.
+
+2.8.8.9.8.4.4 — CONSERVAR LA SECCIÓN VÁLIDA DE LA BASE FRENTE AL FICHERO DE FEEDBACK [PENDIENTE]
+- Que la carga del fichero de feedback no sobrescriba con una lista incompleta la sección `goal_adaptation_feedback` sana que la base ya había cargado.
 
 2.8.8.9.9 — EVIDENCIA MÍNIMA
 
@@ -4374,3 +4392,59 @@ VERIFICACION:
 DISCREPANCIAS: El estado persistente anterior marcaba esta unidad como IMPLEMENTADA con LAST_COMPLETED_UNIT igual, sin registro canonico; se registra ahora el cierre. Se detecto la discrepancia entre el bloque persistente y los registros (no habia registro canonico de 2.8.8.9.8.3); se conserva la unidad indicada por el bloque persistente y se completa su cierre.
 PENDIENTES: 2.8.8.9.8.4 - verificar no sobrescritura indebida.
 ESTADO FINAL: 2.8.8.9.8.3 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 2.8.8.9.8.4
+FECHA: 2026-10-22
+ESTADO: PARCIALMENTE IMPLEMENTADA
+OBJETIVO: Comprobar que la recuperación no destruye datos validos todavia recuperables.
+TIPO DE TRABAJO: VERIFICACION
+CAMBIOS / HALLAZGOS:
+- VERIFICACION en runtime (sondas `tests/utils/contextual_adaptation_engine/probe_2_8_8_9_8_4_hallazgos.py`, `tests/utils/contextual_adaptation_engine/probe_2_8_8_9_8_4_hallazgos2.py` y `tests/utils/contextual_adaptation_engine/probe_2_8_8_9_8_4_h3_integridad.py`): la NO-REESCRITURA de los ficheros de persistencia originales esta COMPROBADA (sha256 de `contextual_knowledge_base.json` y `contextual_adaptation_rules.json` identico antes y despues de `load_all_data()` con ficheros corruptos: `intacto=True` en ambos). La NO DESTRUCCION de datos validos NO se cumple: se han confirmado 4 defectos.
+- HALLAZGO H1 (PERSISTENCIA DE DATOS SANOS): `src/utils/contextual_adaptation_engine.py:1652` - `_recuperar_grupos_de_base` invoca `por_defecto.values()` sobre el valor por defecto de la seccion; cuando ese defecto es de tipo LISTA (`learning_results`, `goal_adaptation_feedback`) lanza `AttributeError: 'list' object has no attribute 'values'` (medido). La excepcion aborta TODO `load_knowledge_base` por el `except` de `:1845`: el fichero devuelve `False`, `_unidades_cargadas['knowledge_base']` queda en 0 y las secciones SANAS del MISMO fichero se PIERDEN (`context_patterns.production` queda `[]` en lugar de `[{"patron": "sano"}]`).
+- HALLAZGO E1/E2/E3 (SOBRESCRITURA INDEBIDA): `src/utils/contextual_adaptation_engine.py:1763,1784` - una fila con `rule_id` no-string se registra con la identidad INVENTADA `None`; dos filas con `rule_id` no-string COLISIONAN y la SEGUNDA SOBREESCRIBE a la primera (medido: 2 filas en el fichero -> 1 regla en el estado, la de nombre `segunda`). La misma fila por la via de CONTENEDOR (`:1757`) se DESCARTA: las dos vias se contradicen. El contrato declarado `adaptation_rules.row_missing_identity` afirma "sin `rule_id` no hay identidad: la fila no se puede registrar y no se inventa una": el runtime hace lo contrario.
+- HALLAZGO E5/D2 (VALOR POR DEFECTO INVENTADO): `condition_pattern` figura en el FORMATO REAL pero no en `field_defaults` de `_RECOVERABLE_DATA` (medido: unico campo del formato sin default declarado). Al corromperse, la recuperacion le asigna `None` (informe: `"campo": "condition_pattern", "violacion": "wrong_type", "politica": "default_the_field", "valor": null`) cuando el CARGADOR usa `""` (`row.get("condition_pattern", "")`).
+- HALLAZGO D3 (SOBRESCRITURA INDEBIDA): `src/utils/contextual_adaptation_engine.py:3020` - `_load_goal_adaptation_feedback` ASIGNA la lista completa del fichero de feedback sobre la seccion `goal_adaptation_feedback` de la base: el feedback SANO de la base (`fb_kb`) se DESTRUYE y solo sobrevive el del fichero (`fb_fichero`) (medido: `adaptation_id en el estado: ['fb_fichero']`, `fb_kb sobrevive: False`). Contraste D4: si la seccion del fichero de feedback no es lista, el dato sano de la base SI sobrevive (`fb_kb sobrevive: True`), luego la perdida depende de la forma de la corrupcion.
+- La unidad se divide en cuatro hojas hijas, una por defecto, para que cada correccion sea pequena y verificable por separado.
+ARCHIVOS MODIFICADOS:
+- PRODUCCION: NO APLICA (esta hoja NO modifica el motor: verifica y acota las correcciones que quedan pendientes en las hojas hijas).
+- TESTS: `tests/utils/contextual_adaptation_engine/probe_2_8_8_9_8_4_hallazgos.py`, `tests/utils/contextual_adaptation_engine/probe_2_8_8_9_8_4_hallazgos2.py`, `tests/utils/contextual_adaptation_engine/probe_2_8_8_9_8_4_h3_integridad.py` (sondas de verificacion; no son test permanente).
+- DOCUMENTACION: `prompt_mejoraActual.txt`.
+TESTS Y RESULTADOS:
+- UNITARIOS: NO EJECUTADOS (la hoja no anade test permanente: su producto son los hallazgos y las hojas hijas que los corregiran).
+- INTEGRACION: NO EJECUTADOS (no hay cambio de produccion que integrar).
+- NO REGRESION: NO EJECUTADA (no hay cambio de codigo de produccion).
+VERIFICACION:
+- SINTAXIS: NO EJECUTADA (no se modifico codigo de produccion).
+- MAIN.PY: NO APLICA.
+- COMPORTAMIENTO / INTEGRACION REAL: verificado en runtime con las tres sondas: excepcion `AttributeError: 'list' object has no attribute 'values'` medida en `_recuperar_grupos_de_base`; `load_knowledge_base()` devolviendo `False` con `_unidades_cargadas['knowledge_base'] = 0` y `context_patterns.production` vacio; colision de identidad con 2 filas no-string que dejan 1 regla (`nombre: 'segunda'`); contradiccion entre la via LISTA (`[None]`) y la de CONTENEDOR (reglas por defecto) con la misma fila; `fb_kb` destruido por D3 y conservado por D4; sha256 de los dos ficheros de persistencia intacto antes y despues de la carga.
+DISCREPANCIAS: el contrato declarado `adaptation_rules.row_missing_identity` afirma que sin `rule_id` la fila "no se puede registrar y no se inventa una", pero el runtime la registra con identidad inventada `None` y, al colisionar, hace que la segunda fila sobreescriba a la primera. La hoja 2.8.8.9.8.3 dejo constancia de que la no sobrescritura "queda COMPROBADA por el test permanente de esta hoja": esa comprobacion se refiere a que la carga no REESCRIBE los ficheros, no a que la recuperacion no destruya datos validos dentro del estado, que es lo que esta hoja verifica y lo que NO se cumple. RESOLUCION: se mantienen ambas afirmaciones con su alcance propio; la correccion del defecto de identidad corresponde a la hoja hija 2.8.8.9.8.4.2.
+PENDIENTES: 2.8.8.9.8.4.1 - corregir la excepcion de `_recuperar_grupos_de_base` con valores por defecto de tipo lista, para que una seccion corrupta no aborte la carga de las secciones sanas del mismo fichero. 2.8.8.9.8.4.2 - corregir la identidad inventada y la colision de filas con `rule_id` no-string, y unificar la via de LISTA con la de CONTENEDOR. 2.8.8.9.8.4.3 - declarar en `field_defaults` el valor por defecto de `condition_pattern` que usa el cargador (`""`). 2.8.8.9.8.4.4 - evitar que la carga del fichero de feedback sobrescriba la seccion `goal_adaptation_feedback` sana de la base.
+ESTADO FINAL: 2.8.8.9.8.4 - PARCIALMENTE IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 2.8.8.9.8.4.1
+FECHA: 2026-10-22
+ESTADO: IMPLEMENTADA
+OBJETIVO: Corregir la excepcion de `_recuperar_grupos_de_base` con valores por defecto de tipo lista, para que una seccion corrupta no aborte la carga de las secciones sanas del mismo fichero.
+TIPO DE TRABAJO: CORRECCION DE CODIGO | TEST
+CAMBIOS / HALLAZGOS:
+- HALLAZGO H1 (ABORTO DEL FICHERO ENTERO): `src/utils/contextual_adaptation_engine.py` - `_recuperar_grupos_de_base` iteraba `por_defecto.values()` sobre el valor por DEFECTO de la seccion. Cuando ese defecto es de tipo LISTA (`learning_results`, `goal_adaptation_feedback` y las demas secciones de lista de la base) la iteracion lanzaba `AttributeError: 'list' object has no attribute 'values'`. La EXCEPCION era capturada por el `except` general de `load_knowledge_base`, de modo que abortaba TODO el fichero: `load_knowledge_base()` devolvia `False`, `_unidades_cargadas['knowledge_base']` quedaba en 0 y las secciones SANAS del MISMO fichero se PERDIAN (`context_patterns.production` quedaba `[]` en lugar de `[{"patron": "sano"}]`). El defecto era el HALLAZGO H1 de la hoja 2.8.8.9.8.4.
+- CORRECCION (produccion): `_recuperar_grupos_de_base` comprueba ahora que el valor por DEFECTO de la seccion sea un MAPEO antes de iterar sus grupos. Una seccion de tipo LISTA no tiene GRUPOS que recuperar, de modo que se RECHAZA ENTERA en el NIVEL de la SECCION: conserva su valor por DEFECTO (una lista vacia), su contenido corrupto NO llega al estado y el cargador sigue con las demas secciones del fichero. El cambio es UNA guarda de tres lineas y no altera el camino de los GRUPOS (una seccion mapeada con un grupo corrupto se sigue recuperando como antes).
+- CONTRATO: el rechazo en el NIVEL de la SECCION es la POLITICA `preserve_siblings` que el contrato de lo recuperable declara para el nivel `seccion` (la unidad corrompida se rechaza entera, no se coloca nada en su lugar y lo que no depende de ella sobrevive), por lo que la correccion NO relaja el contrato de corrupcion ni cambia los efectos declarados.
+- MEDICION DEL EFECTO: con la correccion, una seccion de tipo LISTA que llega como MAPEO deja de abortar el fichero (antes `load_knowledge_base()` devolvia `False`; ahora devuelve `True`), las secciones sanas del MISMO fichero LLEGAN al estado con su contenido intacto, la seccion rechazada conserva su valor por DEFECTO, el contenido corrupto no aparece ni en el estado ni en el INFORME, la cuenta de unidades cargadas EXCLUYE la seccion rechazada y el fichero corrupto NO se reescribe.
+- Test permanente: `tests/utils/contextual_adaptation_engine/test_2_8_8_9_8_4_1_seccion_lista_corrupta.py` (30 tests). Deriva las secciones de tipo LISTA del FORMATO REAL que declara el motor (`_valores_por_defecto`), de modo que no depende de una lista escrita a mano. Incluye CONTROL de no-vacuo (con payload sano LLEGAN todas las secciones) y REGRESION del camino de los GRUPOS.
+- Banco de mutacion: `tests/utils/contextual_adaptation_engine/mutation_check_2_8_8_9_8_4_1.py` (3 mutaciones: la recuperacion vuelve a iterar los grupos de un default de tipo LISTA; la seccion corrupta se RECUPERA falsamente; el cargador APLICA la seccion que ha descartado). Las 3 son DETECTADAS por el test permanente. La mutacion que devuelve el valor corrupto sin registrar recuperacion resulto ser EQUIVALENTE en comportamiento (el cargador descarta igual la seccion) y se sustituyo por la que-si altera el estado.
+ARCHIVOS MODIFICADOS:
+- PRODUCCION: `src/utils/contextual_adaptation_engine.py` (`_recuperar_grupos_de_base`).
+- TESTS: `tests/utils/contextual_adaptation_engine/test_2_8_8_9_8_4_1_seccion_lista_corrupta.py` (nuevo, test permanente), `tests/utils/contextual_adaptation_engine/mutation_check_2_8_8_9_8_4_1.py` (nuevo, banco de mutacion), `tests/utils/contextual_adaptation_engine/probe_2_8_8_9_8_4_1_repro.py` (nuevo, sonda de reproduccion del defecto).
+- DOCUMENTACION: `README.md` (comportamiento de `_recuperar_grupos_de_base` y apartado de rechazo de seccion corrupta), `prompt_mejoraActual.txt`.
+TESTS Y RESULTADOS:
+- UNITARIOS: `tests/utils/contextual_adaptation_engine/test_2_8_8_9_8_4_1_seccion_lista_corrupta.py` - 30 PASSED / 0 FAILED / TOTAL 30.
+- INTEGRACION: `tests/utils/contextual_adaptation_engine/` - 668 PASSED / 0 FAILED (suite completa del motor, incluye la regresion de las 27 clases de corrupcion y de la recuperacion parcial).
+- NO REGRESION: `tests/` - 675 PASSED / 0 FAILED (suite completa del repositorio). Nota: los ficheros de `tests/hands`, `tests/eyes`, `tests/brain` y `tests/ear` estan VACIOS (0 bytes) y no aportan ningun test; no se ha modificado ninguno.
+VERIFICACION:
+- SINTAXIS: OK (`py_compile` sobre el motor, `main.py`, el test permanente y el banco de mutacion).
+- MAIN.PY: OK; `import main` completa sin error.
+- COMPORTAMIENTO / INTEGRACION REAL: verificado en runtime con la sonda de reproduccion y con el test permanente. ANTES de la correccion: `AttributeError: 'list' object has no attribute 'values'` en `_recuperar_grupos_de_base`, `load_knowledge_base()` devolviendo `False`, `_unidades_cargadas['knowledge_base'] = 0` y `context_patterns.production` vacio. DESPUES: `load_knowledge_base()` devuelve `True`, `context_patterns.production` = `[{"patron": "sano"}]`, `success_patterns.production` = `[{"patron": "sano"}]`, la seccion de lista rechazada queda en `[]` y las unidades cargadas son las de las secciones sanas. El banco de mutacion exige ademas que el fichero corrupto NO se reescriba y que los ficheros de produccion vigilados no cambien (guarda por sha256).
+DISCREPANCIAS: Ninguna. El contrato declarado `adaptation_rules.row_missing_identity` (identidad inventada `None` y colision de filas con `rule_id` no-string) NO es objeto de esta hoja: se mantiene el hallazgo y su alcance, y su correccion corresponde a 2.8.8.9.8.4.2. La via de LISTA y la de CONTENEDOR siguen SIN UNIFICAR por el mismo motivo. Se observa que el rechazo en el NIVEL de la SECCION no genera entrada en el INFORME de recuperacion, lo que es COHERENTE con la regla del contrato de que en el nivel `seccion` no hay nada que registrar (la unidad corrompida se rechaza entera): no hay discrepancia entre el contrato y el runtime.
+PENDIENTES: 2.8.8.9.8.4.2 - corregir la identidad inventada y la colision de filas con `rule_id` no-string, y unificar la via de LISTA con la de CONTENEDOR. 2.8.8.9.8.4.3 - declarar en `field_defaults` el valor por defecto de `condition_pattern` que usa el cargador (`""`). 2.8.8.9.8.4.4 - evitar que la carga del fichero de feedback sobrescriba la seccion `goal_adaptation_feedback` sana de la base.
+ESTADO FINAL: 2.8.8.9.8.4.1 - IMPLEMENTADA

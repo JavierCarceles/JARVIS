@@ -1646,9 +1646,18 @@ class ContextualAdaptationEngine:
         sobreviven: son unidades independientes (la ruta del grupo no es un
         prefijo de la ruta de su hermano). Devuelve `(valor, recuperaciones)`;
         `valor` es None cuando la sección no se puede recuperar.
+
+        Una sección cuyo valor por DEFECTO no es un MAPEO (una sección de tipo
+        LISTA, como `learning_results`) no tiene GRUPOS que recuperar: se
+        rechaza ENTERA en el NIVEL de la SECCIÓN y sus HERMANOS (las demás
+        secciones del mismo fichero) sobreviven. Esta vía intentaba iterar los
+        grupos de un valor por defecto de tipo lista y lanzaba `AttributeError`,
+        lo que abortaba la carga del FICHERO entero y hacía perder las
+        secciones sanas del mismo.
         """
         por_defecto = self._valores_por_defecto.get(clave)
         if por_defecto is None or not isinstance(valor, dict): return None, []
+        if not isinstance(por_defecto, dict): return None, []
         muestra = next(iter(por_defecto.values()), None)
         if not isinstance(muestra, (list, dict)): return None, []
         tipo_grupo = _tipo_de_valor(muestra)
