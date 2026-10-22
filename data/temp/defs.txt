@@ -1,0 +1,69 @@
+337 def _initialize_adaptation_rules(self) -> None:
+490 def analyze_contextual_patterns(self, snapshot: ContextSnapshot) -> List[AdaptationRule]:
+496 def _evaluate_rule_condition(self, rule: AdaptationRule, snapshot: ContextSnapshot) -> bool:
+533 def execute_adaptation(self, snapshot: ContextSnapshot, rules: List[AdaptationRule]) -> AdaptationResult:
+560 def _determine_adaptation_level(rules: List[AdaptationRule]) -> AdaptationLevel:
+568 def _execute_adaptation_actions(self, rule: AdaptationRule, snapshot: ContextSnapshot) -> Dict[str, Any]:
+612 def _update_rule_success_rate(rule: AdaptationRule, success: bool) -> float:
+637 def _calculate_adaptation_confidence(self, rules: List[AdaptationRule], snapshot: ContextSnapshot, impact: Dict[str, float]) -> float:
+643 def _record_adaptation_result(self, adaptation_id: str, snapshot: ContextSnapshot, rules: List[AdaptationRule], confidence: float) -> None:
+924 def _apply_adaptation_strategies(self, strategies: List[Dict[str, Any]], transfer: Optional[KnowledgeTransfer] = None) -> None:
+1015 def register_feedback(
+1107 def register_transfer_feedback(
+1135 def _update_global_confidence_metrics(self, success: bool, feedback_score: float) -> None:
+1354 def transfer_knowledge_with_feedback(self, source_context: ContextType, target_context: ContextType,
+1466 def add_adaptation_rule(self, rule: AdaptationRule) -> bool:
+1471 def remove_adaptation_rule(self, rule_id: str) -> bool:
+1483 def get_adaptation_rule(self, rule_id: str) -> Optional[AdaptationRule]: return self.adaptation_rules.get(rule_id)
+1484 def get_adaptation_rules(self) -> List[Dict[str, Any]]: return [r.to_dict() for r in self.list_adaptation_rules()]
+1485 def list_adaptation_rules(self, enabled_only: bool = False) -> List[AdaptationRule]:
+1489 def save_adaptation_rules(self) -> bool: return self._save_adaptation_rules()
+1491 def _save_adaptation_rules(self) -> bool:
+1826 def load_adaptation_rules(self) -> bool:
+1874 def _load_adaptation_rules(self) -> bool:
+1928 def save_all_data(self) -> bool: return self._save_adaptation_rules() and self.save_knowledge_base()
+1983 def export_adaptation_history(self, export_file: Optional[str] = None) -> bool:
+2038 def integrate_with_adaptive_learning_engine(self) -> Dict[str, Any]:
+2087 def set_meta_learning_system(self, meta_learning_system) -> bool:
+2093 def integrate_with_meta_learning_system(self, meta_learning_system=None) -> Dict[str, Any]:
+2132 def _map_optimization_to_adaptation(self, recommendation: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+2140 def _determine_learning_mode(self) -> str:
+2148 def _sync_adaptation_rules(self, improvement_rules: List[Any]) -> List[Dict[str, Any]]:
+2162 def _calculate_adaptive_learning_rate(self) -> float:
+2184 def _create_adaptation_rule_from_pattern(self, pattern: Dict[str, Any]) -> Optional[AdaptationRule]:
+2387 def represent_adaptation(self, original_goal, context_snapshot, adaptation_rules):
+2437 def _goal_to_dict(goal) -> Dict[str, Any]:
+2470 def create_goal_adaptation_proposal(self, original_goal, context_snapshot, adaptation_rules) -> Dict[str, Any]:
+2481 def _validate_adaptation_constraints(self, original_goal, adapted_goal, adaptation_rules) -> List[str]:
+2515 def _check_intention_preservation(self, original_goal, adapted_goal) -> bool:
+2533 def _validate_goal_structure(self, goal) -> Dict[str, Any]:
+2552 def _required_capabilities_for_goal(goal) -> List[str]:
+2557 def _validate_capabilities(self, goal, available_capabilities) -> Dict[str, Any]:
+2562 def _validate_goal_preconditions(self, goal, current_state) -> Dict[str, Any]:
+2574 def _validate_planner_can_solve(self, goal, current_state) -> Dict[str, Any]:
+2591 def validate_adapted_goal(self, original_goal, adapted_goal, current_state, available_capabilities) -> Dict[str, Any]:
+2626 def _register_validation_result(self, original_goal_id, adapted_goal_id, validation_result) -> None:
+2631 def _capture_feedback(self, adaptation_result: Dict[str, Any]) -> Dict[str, Any]:
+2641 def _analyze_adaptation_improvement(self, adaptation_result: Dict[str, Any]) -> Dict[str, Any]:
+2653 def _capture_goal_adaptation_feedback(self, feedback_data: Dict[str, Any]) -> Dict[str, Any]:
+2690 def _execute_goal_adaptation_learning_loop(self, feedback_result: Dict[str, Any]) -> Dict[str, Any]:
+2704 def _analyze_learning_patterns(self, patterns: List[Dict[str, Any]], metrics: Dict[str, Any]) -> List[Dict[str, Any]]:
+2781 def _calculate_learning_convergence(self, metrics: Dict[str, Any], improvement: float) -> Dict[str, Any]:
+2793 def _record_feedback_analysis(self, adaptation_id: str, analysis: Dict[str, Any]) -> None:
+2798 def _record_adaptation_history(self, adaptation_id: str, analysis: Dict[str, Any], adaptation_context: Dict[str, Any]) -> None:
+2814 def _record_learning_results(self, adaptation_id: str, patterns: List[Dict[str, Any]], strategies: Dict[str, Any], convergence: Dict[str, Any]) -> None:
+2926 def _save_goal_adaptation_feedback(self) -> None:
+2954 def _count_pattern_observations(self, learning_results: List[Dict[str, Any]]) -> Dict[Tuple[str, str, str], int]:
+2998 def _filter_validated_learning_results(self, learning_results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+3017 def _recover_learning_patterns(self, learning_results: Any) -> Any:
+3043 def _save_goal_adaptation_learning_results(self) -> None:
+3093 def _load_goal_adaptation_feedback(self) -> None:
+3118 def _load_goal_adaptation_learning_results(self) -> None:
+3147 def _initialize_goal_adaptation_persistence(self) -> None:
+3389 def _detect_corruption_feedback(self, payload: Any) -> List[Dict[str, Any]]:
+3405 def _detect_corruption_learning_results(self, payload: Any) -> List[Dict[str, Any]]:
+4401 def start_contextual_adaptation_loop(self) -> None:
+4413 def stop_contextual_adaptation_loop(self) -> None:
+4416 def get_adaptation_summary(self) -> Dict[str, Any]:
+4577 def clear_adaptation_history(self, days_old: int = 90) -> Dict[str, Any]:
+4684 def reset_learning_data(self) -> Dict[str, Any]:

@@ -2635,7 +2635,10 @@ class ContextualAdaptationEngine:
             "adaptation_context": data.get("adaptation_context", {}) or {}, "execution_result": data.get("execution_result", {}) or {},
             "verification_result": data.get("verification_result", {}) or {}, "improvement_analysis": self._analyze_adaptation_improvement(data),
             "timestamp": datetime.now().isoformat()}
-        self.knowledge_base.setdefault("goal_adaptation_feedback", []).append(feedback)
+        records = self.knowledge_base.setdefault("goal_adaptation_feedback", [])
+        records.append(feedback)
+        del records[:-1000]
+        self._save_goal_adaptation_feedback()
         return feedback
 
     def _analyze_adaptation_improvement(self, adaptation_result: Dict[str, Any]) -> Dict[str, Any]:
