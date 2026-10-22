@@ -3904,6 +3904,8 @@ class ContextualAdaptationEngine:
             "name": {"value": "$rule_id", "type": "string",
                      "note": "el valor por defecto del formato es la propia identidad de la regla"},
             "description": {"value": "", "type": "string", "note": "valor por defecto del formato"},
+            "condition_pattern": {"value": "", "type": "string",
+                                  "note": "valor por defecto del formato: sin patron la regla no se dispara, pero la fila se conserva integra"},
             "adaptation_actions": {"value": [], "type": "list",
                                    "note": "la regla se conserva pero queda INERTE: no tiene acciones que ejecutar"},
             "context_triggers": {"value": [], "type": "list",
