@@ -4254,6 +4254,33 @@ class ContextualAdaptationEngine:
         ],
     }
 
+    _MINIMUM_EVIDENCE: Dict[str, Any] = {
+        "version": "2.8.8.9.9.2",
+        "principle": (
+            "La evidencia minima se apoya en las metricas que el motor YA "
+            "produce (performance_metrics: response_time, accuracy, success; "
+            "verification_result: verified, impact_score). No se inventan "
+            "metricas nuevas ni se anaden campos a los registros existentes."
+        ),
+        "required": {
+            "success": True,
+            "verified": True,
+            "impact_score_at_least_confidence_threshold": True,
+            "min_similar_observations": True,
+        },
+        "fields": {
+            "success": "execution_result.performance_metrics.success",
+            "verified": "verification_result.verified",
+            "impact_score": "verification_result.impact_score",
+            "threshold": "config.confidence_threshold (0.7 por defecto)",
+            "min_similar_observations": "config.min_similar_observations (3 por defecto)",
+        },
+        "notes": {
+            "no_new_metrics": "la evidencia minima reutiliza metricas existentes; no introduce ninguna metrica adicional",
+            "pending_validation": "la IMPLEMENTACION de la validacion es 2.8.8.9.9.3",
+        },
+    }
+
     def corruption_criteria(self) -> Dict[str, Any]:
         """Contrato DECLARATIVO de los criterios de CORRUPCIÓN (2.8.8.9.6.1).
 
@@ -4320,6 +4347,10 @@ class ContextualAdaptationEngine:
         pendiente.
         """
         return copy.deepcopy(self._TOTAL_LOSS_FALLBACK)
+
+    def minimum_evidence(self) -> Dict[str, Any]:
+        """Contrato DECLARATIVO de la EVIDENCIA MINIMA (2.8.8.9.9.2)."""
+        return copy.deepcopy(self._MINIMUM_EVIDENCE)
 
     # Integración de evolución arquitectónica
     def set_architecture_manager(self, architecture_manager) -> None:
