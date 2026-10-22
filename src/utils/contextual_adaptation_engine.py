@@ -14,7 +14,7 @@ import shutil
 import threading
 import time
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
@@ -4505,6 +4505,344 @@ class ContextualAdaptationEngine:
                 "performance_impact": getattr(item, "performance_impact", {}),
                 "confidence_score": getattr(item, "confidence_score", 0.), "success": getattr(item, "success", False),
                 "timestamp": getattr(item, "timestamp", None)}
+
+    # Métodos de eliminación manual para mantenimiento del sistema
+    def clear_conversational_memory(self, days_old: int = 30) -> Dict[str, Any]:
+        """Elimina conversaciones antiguas de memoria conversacional.
+        
+        Args:
+            days_old: Eliminar conversaciones más antiguos que este número de días
+            
+        Returns:
+            Diccionario con estadísticas de eliminación
+        """
+        import json
+        from pathlib import Path
+        
+        memory_file = Path(self.config.get("memory", {}).get("chat_memory_file", "data/jarvis_memory.json"))
+        if not memory_file.exists():
+            return {"deleted": 0, "total": 0, "message": "Memory file not found"}
+        
+        try:
+            with open(memory_file, 'r', encoding='utf-8') as f:
+                memory_data = json.load(f)
+            
+            if "conversations" not in memory_data:
+                return {"deleted": 0, "total": 0, "message": "No conversations found"}
+            
+            original_count = len(memory_data["conversations"])
+            cutoff_date = datetime.now() - timedelta(days=days_old)
+            
+            # Filtrar conversaciones recientes
+            filtered_conversations = []
+            deleted_count = 0
+            
+            for conv in memory_data["conversations"]:
+                conv_date = conv.get("timestamp")
+                if conv_date:
+                    try:
+                        conv_datetime = datetime.fromisoformat(conv_date.replace('Z', '+00:00'))
+                        if conv_datetime >= cutoff_date:
+                            filtered_conversations.append(conv)
+                        else:
+                            deleted_count += 1
+                    except:
+                        # Si no se puede parsear la fecha, mantener la conversación
+                        filtered_conversations.append(conv)
+                else:
+                    # Sin timestamp, mantener la conversación
+                    filtered_conversations.append(conv)
+            
+            memory_data["conversations"] = filtered_conversations
+            new_count = len(filtered_conversations)
+            
+            # Guardar memoria actualizada
+            with open(memory_file, 'w', encoding='utf-8') as f:
+                json.dump(memory_data, f, indent=2, ensure_ascii=False)
+            
+            return {
+                "deleted": deleted_count,
+                "total": original_count,
+                "remaining": new_count,
+                "message": f"Memory cleanup completed"
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Error clearing conversational memory: {e}")
+            return {"deleted": 0, "total": 0, "error": str(e)}
+
+    def clear_adaptation_history(self, days_old: int = 90) -> Dict[str, Any]:
+        """Elimina registros antiguos de historial de adaptación.
+        
+        Args:
+            days_old: Eliminar registros más antiguos que este número de días
+            
+        Returns:
+            Diccionario con estadísticas de eliminación
+        """
+        import json
+        from pathlib import Path
+        
+        if not hasattr(self, 'adaptation_history') or not self.adaptation_history:
+            return {"deleted": 0, "total": 0, "message": "No adaptation history found"}
+        
+        original_count = len(self.adaptation_history)
+        cutoff_date = datetime.now() - timedelta(days=days_old)
+        
+        # Filtrar registros recientes
+        filtered_history = []
+        deleted_count = 0
+        
+        for record in self.adaptation_history:
+            record_date = getattr(record, 'timestamp', None)
+            if record_date:
+                try:
+                    if isinstance(record_date, str):
+                        record_datetime = datetime.fromisoformat(record_date.replace('Z', '+00:00'))
+                    else:
+                        record_datetime = record_date
+                    
+                    if record_datetime >= cutoff_date:
+                        filtered_history.append(record)
+                    else:
+                        deleted_count += 1
+                except:
+                    # Si no se puede parsear la fecha, mantener el registro
+                    filtered_history.append(record)
+            else:
+                # Sin timestamp, mantener el registro
+                filtered_history.append(record)
+        
+        self.adaptation_history = filtered_history
+        new_count = len(filtered_history)
+        
+        return {
+            "deleted": deleted_count,
+            "total": original_count,
+            "remaining": new_count,
+            "message": f"Adaptation history cleanup completed"
+        }
+
+    def clear_knowledge_base_patterns(self, context_type: str = None, min_success_rate: float = 0.1) -> Dict[str, Any]:
+        """Limpia patrones de conocimiento con bajo rendimiento o contexto específico.
+        
+        Args:
+            context_type: Limpiar solo patrones de este tipo (None para todos)
+            min_success_rate: Eliminar patrones con tasa de éxito menor a este valor
+            
+        Returns:
+            Diccionario con estadísticas de eliminación
+        """
+        if not hasattr(self, 'knowledge_base') or not self.knowledge_base:
+            return {"deleted": 0, "total": 0, "message": "No knowledge base found"}
+        
+        original_patterns = {}
+        for key, patterns in self.knowledge_base.items():
+            if key.startswith("context_patterns"):
+                original_patterns[key] = patterns
+        
+        total_deleted = 0
+        total_original = sum(len(patterns) for patterns in original_patterns.values())
+        
+        # Limpiar patrones por contexto
+        for context_key, patterns in original_patterns.items():
+            if isinstance(patterns, dict):
+                filtered_patterns = {}
+                deleted_in_context = 0
+                
+                for pattern_id, pattern_data in patterns.items():
+                    # Verificar tasa de éxito
+                    success_rate = pattern_data.get("success_rate", 0.0)
+                    pattern_context = pattern_data.get("context_type")
+                    
+                    # Eliminar si:
+                    # 1. La tasa de éxito es muy baja
+                    # 2. El contexto no coincide (si se especificó)
+                    # 3. No tiene ejecuciones recientes
+                    if (success_rate >= min_success_rate and 
+                        (context_type is None or pattern_context == context_type)):
+                        filtered_patterns[pattern_id] = pattern_data
+                    else:
+                        deleted_in_context += 1
+                
+                self.knowledge_base[context_key] = filtered_patterns
+                total_deleted += deleted_in_context
+        
+        total_remaining = sum(len(patterns) for patterns in self.knowledge_base.values() 
+                            if isinstance(patterns, dict) and patterns.keys())
+        
+        return {
+            "deleted": total_deleted,
+            "total": total_original,
+            "remaining": total_remaining,
+            "message": f"Knowledge base cleanup completed"
+        }
+
+    def reset_learning_data(self) -> Dict[str, Any]:
+        """Reinicia datos de aprendizaje y métricas del sistema.
+        
+        Returns:
+            Diccionario con estadísticas de reinicio
+        """
+        import json
+        from pathlib import Path
+        
+        # Reiniciar historial de adaptación
+        if hasattr(self, 'adaptation_history'):
+            original_count = len(self.adaptation_history)
+            self.adaptation_history = []
+        
+        # Limpiar memoria de conocimiento
+        if hasattr(self, 'knowledge_base'):
+            original_patterns = sum(len(patterns) for patterns in self.knowledge_base.values() 
+                                 if isinstance(patterns, dict))
+            # Mantener estructura básica pero limpiar datos
+            self.knowledge_base = {
+                "context_patterns": {},
+                "adaptation_strategies": {},
+                "transfer_efficiency": {}
+            }
+        
+        # Reiniciar contadores
+        if hasattr(self, '_total_adaptations'):
+            self._total_adaptations = 0
+        if hasattr(self, '_successful_adaptations'):
+            self._successful_adaptations = 0
+        
+        # Limpiar archivos de aprendizaje
+        learning_files = [
+            "data/goal_adaptation_feedback.json",
+            "data/goal_adaptation_learning_results.json",
+            "data/improvement_rules.json"
+        ]
+        
+        files_reset = 0
+        for file_path in learning_files:
+            path = Path(file_path)
+            if path.exists():
+                try:
+                    # Crear archivo vacío con estructura básica
+                    if file_path.endswith("feedback.json"):
+                        with open(path, 'w') as f:
+                            json.dump({"feedback": [], "metadata": {"version": "1.0"}}, f)
+                    elif file_path.endswith("learning_results.json"):
+                        with open(path, 'w') as f:
+                            json.dump({"results": [], "metadata": {"version": "1.0"}}, f)
+                    elif file_path.endswith("rules.json"):
+                        with open(path, 'w') as f:
+                            json.dump({"rules": [], "metadata": {"version": "1.0"}}, f)
+                    files_reset += 1
+                except Exception as e:
+                    self.logger.error(f"Error resetting {file_path}: {e}")
+        
+        return {
+            "adaptations_reset": original_count if 'original_count' in locals() else 0,
+            "patterns_reset": original_patterns if 'original_patterns' in locals() else 0,
+            "files_reset": files_reset,
+            "message": f"Learning data reset completed"
+        }
+
+    def clear_corrupted_data(self) -> Dict[str, Any]:
+        """Elimina datos corruptos detectados por el sistema.
+        
+        Returns:
+            Diccionario con estadísticas de eliminación
+        """
+        corruption_info = self.detect_corruption()
+        total_corrupted = len(corruption_info["corrupted"])
+        
+        if total_corrupted == 0:
+            return {"deleted": 0, "total": 0, "message": "No corrupted data found"}
+        
+        # Eliminar datos corruptos de las estructuras internas
+        cleaned_count = 0
+        
+        # Limpiar reglas corruptas
+        if hasattr(self, 'adaptation_rules'):
+            original_count = len(self.adaptation_rules)
+            # Filtrar reglas válidas
+            self.adaptation_rules = [rule for rule in self.adaptation_rules 
+                                   if rule and hasattr(rule, 'rule_id')]
+            cleaned_count += original_count - len(self.adaptation_rules)
+        
+        # Limpiar snapshots corruptos
+        if hasattr(self, 'context_snapshots'):
+            original_count = len(self.context_snapshots)
+            # Filtrar snapshots válidos
+            valid_snapshots = {}
+            for snapshot_id, snapshot in self.context_snapshots.items():
+                if snapshot and hasattr(snapshot, 'context_type'):
+                    valid_snapshots[snapshot_id] = snapshot
+            self.context_snapshots = valid_snapshots
+            cleaned_count += original_count - len(self.context_snapshots)
+        
+        return {
+            "deleted": cleaned_count,
+            "total": total_corrupted,
+            "message": f"Corrupted data cleanup completed"
+        }
+
+    def manual_system_reset(self, preserve_config: bool = True) -> Dict[str, Any]:
+        """Reinicio manual completo del sistema.
+        
+        Args:
+            preserve_config: Si True, mantiene la configuración básica
+            
+        Returns:
+            Diccionario con estadísticas de reinicio
+        """
+        import json
+        from pathlib import Path
+        
+        reset_stats = {}
+        
+        # Detener bucles activos
+        if hasattr(self, '_loop_thread') and self._loop_thread and self._loop_thread.is_alive():
+            self.stop_contextual_adaptation_loop()
+        
+        # Reiniciar estructuras principales
+        if hasattr(self, 'adaptation_history'):
+            reset_stats["adaptations_reset"] = len(self.adaptation_history)
+            self.adaptation_history = []
+        
+        if hasattr(self, 'knowledge_base'):
+            reset_stats["patterns_reset"] = sum(len(patterns) for patterns in self.knowledge_base.values())
+            if preserve_config:
+                # Mantener estructura básica
+                self.knowledge_base = {
+                    "context_patterns": {},
+                    "adaptation_strategies": {},
+                    "transfer_efficiency": {}
+                }
+            else:
+                self.knowledge_base = {}
+        
+        if hasattr(self, 'context_snapshots'):
+            reset_stats["snapshots_reset"] = len(self.context_snapshots)
+            self.context_snapshots = {}
+        
+        if hasattr(self, 'recent_components'):
+            reset_stats["components_reset"] = len(self.recent_components)
+            self.recent_components = []
+        
+        # Reiniciar contadores
+        if hasattr(self, '_total_adaptations'):
+            self._total_adaptations = 0
+        if hasattr(self, '_successful_adaptations'):
+            self._successful_adaptations = 0
+        
+        # Reiniciar modos
+        self._lightweight_mode = False
+        self._offline_mode = False
+        self._performance_mode = False
+        self._recovery_mode = False
+        self._safe_mode = False
+        
+        return {
+            **reset_stats,
+            "config_preserved": preserve_config,
+            "message": f"Manual system reset completed"
+        }
 
 
 def main() -> None:
