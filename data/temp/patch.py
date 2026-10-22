@@ -1,0 +1,9 @@
+p='c:/Users/FO TARDA/Documents/VSC_JC/JARVIS/src/utils/contextual_adaptation_engine.py'
+s=open(p,encoding='utf-8').read()
+old="    def _record_adaptation_result(self, adaptation_id: str, snapshot: ContextSnapshot, rules: List[AdaptationRule], confidence: float) -> None:\n        entries = self.knowledge_base.setdefault(\"adaptation_strategies\", {}).setdefault(snapshot.context_type.value, [])\n        entries.append({\"adaptation_id\": adaptation_id, \"timestamp\": snapshot.timestamp.isoformat(), \"applied_rules\": [r.rule_id for r in rules], \"confidence\": confidence}); del entries[:-50]"
+new="    def _record_adaptation_result(self, adaptation_id: str, snapshot: ContextSnapshot, rules: List[AdaptationRule], confidence: float) -> None:\n        if self._safe_float(confidence, 0.) < self._confidence_threshold():\n            return\n        entries = self.knowledge_base.setdefault(\"adaptation_strategies\", {}).setdefault(snapshot.context_type.value, [])\n        entries.append({\"adaptation_id\": adaptation_id, \"timestamp\": snapshot.timestamp.isoformat(), \"applied_rules\": [r.rule_id for r in rules], \"confidence\": confidence}); del entries[:-50]"
+new="     def _record_adaptation_result(self, adaptation_id: str, snapshot: ContextSnapshot, rules: List[AdaptationRule], confidence: float) -> None:\n         if self._safe_float(confidence, 0.) < self._confidence_threshold():\n             return\n         entries = self.knowledge_base.setdefault(\"adaptation_strategies\", {}).setdefault(snapshot.context_type.value, [])\n         entries.append({\"adaptation_id\": adaptation_id, \"timestamp\": snapshot.timestamp.isoformat(), \"applied_rules\": [r.rule_id for r in rules], \"confidence\": confidence}); del entries[:-50]"
+assert old in s, "pattern not found"
+s=s.replace(old,new,1)
+open(p,'w',encoding='utf-8').write(s)
+print("done")

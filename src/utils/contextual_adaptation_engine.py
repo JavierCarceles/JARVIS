@@ -641,8 +641,10 @@ class ContextualAdaptationEngine:
         return self._bounded_float(rule_score*.3 + snapshot.confidence_score*.4 + impact_score*.3, 0., 1.)
 
     def _record_adaptation_result(self, adaptation_id: str, snapshot: ContextSnapshot, rules: List[AdaptationRule], confidence: float) -> None:
-        entries = self.knowledge_base.setdefault("adaptation_strategies", {}).setdefault(snapshot.context_type.value, [])
-        entries.append({"adaptation_id": adaptation_id, "timestamp": snapshot.timestamp.isoformat(), "applied_rules": [r.rule_id for r in rules], "confidence": confidence}); del entries[:-50]
+         if self._safe_float(confidence, 0.) < self._confidence_threshold():
+             return
+         entries = self.knowledge_base.setdefault("adaptation_strategies", {}).setdefault(snapshot.context_type.value, [])
+         entries.append({"adaptation_id": adaptation_id, "timestamp": snapshot.timestamp.isoformat(), "applied_rules": [r.rule_id for r in rules], "confidence": confidence}); del entries[:-50]
 
     # Transferencia de conocimiento: aquí cada método tiene una única definición.
     def transfer_knowledge(self, source_context: ContextType, target_context: ContextType,
