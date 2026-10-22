@@ -1,9 +1,9 @@
 ESTADO PERSISTENTE ACTUAL
 CURRENT_PHASE: 2.8.8
-CURRENT_WORK_UNIT: 2.8.8.9.10.2
+CURRENT_WORK_UNIT: 2.8.8.9.10.3
 CURRENT_WORK_STATUS: PENDIENTE
-LAST_COMPLETED_UNIT: 2.8.8.9.10.1
-HALLAZGO_2.8.8.9.10.1: confianza en config.confidence_threshold (0.7 por defecto), _calculate_adaptation_confidence, _confidence_threshold, AdaptationRule.confidence_threshold.
+LAST_COMPLETED_UNIT: 2.8.8.9.10.2
+HALLAZGO_2.8.8.9.10.2: umbral real = config.confidence_threshold (0.7 por defecto), expuesto via _confidence_threshold(); AdaptationRule.confidence_threshold es umbral por regla distinto; _calculate_adaptation_confidence es valor calculado, no umbral.
 
 PROMPT MAESTRO JARVIS — AUTOMEJORA INCREMENTAL
 
