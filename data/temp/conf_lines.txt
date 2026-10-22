@@ -1,0 +1,144 @@
+149     confidence_score: float = 0.0
+160             "confidence_score": self.confidence_score, "adaptation_level": self.adaptation_level.value,
+172     confidence_threshold: float
+188             "confidence_threshold": self.confidence_threshold, "priority": self.priority,
+208     confidence_score: float = 0.0
+216                 "transfer_strategy": self.transfer_strategy, "confidence_score": self.confidence_score,
+223     Es un `dict` estructurado (claves `success`, `confidence_score`, `feedback_summary`, ...)
+241     confidence_score: float
+250                 "resource_impact": self.resource_impact, "confidence_score": self.confidence_score,
+281         self._recorded_confidence: Dict[str, float] = {}
+314         config = {"adaptation_enabled": True, "minimal_adaptation_threshold": .3,
+315                   "moderate_adaptation_threshold": .6, "significant_adaptation_threshold": .8,
+316                   "radical_adaptation_threshold": .95, "context_analysis_interval": 30.0,
+319                   "knowledge_base_file": "data/contextual_knowledge_base.json", "performance_impact_threshold": .1,
+320                   "confidence_threshold": .7, "max_concurrent_adaptations": 3, "learning_enabled": True,
+355             "global_confidence_metrics": {"total_feedback": 0, "successful_transfers": 0,
+356                 "average_feedback_score": 0.0, "confidence_trend": []},
+378         confidence = self._calculate_context_confidence(factors, system, performance)
+379         snapshot = ContextSnapshot(sid, now, kind, factors, system, performance, user, environment, confidence)
+475     def _calculate_context_confidence(self, factors, system, performance) -> float:
+483         patterns.append({"timestamp": snapshot.timestamp.isoformat(), "confidence": snapshot.confidence_score,
+510             return snapshot.confidence_score >= rule.confidence_threshold
+548             confidence = self._calculate_adaptation_confidence(applied, snapshot, performance)
+549             self._record_adaptation_result(adaptation_id, snapshot, applied, confidence)
+550             result = AdaptationResult(adaptation_id, snapshot, applied, level, performance, resources, confidence, time.time()-started, not errors, "; ".join(errors) if errors else None)
+637     def _calculate_adaptation_confidence(self, rules: List[AdaptationRule], snapshot: ContextSnapshot, impact: Dict[str, float]) -> float:
+641         return self._bounded_float(rule_score*.3 + snapshot.confidence_score*.4 + impact_score*.3, 0., 1.)
+643     def _record_adaptation_result(self, adaptation_id: str, snapshot: ContextSnapshot, rules: List[AdaptationRule], confidence: float) -> None:
+644          if self._safe_float(confidence, 0.) < self._confidence_threshold():
+647          entries.append({"adaptation_id": adaptation_id, "timestamp": snapshot.timestamp.isoformat(), "applied_rules": [r.rule_id for r in rules], "confidence": confidence}); del entries[:-50]
+844             score = self._bounded_float(self._safe_float(pattern.get("confidence", .5))*modifier, 0., 1.)
+850         thresholds = {"adaptive": .5, "conservative": .7, "aggressive": .3}; output = []
+854             if score >= thresholds.get(strategy, .5):
+859         return self._bounded_float(self._safe_float((pattern or {}).get("confidence", .5))*{"adaptive": 1., "conservative": .8, "aggressive": 1.2}.get(strategy, 1.), 0., 1.)
+868         return self._bounded_float(self._safe_float(strategy.get("confidence", .5))*modifier, 0., 1.)
+921                 "application_timestamp": datetime.now().isoformat(), "application_confidence": self._bounded_float(pattern.get("confidence", 0.), 0., 1.)})
+930                 "application_timestamp": datetime.now().isoformat(), "application_confidence": self._bounded_float(strategy.get("confidence", .5), 0., 1.)})
+956     def get_transfer_confidence(self, transfer_id: str, result: Optional[Dict[str, Any]] = None) -> Optional[float]:
+968             base = self._resolve_transfer_confidence(transfer_id, transfer, efficiency)
+1004     def _resolve_transfer_confidence(self, transfer_id: str, transfer: Any, efficiency: float) -> float:
+1006         recorded = self._recorded_confidence.get(transfer_id)
+1009         attribute = self._safe_float(getattr(transfer, "confidence_score", 0.0), -1.0)
+1040                     transfer.confidence_score = score
+1041                     self._recorded_confidence[transfer_id] = score
+1095                 self._update_global_confidence_metrics(bool(success), score if score is not None else float(bool(success)))
+1135     def _update_global_confidence_metrics(self, success: bool, feedback_score: float) -> None:
+1136         data = self.knowledge_base.setdefault("global_confidence_metrics", {"total_feedback": 0, "successful_transfers": 0, "average_feedback_score": 0., "confidence_trend": []})
+1140         trend = data.setdefault("confidence_trend", []); trend.append({"timestamp": datetime.now().isoformat(), "success": success, "score": score, "running_average": average}); del trend[:-50]
+1142     def adjust_transfer_confidence(self, transfer_id: str, adjustment_factor: Optional[float] = None,
+1152         old = self.get_transfer_confidence(transfer_id); new = self._bounded_float(old+adjustment, 0., 1.)
+1153         transfer.confidence_score = new; transfer.last_feedback = datetime.now()
+1154         self._recorded_confidence[transfer_id] = new
+1155         self.knowledge_base.setdefault("confidence_adjustments", {})[f"{transfer_id}_{int(time.time()*1000)}"] = {"transfer_id": transfer_id, "old_confidence": old, "new_confidence": new, "adjustment_factor": adjustment, "feedback_success": feedback_success, "feedback_score": feedback_score, "reason": reason or "Manual adjustment", "timestamp": datetime.now().isoformat()}
+1180                 "confidence_score": 0.0,
+1215             message = f"Transfer partial: success rate {rate:.2f} below the 0.70 threshold"
+1220         transfer_obj.confidence_score = score
+1222         self._recorded_confidence[transfer_id] = score
+1227         confidence = self.get_transfer_confidence(transfer_id)
+1234             "confidence_score": self._bounded_float(confidence if confidence is not None else score, 0.0, 1.0),
+1264         threshold = self._bounded_float(min_efficiency, 0.0, 1.0)
+1271             if self._safe_float(item.transfer_efficiency) < threshold:
+1311                 "confidence_score": transfer.confidence_score,
+1397                         "confidence": min(1., priority+.1), "reasoning": self._generate_recommendation_reasoning(source, target, kind, compatibility, priority),
+1519     # EVIDENCIA de una estrategia aprendida (2.8.8.9.2.1): sin `confidence`,
+1523     _EVIDENCIA_DE_ESTRATEGIA = ("confidence", "success_rate", "last_updated")
+1699         regla = AdaptationRule(identidad, row.get("name", identidad), row.get("description", ""), row.get("condition_pattern", ""), list(row.get("adaptation_actions", [])), triggers, self._safe_float(row.get("confidence_threshold", .7)), int(row.get("priority", 1)), bool(row.get("enabled", True)), self._safe_float(row.get("success_rate", 0.)), int(row.get("execution_count", 0)), last, self._safe_float(row.get("adaptation_score", 0.)), list(row.get("constraints", [])), dict(row.get("metadata", {})), row.get("deadline"))
+1798         if not _cumple_tipo(entrada.get("confidence"), "number"): return False
+2003                     "adaptation_level": self.adaptation_level.value, "confidence_score": self.current_context.confidence_score})
+2020                     "confidence_threshold": self.current_context.confidence_score, "adaptation_level": self.adaptation_level.value})
+2137                 "confidence": recommendation.get("confidence", 0.), "description": recommendation.get("description", ""),
+2145         if kind == ContextType.PRODUCTION: return "passive" if self.current_context.confidence_score > .8 else "active"
+2153                     (("rule_id", "unknown"), ("name", "Unknown"), ("description", ""), ("condition", ""), ("action", []), ("confidence_threshold", .7), ("priority", 1), ("enabled", True))}
+2157                     self._safe_float(data.get("confidence_threshold", .7)), int(data.get("priority", 1)), bool(data.get("enabled", True)))
+2165         return self._bounded_float(.01*self.current_context.confidence_score*factor, .001, .1)
+2176         return max(10, min(500, int(base*self.current_context.confidence_score)))
+2192             [ContextType.PRODUCTION, ContextType.OPTIMIZATION], self._bounded_float(pattern.get("confidence", .7), 0., 1.), int(pattern.get("priority", 3)))
+2210                 confidence = self.current_context.confidence_score; emergency = self.current_context.context_type == ContextType.EMERGENCY
+2211                 configs = ((self.performance_optimizer, {"optimization_enabled": confidence > .5, "auto_optimization": not emergency, "optimization_interval": max(10, int(60*(1-confidence)))}),
+2212                            (self.self_improvement_system, {"learning_enabled": confidence > .6, "auto_learning": not emergency, "learning_interval": max(60, int(300*(1-confidence)))}),
+2213                            (self.adaptive_learning_engine, {"learning_enabled": confidence > .7, "auto_learning": not emergency, "engine_interval": max(5, int(60*(1-confidence)))}),
+2214                            (self.pattern_analyzer, {"detection_sensitivity": max(.1, confidence), "analysis_interval": max(5, int(30*(1-confidence)))}))
+2233                 "confidence": self._bounded_float(entry.get("confidence", .5), 0., 1.),
+2241                 "confidence": self._bounded_float(entry.get("confidence", .7), 0., 1.),
+2246     def generate_strategy_candidates(self, target_context: ContextType, max_candidates: int = 5, min_confidence: float = .5) -> List[Dict[str, Any]]:
+2250             confidence = self._safe_float(strategy.get("confidence", 0.))
+2251             if confidence < min_confidence: continue
+2264         confidence = candidate.get("confidence")
+2265         if isinstance(confidence, bool) or not isinstance(confidence, (int, float)):
+2266             errors.append(f"Confianza inválida: {confidence}")
+2267         elif not 0.0 <= float(confidence) <= 1.0:
+2268             errors.append(f"Confianza fuera de rango [0, 1]: {confidence}")
+2283         confidence = self._bounded_float(candidate.get("confidence", 0.0), 0.0, 1.0)
+2289             "description": candidate.get("description"), "confidence": confidence,
+2300             strategy_payload.setdefault("confidence", confidence)
+2317             confidence * 0.4 + result["applicability"] * 0.3 + result["efficiency"] * 0.3, 4
+2350             "confidence": self._safe_float(strategy.get("confidence", .7)), "application_timestamp": datetime.now().isoformat(),
+2354             "confidence": record["confidence"], "strategy_id": sid, "description": strategy.get("description", ""), "knowledge_data": record["knowledge_data"]})
+2456                 "confidence_threshold": getattr(rule, "confidence_threshold", None)}
+2468                 "timestamp": str(getattr(snapshot, "timestamp", "")), "confidence_score": getattr(snapshot, "confidence_score", None)}
+2673                 "context": feedback_data["adaptation_context"], "metrics": metrics, "timestamp": datetime.now().isoformat(), "confidence": .9 if is_success else .8})
+2676                     "metrics": metrics, "timestamp": datetime.now().isoformat(), "confidence": .85})
+2705             confidence = self._safe_float(pattern.get("confidence", 0.)); impact = self._safe_float(metrics.get("impact_score", 0.))
+2706             if impact > .7: confidence = min(1., confidence*1.2)
+2707             elif impact < .3: confidence = max(0., confidence*.8)
+2709                 "context": pattern.get("context", {}), "metrics": pattern.get("metrics", {}), "confidence": confidence,
+2760                     "confidence": self._bounded_float(pattern.get("confidence", 0.0), 0.0, 1.0),
+2773                             strategy["confidence"] = self._bounded_float(
+2774                                 self._safe_float(strategy.get("confidence", 0.5)) * 0.9, 0.0, 1.0
+2932     # persiste si está VALIDADO, es decir si (a) su `confidence` alcanza el
+2959         threshold = self._confidence_threshold()
+2965                 if self._safe_float(pattern.get("confidence", 0.)) < threshold: continue
+2970     def _confidence_threshold(self) -> float:
+2979         return self._safe_float(config.get("confidence_threshold", .7), .7)
+2989         Exige `confidence >= confidence_threshold` (configurado en el motor) y
+2992         if self._safe_float(pattern.get("confidence", 0.)) < self._confidence_threshold(): return False
+3018         (2.8.8.9.4.3): un patrón solo se recupera si su `confidence` alcanza el
+3045             # identifica por ``strategy_id`` y aporta evidencia en ``confidence``,
+3050             IDENTITY_FIELDS = ("strategy_id", "confidence", "success_rate", "last_updated")
+3080             # validado si su `confidence` alcanza `confidence_threshold` y tiene
+3342             if "confidence_threshold" in row and not _cumple_tipo(row["confidence_threshold"], "number"):
+3343                 detections.append(self._deteccion("adaptation_rules.threshold_not_numeric", f"{location}.confidence_threshold"))
+3580                          "adaptation_rules.success_rate_not_numeric", "adaptation_rules.threshold_not_numeric",
+3601                          "adaptation_rules.threshold_not_numeric",
+3666                             "context_triggers": "list", "confidence_threshold": "number",
+3707                     {"id": "adaptation_rules.threshold_not_numeric", "target": "rules[].confidence_threshold",
+3710                      "reason": "la corrupcion se rechaza SOLO en el CAMPO `confidence_threshold`: conserva su valor por DEFECTO (0.7) y el resto de la fila y del fichero sobrevive; sin la deteccion, el umbral no numerico se degradaba a 0.0 y la regla se aplicaba sin filtro de confianza"},
+3923             "confidence_threshold": {"value": 0.7, "type": "number",
+3992                     "adaptation_rules.threshold_not_numeric": {
+3993                         "corrupt_unit": "fila:<rule_id>.campo:confidence_threshold", "level": "campo",
+4091                         "note": "sin EVIDENCIA (confidence, success_rate, last_updated) la entrada no es una estrategia aprendida: no se puede ofrecer con una confianza inventada"},
+4114                  "adaptation_rules.threshold_not_numeric",
+4135                  "adaptation_rules.threshold_not_numeric",
+4270             "impact_score_at_least_confidence_threshold": True,
+4277             "threshold": "config.confidence_threshold (0.7 por defecto)",
+4381         threshold = float(minimum.get("confidence_threshold", 0.0))
+4382         if float(evidence.get("impact_score", 0.0) or 0.0) < threshold and float(evidence.get("confidence", 0.0) or 0.0) < threshold:
+4383             sufficient = False; reasons.append("confidence_or_impact")
+4420         confidence = [self._safe_float(value(row, "confidence_score", 0.)) for row in results]
+4423                 "success_rate": success/len(results), "adaptation_levels": levels, "average_confidence": float(np.mean(confidence)),
+4433         average_confidence = float(np.mean([s.confidence_score for s in snapshots]))
+4434         return {"total_snapshots": len(snapshots), "context_distribution": counts, "average_confidence": average_confidence,
+4437                 "most_common_context": max(counts, key=counts.get), "adaptation_readiness": average_confidence > self.config.get("confidence_threshold", .7)}
+4506                 "confidence_score": getattr(item, "confidence_score", 0.), "success": getattr(item, "success", False),
+4515     print(f"Confidence: {snapshot.confidence_score:.2f}")
