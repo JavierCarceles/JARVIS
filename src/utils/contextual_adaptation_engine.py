@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 from urllib.parse import urlparse
 
 try:
@@ -1525,6 +1525,33 @@ class ContextualAdaptationEngine:
         formato = (self._CORRUPTION_CRITERIA.get("files", {}).get(clave, {}) or {}).get("real_format", {}) or {}
         return dict((formato.get("record", {}) or {}).get("fields", {}) or {})
 
+    def _campo_de_identidad(self, clave: str) -> Optional[str]:
+        """Campo que IDENTIFICA una fila en el FORMATO REAL de un fichero.
+
+        Es el campo que el formato declara como `identity`: sin el, la fila no
+        se puede registrar. El FORMATO REAL lo declara ademas como cadena, de
+        modo que un valor de otro tipo NO es una identidad.
+        """
+        formato = (self._CORRUPTION_CRITERIA.get("files", {}).get(clave, {}) or {}).get("real_format", {}) or {}
+        return (formato.get("record", {}) or {}).get("identity")
+
+    def _identidad_de_regla(self, row: Any) -> Optional[str]:
+        """IDENTIDAD REGISTRABLE de una fila de regla.
+
+        La identidad de una fila es su `rule_id`, y el FORMATO REAL lo declara
+        como cadena: la identidad registrable es un `rule_id` que sea una cadena
+        NO VACIA. Un `rule_id` de otro tipo (o vacio) NO es una identidad.
+
+        Devuelve `None` cuando la fila no tiene identidad utilizable. El
+        cargador NUNCA inventa una identidad: una fila sin identidad no se
+        registra y sus HERMANAS sobreviven (2.8.8.9.8.4.2).
+        """
+        if not isinstance(row, dict): return None
+        identidad = row.get("rule_id")
+        if not isinstance(identidad, str): return None
+        if not identidad.strip(): return None
+        return identidad
+
     def _desviaciones_de_regla(self, row: Dict[str, Any]) -> List[Tuple[str, str]]:
         """Desviaciones de una fila de regla respecto del FORMATO REAL.
 
@@ -1532,11 +1559,16 @@ class ContextualAdaptationEngine:
         formato y la violacion del vocabulario declarado (`wrong_type` o
         `invalid_value`). Los campos de conversión ESTRICTA no se comprueban
         aquí: su desvío lo aborta el propio constructor de la regla.
+
+        El campo de IDENTIDAD no se comprueba aquí: la identidad no se
+        RECUPERA, o vale o la fila se descarta entera (2.8.8.9.8.4.2).
         """
         desviaciones: List[Tuple[str, str]] = []
+        identidad = self._campo_de_identidad("adaptation_rules")
         for nombre, tipo in self._campos_de_formato("adaptation_rules").items():
             if nombre not in row: continue
             if nombre in self._CAMPOS_ESTRICTOS_DE_REGLA: continue
+            if nombre == identidad: continue
             valor = row[nombre]
             if not _cumple_tipo(valor, tipo):
                 desviaciones.append((nombre, "wrong_type")); continue
@@ -1619,25 +1651,63 @@ class ContextualAdaptationEngine:
             recuperada[campo] = nuevo
         return recuperada, recuperaciones
 
-    def _recuperar_contenedor_de_reglas(self, rows: Any) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-        """RECONSTRUYE el contenedor `rules` con los valores que sean filas válidas.
+    def _procesar_fila_de_regla(self, row: Any, identidades: Set[str]
+                                ) -> Tuple[Optional[AdaptationRule], List[Dict[str, Any]]]:
+        """Procesa UNA fila de regla por el pipeline COMUN a las dos vías.
+
+        El MISMO pipeline sirve a la vía de LISTA y a la de CONTENEDOR
+        (2.8.8.9.8.4.2): la IDENTIDAD de la fila se comprueba ANTES de
+        registrarla, de modo que una fila sin `rule_id` REGISTRABLE no se
+        registra con una identidad INVENTADA y una fila cuya identidad ya usa
+        otra fila no la COLISIONA (la primera registrada sobrevive).
+
+        Devuelve `(regla, recuperaciones)`. `regla` es `None` cuando la fila no
+        se puede registrar: se RECHAZA ENTERA y sus HERMANAS sobreviven.
+        `recuperaciones` son las acciones de RECUPERACIÓN a nivel de CAMPO.
+        """
+        if not isinstance(row, dict):
+            self.logger.warning("Regla descartada: la fila no es un mapeo")
+            return None, []
+        identidad = self._identidad_de_regla(row)
+        if identidad is None:
+            # SIN IDENTIDAD REGISTRABLE no hay registro: no se inventa ninguna.
+            self.logger.warning("Regla descartada: sin identidad registrable")
+            return None, []
+        if identidad in identidades:
+            # La identidad YA la usa otra fila: registrarla sería una COLISIÓN
+            # que perdería una de las dos filas.
+            self.logger.warning("Regla descartada: identidad duplicada (%s)", identidad)
+            return None, []
+        desviaciones = self._desviaciones_de_regla(row)
+        desviaciones.extend(self._desviaciones_estrictas_de_regla(row))
+        recuperaciones: List[Dict[str, Any]] = []
+        if desviaciones:
+            # RECUPERACIÓN PARCIAL (2.8.8.9.7.2): la corrupción se rechaza
+            # SOLO en el CAMPO que la corrompe: ese campo toma su valor por
+            # DEFECTO y el resto de la fila sobrevive.
+            fila, recuperaciones = self._recuperar_fila_de_regla(row, desviaciones)
+            if not recuperaciones:
+                self.logger.warning("Regla descartada: se aparta del formato real (%s)", identidad)
+                return None, []
+            row = fila
+        triggers = [ctx for raw in row.get("context_triggers", []) if (ctx := self._coerce_context(raw)) is not None]
+        last = row.get("last_execution")
+        try: last = datetime.fromisoformat(last) if last else None
+        except (ValueError, TypeError): last = None
+        regla = AdaptationRule(identidad, row.get("name", identidad), row.get("description", ""), row.get("condition_pattern", ""), list(row.get("adaptation_actions", [])), triggers, self._safe_float(row.get("confidence_threshold", .7)), int(row.get("priority", 1)), bool(row.get("enabled", True)), self._safe_float(row.get("success_rate", 0.)), int(row.get("execution_count", 0)), last, self._safe_float(row.get("adaptation_score", 0.)), list(row.get("constraints", [])), dict(row.get("metadata", {})), row.get("deadline"))
+        return regla, recuperaciones
+
+    def _valores_del_contenedor_de_reglas(self, rows: Any) -> List[Tuple[Any, Dict[str, Any]]]:
+        """VALORES del contenedor `rules` cuando el contenedor tiene FORMA de mapeo.
 
         El contenedor cambió de FORMA (un mapeo en vez de una lista) pero su
         contenido puede seguir siendo válido: se toma cada VALOR del mapeo que
-        sea una fila válida por el FORMATO REAL. Las claves NO se usan como
-        identidad: sin `rule_id` propio la fila no se puede registrar.
-
-        Devuelve `(filas, recuperaciones)`.
+        sea un MAPEO y se pasa por el MISMO pipeline de fila que la vía de LISTA.
+        Las claves NO se usan como identidad: sin `rule_id` propio la fila no se
+        puede registrar.
         """
-        filas: List[Dict[str, Any]] = []
-        recuperaciones: List[Dict[str, Any]] = []
-        if not isinstance(rows, dict): return filas, recuperaciones
-        for clave, valor in rows.items():
-            if not self._fila_valida(valor, "adaptation_rules"): continue
-            filas.append(valor)
-            recuperaciones.append({"clave": clave, "politica": "adapt_container",
-                                    "rule_id": valor.get("rule_id")})
-        return filas, recuperaciones
+        if not isinstance(rows, dict): return []
+        return [(clave, valor) for clave, valor in rows.items() if isinstance(valor, dict)]
 
     def _recuperar_grupos_de_base(self, clave: str, valor: Any) -> Tuple[Any, List[Dict[str, Any]]]:
         """RECUPERA los GRUPOS sanos de una sección con un grupo corrupto.
@@ -1758,39 +1828,39 @@ class ContextualAdaptationEngine:
         try:
             with open(path, "r", encoding="utf-8") as handle: payload = json.load(handle)
             rows = payload.get("rules", []) if isinstance(payload, dict) else payload
-            if not isinstance(rows, list):
+            candidatas: List[Tuple[Any, Any]] = []
+            es_contenedor = not isinstance(rows, list)
+            if es_contenedor:
                 # RECUPERACIÓN PARCIAL (2.8.8.9.7.2): el CONTENEDOR `rules`
                 # cambió de FORMA, pero su contenido puede seguir siendo válido:
-                # se RECONSTRUYE con los valores que sean filas válidas por el
-                # FORMATO REAL. Las claves NO se usan como identidad.
-                rows, recuperadas = self._recuperar_contenedor_de_reglas(rows)
-                if recuperadas:
-                    self._registrar_recuperacion("adaptation_rules", "bloque:rules", recuperadas)
-                    self.logger.warning("Contenedor de reglas reconstruido: cambio de forma")
+                # se RECONSTRUYE con los valores que sean MAPEOS y cada uno pasa
+                # por el MISMO pipeline de fila que la vía de LISTA. Las claves
+                # NO se usan como identidad.
+                candidatas = self._valores_del_contenedor_de_reglas(rows)
+            else:
+                candidatas = [(None, fila) for fila in rows]
             loaded = {}
-            for row in rows if isinstance(rows, list) else []:
-                if not isinstance(row, dict) or not row.get("rule_id"): continue
-                # DETECCIÓN DE CORRUPCIÓN (2.8.8.9.6.3): una fila que se aparta
-                # del FORMATO REAL no llega al estado. Se descarta la fila y el
-                # resto del fichero se carga con normalidad.
-                desviaciones = self._desviaciones_de_regla(row)
-                desviaciones.extend(self._desviaciones_estrictas_de_regla(row))
-                if desviaciones:
-                    # RECUPERACIÓN PARCIAL (2.8.8.9.7.2): la corrupción se
-                    # rechaza SOLO en el CAMPO que la corrompe: ese campo toma
-                    # su valor por DEFECTO y el resto de la fila sobrevive.
-                    fila, recuperadas = self._recuperar_fila_de_regla(row, desviaciones)
-                    if not recuperadas:
-                        self.logger.warning("Regla descartada: se aparta del formato real (%s)", row.get("rule_id"))
-                        continue
-                    self._registrar_recuperacion("adaptation_rules", f"fila:{row.get('rule_id')}", recuperadas)
-                    self.logger.warning("Regla recuperada: campo corrupto por defecto (%s)", row.get("rule_id"))
-                    row = fila
-                triggers = [ctx for raw in row.get("context_triggers", []) if (ctx := self._coerce_context(raw)) is not None]
-                last = row.get("last_execution")
-                try: last = datetime.fromisoformat(last) if last else None
-                except (ValueError, TypeError): last = None
-                loaded[row["rule_id"]] = AdaptationRule(row["rule_id"], row.get("name", row["rule_id"]), row.get("description", ""), row.get("condition_pattern", ""), list(row.get("adaptation_actions", [])), triggers, self._safe_float(row.get("confidence_threshold", .7)), int(row.get("priority", 1)), bool(row.get("enabled", True)), self._safe_float(row.get("success_rate", 0.)), int(row.get("execution_count", 0)), last, self._safe_float(row.get("adaptation_score", 0.)), list(row.get("constraints", [])), dict(row.get("metadata", {})), row.get("deadline"))
+            identidades: Set[str] = set()
+            recuperadas_contenedor: List[Dict[str, Any]] = []
+            for clave, fila in candidatas:
+                # DETECCIÓN DE CORRUPCIÓN (2.8.8.9.6.3), RECUPERACIÓN PARCIAL
+                # (2.8.8.9.7.2) e IDENTIDAD (2.8.8.9.8.4.2): el pipeline descarta
+                # la fila que se aparta del FORMATO REAL o que no tiene
+                # identidad REGISTRABLE, y recupera la que solo tiene un CAMPO
+                # corrupto. Las HERMANAS de la fila descartada sobreviven.
+                regla, recuperaciones = self._procesar_fila_de_regla(fila, identidades)
+                if regla is None: continue
+                identidades.add(regla.rule_id)
+                loaded[regla.rule_id] = regla
+                if es_contenedor:
+                    recuperadas_contenedor.append({"clave": clave, "politica": "adapt_container",
+                                                    "rule_id": regla.rule_id})
+                if recuperaciones:
+                    self._registrar_recuperacion("adaptation_rules", f"fila:{regla.rule_id}", recuperaciones)
+                    self.logger.warning("Regla recuperada: campo corrupto por defecto (%s)", regla.rule_id)
+            if recuperadas_contenedor:
+                self._registrar_recuperacion("adaptation_rules", "bloque:rules", recuperadas_contenedor)
+                self.logger.warning("Contenedor de reglas reconstruido: cambio de forma")
             # FALLBACK por CORRUPCIÓN TOTAL (2.8.8.9.8.2): se REGISTRA lo que
             # la carga ha OBTENIDO, para que la carga aggregate pueda DECIR lo
             # que ocurrio en lugar de suponerlo.
@@ -3253,7 +3323,7 @@ class ContextualAdaptationEngine:
             location = f"rules[{index}]"
             if not isinstance(row, dict):
                 detections.append(self._deteccion("adaptation_rules.row_not_mapping", location)); continue
-            if not row.get("rule_id"):
+            if self._identidad_de_regla(row) is None:
                 detections.append(self._deteccion("adaptation_rules.row_missing_identity", f"{location}.rule_id"))
             if "adaptation_actions" in row and not isinstance(row["adaptation_actions"], list):
                 detections.append(self._deteccion("adaptation_rules.actions_string", f"{location}.adaptation_actions"))
@@ -3603,7 +3673,7 @@ class ContextualAdaptationEngine:
                     {"id": "adaptation_rules.row_missing_identity", "target": "rules[].rule_id",
                      "violation": "missing_identity", "severity": "medium",
                      "expected": ["record_dropped"],
-                     "reason": "la fila no tiene `rule_id`: sin identidad no se puede registrar y se descarta"},
+                     "reason": "la fila no tiene una identidad REGISTRABLE: sin `rule_id` (o con un `rule_id` que no es una cadena no vacia, que no es identidad) no se puede registrar y se descarta; el cargador NUNCA inventa una identidad ni deja que dos filas colisionen con la misma"},
                     {"id": "adaptation_rules.priority_not_castable", "target": "rules[].priority",
                      "violation": "invalid_value", "severity": "high",
                      "expected": ["value_recovered"],
@@ -3881,7 +3951,7 @@ class ContextualAdaptationEngine:
                     "adaptation_rules.row_missing_identity": {
                         "corrupt_unit": "fila:<indice>", "level": "fila", "policy": "preserve_siblings",
                         "recovers": ["siblings"],
-                        "note": "sin `rule_id` no hay identidad: la fila no se puede registrar y no se inventa una"},
+                        "note": "sin identidad REGISTRABLE no hay registro: sin `rule_id`, o con un `rule_id` que no es una cadena no vacia, la fila no se puede registrar y NO se inventa una; una identidad que ya usa otra fila tampoco identifica a esta, asi que la fila se rechaza y la que ya estaba registrada sobrevive"},
                     "adaptation_rules.priority_not_castable": {
                         "corrupt_unit": "fila:<rule_id>.campo:priority", "level": "campo",
                         "policy": "default_the_field", "field_default": 1,
