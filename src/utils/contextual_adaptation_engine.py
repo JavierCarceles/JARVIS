@@ -3094,9 +3094,17 @@ class ContextualAdaptationEngine:
             # DETECCIÓN DE CORRUPCIÓN (2.8.8.9.6.3): la sección corrupta NO
             # llega al estado y las filas que no son filas válidas se
             # descartan; el resto del fichero se carga con normalidad.
+            # 2.8.8.9.8.4.4: conservar la sección válida de la base frente al
+            # fichero de feedback. Si la base ya tiene una sección sana, no se
+            # sobrescribe con una lista del fichero (aunque parcial).
             rows = payload.get("goal_adaptation_feedback", None)
             if isinstance(rows, list):
-                self.knowledge_base["goal_adaptation_feedback"] = [row for row in rows if self._fila_valida(row, "goal_adaptation_feedback")]
+                base_rows = self.knowledge_base.get("goal_adaptation_feedback")
+                if isinstance(base_rows, list) and len(base_rows) > 0:
+                    # Conservar lo ya cargado desde la base de conocimiento
+                    pass
+                else:
+                    self.knowledge_base["goal_adaptation_feedback"] = [row for row in rows if self._fila_valida(row, "goal_adaptation_feedback")]
             history = payload.get("adaptation_history", [])
             if isinstance(history, list) and history:
                 self.adaptation_history = [_AdaptationHistoryEntry(row) for row in history if isinstance(row, dict)]
