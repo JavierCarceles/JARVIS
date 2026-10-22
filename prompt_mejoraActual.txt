@@ -1,8 +1,8 @@
 ESTADO PERSISTENTE ACTUAL
 CURRENT_PHASE: 2.8.8
-CURRENT_WORK_UNIT: 2.8.8.9.11.3
+CURRENT_WORK_UNIT: 2.8.8.9.11.4
 CURRENT_WORK_STATUS: PENDIENTE
-LAST_COMPLETED_UNIT: 2.8.8.9.11.2
+LAST_COMPLETED_UNIT: 2.8.8.9.11.3
 
 PROMPT MAESTRO JARVIS — AUTOMEJORA INCREMENTAL
 
@@ -4527,3 +4527,27 @@ PENDIENTES: 2.8.8.9.11.3 - implementar olvido (unicamente el mecanismo necesario
 ESTADO FINAL: 2.8.8.9.11.2 - IMPLEMENTADA
 """
 filePath: c:\Users\FO TARDA\Documents\VSC_JC\JARVIS\data\temp\reg.txt
+
+
+REGISTRO DE UNIDAD: 2.8.8.9.11.3
+FECHA: 2026-10-22
+ESTADO: IMPLEMENTADA
+OBJETIVO: Implementar olvido unicamente del mecanismo necesario, si se justifica.
+TIPO DE TRABAJO: DEFINICION / VERIFICACION
+CAMBIOS / HALLAZGOS:
+- No se implementa ningun mecanismo nuevo de olvido. La conclusion de 2.8.8.9.11.2 establece que el unico olvido implementable sin inventar mecanismo es el ya existente: eliminacion manual por id (remove_adaptation_rule, persistida), truncamiento por limite de tamano (adaptation_history 1000, feedback 1000, learning_results 500, snapshots 1000, transfers 200, patrones 50/100) y filtrado por umbral de confianza/validacion (>=0.7, >=3 observaciones).
+- Cualquier olvido por edad o por utilidad requeriria un campo de expiracion o una metrica de uso que el sistema no posee; inventarlo contradice las reglas maestras (no inventar funcionalidades ni campos). Por tanto no se justifica un mecanismo nuevo.
+- PRODUCCION: sin cambios de codigo.
+- TESTS: sin cambios (la verificacion de olvido/conservacion corresponde a 2.8.8.9.11.4 y 2.8.8.9.11.5).
+- DOCUMENTACION: prompt_mejoraActual.txt.
+TESTS Y RESULTADOS:
+- UNITARIOS: NO EJECUTADOS (sin cambios de codigo).
+- INTEGRACION: NO APLICA.
+- NO REGRESION: NO EJECUTADA.
+VERIFICACION:
+- SINTAXIS: NO APLICA.
+- MAIN.PY: NO APLICA.
+- COMPORTAMIENTO / INTEGRACION REAL: Sin cambios; el comportamiento de olvido existente permanece como esta implementado y testado en unidades anteriores.
+DISCREPANCIAS: NINGUNA REGISTRADA.
+PENDIENTES: 2.8.8.9.11.4 - TEST DE OLVIDO; 2.8.8.9.11.5 - TEST DE CONSERVACION.
+ESTADO FINAL: 2.8.8.9.11.3 - IMPLEMENTADA
