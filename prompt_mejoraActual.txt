@@ -1,8 +1,8 @@
 ESTADO PERSISTENTE ACTUAL
 CURRENT_PHASE: 2.8.8
-CURRENT_WORK_UNIT: 2.8.8.9.8.4.3
-CURRENT_WORK_STATUS: PENDIENTE
-LAST_COMPLETED_UNIT: 2.8.8.9.8.4.4
+CURRENT_WORK_UNIT: 2.8.8.9.9.2
+CURRENT_WORK_STATUS: EN PROCESO
+LAST_COMPLETED_UNIT: 2.8.8.9.9.1
 
 PROMPT MAESTRO JARVIS — AUTOMEJORA INCREMENTAL
 
@@ -1555,10 +1555,10 @@ mutaciones detectadas y los 4 ficheros de persistencia del `data/` de produccion
 2.8.8.9.8.4.2 — CORREGIR IDENTIDAD INVENTADA Y COLISIÓN DE REGLAS [PENDIENTE]
 - Que una fila de regla sin `rule_id` válido no se registre con identidad inventada ni colisione con otra fila, y que la vía de LISTA y la de CONTENEDOR se comporten igual.
 
-2.8.8.9.8.4.3 — DECLARAR EL VALOR POR DEFECTO DE `condition_pattern` [PENDIENTE]
+2.8.8.9.8.4.3 — DECLARAR EL VALOR POR DEFECTO DE `condition_pattern` [IMPLEMENTADA]
 - Que `field_defaults` declare el valor por defecto que usa el cargador (`""`) para `condition_pattern`, de modo que la recuperación no le asigne `None`.
 
-2.8.8.9.8.4.4 — CONSERVAR LA SECCIÓN VÁLIDA DE LA BASE FRENTE AL FICHERO DE FEEDBACK [PENDIENTE]
+2.8.8.9.8.4.4 — CONSERVAR LA SECCIÓN VÁLIDA DE LA BASE FRENTE AL FICHERO DE FEEDBACK [IMPLEMENTADA]
 - Que la carga del fichero de feedback no sobrescriba con una lista incompleta la sección `goal_adaptation_feedback` sana que la base ya había cargado.
 
 2.8.8.9.9 — EVIDENCIA MÍNIMA
