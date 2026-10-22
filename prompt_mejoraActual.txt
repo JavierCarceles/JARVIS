@@ -1,8 +1,8 @@
 ESTADO PERSISTENTE ACTUAL
 CURRENT_PHASE: 2.8.8
-CURRENT_WORK_UNIT: 2.8.8.9.11.1
+CURRENT_WORK_UNIT: 2.8.8.9.11.2
 CURRENT_WORK_STATUS: PENDIENTE
-LAST_COMPLETED_UNIT: 2.8.8.9.10.5
+LAST_COMPLETED_UNIT: 2.8.8.9.11.1
 
 PROMPT MAESTRO JARVIS — AUTOMEJORA INCREMENTAL
 
@@ -4480,3 +4480,10 @@ VERIFICACION:
 DISCREPANCIAS: el contrato declarado `adaptation_rules.row_missing_identity` afirmaba "sin `rule_id` no hay identidad: la fila no se puede registrar y no se inventa una", pero el runtime registraba la fila con la identidad INVENTADA `None` y, al colisionar, hacia que la segunda fila sobreescribiera a la primera; ademas, la via de LISTA y la de CONTENEDOR se contradecian con la misma fila. RESOLUCION (2026-10-22): el runtime hace ahora lo que el contrato declara; el texto del contrato se actualiza para recoger que un `rule_id` que no es una cadena no vacia tampoco es identidad y que una identidad ya usada por otra fila tampoco identifica a la que colisiona; y la contradiccion entre las dos vias queda RESUELTA por el pipeline unico. Se conserva el antecedente del hallazgo (E1/E2/E3 de la hoja 2.8.8.9.8.4) como registro explicito de la RESOLUCION.
 PENDIENTES: 2.8.8.9.8.4.3 - declarar en `field_defaults` el valor por defecto de `condition_pattern` que usa el cargador (`""`): la recuperacion le sigue asignando `None` porque el campo no tiene valor por defecto declarado (HALLAZGO E5/D2 de la hoja 2.8.8.9.8.4), y esta hoja no lo corrige porque es una unidad distinta. 2.8.8.9.8.4.4 - evitar que la carga del fichero de feedback sobrescriba la seccion `goal_adaptation_feedback` sana de la base (HALLAZGO D3 de la hoja 2.8.8.9.8.4). 2.8.8.9.8.4 - sigue PARCIALMENTE IMPLEMENTADA hasta cerrar 2.8.8.9.8.4.3 y 2.8.8.9.8.4.4.
 ESTADO FINAL: 2.8.8.9.8.4.2 - IMPLEMENTADA
+
+REGISTRO 2.8.8.9.11.1:
+- RESULTADO: implementado (inspeccion pura, sin cambios de codigo).
+- HALLAZGO: NO existe mecanismo dedicado de olvido/expiration en el motor. Existe `remove_adaptation_rule(rule_id)` (eliminacion manual por id, persistida) y truncamiento por limite de tamano: `adaptation_history` (1000), feedback records (1000), learning results (500), snapshots (1000 config max_context_snapshots), patrones/entries (50), summary (100), knowledge transfers (200), etc. No hay expiracion por edad ni eviction automatica basada en utilidad/valor. No se inventa mecanismo nuevo; esta hoja solo localiza.
+- ARCHIVOS: solo lectura de src/utils/contextual_adaptation_engine.py.
+- TESTS: no aplican (sin cambios de codigo).
+- SIGUIENTE: 2.8.8.9.11.2 - definir politica de olvido (sin codigo, solo decision).
