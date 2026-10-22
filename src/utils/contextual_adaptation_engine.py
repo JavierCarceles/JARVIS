@@ -4367,7 +4367,25 @@ class ContextualAdaptationEngine:
         stamp = datetime.now().isoformat(); self.knowledge_base.setdefault("architectural_results", []).append({"result": architectural_result, "timestamp": stamp, "context_type": self.current_context.context_type.value if self.current_context else None}); return {"processed": True, "timestamp": stamp}
 
     def process_evidence_registration(self, verification_id: str, evidence_record: Dict[str, Any]) -> Dict[str, Any]:
-        stamp = datetime.now().isoformat(); self.knowledge_base.setdefault("evidence_registrations", []).append({"verification_id": verification_id, "evidence": evidence_record, "timestamp": stamp}); return {"processed": True, "verification_id": verification_id, "timestamp": stamp}
+        stamp = datetime.now().isoformat()
+        evidence = evidence_record if isinstance(evidence_record, dict) else {}
+        minimum = self.minimum_evidence()
+        sufficient = True
+        reasons: List[str] = []
+        if not bool(evidence.get("success", False)):
+            sufficient = False; reasons.append("success")
+        if not bool(evidence.get("verified", False)):
+            sufficient = False; reasons.append("verified")
+        threshold = float(minimum.get("confidence_threshold", 0.0))
+        if float(evidence.get("impact_score", 0.0) or 0.0) < threshold and float(evidence.get("confidence", 0.0) or 0.0) < threshold:
+            sufficient = False; reasons.append("confidence_or_impact")
+        min_obs = int(minimum.get("min_similar_observations", 1) or 1)
+        if int(evidence.get("similar_observations", 0) or 0) < min_obs:
+            sufficient = False; reasons.append("similar_observations")
+        if not sufficient:
+            return {"processed": False, "verification_id": verification_id, "timestamp": stamp, "reason": "insufficient_evidence", "missing": reasons}
+        self.knowledge_base.setdefault("evidence_registrations", []).append({"verification_id": verification_id, "evidence": evidence_record, "timestamp": stamp})
+        return {"processed": True, "verification_id": verification_id, "timestamp": stamp}
 
     def on_proposal_created(self, proposal) -> Dict[str, Any]:
         pid = proposal.get("proposal_id") if isinstance(proposal, dict) else str(proposal); stamp = datetime.now().isoformat(); ctx = self.current_context.context_type.value if self.current_context else None
