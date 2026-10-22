@@ -2676,9 +2676,12 @@ class ContextualAdaptationEngine:
                     "metrics": metrics, "timestamp": datetime.now().isoformat(), "confidence": .85})
             self._record_feedback_analysis(feedback_data["adaptation_id"], analysis)
             self._record_adaptation_history(feedback_data["adaptation_id"], analysis, feedback_data["adaptation_context"])
+            learning_result = self._execute_goal_adaptation_learning_loop({"success": True, "adaptation_id": feedback_data["adaptation_id"],
+                "original_goal_id": feedback_data["original_goal_id"], "adapted_goal_id": feedback_data["adapted_goal_id"],
+                "improvement_analysis": analysis, "feedback_metrics": metrics, "adaptation_context": feedback_data["adaptation_context"]})
             return {"success": True, "adaptation_id": feedback_data["adaptation_id"], "original_goal_id": feedback_data["original_goal_id"],
                 "adapted_goal_id": feedback_data["adapted_goal_id"], "improvement_analysis": analysis, "feedback_metrics": metrics,
-                "adaptation_context": feedback_data["adaptation_context"], "timestamp": datetime.now().isoformat()}
+                "adaptation_context": feedback_data["adaptation_context"], "learning_result": learning_result, "timestamp": datetime.now().isoformat()}
         except Exception as exc:
             self.logger.error("Error capturando feedback de Goal: %s", exc)
             return {"success": False, "adaptation_id": feedback_data.get("adaptation_id") if isinstance(feedback_data, dict) else None,
