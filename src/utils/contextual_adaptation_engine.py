@@ -305,8 +305,11 @@ class ContextualAdaptationEngine:
         self.scaler = StandardScaler() if StandardScaler else None
         self._initialize_adaptation_rules()
         self._initialize_knowledge_base()
-        self.load_adaptation_rules()
-        self.load_knowledge_base()
+        # CONEXION DE CARGA (2.8.8.9.12.2): el punto real de inicializacion del
+        # sistema carga la persistencia a traves de load_all_data(), que declara
+        # lo que ocurrio (unidades obtenidas), en lugar de invocar los cargadores
+        # por separado y descartar su resultado.
+        self.load_all_data()
         self._initialize_goal_adaptation_persistence()
 
     # Configuración

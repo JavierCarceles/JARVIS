@@ -1,8 +1,8 @@
 ﻿ESTADO PERSISTENTE ACTUAL
 CURRENT_PHASE: 2.8.8
-CURRENT_WORK_UNIT: 2.8.8.9.12.2
+CURRENT_WORK_UNIT: 2.8.8.9.12.3
 CURRENT_WORK_STATUS: PENDIENTE
-LAST_COMPLETED_UNIT: 2.8.8.9.12.1
+LAST_COMPLETED_UNIT: 2.8.8.9.12.2
 
 PROMPT MAESTRO JARVIS — AUTOMEJORA INCREMENTAL
 
@@ -3599,6 +3599,31 @@ Nunca resetear version ni depender del chat anterior.
 
 REGLA FINAL
 La IA debe pensar y resolver; el prompt solo fija limites y continuidad. No sustituir razonamiento por listas. No inventar trabajo para tener algo que hacer. No afirmar que algo funciona porque este escrito en README o en un prompt: verificarlo cuando sea relevante.
+REGISTRO DE UNIDAD: 2.8.8.9.12.2
+FECHA: 2026-10-22
+ESTADO: IMPLEMENTADA
+OBJETIVO: Integrar la carga de persistencia en el punto real donde se inicializa el sistema (el constructor de ContextualAdaptationEngine), usando load_all_data() en lugar de invocar los cargadores por separado y descartar su resultado.
+TIPO DE TRABAJO: INTEGRACION
+CAMBIOS / HALLAZGOS:
+- En __init__ se sustituyeron las llamadas separadas load_adaptation_rules() y load_knowledge_base() por load_all_data(), que carga la misma persistencia pero declara lo que ocurrio (unidades obtenidas) y respeta el fallback por corrupcion total (devuelve FALSO si los ficheros existen pero no aportan unidades utilizables; VERDADERO si el almacenamiento esta ausente). _initialize_goal_adaptation_persistence() se mantiene para feedback y resultados de aprendizaje.
+- NO se inventa carga nueva ni se duplica logica: se reutiliza load_all_data() ya existente.
+- No se modifico main.py ni otros consumidores; el punto de inicializacion real del motor es su constructor.
+ARCHIVOS MODIFICADOS:
+- PRODUCCION: src/utils/contextual_adaptation_engine.py (__init__).
+- TESTS: NO APLICA (no se crearon tests nuevos; se reutilizaron los existentes).
+- DOCUMENTACION: prompt_mejoraActual.txt.
+TESTS Y RESULTADOS:
+- UNITARIOS: tests/utils/contextual_adaptation_engine/test_absent_storage_and_sections.py - 29 PASSED / 0 FAILED / TOTAL 29 (ejecutado como no-regresion).
+- INTEGRACION: NO EJECUTADA POR SEPARADO.
+- NO REGRESION: py_compile de main.py y del motor - OK; import main - OK.
+VERIFICACION:
+- SINTAXIS: py_compile - OK.
+- MAIN.PY: import main - OK.
+- COMPORTAMIENTO / INTEGRACION REAL: el motor se construye y carga persistencia a traves de load_all_data() sin error; los ficheros de produccion no se modifican.
+DISCREPANCIAS: NINGUNA REGISTRADA.
+PENDIENTES: 2.8.8.9.12.3 - verificar feedback.
+ESTADO FINAL: 2.8.8.9.12.2 - IMPLEMENTADA
+
 ## CONTINUIDAD OPERATIVA
 
 REGISTRO DE UNIDAD: 2.8.8.9.4.3
