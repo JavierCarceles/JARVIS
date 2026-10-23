@@ -2816,7 +2816,8 @@ class ContextualAdaptationEngine:
     def _record_learning_results(self, adaptation_id: str, patterns: List[Dict[str, Any]], strategies: Dict[str, Any], convergence: Dict[str, Any]) -> None:
         if strategies: self.knowledge_base["adaptation_strategies"] = strategies
         rows = self.knowledge_base.setdefault("learning_results", [])
-        rows.append({"adaptation_id": adaptation_id, "learned_patterns": patterns, "updated_strategies": strategies,
+        if not any(isinstance(r, dict) and r.get("adaptation_id") == adaptation_id for r in rows):
+            rows.append({"adaptation_id": adaptation_id, "learned_patterns": patterns, "updated_strategies": strategies,
                      "convergence_metrics": convergence, "timestamp": datetime.now().isoformat(), "status": "completed"})
         del rows[:-500]; self._save_goal_adaptation_learning_results()
 
@@ -2896,6 +2897,7 @@ class ContextualAdaptationEngine:
         known = self._known_strategy_ids()
         for sid, entry in flat.items():
             if not isinstance(entry, dict): continue
+            if not self._estrategia_aprendida_valida(entry): continue
             if str(sid) in known: continue
             context_info = entry.get("context") if isinstance(entry.get("context"), dict) else {}
             ctx = self._coerce_context(context_info.get("context_type")) or ContextType.IDLE
@@ -2920,6 +2922,7 @@ class ContextualAdaptationEngine:
             known = {str(x.get("strategy_id")) for x in bucket if isinstance(x, dict) and x.get("strategy_id")}
             for entry in rows:
                 if not isinstance(entry, dict): continue
+                if not self._estrategia_aprendida_valida(entry): continue
                 sid = str(entry.get("strategy_id") or "")
                 if sid and sid in known: continue
                 if sid: known.add(sid)

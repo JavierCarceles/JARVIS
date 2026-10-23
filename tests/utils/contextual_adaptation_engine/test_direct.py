@@ -10,7 +10,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'src')
 # Importar la clase directamente
 from utils.contextual_adaptation_engine import ContextualAdaptationEngine, ContextType
 
-def test_methods_direct():
+def test_engine_exposes_strategy_methods():
     print("Creando instancia de ContextualAdaptationEngine...")
     engine = ContextualAdaptationEngine()
     
@@ -55,4 +55,4 @@ def test_methods_direct():
         print(f"  ... y {len(public_methods) - 20} más")
 
 if __name__ == "__main__":
-    test_methods_direct()
+    test_engine_exposes_strategy_methods()

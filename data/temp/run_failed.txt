@@ -1,0 +1,644 @@
+﻿................FF.F.........F.F....F...                                 [100%]
+================================== FAILURES ===================================
+_________ test_el_patron_recuperado_conserva_las_estructuras_anidadas _________
+
+engine = <utils.contextual_adaptation_engine.ContextualAdaptationEngine object at 0x0000011C08B40830>
+tmp_path = WindowsPath('C:/Users/User/AppData/Local/Temp/pytest-of-User/pytest-410/test_el_patron_recuperado_cons1')
+
+    def test_el_patron_recuperado_conserva_las_estructuras_anidadas(engine, tmp_path):
+        """Las estructuras anidadas deben sobrevivir intactas, no solo existir."""
+        produced = _learn(engine, MIN_SIMILAR_OBSERVATIONS)
+    
+        restarted = ContextualAdaptationEngine(data_dir=str(tmp_path))
+    
+        recovered = _recovered_patterns(restarted)
+        assert recovered, "Los patrones validados deben recuperarse tras el reinicio"
+        by_id = {pattern["pattern_id"]: pattern for pattern in recovered}
+        for original in produced:
+            pattern = by_id.get(original["pattern_id"])
+>           assert pattern is not None, (
+                f"El patron '{original['pattern_id']}' debe recuperarse tras el reinicio"
+            )
+E           AssertionError: El patron 'pattern_1_1792747687705' debe recuperarse tras el reinicio
+E           assert None is not None
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\utils\contextual_adaptation_engine\test_goal_adaptation_pattern_restart_verification.py:195: AssertionError
+---------------------------- Captured stdout setup ----------------------------
+{"timestamp": "2026-10-23T11:28:07.422192", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Modelos ML inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:07.422782", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Bucle de optimizaci¾n iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:07.422909", "level": "INFO", "logger": "PerformanceOptimizer", "message": "PerformanceOptimizer inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:07.525640", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Modelos ML inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:07.526310", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Bucle de optimizaci¾n iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:07.526462", "level": "INFO", "logger": "PerformanceOptimizer", "message": "PerformanceOptimizer inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:07.528201", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Modelos de aprendizaje inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:07.528354", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Reglas de mejora inicializadas: 5 reglas", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:07.528860", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Bucle de aprendizaje iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:07.528938", "level": "INFO", "logger": "SelfImprovementSystem", "message": "SelfImprovementSystem inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:07.529172", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Grafo de conocimiento guardado en data/knowledge_graph.json", "module": "advanced_logger", "function": "log", "line": 851, "thread": 28524, "process": 12424}
+{"timestamp": "2026-10-23T11:28:07.630567", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Modelos ML inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:07.631040", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Bucle de optimizaci¾n iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:07.631115", "level": "INFO", "logger": "PerformanceOptimizer", "message": "PerformanceOptimizer inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:07.697894", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Modelos ML inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:07.698370", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Bucle de optimizaci¾n iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:07.698475", "level": "INFO", "logger": "PerformanceOptimizer", "message": "PerformanceOptimizer inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:07.700651", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Modelos de aprendizaje inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:07.700770", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Reglas de mejora inicializadas: 5 reglas", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:07.701260", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Bucle de aprendizaje iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:07.701327", "level": "INFO", "logger": "SelfImprovementSystem", "message": "SelfImprovementSystem inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:07.701531", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Grafo de conocimiento guardado en data/knowledge_graph.json", "module": "advanced_logger", "function": "log", "line": 851, "thread": 60076, "process": 12424}
+{"timestamp": "2026-10-23T11:28:07.701940", "level": "INFO", "logger": "AdaptiveLearningEngine", "message": "Registro de modelos inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:07.702251", "level": "INFO", "logger": "AdaptiveLearningEngine", "message": "Motor de aprendizaje iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:07.702324", "level": "INFO", "logger": "AdaptiveLearningEngine", "message": "AdaptiveLearningEngine inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+----------------------------- Captured log setup ------------------------------
+INFO     PerformanceOptimizer:advanced_logger.py:851 Modelos ML inicializados
+INFO     PerformanceOptimizer:advanced_logger.py:851 Bucle de optimizaci¾n iniciado
+INFO     PerformanceOptimizer:advanced_logger.py:851 PerformanceOptimizer inicializado
+INFO     PerformanceOptimizer:advanced_logger.py:851 Modelos ML inicializados
+INFO     PerformanceOptimizer:advanced_logger.py:851 Bucle de optimizaci¾n iniciado
+INFO     PerformanceOptimizer:advanced_logger.py:851 PerformanceOptimizer inicializado
+INFO     SelfImprovementSystem:advanced_logger.py:851 Modelos de aprendizaje inicializados
+INFO     SelfImprovementSystem:advanced_logger.py:851 Reglas de mejora inicializadas: 5 reglas
+INFO     SelfImprovementSystem:advanced_logger.py:851 Bucle de aprendizaje iniciado
+INFO     SelfImprovementSystem:advanced_logger.py:851 SelfImprovementSystem inicializado
+INFO     SelfImprovementSystem:advanced_logger.py:851 Grafo de conocimiento guardado en data/knowledge_graph.json
+INFO     PerformanceOptimizer:advanced_logger.py:851 Modelos ML inicializados
+INFO     PerformanceOptimizer:advanced_logger.py:851 Bucle de optimizaci¾n iniciado
+INFO     PerformanceOptimizer:advanced_logger.py:851 PerformanceOptimizer inicializado
+INFO     PerformanceOptimizer:advanced_logger.py:851 Modelos ML inicializados
+INFO     PerformanceOptimizer:advanced_logger.py:851 Bucle de optimizaci¾n iniciado
+INFO     PerformanceOptimizer:advanced_logger.py:851 PerformanceOptimizer inicializado
+INFO     SelfImprovementSystem:advanced_logger.py:851 Modelos de aprendizaje inicializados
+INFO     SelfImprovementSystem:advanced_logger.py:851 Reglas de mejora inicializadas: 5 reglas
+INFO     SelfImprovementSystem:advanced_logger.py:851 Bucle de aprendizaje iniciado
+INFO     SelfImprovementSystem:advanced_logger.py:851 SelfImprovementSystem inicializado
+INFO     SelfImprovementSystem:advanced_logger.py:851 Grafo de conocimiento guardado en data/knowledge_graph.json
+INFO     AdaptiveLearningEngine:advanced_logger.py:851 Registro de modelos inicializado
+INFO     AdaptiveLearningEngine:advanced_logger.py:851 Motor de aprendizaje iniciado
+INFO     AdaptiveLearningEngine:advanced_logger.py:851 AdaptiveLearningEngine inicializado
+---------------------------- Captured stdout call -----------------------------
+{"timestamp": "2026-10-23T11:28:07.809313", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Modelos ML inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:07.809883", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Bucle de optimizaci¾n iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:07.810019", "level": "INFO", "logger": "PerformanceOptimizer", "message": "PerformanceOptimizer inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:07.857994", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Modelos ML inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:07.858484", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Bucle de optimizaci¾n iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:07.858552", "level": "INFO", "logger": "PerformanceOptimizer", "message": "PerformanceOptimizer inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:07.859509", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Modelos de aprendizaje inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:07.859636", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Reglas de mejora inicializadas: 5 reglas", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:07.860884", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Bucle de aprendizaje iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:07.860962", "level": "INFO", "logger": "SelfImprovementSystem", "message": "SelfImprovementSystem inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:07.861169", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Grafo de conocimiento guardado en data/knowledge_graph.json", "module": "advanced_logger", "function": "log", "line": 851, "thread": 40956, "process": 12424}
+{"timestamp": "2026-10-23T11:28:07.955274", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Modelos ML inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:07.955726", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Bucle de optimizaci¾n iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:07.955828", "level": "INFO", "logger": "PerformanceOptimizer", "message": "PerformanceOptimizer inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.034995", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Modelos ML inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.035962", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Bucle de optimizaci¾n iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.036108", "level": "INFO", "logger": "PerformanceOptimizer", "message": "PerformanceOptimizer inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.037611", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Modelos de aprendizaje inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.037765", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Reglas de mejora inicializadas: 5 reglas", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.038323", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Bucle de aprendizaje iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.038417", "level": "INFO", "logger": "SelfImprovementSystem", "message": "SelfImprovementSystem inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.038653", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Grafo de conocimiento guardado en data/knowledge_graph.json", "module": "advanced_logger", "function": "log", "line": 851, "thread": 36004, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.039284", "level": "INFO", "logger": "AdaptiveLearningEngine", "message": "Registro de modelos inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.039572", "level": "INFO", "logger": "AdaptiveLearningEngine", "message": "Motor de aprendizaje iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.039638", "level": "INFO", "logger": "AdaptiveLearningEngine", "message": "AdaptiveLearningEngine inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+------------------------------ Captured log call ------------------------------
+INFO     PerformanceOptimizer:advanced_logger.py:851 Modelos ML inicializados
+INFO     PerformanceOptimizer:advanced_logger.py:851 Bucle de optimizaci¾n iniciado
+INFO     PerformanceOptimizer:advanced_logger.py:851 PerformanceOptimizer inicializado
+INFO     PerformanceOptimizer:advanced_logger.py:851 Modelos ML inicializados
+INFO     PerformanceOptimizer:advanced_logger.py:851 Bucle de optimizaci¾n iniciado
+INFO     PerformanceOptimizer:advanced_logger.py:851 PerformanceOptimizer inicializado
+INFO     SelfImprovementSystem:advanced_logger.py:851 Modelos de aprendizaje inicializados
+INFO     SelfImprovementSystem:advanced_logger.py:851 Reglas de mejora inicializadas: 5 reglas
+INFO     SelfImprovementSystem:advanced_logger.py:851 Bucle de aprendizaje iniciado
+INFO     SelfImprovementSystem:advanced_logger.py:851 SelfImprovementSystem inicializado
+INFO     SelfImprovementSystem:advanced_logger.py:851 Grafo de conocimiento guardado en data/knowledge_graph.json
+INFO     PerformanceOptimizer:advanced_logger.py:851 Modelos ML inicializados
+INFO     PerformanceOptimizer:advanced_logger.py:851 Bucle de optimizaci¾n iniciado
+INFO     PerformanceOptimizer:advanced_logger.py:851 PerformanceOptimizer inicializado
+INFO     PerformanceOptimizer:advanced_logger.py:851 Modelos ML inicializados
+INFO     PerformanceOptimizer:advanced_logger.py:851 Bucle de optimizaci¾n iniciado
+INFO     PerformanceOptimizer:advanced_logger.py:851 PerformanceOptimizer inicializado
+INFO     SelfImprovementSystem:advanced_logger.py:851 Modelos de aprendizaje inicializados
+INFO     SelfImprovementSystem:advanced_logger.py:851 Reglas de mejora inicializadas: 5 reglas
+INFO     SelfImprovementSystem:advanced_logger.py:851 Bucle de aprendizaje iniciado
+INFO     SelfImprovementSystem:advanced_logger.py:851 SelfImprovementSystem inicializado
+INFO     SelfImprovementSystem:advanced_logger.py:851 Grafo de conocimiento guardado en data/knowledge_graph.json
+INFO     AdaptiveLearningEngine:advanced_logger.py:851 Registro de modelos inicializado
+INFO     AdaptiveLearningEngine:advanced_logger.py:851 Motor de aprendizaje iniciado
+INFO     AdaptiveLearningEngine:advanced_logger.py:851 AdaptiveLearningEngine inicializado
+_________ test_el_patron_recuperado_conserva_los_valores_sin_perdida __________
+
+engine = <utils.contextual_adaptation_engine.ContextualAdaptationEngine object at 0x0000011C08B41400>
+tmp_path = WindowsPath('C:/Users/User/AppData/Local/Temp/pytest-of-User/pytest-410/test_el_patron_recuperado_cons2')
+
+    def test_el_patron_recuperado_conserva_los_valores_sin_perdida(engine, tmp_path):
+        """La ida y vuelta debe preservar el valor de cada campo canonico."""
+        produced = _learn(engine, MIN_SIMILAR_OBSERVATIONS)
+    
+        restarted = ContextualAdaptationEngine(data_dir=str(tmp_path))
+    
+        recovered = _recovered_patterns(restarted)
+        assert recovered, "Los patrones validados deben recuperarse tras el reinicio"
+        by_id = {pattern["pattern_id"]: pattern for pattern in recovered}
+        for original in produced:
+            pattern = by_id.get(original["pattern_id"])
+>           assert pattern is not None, (
+                f"El patron '{original['pattern_id']}' debe recuperarse tras el reinicio"
+            )
+E           AssertionError: El patron 'pattern_1_1792747688406' debe recuperarse tras el reinicio
+E           assert None is not None
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\utils\contextual_adaptation_engine\test_goal_adaptation_pattern_restart_verification.py:229: AssertionError
+---------------------------- Captured stdout setup ----------------------------
+{"timestamp": "2026-10-23T11:28:08.147079", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Modelos ML inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.147520", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Bucle de optimizaci¾n iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.147611", "level": "INFO", "logger": "PerformanceOptimizer", "message": "PerformanceOptimizer inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.220689", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Modelos ML inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.221189", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Bucle de optimizaci¾n iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.221282", "level": "INFO", "logger": "PerformanceOptimizer", "message": "PerformanceOptimizer inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.222274", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Modelos de aprendizaje inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.222393", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Reglas de mejora inicializadas: 5 reglas", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.222845", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Bucle de aprendizaje iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.222924", "level": "INFO", "logger": "SelfImprovementSystem", "message": "SelfImprovementSystem inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.223282", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Grafo de conocimiento guardado en data/knowledge_graph.json", "module": "advanced_logger", "function": "log", "line": 851, "thread": 56288, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.323093", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Modelos ML inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.323607", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Bucle de optimizaci¾n iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.323673", "level": "INFO", "logger": "PerformanceOptimizer", "message": "PerformanceOptimizer inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.396882", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Modelos ML inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.397582", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Bucle de optimizaci¾n iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.397724", "level": "INFO", "logger": "PerformanceOptimizer", "message": "PerformanceOptimizer inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.401054", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Modelos de aprendizaje inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.401245", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Reglas de mejora inicializadas: 5 reglas", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.401833", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Bucle de aprendizaje iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.401950", "level": "INFO", "logger": "SelfImprovementSystem", "message": "SelfImprovementSystem inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.402217", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Grafo de conocimiento guardado en data/knowledge_graph.json", "module": "advanced_logger", "function": "log", "line": 851, "thread": 53396, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.402779", "level": "INFO", "logger": "AdaptiveLearningEngine", "message": "Registro de modelos inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.403081", "level": "INFO", "logger": "AdaptiveLearningEngine", "message": "Motor de aprendizaje iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.403162", "level": "INFO", "logger": "AdaptiveLearningEngine", "message": "AdaptiveLearningEngine inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+----------------------------- Captured log setup ------------------------------
+INFO     PerformanceOptimizer:advanced_logger.py:851 Modelos ML inicializados
+INFO     PerformanceOptimizer:advanced_logger.py:851 Bucle de optimizaci¾n iniciado
+INFO     PerformanceOptimizer:advanced_logger.py:851 PerformanceOptimizer inicializado
+INFO     PerformanceOptimizer:advanced_logger.py:851 Modelos ML inicializados
+INFO     PerformanceOptimizer:advanced_logger.py:851 Bucle de optimizaci¾n iniciado
+INFO     PerformanceOptimizer:advanced_logger.py:851 PerformanceOptimizer inicializado
+INFO     SelfImprovementSystem:advanced_logger.py:851 Modelos de aprendizaje inicializados
+INFO     SelfImprovementSystem:advanced_logger.py:851 Reglas de mejora inicializadas: 5 reglas
+INFO     SelfImprovementSystem:advanced_logger.py:851 Bucle de aprendizaje iniciado
+INFO     SelfImprovementSystem:advanced_logger.py:851 SelfImprovementSystem inicializado
+INFO     SelfImprovementSystem:advanced_logger.py:851 Grafo de conocimiento guardado en data/knowledge_graph.json
+INFO     PerformanceOptimizer:advanced_logger.py:851 Modelos ML inicializados
+INFO     PerformanceOptimizer:advanced_logger.py:851 Bucle de optimizaci¾n iniciado
+INFO     PerformanceOptimizer:advanced_logger.py:851 PerformanceOptimizer inicializado
+INFO     PerformanceOptimizer:advanced_logger.py:851 Modelos ML inicializados
+INFO     PerformanceOptimizer:advanced_logger.py:851 Bucle de optimizaci¾n iniciado
+INFO     PerformanceOptimizer:advanced_logger.py:851 PerformanceOptimizer inicializado
+INFO     SelfImprovementSystem:advanced_logger.py:851 Modelos de aprendizaje inicializados
+INFO     SelfImprovementSystem:advanced_logger.py:851 Reglas de mejora inicializadas: 5 reglas
+INFO     SelfImprovementSystem:advanced_logger.py:851 Bucle de aprendizaje iniciado
+INFO     SelfImprovementSystem:advanced_logger.py:851 SelfImprovementSystem inicializado
+INFO     SelfImprovementSystem:advanced_logger.py:851 Grafo de conocimiento guardado en data/knowledge_graph.json
+INFO     AdaptiveLearningEngine:advanced_logger.py:851 Registro de modelos inicializado
+INFO     AdaptiveLearningEngine:advanced_logger.py:851 Motor de aprendizaje iniciado
+INFO     AdaptiveLearningEngine:advanced_logger.py:851 AdaptiveLearningEngine inicializado
+---------------------------- Captured stdout call -----------------------------
+{"timestamp": "2026-10-23T11:28:08.549377", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Modelos ML inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.550014", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Bucle de optimizaci¾n iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.550137", "level": "INFO", "logger": "PerformanceOptimizer", "message": "PerformanceOptimizer inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.626648", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Modelos ML inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.627543", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Bucle de optimizaci¾n iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.627695", "level": "INFO", "logger": "PerformanceOptimizer", "message": "PerformanceOptimizer inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.629383", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Modelos de aprendizaje inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.629567", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Reglas de mejora inicializadas: 5 reglas", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.630424", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Bucle de aprendizaje iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.630539", "level": "INFO", "logger": "SelfImprovementSystem", "message": "SelfImprovementSystem inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.631798", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Grafo de conocimiento guardado en data/knowledge_graph.json", "module": "advanced_logger", "function": "log", "line": 851, "thread": 54712, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.698750", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Modelos ML inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.699259", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Bucle de optimizaci¾n iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.699349", "level": "INFO", "logger": "PerformanceOptimizer", "message": "PerformanceOptimizer inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.744885", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Modelos ML inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.745328", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Bucle de optimizaci¾n iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.745397", "level": "INFO", "logger": "PerformanceOptimizer", "message": "PerformanceOptimizer inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.746340", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Modelos de aprendizaje inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.746460", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Reglas de mejora inicializadas: 5 reglas", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.746895", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Bucle de aprendizaje iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.746978", "level": "INFO", "logger": "SelfImprovementSystem", "message": "SelfImprovementSystem inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.747194", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Grafo de conocimiento guardado en data/knowledge_graph.json", "module": "advanced_logger", "function": "log", "line": 851, "thread": 33800, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.747616", "level": "INFO", "logger": "AdaptiveLearningEngine", "message": "Registro de modelos inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.747880", "level": "INFO", "logger": "AdaptiveLearningEngine", "message": "Motor de aprendizaje iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:08.747951", "level": "INFO", "logger": "AdaptiveLearningEngine", "message": "AdaptiveLearningEngine inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+------------------------------ Captured log call ------------------------------
+INFO     PerformanceOptimizer:advanced_logger.py:851 Modelos ML inicializados
+INFO     PerformanceOptimizer:advanced_logger.py:851 Bucle de optimizaci¾n iniciado
+INFO     PerformanceOptimizer:advanced_logger.py:851 PerformanceOptimizer inicializado
+INFO     PerformanceOptimizer:advanced_logger.py:851 Modelos ML inicializados
+INFO     PerformanceOptimizer:advanced_logger.py:851 Bucle de optimizaci¾n iniciado
+INFO     PerformanceOptimizer:advanced_logger.py:851 PerformanceOptimizer inicializado
+INFO     SelfImprovementSystem:advanced_logger.py:851 Modelos de aprendizaje inicializados
+INFO     SelfImprovementSystem:advanced_logger.py:851 Reglas de mejora inicializadas: 5 reglas
+INFO     SelfImprovementSystem:advanced_logger.py:851 Bucle de aprendizaje iniciado
+INFO     SelfImprovementSystem:advanced_logger.py:851 SelfImprovementSystem inicializado
+INFO     SelfImprovementSystem:advanced_logger.py:851 Grafo de conocimiento guardado en data/knowledge_graph.json
+INFO     PerformanceOptimizer:advanced_logger.py:851 Modelos ML inicializados
+INFO     PerformanceOptimizer:advanced_logger.py:851 Bucle de optimizaci¾n iniciado
+INFO     PerformanceOptimizer:advanced_logger.py:851 PerformanceOptimizer inicializado
+INFO     PerformanceOptimizer:advanced_logger.py:851 Modelos ML inicializados
+INFO     PerformanceOptimizer:advanced_logger.py:851 Bucle de optimizaci¾n iniciado
+INFO     PerformanceOptimizer:advanced_logger.py:851 PerformanceOptimizer inicializado
+INFO     SelfImprovementSystem:advanced_logger.py:851 Modelos de aprendizaje inicializados
+INFO     SelfImprovementSystem:advanced_logger.py:851 Reglas de mejora inicializadas: 5 reglas
+INFO     SelfImprovementSystem:advanced_logger.py:851 Bucle de aprendizaje iniciado
+INFO     SelfImprovementSystem:advanced_logger.py:851 SelfImprovementSystem inicializado
+INFO     SelfImprovementSystem:advanced_logger.py:851 Grafo de conocimiento guardado en data/knowledge_graph.json
+INFO     AdaptiveLearningEngine:advanced_logger.py:851 Registro de modelos inicializado
+INFO     AdaptiveLearningEngine:advanced_logger.py:851 Motor de aprendizaje iniciado
+INFO     AdaptiveLearningEngine:advanced_logger.py:851 AdaptiveLearningEngine inicializado
+______ test_el_patron_recuperado_sigue_disponible_para_los_consumidores _______
+
+engine = <utils.contextual_adaptation_engine.ContextualAdaptationEngine object at 0x0000011C16D6C830>
+tmp_path = WindowsPath('C:/Users/User/AppData/Local/Temp/pytest-of-User/pytest-410/test_el_patron_recuperado_sigu0')
+
+    def test_el_patron_recuperado_sigue_disponible_para_los_consumidores(engine, tmp_path):
+        """El patron recuperado debe seguir siendo legible por los consumidores reales.
+    
+        `_update_adaptive_strategies()` es el consumidor real de `learned_patterns`
+        y las estrategias aprendidas enlazan con su patron via `pattern_id`.
+        """
+        produced = _learn(engine, MIN_SIMILAR_OBSERVATIONS)
+        pattern_ids = {pattern["pattern_id"] for pattern in produced}
+    
+        restarted = ContextualAdaptationEngine(data_dir=str(tmp_path))
+    
+        recovered = _recovered_patterns(restarted)
+        assert recovered, "Los patrones validados deben recuperarse tras el reinicio"
+>       assert {pattern["pattern_id"] for pattern in recovered} == pattern_ids, (
+            "Los patrones recuperados deben ser los mismos que se aprendieron"
+        )
+E       AssertionError: Los patrones recuperados deben ser los mismos que se aprendieron
+E       assert {'pattern_1_1...792747689758'} == {'pattern_1_1...792747689759'}
+E         
+E         Extra items in the left set:
+E         'pattern_1_1792747689753'
+E         'pattern_1_1792747689758'
+E         Extra items in the right set:
+E         'pattern_1_1792747689759'
+E         'pattern_1_1792747689754'
+E         Use -v to get more diff
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\utils\contextual_adaptation_engine\test_goal_adaptation_pattern_restart_verification.py:284: AssertionError
+---------------------------- Captured stdout setup ----------------------------
+{"timestamp": "2026-10-23T11:28:09.519078", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Modelos ML inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:09.519725", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Bucle de optimizaci¾n iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:09.519979", "level": "INFO", "logger": "PerformanceOptimizer", "message": "PerformanceOptimizer inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:09.600295", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Modelos ML inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:09.600783", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Bucle de optimizaci¾n iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:09.600949", "level": "INFO", "logger": "PerformanceOptimizer", "message": "PerformanceOptimizer inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:09.602054", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Modelos de aprendizaje inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:09.602256", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Reglas de mejora inicializadas: 5 reglas", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:09.602767", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Bucle de aprendizaje iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:09.602829", "level": "INFO", "logger": "SelfImprovementSystem", "message": "SelfImprovementSystem inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:09.603058", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Grafo de conocimiento guardado en data/knowledge_graph.json", "module": "advanced_logger", "function": "log", "line": 851, "thread": 7936, "process": 12424}
+{"timestamp": "2026-10-23T11:28:09.685544", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Modelos ML inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:09.686247", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Bucle de optimizaci¾n iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:09.686340", "level": "INFO", "logger": "PerformanceOptimizer", "message": "PerformanceOptimizer inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:09.746958", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Modelos ML inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:09.747493", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Bucle de optimizaci¾n iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:09.747574", "level": "INFO", "logger": "PerformanceOptimizer", "message": "PerformanceOptimizer inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:09.749772", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Modelos de aprendizaje inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:09.749924", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Reglas de mejora inicializadas: 5 reglas", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:09.750347", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Bucle de aprendizaje iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:09.750405", "level": "INFO", "logger": "SelfImprovementSystem", "message": "SelfImprovementSystem inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:09.750614", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Grafo de conocimiento guardado en data/knowledge_graph.json", "module": "advanced_logger", "function": "log", "line": 851, "thread": 14064, "process": 12424}
+{"timestamp": "2026-10-23T11:28:09.751121", "level": "INFO", "logger": "AdaptiveLearningEngine", "message": "Registro de modelos inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:09.751403", "level": "INFO", "logger": "AdaptiveLearningEngine", "message": "Motor de aprendizaje iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:09.751463", "level": "INFO", "logger": "AdaptiveLearningEngine", "message": "AdaptiveLearningEngine inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+----------------------------- Captured log setup ------------------------------
+INFO     PerformanceOptimizer:advanced_logger.py:851 Modelos ML inicializados
+INFO     PerformanceOptimizer:advanced_logger.py:851 Bucle de optimizaci¾n iniciado
+INFO     PerformanceOptimizer:advanced_logger.py:851 PerformanceOptimizer inicializado
+INFO     PerformanceOptimizer:advanced_logger.py:851 Modelos ML inicializados
+INFO     PerformanceOptimizer:advanced_logger.py:851 Bucle de optimizaci¾n iniciado
+INFO     PerformanceOptimizer:advanced_logger.py:851 PerformanceOptimizer inicializado
+INFO     SelfImprovementSystem:advanced_logger.py:851 Modelos de aprendizaje inicializados
+INFO     SelfImprovementSystem:advanced_logger.py:851 Reglas de mejora inicializadas: 5 reglas
+INFO     SelfImprovementSystem:advanced_logger.py:851 Bucle de aprendizaje iniciado
+INFO     SelfImprovementSystem:advanced_logger.py:851 SelfImprovementSystem inicializado
+INFO     SelfImprovementSystem:advanced_logger.py:851 Grafo de conocimiento guardado en data/knowledge_graph.json
+INFO     PerformanceOptimizer:advanced_logger.py:851 Modelos ML inicializados
+INFO     PerformanceOptimizer:advanced_logger.py:851 Bucle de optimizaci¾n iniciado
+INFO     PerformanceOptimizer:advanced_logger.py:851 PerformanceOptimizer inicializado
+INFO     PerformanceOptimizer:advanced_logger.py:851 Modelos ML inicializados
+INFO     PerformanceOptimizer:advanced_logger.py:851 Bucle de optimizaci¾n iniciado
+INFO     PerformanceOptimizer:advanced_logger.py:851 PerformanceOptimizer inicializado
+INFO     SelfImprovementSystem:advanced_logger.py:851 Modelos de aprendizaje inicializados
+INFO     SelfImprovementSystem:advanced_logger.py:851 Reglas de mejora inicializadas: 5 reglas
+INFO     SelfImprovementSystem:advanced_logger.py:851 Bucle de aprendizaje iniciado
+INFO     SelfImprovementSystem:advanced_logger.py:851 SelfImprovementSystem inicializado
+INFO     SelfImprovementSystem:advanced_logger.py:851 Grafo de conocimiento guardado en data/knowledge_graph.json
+INFO     AdaptiveLearningEngine:advanced_logger.py:851 Registro de modelos inicializado
+INFO     AdaptiveLearningEngine:advanced_logger.py:851 Motor de aprendizaje iniciado
+INFO     AdaptiveLearningEngine:advanced_logger.py:851 AdaptiveLearningEngine inicializado
+---------------------------- Captured stdout call -----------------------------
+{"timestamp": "2026-10-23T11:28:09.840048", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Modelos ML inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:09.840463", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Bucle de optimizaci¾n iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:09.840536", "level": "INFO", "logger": "PerformanceOptimizer", "message": "PerformanceOptimizer inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:09.903716", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Modelos ML inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:09.904287", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Bucle de optimizaci¾n iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:09.904370", "level": "INFO", "logger": "PerformanceOptimizer", "message": "PerformanceOptimizer inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:09.905594", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Modelos de aprendizaje inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:09.905769", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Reglas de mejora inicializadas: 5 reglas", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:09.906452", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Bucle de aprendizaje iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:09.906533", "level": "INFO", "logger": "SelfImprovementSystem", "message": "SelfImprovementSystem inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:09.906789", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Grafo de conocimiento guardado en data/knowledge_graph.json", "module": "advanced_logger", "function": "log", "line": 851, "thread": 41688, "process": 12424}
+{"timestamp": "2026-10-23T11:28:09.973001", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Modelos ML inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:09.973555", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Bucle de optimizaci¾n iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:09.973648", "level": "INFO", "logger": "PerformanceOptimizer", "message": "PerformanceOptimizer inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:10.052594", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Modelos ML inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:10.053210", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Bucle de optimizaci¾n iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:10.053348", "level": "INFO", "logger": "PerformanceOptimizer", "message": "PerformanceOptimizer inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:10.054818", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Modelos de aprendizaje inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:10.055071", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Reglas de mejora inicializadas: 5 reglas", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:10.055633", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Bucle de aprendizaje iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:10.055704", "level": "INFO", "logger": "SelfImprovementSystem", "message": "SelfImprovementSystem inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:10.055963", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Grafo de conocimiento guardado en data/knowledge_graph.json", "module": "advanced_logger", "function": "log", "line": 851, "thread": 23064, "process": 12424}
+{"timestamp": "2026-10-23T11:28:10.056451", "level": "INFO", "logger": "AdaptiveLearningEngine", "message": "Registro de modelos inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:10.056782", "level": "INFO", "logger": "AdaptiveLearningEngine", "message": "Motor de aprendizaje iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:10.056855", "level": "INFO", "logger": "AdaptiveLearningEngine", "message": "AdaptiveLearningEngine inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+------------------------------ Captured log call ------------------------------
+INFO     PerformanceOptimizer:advanced_logger.py:851 Modelos ML inicializados
+INFO     PerformanceOptimizer:advanced_logger.py:851 Bucle de optimizaci¾n iniciado
+INFO     PerformanceOptimizer:advanced_logger.py:851 PerformanceOptimizer inicializado
+INFO     PerformanceOptimizer:advanced_logger.py:851 Modelos ML inicializados
+INFO     PerformanceOptimizer:advanced_logger.py:851 Bucle de optimizaci¾n iniciado
+INFO     PerformanceOptimizer:advanced_logger.py:851 PerformanceOptimizer inicializado
+INFO     SelfImprovementSystem:advanced_logger.py:851 Modelos de aprendizaje inicializados
+INFO     SelfImprovementSystem:advanced_logger.py:851 Reglas de mejora inicializadas: 5 reglas
+INFO     SelfImprovementSystem:advanced_logger.py:851 Bucle de aprendizaje iniciado
+INFO     SelfImprovementSystem:advanced_logger.py:851 SelfImprovementSystem inicializado
+INFO     SelfImprovementSystem:advanced_logger.py:851 Grafo de conocimiento guardado en data/knowledge_graph.json
+INFO     PerformanceOptimizer:advanced_logger.py:851 Modelos ML inicializados
+INFO     PerformanceOptimizer:advanced_logger.py:851 Bucle de optimizaci¾n iniciado
+INFO     PerformanceOptimizer:advanced_logger.py:851 PerformanceOptimizer inicializado
+INFO     PerformanceOptimizer:advanced_logger.py:851 Modelos ML inicializados
+INFO     PerformanceOptimizer:advanced_logger.py:851 Bucle de optimizaci¾n iniciado
+INFO     PerformanceOptimizer:advanced_logger.py:851 PerformanceOptimizer inicializado
+INFO     SelfImprovementSystem:advanced_logger.py:851 Modelos de aprendizaje inicializados
+INFO     SelfImprovementSystem:advanced_logger.py:851 Reglas de mejora inicializadas: 5 reglas
+INFO     SelfImprovementSystem:advanced_logger.py:851 Bucle de aprendizaje iniciado
+INFO     SelfImprovementSystem:advanced_logger.py:851 SelfImprovementSystem inicializado
+INFO     SelfImprovementSystem:advanced_logger.py:851 Grafo de conocimiento guardado en data/knowledge_graph.json
+INFO     AdaptiveLearningEngine:advanced_logger.py:851 Registro de modelos inicializado
+INFO     AdaptiveLearningEngine:advanced_logger.py:851 Motor de aprendizaje iniciado
+INFO     AdaptiveLearningEngine:advanced_logger.py:851 AdaptiveLearningEngine inicializado
+_____ TestGoalAdaptationProposal.test_application_integrity_preservation ______
+
+self = <test_goal_adaptation_proposal.TestGoalAdaptationProposal testMethod=test_application_integrity_preservation>
+
+    def test_application_integrity_preservation(self):
+        """Test de preservaci¾n de integridad en aplicaciones"""
+        # Goal de aplicaci¾n
+        app_goal = Goal(
+            id="app_goal",
+            type="open_application",
+            target={"app_name": "chrome.exe"},
+            description="Open Chrome browser"
+        )
+    
+        # Goal adaptado con aplicaci¾n diferente
+        adapted_app = Goal(
+            id="adapted_app_goal",
+            type="open_application",
+            target={"app_name": "firefox.exe"},  # App diferente
+            description="Open Firefox browser"
+        )
+    
+        # Verificar que la intenci¾n no se preserva
+        preserved = self.engine._check_intention_preservation(app_goal, adapted_app)
+>       self.assertFalse(preserved)
+E       AssertionError: True is not false
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\utils\contextual_adaptation_engine\test_goal_adaptation_proposal.py:318: AssertionError
+---------------------------- Captured stdout call -----------------------------
+{"timestamp": "2026-10-23T11:28:16.215052", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Modelos ML inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:16.215542", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Bucle de optimizaci¾n iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:16.215646", "level": "INFO", "logger": "PerformanceOptimizer", "message": "PerformanceOptimizer inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:16.289462", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Modelos ML inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:16.290081", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Bucle de optimizaci¾n iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:16.290195", "level": "INFO", "logger": "PerformanceOptimizer", "message": "PerformanceOptimizer inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:16.291594", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Modelos de aprendizaje inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:16.291727", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Reglas de mejora inicializadas: 5 reglas", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:16.292191", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Bucle de aprendizaje iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:16.292250", "level": "INFO", "logger": "SelfImprovementSystem", "message": "SelfImprovementSystem inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:16.292498", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Grafo de conocimiento guardado en data/knowledge_graph.json", "module": "advanced_logger", "function": "log", "line": 851, "thread": 41784, "process": 12424}
+{"timestamp": "2026-10-23T11:28:16.398433", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Modelos ML inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:16.399140", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Bucle de optimizaci¾n iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:16.399237", "level": "INFO", "logger": "PerformanceOptimizer", "message": "PerformanceOptimizer inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:16.487525", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Modelos ML inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:16.488271", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Bucle de optimizaci¾n iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:16.488419", "level": "INFO", "logger": "PerformanceOptimizer", "message": "PerformanceOptimizer inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:16.489943", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Modelos de aprendizaje inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:16.490082", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Reglas de mejora inicializadas: 5 reglas", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:16.490560", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Bucle de aprendizaje iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:16.490626", "level": "INFO", "logger": "SelfImprovementSystem", "message": "SelfImprovementSystem inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:16.490852", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Grafo de conocimiento guardado en data/knowledge_graph.json", "module": "advanced_logger", "function": "log", "line": 851, "thread": 51300, "process": 12424}
+{"timestamp": "2026-10-23T11:28:16.491271", "level": "INFO", "logger": "AdaptiveLearningEngine", "message": "Registro de modelos inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:16.491550", "level": "INFO", "logger": "AdaptiveLearningEngine", "message": "Motor de aprendizaje iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:16.491626", "level": "INFO", "logger": "AdaptiveLearningEngine", "message": "AdaptiveLearningEngine inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+------------------------------ Captured log call ------------------------------
+INFO     PerformanceOptimizer:advanced_logger.py:851 Modelos ML inicializados
+INFO     PerformanceOptimizer:advanced_logger.py:851 Bucle de optimizaci¾n iniciado
+INFO     PerformanceOptimizer:advanced_logger.py:851 PerformanceOptimizer inicializado
+INFO     PerformanceOptimizer:advanced_logger.py:851 Modelos ML inicializados
+INFO     PerformanceOptimizer:advanced_logger.py:851 Bucle de optimizaci¾n iniciado
+INFO     PerformanceOptimizer:advanced_logger.py:851 PerformanceOptimizer inicializado
+INFO     SelfImprovementSystem:advanced_logger.py:851 Modelos de aprendizaje inicializados
+INFO     SelfImprovementSystem:advanced_logger.py:851 Reglas de mejora inicializadas: 5 reglas
+INFO     SelfImprovementSystem:advanced_logger.py:851 Bucle de aprendizaje iniciado
+INFO     SelfImprovementSystem:advanced_logger.py:851 SelfImprovementSystem inicializado
+INFO     SelfImprovementSystem:advanced_logger.py:851 Grafo de conocimiento guardado en data/knowledge_graph.json
+INFO     PerformanceOptimizer:advanced_logger.py:851 Modelos ML inicializados
+INFO     PerformanceOptimizer:advanced_logger.py:851 Bucle de optimizaci¾n iniciado
+INFO     PerformanceOptimizer:advanced_logger.py:851 PerformanceOptimizer inicializado
+INFO     PerformanceOptimizer:advanced_logger.py:851 Modelos ML inicializados
+INFO     PerformanceOptimizer:advanced_logger.py:851 Bucle de optimizaci¾n iniciado
+INFO     PerformanceOptimizer:advanced_logger.py:851 PerformanceOptimizer inicializado
+INFO     SelfImprovementSystem:advanced_logger.py:851 Modelos de aprendizaje inicializados
+INFO     SelfImprovementSystem:advanced_logger.py:851 Reglas de mejora inicializadas: 5 reglas
+INFO     SelfImprovementSystem:advanced_logger.py:851 Bucle de aprendizaje iniciado
+INFO     SelfImprovementSystem:advanced_logger.py:851 SelfImprovementSystem inicializado
+INFO     SelfImprovementSystem:advanced_logger.py:851 Grafo de conocimiento guardado en data/knowledge_graph.json
+INFO     AdaptiveLearningEngine:advanced_logger.py:851 Registro de modelos inicializado
+INFO     AdaptiveLearningEngine:advanced_logger.py:851 Motor de aprendizaje iniciado
+INFO     AdaptiveLearningEngine:advanced_logger.py:851 AdaptiveLearningEngine inicializado
+________ TestGoalAdaptationProposal.test_check_intention_preservation _________
+
+self = <test_goal_adaptation_proposal.TestGoalAdaptationProposal testMethod=test_check_intention_preservation>
+
+    def test_check_intention_preservation(self):
+        """Test de verificaci¾n de preservaci¾n de intenci¾n"""
+        # Goal similar - intenci¾n preservada
+        similar_goal = Goal(
+            id="similar_goal",
+            type="navigate",
+            target="https://example.com",
+            description="Navigate to example.com",
+            priority=5  # Solo prioridad diferente
+        )
+    
+        preserved = self.engine._check_intention_preservation(self.original_goal, similar_goal)
+        self.assertTrue(preserved)
+    
+        # Goal diferente tipo - intenci¾n no preservada
+        different_goal = Goal(
+            id="different_goal",
+            type="open_application",  # Tipo diferente
+            target="chrome.exe",
+            description="Open Chrome browser"
+        )
+    
+        not_preserved = self.engine._check_intention_preservation(self.original_goal, different_goal)
+>       self.assertFalse(not_preserved)
+E       AssertionError: True is not false
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\utils\contextual_adaptation_engine\test_goal_adaptation_proposal.py:195: AssertionError
+---------------------------- Captured stdout call -----------------------------
+{"timestamp": "2026-10-23T11:28:16.947926", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Modelos ML inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:16.948440", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Bucle de optimizaci¾n iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:16.948517", "level": "INFO", "logger": "PerformanceOptimizer", "message": "PerformanceOptimizer inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:17.063926", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Modelos ML inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:17.064470", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Bucle de optimizaci¾n iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:17.064562", "level": "INFO", "logger": "PerformanceOptimizer", "message": "PerformanceOptimizer inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:17.065652", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Modelos de aprendizaje inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:17.065779", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Reglas de mejora inicializadas: 5 reglas", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:17.066189", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Bucle de aprendizaje iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:17.066266", "level": "INFO", "logger": "SelfImprovementSystem", "message": "SelfImprovementSystem inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:17.066459", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Grafo de conocimiento guardado en data/knowledge_graph.json", "module": "advanced_logger", "function": "log", "line": 851, "thread": 10372, "process": 12424}
+{"timestamp": "2026-10-23T11:28:17.176960", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Modelos ML inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:17.177554", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Bucle de optimizaci¾n iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:17.177654", "level": "INFO", "logger": "PerformanceOptimizer", "message": "PerformanceOptimizer inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:17.234029", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Modelos ML inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:17.234512", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Bucle de optimizaci¾n iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:17.234595", "level": "INFO", "logger": "PerformanceOptimizer", "message": "PerformanceOptimizer inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:17.235534", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Modelos de aprendizaje inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:17.235682", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Reglas de mejora inicializadas: 5 reglas", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:17.236134", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Bucle de aprendizaje iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:17.236221", "level": "INFO", "logger": "SelfImprovementSystem", "message": "SelfImprovementSystem inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:17.236434", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Grafo de conocimiento guardado en data/knowledge_graph.json", "module": "advanced_logger", "function": "log", "line": 851, "thread": 13520, "process": 12424}
+{"timestamp": "2026-10-23T11:28:17.236849", "level": "INFO", "logger": "AdaptiveLearningEngine", "message": "Registro de modelos inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:17.237128", "level": "INFO", "logger": "AdaptiveLearningEngine", "message": "Motor de aprendizaje iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:17.237196", "level": "INFO", "logger": "AdaptiveLearningEngine", "message": "AdaptiveLearningEngine inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+------------------------------ Captured log call ------------------------------
+INFO     PerformanceOptimizer:advanced_logger.py:851 Modelos ML inicializados
+INFO     PerformanceOptimizer:advanced_logger.py:851 Bucle de optimizaci¾n iniciado
+INFO     PerformanceOptimizer:advanced_logger.py:851 PerformanceOptimizer inicializado
+INFO     PerformanceOptimizer:advanced_logger.py:851 Modelos ML inicializados
+INFO     PerformanceOptimizer:advanced_logger.py:851 Bucle de optimizaci¾n iniciado
+INFO     PerformanceOptimizer:advanced_logger.py:851 PerformanceOptimizer inicializado
+INFO     SelfImprovementSystem:advanced_logger.py:851 Modelos de aprendizaje inicializados
+INFO     SelfImprovementSystem:advanced_logger.py:851 Reglas de mejora inicializadas: 5 reglas
+INFO     SelfImprovementSystem:advanced_logger.py:851 Bucle de aprendizaje iniciado
+INFO     SelfImprovementSystem:advanced_logger.py:851 SelfImprovementSystem inicializado
+INFO     SelfImprovementSystem:advanced_logger.py:851 Grafo de conocimiento guardado en data/knowledge_graph.json
+INFO     PerformanceOptimizer:advanced_logger.py:851 Modelos ML inicializados
+INFO     PerformanceOptimizer:advanced_logger.py:851 Bucle de optimizaci¾n iniciado
+INFO     PerformanceOptimizer:advanced_logger.py:851 PerformanceOptimizer inicializado
+INFO     PerformanceOptimizer:advanced_logger.py:851 Modelos ML inicializados
+INFO     PerformanceOptimizer:advanced_logger.py:851 Bucle de optimizaci¾n iniciado
+INFO     PerformanceOptimizer:advanced_logger.py:851 PerformanceOptimizer inicializado
+INFO     SelfImprovementSystem:advanced_logger.py:851 Modelos de aprendizaje inicializados
+INFO     SelfImprovementSystem:advanced_logger.py:851 Reglas de mejora inicializadas: 5 reglas
+INFO     SelfImprovementSystem:advanced_logger.py:851 Bucle de aprendizaje iniciado
+INFO     SelfImprovementSystem:advanced_logger.py:851 SelfImprovementSystem inicializado
+INFO     SelfImprovementSystem:advanced_logger.py:851 Grafo de conocimiento guardado en data/knowledge_graph.json
+INFO     AdaptiveLearningEngine:advanced_logger.py:851 Registro de modelos inicializado
+INFO     AdaptiveLearningEngine:advanced_logger.py:851 Motor de aprendizaje iniciado
+INFO     AdaptiveLearningEngine:advanced_logger.py:851 AdaptiveLearningEngine inicializado
+______ TestGoalAdaptationProposal.test_navigation_integrity_preservation ______
+
+self = <test_goal_adaptation_proposal.TestGoalAdaptationProposal testMethod=test_navigation_integrity_preservation>
+
+    def test_navigation_integrity_preservation(self):
+        """Test de preservaci¾n de integridad en navegaci¾n"""
+        # Goal de navegaci¾n con cambio de URL
+        navigation_goal = Goal(
+            id="nav_goal",
+            type="navigate",
+            target="https://old-site.com",
+            description="Navigate to old site"
+        )
+    
+        # Goal adaptado con URL diferente
+        adapted_navigation = Goal(
+            id="adapted_nav_goal",
+            type="navigate",
+            target="https://new-site.com",  # URL diferente
+            description="Navigate to new site"
+        )
+    
+        # Verificar que la intenci¾n no se preserva (cambio significativo de URL)
+        preserved = self.engine._check_intention_preservation(navigation_goal, adapted_navigation)
+>       self.assertFalse(preserved)
+E       AssertionError: True is not false
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\utils\contextual_adaptation_engine\test_goal_adaptation_proposal.py:285: AssertionError
+---------------------------- Captured stdout call -----------------------------
+{"timestamp": "2026-10-23T11:28:18.962020", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Modelos ML inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:18.962479", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Bucle de optimizaci¾n iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:18.962551", "level": "INFO", "logger": "PerformanceOptimizer", "message": "PerformanceOptimizer inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:19.039052", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Modelos ML inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:19.039605", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Bucle de optimizaci¾n iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:19.039707", "level": "INFO", "logger": "PerformanceOptimizer", "message": "PerformanceOptimizer inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:19.041006", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Modelos de aprendizaje inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:19.041120", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Reglas de mejora inicializadas: 5 reglas", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:19.041694", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Bucle de aprendizaje iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:19.041779", "level": "INFO", "logger": "SelfImprovementSystem", "message": "SelfImprovementSystem inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:19.043130", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Grafo de conocimiento guardado en data/knowledge_graph.json", "module": "advanced_logger", "function": "log", "line": 851, "thread": 31440, "process": 12424}
+{"timestamp": "2026-10-23T11:28:19.149971", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Modelos ML inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:19.150529", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Bucle de optimizaci¾n iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:19.150627", "level": "INFO", "logger": "PerformanceOptimizer", "message": "PerformanceOptimizer inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:19.243166", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Modelos ML inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:19.243711", "level": "INFO", "logger": "PerformanceOptimizer", "message": "Bucle de optimizaci¾n iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:19.243821", "level": "INFO", "logger": "PerformanceOptimizer", "message": "PerformanceOptimizer inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:19.245109", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Modelos de aprendizaje inicializados", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:19.245255", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Reglas de mejora inicializadas: 5 reglas", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:19.245811", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Bucle de aprendizaje iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:19.245899", "level": "INFO", "logger": "SelfImprovementSystem", "message": "SelfImprovementSystem inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:19.246130", "level": "INFO", "logger": "SelfImprovementSystem", "message": "Grafo de conocimiento guardado en data/knowledge_graph.json", "module": "advanced_logger", "function": "log", "line": 851, "thread": 39712, "process": 12424}
+{"timestamp": "2026-10-23T11:28:19.246626", "level": "INFO", "logger": "AdaptiveLearningEngine", "message": "Registro de modelos inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:19.246970", "level": "INFO", "logger": "AdaptiveLearningEngine", "message": "Motor de aprendizaje iniciado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+{"timestamp": "2026-10-23T11:28:19.247051", "level": "INFO", "logger": "AdaptiveLearningEngine", "message": "AdaptiveLearningEngine inicializado", "module": "advanced_logger", "function": "log", "line": 851, "thread": 17900, "process": 12424}
+------------------------------ Captured log call ------------------------------
+INFO     PerformanceOptimizer:advanced_logger.py:851 Modelos ML inicializados
+INFO     PerformanceOptimizer:advanced_logger.py:851 Bucle de optimizaci¾n iniciado
+INFO     PerformanceOptimizer:advanced_logger.py:851 PerformanceOptimizer inicializado
+INFO     PerformanceOptimizer:advanced_logger.py:851 Modelos ML inicializados
+INFO     PerformanceOptimizer:advanced_logger.py:851 Bucle de optimizaci¾n iniciado
+INFO     PerformanceOptimizer:advanced_logger.py:851 PerformanceOptimizer inicializado
+INFO     SelfImprovementSystem:advanced_logger.py:851 Modelos de aprendizaje inicializados
+INFO     SelfImprovementSystem:advanced_logger.py:851 Reglas de mejora inicializadas: 5 reglas
+INFO     SelfImprovementSystem:advanced_logger.py:851 Bucle de aprendizaje iniciado
+INFO     SelfImprovementSystem:advanced_logger.py:851 SelfImprovementSystem inicializado
+INFO     SelfImprovementSystem:advanced_logger.py:851 Grafo de conocimiento guardado en data/knowledge_graph.json
+INFO     PerformanceOptimizer:advanced_logger.py:851 Modelos ML inicializados
+INFO     PerformanceOptimizer:advanced_logger.py:851 Bucle de optimizaci¾n iniciado
+INFO     PerformanceOptimizer:advanced_logger.py:851 PerformanceOptimizer inicializado
+INFO     PerformanceOptimizer:advanced_logger.py:851 Modelos ML inicializados
+INFO     PerformanceOptimizer:advanced_logger.py:851 Bucle de optimizaci¾n iniciado
+INFO     PerformanceOptimizer:advanced_logger.py:851 PerformanceOptimizer inicializado
+INFO     SelfImprovementSystem:advanced_logger.py:851 Modelos de aprendizaje inicializados
+INFO     SelfImprovementSystem:advanced_logger.py:851 Reglas de mejora inicializadas: 5 reglas
+INFO     SelfImprovementSystem:advanced_logger.py:851 Bucle de aprendizaje iniciado
+INFO     SelfImprovementSystem:advanced_logger.py:851 SelfImprovementSystem inicializado
+INFO     SelfImprovementSystem:advanced_logger.py:851 Grafo de conocimiento guardado en data/knowledge_graph.json
+INFO     AdaptiveLearningEngine:advanced_logger.py:851 Registro de modelos inicializado
+INFO     AdaptiveLearningEngine:advanced_logger.py:851 Motor de aprendizaje iniciado
+INFO     AdaptiveLearningEngine:advanced_logger.py:851 AdaptiveLearningEngine inicializado
+=========================== short test summary info ===========================
+FAILED tests/utils/contextual_adaptation_engine/test_goal_adaptation_pattern_restart_verification.py::test_el_patron_recuperado_conserva_las_estructuras_anidadas
+FAILED tests/utils/contextual_adaptation_engine/test_goal_adaptation_pattern_restart_verification.py::test_el_patron_recuperado_conserva_los_valores_sin_perdida
+FAILED tests/utils/contextual_adaptation_engine/test_goal_adaptation_pattern_restart_verification.py::test_el_patron_recuperado_sigue_disponible_para_los_consumidores
+FAILED tests/utils/contextual_adaptation_engine/test_goal_adaptation_proposal.py::TestGoalAdaptationProposal::test_application_integrity_preservation
+FAILED tests/utils/contextual_adaptation_engine/test_goal_adaptation_proposal.py::TestGoalAdaptationProposal::test_check_intention_preservation
+FAILED tests/utils/contextual_adaptation_engine/test_goal_adaptation_proposal.py::TestGoalAdaptationProposal::test_navigation_integrity_preservation
+6 failed, 34 passed in 26.77s

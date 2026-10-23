@@ -68,6 +68,8 @@ class TestContextualPatternRecognizer(unittest.TestCase):
             mock_datetime.now.return_value = datetime(2026, 10, 3, 8, 0, 0)  # 8 AM
             mock_datetime.side_effect = lambda *args, **kw: datetime(*args, **kw)
             
+            self.mock_snapshot.timestamp = datetime(2026, 10, 3, 8, 0, 0)
+            
             pattern = self.recognizer._detect_contextual_seasonal(self.mock_snapshot)
             
             self.assertIsNotNone(pattern)

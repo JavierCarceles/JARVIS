@@ -9,7 +9,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'src')
 
 from utils.contextual_adaptation_engine import ContextualAdaptationEngine, ContextType
 
-def test_methods():
+def test_engine_lists_strategy_methods():
     engine = ContextualAdaptationEngine()
     
     print("Métodos disponibles en ContextualAdaptationEngine:")
@@ -49,4 +49,4 @@ def test_methods():
         print(f"\nError al ejecutar get_available_strategies: {e}")
 
 if __name__ == "__main__":
-    test_methods()
+    test_engine_lists_strategy_methods()
