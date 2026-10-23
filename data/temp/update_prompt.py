@@ -1,0 +1,9 @@
+p='prompt_mejoraActual.txt'
+s=open(p,encoding='utf-8').read()
+s=s.replace('CURRENT_WORK_UNIT: 2.8.11.2.1','CURRENT_WORK_UNIT: 2.8.11.2.2',1)
+s=s.replace('CURRENT_WORK_STATUS: EN PROCESO','CURRENT_WORK_STATUS: PENDIENTE',1)
+s=s.replace('LAST_COMPLETED_UNIT: 2.8.11.1','LAST_COMPLETED_UNIT: 2.8.11.2.1',1)
+reg = "\nREGISTRO DE UNIDAD: 2.8.11.2.1\nFECHA: NO REGISTRADA\nESTADO: IMPLEMENTADA\nOBJETIVO: Localizar los puntos de entrada, validadores y efectos reales del codigo de seguridad; registrar contratos observables sin modificar produccion.\nTIPO DE TRABAJO: AUDITORIA\nCAMBIOS / HALLAZGOS:\n- Puntos de entrada reales identificados en ContextualAdaptationEngine: create_goal_adaptation_proposal, validate_adapted_goal, apply_strategy/_revert_strategy_application, execute_adaptation.\n- Validadores observables: _validate_adaptation_constraints, _check_intention_preservation, _targets_equivalent, _validate_goal_structure, _validate_current_state, _validate_capabilities, _validate_goal_preconditions, _validate_planner_can_solve, validate_adapted_goal, _are_constraints_contradictory.\n- Efectos reales: _register_validation_result (knowledge_base goal_validations), _record_adaptation_result, _capture_feedback, _capture_goal_adaptation_feedback, _update_transfer_patterns, _apply_transferred_knowledge.\n- Contratos observables registrados sin modificar produccion.\nARCHIVOS MODIFICADOS:\n- PRODUCCION: NO APLICA\n- TESTS: NO APLICA\n- DOCUMENTACION: prompt_mejoraActual.txt\nTESTS Y RESULTADOS:\n- UNITARIOS: NO EJECUTADOS\n- INTEGRACION: NO EJECUTADOS\n- NO REGRESION: NO EJECUTADA\nVERIFICACION:\n- SINTAXIS: NO APLICA\n- MAIN.PY: OK\n- COMPORTAMIENTO / INTEGRACION REAL: auditoria documental; sin cambios de codigo.\nDISCREPANCIAS: NINGUNA REGISTRADA\nPENDIENTES: NINGUNO\nESTADO FINAL: 2.8.11.2.1 - IMPLEMENTADA\n"
+s=s.rstrip()+"\n"+reg
+open(p,'w',encoding='utf-8').write(s)
+print('done')

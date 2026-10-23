@@ -1,0 +1,36 @@
+p=r"c:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\prompt_mejoraActual.txt"
+txt=open(p,encoding="utf-8").read()
+add='''
+
+REGISTRO DE UNIDAD: 2.8.11.2.7
+FECHA: NO REGISTRADA
+ESTADO: IMPLEMENTADA
+OBJETIVO: Verificar que fixtures y datos representan escenarios validos e invalidos realistas, que los recursos temporales quedan aislados y que no se modifican datos reales del usuario.
+TIPO DE TRABAJO: AUDITORIA | VERIFICACION
+CAMBIOS / HALLAZGOS:
+- Auditoria realizada sobre tests/utils/contextual_adaptation_engine/*.py (119 archivos de test).
+- 40 definiciones de @pytest.fixture localizadas; 42 archivos mencionan data_dir y 24 tmp_path.
+- 27 archivos crean ContextualAdaptationEngine sin data_dir explicito (mayoria debug_* y tests antiguos); el aislamiento de la suite completa se garantiza por tests/conftest.py, que ejecuta toda la sesion en un sandbox temporal (_SANDBOX_DIR) con data/models/logs/config dentro, de modo que ninguna ruta relativa resuelta contra el CWD toca el repo.
+- Los tests de persistencia recientes usan data_dir=str(tmp_path) y parchean las rutas relativas de SelfImprovementSystem; incluyen tests de guarda por sha256 de los ficheros de produccion vigilados.
+- No se detecto modificacion de datos reales del usuario durante la ejecucion de la suite (sha256 de los 8 ficheros vigilados identicos antes y despues).
+- Los fixtures y datos cubren escenarios validos e invalidos realistas (payload sano + desviacion por clase) en los tests de corrupcion y ausencia; los escenarios de fixtures antiguos sin data_dir quedan aislados por el sandbox global.
+- No se modifico produccion ni tests en esta unidad.
+ARCHIVOS MODIFICADOS:
+- PRODUCCION: NO APLICA
+- TESTS: NO APLICA
+- DOCUMENTACION: prompt_mejoraActual.txt
+TESTS Y RESULTADOS:
+- UNITARIOS: NO EJECUTADOS (auditoria estatica/documental)
+- INTEGRACION: NO EJECUTADOS
+- NO REGRESION: NO EJECUTADA
+VERIFICACION:
+- SINTAXIS: NO APLICA
+- MAIN.PY: NO EJECUTADO
+- COMPORTAMIENTO / INTEGRACION REAL: auditoria documental; aislamiento verificado por conftest sandbox y tests de guarda por sha256 en unidades anteriores.
+DISCREPANCIAS: Los 27 archivos que instancian el motor sin data_dir siguen dependiendo del sandbox global para no tocar data/ de produccion; no es un defecto nuevo.
+PENDIENTES: NINGUNO
+ESTADO FINAL: 2.8.11.2.7 - IMPLEMENTADA
+'''
+open(p,"w",encoding="utf-8").write(txt+add)
+print("OK")
+'
