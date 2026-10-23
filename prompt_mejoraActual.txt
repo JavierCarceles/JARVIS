@@ -1,7 +1,7 @@
 ﻿ESTADO PERSISTENTE ACTUAL
 CURRENT_PHASE: 2.8.10
 CURRENT_WORK_UNIT: 2.8.10.8
-CURRENT_WORK_STATUS: PENDIENTE
+CURRENT_WORK_STATUS: IMPLEMENTADA
 LAST_COMPLETED_UNIT: 2.8.10.7
 
 PROMPT MAESTRO JARVIS — AUTOMEJORA INCREMENTAL
@@ -76,7 +76,7 @@ Cuando CURRENT_WORK_UNIT termina realmente y queda verificada:
 2. Asignar LAST_COMPLETED_UNIT al ID que acaba de completarse.
 3. Buscar en el roadmap la siguiente hoja pendiente real, respetando el orden y la jerarquia definidos. No usar la numeracion por intuicion ni inventar una hoja.
 4. Asignar CURRENT_WORK_UNIT a esa siguiente hoja pendiente y actualizar CURRENT_PHASE para que corresponda a la fase de dicha hoja cuando proceda.
-5. Dejar CURRENT_WORK_STATUS: EN PROCESO. No marcar la siguiente hoja EN PROCESO, no abrirla, no inspeccionar sus archivos, no ejecutar sus tests ni empezar a implementarla durante el chat que acaba de cerrar la unidad anterior.
+5. Dejar CURRENT_WORK_STATUS: IMPLEMENTADA. No marcar la siguiente hoja EN PROCESO, no abrirla, no inspeccionar sus archivos, no ejecutar sus tests ni empezar a implementarla durante el chat que acaba de cerrar la unidad anterior.
 6. Guardar prompt_mejoraActual.txt con los cuatro campos persistentes coherentes: CURRENT_PHASE, CURRENT_WORK_UNIT, CURRENT_WORK_STATUS y LAST_COMPLETED_UNIT.
 7. Finalizar el chat. La unica instruccion de trabajo para el siguiente chat sera la unidad consignada en CURRENT_WORK_UNIT.
 

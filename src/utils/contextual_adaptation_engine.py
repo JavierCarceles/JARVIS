@@ -2582,7 +2582,7 @@ class ContextualAdaptationEngine:
             normalized_status = getattr(status, "value", status)
             result.update({"status": status if (PlannerStatus is not None and isinstance(status, PlannerStatus)) else normalized_status,
                 "plan_id": getattr(plan, "plan_id", None),
-                "execution_time": getattr(plan, "execution_time", 0.), "quality": getattr(getattr(plan, "quality", None), "value", getattr(plan, "quality", None)),
+                "execution_time": getattr(plan, "execution_time", 0.), "quality": getattr(plan, "quality", None),
                 "warnings": list(getattr(plan, "warnings", None) or []), "metadata": dict(getattr(plan, "metadata", None) or {})})
             completed_status = getattr(PlannerStatus, "COMPLETED", None) if PlannerStatus is not None else None
             completed_value = getattr(completed_status, "value", completed_status)
@@ -2616,7 +2616,7 @@ class ContextualAdaptationEngine:
         normalized_status = getattr(status, "value", status)
         completed_status = getattr(PlannerStatus, "COMPLETED", None) if PlannerStatus is not None else None
         completed_value = getattr(completed_status, "value", completed_status)
-        if status is not None and completed_value is not None and normalized_status != completed_value:
+        if status is not None and completed_value is not None and type(status) is type(completed_status) and normalized_status != completed_value:
             errors.append("El Planner no pudo completar un plan para el Goal adaptado")
         details = {"goal_structure": structure, "intention_preserved": intention_preserved,
                    "adaptation_constraints": constraints, "planner_resolvable": not bool(planner_result.get("error")) and (status is None or completed_value is None or normalized_status == completed_value)}
