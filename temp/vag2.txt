@@ -1,0 +1,33 @@
+    def validate_adapted_goal(self, original_goal, adapted_goal, current_state, available_capabilities) -> Dict[str, Any]:
+        """Validar estructura, intención, capacidades, precondiciones y resolubilidad del Goal adaptado."""
+        structure = self._validate_goal_structure(adapted_goal)
+        state_validation = self._validate_current_state(current_state)
+        capabilities_validation = self._validate_capabilities(adapted_goal, available_capabilities)
+        preconditions_validation = self._validate_goal_preconditions(adapted_goal, current_state)
+        planner_result = self._validate_planner_can_solve(adapted_goal, current_state)
+        constraints = self._validate_adaptation_constraints(original_goal, adapted_goal, [])
+        errors: List[str] = []
+        warnings: List[str] = []
+        for result in (structure, state_validation, capabilities_validation, preconditions_validation):
+            errors.extend(result.get("errors", []))
+            warnings.extend(result.get("warnings", []))
+        intention_preserved = self._check_intention_preservation(original_goal, adapted_goal)
+        if not intention_preserved:
+            errors.append("La adaptación no preserva la intención original del Goal")
+        errors.extend(constraints)
+        if planner_result.get("error"):
+            # La ausencia del Planner impide certificar resolubilidad, pero se informa
+            # como advertencia para mantener compatibles instalaciones que no lo incluyen.
+            warnings.append(planner_result["error"])
+        status = planner_result.get("status")
+        normalized_status = getattr(status, "value", status)
+        completed_status = getattr(PlannerStatus, "COMPLETED", None) if PlannerStatus is not None else None
+        completed_value = getattr(completed_status, "value", completed_status)
+        if status is not None and completed_value is not None and type(status) is type(completed_status) and normalized_status != completed_value:
+            errors.append("El Planner no pudo completar un plan para el Goal adaptado")
+        details = {"goal_structure": structure, "intention_preserved": intention_preserved,
+                   "adaptation_constraints": constraints, "planner_resolvable": not bool(planner_result.get("error")) and (status is None or completed_value is None or normalized_status == completed_value)}
+        return {"valid": not errors, "errors": errors, "warnings": warnings,
+                "validation_details": details, "state_validation": state_validation,
+                "capabilities_validation": capabilities_validation,
+                "preconditions_validation": preconditions_validation, "planner_result": planner_result}

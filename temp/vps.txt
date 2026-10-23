@@ -1,0 +1,16 @@
+    def _validate_planner_can_solve(self, goal, current_state) -> Dict[str, Any]:
+        result = {"status": None, "plan_id": None, "execution_time": 0., "quality": None, "warnings": [], "metadata": {}}
+        if Planner is None: result["error"] = "Planner no disponible"; return result
+        try:
+            plan = Planner().plan_with_htn_integration(goal, current_state); status = getattr(plan, "status", None)
+            normalized_status = getattr(status, "value", status)
+            result.update({"status": status if (PlannerStatus is not None and isinstance(status, PlannerStatus)) else normalized_status,
+                "plan_id": getattr(plan, "plan_id", None),
+                "execution_time": getattr(plan, "execution_time", 0.), "quality": getattr(plan, "quality", None),
+                "warnings": list(getattr(plan, "warnings", None) or []), "metadata": dict(getattr(plan, "metadata", None) or {})})
+            completed_status = getattr(PlannerStatus, "COMPLETED", None) if PlannerStatus is not None else None
+            completed_value = getattr(completed_status, "value", completed_status)
+            if status is None or (completed_value is not None and normalized_status != completed_value):
+                result["error"] = "El Planner no pudo verificar el plan: Goal no puede resolver el Goal adaptado"
+        except Exception as exc: result["error"] = f"El Planner no pudo verificar el plan: Goal no puede resolver el Goal adaptado ({exc})"
+        return result

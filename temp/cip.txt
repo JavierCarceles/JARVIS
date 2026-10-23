@@ -1,0 +1,8 @@
+    def _check_intention_preservation(self, original_goal, adapted_goal) -> bool:
+        if original_goal is None or adapted_goal is None: return adapted_goal is None
+        original, adapted = self._goal_to_dict(original_goal), self._goal_to_dict(adapted_goal)
+        if original.get("type") != adapted.get("type"): return False
+        a, b = original.get("target"), adapted.get("target")
+        if original.get("type") == "navigate": return self._targets_equivalent(a, b)
+        if isinstance(a, dict) and isinstance(b, dict) and ("app_name" in a or "app_name" in b): return a.get("app_name") == b.get("app_name")
+        return a == b
