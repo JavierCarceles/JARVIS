@@ -82,8 +82,7 @@ def test_goal_adaptation_feedback(tmp_path):
         patterns = engine.knowledge_base["success_patterns"]
         print(f"Patrones de éxito: {len(patterns)}")
     
-    print("✅ Test de feedback de adaptación completado")
-    return True
+    print("[OK] Test de feedback de adaptación completado")
 
 def test_adaptation_improvement_analysis(tmp_path):
     """Test del análisis de mejora"""
@@ -121,6 +120,15 @@ def test_adaptation_improvement_analysis(tmp_path):
     print(f"Mejora detectada: {improvement_analysis.get('improved', False)}")
     print(f"Evidencia: {improvement_analysis.get('evidence', [])}")
     
+    # Assert: improvement should be detected
+    assert improvement_analysis.get("improved") is True, (
+        "Se esperaba mejora detectada pero improved=False"
+    )
+    evidence = improvement_analysis.get("evidence", [])
+    assert len(evidence) > 0, "Se esperaba evidencia de mejora no vacía"
+    for metric_name, delta in improvement_analysis.get("improvements", {}).items():
+        assert delta > 0, f"El delta de mejora para {metric_name} debe ser positivo: {delta}"
+    
     # Caso 2: Adaptación sin mejora
     result_no_improvement = {
         "adaptation_id": "test_no_improvement_001",
@@ -148,10 +156,18 @@ def test_adaptation_improvement_analysis(tmp_path):
     
     no_improvement_analysis = engine._analyze_adaptation_improvement(result_no_improvement)
     print(f"Mejora detectada: {no_improvement_analysis.get('improved', False)}")
-    print(f"Indicadores de degradación: {no_improvement_analysis.get('degradation_indicators', [])}")
+    print(f"Evidencia: {no_improvement_analysis.get('evidence', [])}")
     
-    print("✅ Test de análisis de mejora completado")
-    return True
+    # Assert: no improvement should be detected
+    assert no_improvement_analysis.get("improved") is False, (
+        "Se esperaba que no se detectara mejora pero improved=True"
+    )
+    evidence = no_improvement_analysis.get("evidence", [])
+    assert len(evidence) > 0, "Se esperaba evidencia de detracción no vacía"
+    for metric_name, delta in no_improvement_analysis.get("improvements", {}).items():
+        assert delta < 0, f"El delta de {metric_name} debe ser negativo en caso de detracción: {delta}"
+    
+    print("[OK] Test de análisis de mejora completado")
 
 if __name__ == "__main__":
     import tempfile
@@ -159,8 +175,8 @@ if __name__ == "__main__":
         with tempfile.TemporaryDirectory() as _tmp:
             test_goal_adaptation_feedback(_tmp)
             test_adaptation_improvement_analysis(_tmp)
-        print("\n🎉 Todos los tests de feedback de adaptación pasaron")
+        print("\n[OK] Todos los tests de feedback de adaptación pasaron")
     except Exception as e:
-        print(f"\n❌ Error en los tests: {e}")
+        print(f"\n[ERROR] Error en los tests: {e}")
         import traceback
         traceback.print_exc()

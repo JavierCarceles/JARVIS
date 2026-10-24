@@ -1,9 +1,8 @@
 ESTADO PERSISTENTE ACTUAL
-CURRENT_PHASE: 2.8.12
-CURRENT_WORK_UNIT: 2.8.12.6
+CURRENT_PHASE: 2.8.13
+CURRENT_WORK_UNIT: 2.8.13.1
 CURRENT_WORK_STATUS: PENDIENTE
-LAST_COMPLETED_UNIT: 2.8.12.5
-
+LAST_COMPLETED_UNIT: 2.8.12.6
 
 PROMPT PRINCIPAL JARVIS — PUNTO DE ENTRADA Y CONTINUIDAD
 
@@ -11,9 +10,9 @@ OBJETIVO
 Evolucionar de `intencion -> comando -> funcion -> ejecucion` a `intencion -> Goal -> Task/HTN -> State/Knowledge -> Graph -> Planner -> Plan -> Executor -> Verification -> State actualizado -> Replan`.
 
 ARCHIVOS QUE FORMAN EL PROMPT
-- `prompt_mejoraActual.txt` (este archivo): unica fuente del estado persistente actual y punto de entrada de cada chat.
-- `prompt_JARVIS_reglas.txt`: reglas operativas, restricciones, tests, verificacion y transiciones de estado. Leerlo completo antes de trabajar.
-- `prompt_JARVIS_fases_estado.txt`: roadmap de fases/unidades y registros historicos de trabajo. Consultar la rama relevante de la unidad activa y los registros necesarios; no cargar todo el historial si no hace falta.
+- `mejora/prompt_mejoraActual.txt` (este archivo): unica fuente del estado persistente actual y punto de entrada de cada chat.
+- `mejora/prompt_JARVIS_reglas.txt`: reglas operativas, restricciones, tests, verificacion y transiciones de estado. Leerlo completo antes de trabajar.
+- `mejora/prompt_JARVIS_fases_estado.txt`: roadmap de fases/unidades y registros historicos de trabajo. Consultar la rama relevante de la unidad activa y los registros necesarios; no cargar todo el historial si no hace falta.
 - `README.md`: documentacion tecnica del codigo existente. Leerlo completo antes de modificar codigo.
 
 ORDEN OBLIGATORIO DE INICIO

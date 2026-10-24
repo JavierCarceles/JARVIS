@@ -3842,4 +3842,14 @@ VERIFICACION: SINTAXIS: OK (py_compile del probe, main.py y src/utils/contextual
 DISCREPANCIAS: NINGUNA
 PENDIENTES: NINGUNA (unidad 2.8.12.5 completa)
 ESTADO FINAL: 2.8.12.5 - IMPLEMENTADA
-  
+REGISTRO DE UNIDAD: 2.8.12.6
+FECHA: 2026-10-25
+OBJETIVO: Tests (2.8.12.6): ejecutar la suite completa de tests de contextual_adaptation_engine y corregir los tests de test_goal_adaptation_feedback.py que tenian fallas de calidad.
+TIPO DE TRABAJO: TESTS
+CAMBIOS / HALLAZGOS: Se identificaron y corregieron tres fallas en tests/utils/contextual_adaptation_engine/test_goal_adaptation_feedback.py: (1) ambos tests retornavan True en lugar de usar assert, provocando PytestReturnNotNoneWarning; (2) test_adaptation_improvement_analysis carecia de aserciones (pasaba vacuamente) y ademas consultaba la clave inexistente 'degradation_indicators' (el metodo devuelve 'improved', 'improvements', 'evidence'); (3) caracteres emoji (U+2705, U+1F389, U+274C) en print statements causaban UnicodeEncodeError con -s en Windows cp1252. Soluciones: eliminados los return True; anadidas aserciones propias para ambos casos (mejora detectada: improved=True, evidence no vacia, todos los deltas positivos; no mejora: improved=False, evidence no vacia, todos los deltas negativos); corregida la clave degradation_indicators por evidence; reemplazados emoji por equivalentes ASCII ([OK], [ERROR]). El motor se instancia con tmp_path (aislado), por lo que data/goal_adaptation_feedback.json no se contamina.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA ; TESTS: c:/Informatica/PROYECTOS/BACKEND/IA_PYTHON/IA/JARVIS/tests/utils/contextual_adaptation_engine/test_goal_adaptation_feedback.py
+TESTS Y RESULTADOS: test_goal_adaptation_feedback.py - 2 PASSED / 0 FAILED ; suite tests/utils/contextual_adaptation_engine/ - 736 PASSED / 0 FAILED (baseline 2.8.12.5: 736; sin regresiones)
+VERIFICACION: SINTAXIS: OK (py_compile del test file) ; MAIN.PY: OK (sin cambios, main.py compila) ; COMPORTAMIENTO / INTEGRACION REAL: 2 tests corregidos verifican ambos casos (mejora y no mejora) con aserciones reales; -s funciona sin errores de codificacion; data/goal_adaptation_feedback.json intacto (3 records preexistentes, sin modificaciones).
+DISCREPANCIAS: El motor escribe data/knowledge_graph.json en PRODUCCION durante __init__ incluso cuando data_dir apunta a tmp_path (observado: archivo marcado como modificado tras la ejecucion de tests; problema preexistente del motor, documentado en el docstring del test, no introducido por este cambio; se hizo git checkout para restaurar).
+PENDIENTES: NINGUNA (unidad 2.8.12.6 completa)
+ESTADO FINAL: 2.8.12.6 - IMPLEMENTADA
