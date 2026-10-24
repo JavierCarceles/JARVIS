@@ -1,0 +1,15 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.14.7, pytest-9.1.1, pluggy-1.6.0 -- C:\Python314\python.exe
+rootdir: C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS
+plugins: anyio-4.14.1, cov-7.1.0
+collecting ... collected 7 items
+
+tests/utils/contextual_adaptation_engine/test_goal_adaptation_restart_compatibility.py::test_modificaciones_de_reglas_sobreviven_al_reinicio PASSED [ 14%]
+tests/utils/contextual_adaptation_engine/test_goal_adaptation_restart_compatibility.py::test_base_de_conocimiento_completa_tras_reinicio PASSED [ 28%]
+tests/utils/contextual_adaptation_engine/test_goal_adaptation_restart_compatibility.py::test_estado_motor_sin_anomalias_tras_reinicio_con_datos_sanos PASSED [ 42%]
+tests/utils/contextual_adaptation_engine/test_goal_adaptation_restart_compatibility.py::test_load_all_data_verdadero_tras_reinicio_con_datos PASSED [ 57%]
+tests/utils/contextual_adaptation_engine/test_goal_adaptation_restart_compatibility.py::test_backup_data_tras_reinicio_cubre_los_cuatro_ficheros PASSED [ 71%]
+tests/utils/contextual_adaptation_engine/test_goal_adaptation_restart_compatibility.py::test_multiples_reinicios_no_duplican PASSED [ 85%]
+tests/utils/contextual_adaptation_engine/test_goal_adaptation_restart_compatibility.py::test_motor_operativo_tras_reinicio PASSED [100%]
+
+============================= 7 passed in 10.85s ==============================

@@ -41,6 +41,10 @@ collect_ignore = [
     "ear/test__init__.py",
     "eyes/test__init__.py",
     "hands/test__init__.py",
+    # fix_cross_context_confidence_feedback_test.py es un SCRIPT de correccion
+    # manual (abre/edita test_cross_context_confidence_feedback.py en caliente),
+    # no un test. Su sufijo *_test.py hace que pytest lo colecte y falle.
+    "utils/contextual_adaptation_engine/fix_cross_context_confidence_feedback_test.py",
 ]
 
 

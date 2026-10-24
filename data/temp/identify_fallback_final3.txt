@@ -1,0 +1,57 @@
+﻿SONDA DE DETERMINACION DEL FALLBACK POR CORRUPCION TOTAL (2.8.8.9.8.1)
+
+== PARTE A: FORMA DEL CONTRATO DEL FALLBACK ==
+  [OK] El contrato declara su version
+  [OK] El contrato declara el principio
+  [OK] El contrato declara la definicion de perdida total
+  [OK] El contrato declara los modos de perdida total
+  [OK] El contrato declara las capas de fallback
+  [OK] El contrato declara los invariantes
+  [OK] Todo invariante declara su CAPA, que existe
+  [OK] Todo invariante declara su ENUNCIADO
+  [OK] Todo invariante declara si lo SATISFACE el runtime
+  [OK] Los PENDIENTES son invariantes declarados
+  [OK] Los PENDIENTES son exactamente los invariantes NO satisfeitos
+  [OK] Todo invariante tiene un OBSERVADOR en la sonda
+  [OK] La API devuelve una COPIA defensiva (mutarla no toca el contrato)
+  [OK] La API no altera el estado del motor
+
+== PARTE B: MEDICION POR MODO DE PERDIDA TOTAL ==
+  -- unreadable_file: anomalias_status=4 carga=False respaldados=4/4
+     cumplen=['backup_covers_all_persistence', 'files_not_overwritten', 'load_result_is_truthful', 'loss_is_detectable', 'loss_visible_in_status', 'operation_continues', 'state_equals_fresh_defaults']
+     NO cumplen=[]
+  -- non_mapping_root: anomalias_status=1 carga=False respaldados=4/4
+     cumplen=['backup_covers_all_persistence', 'files_not_overwritten', 'load_result_is_truthful', 'loss_is_detectable', 'loss_visible_in_status', 'operation_continues', 'state_equals_fresh_defaults']
+     NO cumplen=[]
+  -- list_root_without_valid_rows: anomalias_status=17 carga=False respaldados=4/4
+     cumplen=['backup_covers_all_persistence', 'files_not_overwritten', 'load_result_is_truthful', 'loss_is_detectable', 'loss_visible_in_status', 'operation_continues', 'state_equals_fresh_defaults']
+     NO cumplen=[]
+  -- empty_mapping_root: anomalias_status=16 carga=False respaldados=4/4
+     cumplen=['backup_covers_all_persistence', 'files_not_overwritten', 'load_result_is_truthful', 'loss_is_detectable', 'loss_visible_in_status', 'operation_continues', 'state_equals_fresh_defaults']
+     NO cumplen=[]
+
+== PARTE C: DETERMINACION (invariantes NO Satisfechos) ==
+  [OK] Los invariantes NO Satisfechos coinciden con los PENDIENTES declarados
+  [OK] el invariante `backup_covers_all_persistence` se satisface en TODOS los modos
+  [OK] el invariante `files_not_overwritten` se satisface en TODOS los modos
+  [OK] el invariante `load_result_is_truthful` se satisface en TODOS los modos
+  [OK] el invariante `loss_is_detectable` se satisface en TODOS los modos
+  [OK] el invariante `loss_visible_in_status` se satisface en TODOS los modos
+  [OK] el invariante `operation_continues` se satisface en TODOS los modos
+  [OK] el invariante `state_equals_fresh_defaults` se satisface en TODOS los modos
+
+== PARTE D: NO VACUO (la medicion discrimina) ==
+  [OK] CONTROL `datos sanos`: el estado NO es el de los defaults
+  [OK] CONTROL `datos sanos`: el estado agregado NO declara anomalias
+  [OK] CONTROL `datos sanos`: la carga declara EXITO
+  [OK] CONTROL `perdida real`: el motor cae a los defaults
+  [OK] CONTROL `perdida real`: la perdida es detectable
+  [OK] CONTROL `estado intacto`: la regla centinela LLEGA al estado
+  [OK] CONTROL `estado intacto`: el patron centinela LLEGA a la base
+
+== PARTE E: NO CONTAMINACION DEL `data/` DE PRODUCCION ==
+  [OK] Los ficheros de persistencia de produccion quedan byte a byte igual
+
+== RESUMEN ==
+  Comprobaciones fallidas: 0
+  Hallazgos (invariantes no Satisfechos): 0

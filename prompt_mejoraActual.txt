@@ -1,8 +1,8 @@
 ﻿ESTADO PERSISTENTE ACTUAL
 CURRENT_PHASE: 2.8.12
-CURRENT_WORK_UNIT: 2.8.12.5
+CURRENT_WORK_UNIT: 2.8.12.6
 CURRENT_WORK_STATUS: PENDIENTE
-LAST_COMPLETED_UNIT: 2.8.12.4
+LAST_COMPLETED_UNIT: 2.8.12.5
 
 PROMPT MAESTRO JARVIS — AUTOMEJORA INCREMENTAL
 
@@ -4705,3 +4705,15 @@ VERIFICACION: SINTAXIS: OK (py_compile main.py y src/utils/contextual_adaptation
 DISCREPANCIAS: NINGUNA
 PENDIENTES: NINGUNO
 ESTADO FINAL: 2.8.12.4 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 2.8.12.5
+FECHA: 2026-10-25
+OBJETIVO: Verificar compatibilidad tras reinicio (2.8.12.5): la regla personalizada, el feedback y los learning_results sobreviven a un reinicio completo del motor; backup_data() cubre los 4 ficheros; load_all_data() devuelve True al recargar; get_engine_status() no declara anomalias; segundo reinicio no duplica datos; y el data/ de produccion queda byte a byte intacto.
+TIPO DE TRABAJO: VERIFICACION
+CAMBIOS / HALLAZGOS: Se creo tests/utils/contextual_adaptation_engine/verify_restart_compatibility_real.py que ejecuta un round-trip completo del motor en un sandbox temporal (CWD aislado) verificando: persistencia/recuperacion de reglas personalizadas (16 campos canonicos), feedback (1 entrada) y learning_results (1 entrada), backup_data() sobre los cuatro ficheros declarados, load_all_data()=True al recargar datos validos, get_engine_status() con cero anomalias, deteccion de duplicacion tras segundo reinicio, y aislamiento byte-a-byte del data/ de produccion. Se corrigio un defecto en el probe: _snapshot() usaba ContextType.PRODUCTION como argumento por defecto (evaluado en tiempo de definicion, antes del import perezoso en main()); se cambio el default a None y se resuelve dentro del cuerpo. Se corrigio un error de coleccion preexistente en conftest.py: fix_cross_context_confidence_feedback_test.py (un script de correccion manual, no un test) coincidia con el patron *_test.py de pytest y provocaba FileNotFoundError en coleccion; se anadio a collect_ignore. No se modifico codigo de produccion ni datos de produccion.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA ; TESTS: c:/Informatica/PROYECTOS/BACKEND/IA_PYTHON/IA/JARVIS/tests/utils/contextual_adaptation_engine/verify_restart_compatibility_real.py ; c:/Informatica/PROYECTOS/BACKEND/IA_PYTHON/IA/JARVIS/tests/utils/contextual_adaptation_engine/test_goal_adaptation_restart_compatibility.py ; c:/Informatica/PROYECTOS/BACKEND/IA_PYTHON/IA/JARVIS/tests/conftest.py ; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: verify_restart_compatibility_real.py - 46 comprobaciones, 0 FALLO ; test_goal_adaptation_restart_compatibility.py - 7 PASSED / 0 FAILED ; identify_fallback_real.py - 0 fallos ; INTEGRACION: NE ; NO REGRESION: suite tests/utils/contextual_adaptation_engine/ - 736 PASSED / 0 FAILED (baseline 2.8.12.4: 729; la diferencia se debe a que el error de coleccion preexistente de fix_cross_context_confidence_feedback_test.py interrumpia la sesion anterior)
+VERIFICACION: SINTAXIS: OK (py_compile del probe, main.py y src/utils/contextual_adaptation_engine.py) ; MAIN.PY: OK (main.py compila, sin cambios) ; COMPORTAMIENTO / INTEGRACION REAL: Round-trip de reinicio verificado en sandbox temporal real; 46 comprobaciones OK; data/ de produccion byte a byte intacto tras la verificacion.
+DISCREPANCIAS: NINGUNA
+PENDIENTES: NINGUNA (unidad 2.8.12.5 completa)
+ESTADO FINAL: 2.8.12.5 - IMPLEMENTADA

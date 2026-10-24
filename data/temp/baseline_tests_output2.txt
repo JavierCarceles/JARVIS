@@ -1,0 +1,11 @@
+﻿
+=================================== ERRORS ====================================
+_ ERROR collecting tests/utils/contextual_adaptation_engine/fix_cross_context_confidence_feedback_test.py _
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\utils\contextual_adaptation_engine\fix_cross_context_confidence_feedback_test.py:3: in <module>
+    content = open('test_cross_context_confidence_feedback.py', 'r', encoding='utf-8').read()
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: 'test_cross_context_confidence_feedback.py'
+=========================== short test summary info ===========================
+ERROR tests/utils/contextual_adaptation_engine/fix_cross_context_confidence_feedback_test.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+1 error in 5.14s
