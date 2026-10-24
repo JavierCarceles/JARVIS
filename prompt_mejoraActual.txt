@@ -1,8 +1,8 @@
 ﻿ESTADO PERSISTENTE ACTUAL
 CURRENT_PHASE: 2.8.12
-CURRENT_WORK_UNIT: 2.8.12.4
-CURRENT_WORK_STATUS: EN PROCESO
-LAST_COMPLETED_UNIT: 2.8.12.3
+CURRENT_WORK_UNIT: 2.8.12.5
+CURRENT_WORK_STATUS: PENDIENTE
+LAST_COMPLETED_UNIT: 2.8.12.4
 
 PROMPT MAESTRO JARVIS — AUTOMEJORA INCREMENTAL
 
@@ -4681,3 +4681,27 @@ VERIFICACION: SINTAXIS: OK (py_compile del script de verificacion) ; MAIN.PY: OK
 DISCREPANCIAS: NINGUNA
 PENDIENTES: NINGUNA (unidad 2.8.12.2 completa)
 ESTADO FINAL: 2.8.12.2 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 2.8.12.3
+FECHA: 2026-10-24
+OBJETIVO: Verificar recuperacion de persistencia: load_all_data() declara lo que ocurrio (unidades obtenidas), backup_data() cubre los cuatro ficheros de persistencia, get_engine_status() expone anomalias de lectura y carga, y el fallback por corrupcion total (2.8.8.9.8.2) esta operativo.
+TIPO DE TRABAJO: VERIFICACION
+CAMBIOS / HALLAZGOS: Se verifico que load_all_data() devuelve FALSO cuando los ficheros existen pero no aportan unidades utilizables y VERDADERO con almacenamiento ausente (comportamiento real medido en identify_fallback_real.py). ; backup_data() copia los cuatro ficheros declarados en expected_storage_paths() por clave de persistencia sin alterar origenes. ; get_engine_status() expone corruption.unreadable y corruption.unreadable_count. ; El contrato total_loss_fallback() declara los 7 invariantes SATISFECHOS (pending vacio, capa partial_backup renombrada a full_backup, entrada de reconciliacion añadida). ; No se modifico codigo de produccion ni tests.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA ; TESTS: NA ; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: test_goal_adaptation_total_corruption.py 1 PASSED ; test_goal_adaptation_corrupted_list_section.py 30 PASSED ; test_2_8_8_9_8_3_total_corruption.py 1 PASSED ; test_2_8_8_9_8_2_total_loss_fallback_implemented.py 12 PASSED ; INTEGRACION: NE ; NO REGRESION: suite contextual_adaptation_engine - 729 PASSED / 0 FAILED (baseline 2.8.12.2)
+VERIFICACION: SINTAXIS: OK ; MAIN.PY: OK ; COMPORTAMIENTO / INTEGRACION REAL: Sondas identify_fallback_real.py (0 fallos), verify_recovery_real.py (0 fallos) verifican el fallback real en runtime
+DISCREPANCIAS: NINGUNA
+PENDIENTES: NINGUNO
+ESTADO FINAL: 2.8.12.3 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 2.8.12.4
+FECHA: 2026-10-24
+OBJETIVO: Verificar que los datos corruptos son detectados y rechazados correctamente (deteccion de corrupcion en la via de carga y deteccion via detect_corruption()).
+TIPO DE TRABAJO: VERIFICACION
+CAMBIOS / HALLAZGOS: La deteccion de corrupcion (detect_corruption()) y el rechazo en la via de carga (2.8.8.9.6.3/6.4) estan implementados y verificados. Los 27 clases de corrupcion declaradas en corruption_criteria() son detectadas y rechazadas sin usar el dato corrupto. Los tests de contrato (test_corrupt_data.py 86 tests) y los tests de rechazo en runtime (test_goal_adaptation_rejection_runtime.py 60 tests) pasan. Los tests de corrupcion total (test_goal_adaptation_total_corruption.py, test_goal_adaptation_corrupted_list_section.py 30 tests) pasan. Las sondas de verificacion independientes detect_corruption_real.py, verify_rejection_real.py, verify_recovery_real.py, identify_fallback_real.py pasan sin fallos (0 comprobaciones fallidas cada una). No se modifico codigo de produccion ni tests.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA ; TESTS: NA ; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: test_corrupt_data.py 86 PASSED ; test_goal_adaptation_rejection_runtime.py 60 PASSED ; test_goal_adaptation_total_corruption.py 1 PASSED ; test_goal_adaptation_corrupted_list_section.py 30 PASSED ; INTEGRACION: NE ; NO REGRESION: suite tests/utils/contextual_adaptation_engine/ - 729 PASSED / 0 FAILED
+VERIFICACION: SINTAXIS: OK (py_compile main.py y src/utils/contextual_adaptation_engine.py) ; MAIN.PY: OK (import main - OK, SISTEMA OPERATIVO: ONLINE) ; COMPORTAMIENTO / INTEGRACION REAL: Sondas detect_corruption_real.py (0 fallos), verify_rejection_real.py (0 fallos), verify_recovery_real.py (0 fallos), identify_fallback_real.py (0 fallos) verifican el rechazo real en runtime
+DISCREPANCIAS: NINGUNA
+PENDIENTES: NINGUNO
+ESTADO FINAL: 2.8.12.4 - IMPLEMENTADA

@@ -1,1 +1,17 @@
-[]
+[
+  {
+    "system_entities": {
+      "jarvis": {
+        "type": "ai_assistant",
+        "capabilities": [
+          "learning",
+          "optimization",
+          "memory"
+        ],
+        "status": "active"
+      }
+    },
+    "user_entities": {},
+    "environment_entities": {}
+  }
+]

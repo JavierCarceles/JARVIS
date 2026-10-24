@@ -1,0 +1,21 @@
+============================================================
+REPORTE DE INTEGRIDAD DE DATOS - JARVIS
+============================================================
+
+ESTADÍSTICAS:
+  improvement_rules.json: 6 elementos
+  conversational_memory.json: 2344 elementos
+  entities.json: 1 elementos
+  goal_adaptation_feedback.json: 3 elementos
+  goal_adaptation_learning_results.json: 3 elementos
+  jarvis_memory.json: 26 elementos
+  knowledge_graph.json: 1 elementos
+
+PROBLEMAS CRITICOS:
+  [CRITICAL] CRITICAL: Error al leer jarvis_learned_aliases.json: [Errno 13] Permission denied: 'data\\jarvis_learned_aliases.json'
+  [CRITICAL] CRITICAL: Error de permiso en jarvis_learned_aliases.json: [Errno 13] Permission denied: 'data\\jarvis_learned_aliases.json'
+
+RESUMEN:
+  Problemas críticos: 2
+  Advertencias: 0
+  Estado: CRÍTICO

@@ -1,106 +1,106 @@
 [
-    {
-        "role": "user",
-        "content": "¡Suscríbete!"
-    },
-    {
-        "role": "assistant",
-        "content": "¿Qué quieres que haga?"
-    },
-    {
-        "role": "user",
-        "content": "¡Suscríbete!"
-    },
-    {
-        "role": "assistant",
-        "content": "¿Qué quieres que haga?"
-    },
-    {
-        "role": "user",
-        "content": "Gracias."
-    },
-    {
-        "role": "assistant",
-        "content": "{ \"action\": \"no_action\" }"
-    },
-    {
-        "role": "user",
-        "content": "Gracias."
-    },
-    {
-        "role": "assistant",
-        "content": "❌ Acción no válida o parámetros incorrectos: no_action"
-    },
-    {
-        "role": "user",
-        "content": "Jarvis, ¿qué hora es?"
-    },
-    {
-        "role": "assistant",
-        "content": "No entiendo. ¿Qué quieres que haga?"
-    },
-    {
-        "role": "user",
-        "content": "Jarvis, ¿qué hora es?"
-    },
-    {
-        "role": "assistant",
-        "content": "No entiendo. ¿Qué quieres que haga?"
-    },
-    {
-        "role": "user",
-        "content": "Jarvis, abre Google."
-    },
-    {
-        "role": "assistant",
-        "content": "{\n  \"action\": \"abrir_chrome\",\n  \"parameters\": {}\n}"
-    },
-    {
-        "role": "user",
-        "content": "Jarvis, abre Google."
-    },
-    {
-        "role": "assistant",
-        "content": "✅ Acción ejecutada: abrir_chrome. Resultado: He abierto Google Chrome en tu pantalla predeterminada."
-    },
-    {
-        "role": "user",
-        "content": "Jarvis, abrir, YouTube."
-    },
-    {
-        "role": "assistant",
-        "content": "YouTube abierto en el navegador"
-    },
-    {
-        "role": "user",
-        "content": "Jarvis, cierra YouTube."
-    },
-    {
-        "role": "assistant",
-        "content": "{\n  \"action\": \"cerrar_youtube\",\n  \"parameters\": {}\n}"
-    },
-    {
-        "role": "user",
-        "content": "Jarvis, cierra YouTube."
-    },
-    {
-        "role": "assistant",
-        "content": "❌ Acción no válida o parámetros incorrectos: cerrar_youtube"
-    },
-    {
-        "role": "user",
-        "content": "Vibre aplicaciones."
-    },
-    {
-        "role": "assistant",
-        "content": "{\n  \"action\": \"calibrar_aplicaciones\",\n  \"parameters\": {}\n}"
-    },
-    {
-        "role": "user",
-        "content": "aplicaciones."
-    },
-    {
-        "role": "assistant",
-        "content": "{\n  \"action\": \"calibrar_aplicaciones\",\n  \"parameters\": {}\n}"
-    }
+  {
+    "role": "user",
+    "content": "¡Suscríbete!"
+  },
+  {
+    "role": "assistant",
+    "content": "¿Qué quieres que haga?"
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete!"
+  },
+  {
+    "role": "assistant",
+    "content": "¿Qué quieres que haga?"
+  },
+  {
+    "role": "user",
+    "content": "Gracias."
+  },
+  {
+    "role": "assistant",
+    "content": "{ \"action\": \"no_action\" }"
+  },
+  {
+    "role": "user",
+    "content": "Gracias."
+  },
+  {
+    "role": "assistant",
+    "content": "❌ Acción no válida o parámetros incorrectos: no_action"
+  },
+  {
+    "role": "user",
+    "content": "Jarvis, ¿qué hora es?"
+  },
+  {
+    "role": "assistant",
+    "content": "No entiendo. ¿Qué quieres que haga?"
+  },
+  {
+    "role": "user",
+    "content": "Jarvis, ¿qué hora es?"
+  },
+  {
+    "role": "assistant",
+    "content": "No entiendo. ¿Qué quieres que haga?"
+  },
+  {
+    "role": "user",
+    "content": "Jarvis, abre Google."
+  },
+  {
+    "role": "assistant",
+    "content": "{\n  \"action\": \"abrir_chrome\",\n  \"parameters\": {}\n}"
+  },
+  {
+    "role": "user",
+    "content": "Jarvis, abre Google."
+  },
+  {
+    "role": "assistant",
+    "content": "✅ Acción ejecutada: abrir_chrome. Resultado: He abierto Google Chrome en tu pantalla predeterminada."
+  },
+  {
+    "role": "user",
+    "content": "Jarvis, abrir, YouTube."
+  },
+  {
+    "role": "assistant",
+    "content": "YouTube abierto en el navegador"
+  },
+  {
+    "role": "user",
+    "content": "Jarvis, cierra YouTube."
+  },
+  {
+    "role": "assistant",
+    "content": "{\n  \"action\": \"cerrar_youtube\",\n  \"parameters\": {}\n}"
+  },
+  {
+    "role": "user",
+    "content": "Jarvis, cierra YouTube."
+  },
+  {
+    "role": "assistant",
+    "content": "❌ Acción no válida o parámetros incorrectos: cerrar_youtube"
+  },
+  {
+    "role": "user",
+    "content": "Vibre aplicaciones."
+  },
+  {
+    "role": "assistant",
+    "content": "{\n  \"action\": \"calibrar_aplicaciones\",\n  \"parameters\": {}\n}"
+  },
+  {
+    "role": "user",
+    "content": "aplicaciones."
+  },
+  {
+    "role": "assistant",
+    "content": "{\n  \"action\": \"calibrar_aplicaciones\",\n  \"parameters\": {}\n}"
+  }
 ]
