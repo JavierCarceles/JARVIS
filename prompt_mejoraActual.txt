@@ -1,8 +1,8 @@
 ﻿ESTADO PERSISTENTE ACTUAL
 CURRENT_PHASE: 2.8.12
-CURRENT_WORK_UNIT: 2.8.12.1
+CURRENT_WORK_UNIT: 2.8.12.2
 CURRENT_WORK_STATUS: PENDIENTE
-LAST_COMPLETED_UNIT: 2.8.11.9.9
+LAST_COMPLETED_UNIT: 2.8.12.1
 
 PROMPT MAESTRO JARVIS AUTOMEJORA INCREMENTAL
 
@@ -6856,3 +6856,34 @@ ESTADO FINAL: 2.8.11.9.9 - IMPLEMENTADA
 
 FASE 2.8.11 - IMPLEMENTADA
 Todas las hojas de la fase 2.8.11 (2.8.11.9.1 a 2.8.11.9.9) estan completas y verificadas. Ningun test se debilitó ni se convirtio en PASSED por cambio de aserciones o mocks; los 3 fallos preexistentes de `test_goal_adaptation_pattern_restart_verification.py` (timestamp no conservado) se corrigieron en la logica de emparejamiento del test, no en el codigo de produccion. main.py compila OK. La fase queda cerrada.
+
+REGISTRO DE UNIDAD: 2.8.12.1
+FECHA: 2026-10-24
+ESTADO: IMPLEMENTADA
+OBJETIVO: Verificar reglas de persistencia del motor de adaptacion contextual.
+TIPO DE TRABAJO: VERIFICACION
+CAMBIOS / HALLAZGOS:
+- Se verifico que load_adaptation_rules() y _load_adaptation_rules() (alias legacy) existen y se ejecutan sin error en src/utils/contextual_adaptation_engine.py (l. 1829 y 1877).
+- Se verifico que save_adaptation_rules() y _save_adaptation_rules() (l. 1492 y 1494) escriben el fichero contextual_adaptation_rules.json con payload {version, last_updated, total_rules, rules}.
+- Se verifico que load_knowledge_base() (l. 1891) y save_knowledge_base() (l. 1881) manejan contextual_knowledge_base.json con payload {version, last_updated, context_snapshots, adaptation_history, knowledge_transfers, data}.
+- Se verifico que load_all_data() (l. 1933) es el punto de entrada unificado que el constructor llama en l. 312, y que _initialize_goal_adaptation_persistence() (l. 3237) carga feedback y resultados de aprendizaje.
+- Se verifico que expected_storage_paths() (l. 3248) declara las cuatro rutas de persistencia esperadas.
+- Se verifico que los ficheros de produccion data/goal_adaptation_feedback.json y data/goal_adaptation_learning_results.json estan presentes y vacios (payload canonico); contextual_adaptation_rules.json y contextual_knowledge_base.json siguen ausentes de data/ (ausencia inocua, detectada en 2.8.8.9.5.1).
+- No se modifico codigo de produccion ni tests.
+ARCHIVOS MODIFICADOS:
+- PRODUCCION: NO APLICA
+- TESTS: NO APLICA
+- DOCUMENTACION: NO APLICA (no hay codigo nuevo ni modificado que requiera documentar en README)
+TESTS Y RESULTADOS:
+- UNITARIOS: tests/utils/contextual_adaptation_engine/test_goal_adaptation_conservation.py - 3 PASSED / 0 FAILED / TOTAL 3
+- UNITARIOS: tests/utils/contextual_adaptation_engine/test_goal_adaptation_forgetting.py - 3 PASSED / 0 FAILED / TOTAL 3
+- UNITARIOS: tests/utils/contextual_adaptation_engine/test_2_8_8_9_8_4_3_condition_pattern_default.py - 17 PASSED / 0 FAILED / TOTAL 17
+- INTEGRACION: NO EJECUTADA POR SEPARADO
+- NO REGRESION: suite de tests/utils/contextual_adaptation_engine/ (sin los modulos de 6.4/7.1/7.2/8.4.1/8.4.2) - 729 PASSED / 0 FAILED / 2 WARNINGS / 41 SUBTESTS PASSED
+VERIFICACION:
+- SINTAXIS: py_compile de main.py y src/utils/contextual_adaptation_engine.py - OK
+- MAIN.PY: import main - OK (SISTEMA OPERATIVO: ONLINE)
+- COMPORTAMIENTO / INTEGRACION REAL: Los cargadores y escritores de reglas y knowledge base se ejecutan sin error; los ficheros de produccion no se modifican.
+DISCREPANCIAS: NINGUNA REGISTRADA
+PENDIENTES: 2.8.12.2 - verificar knowledge base.
+ESTADO FINAL: 2.8.12.1 - IMPLEMENTADA
