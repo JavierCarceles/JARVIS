@@ -33,6 +33,7 @@ El motor se instancia con `data_dir` temporal, por lo que el test no lee ni
 escribe sobre `data/` de produccion.
 """
 
+import collections
 import json
 import os
 import sys
@@ -122,6 +123,38 @@ def _recovered_patterns(engine):
     return patterns
 
 
+def _pattern_key(pattern):
+    """Clave multiconjunto para comparar patrones sin colapsar IDs repetidos.
+
+    Un mismo `pattern_id` puede aparecer en varias filas de aprendizaje (una
+    por ciclo de observacion); al comparar solo por `pattern_id` se pierden
+    esas entradas distintas. Esta clave incluye el `timestamp`, unico por
+    observacion, para que dos conjuntos de patrones se consideren iguales
+    cuando contengan los mismos elementos con la misma frecuencia.
+    """
+    return tuple(sorted((pattern.get("pattern_id"), pattern.get("timestamp"))))
+
+
+def _assert_pattern_multiset_equal(left, right, label="patrones"):
+    """Comprobar que dos listas de patrones contienen los mismos elementos.
+
+    Comparar por `pattern_id` solo serviria cuando cada ID aparece una unica
+    vez; el motor puede registrar varias observaciones con el mismo ID (una
+    por ciclo de aprendizaje), por lo que la comparacion debe ser de
+    multiconjunto: mismos elementos con la misma frecuencia.
+    """
+    assert len(left) == len(right), (
+        f"{label}: se esperaban {len(left)} patrones, se encontraron {len(right)}"
+    )
+    remaining = collections.Counter(_pattern_key(p) for p in right)
+    for pattern in left:
+        key = _pattern_key(pattern)
+        assert remaining[key] > 0, (
+            f"{label}: el patron {key} no aparece en el conjunto recuperado"
+        )
+        remaining[key] -= 1
+
+
 def _pattern(pattern_id="pattern_001", confidence=0.9, pattern_type="goal_adaptation_success",
              goal_type="navigation", context_type="production"):
     """Patron de aprendizaje con la estructura real de 7 campos."""
@@ -189,9 +222,10 @@ def test_el_patron_recuperado_conserva_las_estructuras_anidadas(engine, tmp_path
 
     recovered = _recovered_patterns(restarted)
     assert recovered, "Los patrones validados deben recuperarse tras el reinicio"
-    by_id = {pattern["pattern_id"]: pattern for pattern in recovered}
+    _assert_pattern_multiset_equal(recovered, produced, "patrones recuperados")
+    by_key = {_pattern_key(pattern): pattern for pattern in recovered}
     for original in produced:
-        pattern = by_id.get(original["pattern_id"])
+        pattern = by_key.get(_pattern_key(original))
         assert pattern is not None, (
             f"El patron '{original['pattern_id']}' debe recuperarse tras el reinicio"
         )
@@ -216,16 +250,24 @@ def test_el_patron_recuperado_conserva_las_estructuras_anidadas(engine, tmp_path
 
 
 def test_el_patron_recuperado_conserva_los_valores_sin_perdida(engine, tmp_path):
-    """La ida y vuelta debe preservar el valor de cada campo canonico."""
+    """La ida y vuelta debe preservar el valor de cada campo canonico.
+
+    La comparacion es de multiconjunto: el mismo `pattern_id` puede aparecer
+    en varias observaciones (una por ciclo de aprendizaje), y cada una tiene
+    su propio `timestamp`. Comparar solo por `pattern_id` colapsaria esas
+    entradas y haria imposible comprobar que el `timestamp` se conserva.
+    """
     produced = _learn(engine, MIN_SIMILAR_OBSERVATIONS)
 
     restarted = ContextualAdaptationEngine(data_dir=str(tmp_path))
 
     recovered = _recovered_patterns(restarted)
     assert recovered, "Los patrones validados deben recuperarse tras el reinicio"
-    by_id = {pattern["pattern_id"]: pattern for pattern in recovered}
+    _assert_pattern_multiset_equal(recovered, produced, "patrones recuperados")
+
+    by_key = {_pattern_key(pattern): pattern for pattern in recovered}
     for original in produced:
-        pattern = by_id.get(original["pattern_id"])
+        pattern = by_key.get(_pattern_key(original))
         assert pattern is not None, (
             f"El patron '{original['pattern_id']}' debe recuperarse tras el reinicio"
         )
@@ -308,7 +350,13 @@ def test_el_patron_recuperado_sigue_disponible_para_los_consumidores(engine, tmp
 
 
 def test_el_patron_recuperado_es_estable_tras_un_segundo_reinicio(engine, tmp_path):
-    """Un segundo reinicio no debe duplicar ni degradar los patrones."""
+    """Un segundo reinicio no debe duplicar ni degradar los patrones.
+
+    La comparacion es de multiconjunto: el mismo `pattern_id` puede aparecer
+    en varias observaciones (una por ciclo de aprendizaje), y cada una tiene
+    su propio `timestamp`. Comparar solo por `pattern_id` colapsaria esas
+    entradas y haria imposible comprobar que el `timestamp` se conserva.
+    """
     _learn(engine, MIN_SIMILAR_OBSERVATIONS)
 
     first = ContextualAdaptationEngine(data_dir=str(tmp_path))
@@ -323,9 +371,11 @@ def test_el_patron_recuperado_es_estable_tras_un_segundo_reinicio(engine, tmp_pa
         f"primero {len(first_patterns)}, segundo {len(second_patterns)}"
     )
     assert {p["pattern_id"] for p in second_patterns} == {p["pattern_id"] for p in first_patterns}
-    by_id = {pattern["pattern_id"]: pattern for pattern in first_patterns}
+    _assert_pattern_multiset_equal(second_patterns, first_patterns, "patrones del segundo reinicio")
+
+    by_key = {_pattern_key(pattern): pattern for pattern in first_patterns}
     for pattern in second_patterns:
-        original = by_id[pattern["pattern_id"]]
+        original = by_key[_pattern_key(pattern)]
         for field in CANONICAL_PATTERN_FIELDS:
             assert pattern[field] == original[field], (
                 f"El campo '{field}' se degrado tras el segundo reinicio: "
