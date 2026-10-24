@@ -1,0 +1,34 @@
+ESTADO PERSISTENTE ACTUAL
+CURRENT_PHASE: 2.8.12
+CURRENT_WORK_UNIT: 2.8.12.6
+CURRENT_WORK_STATUS: PENDIENTE
+LAST_COMPLETED_UNIT: 2.8.12.5
+
+
+PROMPT PRINCIPAL JARVIS — PUNTO DE ENTRADA Y CONTINUIDAD
+
+OBJETIVO
+Evolucionar de `intencion -> comando -> funcion -> ejecucion` a `intencion -> Goal -> Task/HTN -> State/Knowledge -> Graph -> Planner -> Plan -> Executor -> Verification -> State actualizado -> Replan`.
+
+ARCHIVOS QUE FORMAN EL PROMPT
+- `prompt_mejoraActual.txt` (este archivo): unica fuente del estado persistente actual y punto de entrada de cada chat.
+- `prompt_JARVIS_reglas.txt`: reglas operativas, restricciones, tests, verificacion y transiciones de estado. Leerlo completo antes de trabajar.
+- `prompt_JARVIS_fases_estado.txt`: roadmap de fases/unidades y registros historicos de trabajo. Consultar la rama relevante de la unidad activa y los registros necesarios; no cargar todo el historial si no hace falta.
+- `README.md`: documentacion tecnica del codigo existente. Leerlo completo antes de modificar codigo.
+
+ORDEN OBLIGATORIO DE INICIO
+1. Leer los cuatro campos de ESTADO PERSISTENTE ACTUAL de este archivo. Estos campos son el unico puntero operativo: ni las marcas del roadmap ni los registros historicos pueden sustituirlos.
+2. Leer completo `prompt_JARVIS_reglas.txt`.
+3. Leer completo `README.md`.
+4. Abrir `prompt_JARVIS_fases_estado.txt`, localizar `CURRENT_WORK_UNIT` y consultar su definicion, padre, hijas, posicion en el orden del roadmap y los registros/discrepancias pertinentes. No elegir otra unidad por referencias historicas.
+5. Trabajar solo `CURRENT_WORK_UNIT`. Si el estado es `PENDIENTE`, cambiar unicamente `CURRENT_WORK_STATUS` a `EN PROCESO` en este archivo y guardar este archivo antes de tocar codigo. Si ya esta `EN PROCESO` o `PARCIALMENTE IMPLEMENTADA`, continuar esa misma unidad.
+
+CONTINUIDAD Y CIERRE
+- Una sola unidad hoja por chat. Si es demasiado grande, subdividirla antes de implementar, registrar padre/hijas en `prompt_JARVIS_fases_estado.txt` y trabajar solo la primera hija pendiente.
+- Si se completa: agregar/actualizar su unico registro canonico en `prompt_JARVIS_fases_estado.txt`; establecer `LAST_COMPLETED_UNIT` a la unidad terminada; mover `CURRENT_WORK_UNIT` y `CURRENT_PHASE` a la siguiente hoja realmente pendiente del roadmap; dejar `CURRENT_WORK_STATUS: PENDIENTE`; guardar este archivo y terminar el chat. No abrir ni empezar la siguiente hoja.
+- Si queda incompleta o bloqueada: mantener `CURRENT_WORK_UNIT` en la misma hoja, establecer `CURRENT_WORK_STATUS: PARCIALMENTE IMPLEMENTADA`, registrar pendientes y no avanzar.
+- No dejar el puntero actual en una unidad completada ni marcar la siguiente `EN PROCESO` antes de empezar un chat dedicado a ella.
+- Si se detecta una contradiccion, conservarla y documentar evidencias en el registro pertinente; no reconciliarla por intuicion. El bloque persistente de este archivo sigue siendo el unico estado operativo.
+- No declarar tests, ejecuciones, integraciones o comportamientos como verificados si no existe evidencia real.
+
+No comenzar ninguna tarea de codigo hasta completar las lecturas obligatorias y aplicar las reglas de `prompt_JARVIS_reglas.txt`.

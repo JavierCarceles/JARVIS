@@ -1,0 +1,92 @@
+REGLAS OPERATIVAS JARVIS — AUTOMEJORA INCREMENTAL
+
+OBJETIVO
+Evolucionar de `intencion -> comando -> funcion -> ejecucion` a `intencion -> Goal -> Task/HTN -> State/Knowledge -> Graph -> Planner -> Plan -> Executor -> Verification -> State actualizado -> Replan`.
+
+1. FUENTES DE VERDAD Y ALCANCE
+- El bloque ESTADO PERSISTENTE ACTUAL de `prompt_mejoraActual.txt` es la unica fuente de continuidad y determina la unidad que debe trabajarse. El roadmap de `prompt_JARVIS_fases_estado.txt` define estructura, no estado actual; no usar README, historial, Git ni recuerdos de otros chats para escoger otra unidad.
+- Un chat trabaja una sola unidad hoja: la hoja mas profunda definida. No adelantar la siguiente. La hoja debe ser pequena y verificable; si resulta demasiado grande, dividirla antes de implementarla, registrar la relacion padre-hijas y trabajar solo la primera hija pendiente.
+- No avanzar mientras la hoja activa tenga pendientes. Una unidad padre solo se completa cuando todas sus hijas lo estan. Una fase solo se completa si todas sus hojas estan verificadas y `main.py` cumple cuando corresponda.
+- Leer `prompt_mejoraActual.txt`, este archivo de reglas y TODO `README.md`; despues consultar en `prompt_JARVIS_fases_estado.txt` solo las secciones necesarias para `CURRENT_WORK_UNIT` y abrir solo los archivos de codigo pertinentes. En ficheros grandes, localizar primero clase/metodo/simbolo y ampliar solo cuando haga falta. Para busquedas/analisis de archivos del proyecto, usar siempre `limit=2000`.
+- `README.md` es documentacion tecnica del codigo existente. `prompt_mejoraActual.txt` contiene el estado operativo; este archivo contiene las reglas; `prompt_JARVIS_fases_estado.txt` contiene el roadmap y los registros de trabajo. Documentar en README solo codigo nuevo o modificado que realmente lo necesite, en su apartado tecnico: finalidad, contrato, uso y comportamiento real. No documentar codigo preexistente solo por haberlo inspeccionado ni registrar fases, unidades, IDs de mejora, avances, fechas, historial, commits, resultados de ejecucion o cierres de fase. Puede explicarse la finalidad y cobertura estatica de los tests, pero README no es un registro de ejecuciones.
+- Codigo actual y tests son la evidencia tecnica primaria. Si codigo, README y prompt discrepan, no corregir la discrepancia por intuicion: inspeccionar solo lo necesario, registrar lo contradictorio y la evidencia. No pedir archivos salvo que sean imprescindibles para la hoja o una discrepancia concreta.
+- No inventar funcionalidades, fases, IDs, archivos, clases, metodos, APIs, coordenadas, offsets, tests, metricas ni resultados. Reutilizar implementaciones y contratos reales; no duplicar logica ni crear APIs ficticias.
+- Las coordenadas/puntos UI son datos de percepcion/calibracion, no inteligencia ni reglas de decision. No introducir ML, deep learning, RL u otra complejidad para aparentar inteligencia; usar IA/LLM/Vision cuando aporte valor demostrable.
+
+2. GIT Y VERSIONADO
+- Prohibido usar historial de commits, mensajes/objetos de commits, `git log`, `git show`, `git blame` o contenidos internos de `.git` (incluidos `HEAD`, `config`, `logs`, `objects`, `refs`, `index`) como documentacion, evidencia del comportamiento actual o fuente de verdad. La evidencia debe salir del codigo actual, tests y documentacion tecnica.
+- No crear commits ni realizar operaciones que escriban o cambien el historial/estado de Git (`commit`, `amend`, `push`, `reset`, `rebase`, `cherry-pick`, `revert`, cambio de rama, `stash` o equivalentes) salvo peticion expresa del usuario.
+- `git status` y `git diff` solo se permiten si hacen falta para comprobar cambios actuales o proteger trabajo existente; nunca para reconstruir historia o elegir unidad.
+
+3. TESTS Y SEGURIDAD DE VERIFICACION
+- Un test correcto que falla obliga a corregir el codigo, no a debilitar el test.
+- Prohibido quitar asserts, ocultar errores, aceptar cualquier resultado, saltar casos o borrar pruebas para obtener PASS.
+- Cambiar un test solo si esta objetivamente mal, obsoleto por un cambio legitimo de contrato o contradice requisitos reales; registrar el motivo. Si un test fija correctamente un contrato aun no implementado, registrar el fallo como tal, nunca como PASSED.
+- Todos los tests, mocks, fixtures, datos y scripts cuyo objetivo sea probar, depurar o reproducir deben residir en `tests/`.
+- Auditar los mocks: no permitir que un mock fuerce la decision que se pretende probar ni sustituya la seleccion/validacion del objetivo, autorizacion, persistencia o resultado real. Comprobar estados antes/despues y efectos observables; incluir controles positivos, negativos y sensibilidad de protecciones criticas cuando sea seguro y viable. Registrar limitaciones.
+- Separar resultados unitarios, integracion y no regresion; indicar conteos reales y baseline comparable cuando exista. No presentar resultados no ejecutados como pasados ni atribuir fallos de entorno a codigo sin evidencia.
+
+4. FLUJO OBLIGATORIO DE CADA CHAT
+1. Leer el bloque de estado persistente de `prompt_mejoraActual.txt`.
+2. Leer TODO `README.md` (el archivo principal ya exige leer este archivo de reglas y consultar el roadmap pertinente).
+3. Tomar `CURRENT_WORK_UNIT` como objetivo unico.
+4. Si `CURRENT_WORK_STATUS` es `PENDIENTE`, cambiarlo a `EN PROCESO` en `prompt_mejoraActual.txt` y guardar ese archivo ANTES de modificar codigo. Si es `EN PROCESO`, continuar la misma hoja. Si es `PARCIALMENTE IMPLEMENTADA`, continuarla y resolver pendientes. Nunca reiniciar ni escoger otra unidad por intuicion.
+5. Si ID y estado se contradicen, no adivinar ni saltar: contrastar el bloque persistente de `prompt_mejoraActual.txt` y solo la parte necesaria del roadmap en `prompt_JARVIS_fases_estado.txt`, registrar la discrepancia y mantener la unidad indicada salvo que se demuestre un error concreto.
+6. Leer solo el codigo necesario; implementar exclusivamente la hoja activa.
+7. Ejecutar tests pertinentes, corregir fallos de tests validos en produccion, verificar comportamiento real, sintaxis e integraciones afectadas.
+8. Registrar el resultado real en `prompt_JARVIS_fases_estado.txt` y cerrar la unidad conforme a la transicion de estado; actualizar el puntero en `prompt_mejoraActual.txt`.
+9. Terminar el chat al cerrar la unidad. No abrir, inspeccionar, probar ni implementar la siguiente hoja en ese mismo chat.
+
+5. TRANSICION DE ESTADO Y CONTINUIDAD
+- `CURRENT_WORK_STATUS` siempre describe exclusivamente la unidad indicada por `CURRENT_WORK_UNIT`. Solo puede haber una hoja `EN PROCESO`.
+- Al comenzar una hoja `PENDIENTE`, establecer `EN PROCESO` en `prompt_mejoraActual.txt` y guardar ese archivo antes de tocar codigo.
+- Si se completa la hoja activa: (a) guardar un unico registro final `IMPLEMENTADA` en `prompt_JARVIS_fases_estado.txt`; (b) asignar `LAST_COMPLETED_UNIT` a esa hoja; (c) hallar en el roadmap de `prompt_JARVIS_fases_estado.txt` la siguiente hoja realmente pendiente, respetando jerarquia/orden; (d) actualizar `CURRENT_WORK_UNIT` y `CURRENT_PHASE` en `prompt_mejoraActual.txt`; (e) dejar `CURRENT_WORK_STATUS: PENDIENTE`; (f) guardar los cuatro campos persistentes y finalizar el chat. No iniciar ni inspeccionar la siguiente hoja.
+- Nunca dejar `CURRENT_WORK_STATUS: IMPLEMENTADA` apuntando a la siguiente hoja pendiente: la implementacion de la hoja anterior consta en su registro y en `LAST_COMPLETED_UNIT`; el estado del puntero actual debe ser `PENDIENTE`.
+- Si la hoja queda incompleta o bloqueada, mantener `CURRENT_WORK_UNIT` en esa misma hoja, poner `CURRENT_WORK_STATUS: PARCIALMENTE IMPLEMENTADA` en `prompt_mejoraActual.txt`, registrar pendientes en `prompt_JARVIS_fases_estado.txt` y no avanzar. Si se divide, apuntar a la primera hija pendiente con estado `PENDIENTE`; el padre no se completa hasta terminar todas sus hijas.
+- Al cerrar la ultima hoja de una fase, solo cambiar el puntero a la primera hoja pendiente real siguiente y dejarla `PENDIENTE`. No inventar numeracion. No dejar el puntero en una unidad completada.
+- El siguiente chat debe trabajar la unidad del bloque persistente de `prompt_mejoraActual.txt` aunque el ultimo registro historico de `prompt_JARVIS_fases_estado.txt` sea el de la unidad anterior; no repetir `LAST_COMPLETED_UNIT`.
+
+6. REGISTROS DE UNIDAD: FORMATO COMPACTO UNICO
+Cada unidad debe tener un unico registro final, con los campos siguientes en este orden. Se permite una linea por campo y compactar listas mediante `;`, sin perder datos:
+REGISTRO DE UNIDAD: <ID>
+FECHA: AAAA-MM-DD o NR
+OBJETIVO: <objetivo verificable>
+TIPO DE TRABAJO: INSPECCION | TEST | IMPLEMENTACION | CORRECCION | VERIFICACION | DOCUMENTACION | INTEGRACION (solo los aplicables)
+CAMBIOS / HALLAZGOS: <hechos comprobados; NR si faltan>
+ARCHIVOS MODIFICADOS: PRODUCCION: <rutas o NA>; TESTS: <rutas o NA>; DOCUMENTACION: <rutas o NA>
+TESTS Y RESULTADOS: UNITARIOS: <PASSED/FAILED/SKIPPED/TOTAL o NE>; INTEGRACION: <resultados o NE/NA>; NO REGRESION: <resultados y baseline o NE>
+VERIFICACION: SINTAXIS: <OK/ERROR/NE/NA>; MAIN.PY: <OK/ERROR/NE/NA>; COMPORTAMIENTO / INTEGRACION REAL: <evidencia o NV>
+DISCREPANCIAS: <contradicciones y resolucion o NINGUNA>
+PENDIENTES: <IDs concretos o NINGUNO>
+ESTADO FINAL: <ID> - <NO IMPLEMENTADA | EN PROCESO | PARCIALMENTE IMPLEMENTADA | IMPLEMENTADA>
+- Abreviaturas solo para valores vacios de registros: `NR` = no registrado; `NE` = no ejecutado/a; `NV` = no verificado; `NA` = no aplica. No usarlas si el valor real puede escribirse.
+- Mantener rutas completas entre backticks y grafia exacta de metodos/campos/claves. No inferir datos no comprobados.
+- Anotar cada unidad una sola vez. Si existen varias ejecuciones de tests, registrar cada resultado con su contexto/orden sin duplicar el registro. Mantener discrepancias historicas explicitas y documentar su resolucion posterior, sin borrar el antecedente ni dejar dos cierres para la misma unidad.
+- El estado global se actualiza solo en los cuatro campos persistentes de `prompt_mejoraActual.txt`: `CURRENT_PHASE`, `CURRENT_WORK_UNIT`, `CURRENT_WORK_STATUS`, `LAST_COMPLETED_UNIT`. El detalle va en registros de `prompt_JARVIS_fases_estado.txt`.
+
+7. CIERRE DE FASE
+- Todas las hojas deben estar `IMPLEMENTADA`; verificar la integracion y `main.py` cuando corresponda.
+- Si `main.py` funciona, registrar el dato comprobado y cerrar la fase; si falla, mantenerla en proceso y corregir. `main.py` no necesita ejecutarse al cerrar cada subfase salvo que la integracion de esa hoja lo requiera.
+- README solo se actualiza por cambios reales de codigo que requieran documentacion tecnica. Nunca registrar alli avances o cierres del roadmap.
+
+8. SUPERCOMPLETE, MULTIPANTALLA Y AUTOMATIZACION
+- Detectar conceptualmente `READY`, `EXECUTING`, `TOKEN_AVAILABLE` y `NEED_NEW_CHAT`. Mientras `EXECUTING`, esperar: no enviar otro prompt, repetir Send ni cambiar de chat. Si es imprescindible cambiar de chat, terminar de forma segura la operacion, guardar codigo/estado, cerrar y confirmar antes de abrir el nuevo chat y continuar la misma hoja. No depender de memoria de chats anteriores.
+- Debe funcionar con una o varias pantallas, posiciones intercambiadas, ventanas en segundo plano, maximizacion/restauracion y diferentes escalas/DPI. Prioridad: estado real de ventana -> aplicacion/proceso identificado -> monitor real -> vision -> coordenadas calibradas. No usar offsets fijos ni mover/cerrar ventanas sin identificar primero la ventana correcta.
+
+9. ARQUITECTURA FUNCIONAL
+- `Node` representa, segun proceda: Goal, Task, Action, Condition, State, Resource, Application, UI element y Result.
+- `State` debe representar progresivamente aplicaciones/ventanas, aplicacion y monitor activos, URLs, login, calibracion, recursos y estado de SuperComplete.
+- `Application Knowledge` separa conocimiento, capacidades, estados y ejecucion. `Domain Memory` separa conversacion, aliases, entidades, URLs, preferencias y prediccion.
+- `Graph` representa estados, acciones, transiciones, precondiciones, efectos y costes. `Planner` genera Plan; no ejecuta. `Executor` ejecuta; `Verification` comprueba; `State` se actualiza y `Replan` recalcula ante cambios reales.
+- Orden: determinista -> A* -> replanning -> optimizacion -> aprendizaje -> automejora. Mantener `legacy -> Goal -> Planner -> ejecucion` mientras exista uso y sin romper compatibilidad verificada.
+- `macros_coords.json` es conocimiento UI, no inteligencia completa. Flujo: Planner -> Action -> UI capability -> CoordinateManager -> macros_coords -> Mouse/Keyboard.
+
+10. CALIBRACION
+- Calibracion es una capacidad comun, no una coleccion de funciones decididas por aplicacion. No crear puntos/coordenadas por iniciativa propia: vision detecta elementos visibles y la calibracion persiste el resultado real.
+- Preparar antes la aplicacion (disponibilidad, estado, monitor y ventana). En navegador abierto, usar una pestana temporal sin tocar las del usuario. Cerrar solo recursos creados por JARVIS y restaurar el estado original de las ventanas reutilizadas.
+
+11. USO DEL ROADMAP Y DEL HISTORIAL
+- El roadmap de `prompt_JARVIS_fases_estado.txt` es estructura, no estado. No ampliar IDs salvo peticion expresa o subdivision tecnica necesaria. Cada hoja debe ser una modificacion conceptual, pequena y verificable; separar responsabilidades y preferir inspeccion -> modificacion -> test -> verificacion -> cierre.
+- Los marcadores historicos `[COMPLETADO]` / `[IMPLEMENTADA]` y los registros antiguos no sustituyen los cuatro campos persistentes de `prompt_mejoraActual.txt`.
+- Consultar en `prompt_JARVIS_fases_estado.txt` solo el registro por ID, la rama del roadmap y la discrepancia pertinente para la unidad activa. No usar el historial para sustituir el estado persistente.
+
