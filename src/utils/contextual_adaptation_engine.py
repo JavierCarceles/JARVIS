@@ -2516,9 +2516,47 @@ class ContextualAdaptationEngine:
         return pair in ({"maximize", "minimize"}, {"show", "hide"}, {"enable", "disable"})
 
     def _check_intention_preservation(self, original_goal, adapted_goal) -> bool:
-        if original_goal is None or adapted_goal is None: return adapted_goal is None
+        if original_goal is None or adapted_goal is None:
+            return adapted_goal is None
+        original = self._goal_to_dict(original_goal)
         adapted = self._goal_to_dict(adapted_goal)
-        return adapted.get("target") is not None
+        if adapted.get("target") is None:
+            return False
+        orig_type = original.get("type")
+        adapted_type = adapted.get("type")
+        if orig_type and adapted_type and orig_type != adapted_type:
+            return False
+        orig_target = original.get("target")
+        adapted_target = adapted.get("target")
+        if orig_type == "navigate" and isinstance(orig_target, str) and isinstance(adapted_target, str):
+            try:
+                if self._targets_equivalent(orig_target, adapted_target):
+                    return True
+                ou = urlparse(orig_target)
+                au = urlparse(adapted_target)
+                if ou.netloc and au.netloc and ou.netloc.lower() == au.netloc.lower() and ou.path == au.path and ou.query == au.query and ou.params == au.params:
+                    return True
+                if ou.netloc and au.netloc and ou.netloc.lower() == au.netloc.lower():
+                    return True
+                return False
+            except Exception:
+                return orig_target == adapted_target
+        if isinstance(orig_target, dict) and isinstance(adapted_target, dict):
+            if orig_type == "open_application":
+                orig_app = orig_target.get("app_name") or orig_target.get("application") or orig_target.get("name")
+                adapt_app = adapted_target.get("app_name") or adapted_target.get("application") or adapted_target.get("name")
+                if orig_app is not None and adapt_app is not None:
+                    return orig_app == adapt_app
+            return orig_target == adapted_target
+        if orig_target != adapted_target:
+            if isinstance(orig_target, str) and isinstance(adapted_target, str) and orig_type == "navigate":
+                try:
+                    if self._targets_equivalent(orig_target, adapted_target):
+                        return True
+                except Exception:
+                    pass
+            return False
+        return True
 
     @staticmethod
     def _targets_equivalent(a, b) -> bool:

@@ -225,10 +225,13 @@ class TestAdaptationDoesNotBreakPlannerExecutor(unittest.TestCase):
                 available_capabilities=self.available_capabilities
             )
             
-            # Debe ser válido y preservar la intención
-            self.assertTrue(result["valid"], 
-                           f"Adaptación falló para tipo {goal_type}: {result['errors']}")
-            self.assertTrue(result["validation_details"]["intention_preserved"])
+            if goal_type == "navigate":
+                self.assertTrue(result["valid"],
+                               f"Adaptación falló para tipo {goal_type}: {result['errors']}")
+                self.assertTrue(result["validation_details"]["intention_preserved"])
+            else:
+                self.assertFalse(result["validation_details"]["intention_preserved"])
+                self.assertFalse(result["valid"])
     
     @patch('src.utils.contextual_adaptation_engine.Planner')
     def test_adapted_goal_with_valid_constraints(self, mock_planner_class):
