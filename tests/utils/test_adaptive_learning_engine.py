@@ -9,14 +9,16 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 import json
- import tempfile
- from datetime import datetime
- import unittest
- from utils.adaptive_learning_engine import (
- from sklearn.linear_model import LinearRegression
- import torch
- import torch.nn as nn
- from utils.adaptive_learning_engine import AdaptiveLearningEngine
+import tempfile
+from datetime import datetime
+import unittest
+from utils.adaptive_learning_engine import (
+    LearningTask,
+    NeuralArchitecture,
+    LearningTaskConfig,
+    ModelPerformance,
+    AdaptiveLearningEngine,
+)
 
 
 # --- From test_adaptive_learning_engine.py ---
