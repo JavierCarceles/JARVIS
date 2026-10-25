@@ -1,1 +1,16 @@
-"<MagicMock name='WorldState().to_dict().to_dict()' id='1692995900080'>"
+{
+  "timestamp": 1792955164.425274,
+  "applications": {},
+  "ui_elements": {},
+  "system_info": {
+    "last_intention": {
+      "user_input": "navega a example.com",
+      "goal_type": "navigate",
+      "target": "https://example.com",
+      "timestamp": 1792955164.4250293
+    }
+  },
+  "constraints": [],
+  "last_actions": [],
+  "active_goals": []
+}
