@@ -1,0 +1,17 @@
+[
+  {
+    "node_id": "node_1792952257",
+    "node_type": "system_state",
+    "properties": {
+      "timestamp": "2026-10-25T19:17:37.766643",
+      "efficiency_score": 90.0,
+      "optimization_gain": 0.0,
+      "system_load": 0.0,
+      "learning_rate": 0.01,
+      "exploration_rate": 0.1
+    },
+    "connections": [],
+    "confidence": 0.9,
+    "last_updated": "2026-10-25T19:17:37.766648"
+  }
+]
