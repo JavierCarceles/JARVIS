@@ -55,6 +55,7 @@ def actualizar_api_key_riot() -> str:
     Esta acción es independiente de la calibración universal de aplicaciones.
     """
     logger._print_log("info", "[WINDOWS] Iniciando actualización de API Key de Riot Games...", "windows.py", "method", 57)
+
     screenshot_path: Optional[str] = None
     try:
         webbrowser.open("https://developer.riotgames.com/")
@@ -82,18 +83,21 @@ def actualizar_api_key_riot() -> str:
                 analysis_prompt,
             )
             logger._print_log("info", "[WINDOWS] Análisis de Riot completado.", "windows.py", "method", 84)
+
             return (
                 "He encontrado la página de Riot Developer Portal. "
                 f"Análisis: {analysis_result}"
             )
         except Exception as exc:
             logger._print_log("info", "Procesando solicitud", "windows.py", "method", 90)
+
             return (
                 "Página de Riot Developer Portal abierta. "
                 "El análisis visual ha fallado."
             )
     except Exception as exc:
         logger._print_log("info", "Procesando solicitud", "windows.py", "method", 90)
+
         return "Error al actualizar API Key de Riot."
     finally:
         if screenshot_path:
@@ -121,6 +125,7 @@ def _capturar_pantalla(filepath: str = "screenshot.png") -> Optional[str]:
     de captura dentro de Jarvis.
     """
     logger._print_log("debug", "[WINDOWS] Capturando escritorio completo...", "windows.py", "method", 123)
+
     try:
         screen_manager = get_screen_manager()
         capture_method = getattr(screen_manager, "capture_screen", None)
@@ -141,10 +146,12 @@ def _capturar_pantalla(filepath: str = "screenshot.png") -> Optional[str]:
             path = Path.cwd() / path
         path.parent.mkdir(parents=True, exist_ok=True)
         screenshot.save(path)
-        logger._print_log("debug", [WINDOWS] Captura guardada: %s, "windows.py", "method", 144)
+        logger._print_log("debug", "procesando solicitud", "src\hands\windows\windows.py", "method", 149)
+
         return str(path)
     except Exception as exc:
         logger._print_log("info", "Procesando solicitud", "windows.py", "method", 90)
+
         return None
 
 
@@ -166,7 +173,8 @@ def _abrir_aplicacion_windows(nombre_app: str) -> bool:
         return False
 
     nombre = str(nombre_app).strip()
-    logger._print_log("info", [WINDOWS] Abriendo aplicación: %s, "windows.py", "method", 169)
+    logger._print_log("info", "procesando solicitud", "src\hands\windows\windows.py", "method", 176)
+
 
     # 1) Intentar el gestor centralizado para aplicaciones conocidas.
     try:
@@ -309,6 +317,7 @@ def _verificar_aplicacion_abierta(nombre_app: str) -> bool:
         return False
     except Exception as exc:
         logger._print_log("info", "Procesando solicitud", "windows.py", "method", 90)
+
         return False
 
 
@@ -331,11 +340,13 @@ def _mover_aplicacion_a_pantalla(
     try:
         screen_number = int(pantalla_num)
     except (TypeError, ValueError):
-        logger._print_log("warning", [WINDOWS] Número de monitor inválido: %s, "windows.py", "method", 334)
+        logger._print_log("warning", "procesando solicitud", "src\hands\windows\windows.py", "method", 343)
+
         return False
 
     if screen_number < 1:
-        logger._print_log("warning", [WINDOWS] Número de monitor inválido: %s, "windows.py", "method", 338)
+        logger._print_log("warning", "procesando solicitud", "src\hands\windows\windows.py", "method", 348)
+
         return False
 
     try:
@@ -405,6 +416,7 @@ def _mover_aplicacion_a_pantalla(
         return True
     except Exception as exc:
         logger._print_log("info", "Procesando solicitud", "windows.py", "method", 90)
+
         return False
 
 
@@ -456,11 +468,13 @@ def _cerrar_aplicacion_windows(nombre_app: str) -> bool:
             return False
 
         close_method()
-        logger._print_log("info", [WINDOWS] Ventana de aplicación cerrada: %s, "windows.py", "method", 459)
+        logger._print_log("info", "procesando solicitud", "src\hands\windows\windows.py", "method", 471)
+
         time.sleep(1)
         return True
     except Exception as exc:
         logger._print_log("info", "Procesando solicitud", "windows.py", "method", 90)
+
         return False
 
 
@@ -553,6 +567,7 @@ def _calibrar_aplicacion_windows(nombre_app: str) -> Dict[str, Any]:
         }
     except Exception as exc:
         logger._print_log("info", "Procesando solicitud", "windows.py", "method", 90)
+
         return {
             "application": nombre_app,
             "success": False,
@@ -640,6 +655,7 @@ def _capturar_aplicacion_windows(nombre_app: str) -> Optional[str]:
         return str(temp_path)
     except Exception as exc:
         logger._print_log("info", "Procesando solicitud", "windows.py", "method", 90)
+
         return None
 
 

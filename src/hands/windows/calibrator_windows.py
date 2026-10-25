@@ -142,7 +142,8 @@ Responde únicamente con JSON válido.
             }
 
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "calibrator_windows.py", "method", 145), "calibrator_windows.py", "calibrate_application", 145)
+            logger._print_log("info", "Procesando solicitud", "calibrator_windows.py", "method", 145)
+
 
             return {
                 app_name: {
@@ -227,6 +228,7 @@ def calibrate_app(
 
     logger._print_log("info", "Procesando solicitud", "calibrator_windows.py", "method", 145)
 
+
     try:
         calibrator = WindowsCalibrator()
 
@@ -256,5 +258,6 @@ def calibrate_app(
 
     except Exception as e:
         logger._print_log("info", "Procesando solicitud", "calibrator_windows.py", "method", 145)
+
 
         return f"Error en calibración de {app_name}: {str(e)}"

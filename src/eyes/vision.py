@@ -109,9 +109,7 @@ class Vision:
         self._vision_nodes = self._create_vision_nodes()
 
         logger._print_log("info", "Procesando solicitud", "vision.py", "method", 111)
-        logger._print_log("info", "Procesando solicitud", "vision.py", "method", 111),
-            "vision.py", "__init__", 113
-        )
+        logger._print_log("info", "Procesando solicitud", "vision.py", "method", 111)
 
     # ====================================================================
     # NODOS DE VISIÓN
@@ -231,7 +229,7 @@ class Vision:
                     numbers.append(candidate)
             return numbers or [1]
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "vision.py", "method", 111), "vision.py", "_get_available_monitor_numbers", 236)
+            logger._print_log("info", "Procesando solicitud", "vision.py", "method", 111)
             return [1]
 
     def _get_default_monitor_number(self) -> int:
@@ -250,7 +248,7 @@ class Vision:
             if isinstance(number, int) and number > 0:
                 return number
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "vision.py", "method", 111), "vision.py", "_get_active_monitor_number", 255)
+            logger._print_log("info", "Procesando solicitud", "vision.py", "method", 111)
 
         monitors = self._get_available_monitor_numbers()
         return monitors[0]
@@ -304,8 +302,7 @@ Devuelve ÚNICAMENTE JSON válido:
             try:
                 image_path = self.screen_capture.capture_monitor(monitor_number)
                 if not image_path:
-                    logger._print_log("info", "Procesando solicitud", "vision.py", "method", 111), "vision.py", "analyze_screen_for_world_state", 309)
-                    continue
+                    logger._print_log("info", "Procesando solicitud", "vision.py", "method", 111)
 
                 response = self._chat_json(
                     image_path=image_path,
@@ -359,9 +356,7 @@ Devuelve ÚNICAMENTE JSON válido:
                         "monitor": monitor_number,
                     }
             except Exception as exc:
-                logger._print_log("info", "Procesando solicitud", "vision.py", "method", 111) + ": " + str(exc),
-                    "vision.py", "build_world_state", 364
-                )
+                logger._print_log("info", "Procesando solicitud", "vision.py", "method", 111)
 
         calibrated_elements: Dict[str, Any] = {}
         try:
@@ -369,7 +364,7 @@ Devuelve ÚNICAMENTE JSON válido:
             if isinstance(state_data, dict):
                 calibrated_elements = dict(state_data.get("calibrated_elements", {}) or {})
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "vision.py", "method", 111), "vision.py", "build_world_state", 376)
+            logger._print_log("info", "Procesando solicitud", "vision.py", "method", 111)
 
         known_urls: Dict[str, str] = {}
         try:
@@ -381,7 +376,7 @@ Devuelve ÚNICAMENTE JSON válido:
                 if url:
                     known_urls[str(entity.name)] = str(url)
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "vision.py", "method", 111), "vision.py", "build_world_state", 388)
+            logger._print_log("info", "Procesando solicitud", "vision.py", "method", 111)
 
         system_info = {
             "focused_application": focused_application,
@@ -405,11 +400,9 @@ Devuelve ÚNICAMENTE JSON válido:
         try:
             self.memory_manager.save_world_state(world_state.to_dict())
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "vision.py", "method", 111), "vision.py", "build_world_state", 412)
+            logger._print_log("info", "Procesando solicitud", "vision.py", "method", 111)
 
-        logger._print_log("info", "Procesando solicitud", "vision.py", "method", 111) + " aplicaciones=" + str(len(applications)) + " elementos=" + str(len(ui_elements)),
-            "vision.py", "build_world_state", 414
-        )
+        logger._print_log("info", "Procesando solicitud", "vision.py", "method", 111)
         return world_state
 
     # ====================================================================
@@ -422,9 +415,7 @@ Devuelve ÚNICAMENTE JSON válido:
         application: Optional[str] = None,
     ) -> VisionResponse:
         """Detecta elementos interactivos visibles en una imagen."""
-        logger._print_log("info", "Procesando solicitud", "vision.py", "method", 111) + ")",
-            "vision.py", "detect_ui_elements", 431
-        )
+        logger._print_log("info", "Procesando solicitud", "vision.py", "method", 111)
 
         app_context = f" en {application}" if application else ""
         prompt = f"""
@@ -509,7 +500,7 @@ Devuelve exclusivamente JSON válido con esta estructura:
 
             return VisionResponse(elements=valid_elements)
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "vision.py", "method", 111), "vision.py", "detect_ui_elements", 518)
+            logger._print_log("info", "Procesando solicitud", "vision.py", "method", 111)
             return VisionResponse(elements=[])
 
     # ====================================================================
@@ -529,7 +520,7 @@ Devuelve exclusivamente JSON válido con esta estructura:
         UniversalVisualCalibrator y los calibradores legacy ya utilizan ese
         contrato. No convierte aquí coordenadas ni aplica offsets de monitor.
         """
-        logger._print_log("info", "Procesando solicitud", "vision.py", "method", 111) + ")", "vision.py", "analyze_image", 538)
+        logger._print_log("info", "Procesando solicitud", "vision.py", "method", 111)
 
         schema = {
             "type": "object",
@@ -583,13 +574,13 @@ Devuelve exclusivamente JSON válido con esta estructura:
                 data["elements"] = elements
                 result = json.dumps(data, ensure_ascii=False)
 
-            logger._print_log("info", "Procesando solicitud", "vision.py", "method", 111)) + " caracteres)", "vision.py", "detect_ui_elements", 593)
+            logger._print_log("info", "Procesando solicitud", "vision.py", "method", 111)
             return result
         except ollama.ResponseError as exc:
-            logger._print_log("info", "Procesando solicitud", "vision.py", "method", 111), "vision.py", "detect_ui_elements", 596)
+            logger._print_log("info", "Procesando solicitud", "vision.py", "method", 111)
             return f"ERROR: {exc}"
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "vision.py", "method", 111), "vision.py", "detect_ui_elements", 599)
+            logger._print_log("info", "Procesando solicitud", "vision.py", "method", 111)
             return f"ERROR: {exc}"
 
     # ====================================================================
@@ -645,7 +636,7 @@ Devuelve exclusivamente JSON válido con esta estructura:
                 "application": application,
             }
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "vision.py", "method", 111), "vision.py", "is_element_visible", 655)
+            logger._print_log("info", "Procesando solicitud", "vision.py", "method", 111)
             return {"success": False, "element": element_name, "verified": False, "error": str(exc)}
 
     def verify_action_result(
@@ -655,8 +646,7 @@ Devuelve exclusivamente JSON válido con esta estructura:
         tolerance: float = 0.8,
     ) -> Dict[str, Any]:
         """Verifica visualmente el resultado esperado de una acción."""
-        logger._print_log("info", "Procesando solicitud", "vision.py", "method", 111), "vision.py", "verify_action_result", 665)
-        tolerance = self._clamp_float(tolerance)
+        logger._print_log("info", "Procesando solicitud", "vision.py", "method", 111)
 
         try:
             image_path = self.screen_capture.capture_active_window() if application else None
@@ -697,7 +687,7 @@ Devuelve exclusivamente JSON válido con esta estructura:
                 response["window_title"] = data.get("window_title")
             return response
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "vision.py", "method", 111), "vision.py", "_verify_action_result", 707)
+            logger._print_log("info", "Procesando solicitud", "vision.py", "method", 111)
             return {"success": False, "verified": False, "error": str(exc)}
 
     def _build_verification_prompt(
@@ -804,9 +794,7 @@ Responde ÚNICAMENTE JSON:
                 if best is None or confidence > best[0]:
                     best = (confidence, info)
             except Exception as exc:
-                logger._print_log("info", "Procesando solicitud", "vision.py", "method", 111) + ": " + str(exc),
-                    "vision.py", "detect_application_state", 815
-                )
+                logger._print_log("info", "Procesando solicitud", "vision.py", "method", 111)
 
         return best[1] if best else ApplicationInfo(name=target, state=ApplicationState.CLOSED)
 

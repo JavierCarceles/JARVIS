@@ -222,7 +222,8 @@ def _get_available_monitor_numbers() -> List[int]:
 
         return numbers or [1]
     except Exception as exc:
-        logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225), "screen.py", "_get_available_monitor_numbers", 225)
+        logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225)
+
         return [1]
 
 
@@ -267,8 +268,8 @@ class ScreenAnalyzer:
 
             self._vision = Vision()
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225), "screen.py", "_get_vision", 270)
-            self._vision = None
+            logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225)
+
 
         return self._vision
 
@@ -292,7 +293,8 @@ class ScreenAnalyzer:
                     result.setdefault("name", target)
                     return ApplicationInfo.from_dict(result)
             except Exception as exc:
-                logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225), "screen.py", "detect_application_state", 296)
+                logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225)
+
 
         return self._fallback_detect_application_state(target)
 
@@ -323,7 +325,8 @@ class ScreenAnalyzer:
                         ),
                     )
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225), "screen.py", "_fallback_detect_application_state", 326)
+            logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225)
+
 
         return ApplicationInfo(name=app_name, state=ApplicationState.CLOSED)
 
@@ -331,6 +334,7 @@ class ScreenAnalyzer:
         """Construye el estado del mundo usando la capa Vision cuando está disponible."""
 
         logger._print_log("info", r"Construyendo estado del mundo... [file:screen.py, method:build_world_state, line:336]", "screen.py", "method", 333)
+
         start_time = time.time()
         monitor_numbers = _get_available_monitor_numbers()
 
@@ -346,7 +350,8 @@ class ScreenAnalyzer:
                 self.memory_manager.save_world_state(world_state.to_dict())
                 return world_state
             except Exception as exc:
-                logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225), "screen.py", "build_world_state", 349)
+                logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225)
+
 
         # Fallback: información mínima sin asumir un número fijo de monitores.
         applications: Dict[str, ApplicationInfo] = {}
@@ -367,9 +372,11 @@ class ScreenAnalyzer:
         try:
             self.memory_manager.save_world_state(world_state.to_dict())
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225), "screen.py", "build_world_state", 372)
+            logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225)
+
 
         logger._print_log("info", r"[SCREEN-ANALYZER] Estado construido en %.2fs [file:screen.py, method:build_world_state, line:372]", "screen.py", "method", 372)
+
         return world_state
 
     def _convert_visual_world_state(
@@ -464,7 +471,8 @@ class ScreenAnalyzer:
                 if getattr(entity, "name", None)
             )
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225), "screen.py", "get_application_names", 481)
+            logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225)
+
 
         try:
             entities = self.memory_manager.get_entities_by_type("platform") or []
@@ -474,7 +482,8 @@ class ScreenAnalyzer:
                 if getattr(entity, "name", None)
             )
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225), "screen.py", "_get_known_applications", 480)
+            logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225)
+
 
         try:
             from src.hands.calibration_manager import get_calibration_manager
@@ -491,7 +500,8 @@ class ScreenAnalyzer:
                         if name:
                             names.append(str(name))
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225), "screen.py", "_get_known_applications", 497)
+            logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225)
+
 
         # Fallback mínimo para instalaciones donde la memoria todavía esté vacía.
         names.extend(["chrome", "edge", "firefox", "notepad", "calculator", "paint", "explorer", "cmd", "spotify"])
@@ -535,7 +545,8 @@ class ScreenAnalyzer:
                 if app_info.state == ApplicationState.ACTIVE:
                     return app_name
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225), "screen.py", "_detect_focused_application", 541)
+            logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225)
+
 
         return None
 
@@ -569,7 +580,8 @@ class ScreenAnalyzer:
             if number is not None:
                 return number
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225), "screen.py", "_get_active_monitor", 575)
+            logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225)
+
 
         return _get_available_monitor_numbers()[0]
 
@@ -581,7 +593,8 @@ class ScreenAnalyzer:
             if isinstance(state, dict):
                 return dict(state.get("calibrated_elements", {}) or {})
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225), "screen.py", "_get_calibrated_elements", 587)
+            logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225)
+
         return {}
 
     def _get_known_urls(self) -> Dict[str, str]:
@@ -598,7 +611,8 @@ class ScreenAnalyzer:
                     urls[str(entity.name)] = str(url)
             return urls
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225), "screen.py", "_get_known_urls", 601)
+            logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225)
+
             return {}
 
     def _get_system_resources(self) -> Dict[str, Any]:
@@ -632,7 +646,8 @@ class ScreenAnalyzer:
                 "battery": battery,
             }
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225), "screen.py", "_get_resources", 655)
+            logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225)
+
             return {}
 
 
@@ -648,13 +663,14 @@ class ScreenCapture:
         self.analyzer: Optional[ScreenAnalyzer] = None
         logger._print_log("debug", r"Sistema de captura inicializado [file:screen.py, method:__init__, line:652]", "screen.py", "method", 649)
 
+
     def _get_analyzer(self) -> Optional[ScreenAnalyzer]:
         if self.analyzer is None:
             try:
                 self.analyzer = ScreenAnalyzer()
             except Exception as exc:
-                logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225), "screen.py", "_get_analyzer", 659)
-                self.analyzer = None
+                logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225)
+
         return self.analyzer
 
     # ========================================================================
@@ -676,7 +692,8 @@ class ScreenCapture:
 
             source_path = Path(str(result))
             if not source_path.exists():
-                logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225), "screen.py", "capture_monitor", 682)
+                logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225)
+
                 return None
 
             if save_path is None:
@@ -689,7 +706,8 @@ class ScreenCapture:
             shutil.copy2(source_path, output_path)
             return str(output_path.resolve())
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225) + ": " + str(exc), "screen.py", "capture_monitor", 692)
+            logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225)
+
             return None
 
     # ========================================================================
@@ -724,7 +742,8 @@ class ScreenCapture:
             screenshot.save(str(output_path))
             return str(output_path.resolve())
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225), "screen.py", "capture_region", 730)
+            logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225)
+
             return None
 
     # ========================================================================
@@ -786,7 +805,8 @@ class ScreenCapture:
             screenshot.save(str(output_path))
             return str(output_path.resolve())
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225), "screen.py", "capture_active_window", 815)
+            logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225)
+
             return None
 
     def _prepare_output_path(
@@ -846,7 +866,8 @@ class ScreenCapture:
             screenshot.save(str(output_path))
             return str(output_path.resolve())
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225), "screen.py", "capture_desktop", 878)
+            logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225)
+
             return None
 
     # ========================================================================
@@ -890,7 +911,8 @@ class ScreenCapture:
                     return True
             return False
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225), "screen.py", "is_element_visible", 925)
+            logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225)
+
             return False
 
     # ========================================================================
@@ -905,10 +927,13 @@ class ScreenCapture:
                 try:
                     Path(file_path).unlink()
                     logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225)
+
                 except Exception as exc:
-                    logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225), "screen.py", "clean_temp_files", 947)
+                    logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225)
+
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225), "screen.py", "clean_temp_files", 920)
+            logger._print_log("info", "Procesando solicitud", "screen.py", "method", 225)
+
 
 
 # ============================================================================

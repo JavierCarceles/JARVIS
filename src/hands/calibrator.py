@@ -94,12 +94,15 @@ class UniversalVisualCalibrationStrategy(CalibrationStrategy):
 
     def __init__(self) -> None:
         logger._print_log("info", r"Inicializando UniversalVisualCalibrationStrategy [file:calibrator.py, method:__init__, line:96]", "calibrator.py", "method", 96)
+
         self.calibration_manager = self._get_calibration_manager()
 
     def can_calibrate(self, element: CalibrationElement) -> bool:
         logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
         if element.policy == CalibrationPolicy.NEVER:
             logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
             return False
         can_calibrate_result = element.element_type.casefold() not in {
             "game",
@@ -107,14 +110,17 @@ class UniversalVisualCalibrationStrategy(CalibrationStrategy):
             "terminal",
             "console",
         }
-        logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100), "calibrator.py", "can_calibrate", 110)
+        logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
         return can_calibrate_result
 
     def calibrate(self, element: CalibrationElement) -> Dict[str, Any]:
         logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
 
+
         if element.calibration_status == CalibrationStatus.CALIBRATED:
             logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
             return {
                 "success": True,
                 "message": "Ya calibrado",
@@ -126,7 +132,8 @@ class UniversalVisualCalibrationStrategy(CalibrationStrategy):
             manager = self.calibration_manager
             method = getattr(manager, "calibrate_application", None)
             if not callable(method):
-                logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100) para elemento: {element.id}", "calibrator.py", "calibrate", 129)
+                logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
                 return {
                     "success": False,
                     "message": "CalibrationManager no expone calibrate_application()",
@@ -136,6 +143,7 @@ class UniversalVisualCalibrationStrategy(CalibrationStrategy):
             monitor_number = self._resolve_monitor_number(element)
             if monitor_number is None:
                 logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
                 return {
                     "success": False,
                     "message": "No se pudo determinar el monitor para el elemento",
@@ -144,10 +152,12 @@ class UniversalVisualCalibrationStrategy(CalibrationStrategy):
 
             result = method(element.application, monitor_number)
             result_dict = self._result_to_dict(result)
-            logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)}", "calibrator.py", "calibrate", 147)
+            logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
             if not result_dict.get("success"):
                 error_msg = result_dict.get("error", result_dict.get("error_message", "Error desconocido"))
                 logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
                 return {
                     "success": False,
                     "message": error_msg,
@@ -159,6 +169,7 @@ class UniversalVisualCalibrationStrategy(CalibrationStrategy):
             )
             if coordinates is None:
                 logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
                 return {
                     "success": False,
                     "message": f"No se encontró el elemento '{element.name}' en la calibración",
@@ -173,7 +184,8 @@ class UniversalVisualCalibrationStrategy(CalibrationStrategy):
             element.confidence = self._find_element_confidence(
                 result_dict, element.name
             )
-            logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100), "calibrator.py", "calibrate", 176)
+            logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
 
             return {
                 "success": True,
@@ -185,9 +197,10 @@ class UniversalVisualCalibrationStrategy(CalibrationStrategy):
             }
 
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100), "calibrator.py", "calibrate", 188)
-            element.calibration_status = CalibrationStatus.INVALID
-            logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100), "calibrator.py", "calibrate", 193)
+            logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
+            logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
             return {
                 "success": False,
                 "message": str(exc),
@@ -196,16 +209,19 @@ class UniversalVisualCalibrationStrategy(CalibrationStrategy):
 
     def _resolve_monitor_number(self, element: CalibrationElement) -> Optional[int]:
         logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
         """Obtiene el monitor asociado o, como último recurso, el monitor activo."""
         if element.coordinates:
             keys = [key for key in element.coordinates if re.fullmatch(r"s\d+", str(key).casefold())]
             if keys:
                 try:
                     monitor_num = int(str(keys[0])[1:])
-                    logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100), "calibrator.py", "_resolve_monitor_number", 205)
+                    logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
                     return monitor_num
                 except (TypeError, ValueError):
                     logger._print_log("warning", r"No se pudo parsear número de monitor desde coordenadas [file:calibrator.py, method:_resolve_monitor_number, line:211]", "calibrator.py", "method", 208)
+
                     pass
 
         manager = self.calibration_manager
@@ -231,7 +247,8 @@ class UniversalVisualCalibrationStrategy(CalibrationStrategy):
             if callable(method):
                 return [str(value) for value in method() if str(value).strip()]
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100), "calibrator.py", "_get_available_applications", 234)
+            logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
         return []
 
     @staticmethod
@@ -328,6 +345,7 @@ class KeyboardShortcutStrategy(CalibrationStrategy):
 
     def calibrate(self, element: CalibrationElement) -> Dict[str, Any]:
         logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
         return {
             "success": True,
             "message": "Requiere ejecución de atajo de teclado",
@@ -345,6 +363,7 @@ class EnhancedCalibrator:
 
     def __init__(self) -> None:
         logger._print_log("info", r"Inicializando Calibrator mejorado [file:calibrator.py, method:__init__, line:350]", "calibrator.py", "method", 347)
+
         self.screen_manager = get_screen_manager()
         self.calibration_config = get_calibration_config()
         self.elements: Dict[str, CalibrationElement] = {}
@@ -355,7 +374,8 @@ class EnhancedCalibrator:
         ]
         self.capabilities: Dict[str, CalibrationCapability] = {}
         self._initialize_capabilities()
-        logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)} estrategias", "calibrator.py", "__init__", 361)
+        logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
 
     def _initialize_capabilities(self) -> None:
         self.capabilities = {
@@ -409,33 +429,41 @@ class EnhancedCalibrator:
 
     def check_element_calibration(self, element_id: str) -> CalibrationStatus:
         logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
         element = self.elements.get(element_id)
         if not element:
             logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
             return CalibrationStatus.UNKNOWN
         if element.calibration_status == CalibrationStatus.CALIBRATED and element.last_calibrated:
             if time.time() - element.last_calibrated > 3600:
                 logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
                 element.calibration_status = CalibrationStatus.OUTDATED
         logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
         return element.calibration_status
 
     def can_use_element(self, element_id: str, current_state: Dict[str, Any]) -> bool:
-        logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100), "calibrator.py", "can_use_element", 424)
-        status = self.check_element_calibration(element_id)
+        logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
         if status == CalibrationStatus.CALIBRATED:
-            logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100) + " está calibrado y puede usarse", "calibrator.py", "can_use_element", 427)
+            logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
             return True
         if status == CalibrationStatus.OUTDATED:
             allow_outdated = bool(current_state.get("allow_outdated_calibration", False))
             logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
             return allow_outdated
         if status == CalibrationStatus.NOT_CALIBRATED:
             element = self.elements.get(element_id)
             can_automatic = bool(element and element.policy == CalibrationPolicy.AUTOMATIC)
-            logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100), "calibrator.py", "can_use_element", 436)
+            logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
             return can_automatic
         logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
         return False
 
     def calibrate_element_if_needed(
@@ -443,15 +471,17 @@ class EnhancedCalibrator:
         element_id: str,
         current_state: Dict[str, Any],
     ) -> Dict[str, Any]:
-        logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100), "calibrator.py", "calibrate_element_if_needed", 449)
-        element = self.elements.get(element_id)
+        logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
         if not element:
-            logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100), "calibrator.py", "calibrate_element_if_needed", 452)
+            logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
             return {"success": False, "error": "Elemento no encontrado", "element_id": element_id}
 
         status = self.check_element_calibration(element_id)
         if status == CalibrationStatus.CALIBRATED:
-            logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100), "calibrator.py", "calibrate_element_if_needed", 457)
+            logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
             return {
                 "success": True,
                 "message": "Elemento ya calibrado",
@@ -460,7 +490,8 @@ class EnhancedCalibrator:
             }
 
         if element.policy == CalibrationPolicy.NEVER:
-            logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100) + " tiene política NEVER, no se puede calibrar", "calibrator.py", "calibrate_element_if_needed", 466)
+            logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
             return {
                 "success": False,
                 "error": "Elemento tiene política NEVER",
@@ -469,7 +500,8 @@ class EnhancedCalibrator:
             }
 
         if element.policy == CalibrationPolicy.ASK and not current_state.get("allow_auto_calibration", False):
-            logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100) + " tiene política ASK y no se permite calibración automática", "calibrator.py", "calibrate_element_if_needed", 475)
+            logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
             return {
                 "success": False,
                 "error": "Requiere confirmación manual",
@@ -478,30 +510,36 @@ class EnhancedCalibrator:
             }
 
         for strategy in self.strategies:
-            logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100).__name__}", "calibrator.py", "calibrate_element_if_needed", 481)
+            logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
             if not strategy.can_calibrate(element):
-                logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100).__name__} no puede calibrar elemento: {element.id}", "calibrator.py", "calibrate_element_if_needed", 486)
-                continue
-            result = strategy.calibrate(element)
+                logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
             if result.get("success"):
-                logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100).__name__} calibró exitosamente elemento: {element.id}", "calibrator.py", "calibrate_element_if_needed", 490)
+                logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
                 return result
             else:
-                logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100).__name__} falló al calibrar elemento: {element.id}", "calibrator.py", "calibrate_element_if_needed", 493)
+                logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
 
-        logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100) + ", buscando alternativas", "calibrator.py", "calibrate_element_if_needed", 495)
+
+        logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
         return self._find_alternative_strategy(element)
 
     def _find_alternative_strategy(self, element: CalibrationElement) -> Dict[str, Any]:
         logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
         for strategy in self.strategies:
             if isinstance(strategy, KeyboardShortcutStrategy) and strategy.can_calibrate(element):
-                logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100).__name__, "calibrator.py", "_find_alternative_strategy", 496)
-                result = strategy.calibrate(element)
+                logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
                 if result.get("success"):
                     logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
                     return result
         logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
         element.calibration_status = CalibrationStatus.INVALID
         return {
             "success": False,
@@ -512,16 +550,20 @@ class EnhancedCalibrator:
 
     def register_element(self, element: CalibrationElement) -> None:
         logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
         self.elements[element.id] = element
 
     def get_element_coordinates(self, element_id: str) -> Optional[Dict[str, Tuple[int, int]]]:
         logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
         element = self.elements.get(element_id)
         if element and element.calibration_status == CalibrationStatus.CALIBRATED:
             logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
             return element.coordinates
         else:
             logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
         return None
 
     def create_calibration_node(self, element_id: str) -> Optional["Node"]:
@@ -531,7 +573,8 @@ class EnhancedCalibrator:
         try:
             from src.hands.planner.node import Node, NodeType
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100), "calibrator.py", "create_calibration_node", 535)
+            logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
             return None
 
         return Node(
@@ -555,6 +598,7 @@ class EnhancedCalibrator:
 
     def get_calibration_requirements_for_goal(self, goal: "Goal") -> List[str]:
         logger._print_log("info", r"Obteniendo requisitos de calibración para goal [file:calibrator.py, method:get_calibration_requirements_for_goal, line:561]", "calibrator.py", "method", 557)
+
         required_elements: List[str] = []
         goal_to_elements = {
             "navigate": ["address_bar", "search_bar"],
@@ -566,6 +610,7 @@ class EnhancedCalibrator:
         target = str(getattr(goal, "target", "") or "").strip().casefold()
         goal_type = str(getattr(goal, "type", "") or "").strip().casefold()
         logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
         for element_type in goal_to_elements.get(goal_type, []):
             for element_id, element in self.elements.items():
                 if (
@@ -575,7 +620,9 @@ class EnhancedCalibrator:
                 ):
                     required_elements.append(element_id)
                     logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
-        logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)) + " elementos", "calibrator.py", "get_calibration_requirements_for_goal", 583)
+
+        logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
         return required_elements
 
     # ========================================================================
@@ -588,10 +635,12 @@ class EnhancedCalibrator:
         force: bool = False,
     ) -> Dict[str, Any]:
         """Entrada legacy y global compatible con CalibrationManager."""
-        logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100), "calibrator.py", "calibrate_applications", 596)
+        logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
 
         if not self._verify_system():
             logger._print_log("info", r"Sistema no compatible para calibración [file:calibrator.py, method:calibrate_applications, line:601]", "calibrator.py", "method", 594)
+
             return self._failure_report("Sistema no compatible")
 
         manager = self.calibration_manager
@@ -601,7 +650,8 @@ class EnhancedCalibrator:
 
             method = getattr(manager, "calibrate_all_applications", None)
             if not callable(method):
-                logger._print_log("info", r"CalibrationManager no expone calibrate_all_applications(, "calibrator.py", "method", 604) [file:calibrator.py, method:calibrate_applications, line:610]")
+                logger._print_log("info", "CalibrationManager no expone calibrate_all_applications", "calibrator.py", "method", 653)
+
                 return self._failure_report(
                     "CalibrationManager no expone calibrate_all_applications()"
                 )
@@ -609,7 +659,8 @@ class EnhancedCalibrator:
             result = self._call_global_manager(method, force=force)
             return self._normalize_global_result(result)
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100), "calibrator.py", "calibrate_applications", 617)
+            logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
             return self._failure_report(str(exc))
 
     def _calibrate_single_application(
@@ -639,16 +690,19 @@ class EnhancedCalibrator:
 
         method = getattr(manager, "calibrate_application", None)
         if not callable(method):
-            logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100) para aplicación: " + app_name, "calibrator.py", "_calibrate_single_application", 646)
+            logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
             return self._single_failure_report(
                 app_name, "CalibrationManager no expone calibrate_application()"
             )
 
         logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
         self.screen_manager.refresh_monitors()
         monitors = list(getattr(self.screen_manager, "monitors", []) or [])
         if not monitors:
             logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
             return self._single_failure_report(app_name, "No se encontraron monitores")
 
         results: List[Any] = []
@@ -656,12 +710,8 @@ class EnhancedCalibrator:
             try:
                 results.append(method(app_name, int(monitor.monitor_id)))
             except Exception as exc:
-                logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100) + ": " + str(exc), "calibrator.py", "_calibrate_single_application", 661)
-                results.append({
-                    "success": False,
-                    "error": str(exc),
-                    "screen_number": int(monitor.monitor_id),
-                })
+                logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
 
         return self._build_single_application_report(
             app_name, results, len(monitors)
@@ -682,25 +732,17 @@ class EnhancedCalibrator:
             if normalized.get("success") and not normalized.get("skipped"):
                 success_results += 1
                 total_elements += self._extract_element_count(normalized)
-                logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)), "calibrator.py", "_normalize_single_result", 687)
+                logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
             elif normalized.get("error") or normalized.get("error_message"):
                 errors.append(str(normalized.get("error") or normalized.get("error_message")))
-                logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100) or normalized.get("error_message")), "calibrator.py", "_normalize_single_result", 690)
+                logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
 
         calibrated = [app_name] if success_results else []
         failed = [] if calibrated else [app_name]
-        logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100) + " con " + str(success_results) + " resultados exitosos", "calibrator.py", "_normalize_single_result", 693)
-        report = {
-            "success": bool(calibrated),
-            "application": app_name,
-            "applications_requested": 1,
-            "calibrated": calibrated,
-            "skipped": [],
-            "failed": failed,
-            "monitors_detected": monitor_count,
-            "total_elements": total_elements,
-            "results": results,
-        }
+        logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
         if errors:
             report["errors"] = list(dict.fromkeys(errors))
         return report
@@ -800,7 +842,8 @@ class EnhancedCalibrator:
 
     def calibrate_chrome_both_screens(self) -> Dict[str, Any]:
         """Compatibilidad legacy; delega en la misma API de aplicación."""
-        logger._print_log("warning", r"[CALIBRATION] calibrate_chrome_both_screens(, "calibrator.py", "method", 803) es legacy [file:calibrator.py, method:calibrate_chrome_both_screens, line:803]")
+        logger._print_log("warning", "[CALIBRATION] calibrate_chrome_both_screens es una API legacy", "calibrator.py", "method", 845)
+
         return self.calibrate_applications("chrome")
 
     def _verify_system(self) -> bool:
@@ -813,7 +856,8 @@ class EnhancedCalibrator:
             self.screen_manager.refresh_monitors()
             return len(getattr(self.screen_manager, "monitors", []) or []) > 0
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100), "calibrator.py", "_verify_system", 816)
+            logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
             return False
 
     def get_calibration_statistics(self) -> Dict[str, Any]:
@@ -845,12 +889,14 @@ class EnhancedCalibrator:
             return bool(method(app_name))
         except Exception as exc:
             logger._print_log("warning", r"[CALIBRATOR] No se pudo consultar el estado de %s: %s [file:calibrator.py, method:is_application_capable, line:847]", "calibrator.py", "method", 847)
+
             return False
 
     def _save_organized_results(self, app_name: str, results: Dict[str, Any]) -> None:
         """Compatibilidad legacy; la persistencia pertenece al manager."""
         del results
         logger._print_log("debug", r"[CALIBRATOR] Persistencia delegada al CalibrationManager para %s [file:calibrator.py, method:_save_organized_results, line:853]", "calibrator.py", "method", 853)
+
 
     def _build_setup_info(self) -> Dict[str, Any]:
         setup = getattr(self.screen_manager, "setup", {})
@@ -906,6 +952,7 @@ class EnhancedCalibrator:
             return bool(window is not None and mover(window, int(monitor_num)))
         except Exception as exc:
             logger._print_log("debug", r"[CALIBRATOR] No se pudo preparar %s en monitor %s: %s [file:calibrator.py, method:_prepare_application, line:911]", "calibrator.py", "method", 908)
+
             return False
 
     def _close_app(self, app_name: str) -> bool:
@@ -921,7 +968,8 @@ class EnhancedCalibrator:
                 return False
             return bool(closer(window, owned_hwnds, owned_pids))
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100), "calibrator.py", "_close_app", 924)
+            logger._print_log("info", "Procesando solicitud", "calibrator.py", "method", 100)
+
             return False
 
     def _get_calibration_manager(self):
@@ -978,6 +1026,7 @@ class Calibrator:
     def __init__(self) -> None:
         self.enhanced = get_enhanced_calibrator()
         logger._print_log("info", r"[CALIBRATOR] Fachada de compatibilidad inicializada [file:calibrator.py, method:__init__, line:995]", "calibrator.py", "method", 980)
+
 
     def calibrate_applications(
         self,

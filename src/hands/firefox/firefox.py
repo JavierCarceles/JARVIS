@@ -43,6 +43,7 @@ def _get_firefox_windows() -> List[Any]:
             candidates = gw.getWindowsWithTitle(title)
         except Exception as exc:
             logger._print_log("DEBUG", f"[FIREFOX] Error buscando ventanas con título {title}: {exc}", "firefox.py", "_get_firefox_windows", 45)
+
             continue
 
         for win in candidates:
@@ -86,7 +87,7 @@ def _get_firefox_window_info(window: Any) -> Optional[Dict[str, Any]]:
             "visible": is_visible,
         }
     except Exception as exc:
-        logger.DEBUG(r"[FIREFOX] No se pudo obtener información de la ventana: %s  [file:firefox.py, method:_get_firefox_window_info, line:89]"))
+        logger.DEBUG(r"[FIREFOX] No se pudo obtener información de la ventana: %s  [file:firefox.py, method:_get_firefox_window_info, line:89]")
         return None
 
 
@@ -144,7 +145,7 @@ def abrir_youtube() -> str:
         webbrowser.open("https://www.youtube.com")
         return "He abierto YouTube en tu navegador."
     except Exception as exc:
-        logger.ERROR(r"[FIREFOX] Error abriendo YouTube: %s  [file:firefox.py, method:abrir_youtube, line:147]"))
+        logger.ERROR(r"[FIREFOX] Error abriendo YouTube: %s  [file:firefox.py, method:abrir_youtube, line:147]")
         return f"Error al abrir YouTube: {exc}"
 
 
@@ -154,7 +155,7 @@ def abrir_spotify() -> str:
         webbrowser.open("https://open.spotify.com")
         return "He abierto Spotify en tu navegador."
     except Exception as exc:
-        logger.ERROR(r"[FIREFOX] Error abriendo Spotify: %s  [file:firefox.py, method:abrir_spotify, line:157]"))
+        logger.ERROR(r"[FIREFOX] Error abriendo Spotify: %s  [file:firefox.py, method:abrir_spotify, line:157]")
         return f"Error al abrir Spotify: {exc}"
 
 
@@ -165,7 +166,7 @@ def abrir_spotify() -> str:
 
 def abrir_firefox_pantalla(pantalla: int = 1) -> str:
     """Abre Mozilla Firefox y lo posiciona en la pantalla solicitada."""
-    logger.INFO(r"[FIREFOX] Abriendo Firefox en pantalla %s...  [file:firefox.py, method:abrir_firefox_pantalla, line:168]"))
+    logger.INFO(r"[FIREFOX] Abriendo Firefox en pantalla %s...  [file:firefox.py, method:abrir_firefox_pantalla, line:168]")
 
     try:
         if pantalla < 1:
@@ -215,13 +216,13 @@ def abrir_firefox_pantalla(pantalla: int = 1) -> str:
         return f"He abierto Mozilla Firefox en tu pantalla {pantalla}."
 
     except Exception as exc:
-        logger.ERROR(r"[FIREFOX] Error al abrir Firefox en pantalla %s: %s  [file:firefox.py, method:abrir_firefox_pantalla, line:218]"))
+        logger.ERROR(r"[FIREFOX] Error al abrir Firefox en pantalla %s: %s  [file:firefox.py, method:abrir_firefox_pantalla, line:218]")
         return f"Error al abrir Firefox en pantalla {pantalla}: {exc}"
 
 
 def abrir_firefox_pestana(pantalla: int = 1) -> str:
     """Abre una nueva pestaña de Firefox en la pantalla solicitada."""
-    logger.INFO(r"[FIREFOX] Abriendo nueva pestaña de Firefox en pantalla %s...  [file:firefox.py, method:abrir_firefox_pestana, line:224]"))
+    logger.INFO(r"[FIREFOX] Abriendo nueva pestaña de Firefox en pantalla %s...  [file:firefox.py, method:abrir_firefox_pestana, line:224]")
 
     try:
         if pantalla < 1:
@@ -272,14 +273,14 @@ def abrir_firefox_pestana(pantalla: int = 1) -> str:
         pyautogui.hotkey("ctrl", "t")
         time.sleep(0.3)
 
-        logger.INFO(r"[FIREFOX] Nueva pestaña abierta en pantalla %s  [file:firefox.py, method:abrir_firefox_pestana, line:275]"))
+        logger.INFO(r"[FIREFOX] Nueva pestaña abierta en pantalla %s  [file:firefox.py, method:abrir_firefox_pestana, line:275]")
         return (
             "He abierto una nueva pestaña en tu Mozilla Firefox "
             f"de la pantalla {pantalla}."
         )
 
     except Exception as exc:
-        logger.ERROR(r"[FIREFOX] Error al intentar manipular Firefox: %s  [file:firefox.py, method:abrir_firefox_pestana, line:282]"))
+        logger.ERROR(r"[FIREFOX] Error al intentar manipular Firefox: %s  [file:firefox.py, method:abrir_firefox_pestana, line:282]")
         return f"Error al abrir una nueva pestaña de Firefox: {exc}"
 
 
@@ -325,27 +326,27 @@ def _abrir_firefox_desde_ruta() -> bool:
         for ruta in _candidate_firefox_paths():
             try:
                 if not os.path.isfile(ruta):
-                    logger.DEBUG(r"[FIREFOX] Ruta no encontrada: %s  [file:firefox.py, method:_candidate_firefox_paths, line:328]"))
+                    logger.DEBUG(r"[FIREFOX] Ruta no encontrada: %s  [file:firefox.py, method:_candidate_firefox_paths, line:328]")
                     continue
 
-                logger.INFO(r"[FIREFOX] Abriendo Firefox desde: %s  [file:firefox.py, method:_abrir_firefox_desde_ruta, line:331]"))
+                logger.INFO(r"[FIREFOX] Abriendo Firefox desde: %s  [file:firefox.py, method:_abrir_firefox_desde_ruta, line:331]")
                 subprocess.Popen([ruta], close_fds=True)
                 time.sleep(1.5)
                 return True
             except (OSError, subprocess.SubprocessError) as exc:
-                logger.DEBUG(r"[FIREFOX] Error con ruta %s: %s  [file:firefox.py, method:_abrir_firefox_desde_ruta, line:337]"))
+                logger.DEBUG(r"[FIREFOX] Error con ruta %s: %s  [file:firefox.py, method:_abrir_firefox_desde_ruta, line:337]")
 
-        logger.WARNING(r"[FIREFOX] No se encontró firefox.exe en las rutas habituales; intentando webbrowser...  [file:firefox.py, method:_abrir_firefox_desde_ruta, line:343]"))
+        logger.WARNING(r"[FIREFOX] No se encontró firefox.exe en las rutas habituales; intentando webbrowser...  [file:firefox.py, method:_abrir_firefox_desde_ruta, line:343]")
         try:
             webbrowser.open("https://www.google.com")
             time.sleep(2.0)
             return True
         except Exception as exc:
-            logger.ERROR(r"[FIREFOX] Fallback webbrowser falló: %s  [file:firefox.py, method:_abrir_firefox_desde_ruta, line:351]"))
+            logger.ERROR(r"[FIREFOX] Fallback webbrowser falló: %s  [file:firefox.py, method:_abrir_firefox_desde_ruta, line:351]")
             return False
 
     except Exception as exc:
-        logger.ERROR(r"[FIREFOX] Error abriendo Firefox: %s  [file:firefox.py, method:_abrir_firefox_desde_ruta, line:355]"))
+        logger.ERROR(r"[FIREFOX] Error abriendo Firefox: %s  [file:firefox.py, method:_abrir_firefox_desde_ruta, line:355]")
         return False
 
 
@@ -368,7 +369,7 @@ def _verificar_firefox_abierto() -> bool:
         return False
 
     except Exception as exc:
-        logger.ERROR(r"[FIREFOX] Error verificando Firefox: %s  [file:firefox.py, method:_verificar_firefox_abierto, line:372]"))
+        logger.ERROR(r"[FIREFOX] Error verificando Firefox: %s  [file:firefox.py, method:_verificar_firefox_abierto, line:372]")
         return False
 
 
@@ -491,7 +492,7 @@ def _mover_firefox_a_pantalla(pantalla_num: int) -> bool:
         return False
 
     except Exception as exc:
-        logger.ERROR(r"[FIREFOX] Error moviendo Firefox a pantalla %s: %s  [file:firefox.py, method:_mover_firefox_a_pantalla, line:496]"))
+        logger.ERROR(r"[FIREFOX] Error moviendo Firefox a pantalla %s: %s  [file:firefox.py, method:_mover_firefox_a_pantalla, line:496]")
         return False
 
 
@@ -508,12 +509,12 @@ def _cerrar_firefox() -> bool:
             return False
 
         win.close()
-        logger.INFO(r"[FIREFOX] Firefox cerrado  [file:firefox.py, method:_cerrar_firefox, line:520]"))
+        logger.INFO(r"[FIREFOX] Firefox cerrado  [file:firefox.py, method:_cerrar_firefox, line:520]")
         time.sleep(1.0)
         return True
 
     except Exception as exc:
-        logger.ERROR(r"[FIREFOX] Error cerrando Firefox: %s  [file:firefox.py, method:_cerrar_firefox, line:526]"))
+        logger.ERROR(r"[FIREFOX] Error cerrando Firefox: %s  [file:firefox.py, method:_cerrar_firefox, line:526]")
         return False
 
 
@@ -535,7 +536,7 @@ def _calibrar_firefox() -> Dict[str, Any]:
 
     Esta función no fabrica coordenadas.
     """
-    logger.WARNING(r"[FIREFOX] _calibrar_firefox() es una función legacy. La calibración real utiliza el flujo universal.  [file:firefox.py, method:_calibrar_firefox, line:552]"))
+    logger.WARNING(r"[FIREFOX] _calibrar_firefox() es una función legacy. La calibración real utiliza el flujo universal.  [file:firefox.py, method:_calibrar_firefox, line:552]")
     return {
         "aplicacion": "firefox",
         "elementos_calibrados": [],
@@ -587,7 +588,7 @@ def _capturar_firefox() -> Optional[str]:
         width = info["width"]
         height = info["height"]
         if width <= 0 or height <= 0:
-            logger.WARNING(r"[FIREFOX] Dimensiones de ventana inválidas  [file:firefox.py, method:get_window_dimensions, line:590]"))
+            logger.WARNING(r"[FIREFOX] Dimensiones de ventana inválidas  [file:firefox.py, method:get_window_dimensions, line:590]")
             return None
 
         screenshot = pyautogui.screenshot(
@@ -605,11 +606,11 @@ def _capturar_firefox() -> Optional[str]:
             / f"temp_firefox_{int(time.time() * 1000)}.png"
         )
         screenshot.save(temp_path)
-        logger.INFO(r"[FIREFOX] Captura de Firefox guardada: %s  [file:firefox.py, method:_capturar_firefox, line:618]"))
+        logger.INFO(r"[FIREFOX] Captura de Firefox guardada: %s  [file:firefox.py, method:_capturar_firefox, line:618]")
         return str(temp_path)
 
     except Exception as exc:
-        logger.ERROR(r"[FIREFOX] Error capturando Firefox: %s  [file:firefox.py, method:_capturar_firefox, line:625]"))
+        logger.ERROR(r"[FIREFOX] Error capturando Firefox: %s  [file:firefox.py, method:_capturar_firefox, line:625]")
         return None
 
 
@@ -634,3 +635,4 @@ def get_firefox_commands() -> list:
         "_generar_coordenadas_firefox",
         "_capturar_firefox",
     ]
+

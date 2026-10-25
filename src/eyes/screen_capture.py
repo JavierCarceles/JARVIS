@@ -33,6 +33,7 @@ class ScreenCapture:
         """Inicializa el sistema de captura."""
         self.analyzer = None
         logger._print_log("debug", "[SCREEN-CAPTURE] Sistema de captura inicializado", "screen_capture.py", "method", 35)
+
     
     def _get_analyzer(self):
         """Lazy initialization of ScreenAnalyzer to avoid circular imports."""
@@ -42,6 +43,7 @@ class ScreenCapture:
                 self.analyzer = ScreenAnalyzer()
             except ImportError:
                 logger._print_log("warning", "[SCREEN-CAPTURE] ScreenAnalyzer no disponible (circular import evitada)", "screen_capture.py", "method", 44)
+
                 self.analyzer = None
         return self.analyzer
 
@@ -64,10 +66,12 @@ class ScreenCapture:
             monitor = get_monitor_info(monitor_num)
 
             if monitor is None:
-                logger._print_log("info", "Procesando solicitud", "screen_capture.py", "method", 67) + " no encontrado", "screen_capture.py", "capture_monitor", 69)
+                logger._print_log("info", "Procesando solicitud", "screen_capture.py", "method", 67)
+
                 return None
 
-            logger._print_log("info", "Procesando solicitud", "screen_capture.py", "method", 67) + "," + str(monitor.top) + ") size=" + str(monitor.width) + "x" + str(monitor.height), "screen_capture.py", "capture_monitor", 74)
+            logger._print_log("info", "Procesando solicitud", "screen_capture.py", "method", 67)
+
 
             expected_size = (
                 int(monitor.width),
@@ -86,7 +90,8 @@ class ScreenCapture:
 
             # Fallback si PyAutoGUI devuelve una dimensión inesperada
             if screenshot.size != expected_size:
-                logger._print_log("info", "Procesando solicitud", "screen_capture.py", "method", 67) + "x" + str(screenshot.height) + "; se esperaba " + str(expected_size[0]) + "x" + str(expected_size[1]) + ". Intentando ImageGrab.", "screen_capture.py", "capture_monitor", 89)
+                logger._print_log("info", "Procesando solicitud", "screen_capture.py", "method", 67)
+
 
                 try:
                     screenshot = ImageGrab.grab(
@@ -125,15 +130,18 @@ class ScreenCapture:
 
             screenshot.save(str(output_path))
 
-            logger._print_log("info", "Procesando solicitud", "screen_capture.py", "method", 67) + " (" + str(screenshot.width) + "x" + str(screenshot.height) + ")", "screen_capture.py", "capture_monitor", 138)
+            logger._print_log("info", "Procesando solicitud", "screen_capture.py", "method", 67)
+
 
             if screenshot.size != expected_size:
-                logger._print_log("info", "Procesando solicitud", "screen_capture.py", "method", 67) + "x" + str(screenshot.height) + " en lugar de " + str(expected_size[0]) + "x" + str(expected_size[1]) + ".", "screen_capture.py", "capture_monitor", 148)
+                logger._print_log("info", "Procesando solicitud", "screen_capture.py", "method", 67)
+
 
             return str(output_path.resolve())
 
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "screen_capture.py", "method", 67) + ": " + str(exc), "screen_capture.py", "capture_monitor", 153)
+            logger._print_log("info", "Procesando solicitud", "screen_capture.py", "method", 67)
+
             return None
 
     def capture_region(
@@ -181,12 +189,14 @@ class ScreenCapture:
 
             screenshot.save(str(output_path))
 
-            logger._print_log("info", "Procesando solicitud", "screen_capture.py", "method", 67), "screen_capture.py", "capture_region", 209)
+            logger._print_log("info", "Procesando solicitud", "screen_capture.py", "method", 67)
+
 
             return str(output_path.resolve())
 
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "screen_capture.py", "method", 67), "screen_capture.py", "capture_region", 212)
+            logger._print_log("info", "Procesando solicitud", "screen_capture.py", "method", 67)
+
             return None
 
     def capture_element(
@@ -206,6 +216,7 @@ class ScreenCapture:
                 dict,
             ):
                 logger._print_log("error", r"[SCREEN-CAPTURE] Coordenadas de elemento inválidas [file:screen_capture.py, method:capture_element, line:232]", "screen_capture.py", "method", 208)
+
                 return None
 
             x = int(
@@ -245,7 +256,8 @@ class ScreenCapture:
             )
 
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "screen_capture.py", "method", 67), "screen_capture.py", "capture_element", 272)
+            logger._print_log("info", "Procesando solicitud", "screen_capture.py", "method", 67)
+
             return None
 
     def capture_active_window(
@@ -262,6 +274,7 @@ class ScreenCapture:
 
             if not active_window:
                 logger._print_log("error", r"[SCREEN-CAPTURE] No hay ventana activa [file:screen_capture.py, method:capture_active_window, line:279]", "screen_capture.py", "method", 264)
+
                 return None
 
             left = int(active_window.left)
@@ -271,6 +284,7 @@ class ScreenCapture:
 
             if width <= 0 or height <= 0:
                 logger._print_log("error", r"[SCREEN-CAPTURE] Dimensiones de ventana activa inválidas [file:screen_capture.py, method:capture_active_window, line:288]", "screen_capture.py", "method", 273)
+
                 return None
 
             try:
@@ -309,12 +323,14 @@ class ScreenCapture:
 
             screenshot.save(str(output_path))
 
-            logger._print_log("info", "Procesando solicitud", "screen_capture.py", "method", 67), "screen_capture.py", "capture_active_window", 317)
+            logger._print_log("info", "Procesando solicitud", "screen_capture.py", "method", 67)
+
 
             return str(output_path.resolve())
 
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "screen_capture.py", "method", 67), "screen_capture.py", "capture_active_window", 332)
+            logger._print_log("info", "Procesando solicitud", "screen_capture.py", "method", 67)
+
             return None
 
     def get_world_state(self):
@@ -322,6 +338,7 @@ class ScreenCapture:
         analyzer = self._get_analyzer()
         if analyzer is None:
             logger._print_log("warning", r"[SCREEN-CAPTURE] ScreenAnalyzer no disponible [file:screen_capture.py, method:get_world_state, line:324]", "screen_capture.py", "method", 324)
+
             from src.eyes.screen import WorldState
             return WorldState(applications={}, timestamp=time.time())
         return analyzer.build_world_state()
@@ -331,6 +348,7 @@ class ScreenCapture:
         analyzer = self._get_analyzer()
         if analyzer is None:
             logger._print_log("warning", r"[SCREEN-CAPTURE] ScreenAnalyzer no disponible [file:screen_capture.py, method:get_application_state, line:344]", "screen_capture.py", "method", 333)
+
             from src.eyes.screen import ApplicationInfo, ApplicationState
             return ApplicationInfo(name=app_name, state=ApplicationState.CLOSED)
         return analyzer.analyze_application_state(app_name)

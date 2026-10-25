@@ -1,4 +1,4 @@
-﻿"""
+"""
 ArchitecturalEvolutionManager v2.8.0
 Gestor de evolución de arquitectura interna que permite a JARVIS modificar 
 sus estructuras internas, componentes y flujos de trabajo de forma controlada.

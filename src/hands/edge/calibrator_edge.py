@@ -54,6 +54,7 @@ class EdgeCalibrator:
 
         logger._print_log("info", "Procesando solicitud", "calibrator_edge.py", "method", 55)
 
+
     # ========================================================================
     # API LEGACY
     # ========================================================================
@@ -68,9 +69,8 @@ class EdgeCalibrator:
         actual trabaja con cualquier número de monitores.
         """
 
-        logger._print_log("info", "Procesando solicitud", "calibrator_edge.py", "method", 55) es una API legacy. Delegando en la calibración universal.", 
-            "calibrator_edge.py", "calibrate_edge_both_screens", 75
-        )
+        logger._print_log("info", "Procesando solicitud", "calibrator_edge.py", "method", 55)
+
 
         try:
             result = self._calibrate_edge_universal()
@@ -81,6 +81,7 @@ class EdgeCalibrator:
 
         except Exception as e:
             logger._print_log("info", "Procesando solicitud", "calibrator_edge.py", "method", 55)
+
 
             return {
                 "edge": {
@@ -101,11 +102,13 @@ class EdgeCalibrator:
 
         logger._print_log("info", r"Solicitada calibración universal de Edge. [file:calibrator_edge.py, method:calibrate_edge, line:111]", "calibrator_edge.py", "method", 102)
 
+
         try:
             return self._calibrate_edge_universal()
 
         except Exception as e:
             logger._print_log("info", "Procesando solicitud", "calibrator_edge.py", "method", 55)
+
 
             return {
                 "success": False,
@@ -136,12 +139,8 @@ class EdgeCalibrator:
         )
 
         if not callable(calibrate_method):
-            logger._print_log("info", "Procesando solicitud", "calibrator_edge.py", "method", 55)", 
-                "calibrator_edge.py", "_calibrate_edge_universal", 152
-            )
-            raise AttributeError(
-                "CalibrationManager no dispone de calibrate_application()."
-            )
+            logger._print_log("info", "Procesando solicitud", "calibrator_edge.py", "method", 55)
+
 
         application_candidates = (
             "Microsoft Edge",
@@ -153,6 +152,7 @@ class EdgeCalibrator:
         for application_name in application_candidates:
             try:
                 logger._print_log("info", "Procesando solicitud", "calibrator_edge.py", "method", 55)
+
 
                 result = calibrate_method(application_name)
 
@@ -175,11 +175,14 @@ class EdgeCalibrator:
 
                 logger._print_log("info", "Procesando solicitud", "calibrator_edge.py", "method", 55)
 
+
         if last_error is not None:
             logger._print_log("info", "Procesando solicitud", "calibrator_edge.py", "method", 55)
+
             raise last_error
 
         logger._print_log("info", "Procesando solicitud", "calibrator_edge.py", "method", 55)
+
         raise RuntimeError(
             "No se pudo localizar Microsoft Edge mediante CalibrationManager."
         )
@@ -198,6 +201,7 @@ def calibrate_edge() -> str:
     """
 
     logger._print_log("info", "Procesando solicitud", "calibrator_edge.py", "method", 55)
+
 
     try:
         calibrator = EdgeCalibrator()
@@ -228,5 +232,6 @@ def calibrate_edge() -> str:
 
     except Exception as e:
         logger._print_log("info", "Procesando solicitud", "calibrator_edge.py", "method", 55)
+
 
         return f"Error en la calibración universal de Edge: {str(e)}"

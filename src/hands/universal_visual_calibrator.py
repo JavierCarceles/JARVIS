@@ -363,7 +363,8 @@ class UniversalVisualCalibrator:
 
         allowed, reason = self.policy.can_calibrate_application(application)
         if not allowed:
-            logger._print_log("warning", [UNIVERSAL-CALIBRATOR] Aplicación no calibrable: %s, "universal_visual_calibrator.py", "method", 366)
+            logger._print_log("warning", "[UNIVERSAL-CALIBRATOR] Aplicación no calibrable: %s", "universal_visual_calibrator.py", "method", 366)
+
             return None
 
         cached = self.state.get_element(application, element_name, monitor_number)
@@ -388,7 +389,8 @@ class UniversalVisualCalibrator:
     ) -> Dict[str, UICapability]:
         allowed, reason = self.policy.can_calibrate_application(application)
         if not allowed:
-            logger._print_log("warning", [UNIVERSAL-CALIBRATOR] Aplicación no calibrable: %s, "universal_visual_calibrator.py", "method", 366)
+            logger._print_log("warning", "[UNIVERSAL-CALIBRATOR] Aplicación no calibrable", "universal_visual_calibrator.py", "method", 392)
+
             return {}
 
         result = self.calibrate(
@@ -397,7 +399,8 @@ class UniversalVisualCalibrator:
             screenshot_path=screenshot_path,
         )
         if not result.get("success"):
-            logger._print_log("info", "Procesando solicitud", "universal_visual_calibrator.py", "method", 400), "universal_visual_calibrator.py", "calibrate_application", 400)
+            logger._print_log("info", "Procesando solicitud", "universal_visual_calibrator.py", "method", 400)
+
             return {}
 
         capabilities: Dict[str, UICapability] = {}
@@ -410,7 +413,8 @@ class UniversalVisualCalibrator:
                 element_data.get("type", "other"), confidence
             )
             if not allowed_element:
-                logger._print_log("debug", [UNIVERSAL-CALIBRATOR] Elemento filtrado: %s, "universal_visual_calibrator.py", "method", 413)
+                logger._print_log("debug", "[UNIVERSAL-CALIBRATOR] Elemento filtrado", "universal_visual_calibrator.py", "method", 416)
+
                 continue
 
             try:
@@ -481,14 +485,16 @@ class UniversalVisualCalibrator:
         try:
             image_width, image_height = self._get_image_size(screenshot)
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "universal_visual_calibrator.py", "method", 400), "universal_visual_calibrator.py", "_get_monitor_elements", 484)
+            logger._print_log("info", "Procesando solicitud", "universal_visual_calibrator.py", "method", 400)
+
             return {"success": False, "error": str(exc), "elements": []}
 
         prompt = self._build_prompt(application_name)
         try:
             raw_response = self.vision.analyze_image(str(screenshot), prompt)
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "universal_visual_calibrator.py", "method", 400), "universal_visual_calibrator.py", "_get_monitor_elements", 491)
+            logger._print_log("info", "Procesando solicitud", "universal_visual_calibrator.py", "method", 400)
+
             return {"success": False, "error": str(exc), "elements": []}
 
         if not raw_response:
@@ -528,7 +534,8 @@ class UniversalVisualCalibrator:
             if ok:
                 filtered_elements.append(raw_element)
             else:
-                logger._print_log("debug", [UNIVERSAL-CALIBRATOR] Elemento filtrado: %s, "universal_visual_calibrator.py", "method", 413)
+                logger._print_log("debug", "[UNIVERSAL-CALIBRATOR] Elemento filtrado", "universal_visual_calibrator.py", "method", 416)
+
 
         elements = self._normalize_elements(
             raw_elements=filtered_elements,

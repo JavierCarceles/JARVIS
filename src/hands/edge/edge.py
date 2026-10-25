@@ -39,6 +39,7 @@ def _get_edge_windows() -> List[Any]:
             candidates = gw.getWindowsWithTitle(title)
         except Exception as exc:
             logger._print_log("DEBUG", f"[EDGE] Error buscando ventanas con título {title!r}: {exc}", "edge.py", "_get_edge_windows", 41)
+
             continue
 
         for win in candidates:
@@ -78,6 +79,7 @@ def _get_edge_window_info(window: Any) -> Optional[Dict[str, Any]]:
         }
     except Exception as exc:
         logger._print_log("DEBUG", r"[EDGE] No se pudo obtener información de la ventana: %s  [file:edge.py, method:_get_edge_window_info, line:80]", "edge.py", "_get_edge_window_info", 80)
+
         return None
 
 
@@ -130,6 +132,7 @@ def abrir_edge_pantalla(pantalla: int = 1) -> str:
     """Abre Microsoft Edge y lo posiciona en la pantalla solicitada."""
     logger._print_log("info", "Procesando solicitud", "edge.py", "method", 131)
 
+
     try:
         if pantalla < 1:
             return "Error: el número de pantalla debe ser mayor que 0."
@@ -163,6 +166,7 @@ def abrir_edge_pantalla(pantalla: int = 1) -> str:
 
         if edge_window is None:
             logger._print_log("WARNING", r"[EDGE] Edge se abrió pero no se encontró su ventana.  [file:edge.py, method:abrir_edge_pantalla, line:165]", "edge.py", "abrir_edge_pantalla", 165)
+
             return (
                 f"Microsoft Edge está abierto, pero no he podido localizar su "
                 f"ventana para la pantalla {pantalla}."
@@ -178,12 +182,14 @@ def abrir_edge_pantalla(pantalla: int = 1) -> str:
 
     except Exception as exc:
         logger._print_log("ERROR", r"[EDGE] Error al abrir Edge en pantalla %s: %s", "edge.py", "abrir_edge_pantalla", 180)
+
         return f"Error al abrir Edge en pantalla {pantalla}: {exc}"
 
 
 def abrir_edge_pestana(pantalla: int = 1) -> str:
     """Abre una nueva pestaña de Edge en la pantalla solicitada."""
     logger._print_log("info", "Procesando solicitud", "edge.py", "method", 131)
+
 
     try:
         if pantalla < 1:
@@ -231,6 +237,7 @@ def abrir_edge_pestana(pantalla: int = 1) -> str:
         time.sleep(0.3)
 
         logger._print_log("info", "Procesando solicitud", "edge.py", "method", 131)
+
         return (
             "He abierto una nueva pestaña en tu Microsoft Edge "
             f"de la pantalla {pantalla}."
@@ -238,6 +245,7 @@ def abrir_edge_pestana(pantalla: int = 1) -> str:
 
     except Exception as exc:
         logger._print_log("ERROR", r"[EDGE] Error al intentar manipular Edge: %s", "edge.py", "abrir_edge_pestana", 240)
+
         return f"Error al abrir una nueva pestaña de Edge: {exc}"
 
 
@@ -281,20 +289,24 @@ def _abrir_edge_desde_ruta() -> bool:
             try:
                 if not os.path.isfile(ruta):
                     logger._print_log("DEBUG", r"[EDGE] Ruta no encontrada: %s", "edge.py", "_candidate_edge_paths", 283)
+
                     continue
 
                 logger._print_log("info", "Procesando solicitud", "edge.py", "method", 131)
+
                 subprocess.Popen([ruta], close_fds=True)
                 time.sleep(1.5)
                 return True
             except (OSError, subprocess.SubprocessError) as exc:
                 logger._print_log("DEBUG", r"[EDGE] Error con ruta %s: %s", "edge.py", "_candidate_edge_paths", 291)
 
+
         logger._print_log("WARNING", "[EDGE] No se encontró msedge.exe en las rutas habituales.", "edge.py", "_abrir_edge_desde_ruta", 293)
+
         return False
 
     except Exception as exc:
-        logger.ERROR(r"[EDGE] Error abriendo Edge: %s  [file:edge.py, method:_abrir_edge_desde_ruta, line:306]"))
+        logger.ERROR(r"[EDGE] Error abriendo Edge: %s  [file:edge.py, method:_abrir_edge_desde_ruta, line:306]")
         return False
 
 
@@ -317,7 +329,7 @@ def _verificar_edge_abierto() -> bool:
         return False
 
     except Exception as exc:
-        logger.ERROR(r"[EDGE] Error verificando Edge: %s  [file:edge.py, method:_verificar_edge_abierto, line:329]"))
+        logger.ERROR(r"[EDGE] Error verificando Edge: %s  [file:edge.py, method:_verificar_edge_abierto, line:329]")
         return False
 
 
@@ -361,7 +373,7 @@ def _verificar_edge_instalado() -> bool:
         return False
 
     except Exception as exc:
-        logger.DEBUG(r"[EDGE] Error verificando Edge instalado: %s  [file:edge.py, method:_verificar_edge_instalado, line:373]"))
+        logger.DEBUG(r"[EDGE] Error verificando Edge instalado: %s  [file:edge.py, method:_verificar_edge_instalado, line:373]")
         return False
 
 
@@ -380,10 +392,10 @@ def _move_edge_window(window: Any, monitor: Any) -> bool:
         try:
             window.maximize()
         except Exception as exc:
-            logger.DEBUG(r"[EDGE] No se pudo maximizar Edge: %s  [file:edge.py, method:_move_edge_window, line:392]"))
+            logger.DEBUG(r"[EDGE] No se pudo maximizar Edge: %s  [file:edge.py, method:_move_edge_window, line:392]")
         return True
     except Exception as exc:
-        logger.WARNING(r"[EDGE] No se pudo mover Edge al monitor: %s  [file:edge.py, method:_move_edge_window, line:395]"))
+        logger.WARNING(r"[EDGE] No se pudo mover Edge al monitor: %s  [file:edge.py, method:_move_edge_window, line:395]")
         return False
 
 
@@ -391,19 +403,20 @@ def _mover_edge_a_pantalla(pantalla_num: int) -> bool:
     """Mueve una ventana de Edge al monitor solicitado."""
     try:
         if pantalla_num < 1:
-            logger.WARNING(r"[EDGE] Número de pantalla inválido: %s  [file:edge.py, method:_mover_edge_a_pantalla, line:403]"))
+            logger.WARNING(r"[EDGE] Número de pantalla inválido: %s  [file:edge.py, method:_mover_edge_a_pantalla, line:403]")
             return False
 
         screen_manager = get_screen_manager()
         screen_manager.refresh_monitors()
         monitor = screen_manager.get_monitor(pantalla_num)
         if monitor is None:
-            logger.WARNING(r"[EDGE] El monitor %s no existe  [file:edge.py, method:_mover_edge_a_pantalla, line:410]"))
+            logger.WARNING(r"[EDGE] El monitor %s no existe  [file:edge.py, method:_mover_edge_a_pantalla, line:410]")
             return False
 
         win = _select_edge_window(preferred_monitor=pantalla_num)
         if win is None:
             logger._print_log("warning", "[EDGE] No se encontró ventana de Edge para mover", "edge.py", "method", 406)
+
             return False
 
         if _move_edge_window(win, monitor):
@@ -419,6 +432,7 @@ def _mover_edge_a_pantalla(pantalla_num: int) -> bool:
 
     except Exception as exc:
         logger._print_log("info", "Procesando solicitud", "edge.py", "method", 131)
+
         return False
 
 
@@ -435,12 +449,12 @@ def _cerrar_edge() -> bool:
             return False
 
         win.close()
-        logger.INFO(r"[EDGE] Edge cerrado  [file:edge.py, method:cerrar_edge, line:452]"))
+        logger.INFO(r"[EDGE] Edge cerrado  [file:edge.py, method:cerrar_edge, line:452]")
         time.sleep(1.0)
         return True
 
     except Exception as exc:
-        logger.ERROR(r"[EDGE] Error cerrando Edge: %s  [file:edge.py, method:_cerrar_edge, line:457]"))
+        logger.ERROR(r"[EDGE] Error cerrando Edge: %s  [file:edge.py, method:_cerrar_edge, line:457]")
         return False
 
 
@@ -505,7 +519,7 @@ def _capturar_edge() -> Optional[str]:
     try:
         win = _select_edge_window()
         if win is None:
-            logger.WARNING(r"[EDGE] No se encontró ventana de Edge para capturar  [file:edge.py, method:_capturar_edge, line:522]"))
+            logger.WARNING(r"[EDGE] No se encontró ventana de Edge para capturar  [file:edge.py, method:_capturar_edge, line:522]")
             return None
 
         info = _get_edge_window_info(win)
@@ -524,11 +538,11 @@ def _capturar_edge() -> Optional[str]:
         project_root = get_screen_manager().project_root
         temp_path = Path(project_root) / f"temp_edge_{int(time.time() * 1000)}.png"
         screenshot.save(temp_path)
-        logger.INFO(r"[EDGE] Captura de Edge guardada: %s  [file:edge.py, method:_capturar_edge, line:541]"))
+        logger.INFO(r"[EDGE] Captura de Edge guardada: %s  [file:edge.py, method:_capturar_edge, line:541]")
         return str(temp_path)
 
     except Exception as exc:
-        logger.ERROR(r"[EDGE] Error capturando Edge: %s  [file:edge.py, method:_capturar_edge, line:545]"))
+        logger.ERROR(r"[EDGE] Error capturando Edge: %s  [file:edge.py, method:_capturar_edge, line:545]")
         return None
 
 
@@ -551,3 +565,4 @@ def get_edge_commands() -> list:
         "_generar_coordenadas_edge",
         "_capturar_edge",
     ]
+

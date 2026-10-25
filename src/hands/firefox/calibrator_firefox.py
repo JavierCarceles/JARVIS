@@ -53,7 +53,8 @@ class FirefoxCalibrator:
     def __init__(self) -> None:
         self.calibration_manager = CalibrationManager()
 
-        logger._print_log("info", r"[CALIBRATOR-FIREFOX] Adaptador inicializado. La calibración utiliza el flujo universal. [file:calibrator_firefox.py, method:__init__, line:57]", "calibrator_firefox.py", "method", 56)
+        logger._print_log("info", "procesando solicitud", "src\hands\firefox\calibrator_firefox.py", "method", 56)
+
 
     # ========================================================================
     # API LEGACY
@@ -72,7 +73,8 @@ class FirefoxCalibrator:
         Esta función delega la calibración exclusivamente en el sistema
         universal.
         """
-        logger._print_log("warning", r"[CALIBRATOR-FIREFOX] calibrate_firefox_both_screens(, "calibrator_firefox.py", "method", 75) es una API legacy. Delegando en la calibración universal. [file:calibrator_firefox.py, method:calibrate_firefox_both_screens, line:80]")
+        logger._print_log("warning", "procesando solicitud", "src\hands\firefox\calibrator_firefox.py", "method", 76)
+
 
         try:
             result = self._calibrate_firefox_universal()
@@ -82,7 +84,8 @@ class FirefoxCalibrator:
             }
 
         except Exception as e:
-            logger._print_log("error", r"[CALIBRATOR-FIREFOX] Error en delegación universal: %s [file:calibrator_firefox.py, method:calibrate_firefox_both_screens, line:86]", "calibrator_firefox.py", "method", 85)
+            logger._print_log("error", "procesando solicitud", "src\hands\firefox\calibrator_firefox.py", "method", 87)
+
 
             return {
                 "firefox": {
@@ -98,13 +101,15 @@ class FirefoxCalibrator:
 
         Delegación directa al flujo universal.
         """
-        logger._print_log("info", r"[CALIBRATOR-FIREFOX] Iniciando calibración universal de Firefox... [file:calibrator_firefox.py, method:calibrate_firefox, line:105]", "calibrator_firefox.py", "method", 101)
+        logger._print_log("info", "procesando solicitud", "src\hands\firefox\calibrator_firefox.py", "method", 104)
+
 
         try:
             return self._calibrate_firefox_universal()
 
         except Exception as e:
-            logger._print_log("error", r"[CALIBRATOR-FIREFOX] Error calibrando Firefox: %s [file:calibrator_firefox.py, method:calibrate_firefox, line:113]", "calibrator_firefox.py", "method", 107)
+            logger._print_log("error", "procesando solicitud", "src\hands\firefox\calibrator_firefox.py", "method", 111)
+
 
             return {
                 "success": False,
@@ -150,7 +155,8 @@ class FirefoxCalibrator:
 
         for application_name in application_candidates:
             try:
-                logger._print_log("info", r"[CALIBRATOR-FIREFOX] Solicitando al CalibrationManager la aplicación '%s' [file:calibrator_firefox.py, method:_calibrate_firefox_universal, line:162]", "calibrator_firefox.py", "method", 153)
+                logger._print_log("info", "procesando solicitud", "src\hands\firefox\calibrator_firefox.py", "method", 158)
+
 
                 result = calibrate_method(application_name)
 
@@ -171,7 +177,8 @@ class FirefoxCalibrator:
             except Exception as e:
                 last_error = e
 
-                logger._print_log("debug", r"[CALIBRATOR-FIREFOX] No se pudo calibrar '%s': %s [file:calibrator_firefox.py, method:_calibrate_firefox_universal, line:188]", "calibrator_firefox.py", "method", 174)
+                logger._print_log("debug", "procesando solicitud", "src\hands\firefox\calibrator_firefox.py", "method", 180)
+
 
         if last_error is not None:
             raise last_error
@@ -194,7 +201,8 @@ def calibrate_firefox() -> str:
     El guardado de coordenadas pertenece al flujo universal.
     """
 
-    logger._print_log("info", r"[CALIBRATOR-FIREFOX] Solicitud de calibración de Firefox [file:calibrator_firefox.py, method:calibrate_firefox, line:214]", "calibrator_firefox.py", "method", 197)
+    logger._print_log("info", "procesando solicitud", "src\hands\firefox\calibrator_firefox.py", "method", 204)
+
 
     try:
         calibrator = FirefoxCalibrator()
@@ -221,6 +229,7 @@ def calibrate_firefox() -> str:
         return "Calibración universal de Firefox ejecutada."
 
     except Exception as e:
-        logger._print_log("error", r"[CALIBRATOR-FIREFOX] Error en calibración: %s [file:calibrator_firefox.py, method:calibrate_firefox, line:242]", "calibrator_firefox.py", "method", 224)
+        logger._print_log("error", "procesando solicitud", "src\hands\firefox\calibrator_firefox.py", "method", 232)
+
 
         return f"Error en la calibración universal de Firefox: {str(e)}"

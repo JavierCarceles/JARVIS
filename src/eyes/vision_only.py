@@ -110,7 +110,7 @@ class Vision:
         self._vision_nodes = self._create_vision_nodes()
 
         logger._print_log("info", "Procesando solicitud", "vision_only.py", "method", 112)
-        logger._print_log("info", "Procesando solicitud", "vision_only.py", "method", 112), "vision_only.py", "__init__", 116)
+        logger._print_log("info", "Procesando solicitud", "vision_only.py", "method", 112)
     
     def _create_vision_nodes(self) -> List[Any]:
         """Crea los nodos de visión estándar para el planificador."""
@@ -130,7 +130,7 @@ class Vision:
         Returns:
             Respuesta del modelo como string
         """
-        logger._print_log("info", "Procesando solicitud", "vision_only.py", "method", 112)", "vision_only.py", "analyze_image", 133)
+        logger._print_log("info", "Procesando solicitud", "vision_only.py", "method", 112)
         
         try:
             response = ollama.chat(
@@ -166,7 +166,7 @@ class Vision:
             return result
             
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "vision_only.py", "method", 112), "vision_only.py", "analyze_image", 169)
+            logger._print_log("info", "Procesando solicitud", "vision_only.py", "method", 112)
             return f"ERROR: {exc}"
 
     def verify_action_result(self, expected_state: Dict[str, Any], tolerance: float = 0.1) -> Dict[str, Any]:
