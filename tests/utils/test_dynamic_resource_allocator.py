@@ -16,6 +16,14 @@ import unittest
 import unittest.mock
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', 'src'))
 from utils.dynamic_resource_allocator import (
+    DynamicResourceAllocator,
+    ResourceType,
+    ResourcePriority,
+    ResourceAllocation,
+    AllocationStatus,
+    ResourceRequest,
+    ResourceAvailability,
+)
 from datetime import datetime
 from unittest.mock import Mock, patch
 from utils.contextual_adaptation_engine import ContextualAdaptationEngine

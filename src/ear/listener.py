@@ -96,9 +96,10 @@ class CalibrationNode(AudioNode):
         levels = []
         
         for _ in range(20):
-            if not audio_queue.empty():
-                chunk = audio_queue.get()
-                levels.append(self._rms(chunk.flatten()))
+            if audio_queue.empty():
+                break
+            chunk = audio_queue.get()
+            levels.append(self._rms(chunk.flatten()))
         
         if not levels:
             logger._print_log("DEBUG", "No se detectó audio durante calibración, usando valor por defecto", "listener.py", "execute", 105)
@@ -290,8 +291,7 @@ class RecordingNode(AudioNode):
         
         while True:
             if audio_queue.empty():
-                time.sleep(0.01)
-                continue
+                break
             
             chunk = audio_queue.get().flatten()
             volume = self._rms(chunk)

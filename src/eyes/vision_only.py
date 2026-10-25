@@ -37,34 +37,13 @@ class VisionNodeType(Enum):
 class UIElement:
     """Elemento UI detectado por visión."""
     
-    name: str = Field(
-        ...,
-        description="Nombre del elemento.",
-    )
-    type: str = Field(
-        ...,
-        description="Tipo de elemento.",
-    )
-    text: Optional[str] = Field(
-        default=None,
-        description="Texto o descripción del elemento.",
-    )
-    bbox: List[int] = Field(
-        ...,
-        description="Bounding box [x1, y1, x2, y2].",
-    )
-    center: List[int] = Field(
-        default_factory=list,
-        description="Centro [x, y], si está disponible.",
-    )
-    interactive: bool = Field(
-        True,
-        description="Indica si el elemento es interactivo.",
-    )
-    confidence: float = Field(
-        ...,
-        description="Confianza entre 0.0 y 1.0.",
-    )
+    name: str
+    type: str
+    bbox: List[int]
+    confidence: float
+    text: Optional[str] = None
+    center: List[int] = field(default_factory=list)
+    interactive: bool = True
 
 
 class VisionResponse(BaseModel):
@@ -166,7 +145,6 @@ class Vision:
             return result
             
         except Exception as exc:
-            import traceback; traceback.print_exc()
             logger._print_log("info", "Procesando solicitud", "vision_only.py", "method", 112)
             return f"ERROR: {exc}"
 
@@ -383,6 +361,9 @@ Responde en JSON:
                     )
                 
                 state_str = data.get("state", "closed").lower()
+
+                # Importar aquí para evitar circular imports
+                from src.eyes.screen import ApplicationInfo, ApplicationState
                 state_map = {
                     "active": ApplicationState.ACTIVE,
                     "open": ApplicationState.OPEN,
@@ -390,9 +371,7 @@ Responde en JSON:
                     "maximized": ApplicationState.MAXIMIZED,
                     "closed": ApplicationState.CLOSED
                 }
-                
-                # Importar aquí para evitar circular imports
-                from src.eyes.screen import ApplicationInfo, ApplicationState
+
                 return ApplicationInfo(
                     name=app_name,
                     state=state_map.get(state_str, ApplicationState.OPEN),
@@ -409,6 +388,7 @@ Responde en JSON:
                 )
             
         except Exception as exc:
+            import traceback; traceback.print_exc()
             logger._print_log("info", "Procesando solicitud", "vision_only.py", "method", 112)
             # Importar aquí para evitar circular imports
             from src.eyes.screen import ApplicationInfo, ApplicationState
