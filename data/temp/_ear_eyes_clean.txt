@@ -1,0 +1,40 @@
+
+
+no tests ran in 5.68s
+
+python : ERROR: not found: C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\eyes\test_vision_only.py::TestCre
+
+ateMinimal::test_create_minimal
+
+En lnea: 1 Carcter: 58
+
++ ... /IA\JARVIS; python -m pytest "tests/ear/test_listener.py::TestCalibra ...
+
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    + CategoryInfo          : NotSpecified: (ERROR: not foun..._create_minimal:String) [], RemoteException
+
+    + FullyQualifiedErrorId : NativeCommandError
+
+ 
+
+(no match in any of [<Module test_vision_only.py>])
+
+
+
+ERROR: not found: C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\eyes\test_vision_only.py::TestAppDetectedA
+
+ctive::test_app_detected_active
+
+(no match in any of [<Module test_vision_only.py>])
+
+
+
+ERROR: not found: C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\eyes\test_vision_only.py::TestInvalidState
+
+DefaultsOpen::test_invalid_state_defaults_open
+
+(no match in any of [<Module test_vision_only.py>])
+
+
+

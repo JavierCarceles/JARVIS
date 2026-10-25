@@ -1,0 +1,72 @@
+
+
+=================================== ERRORS ====================================
+
+_ ERROR collecting tests/utils/contextual_adaptation_engine/test_corrupt_data.py _
+
+E   FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Informatica\\PROYECTOS\\BACKEND\\IA_PYTHON\\IA\\JARVIS\\tests\\utils\\contextual_adaptation_engine\\corruption_criteria_real.py'
+
+_ ERROR collecting tests/utils/contextual_adaptation_engine/test_goal_adaptation_recoverable.py _
+
+E   FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Informatica\\PROYECTOS\\BACKEND\\IA_PYTHON\\IA\\JARVIS\\tests\\utils\\contextual_adaptation_engine\\identify_recoverable_real.py'
+
+_ ERROR collecting tests/utils/contextual_adaptation_engine/test_goal_adaptation_recovery_partial.py _
+
+E   FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Informatica\\PROYECTOS\\BACKEND\\IA_PYTHON\\IA\\JARVIS\\tests\\utils\\contextual_adaptation_engine\\identify_recoverable_real.py'
+
+_ ERROR collecting tests/utils/contextual_adaptation_engine/test_goal_adaptation_rejection_runtime.py _
+
+E   FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Informatica\\PROYECTOS\\BACKEND\\IA_PYTHON\\IA\\JARVIS\\tests\\utils\\contextual_adaptation_engine\\verify_rejection_real.py'
+
+_ ERROR collecting tests/utils/contextual_adaptation_engine/test_goal_adaptation_total_loss_fallback.py _
+
+E   FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Informatica\\PROYECTOS\\BACKEND\\IA_PYTHON\\IA\\JARVIS\\tests\\utils\\contextual_adaptation_engine\\identify_fallback_real.py'
+
+________ ERROR collecting tests/utils/test_adaptive_learning_engine.py ________
+
+import file mismatch:
+
+imported module 'test_adaptive_learning_engine' has this __file__ attribute:
+
+  C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\utils\adaptive_learning_engine\test_adaptive_learning_engine.py
+
+which is not the same as the test file we want to collect:
+
+  C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\utils\test_adaptive_learning_engine.py
+
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+
+_____ ERROR collecting tests/utils/test_contextual_pattern_recognizer.py ______
+
+import file mismatch:
+
+imported module 'test_contextual_pattern_recognizer' has this __file__ attribute:
+
+  C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\test_contextual_pattern_recognizer.py
+
+which is not the same as the test file we want to collect:
+
+  C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\utils\test_contextual_pattern_recognizer.py
+
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+
+=========================== short test summary info ===========================
+
+ERROR tests/utils/contextual_adaptation_engine/test_corrupt_data.py - FileNot...
+
+ERROR tests/utils/contextual_adaptation_engine/test_goal_adaptation_recoverable.py
+
+ERROR tests/utils/contextual_adaptation_engine/test_goal_adaptation_recovery_partial.py
+
+ERROR tests/utils/contextual_adaptation_engine/test_goal_adaptation_rejection_runtime.py
+
+ERROR tests/utils/contextual_adaptation_engine/test_goal_adaptation_total_loss_fallback.py
+
+ERROR tests/utils/test_adaptive_learning_engine.py
+
+ERROR tests/utils/test_contextual_pattern_recognizer.py
+
+!!!!!!!!!!!!!!!!!!! Interrupted: 7 errors during collection !!!!!!!!!!!!!!!!!!!
+
+7 errors in 11.20s
+
