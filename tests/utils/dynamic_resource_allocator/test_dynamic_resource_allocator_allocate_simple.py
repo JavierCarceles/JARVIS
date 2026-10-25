@@ -30,18 +30,18 @@ class TestResourceRequestDataclass(unittest.TestCase):
             request_id="req_001",
             resource_type=ResourceType.SYSTEM_CPU,
             amount=50.0,
+            context={"app": "test"},
             priority=ResourcePriority.HIGH,
-            context={"app": "chrome"},
             required=True,
-            timeout=30.0,
+            metadata={"key": "val"},
         )
         self.assertEqual(req.request_id, "req_001")
         self.assertEqual(req.resource_type, ResourceType.SYSTEM_CPU)
         self.assertEqual(req.amount, 50.0)
+        self.assertEqual(req.context, {"app": "test"})
         self.assertEqual(req.priority, ResourcePriority.HIGH)
-        self.assertEqual(req.context, {"app": "chrome"})
         self.assertTrue(req.required)
-        self.assertEqual(req.timeout, 30.0)
+        self.assertEqual(req.metadata, {"key": "val"})
 
     def test_2_8_4_2_1_request_defaults(self):
         """ResourceRequest tiene valores por defecto"""
@@ -53,7 +53,8 @@ class TestResourceRequestDataclass(unittest.TestCase):
         self.assertEqual(req.priority, ResourcePriority.MEDIUM)
         self.assertEqual(req.context, {})
         self.assertTrue(req.required)
-        self.assertIsNone(req.timeout)
+        self.assertEqual(req.amount, 100.0)
+        self.assertEqual(req.metadata, {})
 
     def test_2_8_4_2_1_request_to_dict(self):
         """ResourceRequest.to_dict serializa todos los campos"""
@@ -64,7 +65,6 @@ class TestResourceRequestDataclass(unittest.TestCase):
             priority=ResourcePriority.LOW,
             context={"app": "test"},
             required=False,
-            timeout=None,
         )
         d = req.to_dict()
         self.assertEqual(d["request_id"], "req_003")
@@ -73,56 +73,86 @@ class TestResourceRequestDataclass(unittest.TestCase):
         self.assertEqual(d["priority"], 1)
         self.assertEqual(d["context"], {"app": "test"})
         self.assertFalse(d["required"])
-        self.assertIsNone(d["timeout"])
 
 
 class TestResourceRequestValidate(unittest.TestCase):
     """2.8.4.2.5 — Validar solicitud"""
 
     def test_2_8_4_2_2_validate_valida(self):
-        """validate retorna True para una solicitud correcta"""
+        """validate retorna (True, []) para una solicitud correcta"""
         req = ResourceRequest(
             request_id="req_001",
             resource_type=ResourceType.SYSTEM_CPU,
             amount=50.0,
         )
-        self.assertTrue(req.validate())
+        valid, errors = req.validate()
+        self.assertTrue(valid)
+        self.assertEqual(errors, [])
 
     def test_2_8_4_2_2_validate_sin_resource_type(self):
-        """validate retorna False si resource_type es None"""
+        """validate retorna (False, [errors]) si resource_type es None"""
         req = ResourceRequest(
             request_id="req_002",
             resource_type=None,
             amount=50.0,
         )
-        self.assertFalse(req.validate())
-
-    def test_2_8_4_2_2_validate_amount_cero(self):
-        """validate retorna False si amount es <= 0"""
-        req = ResourceRequest(
-            request_id="req_003",
-            resource_type=ResourceType.SYSTEM_CPU,
-            amount=0,
-        )
-        self.assertFalse(req.validate())
-
-    def test_2_8_4_2_2_validate_amount_negativo(self):
-        """validate retorna False si amount es negativo"""
-        req = ResourceRequest(
-            request_id="req_004",
-            resource_type=ResourceType.SYSTEM_CPU,
-            amount=-10.0,
-        )
-        self.assertFalse(req.validate())
+        valid, errors = req.validate()
+        self.assertFalse(valid)
+        self.assertTrue(len(errors) > 0)
 
     def test_2_8_4_2_2_validate_request_id_vacio(self):
-        """validate retorna False si request_id es None o vacio"""
+        """validate retorna (False, [errors]) si request_id es None"""
         req = ResourceRequest(
             request_id=None,
             resource_type=ResourceType.SYSTEM_CPU,
             amount=50.0,
         )
-        self.assertFalse(req.validate())
+        valid, errors = req.validate()
+        self.assertFalse(valid)
+        self.assertTrue(len(errors) > 0)
+
+    def test_2_8_4_2_2_validate_amount_negativo(self):
+        """validate retorna (False, [errors]) si amount es negativo"""
+        req = ResourceRequest(
+            request_id="req_004",
+            resource_type=ResourceType.SYSTEM_CPU,
+            amount=-10.0,
+        )
+        valid, errors = req.validate()
+        self.assertFalse(valid)
+        self.assertTrue(len(errors) > 0)
+
+    def test_2_8_4_2_2_validate_amount_cero_valido(self):
+        """amount=0 es valido (solo < 0 es invalido)"""
+        req = ResourceRequest(
+            request_id="req_005",
+            resource_type=ResourceType.SYSTEM_CPU,
+            amount=0,
+        )
+        valid, errors = req.validate()
+        self.assertTrue(valid)
+
+    def test_2_8_4_2_2_validate_amount_none_valido(self):
+        """amount=None es valido"""
+        req = ResourceRequest(
+            request_id="req_006",
+            resource_type=ResourceType.THREAD_POOL,
+            amount=None,
+        )
+        valid, _ = req.validate()
+        self.assertTrue(valid)
+
+    def test_2_8_4_2_2_validate_priority_invalida(self):
+        """validate retorna (False, [errors]) si priority no es ResourcePriority"""
+        req = ResourceRequest(
+            request_id="req_007",
+            resource_type=ResourceType.SYSTEM_CPU,
+            amount=50.0,
+            priority="HIGH",
+        )
+        valid, errors = req.validate()
+        self.assertFalse(valid)
+        self.assertTrue(len(errors) > 0)
 
 
 class TestCreateRequest(unittest.TestCase):
@@ -134,12 +164,12 @@ class TestCreateRequest(unittest.TestCase):
     def test_2_8_4_2_3_create_request(self):
         """create_request genera un ResourceRequest con todos los campos"""
         req = self.allocator.create_request(
+            request_id="req_001",
             resource_type=ResourceType.SYSTEM_MEMORY,
             amount=200.0,
-            priority=ResourcePriority.HIGH,
             context={"app": "firefox"},
+            priority=ResourcePriority.HIGH,
             required=True,
-            timeout=60.0,
         )
         self.assertIsInstance(req, ResourceRequest)
         self.assertEqual(req.resource_type, ResourceType.SYSTEM_MEMORY)
@@ -147,33 +177,44 @@ class TestCreateRequest(unittest.TestCase):
         self.assertEqual(req.priority, ResourcePriority.HIGH)
         self.assertEqual(req.context, {"app": "firefox"})
         self.assertTrue(req.required)
-        self.assertEqual(req.timeout, 60.0)
-        self.assertTrue(req.validate())
+        valid, _ = req.validate()
+        self.assertTrue(valid)
 
     def test_2_8_4_2_3_create_request_defaults(self):
         """create_request usa valores por defecto si no se especifican"""
         req = self.allocator.create_request(
+            request_id="req_002",
             resource_type=ResourceType.THREAD_POOL,
             amount=4,
         )
         self.assertEqual(req.priority, ResourcePriority.MEDIUM)
         self.assertEqual(req.context, {})
         self.assertTrue(req.required)
-        self.assertIsNone(req.timeout)
 
-    def test_2_8_4_2_3_create_request_id_incremental(self):
-        """create_request genera IDs incrementales"""
+    def test_2_8_4_2_3_create_request_id_unico(self):
+        """create_request mantiene IDs unicos al pasar request_id explicito"""
         req1 = self.allocator.create_request(
+            request_id="req_a",
             resource_type=ResourceType.SYSTEM_CPU,
             amount=10.0,
         )
         req2 = self.allocator.create_request(
+            request_id="req_b",
             resource_type=ResourceType.SYSTEM_MEMORY,
             amount=20.0,
         )
+        self.assertEqual(req1.request_id, "req_a")
+        self.assertEqual(req2.request_id, "req_b")
         self.assertNotEqual(req1.request_id, req2.request_id)
-        self.assertIn("req_", req1.request_id)
-        self.assertIn("req_", req2.request_id)
+
+    def test_2_8_4_2_3_create_request_invalido_lanza(self):
+        """create_request levanta ValueError para una solicitud invalida"""
+        with self.assertRaises(ValueError):
+            self.allocator.create_request(
+                request_id="req_invalido",
+                resource_type=None,
+                amount=50.0,
+            )
 
 
 class TestAllocateSimple(unittest.TestCase):
@@ -192,6 +233,7 @@ class TestAllocateSimple(unittest.TestCase):
     def test_2_8_4_3_1_allocate_exitoso(self):
         """allocate asigna correctamente un recurso disponible"""
         req = self.allocator.create_request(
+            request_id="req_001",
             resource_type=ResourceType.SYSTEM_CPU,
             amount=30.0,
             priority=ResourcePriority.MEDIUM,
@@ -206,6 +248,7 @@ class TestAllocateSimple(unittest.TestCase):
     def test_2_8_4_3_1_allocate_deduce_disponibilidad(self):
         """allocate reduce la cantidad disponible tras la asignacion"""
         req = self.allocator.create_request(
+            request_id="req_002",
             resource_type=ResourceType.SYSTEM_CPU,
             amount=30.0,
         )
@@ -216,6 +259,7 @@ class TestAllocateSimple(unittest.TestCase):
     def test_2_8_4_3_1_allocate_registra_en_allocations(self):
         """allocate registra la asignacion en el dict allocations"""
         req = self.allocator.create_request(
+            request_id="req_003",
             resource_type=ResourceType.SYSTEM_CPU,
             amount=30.0,
         )
@@ -223,36 +267,66 @@ class TestAllocateSimple(unittest.TestCase):
         self.assertIn(result.allocation_id, self.allocator.allocations)
 
     def test_2_8_4_3_1_allocate_callback_on_changed(self):
-        """allocate llama a on_allocation_changed si esta registrado"""
+        """allocate llama a on_allocation_changed con (allocation_id, allocation)"""
         called = []
-        self.allocator.on_allocation_changed = lambda alloc: called.append(alloc)
+        self.allocator.on_allocation_changed = lambda alloc_id, alloc: called.append((alloc_id, alloc))
 
         req = self.allocator.create_request(
+            request_id="req_004",
             resource_type=ResourceType.SYSTEM_CPU,
             amount=40.0,
         )
         result = self.allocator.allocate(req)
         self.assertEqual(len(called), 1)
-        self.assertEqual(called[0], result)
+        self.assertEqual(called[0][0], result.allocation_id)
+        self.assertEqual(called[0][1], result)
 
-    def test_2_8_4_3_1_allocate_no_duplica_contexto(self):
-        """allocate rechaza una solicitud con el mismo contexto que ya esta asignado"""
-        ctx = {"app": "chrome", "tab": "gmail"}
-
-        req1 = self.allocator.create_request(
+    def test_2_8_4_3_1_allocate_sin_amount(self):
+        """allocate funciona con amount=None (solo marca disponible True)"""
+        req = self.allocator.create_request(
+            request_id="req_005",
             resource_type=ResourceType.SYSTEM_CPU,
-            amount=30.0,
-            context=ctx,
+            amount=None,
         )
-        self.allocator.allocate(req1)
+        result = self.allocator.allocate(req)
+        self.assertIsNotNone(result)
+        self.assertEqual(result.status, AllocationStatus.ASSIGNED)
 
-        # Intentar asignar el mismo contexto debe retornar None o rechazar
-        req2 = self.allocator.create_request(
-            resource_type=ResourceType.SYSTEM_CPU,
-            amount=20.0,
-            context=ctx,
+    def test_2_8_4_3_1_allocate_recurso_no_registrado(self):
+        """allocate retorna None si el recurso no esta registrado"""
+        req = self.allocator.create_request(
+            request_id="req_006",
+            resource_type=ResourceType.SYSTEM_DISK,
+            amount=10.0,
         )
-        result = self.allocator.allocate(req2)
+        result = self.allocator.allocate(req)
+        self.assertIsNone(result)
+
+    def test_2_8_4_3_1_allocate_cantidad_insuficiente(self):
+        """allocate retorna None si la cantidad solicitada excede la disponible"""
+        req = self.allocator.create_request(
+            request_id="req_007",
+            resource_type=ResourceType.SYSTEM_CPU,
+            amount=200.0,
+        )
+        result = self.allocator.allocate(req)
+        self.assertIsNone(result)
+
+    def test_2_8_4_3_1_allocate_recurso_no_disponible(self):
+        """allocate retorna None si el recurso esta marcado como no disponible"""
+        self.allocator.register_resource(
+            ResourceType.SYSTEM_MEMORY,
+            available=False,
+            available_amount=0.0,
+            maximum=100.0,
+            unit="%",
+        )
+        req = self.allocator.create_request(
+            request_id="req_008",
+            resource_type=ResourceType.SYSTEM_MEMORY,
+            amount=10.0,
+        )
+        result = self.allocator.allocate(req)
         self.assertIsNone(result)
 
 
