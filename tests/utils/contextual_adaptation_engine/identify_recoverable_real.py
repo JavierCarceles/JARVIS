@@ -75,9 +75,14 @@ def _solo_letras(texto):
 
 
 # ----------------------------------------------------------- contrato (7.1 a)
-def _declaraciones():
-    """Lee el contrato REAL de recovery de `motor_ref` sin validar (sin mutar)."""
-    motor_ref = B._motor_ref()
+def _declaraciones(motor_ref=None):
+    """Lee el contrato REAL de recovery de `motor_ref` sin validar (sin mutar).
+
+    Si no se pasa `motor_ref`, crea uno de producción (comportamiento legacy para CLI).
+    En tests se debe pasar el `motor_ref` del fixture para usar el mismo data_dir temporal.
+    """
+    if motor_ref is None:
+        motor_ref = B._motor_ref()
     rec = motor_ref.recoverable_data()
     decl = {}
     for spec in (rec.get("files") or {}).values():
@@ -209,11 +214,16 @@ def _escenario_doble_perdida(escenario):
             "unidades": escenario["unidades"]}
 
 
-def control_de_no_vacio(nombre):
-    """Control de no-vacuidad. Devuelve [] si pasa, [msg] si falla."""
+def control_de_no_vacio(nombre, motor_ref=None):
+    """Control de no-vacuidad. Devuelve [] si pasa, [msg] si falla.
+
+    Si se pasa `motor_ref`, usa ese motor (del fixture de test) en lugar de
+    crear uno de producción. Esto garantiza que bajo pytest se use el mismo
+    data_dir temporal que el resto de la suite.
+    """
     fallos = []
     if nombre == "pérdida real":
-        rec, decl = _declaraciones()
+        rec, decl = _declaraciones(motor_ref)
         esc = ESCENARIOS["adaptation_rules.row_not_mapping"]
         med = medir(_escenario_doble_perdida(esc))
         perdidas = perdidas_de(decl["adaptation_rules.row_not_mapping"], med)
@@ -226,9 +236,9 @@ def control_de_no_vacio(nombre):
     return fallos
 
 
-def parte_d_no_vacio():
+def parte_d_no_vacio(motor_ref=None):
     """Verifica que la medición distingue datos SANOS (sin pérdida) de pérdida real."""
-    rec, decl = _declaraciones()
+    rec, decl = _declaraciones(motor_ref)
     # (a) datos sanos: el hermano recuperable sobrevive -> sin pérdidas.
     esc = ESCENARIOS["adaptation_rules.row_not_mapping"]
     sanos = {"files": {esc["filename"]: _payload_sano(esc["grupo"])},
@@ -239,7 +249,7 @@ def parte_d_no_vacio():
         FAILURES.append("no-vacuo: con datos SANOS se midieron pérdidas: %r"
                         % [u["etiqueta"] for u in perdidas])
     # (b) con una pérdida REAL la medición reacciona.
-    for f in control_de_no_vacio("pérdida real"):
+    for f in control_de_no_vacio("pérdida real", motor_ref):
         FAILURES.append("no-vacuo: " + f)
 
 

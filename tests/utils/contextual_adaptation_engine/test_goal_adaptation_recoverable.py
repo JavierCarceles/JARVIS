@@ -224,7 +224,7 @@ def test_la_clase_declara_lo_que_se_puede_recuperar(sonda, contrato, clase_id):
     assert isinstance(clase["recovers"], list), f"`{clase_id}`: recovers no es una lista"
 
 
-def test_la_determinacion_no_es_vacia(sonda, contrato, medicion):
+def test_la_determinacion_no_es_vacia(sonda, motor_ref, contrato, medicion):
     """La DETERMINACION identifica algo: la perdida medida y la declarada.
 
     La hoja no puede medir "no se pierde nada" y declarar a la vez que no hay
@@ -245,7 +245,7 @@ def test_la_determinacion_no_es_vacia(sonda, contrato, medicion):
         f"clases con perdida medida={sorted(medidas)} "
         f"clases declaradas pendientes={sorted(pendientes)}")
     # Y la medicion NO es vacua: el control de la sonda ve una perdida REAL.
-    fallos = sonda.control_de_no_vacio("perdida real")
+    fallos = sonda.control_de_no_vacio("pérdida real", motor_ref)
     assert not fallos, (
         "el control de perdida real no ve la perdida: la medicion no discrimina\n  - "
         + "\n  - ".join(fallos))
@@ -266,14 +266,14 @@ def test_la_determinacion_cubre_todas_las_clases_con_dato_recuperable(sonda, con
                 f"ninguna unidad que lo mida")
 
 
-def test_la_sonda_no_es_vacia(sonda):
+def test_la_sonda_no_es_vacia(sonda, motor_ref):
     """La medicion discrimina: con datos sanos no hay perdida y con perdida real si.
 
     Es el control de NO VACUO de la sonda (PARTE D): sin el, una sonda que no
     mirase el estado pasaria todas sus comprobaciones sin comprobar nada.
     """
     desde = len(sonda.FAILURES)
-    sonda.parte_d_no_vacio()
+    sonda.parte_d_no_vacio(motor_ref)
     assert not sonda.FAILURES[desde:], (
         "los controles de no-vacuidad han fallado: " + "; ".join(sonda.FAILURES[desde:]))
 
