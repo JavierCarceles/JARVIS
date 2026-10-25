@@ -611,6 +611,11 @@ class TestVisionAnalyzeImage:
 
     @patch("src.eyes.vision.ollama")
     def test_analyze_image_exception(self, mock_ollama):
+        # analyze_image catches ollama.ResponseError first, then Exception.
+        # The mock replaces the whole ollama module, so ResponseError must be
+        # a real exception class for the except clause to work.
+        import ollama as real_ollama
+        mock_ollama.ResponseError = real_ollama.ResponseError
         mock_ollama.chat.side_effect = Exception("fail")
         result = self.vision.analyze_image("/fake/image.png", "prompt")
         assert "ERROR:" in result

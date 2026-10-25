@@ -166,6 +166,7 @@ class Vision:
             return result
             
         except Exception as exc:
+            import traceback; traceback.print_exc()
             logger._print_log("info", "Procesando solicitud", "vision_only.py", "method", 112)
             return f"ERROR: {exc}"
 

@@ -1,0 +1,8 @@
+ollama is mock: True
+METHOD FINAL state: ApplicationState.CLOSED
+METHOD FINAL window_title: None
+Number of 'except' in source: 2
+Has json.JSONDecodeError: True
+Has outer except: True
+Vision.__module__: src.eyes.vision_only
+Vision.__qualname__: Vision
