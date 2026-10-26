@@ -4145,3 +4145,60 @@ TESTS Y RESULTADOS: UNITARIOS: 296 PASSED / 0 FAILED (test_applications_core.py 
 VERIFICACION: SINTAXIS: OK (python -m py_compile src/hands/applications_core.py src/hands/action_registry.py src/hands/planner/application_integration.py src/memory/storage.py src/brain/llm.py -> exit 0); MAIN.PY: NE; COMPORTAMIENTO / INTEGRACION REAL: Inspeccion estatica confirmada en todas las capas; tests ejecutados y PASSED; json.load sobre data/knowledge/applications.json y capabilities.json -> OK.
 PENDIENTES: 3.1.1.4 (estados), 3.1.1.5 (elementos UI), 3.1.1.6 (cierre de 3.1.1) pendientes en orden del roadmap.
 ESTADO FINAL: 3.1.1.3 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.1.1.4
+FECHA: 2026-10-26
+OBJETIVO: Localizar como se representan estados (states) en el modelo de Application Knowledge, incluyendo todas las capas del sistema, sin modificar codigo.
+TIPO DE TRABAJO: INSPECCION | VERIFICACION
+CAMBIOS / HALLAZGOS: Inspeccion estatica del codigo fuente, datos y tests. No se modifico codigo de produccion ni tests. Representaciones de estados localizadas en 5 capas distintas:
+
+(1) MODELO DE CONOCIMIENTO (src/hands/applications_core.py):
+  - `ApplicationState` (Enum, lineas 63-73): 8 miembros con valor string — CLOSED="closed", OPEN="open", ACTIVE="active", INACTIVE="inactive", LOADING="loading", READY="ready", ERROR="error", BACKGROUND="background".
+  - `ApplicationKnowledge.states: Optional[List[ApplicationState]]` (linea 147): lista de estados posibles/DECLARADOS que una aplicacion puede tener. __post_init__ (lineas 159-160) inicializa a `[ApplicationState.CLOSED]` si es None.
+  - `ApplicationKnowledge.default_state: ApplicationState = ApplicationState.CLOSED` (linea 151): estado por defecto.
+  - Estado declarado en _initialize_applications: Chrome -> states=[CLOSED, OPEN, ACTIVE, LOADING], default_state=CLOSED; Spotify -> states=[CLOSED, OPEN, ACTIVE], default_state=CLOSED (lineas 287-296, 336-344).
+  - Serializacion en get_application_knowledge() (lineas 997-1000): `"states": [state.value for state in app.states]` (lista de strings) y `"default_state": app.default_state.value`.
+  - Deserializacion/reconstruccion en register_custom_application() (lineas 1042-1049): parsea states desde JSON con `ApplicationState(state) if isinstance(state, str) else state`; default_state como string -> enum.
+  - NO persiste states ni default_state en register_application() (lineas 351-375): el dict entity_data solo incluye name, type, executable, url, login_required, capabilities y aliases=[]; omite states y default_state.
+  - NO hay metodos de consulta de estados en ApplicationKnowledge: existe get_capability(), is_capable(), get_ui_element(), get_calibrated_elements() pero NO is_state(), has_state(), get_state() ni equivalente.
+  - wait_for_application_state() (lineas 557-605): accion registrada que recibe target_state como str (sin validacion contra ApplicationState enum); solo comprueba `if target in {"active", "ready"}`; para timeout=0 lanza RuntimeError "agotado". Cualquier string desconocido pasa sin validacion.
+
+(2) CAPA DE PERCEPCION/STATE (src/eyes/screen.py):
+  - `ApplicationState` (Enum, lineas 41-48): 5 miembros con valor string — CLOSED="closed", OPEN="open", ACTIVE="active", MINIMIZED="minimized", MAXIMIZED="maximized".
+  - `ApplicationInfo.state: ApplicationState` (linea 56): estado ACTUAL de runtime (un solo valor, no lista).
+  - Serializacion: ApplicationInfo.to_dict() (lineas 68-78) -> `"state": self.state.value`; from_dict() (lineas 80-87) mapea string -> enum con fallback a CLOSED (ValueError) o OPEN (estado desconocido via state_map.get(state_str, ApplicationState.OPEN)).
+  - `WorldState.applications: Dict[str, ApplicationInfo]` (screen.py:145): cada aplicacion tiene un state individual.
+  - Consumido por ScreenAnalyzer, ScreenCapture, Vision, vision_only.
+  - Documentado en README (linea 153): "Estados conocidos de una aplicacion (CLOSED, OPEN, ACTIVE, MINIMIZED, MAXIMIZED)".
+
+(3) CAPA DE DATOS (data/knowledge/applications.json):
+  - states como Dict[str, bool] de flags booleanos — NO como List[ApplicationState]. Claves difieren por aplicacion:
+    - chrome: {open=False, active=False, maximized=False, focused=False}
+    - spotify: {open=False, playing=False, maximized=False, focused=False}
+    - vscode: {open=False, maximized=False, focused=False}
+    - obs_studio: {open=False, streaming=False, recording=False, maximized=False}
+  - Cargado como dict raw por DomainMemory.load_domain_knowledge() (conversation.py:175): `self.applications = json.load(f)`. NO hay adaptador que convierta el dict de booleans a ApplicationState enum o a ApplicationKnowledge.states.
+  - NO contiene clave "default_state" en ninguna aplicacion.
+  - El README de applications_core.py (linea 348) NO lista los campos states ni default_state de ApplicationKnowledge; menciona ApplicationState enum (linea 350) sin enumerar miembros.
+
+(4) CAPA DE EJECUCION (src/hands/executor.py):
+  - `ExecutionState.application_states: Dict[str, Dict[str, Any]]` (linea 136): mapea app_name -> Dict[str, bool] de flags de runtime.
+  - Default: `"application_states": {}` en _get_default_state() (lineas 2495-2503).
+  - Actualizado en _update_world_state() (lineas 1017-1048): establece flags como app_state["open"]=True, app_state["active"]=True, etc. NO usa ApplicationState enum (ni el de hands ni el de eyes).
+  - Consumido en verificacion de precondiciones (lineas 766-886, 913-915): comprueba flags booleanos como app_state[field_name].
+
+(5) ACCION REGISTERED:
+  - wait_for_application_state (lineas 557-605): parameter target_state es str sin validacion de enum.
+
+RESUMEN DE REPRESENTACIONES DE ESTADO:
+  - Enum ApplicationState (8 miembros) en hands/applications_core.py: estados posibles/declarados (List).
+  - Enum ApplicationState (5 miembros) en eyes/screen.py: estado actual de runtime (unico valor).
+  - Dict[str,bool] en applications.json: flags booleanos de runtime por app.
+  - Dict[str,Dict[str,bool]] en executor.py ExecutionState: flags booleanos de runtime por app.
+  - str target_state en wait_for_application_state: sin validar contra enum.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: NA; DOCUMENTACION: `mejora/prompt_JARVIS_fases_estado.txt`
+TESTS Y RESULTADOS: UNITARIOS: 120/120 PASSED (tests/hands/test_applications_core.py — incluye TestApplicationState::test_values/test_from_string, TestApplicationKnowledgeDefaults::test_all_defaults/test_none_states_not_overwritten/test_custom_states, TestGetApplicationKnowledgeFullStructure::test_chrome_full_structure [verifica states=['closed','open','active','loading'] y default_state='closed']), y 154/154 PASSED (tests/eyes/test_screen.py + test_vision.py + test_vision_only.py — incluye TestApplicationState, TestApplicationInfo, TestVisionOnlyDetectApplicationState); INTEGRACION: NE; NO REGRESION: NE (no se modifico codigo)
+VERIFICACION: SINTAXIS: OK (`python -m py_compile src/hands/applications_core.py src/eyes/screen.py src/eyes/vision.py src/eyes/vision_only.py src/eyes/screen_capture.py src/hands/executor.py src/memory/conversation.py` -> exit 0); JSON: OK (json.load sobre data/knowledge/applications.json, entities.json, capabilities.json -> validos); MAIN.PY: NE (no se modifico codigo); COMPORTAMIENTO / INTEGRACION REAL: Inspeccion estatica confirmada en todas las capas; estados verificados en tiempo real via script de verificacion (chrome states=[CLOSED,OPEN,ACTIVE,LOADING], default_state=CLOSED; spotify states=[CLOSED,OPEN,ACTIVE], default_state=CLOSED; get_application_knowledge serializa states como lista de strings; register_application omite states/default_state; applications.json states como Dict[str,bool] con claves per-app; ExecutionState.application_states como Dict[str,Dict[str,Any]]).
+DISCREPANCIAS: (A) DOS ENUMS ApplicationState CON MIEMBROS DISTINTOS: hands/applications_core.py:63 tiene 8 miembros [CLOSED,OPEN,ACTIVE,INACTIVE,LOADING,READY,ERROR,BACKGROUND]; eyes/screen.py:41 tiene 5 miembros [CLOSED,OPEN,ACTIVE,MINIMIZED,MAXIMIZED]. Solo 3 en comun (CLOSED,OPEN,ACTIVE). No hay import ni relacion entre ambos; coexistencia de dos enums homonimos con semanticas distintas. No se resuelve por intuicion. (B) SEMANTICA DE LISTA VS UNICO VALOR: hands `states` = List[ApplicationState] (estados posibles/declarados); eyes `state` = ApplicationState unico (estado actual de runtime). No hay conversion entre ambos. (C) FORMATO DE DATOS INCOMPATIBLE: applications.json states = Dict[str,bool] (flags booleanos, claves per-app como "playing"/"streaming"/"recording"/"focused"); ApplicationKnowledge.states = List[ApplicationState]. No hay adaptador. La carga raw en conversation.py:175 no convierte. (D) register_application() (lineas 351-375) NO persiste states ni default_state en el Entity/properties; register_custom_application() (lineas 1042-1049) los reconstruye desde JSON pero register_application nunca los guarda -> round-trip roto. (E) CAPA DE EJECUCION INDEPENDIENTE: ExecutionState.application_states (executor.py:136) usa Dict[str,Dict[str,bool]] de flags booleanos, no ApplicationState enum. Formato cuarto completamente independiente. (F) wait_for_application_state (lineas 557-605) recibe target_state como str sin validar contra ApplicationState enum; "unknown_state" pasa sin error hasta timeout. (G) SIN METODOS DE CONSULTA DE ESTADOS: ApplicationKnowledge tiene get_capability/is_capable/get_ui_element/get_calibrated_elements pero NO metodo alguno para consultar estados (is_state, has_state, get_state). (H) README NO documenta fields states/default_state de ApplicationKnowledge (linea 350 menciona el enum sin enumerar miembros); eyes ApplicationState documentada con miembros (linea 153). Ninguna se resuelve por intuicion.
+PENDIENTES: 3.1.1.5 (elementos UI), 3.1.1.6 (cierre de 3.1.1) pendientes en orden del roadmap.
+ESTADO FINAL: 3.1.1.4 - IMPLEMENTADA
