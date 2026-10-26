@@ -23,6 +23,7 @@ from src.eyes.screen_capture import ScreenCapture
 from src.eyes.screen import ApplicationInfo, ApplicationState
 from src.memory.storage import MemoryType, WorldState, get_memory_manager
 from src.utils.logger import get_logger
+from src.utils.ui_element_model import UIElementData
 
 logger = get_logger(__name__)
 
@@ -81,15 +82,17 @@ class VisionNode:
         return self.cost
 
 
-class UIElement(BaseModel):
-    """Elemento UI detectado por el modelo de visión."""
+class UIElement(UIElementData):
+    """Elemento UI detectado por el modelo de visi\u00f3n (forma can\u00f3nica).
 
-    type: str = Field(..., description="Tipo de elemento interactivo.")
-    text: str = Field("", description="Texto o descripción del elemento.")
-    bbox: List[int] = Field(..., description="Bounding box [x1, y1, x2, y2].")
-    center: List[int] = Field(default_factory=list, description="Centro [x, y].")
-    interactive: bool = Field(True, description="Indica si es interactivo.")
-    confidence: float = Field(..., description="Confianza entre 0.0 y 1.0.")
+    Deriva de :class:`UIElementData`, por lo que comparte el vocabulario
+    can\u00f3nico (``name``, ``coordinates``, ``screen``, ``calibrated``...).
+    Los elementos detectados visualmente aportan ``bbox``, ``center`` y
+    ``confidence``; las coordenadas de calibraci\u00f3n y el estado
+    ``calibrated`` se enriquecen en capas superiores (executor/calibrador).
+    """
+
+    model_config = {"populate_by_name": True}
 
 
 class VisionResponse(BaseModel):
@@ -429,6 +432,7 @@ Devuelve exclusivamente JSON válido con esta estructura:
 {{
   "elements": [
     {{
+      "name": "boton_abrir",
       "type": "button",
       "text": "Abrir",
       "bbox": [100, 200, 200, 250],
@@ -448,6 +452,7 @@ Devuelve exclusivamente JSON válido con esta estructura:
                     "items": {
                         "type": "object",
                         "properties": {
+                            "name": {"type": "string"},
                             "type": {"type": "string"},
                             "text": {"type": "string"},
                             "bbox": {"type": "array", "items": {"type": "integer"}, "minItems": 4, "maxItems": 4},
@@ -485,8 +490,16 @@ Devuelve exclusivamente JSON válido con esta estructura:
                     if bbox is None or center is None:
                         continue
                     confidence = self._clamp_float(item.get("confidence", 0.0))
+                    # El nombre es la clave can\u00f3nica de direccionamiento;
+                    # cuando el modelo no lo devuelve se infiere de text/type.
+                    element_name = (
+                        str(item.get("name") or "").strip()
+                        or str(item.get("text") or "").strip()
+                        or str(item.get("type") or "").strip()
+                    )
                     valid_elements.append(
                         UIElement(
+                            name=element_name or f"element_{len(valid_elements)}",
                             type=str(item.get("type", "other")),
                             text=str(item.get("text", "") or ""),
                             bbox=bbox,
@@ -609,23 +622,24 @@ Devuelve exclusivamente JSON válido con esta estructura:
             target = str(element_name or "").strip().lower()
 
             for element in ui_response.elements:
-                haystack = f"{element.type} {element.text}".lower()
-                if target and (target == element.type.lower() or target in haystack):
-                    coords_match = self._coordinates_match(expected_coords, element.center, element.bbox)
-                    return {
-                        "success": True,
-                        "element": element_name,
-                        "verified": True,
-                        "found_element": {
-                            "type": element.type,
-                            "text": element.text,
-                            "bbox": element.bbox,
-                            "center": element.center,
-                            "confidence": element.confidence,
-                        },
-                        "coordinates_match": coords_match,
-                        "application": application,
-                    }
+                if target and not element.matches_name(target):
+                    continue
+                coords_match = self._coordinates_match(expected_coords, element.center, element.bbox)
+                return {
+                    "success": True,
+                    "element": element_name,
+                    "verified": True,
+                    "found_element": {
+                        "name": element.name,
+                        "type": element.type,
+                        "text": element.text,
+                        "bbox": element.bbox,
+                        "center": element.center,
+                        "confidence": element.confidence,
+                    },
+                    "coordinates_match": coords_match,
+                    "application": application,
+                }
 
             return {
                 "success": True,

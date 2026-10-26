@@ -50,7 +50,7 @@ class TestVisionOnlyUIElement:
             bbox=[0, 0, 10, 10],
             confidence=0.5,
         )
-        assert elem.text is None
+        assert elem.text == ""
         assert elem.center == []
         assert elem.interactive is True
 

@@ -10,15 +10,16 @@ from __future__ import annotations
 
 import json
 import time
-from typing import List, Dict, Any, Optional
-from dataclasses import dataclass, field
 from enum import Enum
+
+from typing import List, Dict, Any
 
 import ollama
 from pydantic import BaseModel, Field
 
 from src.eyes.screen_capture import ScreenCapture
 from src.utils.logger import get_logger
+from src.utils.ui_element_model import UIElementData
 
 logger = get_logger(__name__)
 
@@ -33,17 +34,14 @@ class VisionNodeType(Enum):
     APPLICATION_DETECTION = "application_detection"
 
 
-@dataclass
-class UIElement:
-    """Elemento UI detectado por visión."""
-    
-    name: str
-    type: str
-    bbox: List[int]
-    confidence: float
-    text: Optional[str] = None
-    center: List[int] = field(default_factory=list)
-    interactive: bool = True
+class UIElement(UIElementData):
+    """Elemento UI detectado por visi\u00f3n (forma can\u00f3nica unificada).
+
+    Deriva de :class:`UIElementData`, compartiendo as\u00ed la misma forma
+    can\u00f3nica que ``eyes.vision`` y ``hands.applications_core``.
+    """
+
+    model_config = {"populate_by_name": True}
 
 
 class VisionResponse(BaseModel):
