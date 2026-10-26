@@ -4091,3 +4091,57 @@ VERIFICACION: SINTAXIS: OK (`python -m py_compile src/hands/applications_core.py
 DISCREPANCIAS: (A) Modelo de alias de aplicacion desconectado de la capa de entidades: `ApplicationKnowledge`/`ApplicationManager._normalize_name` (diccionario inline) y `Entity.aliases` (poblado en `entities.json`) son dos representaciones paralelas e independientes; no hay adaptador que una los alias de `_normalize_name` con `Entity.aliases`. (B) `register_application` persiste `aliases: []` siempre vacio -> aplicaciones registradas por codigo nunca reciben alias de entidad. (C) `_initialize_applications` construye chrome/spotify desde codigo sin datos de alias, mientras `entities.json` contiene alias para spotify/youtube/github/twitch que `get_application`/`_normalize_name` no consultan (e.g. "spoti","music","yt","gh" no resuelven por el camino de Application Knowledge). (D) Registro 3.1.1.1 indica FECHA 2026-10-27 mientras el reloj del entorno indica 2026-10-26; se conserva sin reconciliar por intuicion. Ninguna se resuelve por intuicion.
 PENDIENTES: 3.1.1.3 (capacidades), 3.1.1.4 (estados), 3.1.1.5 (elementos UI), 3.1.1.6 (cierre de 3.1.1) pendientes en orden del roadmap.
 ESTADO FINAL: 3.1.1.2 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.1.1.3
+FECHA: 2026-10-26
+OBJETIVO: Localizar y documentar como se representan las capacidades (capabilities) en el modelo de Application Knowledge, incluyendo todas las capas del sistema, sin modificar codigo.
+TIPO DE TRABAJO: INSPECCION | VERIFICACION
+CAMBIOS / HALLAZGOS: Inspeccion estatica del codigo fuente, datos y tests. No se modifico codigo de produccion ni tests. Capacidades localizadas en 6 capas:
+
+(1) MODELO PRINCIPAL (src/hands/applications_core.py):
+  - `ApplicationCapability` (Enum, :35-60): 21 miembros con valor string — OPEN="open", CLOSE="close", NAVIGATE="navigate", SEARCH="search", TYPE="type", CLICK="click", WAIT="wait", SCREENSHOT="screenshot", LOGIN="login", LOGOUT="logout", REFRESH="refresh", NEW_TAB="new_tab", CLOSE_TAB="close_tab", SWITCH_TAB="switch_tab", ZOOM="zoom", SCROLL="scroll", BOOKMARK="bookmark", DOWNLOAD="download", UPLOAD="upload", SHARE="share", PRINT="print", EXPORT="export", IMPORT="import".
+  - `ApplicationCapabilityDef` (dataclass, :117-133): campos — capability (ApplicationCapability), name (str), description (str), required_ui_elements (List[str]), preconditions (List[str]), effects (List[str]), cost (float), timeout=30.0, retry_count=3, alternatives: Optional[List[str]]=None (-> [] en __post_init__ :143-145).
+  - `ApplicationKnowledge.capabilities: Optional[List[ApplicationCapabilityDef]]` (:145): lista de definiciones; __post_init__ (:154-156) default a [] si None.
+  - `ApplicationKnowledge.get_capability(name)` (:168-178): resuelve por capability.value ("open") O capability.name ("open_chrome"), case-insensitive; devuelve None si no existe.
+  - `ApplicationKnowledge.is_capable(capability)` (:188-190): comparacion enum-a-enum directa (capability_def.capability == capability); string inputs SIEMPRE devuelven False.
+  - `ApplicationKnowledge.get_capabilities_summary()` (:192-195): devuelve lista de cap.capability.value (strings).
+  - `ApplicationManager.applications: Dict[str, ApplicationKnowledge]` (:201): keyed por app.name.lower().
+  - `ApplicationManager._initialize_applications()` (:234-349): Chrome con [open_chrome(OPEN), navigate_to_url(NAVIGATE), search_web(SEARCH)], Spotify con [open_spotify(OPEN), login_spotify(LOGIN)]. Construido desde codigo Python (NO desde JSON).
+  - `ApplicationManager.register_application(app)` (:351-375): persiste Entity con "properties.capabilities": [cap.capability.value for cap in app.capabilities] (strings enum) y "aliases": [] (SIEMPRE vacio); registra en self.applications[app.name.lower()] (:370).
+  - `ApplicationManager.get_applications_by_capability(capability: ApplicationCapability)` (:387-389): delega a app.is_capable() para cada app; SOLO acepta enum, strings devuelven [] siempre.
+  - `ApplicationManager.get_application_capabilities(app_name)` (:404-423): devuelve dict keyed por capability.name con campos: description, required_ui_elements, preconditions, effects, cost, alternatives, capability (string value), timeout, retry_count.
+  - `ApplicationManager.get_available_commands()` (:975-993): devuelve nombres de acciones registradas con ActionType.APPLICATION o SYSTEM y planner_enabled=True.
+
+(2) CAPA DE DATOS/PERSISTENCIA (src/memory/storage.py):
+  - `Entity.properties: Dict[str, Any]` (:54): capabilities almacenadas como List[str] de valores de enum (e.g. ["open","navigate","search"]) — NO como ApplicationCapabilityDef.
+
+(3) ARCHIVOS DE DATOS (data/knowledge/):
+  - `applications.json`: capabilities como List[str] — valores NO todos en ApplicationCapability enum (e.g. "back","forward","play","pause","next_track","previous_track","like_song","create_playlist","zoom_in","zoom_out","start_stream","stop_stream","add_source","change_scene","open_file","new_file","save_file","run_code","debug_code","open_terminal","install_extension"). NO es cargado por ApplicationManager.__init__() (usa objetos Python hardcoded). Solo DomainMemory.load_domain_knowledge() (:170-178 en conversation.py) lo carga como dict raw.
+  - `capabilities.json`: estructurado por categoria ("system","browser","media","development","streaming") con schema DISTINTO de ApplicationCapabilityDef — campos: description, required_state, effects, cost, applications (NO required_ui_elements/preconditions/timeout/retry_count). Solo consumido por DomainMemory (conversation.py:180-188) en self.capabilities; usado por DomainMemory.get_application_capabilities() (:223-225, devuelve list), get_capability_definition() (:227-230) y get_preferred_application() (:307-325, verifica si action_type string esta en capabilities list).
+
+(4) ACCIONES REGISTRADAS (src/hands/applications_core.py :460-790; action_registry.py :470-495):
+  - `@register_action(..., capability="open_application")` (:464, :480): `ActionInfo.capability: Optional[str]` (:487 action_registry.py) — strings libres, NO valores de ApplicationCapability enum.
+  - Acciones registradas con capability: open_application (capability="open_application" :480), close_application (capability="close_application" :510), navigate_to_url (capability="navigate" :557), search_web (capability="search" :608), abrir_gmail/abrir_youtube (capability="navigate" :699, :744).
+  - Acciones legacy: abrir_youtube, abrir_gmail, navigate_to_url, open_application, close_application — todos con capability strings del estilo "open_application","close_application","navigate" (vocabulary distinto al enum "open","close","navigate").
+
+(5) CAPA DE INTEGRACION (src/hands/planner/application_integration.py):
+  - `ApplicationKnowledgeIntegrator` (singleton, :40-60):
+  - `_capability_value()` (:100-125): extrae valor de enum, objeto (.value attr), dict (clave "value") o string.
+  - `_capability_key()` (:127-140): normaliza valor de capability a clave.
+  - `convert_application_to_nodes(app_name)` (:142-200): convierte lista de ApplicationCapabilityDef en Node objetos (NodeType.ACTION); crea nodos UI element; construye jerarquia.
+  - `_create_capability_node(app, capability_def)` (:202-260): crea action Node desde ApplicationCapabilityDef con preconditions/effects.
+  - `get_applications_by_capability(cap)` (:310-340): acepta enum y string; intenta resolver via ApplicationCapability enum; delega a ApplicationManager.get_applications_by_capability para enums.
+  - `is_application_capable(app_name, cap)` (:342-370): para enums -> is_capable(); para strings -> resuelve via _resolve_capability_enum -> si resoluble usa is_capable(), sino devuelve False.
+  - `get_ui_elements_for_capability(app_name, cap)` (:372-400): resuelve capability, obtiene required_ui_elements del capability def matching.
+
+(6) CAPA CEREBRAL (src/brain/llm.py):
+  - `_get_application_knowledge()` (:241-248): llama app_integrator.get_application_capabilities(app_name) e is_application_capable(app_name, ApplicationCapability.OPEN) — usa enum.
+  - `_get_entity_capabilities(entity, goal_type)` (:705-719): devuelve strings libres COMPLETAMENTE DISTINTOS al enum: "open_application","navigate","focus_element","type_text","press_key","activate_window","close_application","stream_interaction","chat_interaction","platform_navigation","search_functionality","application_control","window_management".
+
+DISCREPANCIAS: (A) TRES VOCABULARIOS DE CAPABILITIES DIVERGENTES: ApplicationCapability enum (valores "open"/"close"/"navigate"/...) vs ActionInfo.capability strings ("open_application"/"close_application"/"navigate") vs brain _get_entity_capabilities strings ("open_application"/"navigate"/"focus_element"/...). No existe mapeo bidireccional entre los tres. (B) applications.json capabilities NO en ApplicationCapability enum: valores como "back","forward","play","pause","next_track","previous_track","zoom_in","start_stream" no son miembros del enum. Ademas applications.json NO es cargado por ApplicationManager.__init__() (usa objetos Python hardcoded) — solo DomainMemory lo carga como dict raw. (C) capabilities.json schema DISTINTO: por categoria con required_state/effects/cost/applications, no con required_ui_elements/preconditions/timeout/retry_count de ApplicationCapabilityDef; solo consumido por DomainMemory, no por ApplicationManager/ApplicationKnowledgeIntegrator. (D) String vs enum mismatch: ApplicationKnowledge.is_capable() SOLO funciona con enum; string inputs SIEMPRE devuelven False. La integracion (is_application_capable) tiene path de resolucion de strings pero cae a False cuando el string no mapea a enum. (E) ActionInfo.capability strings NO reconciliados con enum: acciones registradas usan "open_application" sin vincular a ApplicationCapability.OPEN ("open"). (F) get_applications_by_capability de ApplicationManager SOLO acepta enum (:387); strings devuelven [] siempre. Ninguna se resuelve por intuicion.
+
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: NA; DOCUMENTACION: c:/Informatica/PROYECTOS/BACKEND/IA_PYTHON/IA/JARVIS/mejora/prompt_JARVIS_fases_estado.txt
+TESTS Y RESULTADOS: UNITARIOS: 296 PASSED / 0 FAILED (test_applications_core.py 238 + test_action_registry.py 58); INTEGRACION: NE; NO REGRESION: NE (no se modifico codigo)
+VERIFICACION: SINTAXIS: OK (python -m py_compile src/hands/applications_core.py src/hands/action_registry.py src/hands/planner/application_integration.py src/memory/storage.py src/brain/llm.py -> exit 0); MAIN.PY: NE; COMPORTAMIENTO / INTEGRACION REAL: Inspeccion estatica confirmada en todas las capas; tests ejecutados y PASSED; json.load sobre data/knowledge/applications.json y capabilities.json -> OK.
+PENDIENTES: 3.1.1.4 (estados), 3.1.1.5 (elementos UI), 3.1.1.6 (cierre de 3.1.1) pendientes en orden del roadmap.
+ESTADO FINAL: 3.1.1.3 - IMPLEMENTADA
