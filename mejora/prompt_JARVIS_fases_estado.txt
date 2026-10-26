@@ -4324,3 +4324,27 @@ VERIFICACION: SINTAXIS: OK (`python -m py_compile src/hands/applications_core.py
 DISCREPANCIAS: (D1) `_normalize_name` es diccionario hardcodeado (applications_core.py:206-232), desconectado de `Entity.aliases` (storage.py:56); entities.json tiene aliases (spotify->["spoti","music"], youtube->["yt","you"], github->["gh","git"]) que `_normalize_name` no consume. (D2) `data/knowledge/applications.json` usa keys JSON y `name` que no coinciden con el modelo hardcoded: JSON key="chrome" con name="Google Chrome" vs modelo name="Chrome". (D3) `register_application` persiste `aliases: []` siempre vacío (applications_core.py:365). (D4) No hay verificación de unicidad: registro duplicado sobrescribe silenciosamente (applications_core.py:370). (D5) `applications.json` no es cargado por `ApplicationManager.__init__`; solo como dict raw en DomainMemory (conversation.py:170-178). (D6) Capa de datos y modelo de código coexisten sin adaptador (heredado de 3.1.1.1-D, 3.1.1.2-D, 3.1.1.6-G2). Ninguna se resuelve por intuición; pendientes para 3.1.2.2/3.1.2.3/3.1.2.4/3.1.3.
 PENDIENTES: 3.1.2.2 (datos obligatorios), 3.1.2.3 (datos opcionales), 3.1.2.4 (verificar no duplicación), 3.1.3 (compatibilidad y tests del contrato). Resolver D1-D6 según decisión de modelo canónico.
 ESTADO FINAL: 3.1.2.1 - IMPLEMENTADA
+
+================================================================================
+REGISTRO DE UNIDAD: 3.1.2.2
+FECHA: 2026-10-27
+OBJETIVO: Definir qué datos son obligatorios para registrar una aplicación (inspección del contrato de datos obligatorios y tests).
+TIPO DE TRABAJO: Inspección / verificación de contrato de datos.
+CAMBIOS / HALLAZGOS:
+- ApplicationKnowledge (applications_core.py:137-161): DOS campos obligatorios sin default — `name: str` (línea 140) y `type: str` (línea 141). Los 9 campos restantes tienen default explícito o se normalizan en `__post_init__` (None→[] / None→{} / states→[CLOSED]).
+- UIElement (applications_core.py:77-86): DOS campos obligatorios sin default — `name: str` (línea 80) y `type: str` (línea 81). Los 4 campos restantes son opcionales con default.
+- register_custom_application (applications_core.py:1016-1021): valida explícitamente ambos campos en el límite JSON/Dict: `if "name" not in data or "type" not in data: raise ValueError("Una aplicación personalizada necesita 'name' y 'type'")`. El contrato en la API refuerza el mismo modelo del dataclass.
+- CONTRATO CANÓNICO: para registrar una aplicación obligan los campos {name, type}; todos los demás son opcionales con defaults.
+- Discrepancia corregida: ver D7 (el registro 3.1.2.1 afirmaba que `name` era el único campo obligatorio sin default — incorrecto; `type` también lo es).
+ARCHIVOS MODIFICADOS:
+- PRODUCCIÓN: NA (ningún cambio en código de producción).
+- TESTS: NA (test_application_mandatory_data.py ya existía con 16 tests; verificado).
+- DOCUMENTACIÓN: mejora/inspeccion_unit3122.md (inspección formal del contrato).
+TESTS Y RESULTADOS: tests/hands/test_application_mandatory_data.py — 16/16 PASSED. Regresión: 1535/1535 tests de tests/hands/ pasan (incluye los de 3.1.2.1). Pytest exit code 0.
+VERIFICACIÓN:
+- SINTAXIS: OK (python -m py_compile src/hands/applications_core.py tests/hands/test_application_mandatory_data.py main.py → exit 0).
+- MAIN.PY: OK (compilado sin errores; no modificado).
+- BEHAVIOR: ApplicationKnowledge requiere {name, type} (TypeError si falta alguno); register_custom_application lanza ValueError si falta name o type en el dict; UIElement requiere {name, type} (TypeError si falta alguno); todos los demás campos funcionan con defaults.
+DISCREPANCIAS: (D7) El registro 3.1.2.1 (línea 4320) afirma "`name` es el único campo obligatorio sin default (aplicaciones_core.py:140)" — INCORRECTO. `type: str` (línea 141) también carece de default. La presente unidad 3.1.2.2 corrige el contrato: los campos obligatorios son {name, type} tanto en ApplicationKnowledge como en UIElement. Documentado en inspeccion_unit3122.md. D1-D6 persisten sin cambios (ver 3.1.2.1). (D8) El registro 3.1.2.1 lista documentación `mejora/inspeccion_unit3121.md` y `mejora/construccion_unit3121.md` pero dichos archivos no existen en el directorio mejora/.
+PENDIENTES: 3.1.2.3 (definir datos opcionales / defaults canónicos), 3.1.2.4 (verificar no duplicación de campos), 3.1.3 (compatibilidad y tests del contrato end-to-end). D1-D8 persisten documentadas.
+ESTADO FINAL: 3.1.2.2 - IMPLEMENTADA
