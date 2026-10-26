@@ -4202,3 +4202,100 @@ VERIFICACION: SINTAXIS: OK (`python -m py_compile src/hands/applications_core.py
 DISCREPANCIAS: (A) DOS ENUMS ApplicationState CON MIEMBROS DISTINTOS: hands/applications_core.py:63 tiene 8 miembros [CLOSED,OPEN,ACTIVE,INACTIVE,LOADING,READY,ERROR,BACKGROUND]; eyes/screen.py:41 tiene 5 miembros [CLOSED,OPEN,ACTIVE,MINIMIZED,MAXIMIZED]. Solo 3 en comun (CLOSED,OPEN,ACTIVE). No hay import ni relacion entre ambos; coexistencia de dos enums homonimos con semanticas distintas. No se resuelve por intuicion. (B) SEMANTICA DE LISTA VS UNICO VALOR: hands `states` = List[ApplicationState] (estados posibles/declarados); eyes `state` = ApplicationState unico (estado actual de runtime). No hay conversion entre ambos. (C) FORMATO DE DATOS INCOMPATIBLE: applications.json states = Dict[str,bool] (flags booleanos, claves per-app como "playing"/"streaming"/"recording"/"focused"); ApplicationKnowledge.states = List[ApplicationState]. No hay adaptador. La carga raw en conversation.py:175 no convierte. (D) register_application() (lineas 351-375) NO persiste states ni default_state en el Entity/properties; register_custom_application() (lineas 1042-1049) los reconstruye desde JSON pero register_application nunca los guarda -> round-trip roto. (E) CAPA DE EJECUCION INDEPENDIENTE: ExecutionState.application_states (executor.py:136) usa Dict[str,Dict[str,bool]] de flags booleanos, no ApplicationState enum. Formato cuarto completamente independiente. (F) wait_for_application_state (lineas 557-605) recibe target_state como str sin validar contra ApplicationState enum; "unknown_state" pasa sin error hasta timeout. (G) SIN METODOS DE CONSULTA DE ESTADOS: ApplicationKnowledge tiene get_capability/is_capable/get_ui_element/get_calibrated_elements pero NO metodo alguno para consultar estados (is_state, has_state, get_state). (H) README NO documenta fields states/default_state de ApplicationKnowledge (linea 350 menciona el enum sin enumerar miembros); eyes ApplicationState documentada con miembros (linea 153). Ninguna se resuelve por intuicion.
 PENDIENTES: 3.1.1.5 (elementos UI), 3.1.1.6 (cierre de 3.1.1) pendientes en orden del roadmap.
 ESTADO FINAL: 3.1.1.4 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.1.1.5
+FECHA: 2026-10-26
+OBJETIVO: Localizar como se representan los elementos UI (UI elements) en el modelo de Application Knowledge, incluyendo todas las capas del sistema (modelo canonico, vision, conocimiento de apps, datos, planner, ejecutor, calibrador, state), sin modificar codigo.
+TIPO DE TRABAJO: INSPECCION | VERIFICACION
+CAMBIOS / HALLAZGOS: Inspeccion estatica del codigo fuente, datos y tests. No se modifico codigo de produccion ni tests. Representaciones de elementos UI localizadas en 16 capas/layeres distintas:
+
+(1) MODELO CANONICO (`src/utils/ui_element_model.py` lines 45-178, creado esta fase):
+  - `UIElementData(BaseModel)`: modelo unico de verdad con 13 campos: name(str=""), type(str="unknown"), description(str=""), text(str=""), bbox(Optional[List[int]]), center(List[int]), coordinates(Optional[Dict]), screen(int=0), interactive(bool=True), confidence(float=0.0), calibrated(bool=False), calibration_data(Optional[Dict]), required_capability(Optional[str]).
+  - Metodos: is_calibrated() [OR entre flag `calibrated` y presencia de coordenadas], _coordinates_calibrated() [static], has_valid_geometry(), matches_name(), to_dict(), from_dict(), from_compact_dict(), normalize_name() [static].
+  - No importa de `hands` ni `eyes` (solo pydantic/typing); evita circular imports.
+
+(2) VISION DETALLADA (`src/eyes/vision.py` lines 85-101, 415-517):
+  - `UIElement(UIElementData)` (pydantic): hereda del modelo canonico.
+  - `VisionResponse(BaseModel)`: tiene `elements: List[UIElement]`.
+  - `Vision.detect_ui_elements(image_path, application=None)` (line 415): devuelve VisionResponse; el prompt JSON incluye `name`; nombre inferido de name/text/type con fallback `element_{n}`.
+  - `Vision.verify_element_visibility(element_name, application, expected_coords)` (line 603): usa `element.matches_name(target)`.
+
+(3) VISION SIMPLIFICADA (`src/eyes/vision_only.py` lines 37-52):
+  - `UIElement(UIElementData)` (pydantic): hereda del modelo canonico. No tiene detect_ui_elements; solo detect_application_state.
+  - `VisionResponse(BaseModel)`: tiene `elements: List[UIElement]`.
+
+(4) CONOCIMIENTO DE APLICACIONES (`src/hands/applications_core.py` lines 77-194):
+  - `UIElement` (dataclass, line 77): 6 campos — name(str), type(str), coordinates(Optional[Dict]), screen(int=0), calibration_data(Optional[Dict]), required_capability(Optional[ApplicationCapability]). NO tiene: description, text, bbox, center, interactive, confidence, calibrated. NO hereda UIElementData.
+  - `is_calibrated()` (line 87): solo comprueba coordenadas ({"x","y"} o {"sN":[x,y]}), NO considera flag `calibrated` (que no existe en este dataclass).
+  - `_is_coordinate_pair()` (static, line 104): valida pares numericos.
+  - `ApplicationKnowledge.ui_elements: Optional[List[UIElement]] = None` (line 146), defaults a [] en __post_init__ (lines 157-158).
+  - `ApplicationKnowledge.get_ui_element(element_name)` (line 180): resuelve por name.lower(), case-insensitive.
+  - `ApplicationKnowledge.get_calibrated_elements()` (line 192): devuelve List[UIElement] donde is_calibrated() es True.
+  - `ApplicationManager.get_application_ui_elements(app_name)` (line 425): devuelve Dict[str, Dict] con keys: type, coordinates, screen, is_calibrated, required_capability, calibration_data. NO incluye: description, interactive, confidence, calibrated, bbox, center, text.
+  - `ApplicationManager.register_application(app)` (line 351): NO persiste ui_elements en el Entity; entity_data.properties solo incluye type, executable, url, login_required, capabilities (strings). ui_elements se pierde en el round-trip.
+  - `register_custom_application(app_config)` (line 1016): reconstruye UIElement(**element_data) desde JSON; pero UIElement es un dataclass SIN campo `description`, por lo que si element_data contiene `description` (como en applications.json) lanza TypeError ("unexpected keyword argument 'description'"). Verificado en runtime.
+
+(5) DATOS DE CONOCIMIENTO (`data/knowledge/applications.json`):
+  - `ui_elements` es un Dict[str, Dict] (NO una lista) — keyed por nombre de elemento, cada uno con solo `type` y `description`. NO tiene coordinates, screen, calibration_data, required_capability.
+  - `calibration_needed` es una lista separada de nombres (e.g. ["address_bar", "new_tab_button"]).
+  - `data/knowledge/entities.json`: lista de Entity objects con `aliases` pero NO campo `ui_elements`.
+  - `data/knowledge/capabilities.json`: schema por categoria (system/browser/media/development/streaming) con campos description, required_state, effects, cost, applications. NO tiene ui_elements ni required_ui_elements. Schema distinto de ApplicationCapabilityDef.
+
+(6) COORDINATES/MACROS (`data/macros_coords.json`):
+  - `ui_knowledge` seccion: dict keyed por app (chrome, spotify, riot_api), luego por elemento, con schema: type, description, calibration_strategy, alternatives (List[str]), screens (Dict[str, [x,y]] multipantalla s1/s2), confidence.
+  - Schema distinto de UIElement dataclass (que usa `coordinates` no `screens`; `calibration_data` no `calibration_strategy`/`alternatives`/`confidence`).
+
+(7) PLANIFICADOR/INTEGRACION (`src/hands/planner/application_integration.py` lines 437-513, 516-527, 692):
+  - `_create_ui_element_node(app, element_name, capability_def)` (line 437): crea Node con NodeType.UI_ELEMENT (si element conocido) o NodeType.RESOURCE (si no). Lee `app.get_ui_element()` callable O `app.ui_elements` dict — soporta ambos formatos (dataclass y dict).
+  - Node.parameters incluye: type, screen, calibrated, capability. NO lee bbox, center, description, text, interactive, confidence de ApplicationKnowledge UIElement (que no los tiene).
+  - Node.ui_element = element_name (string). metadata: source="application_knowledge", known, calibrated, required_by_capabilities.
+  - `_is_element_calibrated(element)` (line 516): chequea via is_calibrated callable, boolean, o campo `calibrated`. Soporta objetos y dicts.
+  - `get_ui_elements_for_capability(app_name, cap)` (line 692): resuelve capability, obtiene required_ui_elements del capability def.
+
+(8) NODO PLANNER (`src/hands/planner/node.py` line 139):
+  - `Node.ui_element: Optional[str] = None` (line 139): almacena nombre del elemento (string, no objeto).
+  - `NodeType.UI_ELEMENT = "ui_element"` (line 42).
+  - Node.to_dict() serializa `ui_element` (line 516); create_action_node() acepta ui_element param (line 1037).
+
+(9) EJECUTOR (`src/hands/executor.py` lines 137-141, 1042-1076, 1763-1767, 1095-1111):
+  - `ExecutionState.ui_elements: Dict[str, Dict[str, Any]]` (line 137): estado runtime per elemento (string name -> Dict[str,bool]). Flags: focused, clicked, typed, available, calibrated.
+  - `_record_success()` (lines ~1042-1076): cuando marca focused/clicked/typed, establece ui_elements[element]["focused"/"clicked"/"typed"]=True. NO establece `available=True` (contrariamente a lo que indica ESTADO_FASE_UI_ELEMENTS.md task 6, pendiente).
+  - `_get_state_for_planning()` (line 1763): serializa ui_elements a keys planas `ui_{element}_{property}`.
+  - `_apply_state_updates()` (line 1095): fusiona updates de ui_elements.
+
+(10) GOAL STATE MAPPER (`src/hands/planner/goal_state_mapper.py` line 813):
+  - `_create_calibrated_element_nodes()` (line 813): crea Node(NodeType.UI_ELEMENT) desde `world_state.calibrated_elements` (Dict[str, Dict[str, Any]] con calibration_data, confidence, monitor_id). Metadata: element_name, calibration_data, confidence, monitor_id, mapping_phase="6.5.2".
+
+(11) STATE/SCREEN (`src/eyes/screen.py` lines 118-154):
+  - `WorldState.calibrated_elements: Optional[Dict[str, Dict[str, Any]]]` (line 127) — elementos calibrados con calibration_data. Inicializado a {} en __post_init__ (line 162).
+  - `_get_calibrated_elements()` (line 588): carga desde memoria (storage STATE).
+
+(12) PRECONDITIONS/EFFECTS (`src/hands/planner/preconditions_effects_types.py` lines 248-300, 616-637):
+  - `_get_ui_element_state(state, app_name, element_name)` (line 248): soporta formatos anidados {app:{element:{...}}} y planos {element:{available,calibrated,focused,visible}} y compound {app_element_{property}}.
+  - `ConditionType`: UI_ELEMENT_AVAILABLE="ui_element_available", UI_ELEMENT_CALIBRATED="ui_element_calibrated" (lines 41-42).
+  - Efectos ui_element_calibrate: establece {calibrated:True, available:True} (line 627). ui_element_focus: {focused:True} (line 630).
+  - Vocabulary canonico esperado: available, calibrated, focused, visible.
+
+(13) DATOS DE MEMORIA (`data/memory/world_state.json`):
+  - `ui_elements: {}` (empty).
+  - `data/memory/applications.json`: `{}` (vacio — no contiene ui_elements registrados).
+
+(14) CALIBRADOR (`src/hands/calibrator.py` lines 52-76, 43-50):
+  - `CalibrationElement` (dataclass): campos — id, name, application, element_type (NO type), coordinates (Dict[str, Tuple[int,int]]), calibration_status (CalibrationStatus enum), last_calibrated, confidence, alternatives, requires_focus, policy.
+  - `CalibrationStatus` (Enum, line 43): UNKNOWN, CALIBRATING, CALIBRATED, OUTDATED, INVALID, NOT_CALIBRATED.
+  - Usa `element_type` (no `type`), `coordinates` Dict[str, Tuple[int,int]] (no Dict[str, Any]).
+
+(15) UNIVERSAL VISUAL CALIBRATOR (`src/universal_visual_calibrator.py` lines 202-229):
+  - `UICapability`: campos — name, element_type (no type), center (Tuple[int,int]), bbox (Tuple[int,int,int,int]), screen, confidence.
+  - `self.calibrated_elements: Dict[str, Dict[str, UICapability]]` (line 200): keyed por app luego por elemento.
+  - `UICapability.to_dict()` (line 222): serializa `type` (no element_type) como alias.
+
+(16) CALIBRATION MANAGER (`src/hands/calibration_manager.py` lines 122-148, 131):
+  - `CalibrationResult` (dataclass): application_name, application_type, screen_number, success, elements_count, timestamp, error, calibration_data (Optional[Dict]), skipped.
+  - `calibration_data` contiene Dict con clave "elements" (List[Dict]) — tercer formato para elementos calibrados distinto de WorldState.calibrated_elements y ExecutionState.ui_elements.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: NA; DOCUMENTACION: `mejora/prompt_JARVIS_fases_estado.txt`
+TESTS Y RESULTADOS: UNITARIOS: PASSED (tests/hands/test_applications_core.py incluye TestUIElement::test_is_calibrated/test_coordinates/test_get_ui_element/test_get_calibrated_elements; tests/hands/planner/test_application_integration.py incluye TestUIElementNodeCreation; tests/eyes/test_vision.py incluye TestDetectUIElements; tests/hands/test_executor.py incluye TestExecutionStateUIElements; tests/hands/planner/test_node.py incluye TestNodeUIElement; tests/hands/test_calibration_manager.py incluye TestCalibrationResult). Total: 1050 tests relevantes PASSED; INTEGRACION: NE; NO REGRESION: NE (no se modifico codigo)
+VERIFICACION: SINTAXIS: OK (`python -m py_compile src/hands/applications_core.py src/eyes/vision.py src/eyes/vision_only.py src/hands/executor.py src/hands/planner/application_integration.py src/hands/planner/node.py src/hands/planner/preconditions_effects_types.py src/utils/ui_element_model.py src/eyes/screen.py src/hands/calibrator.py src/universal_visual_calibrator.py src/hands/calibration_manager.py` -> exit 0); JSON: OK (json.load sobre data/knowledge/applications.json, entities.json, capabilities.json, macros_coords.json, data/memory/world_state.json -> validos); MAIN.PY: NE (no se modifico codigo); COMPORTAMIENTO / INTEGRACION REAL: Inspeccion estatica confirmada en todas las capas; verificacion en runtime: (a) applications_core.UIElement fields = ['name','type','coordinates','screen','calibration_data','required_capability'] (6 campos, sin description); (b) UIElement(name='btn', type='button', description='Test') lanza TypeError: unexpected keyword argument 'description'; (c) chrome.ui_elements = 3 elementos (address_bar, search_bar, new_tab_button), 0 calibrados; (d) get_application_ui_elements('chrome')['address_bar'] keys = ['type','coordinates','screen','is_calibrated','required_capability','calibration_data']; (e) applications.json ui_elements = Dict[str,{type,description}]+calibration_needed list; (f) macros_coords.json ui_knowledge.chrome.address_bar = {type,description,calibration_strategy,alternatives,screens:{"s1":[x,y]},confidence}; (g) UIElementData(UIElementData) tiene 13 campos con name/description/text/bbox/center/interactive/confidence/calibrated.
+DISCREPANCIAS: (A) CINCO REPRESENTACIONES INCOMPATIBLES de UI element: (1) UIElementData pydantic (src/utils/ui_element_model.py) — modelo canonico 13 campos; (2) UIElement pydantic (eyes/vision.py + eyes/vision_only.py) — heredan UIElementData; (3) UIElement dataclass (hands/applications_core.py) — 6 campos, NO hereda UIElementData; (4) CalibrationElement dataclass (hands/calibrator.py) — vocabulary element_type + coordinates Dict[str,Tuple[int,int]]; (5) UICapability (universal_visual_calibrator.py) — element_type + center/bbox tuples, to_dict serializa como type. No hay conversion unified entre las 5. No se resuelve por intuicion. (B) README dice "UIElement (dataclass)" para eyes/vision.py (linea 210) y eyes/vision_only.py (linea 240) — pero el codigo usa pydantic BaseModel (UIElement(UIElementData)). README desactualizado. (C) README linea 210 describe vision.py UIElement con "tipo, texto, bounding box, centro, interactividad y confianza" (SIN name) — pero UIElementData incluye name; code now includes name. (D) applications_core UIElement dataclass NO hereda UIElementData — no comparte vocabulary canonico; falta description, text, bbox, center, interactive, confidence, calibrated. (E) applications.json ui_elements = Dict[str,{type,description}] (flat dict, con description) vs ApplicationKnowledge.ui_elements = List[UIElement] (dataclass con coordinates/screen/calibration_data, sin description). No adapter existe; format dict vs list. (F) register_custom_application: UIElement(**element_data) falla con TypeError si element_data tiene 'description' (verificado en runtime) — applications.json tiene description en ui_elements. (G) applications.json NO es cargado por ApplicationManager.__init__() (usa hardcoded Chrome/Spotify); solo DomainMemory lo carga como dict raw — ui_elements de JSON nunca entran en ApplicationKnowledge. (H) register_application (linea 351): NO persiste ui_elements en Entity properties (solo type, executable, url, login_required, capabilities, aliases=[]); entity.properties.ui_elements nunca populado. (I) get_application_ui_elements (linea 425): NO incluye description, interactive, confidence, calibrated, bbox, center, text aunque UIElementData canonico los tiene; omite campos que el planning layer necesitaria. (J) macros_coords.json ui_knowledge schema (type, description, calibration_strategy, alternatives, screens, confidence) distinto de UIElement schema (name, type, coordinates, screen, calibration_data, required_capability). No adapter. (K) ExecutionState.ui_elements (executor.py:137) = Dict[str,Dict[str,bool]] flags runtime (focused,clicked,typed,available) — concepto distinto de UIElement declarativo (coordinates, calibration_data). preconditions_effects_types soporta ambos formatos anidado y plano. (L) CalibrationElement (calibrator.py:52) usa element_type (no type) + coordinates Dict[str,Tuple[int,int]]; CalibrationStatus enum separado. (M) UICapability (universal_visual_calibrator.py:202) usa element_type (no type) aunque to_dict() serializa como "type". (N) CalibrationResult.calibration_data (calibration_manager.py:131) = Dict con "elements": List[Dict] — tercer formato para elementos calibrados, distinto de WorldState.calibrated_elements (Dict[str,Dict]) y ExecutionState.ui_elements (Dict[str,Dict[str,bool]]). (O) README no documenta src/utils/ui_element_model.py (modelo canonico). Ninguna se resuelve por intuicion.
+PENDIENTES: 3.1.1.6 (registrar discrepancias generales de la fase) pendiente en orden del roadmap.
+ESTADO FINAL: 3.1.1.5 - IMPLEMENTADA
