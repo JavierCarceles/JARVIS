@@ -13,10 +13,11 @@ Evolucionar de `intencion -> comando -> funcion -> ejecucion` a `intencion -> Go
 - No inventar funcionalidades, fases, IDs, archivos, clases, metodos, APIs, coordenadas, offsets, tests, metricas ni resultados. Reutilizar implementaciones y contratos reales; no duplicar logica ni crear APIs ficticias.
 - Las coordenadas/puntos UI son datos de percepcion/calibracion, no inteligencia ni reglas de decision. No introducir ML, deep learning, RL u otra complejidad para aparentar inteligencia; usar IA/LLM/Vision cuando aporte valor demostrable.
 
-2. GIT Y VERSIONADO
-- Prohibido usar historial de commits, mensajes/objetos de commits, `git log`, `git show`, `git blame` o contenidos internos de `.git` (incluidos `HEAD`, `config`, `logs`, `objects`, `refs`, `index`) como documentacion, evidencia del comportamiento actual o fuente de verdad. La evidencia debe salir del codigo actual, tests y documentacion tecnica.
-- No crear commits ni realizar operaciones que escriban o cambien el historial/estado de Git (`commit`, `amend`, `push`, `reset`, `rebase`, `cherry-pick`, `revert`, cambio de rama, `stash` o equivalentes) salvo peticion expresa del usuario.
-- `git status` y `git diff` solo se permiten si hacen falta para comprobar cambios actuales o proteger trabajo existente; nunca para reconstruir historia o elegir unidad.
+2. PROHIBICION ABSOLUTA DE GIT
+- Está terminantemente prohibido ejecutar comandos `git` en cualquier circunstancia, sin excepciones y aunque sean de solo lectura. La prohibición incluye, entre otros, `git status`, `git diff`, `git log`, `git show`, `git blame`, `git branch`, `git switch`, `git checkout`, `git stash`, `git fetch`, `git pull`, `git push`, `git commit`, `git add`, `git reset`, `git rebase`, `git cherry-pick`, `git revert` y cualquier otro subcomando, opción, alias o variante de Git.
+- También está prohibido invocar Git indirectamente mediante scripts, herramientas, extensiones, interfaces gráficas, automatizaciones o comandos encadenados; así como consultar o manipular `.git` (incluidos `HEAD`, `config`, `logs`, `objects`, `refs` e `index`) para examinar el estado, comparar cambios, obtener evidencias o alterar el repositorio.
+- No crear commits ni realizar ninguna operación de versionado. Esta prohibición no se puede levantar por inferencia ni por conveniencia; solo podrá cambiarse si el usuario modifica expresamente estas reglas.
+- Para analizar el proyecto, verificar cambios y obtener evidencia, usar exclusivamente los archivos de trabajo, el código actual, los tests y la documentación técnica permitida, sin recurrir a Git ni a sus datos.
 
 3. TESTS Y SEGURIDAD DE VERIFICACION
 - Un test correcto que falla obliga a corregir el codigo, no a debilitar el test.
