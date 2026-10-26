@@ -1,8 +1,8 @@
 ESTADO PERSISTENTE ACTUAL
-CURRENT_PHASE: 3.1.2
-CURRENT_WORK_UNIT: 3.1.2.4
+CURRENT_PHASE: 3.1.3
+CURRENT_WORK_UNIT: 3.1.3.2
 CURRENT_WORK_STATUS: PENDIENTE
-LAST_COMPLETED_UNIT: 3.1.2.3
+LAST_COMPLETED_UNIT: 3.1.3.1
 
 PROMPT PRINCIPAL JARVIS — PUNTO DE ENTRADA Y CONTINUIDAD
 
@@ -24,7 +24,7 @@ ORDEN OBLIGATORIO DE INICIO
 
 CONTINUIDAD Y CIERRE
 - Una sola unidad hoja por chat. Si es demasiado grande, subdividirla antes de implementar, registrar padre/hijas en `prompt_JARVIS_fases_estado.txt` y trabajar solo la primera hija pendiente.
-- Si se completa: agregar/actualizar su unico registro canonico en `prompt_JARVIS_fases_estado.txt`; establecer `LAST_COMPLETED_UNIT` a la unidad terminada; mover `CURRENT_WORK_UNIT` y `CURRENT_PHASE` a la siguiente hoja realmente pendiente del roadmap; dejar `CURRENT_WORK_STATUS: PENDIENTE`; guardar este archivo y terminar el chat. No abrir ni empezar la siguiente hoja.
+- Si se completa: agregar/actualizar su unico registro canonico en `prompt_JARVIS_fases_estado.txt`; establecer `LAST_COMPLETED_UNIT` a la unidad terminada; mover `CURRENT_WORK_UNIT` y `CURRENT_PHASE` a la siguiente hoja realmente pendiente del roadmap; dejar `CURRENT_WORK_STATUS: EN PROCESO`; guardar este archivo y terminar el chat. No abrir ni empezar la siguiente hoja.
 - Si queda incompleta o bloqueada: mantener `CURRENT_WORK_UNIT` en la misma hoja, establecer `CURRENT_WORK_STATUS: PARCIALMENTE IMPLEMENTADA`, registrar pendientes y no avanzar.
 - No dejar el puntero actual en una unidad completada ni marcar la siguiente `EN PROCESO` antes de empezar un chat dedicado a ella.
 - Si se detecta una contradiccion, conservarla y documentar evidencias en el registro pertinente; no reconciliarla por intuicion. El bloque persistente de este archivo sigue siendo el unico estado operativo.

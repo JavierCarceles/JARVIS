@@ -4374,3 +4374,55 @@ VERIFICACIÓN:
 DISCREPANCIAS: D1-D8 persisten sin cambios (ver 3.1.2.1, 3.1.2.2). (D9) ApplicationKnowledge tiene 13 campos (no 11). El conteo correcto es 2 obligatorios + 11 opcionales. D8 se mantiene (el archivo test_application_identification.py sigue sin existir en disco).
 PENDIENTES: 3.1.2.4 (verificar no duplicación de campos), 3.1.3 (compatibilidad y tests del contrato end-to-end). D1-D9 persisten documentadas.
 ESTADO FINAL: 3.1.2.3 - IMPLEMENTADA
+
+====================================================================
+REGISTRO DE UNIDAD: 3.1.2.4
+FECHA: 2026-10-27
+OBJETIVO: Verificar que el contrato minimo (ApplicationKnowledge) no duplica informacion ya existente en el modelo Entity, en register_application y en las capas de datos; documentar con tests las superposiciones halladas, sin modificar codigo de produccion.
+TIPO DE TRABAJO: VERIFICACION | TEST
+CAMBIOS / HALLAZGOS:
+- Inspeccion estatica de `src/hands/applications_core.py:137-166` (ApplicationKnowledge, 13 campos), `src/memory/storage.py:46-91` (Entity, 10 campos), `applications_core.py:351-375` (register_application) y `data/knowledge/applications.json`.
+- SUPERPOSICION DE NOMBRE a nivel top-level entre ApplicationKnowledge y Entity: {name, type, metadata} comparten nombre. `id` se DERIVA de `name` (`app_{name.lower()}`, applications_core.py:355) y NO es un campo del contrato: no es duplicacion directa, es una derivacion.
+- register_application (applications_core.py:354-368) escribe EXACTAMENTE 5 claves en `Entity.properties`: {type, executable, url, login_required, capabilities}, duplicando campos del contrato. Entity.name es una copia directa de ApplicationKnowledge.name.
+- `type` se duplica con valores distintos segun nivel: Entity.type='application' (categoria de entidad, hardcoded linea 357) vs Entity.properties.type=app.type (categoria de app, ej. 'browser'). No es redundancia inutil: division de responsabilidad (entidad vs aplicacion).
+- capabilities se duplica CON TRANSFORMACION: ApplicationKnowledge.capabilities (List[ApplicationCapabilityDef], linea 145) → Entity.properties.capabilities (List[str] de cap.capability.value, linea 363). La forma difiere pero la informacion se reduce.
+- Los 4 campos opcionales duplicados: {executable, url, login_required, capabilities}. Los 7 campos opcionales NO persistidos (se pierden): {icon, ui_elements, states, calibration_policy, preflight_requirements, default_state, metadata} — heredado de 3.1.2.3.
+- `data/knowledge/applications.json` (NO cargado por ApplicationManager.__init__, D5) superpone 6 nombres de campos con el contrato: {name, executable, capabilities, states, ui_elements, login_required}. NO contiene `type` (obligatorio en el contrato) y contiene `calibration_needed` (ausente del contrato).
+- get_application_knowledge (applications_core.py:989-1002) reexpoña 12 de 13 campos del contrato en un dict (todas menos `icon`); `icon` se pierde en la serializacion (Chrome no lo popula -> None).
+- VERIFICACION: la contraposicion del contrato minimo no elimina toda duplicacion; `name` se duplica (Entity.name + Entity.id derivado), `type` parcialmente (nivel entidad vs nivel properties), y 5 campos se copian a Entity.properties. La duplicacion de `name` es el mecanismo de identificacion unico (3.1.2.1) y no es redundante involuntaria. La copia a Entity.properties es la adaptacion contrato->entidad (D6). La decision de modelo canonico definitivo queda pendiente de 3.1.3.
+- Sin cambios en codigo de produccion. Tests creados: tests/hands/test_application_contract_no_duplication.py (32 tests, 7 clases).
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: `tests/hands/test_application_contract_no_duplication.py` (nuevo, 32 tests); DOCUMENTACION: NA (documentado inline en este registro).
+TESTS Y RESULTADOS: UNITARIOS: 32/32 PASSED (test_application_contract_no_duplication.py, nuevo); INTEGRACION: NE; NO REGRESION: 1589/1589 tests de tests/hands/ pasan (1557 baseline previo + 32 nuevos); suite 3.1.2.1-3.1.2.3 intacta (19+16+22=57 PASSED). Pytest exit code 0.
+VERIFICACION: SINTAXIS: OK (python -m py_compile src/hands/applications_core.py tests/hands/test_application_contract_no_duplication.py main.py -> exit 0); MAIN.PY: OK (compilado sin errores; no modificado); COMPORTAMIENTO / INTEGRACION REAL: 32 tests verifican caracterizacion de duplicacion; Entity.properties tiene exactamente {type, executable, url, login_required, capabilities}; applications.json schema verificado con json.load; get_application_knowledge("chrome") reexpone 12 claves (drop icon).
+DISCREPANCIAS: (D8/D9 de 3.1.2.2/3.1.2.3 afirman que `tests/hands/test_application_identification.py` "sigue sin existir en disco") — CONTRADICCION RESUELTA POR EVIDENCIA: el archivo EXISTE en disco (6818 bytes, 26/10/2026 19:45, 19 tests que PASS). Se conservan los registros historicos D8/D9 sin borrarlos; el estado actual documentado aqui contradice la afirmacion historica. (D8) `mejora/inspeccion_unit3121.md` y `mejora/construccion_unit3121.md` NO existen en disco — CONFIRMADO (Test-Path=False). (D10) El registro 3.1.2.2 documenta `mejora/inspeccion_unit3122.md` como archivo creado, pero NO existe en disco (Test-Path=False): la documentacion declarada no materializa archivo. D1-D6 persisten sin cambios (ver 3.1.2.1).
+PENDIENTES: 3.1.3 (compatibilidad y tests del contrato end-to-end; decision de modelo canonico definitivo y mapeo datos<->codigo). D1-D6, D10 persisten documentadas.
+ESTADO FINAL: 3.1.2.4 - IMPLEMENTADA
+
+===
+REGISTRO DE UNIDAD: 3.1.3.1
+FECHA: 2026-10-27
+OBJETIVO: Verificar los consumidores actuales del modelo de aplicaciones (ApplicationKnowledgeIntegrator / ApplicationManager) para confirmar que es la unica fuente de verdad, sin modificar codigo de produccion.
+TIPO DE TRABAJO: VERIFICACION ESTATICA | AUDITORIA DE CONSUMIDORES
+CAMBIOS / HALLAZGOS:
+- ESTRUCTURA DEL MODELO: ApplicationKnowledgeIntegrator (application_integration.py:35) wraps ApplicationManager (applications_core.py:197). ApplicationManager almacena self.applications: Dict[str, ApplicationKnowledge] populado por _initialize_applications() (hardcoded Chrome, Spotify) + _load_custom_applications() (carrega entidades de data/memory/entities.json via memory_manager.get_entities_by_type("application"), PERO no reconstruye objetos ApplicationKnowledge — codigo incompleto).
+- FUENTE DE DATOS: ApplicationManager.__init__() NO lee data/memory/applications.json (grep de applications.json|json.load|open(|_load en applications_core.py → 0 resultados). El archivo data/memory/applications.json contiene {} (vacio) y NO es leido ni escrito por el modelo. CONFIRMA D5/D6: applications.json no es fuente del modelo.
+- data/knowledge/applications.json (schema name/executable/capabilities/states/ui_elements) es cargado SOLO por conversation.py:172 (DomainKnowledge class) para contexto conversacional — NO por el modelo ApplicationManager.
+- ACCESOR SINGLETON: get_application_knowledge_integrator() (application_integration.py:168-172) returns singleton ApplicationKnowledgeIntegrator wrapping get_application_manager() (applications_core.py:465-469).
+- CONSUMIDORES_ACTIVOS (usan el modelo, no solo almacenan referencia):
+  1. ApplicationKnowledgeIntegrator (application_integration.py:35) — PRIMARY consumer; expone convert_application_to_nodes(), get_applications_by_capability(), get_application_capabilities(), get_ui_elements_for_capability(), update_application_state(), register_action()
+  2. Brain._get_application_knowledge() (llm.py:102-107) — accede integrator.application_manager.applications.keys(), llama get_application_capabilities() e is_application_capable()
+  3. Planner (planner.py:184) — llama convert_application_to_nodes() para HTN task nodes; usa get_applications_by_capability(), get_application_capabilities(), get_ui_elements_for_capability()
+  4. HTNManager._application_catalog_available() (htn_manager.py:203) — accede self.application_integrator.application_manager.applications dict para chequeo de disponibilidad
+  5. Executor (executor.py:104) — usa get_application_manager() → manager.applications dict para browser_available check
+  6. Funciones internas en applications_core.py: open_application() (linea 483), close_application() (linea 529), calibrate_application_ui(), calibrar_aplicaciones(), _check_application_available(), _check_application_login() — usan el modelo via get_application_manager() + self.applications
+- CONSUMIDORES_OBSOLETOS (referencia establecida en __init__ pero NUNCA accedida posteriormente):
+  1. HTNBrainIntegration.application_integrator (htn_integration.py:46) — self.application_integrator asignado via get_application_knowledge_integrator() pero findstr de self.application_integrator en htn_integration.py → SOLO linea 46 (asignacion). Nunca leido.
+  2. TaskExecutor.application_integrator (task_executor.py:135-137) — self.application_integrator asignado via self._safe_get(get_application_knowledge_integrator) pero findstr de self.application_integrator en task_executor.py → SOLO linea 135 (asignacion). Nunca leido.
+- WorldState.from_dict() en screen.py:160 parsea "applications" desde un payload de monitor de pantalla — NO consume del modelo ApplicationManager. Estructura de datos separada (WorldState/ApplicationInfo).
+- VERIFICACION DE DATA FLOW: register_application() (applications_core.py:351-375) guarda Entity a data/memory/entities.json via memory_manager.save_entity(); NO escribe a data/memory/applications.json.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: NA (sin tests nuevos, verificacion estatica); DOCUMENTACION: este registro en prompt_JARVIS_fases_estado.txt.
+TESTS Y RESULTADOS: EXISTENTES: 1094/1094 PASSED (suite completo pytest). Unit test test_application_contract_no_duplication.py (32 tests) verifica schema de data/knowledge/applications.json.
+VERIFICACION: SINTAXIS: OK (python -m py_compile main.py → exit 0). MAIN.PY: OK (no modificado). CONSUMIDORES: 6 activos + 2 obsoletos documentados. FUENTE DE DATOS: model es in-memory (hardcoded), data/memory/applications.json vacio y no leido.
+DISCREPANCIAS: (D5) ApplicationManager.__init__ no carga data/knowledge/applications.json — CONFIRMADO (grep 0 resultados de json.load/open en applications_core.py). (D6) data/knowledge/applications.json tiene schema distinto a ApplicationKnowledge — CONFIRMADO (knowledge/applications.json tiene calibration_needed, no type; ApplicationKnowledge tiene type (obligatorio), no calibration_needed). Data flow model→entities.json documentado. D1-D4 persisten sin cambios (ver 3.1.2.1).
+PENDIENTES: 3.1.3.2 (mantener compatibilidad con APIs ya utilizadas), 3.1.3.3 (crear tests del contrato minimo), 3.1.3.4 (cerrar 3.1). 2 consumidores obsoletos (HTNBrainIntegration.application_integrator, TaskExecutor.application_integrator) marcados para revision en fase posterior. data/memory/applications.json vacio y no conectado al modelo — pendiente decision sobre 3.2.1.
+ESTADO FINAL: 3.1.3.1 - COMPLETADA
