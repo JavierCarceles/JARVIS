@@ -586,7 +586,8 @@ FASE 2 ? ARQUITECTURA (extension documentada actual)
 2.8.13.6 Tests de ejecucion.
 2.8.13.7 Verificar main.py.
 2.8.13.8 No declarar cierre si existe una regresion abierta.
-2.8.14 ? DOCUMENTACION Y CIERRE
+
+2.8.14  DOCUMENTACION Y CIERRE
 2.8.14.1 Actualizar README con lo realmente implementado.
 2.8.14.2 Mantener discrepancias no resueltas.
 2.8.14.3 Actualizar prompt con estado real.
@@ -3913,3 +3914,15 @@ VERIFICACION: SINTAXIS: OK (py_compile de test_executor.py y test_task_executor.
 DISCREPANCIAS: NINGUNA
 PENDIENTES: NINGUNO (unidad 2.8.13.6 completa)
 ESTADO FINAL: 2.8.13.6 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 2.8.13.7
+FECHA: 2026-10-26
+OBJETIVO: Verificar que main.py compila e importa correctamente en el entorno real.
+TIPO DE TRABAJO: VERIFICACION
+CAMBIOS / HALLAZGOS: `python -m py_compile main.py` -> OK (exit code 0). `import main` -> OK (IMPORT MAIN OK). Todos los componentes se inicializaron sin errores: PerformanceOptimizer, SelfImprovementSystem, AdaptiveLearningEngine, OptimizationOrchestrator, OptimizationSystem, ActionRegistry (10 ops -> 20 -> 30 tras registrar teclado/raton/chrome), Memory/Storage, y el sistema logging de Jarvis. El proceso se apago gracefulmente al finalizar. No se modifico codigo de produccion ni tests. El import modifico data/knowledge_graph.json (comportamiento preexistente documentado en 2.8.12.6: SelfImprovementSystem escribe knowledge_graph.json durante __init__).
+ARCHIVOS MODIFICADOS: PRODUCCION: NA ; TESTS: NA ; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: NE ; INTEGRACION: NE ; NO REGRESION: baseline 2.8.13.6 (1609 PASSED / 0 FAILED)
+VERIFICACION: SINTAXIS: OK (`python -m py_compile main.py`, exit code 0) ; MAIN.PY: OK (`import main` exitoso, IMPORT MAIN OK) ; COMPORTAMIENTO / INTEGRACION REAL: Todos los componentes se inicializaron sin errores; shutdown graceful al finalizar el proceso.
+DISCREPANCIAS: El import de main.py modifico data/knowledge_graph.json (SelfImprovementSystem escribe knowledge_graph.json durante __init__, comportamiento preexistente documentado en 2.8.12.6). No se modifico codigo de produccion.
+PENDIENTES: NINGUNO (unidad 2.8.13.7 completa)
+ESTADO FINAL: 2.8.13.7 - IMPLEMENTADA

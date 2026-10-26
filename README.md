@@ -1,5 +1,4 @@
 # JARVIS - Asistente de IA con Planificacion Jerarquica
-
 ## Arquitectura del Proyecto
 
 ### 📁 Modulo `src/` - Directorio Principal del Sistema
@@ -143,7 +142,7 @@
 
 #### `src/eyes/__init__.py` - Inicializacion del Modulo Vision
 - **Descripcion**: Modulo de vision de JARVIS que exporta las clases principales para el sistema de vision y captura de pantalla. Importa `Vision` desde `vision_only` y `ScreenCapture` desde `screen_capture`.
-- **Exportaciones Principales**: 
+- **Exportaciones Principales**:
   - `Vision`: Clase principal del sistema de vision simplificado.
   - `ScreenCapture`: Clase principal del sistema de captura de pantalla.
   - `get_screen_capture`: Funcion para obtener la instancia global del sistema de captura de pantalla.
@@ -268,448 +267,6 @@
   - `get_applications_by_capability`: Funcion para obtener aplicaciones disponibles por capacidad especifica.
   - `register_custom_application`: Funcion para registrar aplicaciones personalizadas en el sistema.
 
-#### `src/hands/executor.py` [1373 lineas] - Ejecutor Mejorado con Planificacion Jerarquica
-- **Descripcion**: Ejecutor mejorado de JARVIS con arquitectura de planificacion jerarquica que maneja la ejecucion de acciones individuales y planes completos con replanificacion dinamica.
-- **Clases principales**:
-  - `Executor`: Clase principal del sistema de ejecucion con soporte para planificacion jerarquica y replanificacion
-  - `ExecutionResult`: Resultado de ejecucion de un nodo o plan con estado, tiempo de ejecucion, errores y alternativas
-  - `ExecutionStatus`: Enum con estados: PENDING, RUNNING, SUCCESS, FAILED, RETRYING, ALTERNATIVE
-  - `ExecutionState`: Estado actual del mundo para ejecucion con timestamps y estados de aplicaciones/UI
-- **Metodos principales**:
-  - `execute_plan`: Ejecuta un plan completo (lista de nodos) con replanificacion dinamica
-  - `execute_action`: Ejecuta una accion registrada con mejoras de estado y verificacion
-  - `execute_goal`: Ejecuta un objetivo usando el planificador integrado
-  - `process_and_execute`: Procesa respuesta LLM y ejecuta comando (compatibilidad legacy)
-  - `get_current_state`: Obtiene el estado actual del mundo
-  - `get_action_stats`: Obtiene estadisticas de ejecucion de acciones
-  - `get_learning_insights`: Obtiene insights del sistema de aprendizaje
-- **Caracteristicas mejoradas**:
-  - Ejecucion de planes completos con replanificacion cuando una accion falla
-  - Verificacion de precondiciones y efectos de cada nodo
-  - Manejo de estado del mundo y actualizaciones en tiempo real
-  - Sistema de aprendizaje integrado para optimizacion
-  - Timeout handling y manejo robusto de errores
-  - Soporte para acciones alternativas cuando falla la ejecucion principal
-- **Integraciones**:
-  - `ActionRegistry` para registro y ejecucion de acciones
-  - `MemoryManager` para estado del mundo y estadisticas
-  - `LearningSystem` para aprendizaje y optimizacion
-  - `Planner` para planificacion jerarquica de objetivos
-  - Modulos de aplicaciones (keyboard, mouse, applications_core)
-- **Capacidades**: Planificacion jerarquica y ejecucion de planes; sistema de aprendizaje y optimizacion
-
-#### `src/hands/mouse.py` [129 lineas] - Control Basico del Raton
-- **Descripcion**: Control basico del raton para JARVIS con capacidades de movimiento, clic y scroll integradas en el sistema de acciones.
-- **Funciones principales**:
-  - `move_to_position`: Mueve el raton a una posicion especifica con duracion configurable.
-  - `click_element`: Realiza clic con boton especifico (left, right, middle) con espera posterior.
-  - `scroll_at_position`: Realiza scroll en una posicion especifica con numero de clicks configurable.
-  - `register_mouse_capabilities`: Registra capacidades del raton en el sistema de acciones.
-- **Caracteristicas**:
-  - Validacion de parametros (coordenadas, botones, clicks)
-  - Manejo robusto de errores con logging detallado
-  - Integracion con ActionRegistry para planificacion
-  - Soporte para movimientos suaves con duracion configurable
-  - Registro automatico al importar el modulo
-- **Tipos de acciones registradas**:
-  - `move_mouse`: Mover raton a posicion (INTERACTION)
-  - `click_mouse`: Hacer clic con el raton (INTERACTION)  
-  - `scroll_mouse`: Hacer scroll con el raton (INTERACTION)
-- **Dependencias**: pyautogui para control del raton, utils.logger para logging.
-
-#### `src/hands/universal_visual_calibrator.py` [916 lineas] - Calibrador Visual Universal
-- **Descripcion**: Calibrador visual universal para la arquitectura de planificacion jerarquica. Esta capa realiza exclusivamente percepcion/calibracion visual. No abre ni mueve aplicaciones y no persiste macros_coords.json directamente. El resultado de `calibrate()` utiliza coordenadas absolutas del escritorio virtual y asocia cada elemento al monitor fisico real (`s1`, `s2`, ...).
-- **Clases principales**:
-  - `CalibrationPolicy` (Policy): Politica centralizada de seguridad, no una allowlist de aplicaciones. La calibracion visual es universal: una aplicacion GUI no bloqueada puede ser analizada. Las aplicaciones peligrosas/protegidas se rechazan aqui y en el preflight del CalibrationManager cuando corresponde.
-  - `UICapability` (dataclass): Representa un elemento UI calibrado y consumible por acciones con propiedades de nombre, tipo, centro, bounding box, pantalla, confianza y timestamp.
-  - `CalibrationState`: Estado en memoria de los elementos calibrados con soporte para multipantalla (app -> sN -> element -> capability).
-  - `UniversalVisualCalibrator`: Calibrador visual universal integrado con las capas superiores que usa Qwen3-VL para analisis visual y normalizacion de coordenadas.
-- **Metodos principales**:
-  - `get_ui_capability`: Obtiene una capacidad UI especifica para una aplicacion y elemento en un monitor concreto con cache automatico.
-  - `calibrate_application_elements`: Calibra todos los elementos de una aplicacion en un monitor especifico aplicando politica de filtrado.
-  - `calibrate`: Metodo principal que realiza calibracion completa de una aplicacion usando captura de pantalla y analisis con Qwen3-VL.
-  - `_calibrate_element`: Metodo interno para calibrar un elemento especifico dentro de una aplicacion ya calibrada.
-  - `_build_prompt`: Construye prompt personalizado para Qwen3-VL basado en el nombre de la aplicacion.
-  - `_parse_response`: Parsea respuesta JSON de Qwen3-VL con manejo robusto de errores y formato libre.
-  - `_normalize_elements`: Normaliza elementos crudos del modelo con transformacion de coordenadas y deduplicacion.
-  - `_normalize_single_element`: Normaliza un elemento individual con validacion de coordenadas y confianza.
-  - `_extract_image_bbox`: Extrae bounding box de imagen normalizada (0-1000) y lo convierte a pixeles.
-  - `_image_bbox_to_monitor_bbox`: Convierte coordenadas de imagen a coordenadas absolutas del monitor.
-  - `_deduplicate_elements`: Elimina duplicados por nombre, centro y tipo manteniendo el de mayor confianza.
-- **Caracteristicas principales**:
-  - Politica de seguridad con listas de aplicaciones bloqueadas (juegos, herramientas sensibles, terminales, etc.) y tipos de elemento filtrados.
-  - Soporte multi-monitor con coordenadas absolutas del escritorio virtual asociadas a monitores fisicos.
-  - Cache automatico de elementos calibrados con historial y timestamps.
-  - Analisis visual con Qwen3-VL mediante Ollama para deteccion de elementos interactivos.
-  - Normalizacion robusta de coordenadas, nombres y confianza con validacion exhaustiva.
-  - Sistema de deduplicacion basado en nombre, centro y tipo de elemento.
-  - Maximo de 80 elementos por calibracion con confianza minima del 20%.
-- **Constantes de configuracion**:
-  - `MODEL`: "qwen3-vl:8b-instruct" - Modelo de vision por computadora.
-  - `NORMALIZED_MAX`: 1000 - Valor maximo para coordenadas normalizadas.
-  - `MAX_ELEMENTS`: 80 - Maximo numero de elementos detectables.
-  - `MIN_CONFIDENCE`: 0.20 - Confianza minima para elementos detectados.
-- **Funciones globales**:
-  - `get_calibrator`: Obtiene instancia singleton del calibrador visual universal.
-  - `get_ui_capability`: Funcion de conveniencia para obtener capacidades UI especificas.
-- **Integraciones**:
-  - `Vision` para analisis de imagenes mediante Qwen3-VL.
-  - `ConversationMemory` para estado y cache de calibraciones.
-  - `ScreenManager` para informacion de monitores y geometria.
-  - `utils.logger` para logging detallado del proceso de calibracion.
-- **Dependencias**: PIL para procesamiento de imagenes, json para manejo de respuestas, regex para normalizacion, unicodedata para normalizacion de texto.
-
-#### `src/hands/planner/__init__.py` [96 lineas] - Inicializacion del Modulo Planificacion
-- **Descripcion**: Modulo de planificacion de JARVIS que evita inicializar componentes pesados durante la importacion para prevenir ciclos entre action_registry y los modulos del planner. Los componentes principales se resuelven de forma perezosa cuando se solicitan.
-- **Clases principales importadas**:
-  - `Goal`: Clase base para objetivos del sistema.
-  - `Node`: Clase base para nodos del planificador.
-  - `NodeType`: Enumeracion que define tipos de nodos.
-  - `Task`: Clase base para tareas del sistema.
-  - `TaskStatus`: Enumeracion que define estados de tareas.
-- **Funciones principales**:
-  - `get_htn_manager()`: Obtiene la instancia global del HTN Manager mediante importacion perezosa.
-  - `get_application_knowledge_integrator()`: Obtiene la instancia global del integrador de conocimiento de aplicaciones.
-  - `get_task_executor()`: Obtiene la instancia global del TaskExecutor mediante importacion perezosa.
-- **Funciones dinamicas (__getattr__)**:
-  - `StateGraph`, `GraphNode`, `GraphEdge`, `GraphBuilder`: Clases del sistema de grafos cargadas perezosamente.
-  - `HTNManager`: Clase principal del HTN Manager cargada perezosamente.
-  - `TaskExecutor`: Clase principal del Task Executor cargada perezosamente.
-- **Caracteristicas principales**:
-  - Importacion perezosa para evitar ciclos de dependencia
-  - Delegacion directa en singletons definidos por cada modulo
-  - Evita mantener caches duplicadas a nivel de paquete
-  - Sistema de carga dinamica bajo demanda
-- **Exportaciones (__all__)**:
-  - Clases base: Node, Goal, Task, NodeType, TaskStatus
-  - Componentes de grafos: StateGraph, GraphNode, GraphEdge, GraphBuilder
-  - Gestores: HTNManager, TaskExecutor
-  - Funciones de acceso: get_htn_manager, get_task_executor, get_application_knowledge_integrator
-
-#### `src/hands/planner/preconditions_effects.py` [1077 lineas] - Sistema Avanzado de Precondiciones y Efectos
-- **Descripcion**: Sistema avanzado de precondiciones y efectos para planificacion jerarquica con gestion centralizada de condiciones y efectos, evaluacion segura y aplicacion determinista sobre estados del mundo.
-- **Clases principales**:
-  - `PreconditionsEffectsManager`: Gestor centralizado de precondiciones y efectos con registro y reutilizacion.
-  - `Condition`: Representa condiciones evaluables sobre el estado del mundo.
-  - `Effect`: Representa efectos que modifican el estado del mundo.
-- **Metodos principales**:
-  - `create_condition()`: Crea y registra condiciones para reutilizacion.
-  - `create_effect()`: Crea y registra efectos para reutilizacion.
-  - `create_composite_condition()`: Crea condiciones compuestas AND/OR.
-  - `verify_action_preconditions()`: Verifica si todas las precondiciones de una accion se cumplen.
-  - `evaluate_condition()`: Evalua condiciones individuales o funcionales de forma segura.
-  - `apply_action_effects()`: Aplica los efectos de una accion y devuelve un nuevo estado.
-  - `apply_effect()`: Aplica un efecto individual sobre el estado.
-  - `get_state_requirements_for_action()`: Extrae precondiciones representables como requisitos escalares.
-  - `get_state_modifications_from_action()`: Extrae modificaciones de estado estaticas de los efectos.
-  - `create_action_with_preconditions_effects()`: Crea ActionInfo compatible con el registro central.
-- **Funciones globales**:
-  - `get_preconditions_effects_manager()`: Obtiene la instancia global del gestor.
-  - `create_application_open_condition()`: Crea condicion de aplicacion abierta.
-  - `create_application_active_condition()`: Crea condicion de aplicacion activa.
-  - `create_ui_element_calibrated_condition()`: Crea condicion de elemento UI calibrado.
-  - `create_application_open_effect()`: Crea efecto de aplicacion abierta.
-  - `create_ui_element_calibrate_effect()`: Crea efecto de calibracion de elemento UI.
-- **Caracteristicas principales**:
-  - Construccion y reutilizacion de condiciones y efectos
-  - Evaluacion segura de precondiciones simples, compuestas y funcionales
-  - Aplicacion determinista y acumulativa de efectos sobre estados
-  - Integracion con ActionInfo/ActionType del registro central de acciones
-  - Utilidades comunes para acciones de aplicaciones y elementos UI
-  - Manejo robusto de errores y logging detallado
-  - Soporte para condiciones compuestas con operadores AND/OR
-  - Sistema de plantillas para condiciones y efectos comunes
-- **Integraciones**:
-  - `ActionInfo` y `ActionType` del registro central de acciones
-  - `Condition` y `Effect` de preconditions_effects_types
-  - Sistema de logging para depuracion y monitoreo
-- **Dependencias**: copy, math, typing, hands.action_registry, hands.planner.preconditions_effects_types, utils.logger
-
-#### `src/hands/chrome/__init__.py` [75 lineas] - Inicializacion del Modulo Chrome
-- **Descripcion**: Modulo especifico para Google Chrome con sistema de acciones registrado.
-- **Importaciones principales**:
-  - `chrome`: Modulo con funciones de Chrome (abrir_chrome, abrir_chrome_pantalla, etc.)
-  - `chrome_calibrator`: Modulo con ChromeCalibrator y calibrar_chrome
-  - `action_registry`: Sistema de registro de acciones
-  - `ActionType`: Tipos de acciones disponibles
-- **Acciones registradas**:
-  - `abrir_chrome_action`: Abre Google Chrome en el navegador (APPLICATION, navegacion, ["chrome", "web", "navegador"])
-  - `abrir_chrome_pantalla_action`: Abre Google Chrome en una pantalla especifica (APPLICATION, navegacion, ["chrome", "multi-monitor", "pantalla"])
-  - `calibrar_chrome_action`: Calibra Google Chrome con sistema mejorado y nombres semanticos (APPLICATION, calibracion, ["chrome", "calibracion", "qwen3vl", "multi-monitor"])
-- **Funciones globales**:
-  - `abrir_chrome`: Abre Google Chrome en el navegador.
-  - `abrir_chrome_pantalla`: Abre Google Chrome en una pantalla especifica.
-  - `get_chrome_commands`: Obtiene los comandos especificos de Chrome.
-  - `calibrar_chrome`: Calibra Google Chrome con sistema mejorado y nombres semanticos.
-- **Exportaciones principales**:
-  - `ChromeCalibrator`: Clase principal del calibrador de Chrome.
-  - `abrir_chrome`, `abrir_chrome_pantalla`, `get_chrome_commands`: Funciones basicas de Chrome.
-  - `abrir_chrome_action`, `abrir_chrome_pantalla_action`, `calibrar_chrome_action`: Acciones registradas en el sistema.
-- **Modulo registrado**: `src.hands.chrome`
-
-#### `src/hands/chrome/chrome.py` [501 lineas] - Funciones Especificas de Google Chrome
-- **Descripcion**: Modulo con acciones especificas para Google Chrome que maneja apertura, cierre, movimiento, maximizacion y calibracion del navegador. La logica universal de calibracion, deteccion de aplicaciones y geometria de monitores pertenece a CalibrationManager y ScreenManager respectivamente.
-- **Clases principales**:
-  - Ninguna clase principal, solo funciones utilitarias.
-- **Metodos principales**:
-  - `abrir_chrome`: Abre Google Chrome en la pantalla predeterminada con multiples metodos de fallback.
-  - `abrir_chrome_pantalla`: Abre Chrome en un monitor especifico con validacion de numero de pantalla.
-  - `cerrar_chrome`: Cierra todas las ventanas de Google Chrome mediante ScreenManager.
-  - `calibrar_chrome`: Calibra elementos de Chrome usando el flujo universal de aplicaciones con seleccion automatica o manual de monitor.
-  - `mover_chrome_pantalla`: Mueve ventana de Chrome a una pantalla especifica con deteccion de ventanas existentes.
-  - `maximizar_chrome`: Maximiza la ventana de Chrome preferentemente la que esta en primer plano.
-- **Funciones internas**:
-  - `_get_chrome_executable`: Busca chrome.exe en ubicaciones habituales de Windows.
-  - `_abrir_chrome_desde_ruta`: Abre Chrome directamente usando multiples metodos de fallback.
-  - `_get_chrome_windows`: Obtiene ventanas de Chrome mediante ScreenManager.
-  - `_select_preferred_chrome_window`: Selecciona la ventana Chrome en primer plano.
-  - `_verificar_chrome_abierto`: Verifica si existe al menos una ventana visible de Chrome.
-  - `_verificar_chrome_instalado`: Verifica si Chrome esta instalado o resoluble en el sistema.
-  - `_capturar_chrome`: Captura una ventana de Chrome (API legacy).
-- **Acciones registradas**:
-  - `abrir_chrome`: Abre Google Chrome (APPLICATION)
-  - `abrir_chrome_pantalla`: Abre Chrome en pantalla especifica (APPLICATION)
-  - `cerrar_chrome`: Cierra todas las ventanas de Chrome (APPLICATION)
-  - `calibrar_chrome`: Calibra elementos de Chrome (CALIBRATION)
-  - `mover_chrome_pantalla`: Mueve Chrome a pantalla especifica (NAVIGATION)
-  - `maximizar_chrome`: Maximiza ventana de Chrome (NAVIGATION)
-- **Caracteristicas principales**:
-  - Multiples metodos de apertura con fallback (subprocess, webbrowser)
-  - Soporte multi-monitor con validacion de numeros de pantalla
-  - Integracion con ScreenManager para deteccion y manejo de ventanas
-  - Manejo robusto de errores con logging detallado
-  - Seleccion inteligente de ventanas (preferir ventana en primer plano)
-  - API legacy para captura de pantalla (reemplazada por flujo universal)
-- **Dependencias**: pyautogui, subprocess, webbrowser, os, pathlib, time, typing.
-
-#### `src/hands/edge/__init__.py` - Inicializacion del Modulo Edge
-- **Descripcion**: Modulo especifico para Microsoft Edge con importacion del sistema de calibracion y funciones especificas de Edge.
-- **Metodos principales**:
-  - `EdgeCalibrator`: Clase principal del calibrador de Edge importada desde calibrator_edge.
-  - `get_edge_calibrator`: Funcion para obtener el calibrador de Edge.
-
-#### `src/hands/edge/calibrator_edge.py` [233 lineas] - Calibrador de Compatibilidad para Microsoft Edge
-- **Descripcion**: Adaptador de compatibilidad para la calibracion de Microsoft Edge que delega en el sistema universal de calibracion. Mantiene API legacy para compatibilidad con codigo antiguo.
-- **Arquitectura**: Delegating pattern hacia CalibrationManager → UniversalVisualCalibrator → Qwen3-VL
-- **Clases principales**:
-  - `EdgeCalibrator`: Adaptador legacy hacia CalibrationManager con metodos de compatibilidad.
-- **Metodos principales**:
-  - `calibrate_edge_both_screens()`: API legacy por compatibilidad (mantiene nombre historico pero trabaja con cualquier numero de monitores).
-  - `calibrate_edge()`: API moderna de compatibilidad que delega directamente en CalibrationManager.
-  - `_calibrate_edge_universal()`: Metodo de delegacion universal que intenta multiples nombres de aplicacion ("Microsoft Edge", "Edge").
-- **Funciones globales**:
-  - `calibrate_edge()`: Funcion publica de compatibilidad que devuelve mensajes de estado de calibracion.
-- **Caracteristicas principales**:
-  - Mantiene compatibilidad con codigo antiguo que importe EdgeCalibrator o calibrate_edge()
-  - No asume numero especifico de monitores ni resoluciones
-  - No calcula offsets ni coordenadas manualmente
-  - Utiliza sistema universal de calibracion con Qwen3-VL
-  - Soporte multi-monitor sin limitaciones
-  - Manejo robusto de errores con logging detallado
-- **Integraciones**:
-  - `CalibrationManager` para calibracion real
-  - `UniversalVisualCalibrator` para analisis visual
-  - `Qwen3-VL` para deteccion de elementos
-  - `ScreenManager` para informacion de monitores
-- **Limitaciones**:
-  - No genera coordenadas manuales
-  - No analiza elementos uno por uno
-  - No escribe macros_coords.json directamente
-  - No utiliza pyautogui.size() para determinar monitores
-  - No asume DPI o resoluciones especificas
-
-#### `src/hands/edge/edge.py` [554 lineas] - Funciones Especificas de Microsoft Edge
-- **Descripcion**: Modulo con acciones especificas para Microsoft Edge que maneja apertura, cierre, movimiento, maximizacion y calibracion del navegador. La geometria de monitores se obtiene exclusivamente de ScreenManager. Este modulo conserva funciones antiguas por compatibilidad, pero no genera coordenadas artificiales, no asume dos monitores y no utiliza una resolucion ni un DPI fijo.
-- **Funciones principales**:
-  - `abrir_edge_pantalla`: Abre Microsoft Edge y lo posiciona en la pantalla solicitada.
-  - `abrir_edge_pestana`: Abre una nueva pestana de Edge en la pantalla solicitada.
-  - `_get_edge_windows`: Obtiene las ventanas visibles/localizables de Microsoft Edge.
-  - `_get_edge_window_info`: Obtiene metadatos y geometria actual de una ventana de Edge.
-  - `_find_edge_window_on_monitor`: Busca una ventana de Edge cuyo centro este dentro del monitor indicado.
-  - `_select_edge_window`: Selecciona una ventana Edge, priorizando el monitor indicado.
-  - `_abrir_edge_desde_ruta`: Abre Edge desde una instalacion local conocida.
-  - `_verificar_edge_abierto`: Verifica si Edge esta abierto y visible.
-  - `_verificar_edge_instalado`: Verifica si Microsoft Edge esta instalado.
-  - `_move_edge_window`: Mueve una ventana Edge al origen del monitor y trata de maximizarla.
-  - `_mover_edge_a_pantalla`: Mueve una ventana de Edge al monitor solicitado.
-  - `_cerrar_edge`: Cierra una ventana visible de Edge.
-  - `_calibrar_edge`: Compatibilidad con la implementacion antigua (legacy).
-  - `_generar_coordenadas_edge`: Compatibilidad con codigo antiguo; no genera coordenadas artificiales.
-  - `_capturar_edge`: Captura la ventana visible de Edge (compatibilidad).
-  - `get_edge_commands`: Obtiene los comandos legacy de Edge.
-- **Caracteristicas principales**:
-  - Soporte multi-monitor con validacion de numeros de pantalla
-  - Integracion con ScreenManager para deteccion y manejo de ventanas
-  - Multiples metodos de apertura con fallback (subprocess, busqueda de rutas)
-  - Seleccion inteligente de ventanas (priorizar ventana en primer plano)
-  - Manejo robusto de errores con logging detallado
-  - Funciones legacy para compatibilidad con sistemas antiguos
-  - Soporte para deteccion de instalacion de Edge mediante multiples metodos
-- **Acciones registradas**:
-  - `abrir_edge_pantalla`: Abre Microsoft Edge en pantalla especifica (APPLICATION)
-  - `abrir_edge_pestana`: Abre nueva pestana de Edge en pantalla especifica (APPLICATION)
-- **Funciones legacy (deprecated)**:
-  - `_calibrar_edge`: La calibracion especifica legacy ha sido desactivada. Utiliza el calibrador universal de aplicaciones.
-  - `_generar_coordenadas_edge`: No genera coordenadas artificiales por diseno.
-- **Integraciones**:
-  - `ScreenManager` para informacion de monitores y geometria
-  - `pyautogui` para captura de pantalla
-  - `pygetwindow` para deteccion de ventanas
-  - `utils.logger` para logging detallado
-- **Dependencias**: pyautogui, pygetwindow, subprocess, os, pathlib, time, typing.
-
-#### `src/hands/firefox/__init__.py` [3 lineas] - Inicializacion del Modulo Firefox
-- **Descripcion**: Modulo especifico para Mozilla Firefox con sistema de acciones registrado.
-- **Metodos principales**:
-  - `Firefox`: Clase principal del sistema de Firefox importada desde firefox.
-  - `abrir_firefox_action`: Accion wrapper para abrir Firefox.
-  - `abrir_firefox_pantalla_action`: Accion wrapper para abrir Firefox en pantalla especifica.
-  - `calibrar_firefox_action`: Accion wrapper para calibrar Firefox.
-- **Funciones globales**:
-  - `abrir_firefox`: Abre Mozilla Firefox en el navegador.
-  - `abrir_firefox_pantalla`: Abre Mozilla Firefox en una pantalla especifica.
-  - `get_firefox_commands`: Obtiene los comandos especificos de Firefox.
-  - `calibrar_firefox`: Calibra Mozilla Firefox con sistema mejorado y nombres semanticos.
-- **Exportaciones principales**:
-  - `FirefoxCalibrator`: Clase principal del calibrador de Firefox.
-  - `abrir_firefox`, `abrir_firefox_pantalla`, `get_firefox_commands`: Funciones basicas de Firefox.
-  - `abrir_firefox_action`, `abrir_firefox_pantalla_action`, `calibrar_firefox_action`: Acciones registradas en el sistema.
-
-#### `src/hands/firefox/firefox.py` [637 lineas] - Funciones Especificas de Mozilla Firefox
-- **Descripcion**: Modulo con acciones especificas para Mozilla Firefox que maneja apertura, cierre, movimiento, maximizacion y calibracion del navegador. La logica universal de calibracion, deteccion de aplicaciones y geometria de monitores pertenece a CalibrationManager y ScreenManager respectivamente.
-- **Clases principales**:
-  - Ninguna clase principal, solo funciones utilitarias.
-- **Metodos principales**:
-  - `abrir_youtube`: Abre YouTube en el navegador predeterminado.
-  - `abrir_spotify`: Abre Spotify Web en el navegador predeterminado.
-  - `abrir_firefox_pantalla`: Abre Mozilla Firefox y lo posiciona en la pantalla solicitada.
-  - `abrir_firefox_pestana`: Abre una nueva pestana de Firefox en la pantalla solicitada.
-  - `_get_firefox_windows`: Obtiene las ventanas visibles/localizables de Mozilla Firefox.
-  - `_get_firefox_window_info`: Obtiene metadatos y geometria actual de una ventana de Firefox.
-  - `_find_firefox_window_on_monitor`: Busca una ventana de Firefox cuyo centro este dentro del monitor indicado.
-  - `_select_firefox_window`: Selecciona una ventana Firefox, priorizando el monitor indicado.
-  - `_abrir_firefox_desde_ruta`: Abre Firefox desde una instalacion local conocida.
-  - `_verificar_firefox_abierto`: Verifica si Firefox esta abierto y visible.
-  - `_verificar_firefox_instalado`: Verifica si Mozilla Firefox esta instalado.
-  - `_move_firefox_window`: Mueve una ventana Firefox al origen del monitor y trata de maximizarla.
-  - `_mover_firefox_a_pantalla`: Mueve una ventana de Firefox al monitor solicitado.
-  - `_cerrar_firefox`: Cierra una ventana visible de Firefox.
-  - `_calibrar_firefox`: Compatibilidad con la implementacion antigua (no genera coordenadas).
-  - `_generar_coordenadas_firefox`: Compatibilidad con codigo antiguo; no genera coordenadas artificiales.
-  - `_capturar_firefox`: Captura la ventana visible de Firefox (compatibilidad).
-  - `get_firefox_commands`: Obtiene los comandos legacy de Firefox.
-- **Caracteristicas principales**:
-  - Soporte multi-monitor con validacion de numeros de pantalla
-  - Integracion con ScreenManager para deteccion y manejo de ventanas
-  - Multiples metodos de apertura con fallback (subprocess, busqueda de rutas)
-  - Seleccion inteligente de ventanas (priorizar ventana en primer plano)
-  - Manejo robusto de errores con logging detallado
-  - Funciones legacy para compatibilidad con sistemas antiguos
-  - Soporte para deteccion de instalacion de Firefox mediante multiples metodos
-- **Acciones registradas**:
-  - `abrir_firefox_pantalla`: Abre Mozilla Firefox en pantalla especifica (APPLICATION)
-  - `abrir_firefox_pestana`: Abre nueva pestana de Firefox en pantalla especifica (APPLICATION)
-- **Funciones legacy (deprecated)**:
-  - `_calibrar_firefox`: La calibracion especifica legacy ha sido desactivada. Utiliza el calibrador universal de aplicaciones.
-  - `_generar_coordenadas_firefox`: No genera coordenadas artificiales por diseno.
-- **Integraciones**:
-  - `ScreenManager` para informacion de monitores y geometria
-  - `pyautogui` para captura de pantalla
-  - `pygetwindow` para deteccion de ventanas
-  - `utils.logger` para logging detallado
-- **Dependencias**: pyautogui, pygetwindow, subprocess, os, pathlib, time, typing.
-
-#### `src/hands/firefox/calibrator_firefox.py` [227 lineas] - Calibrador de Compatibilidad para Mozilla Firefox
-- **Descripcion**: Adaptador de compatibilidad para la calibracion de Mozilla Firefox que delega en el sistema universal de calibracion. Mantiene API legacy para compatibilidad con codigo antiguo.
-- **Arquitectura**: Delegating pattern hacia CalibrationManager → UniversalVisualCalibrator → Qwen3-VL
-- **Clases principales**:
-  - `FirefoxCalibrator`: Adaptador legacy hacia CalibrationManager con metodos de compatibilidad.
-- **Metodos principales**:
-  - `calibrate_firefox_both_screens()`: API legacy por compatibilidad (mantiene nombre historico pero trabaja con cualquier numero de monitores).
-  - `calibrate_firefox()`: API moderna de compatibilidad que delega directamente en CalibrationManager.
-  - `_calibrate_firefox_universal()`: Metodo de delegacion universal que intenta multiples nombres de aplicacion ("Mozilla Firefox", "Firefox").
-- **Funciones globales**:
-  - `calibrate_firefox()`: Funcion publica de compatibilidad que devuelve mensajes de estado de calibracion.
-- **Caracteristicas principales**:
-  - Mantiene compatibilidad con codigo antiguo que importe FirefoxCalibrator o calibrate_firefox()
-  - No asume numero especifico de monitores ni resoluciones
-  - No calcula offsets ni coordenadas manualmente
-  - Utiliza sistema universal de calibracion con Qwen3-VL
-  - Soporte multi-monitor sin limitaciones
-  - Manejo robusto de errores con logging detallado
-- **Integraciones**:
-  - `CalibrationManager` para calibracion real
-  - `UniversalVisualCalibrator` para analisis visual
-  - `Qwen3-VL` para deteccion de elementos
-  - `ScreenManager` para informacion de monitores
-- **Limitaciones**:
-  - No genera coordenadas manuales
-  - No analiza elementos uno por uno
-  - No escribe macros_coords.json directamente
-  - No utiliza pyautogui.size() para determinar monitores
-  - No asume DPI o resoluciones especificas
-
-#### `src/hands/firefox/calibrator_firefox.py` [227 lineas] - Calibrador de Compatibilidad para Mozilla Firefox
-- **Descripcion**: Adaptador de compatibilidad para la calibracion de Mozilla Firefox que delega en el sistema universal de calibracion. Mantiene API legacy para compatibilidad con codigo antiguo.
-- **Arquitectura**: Delegating pattern hacia CalibrationManager → UniversalVisualCalibrator → Qwen3-VL
-- **Clases principales**:
-  - `FirefoxCalibrator`: Adaptador legacy hacia CalibrationManager con metodos de compatibilidad.
-- **Metodos principales**:
-  - `calibrate_firefox_both_screens()`: API legacy por compatibilidad (mantiene nombre historico pero trabaja con cualquier numero de monitores).
-  - `calibrate_firefox()`: API moderna de compatibilidad que delega directamente en CalibrationManager.
-  - `_calibrate_firefox_universal()`: Metodo de delegacion universal que intenta multiples nombres de aplicacion ("Mozilla Firefox", "Firefox").
-- **Funciones globales**:
-  - `calibrate_firefox()`: Funcion publica de compatibilidad que devuelve mensajes de estado de calibracion.
-- **Caracteristicas principales**:
-  - Mantiene compatibilidad con codigo antiguo que importe FirefoxCalibrator o calibrate_firefox()
-  - No asume numero especifico de monitores ni resoluciones
-  - No calcula offsets ni coordenadas manualmente
-  - Utiliza sistema universal de calibracion con Qwen3-VL
-  - Soporte multi-monitor sin limitaciones
-  - Manejo robusto de errores con logging detallado
-- **Integraciones**:
-  - `CalibrationManager` para calibracion real
-  - `UniversalVisualCalibrator` para analisis visual
-  - `Qwen3-VL` para deteccion de elementos
-  - `ScreenManager` para informacion de monitores
-- **Limitaciones**:
-  - No genera coordenadas manuales
-  - No analiza elementos uno por uno
-  - No escribe macros_coords.json directamente
-  - No utiliza pyautogui.size() para determinar monitores
-  - No asume DPI o resoluciones especificas
-
-#### `src/hands/planner/__init__.py` - Inicializacion del Modulo de Planificacion
-- **Descripcion**: Modulo principal de planificacion que carga componentes pesados de forma perezosa para evitar ciclos de importacion y mantener compatibilidad con action_registry.
-- **Clases principales**:
-  - `Node`: Modelo conceptual comun para todos los elementos del sistema (importado de node)
-  - `Goal`: Objetivos de alto nivel alcanzables mediante planificacion (importado de node)
-  - `Task`: Tareas jerarquicas descomponibles en otras tareas o nodos (importado de node)
-  - `NodeType`: Tipos de nodos en el sistema de planificacion (importado de node)
-  - `TaskStatus`: Estados de ejecucion de tareas (importado de node)
-  - `StateGraph`: Sistema de grafos de estados para planificacion (importado perezoso de graph)
-  - `GraphNode`: Nodo del grafo de estados (importado perezoso de graph)
-  - `GraphEdge`: Arista del grafo de estados (importado perezoso de graph)
-  - `GraphBuilder`: Constructor de grafos predefinidos (importado perezoso de graph)
-  - `HTNManager`: Gestor de descomposicion jerarquica de tareas (importado perezoso de htn_manager)
-  - `TaskExecutor`: Ejecutor de tareas jerarquicas (importado perezoso de task_executor)
-- **Metodos principales**:
-  - `get_htn_manager`: Obtiene la instancia global del HTN Manager mediante importacion perezosa
-  - `get_application_knowledge_integrator`: Obtiene la instancia global del integrador de conocimiento de aplicaciones
-  - `get_task_executor`: Obtiene la instancia global del TaskExecutor mediante importacion perezosa
-  - `__getattr__`: Carga componentes pesados del planner solo cuando se solicitan (StateGraph, GraphNode, GraphEdge, GraphBuilder, HTNManager, TaskExecutor)
-  - `__dir__`: Expone nombres disponibles mediante carga perezosa para autocompletado
-- **Funciones globales**:
-  - `get_htn_manager`: Obtiene instancia singleton del gestor HTN
-  - `get_application_knowledge_integrator`: Obtiene instancia global del integrador de conocimiento
-  - `get_task_executor`: Obtiene instancia global del ejecutor de tareas
-- **Constantes**:
-  - `__all__`: Lista de exportaciones del modulo incluyendo clases y funciones principales
-
-#### `src/hands/windows/__init__.py` - Inicializacion del Modulo Windows
-- **Descripcion**: Modulo especifico para aplicaciones de Windows. Archivo de inicializacion del paquete Windows que contiene solo la documentacion del modulo.
-- **Contenido**: Archivo `__init__.py` basico con docstring que define el modulo Windows para JARVIS.
-
 #### `src/hands/action_registry.py` [936 lineas] - Registro y Ejecucion de Acciones
 - **Descripcion**: Registro centralizado de acciones para JARVIS con sistema de planificacion, validacion de parametros y monitoreo.
 - **Clases principales**:
@@ -742,43 +299,13 @@
   - `list_actions`: Lista acciones disponibles, opcionalmente por categoria
   - `get_action_categories`: Obtiene lista de categorias disponibles
   - `get_optimization_stats`: Obtiene estadisticas para monitoreo y optimizacion
-  - `optimize_logging`: Optimiza sistema de eliminando mensajes redundantes
+  - `optimize_logging`: Optimiza el sistema de logging eliminando mensajes redundantes
+  - `ActionRegistry.__init__`: Inicializa el registro de acciones con un diccionario vacío de acciones, diccionario de categorías, conjunto de módulos registrados, contadores de ejecución (éxitos, errores) y un lock de re-entrada para acceso thread-safe. Registra la inicialización en el logger.
+  - `ActionRegistry._record_execution`: Registra el resultado de una ejecución (éxito o fallo) incrementando los contadores de ejecución, aciertos y errores bajo un lock de thread-safety, y emite un mensaje de log con el número de ejecución y si fue correcta o fallida.
 - **Funciones globales**:
   - `get_action_registry`: Obtiene instancia singleton del registro de acciones
   - `register_action`: Decorador de conveniencia para registrar acciones
   - `register_module`: Importa modulo y registra sus acciones decoradas
-- **Funciones globales**:
-  - `get_action_registry`: Obtiene instancia singleton del registro de acciones
-  - `register_action`: Decorador de conveniencia para registrar acciones
-  - `register_module`: Importa modulo y registra sus acciones decoradas
-
-#### `src/hands/planner/application_integration.py` - Integracion de Conocimiento de Aplicaciones
-- **Descripcion**: Convierte conocimiento declarativo de aplicaciones en Nodes compatibles con el modelo canonico de planificacion, manteniendo separadas planificacion y ejecucion.
-- **Clases principales**:
-  - `ApplicationKnowledgeIntegrator`: Integrador de conocimiento estructurado de aplicaciones con el planificador
-- **Metodos principales**:
-  - `__init__`: Inicializa integrador con gestor de aplicaciones y memoria
-  - `_normalize_name`: Normaliza nombres para IDs/keys de estado
-  - `_capability_value`: Obtiene el valor estable de una capacidad o su representacion textual
-  - `_as_list`: Normaliza listas/tuplas/conjuntos y valores individuales
-  - `_get_application`: Obtiene aplicacion del gestor por nombre
-  - `convert_application_to_nodes`: Convierte una aplicacion y sus capacidades en Nodes canonicos
-  - `_create_application_node`: Crea el nodo declarativo principal de la aplicacion
-  - `_create_capability_node`: Crea un nodo de accion para una capacidad de aplicacion
-  - `_create_ui_element_node`: Crea un nodo declarativo para un elemento UI requerido
-  - `_safe_cost`: Calcula coste seguro con valores por defecto
-  - `_get_application_current_state`: Obtiene estado persistido de la aplicacion cuando existe
-  - `_generate_application_preconditions`: Genera precondiciones reales de preparacion de la aplicacion
-  - `_generate_application_effects`: Genera efectos declarativos de disponibilidad/authenticacion
-  - `get_applications_by_capability`: Obtiene aplicaciones que exponen una capacidad
-  - `get_application_capabilities`: Obtiene capacidades de una aplicacion en formato declarativo
-  - `get_ui_elements_for_capability`: Obtiene elementos UI requeridos por una capacidad
-  - `is_application_capable`: Verifica si una aplicacion ofrece una capacidad
-  - `register_application_knowledge`: Registra conocimiento de una aplicacion mediante applications_core
-- **Funciones globales**:
-  - `get_application_knowledge_integrator`: Obtiene la instancia global del integrador
-  - `get_applications_by_capability`: Compatibilidad legacy usando ApplicationCapability cuando existe
-  - `get_application_knowledge`: Compatibilidad legacy para consultar el conocimiento de una aplicacion
 
 #### `src/hands/application_preflight.py` [894 lineas] - Sistema de Preflight de Aplicaciones
 - **Descripcion**: Sistema de verificacion previa de aplicaciones antes de su apertura y calibracion. Bloquea aplicaciones administrativas/tecnicas, resuelve ejecutables, inspecciona manifiestos y detecta requisitos de elevacion. No ejecuta aplicaciones ni realiza capturas.
@@ -1003,7 +530,7 @@
   - `EnhancedCalibrator._call_global_manager`: Llama a metodo del manager con manejo de firma
   - `EnhancedCalibrator._normalize_global_result`: Normaliza resultado global a formato estructurado
   - `EnhancedCalibrator._looks_like_global_report`: Verifica si resultado tiene formato global esperado
-  - `EnhancedCalibrator._result_to_dict`: Convierte resultado a diccionario (metodo duplicado)
+  - `EnhancedCalibrator._result_to_dict`: Convierte resultado a diccionario
   - `EnhancedCalibrator._extract_element_count`: Extrae cantidad de elementos de resultado
   - `EnhancedCalibrator.calibrate_chrome_both_screens`: Compatibilidad legacy para Chrome en ambos monitores
   - `EnhancedCalibrator._verify_system`: Verifica compatibilidad del sistema para calibracion
@@ -1030,6 +557,63 @@
   - `get_enhanced_calibrator`: Obtiene instancia singleton del calibrador mejorado
   - `calibrate_chrome_both_screens`: Funcion global legacy para calibrar Chrome en ambos monitores
 
+#### `src/hands/chrome/__init__.py` [75 lineas] - Inicializacion del Modulo Chrome
+- **Descripcion**: Modulo especifico para Google Chrome con sistema de acciones registrado.
+- **Importaciones principales**:
+  - `chrome`: Modulo con funciones de Chrome (abrir_chrome, abrir_chrome_pantalla, etc.)
+  - `chrome_calibrator`: Modulo con ChromeCalibrator y calibrar_chrome
+  - `action_registry`: Sistema de registro de acciones
+  - `ActionType`: Tipos de acciones disponibles
+- **Acciones registradas**:
+  - `abrir_chrome_action`: Abre Google Chrome en el navegador (APPLICATION, navegacion, ["chrome", "web", "navegador"])
+  - `abrir_chrome_pantalla_action`: Abre Google Chrome en una pantalla especifica (APPLICATION, navegacion, ["chrome", "multi-monitor", "pantalla"])
+  - `calibrar_chrome_action`: Calibra Google Chrome con sistema mejorado y nombres semanticos (APPLICATION, calibracion, ["chrome", "calibracion", "qwen3vl", "multi-monitor"])
+- **Funciones globales**:
+  - `abrir_chrome`: Abre Google Chrome en el navegador.
+  - `abrir_chrome_pantalla`: Abre Google Chrome en una pantalla especifica.
+  - `get_chrome_commands`: Obtiene los comandos especificos de Chrome.
+  - `calibrar_chrome`: Calibra Google Chrome con sistema mejorado y nombres semanticos.
+- **Exportaciones principales**:
+  - `ChromeCalibrator`: Clase principal del calibrador de Chrome.
+  - `abrir_chrome`, `abrir_chrome_pantalla`, `get_chrome_commands`: Funciones basicas de Chrome.
+  - `abrir_chrome_action`, `abrir_chrome_pantalla_action`, `calibrar_chrome_action`: Acciones registradas en el sistema.
+- **Modulo registrado**: `src.hands.chrome`
+
+#### `src/hands/chrome/chrome.py` [501 lineas] - Funciones Especificas de Google Chrome
+- **Descripcion**: Modulo con acciones especificas para Google Chrome que maneja apertura, cierre, movimiento, maximizacion y calibracion del navegador. La logica universal de calibracion, deteccion de aplicaciones y geometria de monitores pertenece a CalibrationManager y ScreenManager respectivamente.
+- **Clases principales**:
+  - Ninguna clase principal, solo funciones utilitarias.
+- **Metodos principales**:
+  - `abrir_chrome`: Abre Google Chrome en la pantalla predeterminada con multiples metodos de fallback.
+  - `abrir_chrome_pantalla`: Abre Chrome en un monitor especifico con validacion de numero de pantalla.
+  - `cerrar_chrome`: Cierra todas las ventanas de Google Chrome mediante ScreenManager.
+  - `calibrar_chrome`: Calibra elementos de Chrome usando el flujo universal de aplicaciones con seleccion automatica o manual de monitor.
+  - `mover_chrome_pantalla`: Mueve ventana de Chrome a una pantalla especifica con deteccion de ventanas existentes.
+  - `maximizar_chrome`: Maximiza la ventana de Chrome preferentemente la que esta en primer plano.
+- **Funciones internas**:
+  - `_get_chrome_executable`: Busca chrome.exe en ubicaciones habituales de Windows.
+  - `_abrir_chrome_desde_ruta`: Abre Chrome directamente usando multiples metodos de fallback.
+  - `_get_chrome_windows`: Obtiene ventanas de Chrome mediante ScreenManager.
+  - `_select_preferred_chrome_window`: Selecciona la ventana Chrome en primer plano.
+  - `_verificar_chrome_abierto`: Verifica si existe al menos una ventana visible de Chrome.
+  - `_verificar_chrome_instalado`: Verifica si Chrome esta instalado o resoluble en el sistema.
+  - `_capturar_chrome`: Captura una ventana de Chrome (API legacy).
+- **Acciones registradas**:
+  - `abrir_chrome`: Abre Google Chrome (APPLICATION)
+  - `abrir_chrome_pantalla`: Abre Chrome en pantalla especifica (APPLICATION)
+  - `cerrar_chrome`: Cierra todas las ventanas de Chrome (APPLICATION)
+  - `calibrar_chrome`: Calibra elementos de Chrome (CALIBRATION)
+  - `mover_chrome_pantalla`: Mueve Chrome a pantalla especifica (NAVIGATION)
+  - `maximizar_chrome`: Maximiza ventana de Chrome (NAVIGATION)
+- **Caracteristicas principales**:
+  - Multiples metodos de apertura con fallback (subprocess, webbrowser)
+  - Soporte multi-monitor con validacion de numeros de pantalla
+  - Integracion con ScreenManager para deteccion y manejo de ventanas
+  - Manejo robusto de errores con logging detallado
+  - Seleccion inteligente de ventanas (preferir ventana en primer plano)
+  - API legacy para captura de pantalla (reemplazada por flujo universal)
+- **Dependencias**: pyautogui, subprocess, webbrowser, os, pathlib, time, typing.
+
 #### `src/hands/chrome/chrome_calibrator.py` [57 lineas] - Calibrador Especifico para Chrome
 - **Descripcion**: Adaptador de compatibilidad para la calibracion de Google Chrome. La calibracion real se realiza mediante el sistema universal: CalibrationManager -> descubrimiento de aplicacion -> apertura/enfoque -> ScreenManager -> deteccion de monitor real -> captura -> UniversalVisualCalibrator -> Qwen3-VL 8B Instruct -> coordenadas absolutas -> guardado centralizado.
 - **Clases principales**:
@@ -1048,198 +632,81 @@
   - Formato estructurado de resultados con exito/fracaso, monitor, elementos y coordenadas
   - Compatibilidad con APIs legacy del proyecto
 
-#### `src/hands/edge/calibrator_edge.py` [233 lineas] - Calibrador Especifico para Edge
-- **Descripcion**: Adaptador de compatibilidad para la calibracion de Microsoft Edge. La calibracion real se realiza mediante el sistema universal: CalibrationManager -> descubrimiento de aplicacion -> apertura/enfoque -> ScreenManager -> deteccion de monitor real -> captura -> UniversalVisualCalibrator -> Qwen3-VL 8B Instruct -> coordenadas absolutas -> guardado centralizado.
-- **Clases principales**:
-  - `EdgeCalibrator`: Adaptador legacy que usa exactamente el flujo universal.
+#### `src/hands/edge/__init__.py` - Inicializacion del Modulo Edge
+- **Descripcion**: Modulo especifico para Microsoft Edge con importacion del sistema de calibracion y funciones especificas de Edge.
 - **Metodos principales**:
-  - `calibrate_edge_both_screens()`: Mantiene la API antigua por compatibilidad. El nombre historico hacia referencia a dos pantallas, pero el sistema actual trabaja con cualquier numero de monitores. Delega en la calibracion universal.
-  - `calibrate_edge()`: API moderna de compatibilidad. Delega directamente en CalibrationManager.
-  - `_calibrate_edge_universal()`: Delega Edge en CalibrationManager. No selecciona monitores, no captura pantallas, no calcula coordenadas, no analiza elementos directamente.
-- **Funciones globales**:
-  - `calibrate_edge()`: Funcion publica de compatibilidad. No escribe macros_coords.json.
+  - `EdgeCalibrator`: Clase principal del calibrador de Edge importada desde calibrator_edge.
+  - `get_edge_calibrator`: Funcion para obtener el calibrador de Edge.
 
-#### `src/hands/firefox/calibrator_firefox.py` - Calibrador Especifico para Firefox
-- **Descripcion**: Adaptador de compatibilidad para la calibracion de Mozilla Firefox. La calibracion real ya NO se realiza mediante logica especifica de Firefox. El flujo oficial es: CalibrationManager -> deteccion de aplicacion -> apertura/enfoque -> ScreenManager -> captura del monitor -> UniversalVisualCalibrator -> Qwen3-VL 8B Instruct -> coordenadas absolutas -> guardado centralizado. Este modulo existe unicamente para mantener compatibilidad con codigo antiguo que pudiera importar FirefoxCalibrator o calibrate_firefox(). NO detecta coordenadas manualmente, NO calcula offsets de monitores, NO asume dos pantallas, NO asume resoluciones, NO asume DPI, NO genera coordenadas artificiales, NO escribe macros_coords.json directamente.
+#### `src/hands/edge/calibrator_edge.py` [233 lineas] - Calibrador de Compatibilidad para Microsoft Edge
+- **Descripcion**: Adaptador de compatibilidad para la calibracion de Microsoft Edge que delega en el sistema universal de calibracion. Mantiene API legacy para compatibilidad con codigo antiguo.
+- **Arquitectura**: Delegating pattern hacia CalibrationManager → UniversalVisualCalibrator → Qwen3-VL
 - **Clases principales**:
-  - `FirefoxCalibrator`: Adaptador legacy hacia CalibrationManager. No contiene logica visual especifica de Firefox.
+  - `EdgeCalibrator`: Adaptador legacy hacia CalibrationManager con metodos de compatibilidad.
 - **Metodos principales**:
-  - `__init__`: Inicializa el calibrador con CalibrationManager.
-  - `calibrate_firefox_both_screens()`: Mantiene el nombre antiguo por compatibilidad. Delegando en CalibrationManager.
-  - `calibrate_firefox()`: API moderna de compatibilidad. Delegacion directa al flujo universal.
-  - `_calibrate_firefox_universal()`: Delega Firefox al CalibrationManager universal. No realiza ninguna operacion de pantalla directamente.
+  - `calibrate_edge_both_screens()`: API legacy por compatibilidad (mantiene nombre historico pero trabaja con cualquier numero de monitores).
+  - `calibrate_edge()`: API moderna de compatibilidad que delega directamente en CalibrationManager.
+  - `_calibrate_edge_universal()`: Metodo de delegacion universal que intenta multiples nombres de aplicacion ("Microsoft Edge", "Edge").
 - **Funciones globales**:
-  - `calibrate_firefox()`: Funcion publica de compatibilidad. No escribe macros_coords.json.
+  - `calibrate_edge()`: Funcion publica de compatibilidad que devuelve mensajes de estado de calibracion.
+- **Caracteristicas principales**:
+  - Mantiene compatibilidad con codigo antiguo que importe EdgeCalibrator o calibrate_edge()
+  - No asume numero especifico de monitores ni resoluciones
+  - No calcula offsets ni coordenadas manualmente
+  - Utiliza sistema universal de calibracion con Qwen3-VL
+  - Soporte multi-monitor sin limitaciones
+  - Manejo robusto de errores con logging detallado
+- **Integraciones**:
+  - `CalibrationManager` para calibracion real
+  - `UniversalVisualCalibrator` para analisis visual
+  - `Qwen3-VL` para deteccion de elementos
+  - `ScreenManager` para informacion de monitores
+- **Limitaciones**:
+  - No genera coordenadas manuales
+  - No analiza elementos uno por uno
+  - No escribe macros_coords.json directamente
+  - No utiliza pyautogui.size() para determinar monitores
+  - No asume DPI o resoluciones especificas
 
-#### `src/hands/windows/calibrator_windows.py` - Calibrador Especifico para Windows
-- **Descripcion**: Adaptador de compatibilidad para la calibracion de aplicaciones Windows. La calibracion real se realiza mediante el sistema universal: CalibrationManager -> descubrimiento de aplicacion -> apertura/enfoque -> ScreenManager -> deteccion de monitor real -> captura -> UniversalVisualCalibrator -> Qwen3-VL 8B Instruct -> coordenadas absolutas -> guardado centralizado.
-- **Clases principales**:
-  - `WindowsCalibrator`: Adaptador legacy que usa exactamente el flujo universal.
-- **Metodos principales**:
-  - `get_calibration_prompt()`: Mantiene la API antigua por compatibilidad. El flujo universal actual no depende de este prompt.
-  - `calibrate_app_both_screens()`: Mantiene el nombre antiguo por compatibilidad. Delegando en CalibrationManager.
-  - `calibrate_app()`: API de compatibilidad para calibrar Windows. La calibracion la realiza integramente CalibrationManager.
-  - `_calibrate_universal()`: Delega la calibracion en CalibrationManager. No realiza deteccion, captura ni calculo de coordenadas.
-- **Funciones globales**:
-  - `calibrate_app()`: Funcion publica de compatibilidad. No escribe macros_coords.json.
-- **Caracteristicas**:
-  - Deteccion multi-monitor integrada con ScreenManager
-  - Soporte para cualquier numero de monitores (no limitado a 1 o 2)
-  - Verificacion de instalacion y disponibilidad
-  - Movimiento y posicionamiento preciso
-  - Compatibilidad con API legacy
-  - No genera coordenadas artificiales
-  - Utiliza calibracion universal a traves de CalibrationManager
-
-#### `src/hands/chrome/chrome.py` - Funciones Especificas para Google Chrome
-- **Descripcion**: Funciones especificas para Google Chrome con apertura, cierre, calibracion, movimiento y maximizacion de ventanas. Utiliza ScreenManager para gestion de monitores y CalibrationManager para calibracion universal.
-- **Acciones Registradas**:
-  - `abrir_chrome`: Abre Google Chrome en la pantalla predeterminada.
-  - `abrir_chrome_pantalla`: Abre Google Chrome en una pantalla especifica.
-  - `cerrar_chrome`: Cierra todas las ventanas de Google Chrome.
-  - `calibrar_chrome`: Calibra elementos de Google Chrome usando vision artificial.
-  - `mover_chrome_pantalla`: Mueve la ventana de Chrome a una pantalla especifica.
-  - `maximizar_chrome`: Maximiza la ventana de Chrome.
-- **Funciones Principales**:
-  - `abrir_chrome()`: Abre especificamente Google Chrome, sin depender del navegador predeterminado.
-  - `abrir_chrome_pantalla(pantalla: int)`: Abre Chrome en un monitor especifico.
-  - `cerrar_chrome()`: Cierra las ventanas de Google Chrome.
-  - `calibrar_chrome(pantalla: int = 0)`: Calibra Chrome usando el flujo universal de aplicaciones.
-  - `mover_chrome_pantalla(pantalla: int)`: Mueve una ventana de Chrome al monitor solicitado.
-  - `maximizar_chrome()`: Maximiza la ventana de Chrome preferentemente la que esta en primer plano.
-- **Funciones Auxiliares**:
-  - `_get_chrome_executable()`: Busca chrome.exe en ubicaciones habituales de Windows.
-  - `_abrir_chrome_desde_ruta()`: Abre Chrome directamente; solo usa webbrowser como ultimo fallback.
-  - `_get_chrome_windows(screen_manager)`: Obtiene ventanas de Chrome mediante ScreenManager.
-  - `_select_preferred_chrome_window(screen_manager, chrome_windows)`: Selecciona la ventana Chrome en primer plano cuando sea posible.
-  - `_verificar_chrome_abierto()`: Verifica si existe al menos una ventana visible de Chrome.
-  - `_verificar_chrome_instalado()`: Verifica si Chrome esta instalado o resoluble en el sistema.
-  - `_capturar_chrome()`: Captura una ventana de Chrome (API legacy).
-- **Funciones Globales**:
-  - `get_chrome_commands()`: Obtiene los comandos especificos de Chrome.
-  - `get_chrome_action_commands()`: Escanea el modulo y devuelve las funciones registradas como acciones.
-
-#### `src/hands/chrome/chrome_calibrator.py` - Calibrador Especifico para Chrome
-- **Descripcion**: Adaptador de compatibilidad para la calibracion de Google Chrome. La calibracion real se realiza mediante el sistema universal: CalibrationManager -> descubrimiento de aplicacion -> apertura/enfoque -> ScreenManager -> deteccion de monitor real -> captura -> UniversalVisualCalibrator -> Qwen3-VL 8B Instruct -> coordenadas absolutas -> guardado centralizado.
-- **Clases principales**:
-  - `ChromeCalibrator`: Adaptador legacy que usa exactamente el flujo universal.
-- **Metodos principales**:
-  - `get_calibration_prompt()`: Mantiene la API antigua por compatibilidad. El flujo universal actual no depende de este prompt.
-  - `calibrate_app_both_screens()`: Mantiene el nombre antiguo por compatibilidad. Delegando en CalibrationManager.
-  - `calibrate_app()`: API de compatibilidad para calibrar Chrome. La calibracion la realiza integramente CalibrationManager.
-  - `_calibrate_universal()`: Delega la calibracion en CalibrationManager. No realiza deteccion, captura ni calculo de coordenadas.
-- **Funciones globales**:
-  - `calibrate_app()`: Funcion publica de compatibilidad. No escribe macros_coords.json.
-
-#### `src/hands/coordinate_manager.py` [1113 lineas] - Gestor Unificado de Coordenadas
-- **Descripcion**: Gestor unificado de coordenadas para JARVIS. Responsabilidades: administrar recursos UI calibrados, proporcionar capacidades de UI al planificador, gestionar estado de calibracion, convertir y validar sistemas de coordenadas, leer datos existentes de macros_coords.json, mantener compatibilidad con APIs legacy.
-- **Clases principales**:
-  - `ResourceType` (Enum): Tipos de recursos UI gestionados por el coordinate manager (ELEMENT, REGION, APPLICATION, WINDOW, MONITOR)
-  - `CalibrationStrategy` (Enum): Estrategias de calibracion disponibles (VISUAL_DETECTION, WINDOW_DETECTION, SCREEN_CAPTURE, KEYBOARD_SHORTCUT, HOTKEY)
-  - `UIResource` (dataclass): Recurso UI calibrado utilizable por acciones del planificador
-  - `UICapability` (Clase): Capacidad UI que puede ser utilizada por una accion
-  - `CoordinateSystem` (Enum): Sistemas de coordenadas soportados por JARVIS (RELATIVE_SCREEN, ABSOLUTE_DESKTOP, WINDOW_RELATIVE)
-  - `BoundingBox` (dataclass): Rectangulo delimitador de un elemento
-  - `ElementInfo` (dataclass): Informacion de un elemento calibrado (compatibilidad)
-  - `CoordinateManager`: Gestor centralizado de conocimiento UI y coordenadas calibradas
-- **Metodos principales**:
-  - `CoordinateManager.__init__`: Inicializa el gestor con screen manager, UI resources, UI capabilities, UI knowledge y calibration policies
-  - `UIResource.__post_init__`: Inicializa recursos UI con normalizacion de valores y verificacion de calibracion
-  - `UIResource.is_usable`: Propiedad que verifica si el recurso esta disponible y calibrado
-  - `UIResource.get_coordinates_for_screen`: Obtiene coordenadas para un monitor especifico
-  - `UIResource.get_region_for_screen`: Obtiene regiones para un monitor especifico
-  - `UIResource.get_best_coordinates`: Devuelve coordenadas del monitor activo o de cualquier monitor calibrado
-  - `UIResource.get_alternatives`: Obtiene recursos alternativos para el recurso actual
-  - `UIResource.can_use_fallback_strategy`: Verifica si se puede usar una estrategia de fallback
-  - `UICapability.__init__`: Inicializa capacidad UI con nombre, descripcion y recursos requeridos
-  - `UICapability.can_execute_with_resources`: Verifica si la capacidad puede ejecutarse con recursos disponibles
-  - `CoordinateManager._initialize_base_capabilities`: Inicializa capacidades base (focus_element, click_element, type_in_element)
-  - `CoordinateManager._load_ui_knowledge`: Carga conocimiento UI desde macros_coords.json
-  - `CoordinateManager._process_ui_knowledge`: Procesa conocimiento UI y crea recursos correspondientes
-  - `CoordinateManager._create_resource_from_knowledge`: Crea recurso UI a partir de datos de conocimiento
-  - `CoordinateManager._resource_type_for_element`: Determina tipo de recurso para un elemento
-  - `CoordinateManager._parse_screen_data`: Parsea datos de pantallas para extraer coordenadas y regiones
-  - `CoordinateManager.register_ui_resource`: Registra un recurso UI en el sistema
-  - `CoordinateManager.get_ui_resource`: Obtiene un recurso UI por ID
-  - `CoordinateManager.get_available_resources`: Obtiene recursos UI disponibles, opcionalmente filtrados por aplicacion
-  - `CoordinateManager.find_resources_by_type`: Encuentra recursos por tipo y aplicacion
-  - `CoordinateManager.has_resource`: Verifica si existe un recurso usable por ID
-  - `CoordinateManager.get_resource_alternatives`: Obtiene alternativas para un recurso especifico
-  - `CoordinateManager.get_fallback_strategies`: Obtiene estrategias de fallback para un recurso
-  - `CoordinateManager.get_capabilities_for_resources`: Obtiene capacidades que pueden usar los recursos especificados
-  - `CoordinateManager.can_execute_capability`: Verifica si una capacidad puede ejecutarse con recursos disponibles
-  - `CoordinateManager.get_capability_alternatives`: Obtiene alternativas para una capacidad especifica
-  - `CoordinateManager.get_calibration_strategy`: Devuelve estrategia permitida para aplicacion/elemento
-  - `CoordinateManager.is_application_calibrable`: Verifica si una aplicacion puede ser calibrada
-  - `CoordinateManager.can_calibrate_element`: Verifica si un elemento puede ser calibrado
-  - `CoordinateManager.get_execution_strategy_for_action`: Obtiene estrategia de ejecucion para una accion
-  - `CoordinateManager.get_resource_coordinates`: Obtiene coordenadas de un recurso para pantalla especifica o mejor disponible
-  - `CoordinateManager.validate_resource_for_action`: Valida si un recurso es adecuado para una accion especifica
-  - `CoordinateManager.load_from_macros_coords`: Carga recursos desde calibraciones o datos legacy
-  - `CoordinateManager._create_legacy_resource`: Crea recurso a partir de datos legacy de macros_coords.json
-  - `CoordinateManager._infer_element_type`: Inferir tipo de elemento basado en nombre
-  - `CoordinateManager.get_calibrated_coordinate`: Obtiene coordenadas calibradas con compatibilidad legacy
-  - `CoordinateManager._get_legacy_calibrated_coordinate`: Obtiene coordenadas legacy del sistema antiguo
-  - `CoordinateManager._case_insensitive_dict_get`: Obtiene valor de diccionario sin distinguir mayusculas/minusculas
-  - `CoordinateManager.monitor_number_from_object`: Extrae numero de monitor de objeto sin asumir atributo concreto
-  - `CoordinateManager.get_screen_key`: Genera clave de pantalla (sN) para numero especifico
-  - `CoordinateManager.screen_number_from_key`: Convierte clave de pantalla (sN) a numero
-  - `CoordinateManager.get_screen_number_from_key`: Obtiene numero de pantalla desde clave
-  - `CoordinateManager._read_coordinate_value`: Lee y valida valor de coordenada
-  - `CoordinateManager.validate_coordinates`: Valida coordenadas dentro de limites de pantalla
-  - `CoordinateManager.validate_bounding_box`: Valida rectangulo delimitador dentro de limites de pantalla
-  - `CoordinateManager.get_window_bounding_box`: Obtiene rectangulo delimitador de ventana por titulo (compatibilidad legacy)
-  - `CoordinateManager._get_window_rect`: Obtiene geometria de ventana priorizando rectangulo normal de Win32
-- **Funciones globales**:
-  - `get_coordinate_manager`: Obtiene la instancia global del gestor de coordenadas
-- **Caracteristicas implementadas**:
-  - Administracion centralizada de recursos UI calibrados
-  - Sistema de capacidades UI para planificacion jerarquica
-  - Gestion de estrategias de calibracion (visual, deteccion de ventanas, captura de pantalla, atajos)
-  - Soporte para multiples sistemas de coordenadas
-  - Carga persistente desde macros_coords.json
-  - Sistema de alternativas y fallbacks para robustez
-  - Validacion de coordenadas y regiones
-  - Compatibilidad con APIs legacy del sistema anterior
-  - Deteccion automatica de tipos de elementos
-  - Manejo de multiples monitores con sistema sN
-  - Integracion con ScreenManager para geometria de monitores
-
-#### `src/hands/edge/edge.py` - Funciones Especificas para Microsoft Edge
-- **Descripcion**: Funciones especificas para Microsoft Edge con apertura, cierre, calibracion, movimiento y maximizacion de ventanas. Utiliza ScreenManager para gestion de monitores y CalibrationManager para calibracion universal. La geometria de monitores se obtiene exclusivamente de ScreenManager. Este modulo conserva funciones antiguas por compatibilidad, pero no genera coordenadas artificiales, no asume dos monitores y no utiliza una resolucion ni un DPI fijo.
-- **Acciones Registradas**:
-  - `abrir_edge_pantalla`: Abre Microsoft Edge en una pantalla especifica.
+#### `src/hands/edge/edge.py` [554 lineas] - Funciones Especificas de Microsoft Edge
+- **Descripcion**: Modulo con acciones especificas para Microsoft Edge que maneja apertura, cierre, movimiento, maximizacion y calibracion del navegador. La geometria de monitores se obtiene exclusivamente de ScreenManager. Este modulo conserva funciones antiguas por compatibilidad, pero no genera coordenadas artificiales, no asume dos monitores y no utiliza una resolucion ni un DPI fijo.
+- **Funciones principales**:
+  - `abrir_edge_pantalla`: Abre Microsoft Edge y lo posiciona en la pantalla solicitada.
   - `abrir_edge_pestana`: Abre una nueva pestana de Edge en la pantalla solicitada.
-  - `cerrar_edge`: Cierra una ventana visible de Edge.
-  - `mover_edge_a_pantalla`: Mueve una ventana de Edge al monitor solicitado.
-- **Funciones Principales**:
-  - `abrir_edge_pantalla(pantalla: int = 1)`: Abre Microsoft Edge y lo posiciona en la pantalla solicitada.
-  - `abrir_edge_pestana(pantalla: int = 1)`: Abre una nueva pestana de Edge en la pantalla solicitada.
-  - `cerrar_edge()`: Cierra una ventana visible de Edge.
-  - `mover_edge_a_pantalla(pantalla_num: int)`: Mueve una ventana de Edge al monitor solicitado.
-- **Funciones Auxiliares**:
-  - `_get_edge_windows()`: Obtiene las ventanas visibles/localizables de Microsoft Edge.
-  - `_get_edge_window_info()`: Obtiene metadatos y geometria actual de una ventana de Edge.
-  - `_find_edge_window_on_monitor()`: Busca una ventana de Edge cuyo centro este dentro del monitor indicado.
-  - `_select_edge_window()`: Selecciona una ventana Edge, priorizando el monitor indicado.
-  - `_candidate_edge_paths()`: Devuelve rutas habituales donde puede estar instalado Edge.
-  - `_abrir_edge_desde_ruta()`: Abre Edge desde una instalacion local conocida.
-  - `_verificar_edge_abierto()`: Verifica si Edge esta abierto y visible.
-  - `_verificar_edge_instalado()`: Verifica si Microsoft Edge esta instalado.
-  - `_move_edge_window()`: Mueve una ventana Edge al origen del monitor y trata de maximizarla.
-  - `_calibrar_edge()`: Compatibilidad con la implementacion antigua (deprecated).
-  - `_generar_coordenadas_edge()`: Compatibilidad con codigo antiguo; no genera coordenadas artificiales (deprecated).
-  - `_capturar_edge()`: Captura la ventana visible de Edge (compatibilidad).
-- **Funciones Globales**:
-  - `get_edge_commands()`: Obtiene los comandos legacy de Edge.
-- **Caracteristicas**:
-  - Deteccion multi-monitor integrada con ScreenManager
-  - Soporte para multiples ventanas de Edge
-  - Verificacion de instalacion y disponibilidad
-  - Movimiento y posicionamiento preciso
-  - Compatibilidad con API legacy
-  - No genera coordenadas artificiales
-  - Utiliza calibracion universal a traves de CalibrationManager
+  - `_get_edge_windows`: Obtiene las ventanas visibles/localizables de Microsoft Edge.
+  - `_get_edge_window_info`: Obtiene metadatos y geometria actual de una ventana de Edge.
+  - `_find_edge_window_on_monitor`: Busca una ventana de Edge cuyo centro este dentro del monitor indicado.
+  - `_select_edge_window`: Selecciona una ventana Edge, priorizando el monitor indicado.
+  - `_abrir_edge_desde_ruta`: Abre Edge desde una instalacion local conocida.
+  - `_verificar_edge_abierto`: Verifica si Edge esta abierto y visible.
+  - `_verificar_edge_instalado`: Verifica si Microsoft Edge esta instalado.
+  - `_move_edge_window`: Mueve una ventana Edge al origen del monitor y trata de maximizarla.
+  - `_mover_edge_a_pantalla`: Mueve una ventana de Edge al monitor solicitado.
+  - `_cerrar_edge`: Cierra una ventana visible de Edge.
+  - `_calibrar_edge`: Compatibilidad con la implementacion antigua (legacy).
+  - `_generar_coordenadas_edge`: Compatibilidad con codigo antiguo; no genera coordenadas artificiales.
+  - `_capturar_edge`: Captura la ventana visible de Edge (compatibilidad).
+  - `get_edge_commands`: Obtiene los comandos legacy de Edge.
+- **Caracteristicas principales**:
+  - Soporte multi-monitor con validacion de numeros de pantalla
+  - Integracion con ScreenManager para deteccion y manejo de ventanas
+  - Multiples metodos de apertura con fallback (subprocess, busqueda de rutas)
+  - Seleccion inteligente de ventanas (priorizar ventana en primer plano)
+  - Manejo robusto de errores con logging detallado
+  - Funciones legacy para compatibilidad con sistemas antiguos
+  - Soporte para deteccion de instalacion de Edge mediante multiples metodos
+- **Acciones registradas**:
+  - `abrir_edge_pantalla`: Abre Microsoft Edge en pantalla especifica (APPLICATION)
+  - `abrir_edge_pestana`: Abre nueva pestana de Edge en pantalla especifica (APPLICATION)
+- **Funciones legacy (deprecated)**:
+  - `_calibrar_edge`: La calibracion especifica legacy ha sido desactivada. Utiliza el calibrador universal de aplicaciones.
+  - `_generar_coordenadas_edge`: No genera coordenadas artificiales por diseno.
+- **Integraciones**:
+  - `ScreenManager` para informacion de monitores y geometria
+  - `pyautogui` para captura de pantalla
+  - `pygetwindow` para deteccion de ventanas
+  - `utils.logger` para logging detallado
+- **Dependencias**: pyautogui, pygetwindow, subprocess, os, pathlib, time, typing.
 
 #### `src/hands/executor.py` [1373 lineas] - Ejecutor Central del Sistema
 - **Descripcion**: Ejecutor mejorado de JARVIS con arquitectura de planificacion jerarquica. Responsabilidades: ejecutar acciones individuales con verificacion de precondiciones y efectos, ejecutar planes completos, manejar estado del mundo, soportar replanificacion cuando una accion falla, integrarse con el sistema de nodos y objetivos, mantener compatibilidad con acciones legacy.
@@ -1297,6 +764,94 @@
 - **Funciones globales**:
   - `get_executor`: Obtiene la instancia global del ejecutor
 
+#### `src/hands/firefox/__init__.py` [3 lineas] - Inicializacion del Modulo Firefox
+- **Descripcion**: Modulo especifico para Mozilla Firefox con sistema de acciones registrado.
+- **Metodos principales**:
+  - `Firefox`: Clase principal del sistema de Firefox importada desde firefox.
+  - `abrir_firefox_action`: Accion wrapper para abrir Firefox.
+  - `abrir_firefox_pantalla_action`: Accion wrapper para abrir Firefox en pantalla especifica.
+  - `calibrar_firefox_action`: Accion wrapper para calibrar Firefox.
+- **Funciones globales**:
+  - `abrir_firefox`: Abre Mozilla Firefox en el navegador.
+  - `abrir_firefox_pantalla`: Abre Mozilla Firefox en una pantalla especifica.
+  - `get_firefox_commands`: Obtiene los comandos especificos de Firefox.
+  - `calibrar_firefox`: Calibra Mozilla Firefox con sistema mejorado y nombres semanticos.
+- **Exportaciones principales**:
+  - `FirefoxCalibrator`: Clase principal del calibrador de Firefox.
+  - `abrir_firefox`, `abrir_firefox_pantalla`, `get_firefox_commands`: Funciones basicas de Firefox.
+  - `abrir_firefox_action`, `abrir_firefox_pantalla_action`, `calibrar_firefox_action`: Acciones registradas en el sistema.
+
+#### `src/hands/firefox/calibrator_firefox.py` [227 lineas] - Calibrador de Compatibilidad para Mozilla Firefox
+- **Descripcion**: Adaptador de compatibilidad para la calibracion de Mozilla Firefox que delega en el sistema universal de calibracion. Mantiene API legacy para compatibilidad con codigo antiguo.
+- **Arquitectura**: Delegating pattern hacia CalibrationManager → UniversalVisualCalibrator → Qwen3-VL
+- **Clases principales**:
+  - `FirefoxCalibrator`: Adaptador legacy hacia CalibrationManager con metodos de compatibilidad.
+- **Metodos principales**:
+  - `calibrate_firefox_both_screens()`: API legacy por compatibilidad (mantiene nombre historico pero trabaja con cualquier numero de monitores).
+  - `calibrate_firefox()`: API moderna de compatibilidad que delega directamente en CalibrationManager.
+  - `_calibrate_firefox_universal()`: Metodo de delegacion universal que intenta multiples nombres de aplicacion ("Mozilla Firefox", "Firefox").
+- **Funciones globales**:
+  - `calibrate_firefox()`: Funcion publica de compatibilidad que devuelve mensajes de estado de calibracion.
+- **Caracteristicas principales**:
+  - Mantiene compatibilidad con codigo antiguo que importe FirefoxCalibrator o calibrate_firefox()
+  - No asume numero especifico de monitores ni resoluciones
+  - No calcula offsets ni coordenadas manualmente
+  - Utiliza sistema universal de calibracion con Qwen3-VL
+  - Soporte multi-monitor sin limitaciones
+  - Manejo robusto de errores con logging detallado
+- **Integraciones**:
+  - `CalibrationManager` para calibracion real
+  - `UniversalVisualCalibrator` para analisis visual
+  - `Qwen3-VL` para deteccion de elementos
+  - `ScreenManager` para informacion de monitores
+- **Limitaciones**:
+  - No genera coordenadas manuales
+  - No analiza elementos uno por uno
+  - No escribe macros_coords.json directamente
+  - No utiliza pyautogui.size() para determinar monitores
+  - No asume DPI o resoluciones especificas
+
+#### `src/hands/firefox/firefox.py` [637 lineas] - Funciones Especificas para Mozilla Firefox
+- **Descripcion**: Funciones especificas para Mozilla Firefox con apertura, cierre, calibracion, movimiento y maximizacion de ventanas. Utiliza ScreenManager para gestion de monitores y CalibrationManager para calibracion universal. La geometria de monitores se obtiene exclusivamente de ScreenManager. Este modulo conserva funciones antiguas por compatibilidad, pero no genera coordenadas artificiales, no asume dos monitores y no utiliza una resolucion ni un DPI fijo. La calibracion real de aplicaciones debe pasar por el flujo universal: CalibrationManager -> ScreenManager -> UniversalVisualCalibrator -> Qwen3-VL.
+- **Acciones Registradas**:
+  - `abrir_firefox_pantalla`: Abre Mozilla Firefox en la pantalla solicitada.
+  - `abrir_firefox_pestana`: Abre una nueva pestana de Firefox en la pantalla solicitada.
+  - `cerrar_firefox`: Cierra una ventana visible de Firefox.
+  - `mover_firefox_a_pantalla`: Mueve una ventana de Firefox al monitor solicitado.
+- **Funciones Principales**:
+  - `abrir_youtube()`: Abre YouTube en el navegador predeterminado.
+  - `abrir_spotify()`: Abre Spotify Web en el navegador predeterminado.
+  - `abrir_firefox_pantalla(pantalla: int = 1)`: Abre Mozilla Firefox y lo posiciona en la pantalla solicitada.
+  - `abrir_firefox_pestana(pantalla: int = 1)`: Abre una nueva pestana de Firefox en la pantalla solicitada.
+  - `_verificar_firefox_abierto()`: Verifica si Firefox esta abierto y visible.
+  - `_verificar_firefox_instalado()`: Verifica si Mozilla Firefox esta instalado.
+  - `_move_firefox_window(window, monitor)`: Mueve una ventana Firefox al origen del monitor y trata de maximizarla.
+  - `_cerrar_firefox()`: Cierra una ventana visible de Firefox.
+  - `_calibrar_firefox()`: Compatibilidad con la implementacion antigua. La calibracion real utiliza el flujo universal.
+  - `_generar_coordenadas_firefox(tipo_elemento: str)`: Compatibilidad con codigo legacy; no genera coordenadas artificiales.
+  - `_capturar_firefox()`: Captura la ventana visible de Firefox para compatibilidad.
+- **Funciones Auxiliares**:
+  - `_get_firefox_windows()`: Obtiene las ventanas localizables de Mozilla Firefox.
+  - `_get_firefox_window_info(window)`: Obtiene metadatos y geometria actual de una ventana de Firefox.
+  - `_find_firefox_window_on_monitor(pantalla)`: Busca una ventana de Firefox cuyo centro este dentro del monitor indicado.
+  - `_select_firefox_window(preferred_monitor)`: Selecciona una ventana Firefox, priorizando el monitor indicado.
+  - `_candidate_firefox_paths()`: Devuelve rutas habituales donde puede estar instalado Firefox.
+  - `_abrir_firefox_desde_ruta()`: Abre Firefox desde una instalacion local conocida.
+  - `_mover_firefox_a_pantalla(pantalla_num: int)`: Mueve una ventana de Firefox al monitor solicitado.
+- **Caracteristicas implementadas**:
+  - Deteccion multi-monitor integrada con ScreenManager
+  - Soporte para multiples ventanas de Firefox
+  - Verificacion de instalacion y disponibilidad
+  - Movimiento y posicionamiento preciso
+  - Compatibilidad con API legacy
+  - No genera coordenadas artificiales
+  - Utiliza calibracion universal a traves de CalibrationManager
+  - Manejo robusto de errores con logging estructurado
+  - Busqueda de ventanas por multiples patrones de titulo
+  - Integracion con pyautogui para capturas de pantalla
+  - Soporte para rutas de instalacion multiples en Windows
+  - Funciones de compatibilidad legacy para calibracion y coordenadas
+
 #### `src/hands/keyboard.py` [901 lineas] - Control del Teclado con Capacidades de Planificacion
 - **Descripcion**: Control del teclado transformado de acciones primitivas a capacidades reutilizables para el sistema de planificacion jerarquica de JARVIS. Integrado con el sistema de registro de acciones y soporte para precondiciones, efectos y costes.
 - **Clases principales**:
@@ -1320,7 +875,7 @@
   - `get_keyboard_capability_system`: Obtener la instancia global del sistema de capacidades del teclado
 - **Capacidades del Sistema**:
   - **Text Operations**: type_text, copy_text, paste_text, cut_text, select_all_text
-  - **Navigation**: navigate_tab, navigate_enter  
+  - **Navigation**: navigate_tab, navigate_enter
   - **Shortcuts**: execute_hotkey, switch_window, close_window, open_start_menu
   - **Basic**: press_key
 - **Funciones de Compatibilidad**:
@@ -1368,68 +923,66 @@
   - Registro automatico al importar el modulo
   - Funcionalidad basica pero completa para interacciones graficas
 
-#### `src/hands/firefox/firefox.py` [637 lineas] - Funciones Especificas para Mozilla Firefox
-- **Descripcion**: Funciones especificas para Mozilla Firefox con apertura, cierre, calibracion, movimiento y maximizacion de ventanas. Utiliza ScreenManager para gestion de monitores y CalibrationManager para calibracion universal. La geometria de monitores se obtiene exclusivamente de ScreenManager. Este modulo conserva funciones antiguas por compatibilidad, pero no genera coordenadas artificiales, no asume dos monitores y no utiliza una resolucion ni un DPI fijo. La calibracion real de aplicaciones debe pasar por el flujo universal: CalibrationManager -> ScreenManager -> UniversalVisualCalibrator -> Qwen3-VL.
-- **Acciones Registradas**:
-  - `abrir_firefox_pantalla`: Abre Mozilla Firefox en la pantalla solicitada.
-  - `abrir_firefox_pestana`: Abre una nueva pestana de Firefox en la pantalla solicitada.
-  - `cerrar_firefox`: Cierra una ventana visible de Firefox.
-  - `mover_firefox_a_pantalla`: Mueve una ventana de Firefox al monitor solicitado.
-- **Funciones Principales**:
-  - `abrir_youtube()`: Abre YouTube en el navegador predeterminado.
-  - `abrir_spotify()`: Abre Spotify Web en el navegador predeterminado.
-  - `abrir_firefox_pantalla(pantalla: int = 1)`: Abre Mozilla Firefox y lo posiciona en la pantalla solicitada.
-  - `abrir_firefox_pestana(pantalla: int = 1)`: Abre una nueva pestana de Firefox en la pantalla solicitada.
-  - `_verificar_firefox_abierto()`: Verifica si Firefox esta abierto y visible.
-  - `_verificar_firefox_instalado()`: Verifica si Mozilla Firefox esta instalado.
-  - `_move_firefox_window(window, monitor)`: Mueve una ventana Firefox al origen del monitor y trata de maximizarla.
-  - `_cerrar_firefox()`: Cierra una ventana visible de Firefox.
-  - `_calibrar_firefox()`: Compatibilidad con la implementacion antigua. La calibracion real utiliza el flujo universal.
-  - `_generar_coordenadas_firefox(tipo_elemento: str)`: Compatibilidad con codigo legacy; no genera coordenadas artificiales.
-  - `_capturar_firefox()`: Captura la ventana visible de Firefox para compatibilidad.
-  - `get_firefox_commands()`: Obtiene los comandos legacy de Firefox.
-- **Funciones Auxiliares**:
-  - `_get_firefox_windows()`: Obtiene las ventanas localizables de Mozilla Firefox.
-  - `_get_firefox_window_info(window)`: Obtiene metadatos y geometria actual de una ventana de Firefox.
-  - `_find_firefox_window_on_monitor(pantalla)`: Busca una ventana de Firefox cuyo centro este dentro del monitor indicado.
-  - `_select_firefox_window(preferred_monitor)`: Selecciona una ventana Firefox, priorizando el monitor indicado.
-  - `_candidate_firefox_paths()`: Devuelve rutas habituales donde puede estar instalado Firefox.
-  - `_abrir_firefox_desde_ruta()`: Abre Firefox desde una instalacion local conocida.
-  - `_mover_firefox_a_pantalla(pantalla_num: int)`: Mueve una ventana de Firefox al monitor solicitado.
-- **Caracteristicas implementadas**:
-  - Deteccion multi-monitor integrada con ScreenManager
-  - Soporte para multiples ventanas de Firefox
-  - Verificacion de instalacion y disponibilidad
-  - Movimiento y posicionamiento preciso
-  - Compatibilidad con API legacy
-  - No genera coordenadas artificiales
-  - Utiliza calibracion universal a traves de CalibrationManager
-  - Manejo robusto de errores con logging estructurado
-  - Busqueda de ventanas por multiples patrones de titulo
-  - Integracion con pyautogui para capturas de pantalla
-  - Soporte para rutas de instalacion multiples en Windows
-  - Funciones de compatibilidad legacy para calibracion y coordenadas
-- **Funciones Principales**:
-  - `abrir_firefox_pantalla(pantalla: int = 1)`: Abre Mozilla Firefox y lo posiciona en la pantalla solicitada.
-  - `abrir_firefox_pestana(pantalla: int = 1)`: Abre una nueva pestana de Firefox en la pantalla solicitada.
-  - `_verificar_firefox_abierto()`: Verifica si Firefox esta abierto y visible.
-  - `_verificar_firefox_instalado()`: Verifica si Mozilla Firefox esta instalado.
-  - `_move_firefox_window(window, monitor)`: Mueve una ventana Firefox al origen del monitor y trata de maximizarla.
-  - `_cerrar_firefox()`: Cierra una ventana visible de Firefox.
-- **Funciones Auxiliares**:
-  - `_get_firefox_windows()`: Obtiene las ventanas localizables de Mozilla Firefox.
-  - `_get_firefox_window_info(window)`: Obtiene metadatos y geometria actual de una ventana de Firefox.
-  - `_find_firefox_window_on_monitor(pantalla)`: Busca una ventana de Firefox cuyo centro este dentro del monitor indicado.
-  - `_select_firefox_window(preferred_monitor)`: Selecciona una ventana Firefox, priorizando el monitor indicado.
-  - `_candidate_firefox_paths()`: Devuelve rutas habituales donde puede estar instalado Firefox.
-  - `_abrir_firefox_desde_ruta()`: Abre Firefox desde una instalacion local conocida.
-  - `_mover_firefox_a_pantalla(pantalla_num)`: Mueve una ventana de Firefox al monitor solicitado.
-  - `_calibrar_firefox()`: Compatibilidad con la implementacion antigua. La calibracion real utiliza el flujo universal.
-  - `_generar_coordenadas_firefox(tipo_elemento)`: Compatibilidad con codigo legacy; no genera coordenadas artificiales.
-  - `_capturar_firefox()`: Captura la ventana visible de Firefox para compatibilidad.
-  - `get_firefox_commands()`: Obtiene los comandos legacy de Firefox.
-- **Funciones Globales**:
-  - `get_firefox_commands()`: Obtiene los comandos especificos de Firefox.
+#### `src/hands/planner/__init__.py` [96 lineas] - Inicializacion del Modulo de Planificacion
+- **Descripcion**: Modulo principal de planificacion que carga componentes pesados de forma perezosa para evitar ciclos de importacion y mantener compatibilidad con action_registry.
+- **Clases principales**:
+  - `Node`: Modelo conceptual comun para todos los elementos del sistema (importado de node)
+  - `Goal`: Objetivos de alto nivel alcanzables mediante planificacion (importado de node)
+  - `Task`: Tareas jerarquicas descomponibles en otras tareas o nodos (importado de node)
+  - `NodeType`: Tipos de nodos en el sistema de planificacion (importado de node)
+  - `TaskStatus`: Estados de ejecucion de tareas (importado de node)
+  - `StateGraph`: Sistema de grafos de estados para planificacion (importado perezoso de graph)
+  - `GraphNode`: Nodo del grafo de estados (importado perezoso de graph)
+  - `GraphEdge`: Arista del grafo de estados (importado perezoso de graph)
+  - `GraphBuilder`: Constructor de grafos predefinidos (importado perezoso de graph)
+  - `HTNManager`: Gestor de descomposicion jerarquica de tareas (importado perezoso de htn_manager)
+  - `TaskExecutor`: Ejecutor de tareas jerarquicas (importado perezoso de task_executor)
+- **Metodos principales**:
+  - `get_htn_manager`: Obtiene la instancia global del HTN Manager mediante importacion perezosa
+  - `get_application_knowledge_integrator`: Obtiene la instancia global del integrador de conocimiento de aplicaciones
+  - `get_task_executor`: Obtiene la instancia global del TaskExecutor mediante importacion perezosa
+  - `__getattr__`: Carga componentes pesados del planner solo cuando se solicitan (StateGraph, GraphNode, GraphEdge, GraphBuilder, HTNManager, TaskExecutor)
+  - `__dir__`: Expone nombres disponibles mediante carga perezosa para autocompletado
+- **Funciones globales**:
+  - `get_htn_manager`: Obtiene instancia singleton del gestor HTN
+  - `get_application_knowledge_integrator`: Obtiene instancia global del integrador de conocimiento
+  - `get_task_executor`: Obtiene instancia global del ejecutor de tareas
+- **Constantes**:
+  - `__all__`: Lista de exportaciones del modulo incluyendo clases y funciones principales
+
+- **Funciones globales adicionales del módulo planner**:
+  - `get_applications_by_capability`: Busca aplicaciones que poseen una capacidad específica mediante importación diferida de application_integration.
+  - `get_application_knowledge`: Obtiene las capacidades declaradas de una aplicación específica mediante importación diferida.
+  - `get_learning_system`: Obtiene el singleton del sistema de aprendizaje del planificador mediante importación diferida.
+  - `get_preconditions_effects_manager`: Obtiene el singleton del gestor de precondiciones y efectos mediante importación diferida.
+
+#### `src/hands/planner/application_integration.py` - Integracion de Conocimiento de Aplicaciones
+- **Descripcion**: Convierte conocimiento declarativo de aplicaciones en Nodes compatibles con el modelo canonico de planificacion, manteniendo separadas planificacion y ejecucion.
+- **Clases principales**:
+  - `ApplicationKnowledgeIntegrator`: Integrador de conocimiento estructurado de aplicaciones con el planificador
+- **Metodos principales**:
+  - `__init__`: Inicializa integrador con gestor de aplicaciones y memoria
+  - `_normalize_name`: Normaliza nombres para IDs/keys de estado
+  - `_capability_value`: Obtiene el valor estable de una capacidad o su representacion textual
+  - `_as_list`: Normaliza listas/tuplas/conjuntos y valores individuales
+  - `_get_application`: Obtiene aplicacion del gestor por nombre
+  - `convert_application_to_nodes`: Convierte una aplicacion y sus capacidades en Nodes canonicos
+  - `_create_application_node`: Crea el nodo declarativo principal de la aplicacion
+  - `_create_capability_node`: Crea un nodo de accion para una capacidad de aplicacion
+  - `_create_ui_element_node`: Crea un nodo declarativo para un elemento UI requerido
+  - `_safe_cost`: Calcula coste seguro con valores por defecto
+  - `_get_application_current_state`: Obtiene estado persistido de la aplicacion cuando existe
+  - `_generate_application_preconditions`: Genera precondiciones reales de preparacion de la aplicacion
+  - `_generate_application_effects`: Genera efectos declarativos de disponibilidad/authenticacion
+  - `get_applications_by_capability`: Obtiene aplicaciones que exponen una capacidad
+  - `get_application_capabilities`: Obtiene capacidades de una aplicacion en formato declarativo
+  - `get_ui_elements_for_capability`: Obtiene elementos UI requeridos por una capacidad
+  - `is_application_capable`: Verifica si una aplicacion ofrece una capacidad
+  - `register_application_knowledge`: Registra conocimiento de una aplicacion mediante applications_core
+- **Funciones globales**:
+  - `get_application_knowledge_integrator`: Obtiene la instancia global del integrador
+  - `get_applications_by_capability`: Compatibilidad legacy usando ApplicationCapability cuando existe
+  - `get_application_knowledge`: Compatibilidad legacy para consultar el conocimiento de una aplicacion
 
 #### `src/hands/planner/goal_state_mapper.py` [1498 lineas] - Mapeo de Goal y World State al Grafo de Estados
 - **Descripcion**: Mapea objetivos y estado del mundo al grafo de estados para planificacion jerarquica, creando relaciones explicitas entre objetivos, capacidades, acciones y estado.
@@ -1670,45 +1223,6 @@
 - **Funciones globales**:
   - `get_htn_manager`: Obtiene instancia singleton del gestor HTN
 
-#### `src/hands/keyboard.py` [901 lineas] - Control de Teclado y Entrada
-- **Descripcion**: Sistema de control de teclado para automatizacion de entrada de texto y comandos.
-- **Clases principales**:
-  - `KeyModifier` (Enum): Modificadores de tecla soportados (CTRL, ALT, SHIFT, WIN).
-  - `KeyboardCapabilities`: Capacidades del teclado para el sistema de planificacion.
-  - `KeyboardCapabilitySystem`: Sistema de capacidades del teclado para planificacion jerarquica.
-- **Metodos principales**:
-  - `keyboard_capability`: Decorador para registrar capacidades del teclado en el sistema de planificacion.
-  - `type_text`: Escribir texto en el campo activo o en un campo especifico.
-  - `press_key`: Presionar una tecla individual con tiempo de espera configurable.
-  - `execute_hotkey`: Ejecutar combinacion de teclas (hotkeys) con contexto de aplicacion.
-  - `copy_text`: Copiar texto seleccionado al portapapeles (Ctrl+C).
-  - `paste_text`: Pegar texto desde el portapapeles (Ctrl+V).
-  - `cut_text`: Cortar texto seleccionado al portapapeles (Ctrl+X).
-  - `select_all_text`: Seleccionar todo el texto en el campo activo (Ctrl+A).
-  - `navigate_tab`: Navegar entre campos con Tabulador (adelante/atras).
-  - `navigate_enter`: Confirmar accion con la tecla Enter.
-  - `switch_window`: Cambiar a la siguiente ventana con Alt+Tab.
-  - `close_window`: Cerrar la ventana activa con Alt+F4.
-  - `open_start_menu`: Abrir el menu de inicio de Windows (Tecla Windows).
-  - `_get_typing_interval`: Obtiene el intervalo de escritura (mantenido por compatibilidad).
-  - `escribir_texto`: Escribe texto en el campo activo (mantenido por compatibilidad).
-  - `presionar_enter`: Presiona la tecla Enter (mantenido por compatibilidad).
-  - `presionar_tecla`: Presiona una tecla especifica (mantenido por compatibilidad).
-  - `copiar`: Ejecuta Ctrl+C (Copiar) (mantenido por compatibilidad).
-  - `pegar`: Ejecuta Ctrl+V (Pegar) (mantenido por compatibilidad).
-  - `cortar`: Ejecuta Ctrl+X (Cortar) (mantenido por compatibilidad).
-  - `seleccionar_todo`: Ejecuta Ctrl+A (Seleccionar todo) (mantenido por compatibilidad).
-  - `cambiar_ventana`: Ejecuta Alt+Tab (Cambiar ventana) (mantenido por compatibilidad).
-  - `cerrar_ventana`: Ejecuta Alt+F4 (Cerrar ventana) (mantenido por compatibilidad).
-  - `tecla_super`: Presiona la tecla Windows (Super) (mantenido por compatibilidad).
-  - `abrir_menu_inicio`: Abre el menu de inicio de Windows (mantenido por compatibilidad).
-  - `KeyboardCapabilitySystem.__init__`: Inicializar el sistema de capacidades.
-  - `KeyboardCapabilitySystem._initialize_capabilities`: Inicializar el catalogo de capacidades.
-  - `KeyboardCapabilitySystem.get_capabilities_for_context`: Obtener capacidades que se pueden ejecutar con el contexto dado.
-  - `KeyboardCapabilitySystem._check_conditions`: Verificar si las condiciones se cumplen en el contexto dado.
-  - `KeyboardCapabilitySystem.can_execute_capability`: ¿Se puede ejecutar una capacidad con el contexto dado?
-  - `get_keyboard_capability_system`: Obtener la instancia global del sistema de capacidades del teclado.
-
 #### `src/hands/planner/learning_system.py` [872 lineas] - Sistema de Aprendizaje para Planificacion
 - **Descripcion**: Sistema central de registro y aprendizaje de planificacion que registra ejecuciones reales, costes, tiempos, rutas y patrones para que el planificador pueda disponer de datos historicos sin mezclar el aprendizaje con la ejecucion de acciones.
 - **Clases principales**:
@@ -1748,29 +1262,6 @@
   - `_cost_error`: Calcula error relativo entre coste estimado y real
 - **Funciones globales**:
   - `get_learning_system`: Obtiene instancia singleton del sistema de aprendizaje
-
-#### `src/hands/mouse.py` - Control Basico del Raton
-- **Descripcion**: Control basico del raton para JARVIS con capacidades fundamentales de interaccion del sistema. Proporciona funcionalidades esenciales de movimiento, clic y scroll para la automatizacion de tareas.
-- **Clases principales**:
-  - (Modulo funcional sin clases principales, solo funciones)
-- **Metodos principales**:
-  - `move_to_position(x: float, y: float, duration: float = 0.1)`: Mueve el raton a una posicion especifica con validacion de coordenadas y duracion configurable.
-  - `click_element(button: str = "left", wait_after: float = 0.1)`: Realiza un clic con el raton en el boton especificado (left, right, middle) con tiempo de espera posterior.
-  - `scroll_at_position(x: float, y: float, clicks: int, wait_after: float = 0.1)`: Realiza scroll en una posicion especifica con numero de clicks configurable (positivo para arriba, negativo para abajo).
-- **Funciones globales**:
-  - `register_mouse_capabilities()`: Registra las capacidades del raton en el sistema de acciones disponibles.
-- **Acciones Registradas**:
-  - `move_mouse`: Mover raton a posicion con tipo de accion INTERACTION.
-  - `click_mouse`: Hacer clic con el raton con tipo de accion INTERACTION.
-  - `scroll_mouse`: Hacer scroll con el raton con tipo de accion INTERACTION.
-- **Caracteristicas implementadas**:
-  - Validacion de coordenadas y parametros de entrada
-  - Manejo de errores con logging estructurado
-  - Integracion con el sistema de registro de acciones
-  - Soporte para multiples botones del raton
-  - Tiempos de espera configurables para operaciones sincronicas
-  - Importacion diferida de pyautogui para optimizacion de recursos
-  - Inicializacion automatica de capacidades al importar el modulo
 
 #### `src/hands/planner/node.py` [1138 lineas] - Modelo Canonico de Nodos para Planificacion Jerarquica
 - **Descripcion**: Fuente unica de verdad para el sistema de planificacion jerarquica de JARVIS. Implementa un modelo de nodos completo con soporte para multiples niveles del sistema, aprendizaje automatico, grafos de estados, y ejecucion con replanificacion. El sistema soporta desde nodos simples hasta estructuras jerarquicas complejas con dependencias, precondiciones, efectos y gestion de estado.
@@ -1853,6 +1344,36 @@
   - **Integracion HTN**: Disenado para trabajar con sistemas de descomposicion jerarquica de tareas
   - **Estado del Mundo**: Integracion completa con sistemas de memoria y estado persistente
 
+#### `src/hands/planner/optimization_config.py` [355 lineas] - Configuracion del Sistema de Optimizacion
+- **Descripcion**: Configuracion tipada y validada del sistema de optimizacion con modos predefinidos, configuraciones por subsistema y serializacion segura.
+- **Clases principales**:
+  - `OptimizationMode` (Enum): Modos de operacion del sistema de optimizacion (AGGRESSIVE, BALANCED, CONSERVATIVE, LEARNING_ONLY)
+  - `RouteCacheConfig`: Configuracion del cache de rutas con LRU, precarga y compresion
+  - `CostLearningConfig`: Configuracion del aprendizaje de costes con tasa de aprendizaje y factor de descuento
+  - `RedundancyRemovalConfig`: Configuracion de eliminacion de redundancias con analisis de efectos y alternativas
+  - `ContextAwareConfig`: Configuracion de optimizacion basada en contexto con patrones temporales y de usuario
+  - `AlternativeSelectionConfig`: Configuracion de seleccion de alternativas con comparacion multidimensional
+  - `PerformanceMonitoringConfig`: Configuracion de monitoreo de rendimiento con deteccion de cuellos de botella
+  - `OptimizationConfig`: Configuracion completa del sistema de optimizacion con validacion automatica
+- **Metodos principales**:
+  - `OptimizationMode`: AGGRESSIVE, BALANCED, CONSERVATIVE, LEARNING_ONLY
+  - `RouteCacheConfig.__init__`: Inicializa configuracion de cache de rutas con valores por defecto
+  - `CostLearningConfig.__init__`: Inicializa configuracion de aprendizaje de costes con hiperparametros
+  - `RedundancyRemovalConfig.__init__`: Inicializa configuracion de eliminacion de redundancias
+  - `ContextAwareConfig.__init__`: Inicializa configuracion de optimizacion contextual
+  - `AlternativeSelectionConfig.__init__`: Inicializa configuracion de seleccion de alternativas
+  - `PerformanceMonitoringConfig.__init__`: Inicializa configuracion de monitoreo de rendimiento
+  - `OptimizationConfig.__init__`: Inicializa configuracion completa con normalizacion automatica
+  - `OptimizationConfig.__post_init__`: Normaliza valores basicos y valida configuracion anidada
+  - `OptimizationConfig._coerce_nested`: Convierte y valida configuraciones anidadas desde diccionarios
+  - `OptimizationConfig.get_aggressive_config`: Obtiene configuracion optimizada para modo agresivo
+  - `OptimizationConfig.get_conservative_config`: Obtiene configuracion para modo conservador
+  - `OptimizationConfig.get_learning_only_config`: Obtiene configuracion para modo solo aprendizaje
+  - `OptimizationConfig.get_optimization_enabled`: Obtiene estado efectivo de cada tecnica de optimizacion
+  - `OptimizationConfig.validate_config`: Valida configuracion completa y devuelve advertencias
+  - `OptimizationConfig.to_dict`: Convierte configuracion a diccionario serializable
+  - `OptimizationConfig.from_dict`: Crea configuracion desde diccionario parcial o completo
+
 #### `src/hands/planner/optimization.py` [938 lineas] - Sistema de Optimizacion de Planificacion
 - **Descripcion**: Sistema avanzado de optimizacion para el planificador JARVIS con cache LRU de rutas, eliminacion de redundancias, seleccion de alternativas y optimizacion contextual. Integracion completa con LearningSystem para costes aprendidos y persistencia robusta de datos.
 - **Clases principales**:
@@ -1901,36 +1422,6 @@
   - Sistema de metricas detallado para monitoreo y mejora continua
   - Manejo thread-safe de cache y datos compartidos
   - Soporte para multiples estrategias de optimizacion configurables
-
-#### `src/hands/planner/optimization_config.py` [355 lineas] - Configuracion del Sistema de Optimizacion
-- **Descripcion**: Configuracion tipada y validada del sistema de optimizacion con modos predefinidos, configuraciones por subsistema y serializacion segura.
-- **Clases principales**:
-  - `OptimizationMode` (Enum): Modos de operacion del sistema de optimizacion (AGGRESSIVE, BALANCED, CONSERVATIVE, LEARNING_ONLY)
-  - `RouteCacheConfig`: Configuracion del cache de rutas con LRU, precarga y compresion
-  - `CostLearningConfig`: Configuracion del aprendizaje de costes con tasa de aprendizaje y factor de descuento
-  - `RedundancyRemovalConfig`: Configuracion de eliminacion de redundancias con analisis de efectos y alternativas
-  - `ContextAwareConfig`: Configuracion de optimizacion basada en contexto con patrones temporales y de usuario
-  - `AlternativeSelectionConfig`: Configuracion de seleccion de alternativas con comparacion multidimensional
-  - `PerformanceMonitoringConfig`: Configuracion de monitoreo de rendimiento con deteccion de cuellos de botella
-  - `OptimizationConfig`: Configuracion completa del sistema de optimizacion con validacion automatica
-- **Metodos principales**:
-  - `OptimizationMode`: AGGRESSIVE, BALANCED, CONSERVATIVE, LEARNING_ONLY
-  - `RouteCacheConfig.__init__`: Inicializa configuracion de cache de rutas con valores por defecto
-  - `CostLearningConfig.__init__`: Inicializa configuracion de aprendizaje de costes con hiperparametros
-  - `RedundancyRemovalConfig.__init__`: Inicializa configuracion de eliminacion de redundancias
-  - `ContextAwareConfig.__init__`: Inicializa configuracion de optimizacion contextual
-  - `AlternativeSelectionConfig.__init__`: Inicializa configuracion de seleccion de alternativas
-  - `PerformanceMonitoringConfig.__init__`: Inicializa configuracion de monitoreo de rendimiento
-  - `OptimizationConfig.__init__`: Inicializa configuracion completa con normalizacion automatica
-  - `OptimizationConfig.__post_init__`: Normaliza valores basicos y valida configuracion anidada
-  - `OptimizationConfig._coerce_nested`: Convierte y valida configuraciones anidadas desde diccionarios
-  - `OptimizationConfig.get_aggressive_config`: Obtiene configuracion optimizada para modo agresivo
-  - `OptimizationConfig.get_conservative_config`: Obtiene configuracion para modo conservador
-  - `OptimizationConfig.get_learning_only_config`: Obtiene configuracion para modo solo aprendizaje
-  - `OptimizationConfig.get_optimization_enabled`: Obtiene estado efectivo de cada tecnica de optimizacion
-  - `OptimizationConfig.validate_config`: Valida configuracion completa y devuelve advertencias
-  - `OptimizationConfig.to_dict`: Convierte configuracion a diccionario serializable
-  - `OptimizationConfig.from_dict`: Crea configuracion desde diccionario parcial o completo
 
 #### `src/hands/planner/planner.py` - Planificador Principal de JARVIS
 - **Descripcion**: Planificador central de JARVIS con capacidades avanzadas de planificacion jerarquica, integracion HTN, optimizacion de rutas, aprendizaje automatico y gestion de recursos UI. Coordina todas las operaciones de planificacion y ejecucion del sistema.
@@ -2086,38 +1577,44 @@
   - `_normalize_route_result`: Normaliza resultado de ruta
   - `_create_sequential_navigation_edges`: Crea aristas de navegacion secuenciales
 
-#### `src/hands/planner/preconditions_effects.py` - Sistema Avanzado de Precondiciones y Efectos
-- **Descripcion**: Sistema avanzado de precondiciones y efectos para planificacion jerarquica con construccion y reutilizacion de condiciones y efectos, evaluacion de precondiciones simples y compuestas, aplicacion determinista de efectos sobre estados, e integracion con ActionInfo/ActionType del registro central de acciones.
+#### `src/hands/planner/preconditions_effects.py` [1077 lineas] - Sistema Avanzado de Precondiciones y Efectos
+- **Descripcion**: Sistema avanzado de precondiciones y efectos para planificacion jerarquica con gestion centralizada de condiciones y efectos, evaluacion segura y aplicacion determinista sobre estados del mundo.
 - **Clases principales**:
-  - `PreconditionsEffectsManager`: Gestor centralizado de precondiciones y efectos
+  - `PreconditionsEffectsManager`: Gestor centralizado de precondiciones y efectos con registro y reutilizacion.
+  - `Condition`: Representa condiciones evaluables sobre el estado del mundo.
+  - `Effect`: Representa efectos que modifican el estado del mundo.
 - **Metodos principales**:
-  - `__init__`: Inicializa gestor con condiciones, efectos y plantillas
-  - `_initialize_templates`: Inicializa plantillas comunes de condiciones y efectos
-  - `create_condition`: Crea una condicion y la registra para reutilizacion
-  - `create_effect`: Crea un efecto y lo registra para reutilizacion
-  - `_make_registry_key`: Construye clave de registro unica para condiciones/efectos
-  - `create_composite_condition`: Crea una condicion compuesta AND u OR
-  - `verify_action_preconditions`: Verifica si todas las precondiciones de una accion se cumplen
-  - `evaluate_condition`: Evalua una condicion individual o funcional de forma segura
-  - `_dict_condition_matches`: Compara condicion diccionario con estado actual
-  - `_dict_to_condition`: Convierte diccionario a objeto Condition
-  - `_resolve_condition_type`: Resuelve tipo de condicion con aliases y normalizacion
-  - `apply_action_effects`: Aplica los efectos de una accion y devuelve un nuevo estado
-  - `apply_effect`: Aplica un efecto individual al estado actual
-  - `_dict_to_effect`: Convierte diccionario a objeto Effect
-  - `get_state_requirements_for_action`: Extrae requisitos de estado expresables como clave/valor
-  - `get_state_modifications_from_action`: Extrae modificaciones de estado estaticas de los efectos
-  - `create_action_with_preconditions_effects`: Crea un ActionInfo compatible con el registro central
-  - `_normalize_sequence`: Normaliza cualquier valor a lista
-  - `_ensure_condition`: Asegura que cualquier entrada sea un objeto Condition valido
-  - `_resolve_action_type`: Resuelve ActionType desde string con aliases
+  - `create_condition()`: Crea y registra condiciones para reutilizacion.
+  - `create_effect()`: Crea y registra efectos para reutilizacion.
+  - `create_composite_condition()`: Crea condiciones compuestas AND/OR.
+  - `verify_action_preconditions()`: Verifica si todas las precondiciones de una accion se cumplen.
+  - `evaluate_condition()`: Evalua condiciones individuales o funcionales de forma segura.
+  - `apply_action_effects()`: Aplica los efectos de una accion y devuelve un nuevo estado.
+  - `apply_effect()`: Aplica un efecto individual sobre el estado.
+  - `get_state_requirements_for_action()`: Extrae precondiciones representables como requisitos escalares.
+  - `get_state_modifications_from_action()`: Extrae modificaciones de estado estaticas de los efectos.
+  - `create_action_with_preconditions_effects()`: Crea ActionInfo compatible con el registro central.
 - **Funciones globales**:
-  - `get_preconditions_effects_manager`: Obtiene la instancia global del gestor
-  - `create_application_open_condition`: Crea una condicion que representa una aplicacion abierta
-  - `create_application_active_condition`: Crea una condicion que representa una aplicacion activa
-  - `create_ui_element_calibrated_condition`: Crea una condicion que representa un elemento UI calibrado
-  - `create_application_open_effect`: Crea un efecto que representa una aplicacion abierta
-  - `create_ui_element_calibrate_effect`: Crea un efecto que representa un elemento UI calibrado
+  - `get_preconditions_effects_manager()`: Obtiene la instancia global del gestor.
+  - `create_application_open_condition()`: Crea condicion de aplicacion abierta.
+  - `create_application_active_condition()`: Crea condicion de aplicacion activa.
+  - `create_ui_element_calibrated_condition()`: Crea condicion de elemento UI calibrado.
+  - `create_application_open_effect()`: Crea efecto de aplicacion abierta.
+  - `create_ui_element_calibrate_effect()`: Crea efecto de calibracion de elemento UI.
+- **Caracteristicas principales**:
+  - Construccion y reutilizacion de condiciones y efectos
+  - Evaluacion segura de precondiciones simples, compuestas y funcionales
+  - Aplicacion determinista y acumulativa de efectos sobre estados
+  - Integracion con ActionInfo/ActionType del registro central de acciones
+  - Utilidades comunes para acciones de aplicaciones y elementos UI
+  - Manejo robusto de errores y logging detallado
+  - Soporte para condiciones compuestas con operadores AND/OR
+  - Sistema de plantillas para condiciones y efectos comunes
+- **Integraciones**:
+  - `ActionInfo` y `ActionType` del registro central de acciones
+  - `Condition` y `Effect` de preconditions_effects_types
+  - Sistema de logging para depuracion y monitoreo
+- **Dependencias**: copy, math, typing, hands.action_registry, hands.planner.preconditions_effects_types, utils.logger
 
 #### `src/hands/planner/preconditions_effects_types.py` [822 lineas] - Sistema de Tipos para Precondiciones y Efectos
 - **Descripcion**: Sistema avanzado de tipos base para precondiciones y efectos con copias de estado seguras, evaluacion robusta y aplicacion determinista. Proporciona estructuras de datos fundamentales para definir condiciones que deben cumplirse antes de ejecutar acciones y efectos que modifican el estado tras la ejecucion. Evita importaciones circulares con action_registry y mantiene separacion entre planificacion y ejecucion.
@@ -2200,40 +1697,73 @@
   - `get_executor`: Obtiene el executor principal de JARVIS mediante importacion diferida
   - `get_action_registry`: Obtiene el registro central de acciones mediante importacion diferida
 
-#### `src/hands/universal_visual_calibrator.py` - Calibrador Visual Universal
+#### `src/hands/universal_visual_calibrator.py` [916 lineas] - Calibrador Visual Universal
 - **Descripcion**: Calibrador visual universal para la arquitectura de planificacion jerarquica. Esta capa realiza exclusivamente percepcion/calibracion visual. No abre ni mueve aplicaciones y no persiste macros_coords.json directamente. El resultado de `calibrate()` utiliza coordenadas absolutas del escritorio virtual y asocia cada elemento al monitor fisico real (`s1`, `s2`, ...).
 - **Clases principales**:
-  - `CalibrationPolicy`: Politica centralizada de seguridad, no una allowlist de aplicaciones. La calibracion visual es universal: una aplicacion GUI no bloqueada puede ser analizada. Las aplicaciones peligrosas/protegidas se rechazan aqui y en el preflight del CalibrationManager cuando corresponde.
-  - `UICapability`: Representa un elemento UI calibrado y consumible por acciones.
-  - `CalibrationState`: Estado en memoria de los elementos calibrados.
-  - `UniversalVisualCalibrator`: Calibrador visual universal integrado con las capas superiores.
+  - `CalibrationPolicy` (Policy): Politica centralizada de seguridad, no una allowlist de aplicaciones. La calibracion visual es universal: una aplicacion GUI no bloqueada puede ser analizada. Las aplicaciones peligrosas/protegidas se rechazan aqui y en el preflight del CalibrationManager cuando corresponde.
+  - `UICapability` (dataclass): Representa un elemento UI calibrado y consumible por acciones con propiedades de nombre, tipo, centro, bounding box, pantalla, confianza y timestamp.
+  - `CalibrationState`: Estado en memoria de los elementos calibrados con soporte para multipantalla (app -> sN -> element -> capability).
+  - `UniversalVisualCalibrator`: Calibrador visual universal integrado con las capas superiores que usa Qwen3-VL para analisis visual y normalizacion de coordenadas.
 - **Metodos principales**:
-  - `UniversalVisualCalibrator.__init__`: Inicializa el calibrador con modelo Qwen3-VL, politica y estado.
-  - `UniversalVisualCalibrator.get_ui_capability`: Obtiene una capacidad UI especifica para una aplicacion y elemento.
-  - `UniversalVisualCalibrator.calibrate_application_elements`: Calibra todos los elementos de una aplicacion en un monitor especifico.
-  - `UniversalVisualCalibrator.calibrate`: Metodo principal de calibracion universal para cualquier aplicacion.
-  - `UniversalVisualCalibrator._calibrate_element`: Calibra un elemento especifico dentro de una aplicacion.
-  - `UniversalVisualCalibrator._build_prompt`: Construye prompt personalizado para el modelo de vision.
-  - `UniversalVisualCalibrator._parse_response`: Parsea respuesta JSON del modelo de vision con manejo robusto de errores.
-  - `UniversalVisualCalibrator._normalize_elements`: Normaliza y filtra elementos detectados.
-  - `UniversalVisualCalibrator._normalize_single_element`: Normaliza un elemento individual con validacion de coordenadas.
-  - `UniversalVisualCalibrator._extract_image_bbox`: Extrae bounding box de imagen con validacion.
-  - `UniversalVisualCalibrator._bbox_to_image_pixels`: Convierte coordenadas normalizadas a pixeles de imagen.
-  - `UniversalVisualCalibrator._image_bbox_to_monitor_bbox`: Convierte coordenadas de imagen a coordenadas del monitor.
-  - `UniversalVisualCalibrator._normalize_element_name`: Normaliza nombres de elementos para consistencia.
-  - `UniversalVisualCalibrator._normalize_confidence`: Normaliza valores de confianza entre 0.0 y 1.0.
-  - `UniversalVisualCalibrator._deduplicate_elements`: Elimina duplicados manteniendo el elemento con mayor confianza.
+  - `__init__`: Inicializa UniversalVisualCalibrator con Vision (Qwen3-VL), CalibrationPolicy, CalibrationState y ConversationMemory; registra la inicialización en log.
+  - `get_ui_capability`: Obtiene una capacidad UI especifica para una aplicacion y elemento en un monitor concreto con cache automatico.
+  - `calibrate_application_elements`: Calibra todos los elementos de una aplicacion en un monitor especifico aplicando politica de filtrado.
+  - `calibrate`: Metodo principal que realiza calibracion completa de una aplicacion usando captura de pantalla y analisis con Qwen3-VL.
+  - `_calibrate_element`: Metodo interno para calibrar un elemento especifico dentro de una aplicacion ya calibrada.
+  - `_build_prompt`: Construye prompt personalizado para Qwen3-VL basado en el nombre de la aplicacion.
+  - `_parse_response`: Parsea respuesta JSON de Qwen3-VL con manejo robusto de errores y formato libre.
+  - `_normalize_elements`: Normaliza elementos crudos del modelo con transformacion de coordenadas y deduplicacion.
+  - `_normalize_single_element`: Normaliza un elemento individual con validacion de coordenadas y confianza.
+  - `_extract_image_bbox`: Extrae bounding box de imagen normalizada (0-1000) y lo convierte a pixeles.
+  - `_image_bbox_to_monitor_bbox`: Convierte coordenadas de imagen a coordenadas absolutas del monitor.
+  - `_deduplicate_elements`: Elimina duplicados por nombre, centro y tipo manteniendo el de mayor confianza.
+- **Caracteristicas principales**:
+  - Politica de seguridad con listas de aplicaciones bloqueadas (juegos, herramientas sensibles, terminales, etc.) y tipos de elemento filtrados.
+  - Soporte multi-monitor con coordenadas absolutas del escritorio virtual asociadas a monitores fisicos.
+  - Cache automatico de elementos calibrados con historial y timestamps.
+  - Analisis visual con Qwen3-VL mediante Ollama para deteccion de elementos interactivos.
+  - Normalizacion robusta de coordenadas, nombres y confianza con validacion exhaustiva.
+  - Sistema de deduplicacion basado en nombre, centro y tipo de elemento.
+  - Maximo de 80 elementos por calibracion con confianza minima del 20%.
+- **Constantes de configuracion**:
+  - `MODEL`: "qwen3-vl:8b-instruct" - Modelo de vision por computadora.
+  - `NORMALIZED_MAX`: 1000 - Valor maximo para coordenadas normalizadas.
+  - `MAX_ELEMENTS`: 80 - Maximo numero de elementos detectables.
+  - `MIN_CONFIDENCE`: 0.20 - Confianza minima para elementos detectados.
 - **Funciones globales**:
   - `get_calibrator`: Obtiene instancia singleton del calibrador visual universal.
-  - `get_ui_capability`: Funcion de conveniencia para obtener capacidades UI directamente.
+  - `get_ui_capability`: Funcion de conveniencia para obtener capacidades UI especificas.
+- **Integraciones**:
+  - `Vision` para analisis de imagenes mediante Qwen3-VL.
+  - `ConversationMemory` para estado y cache de calibraciones.
+  - `ScreenManager` para informacion de monitores y geometria.
+  - `utils.logger` para logging detallado del proceso de calibracion.
+- **Dependencias**: PIL para procesamiento de imagenes, json para manejo de respuestas, regex para normalizacion, unicodedata para normalizacion de texto.
+
+#### `src/hands/windows/__init__.py` - Inicializacion del Modulo Windows
+- **Descripcion**: Modulo especifico para aplicaciones de Windows. Archivo de inicializacion del paquete Windows que contiene solo la documentacion del modulo.
+- **Contenido**: Archivo `__init__.py` basico con docstring que define el modulo Windows para JARVIS.
+
+#### `src/hands/windows/calibrator_windows.py` - Calibrador Especifico para Windows
+- **Descripcion**: Adaptador de compatibilidad para la calibracion de aplicaciones Windows. La calibracion real se realiza mediante el sistema universal: CalibrationManager -> descubrimiento de aplicacion -> apertura/enfoque -> ScreenManager -> deteccion de monitor real -> captura -> UniversalVisualCalibrator -> Qwen3-VL 8B Instruct -> coordenadas absolutas -> guardado centralizado.
+- **Clases principales**:
+  - `WindowsCalibrator`: Adaptador legacy que usa exactamente el flujo universal.
+- **Metodos principales**:
+  - `__init__`: Inicializa WindowsCalibrator creando una instancia de CalibrationManager y registrando el uso del flujo universal en log.
+  - `get_calibration_prompt()`: Mantiene la API antigua por compatibilidad. El flujo universal actual no depende de este prompt.
+  - `calibrate_app_both_screens()`: Mantiene el nombre antiguo por compatibilidad. Delegando en CalibrationManager.
+  - `calibrate_app()`: API de compatibilidad para calibrar Windows. La calibracion la realiza integramente CalibrationManager.
+  - `_calibrate_universal()`: Delega la calibracion en CalibrationManager. No realiza deteccion, captura ni calculo de coordenadas.
+- **Funciones globales**:
+  - `calibrate_app()`: Funcion publica de compatibilidad. No escribe macros_coords.json.
 - **Caracteristicas**:
-  - Modelo: Qwen3-VL 8B Instruct para analisis visual
-  - Sistema de coordenadas: absolutas del escritorio virtual con asociacion a monitores fisicos
-  - Politica de seguridad: aplicaciones bloqueadas por tipo (juegos, herramientas sensibles, etc.)
-  - Filtrado de elementos: elementos no interactivos o con baja confianza se excluyen
-  - Normalizacion robusta: nombres, coordenadas y confianza se normalizan consistentemente
-  - Soporte multipantalla: elementos se asocian a monitores especificos (s1, s2, etc.)
-  - Persistencia: estado en memoria, no persiste directamente a archivos
+  - Deteccion multi-monitor integrada con ScreenManager
+  - Soporte para cualquier numero de monitores (no limitado a 1 o 2)
+  - Verificacion de instalacion y disponibilidad
+  - Movimiento y posicionamiento preciso
+  - Compatibilidad con API legacy
+  - No genera coordenadas artificiales
+  - Utiliza calibracion universal a traves de CalibrationManager
 
 #### `src/hands/windows/windows.py` [678 lineas] - Funciones Especificas para Windows
 - **Funciones principales**:
@@ -2252,6 +1782,80 @@
   - `_capturar_aplicacion_windows`: Captura la ventana de una aplicacion.
   - `_safe_filename`: Convierte un nombre de aplicacion en un nombre de archivo seguro.
   - `get_windows_commands`: Devuelve las funciones publicas/legacy asociadas a Windows.
+
+#### `src/hands/coordinate_manager.py` [1113 lineas] - Gestor Unificado de Coordenadas
+- **Descripcion**: Gestor unificado de coordenadas para JARVIS. Responsabilidades: administrar recursos UI calibrados, proporcionar capacidades de UI al planificador, gestionar estado de calibracion, convertir y validar sistemas de coordenadas, leer datos existentes de macros_coords.json, mantener compatibilidad con APIs legacy.
+- **Clases principales**:
+  - `ResourceType` (Enum): Tipos de recursos UI gestionados por el coordinate manager (ELEMENT, REGION, APPLICATION, WINDOW, MONITOR)
+  - `CalibrationStrategy` (Enum): Estrategias de calibracion disponibles (VISUAL_DETECTION, WINDOW_DETECTION, SCREEN_CAPTURE, KEYBOARD_SHORTCUT, HOTKEY)
+  - `UIResource` (dataclass): Recurso UI calibrado utilizable por acciones del planificador
+  - `UICapability` (Clase): Capacidad UI que puede ser utilizada por una accion
+  - `CoordinateSystem` (Enum): Sistemas de coordenadas soportados por JARVIS (RELATIVE_SCREEN, ABSOLUTE_DESKTOP, WINDOW_RELATIVE)
+  - `BoundingBox` (dataclass): Rectangulo delimitador de un elemento
+  - `ElementInfo` (dataclass): Informacion de un elemento calibrado (compatibilidad)
+  - `CoordinateManager`: Gestor centralizado de conocimiento UI y coordenadas calibradas
+- **Metodos principales**:
+  - `CoordinateManager.__init__`: Inicializa el gestor con screen manager, UI resources, UI capabilities, UI knowledge y calibration policies
+  - `UIResource.__post_init__`: Inicializa recursos UI con normalizacion de valores y verificacion de calibracion
+  - `UIResource.is_usable`: Propiedad que verifica si el recurso esta disponible y calibrado
+  - `UIResource.get_coordinates_for_screen`: Obtiene coordenadas para un monitor especifico
+  - `UIResource.get_region_for_screen`: Obtiene regiones para un monitor especifico
+  - `UIResource.get_best_coordinates`: Devuelve coordenadas del monitor activo o de cualquier monitor calibrado
+  - `UIResource.get_alternatives`: Obtiene recursos alternativos para el recurso actual
+  - `UIResource.can_use_fallback_strategy`: Verifica si se puede usar una estrategia de fallback
+  - `UICapability.__init__`: Inicializa capacidad UI con nombre, descripcion y recursos requeridos
+  - `UICapability.can_execute_with_resources`: Verifica si la capacidad puede ejecutarse con recursos disponibles
+  - `CoordinateManager._initialize_base_capabilities`: Inicializa capacidades base (focus_element, click_element, type_in_element)
+  - `CoordinateManager._load_ui_knowledge`: Carga conocimiento UI desde macros_coords.json
+  - `CoordinateManager._process_ui_knowledge`: Procesa conocimiento UI y crea recursos correspondientes
+  - `CoordinateManager._create_resource_from_knowledge`: Crea recurso UI a partir de datos de conocimiento
+  - `CoordinateManager._resource_type_for_element`: Determina tipo de recurso para un elemento
+  - `CoordinateManager._parse_screen_data`: Parsea datos de pantallas para extraer coordenadas y regiones
+  - `CoordinateManager.register_ui_resource`: Registra un recurso UI en el sistema
+  - `CoordinateManager.get_ui_resource`: Obtiene un recurso UI por ID
+  - `CoordinateManager.get_available_resources`: Obtiene recursos UI disponibles, opcionalmente filtrados por aplicacion
+  - `CoordinateManager.find_resources_by_type`: Encuentra recursos por tipo y aplicacion
+  - `CoordinateManager.has_resource`: Verifica si existe un recurso usable por ID
+  - `CoordinateManager.get_resource_alternatives`: Obtiene alternativas para un recurso especifico
+  - `CoordinateManager.get_fallback_strategies`: Obtiene estrategias de fallback para un recurso
+  - `CoordinateManager.get_capabilities_for_resources`: Obtiene capacidades que pueden usar los recursos especificados
+  - `CoordinateManager.can_execute_capability`: Verifica si una capacidad puede ejecutarse con recursos disponibles
+  - `CoordinateManager.get_capability_alternatives`: Obtiene alternativas para una capacidad especifica
+  - `CoordinateManager.get_calibration_strategy`: Devuelve estrategia permitida para aplicacion/elemento
+  - `CoordinateManager.is_application_calibrable`: Verifica si una aplicacion puede ser calibrada
+  - `CoordinateManager.can_calibrate_element`: Verifica si un elemento puede ser calibrado
+  - `CoordinateManager.get_execution_strategy_for_action`: Obtiene estrategia de ejecucion para una accion
+  - `CoordinateManager.get_resource_coordinates`: Obtiene coordenadas de un recurso para pantalla especifica o mejor disponible
+  - `CoordinateManager.validate_resource_for_action`: Valida si un recurso es adecuado para una accion especifica
+  - `CoordinateManager.load_from_macros_coords`: Carga recursos desde calibraciones o datos legacy
+  - `CoordinateManager._create_legacy_resource`: Crea recurso a partir de datos legacy de macros_coords.json
+  - `CoordinateManager._infer_element_type`: Inferir tipo de elemento basado en nombre
+  - `CoordinateManager.get_calibrated_coordinate`: Obtiene coordenadas calibradas con compatibilidad legacy
+  - `CoordinateManager._get_legacy_calibrated_coordinate`: Obtiene coordenadas legacy del sistema antiguo
+  - `CoordinateManager._case_insensitive_dict_get`: Obtiene valor de diccionario sin distinguir mayusculas/minusculas
+  - `CoordinateManager.monitor_number_from_object`: Extrae numero de monitor de objeto sin asumir atributo concreto
+  - `CoordinateManager.get_screen_key`: Genera clave de pantalla (sN) para numero especifico
+  - `CoordinateManager.screen_number_from_key`: Convierte clave de pantalla (sN) a numero
+  - `CoordinateManager.get_screen_number_from_key`: Obtiene numero de pantalla desde clave
+  - `CoordinateManager._read_coordinate_value`: Lee y valida valor de coordenada
+  - `CoordinateManager.validate_coordinates`: Valida coordenadas dentro de limites de pantalla
+  - `CoordinateManager.validate_bounding_box`: Valida rectangulo delimitador dentro de limites de pantalla
+  - `CoordinateManager.get_window_bounding_box`: Obtiene rectangulo delimitador de ventana por titulo (compatibilidad legacy)
+  - `CoordinateManager._get_window_rect`: Obtiene geometria de ventana priorizando rectangulo normal de Win32
+- **Funciones globales**:
+  - `get_coordinate_manager`: Obtiene la instancia global del gestor de coordenadas
+- **Caracteristicas implementadas**:
+  - Administracion centralizada de recursos UI calibrados
+  - Sistema de capacidades UI para planificacion jerarquica
+  - Gestion de estrategias de calibracion (visual, deteccion de ventanas, captura de pantalla, atajos)
+  - Soporte para multiples sistemas de coordenadas
+  - Carga persistente desde macros_coords.json
+  - Sistema de alternativas y fallbacks para robustez
+  - Validacion de coordenadas y regiones
+  - Compatibilidad con APIs legacy del sistema anterior
+  - Deteccion automatica de tipos de elementos
+  - Manejo de multiples monitores con sistema sN
+  - Integracion con ScreenManager para geometria de monitores
 
 ### 🗃 Modulo `src/memory/` - Sistema de Memoria y Planificacion
 
@@ -2553,14 +2157,6 @@
   - Sistema de logging integrado para depuracion y monitoreo
   - Gestion de limites de tokens y truncacion automatica
   - Integracion con sistema de configuracion y preferencias de usuario
-  - `_load_voice_style_vector`: Carga el vector de estilo correspondiente a voice_id desde archivo binario.
-  - `_load_voice`: Carga una voz y la establece como voz actual con opcion de persistencia.
-  - `set_voice`: Cambia la voz actualmente utilizada en caliente sin requerir reiniciar Jarvis.
-  - `get_current_voice`: Devuelve el ID de la voz actualmente activa en el sistema.
-  - `_load_token_map`: Carga el mapa de tokens desde el archivo de configuracion JSON.
-  - `_text_to_tokens`: Convierte texto a tokens para el modelo con normalizacion y procesamiento fonetico.
-  - `speak`: Convierte texto a voz y lo reproduce con gestion de temporales y reproduccion de audio.
-  - `speak_async`: Version async de speak que no bloquea la ejecucion usando threading.
 
 ### 🛠 Modulo `src/tools/` - Sistema de Herramientas
 
@@ -2706,7 +2302,6 @@
   - `get_system_status`: Obtiene estado del sistema de optimizacion.
   - `optimize_system`: Optimiza el sistema manualmente.
   - `start_auto_optimization`: Inicia optimizacion automatica.
-  - `stop_auto_optimization`: Detiene optimizacion automatica.
   - `get_optimization_recommendations`: Obtiene recomendaciones de optimizacion.
   - `emergency_optimization`: Realiza optimizacion de emergencia.
 - **Variables Globales**:
@@ -3117,6 +2712,11 @@
   - `get_monitor_config`: Retorna monitor concreto del JSON
   - `get_primary_monitor_config`: Retorna monitor principal definido en el JSON
   - `get_monitor_count`: Retorna numero de monitores definidos en el JSON
+  - `MonitorConfig.right`: Propiedad que retorna la coordenada X final del monitor (x + width).
+  - `MonitorConfig.bottom`: Propiedad que retorna la coordenada Y final del monitor (y + height).
+  - `ScreenConfig.monitor_count`: Propiedad que retorna el numero de monitores configurados en el JSON.
+  - `ScreenConfig.get_monitor`: Obtiene un monitor por su ID.
+  - `ScreenConfig.get_primary_monitor`: Obtiene el monitor marcado como principal.
 - **Caracteristicas implementadas**:
   - Sistema de configuracion unificada con herencia y valores por defecto
   - Validacion automatica de tipos y rangos en todas las configuraciones
@@ -3163,7 +2763,7 @@
   - Priorizacion automatica de hallazgos y brechas por impacto critico
   - Sistema de seguimiento de issues y dependencias entre componentes
 
-#### `src/utils/contextual_adaptation_engine.py` [4187 lineas] - Motor de Adaptacion Contextual
+#### `src/utils/contextual_adaptation_engine.py` [4959 lineas] - Motor de Adaptacion Contextual
 - **Descripcion**: Motor de adaptacion contextual que permite a JARVIS evolucionar y adaptarse automaticamente a diferentes entornos, condiciones de uso y requerimientos cambiantes.
 - **Enums y dataclasses principales**:
   - `ContextType` (Enum): Tipos de contexto (DEVELOPMENT, PRODUCTION, TESTING, MAINTENANCE, EMERGENCY, OPTIMIZATION, LEARNING, IDLE, RECOVERY)
@@ -3173,7 +2773,9 @@
   - `AdaptationRule` (dataclass): Regla de adaptacion contextual con condiciones y acciones
   - `KnowledgeTransfer` (dataclass): Transferencia de conocimiento entre contextos
   - `AdaptationResult` (dataclass): Resultado de adaptacion con impacto y metricas
-- **Metodos principales de ContextualAdaptationEngine**:
+  - `TransferEvaluation` (dict subclass): Resultado de evaluacion de transferencia con campos de exito, puntuacion, mensaje e informacion de feedback; itera sobre (success, evaluation_score, message)
+  - `_AdaptationHistoryEntry` (dict subclass): Entrada de historial de adaptacion con compatibilidad de atributos legacy; expone `__getattr__` para acceso por clave y `to_dict` para serializacion
+- **Metodos principales de `ContextualAdaptationEngine`**:
   - `__init__`: Inicializa el motor con sistemas existentes, configuracion y modelos de aprendizaje
   - `_load_config`: Cargar configuracion del motor de adaptacion contextual
   - `_initialize_adaptation_rules`: Inicializar reglas de adaptacion contextual por defecto
@@ -3293,6 +2895,126 @@
   - `_flatten_strategy_map`: Normalizar el mapa de estrategias al indice plano `strategy_id -> entrada` usado en disco
   - `_project_strategies_by_context`: Proyectar el indice plano de estrategias sobre el mapa `contexto -> lista` del motor
   - `_merge_strategies_by_context`: Restaurar el contexto exacto de cada estrategia aprendida desde `updated_strategies`
+  - **Metodos de utilidad y helpers**:
+    - `_safe_float`: Convertir un valor a float de forma segura, devolviendo un valor por defecto ante error, NaN o infinito
+    - `_bounded_float`: Ajustar un valor float entre un minimo y maximo usando `_safe_float`
+    - `_coerce_context`: Convertir un valor (ContextType o string) al enum ContextType correspondiente
+    - `_call_optional`: Llamar a un metodo opcional en un objeto, devolviendo un valor por defecto si no existe o falla
+    - `_json_default`: Serializador JSON por defecto para tipos no nativos (Enum, datetime, Path, objetos con `to_dict`)
+    - `_serializable_history`: Convertir una entrada de historial de adaptacion (AdaptationResult o dict) a un diccionario serializable
+    - `_resolve_path`: Resolver una ruta de configuracion contra el directorio de datos, respetando rutas absolutas y el prefijo `data/`
+  - **Metodos de ejecucion de adaptacion**:
+    - `_execute_single_action`: Ejecutar una accion de adaptacion individual con integracion real de los sistemas existentes (PerformanceOptimizer, AdaptiveLearningEngine, PatternAnalyzer)
+    - `_set_optimization_interval`: Ajustar el intervalo de optimizacion del PerformanceOptimizer
+    - `_reduce_data_transfer_real`: Reducir transferencia de datos consultando LogAnalytics
+    - `_calculate_overall_impact`: Normalizar el signo de los impactos de rendimiento evitando confundir aumentos buenos y malos
+    - `_calculate_adaptation_confidence`: Calcular la confianza en una adaptacion basada en la tasa de exito de reglas, el contexto y el impacto
+    - `_record_adaptation_result`: Grabar el resultado de una adaptacion en la base de conocimiento si supera el umbral de confianza
+    - `to_dict`: Serializar la dataclass (ContextSnapshot, AdaptationRule, KnowledgeTransfer, AdaptationResult, _AdaptationHistoryEntry) a un diccionario canónico
+  - **Metodos de transferencia de conocimiento adicionales**:
+    - `_extract_knowledge_from_context`: Extraer conocimiento de un contexto segun el tipo (patterns, estrategias, baselines, metricas)
+    - `_extract_contextual_metrics`: Extraer metricas contextuales agregadas (avg/min/max) de los snapshots de un contexto
+    - `_has_transfer_history`: Comprobar si existe historial de transferencia entre dos contextos
+    - `_get_context_adjustment_factor`: Factor de ajuste entre pares de contextos para transferencia de conocimiento
+    - `_adapt_baselines_to_context`: Adaptar lineas base de rendimiento para un contexto destino usando un factor de ajuste
+    - `_get_context_knowledge_amount`: Cantidad de conocimiento disponible en un contexto (patterns, estrategias, baselines)
+    - `_calculate_transfer_potential`: Calcular el potencial de transferencia entre contextos
+    - `_calculate_transfer_efficiency_with_strategy`: Calcular eficiencia de transferencia con una estrategia especifica (conservative/adaptive/aggressive)
+    - `_estimate_transfer_efficiency`: Estimar eficiencia de transferencia usando estrategia adaptativa
+    - `_identify_relevant_knowledge_types`: Identificar tipos de conocimiento disponibles entre dos contextos
+    - `_generate_transfer_reasoning`: Generar razonamiento descriptivo para una transferencia de conocimiento
+    - `_calculate_transfer_priority`: Calcular prioridad de transferencia basada en compatibilidad, potencial y tipo
+    - `_record_successful_transfer_pattern`: Registrar un patron de transferencia exitosa en la base de conocimiento
+    - `_resolve_transfer_confidence`: Resolver la confianza de una transferencia: feedback explicito > atributo > eficiencia
+    - `knowledge_transaptors`: Propiedad que devuelve un alias de `knowledge_transfers` para consumidores legacy
+    - `get_knowledge_transfer_objects`: Devolver objetos KnowledgeTransfer filtrados por contexto y eficiencia
+    - `register_feedback`: Registrar feedback y sincronizar el objeto de transferencia con su historial
+    - `record_resource_allocation`: Registrar una asignacion de recursos en la base de conocimiento
+    - `_update_resource_usage_patterns`: Actualizar patrones de uso de recursos tras una asignacion
+  - **Metodos de estrategia y validacion de Goals**:
+    - `represent_adaptation`: Crear una copia adaptada del Goal; acepta objetos y diccionarios
+    - `create_goal_adaptation_proposal`: Crear una propuesta de adaptacion de Goal con reglas y metadata
+    - `_goal_to_dict`: Serializar un Goal (objeto o diccionario) a un diccionario canonico
+    - `_rule_to_dict`: Serializar una regla de adaptacion (objeto o diccionario) a un diccionario
+    - `_snapshot_to_dict`: Serializar un ContextSnapshot (objeto o diccionario) a un diccionario
+    - `_validate_adaptation_constraints`: Validar que las restricciones de un Goal adaptado no son contradictorias
+    - `_are_constraints_contradictory`: Comprobar si dos restricciones son contradictorias (maximize/minimize, show/hide, enable/disable)
+    - `_check_intention_preservation`: Verificar que la adaptacion preserva la intencion original del Goal
+    - `_targets_equivalent`: Comprobar equivalencia de dos URLs/objetivos
+    - `_validate_goal_structure`: Validar que un Goal tiene id, tipo, target y prioridad validos
+    - `_validate_current_state`: Validar que el estado actual contiene las claves esperadas
+    - `_required_capabilities_for_goal`: Obtener las capacidades requeridas por el tipo de Goal
+    - `_validate_capabilities`: Comprobar que las capacidades disponibles cubren las requeridas
+    - `_validate_goal_preconditions`: Validar precondiciones del Goal (URL valida para navegacion, etc.)
+    - `_validate_planner_can_solve`: Verificar si el Planner puede resolver el Goal adaptado
+    - `validate_adapted_goal`: Validar estructura, intencion, capacidades, precondiciones y resolubilidad del Goal adaptado
+    - `_register_validation_result`: Registrar el resultado de validacion de un Goal adaptado en la base de conocimiento
+  - **Metodos de feedback y aprendizaje de Goal**:
+    - `_capture_feedback`: Capturar feedback de un resultado de adaptacion y registrarlo en la base de conocimiento
+    - `_analyze_adaptation_improvement`: Analizar mejoras de rendimiento entre metricas esperadas y actuales
+    - `_execute_goal_adaptation_learning_loop`: Ejecutar el bucle de aprendizaje de adaptacion de Goal (feedback, analisis, registro de resultados)
+    - `_analyze_learning_patterns`: Analizar patrones de aprendizaje y generar descripciones
+    - `_update_adaptive_strategies`: Actualizar estrategias adaptativas con patrones aprendidos
+    - `_calculate_learning_convergence`: Calcular metricas de convergencia del aprendizaje (status, puntuacion, tendencia)
+    - `_record_feedback_analysis`: Registrar analisis de feedback en la base de conocimiento
+    - `_record_adaptation_history`: Registrar entrada en el historial de adaptaciones
+    - `_extract_performance_improvement`: Extraer la mejora de rendimiento de una entrada de historial
+    - `_record_learning_results`: Registrar resultados de aprendizaje en la base de conocimiento
+    - `_generate_pattern_description`: Generar una descripcion para un patron de aprendizaje
+    - `_generate_strategy_description`: Generar una descripcion para una estrategia
+    - `_known_strategy_ids`: Identificadores de estrategias ya presentes en el mapa contexto -> lista
+    - `_pattern_identity`: Identidad estable de un patron (pattern_type + goal_type + context_type)
+    - `_count_pattern_observations`: Contar observaciones similares acumuladas por patron
+    - `_confidence_threshold`: Umbral de confianza configurado en el motor (por defecto 0.7)
+    - `_min_similar_observations`: Minimo de observaciones similares exigido por el motor
+    - `_is_validated_pattern`: Comprobar si un patron cumple el contrato de datos validados
+    - `_filter_validated_learning_results`: Dejar en `learning_results` unicamente los patrones validados
+    - `_recover_learning_patterns`: Recuperar unicamente los patrones de aprendizaje validados al cargar
+    - `_estrategia_aprendida_valida`: Comprobar que una entrada de estrategia aprendida aporta evidencia
+  - **Metodos de estrategia individual**:
+    - `apply_strategy`: Aplicar una estrategia al contexto destino, registrando el resultado y verificando consistencia
+    - `compare_strategies`: Comparar dos estrategias evaluadas por su puntuacion global y porcentaje de mejora
+    - `select_strategy`: Seleccionar la mejor estrategia de un conjunto evaluado, con razonamiento de decision
+    - `evaluate_candidate_strategy`: Evaluar una estrategia en su contexto destino sin comparar un contexto consigo mismo
+    - `validate_candidate_strategy`: Validar estructura y rangos de un candidato de estrategia
+    - `_verify_strategy_application`: Verificar la consistencia de la aplicacion de una estrategia
+    - `_revert_strategy_application`: Revertir la aplicacion de una estrategia que fallo la verificacion (idempotente)
+  - **Metodos de limpieza y reinicio del sistema**:
+    - `clear_conversational_memory`: Eliminar conversaciones antiguas de memoria conversacional (por defecto 30 dias)
+    - `clear_adaptation_history`: Eliminar registros antiguos de historial de adaptacion (por defecto 90 dias)
+    - `clear_knowledge_base_patterns`: Limpiar patrones de conocimiento con bajo rendimiento o contexto especifico
+    - `clear_corrupted_data`: Eliminar datos corruptos detectados por `detect_corruption`
+    - `reset_learning_data`: Reinicia datos de aprendizaje y metricas del sistema
+    - `manual_system_reset`: Reinicio manual completo del sistema, preservando opcionalmente la configuracion
+  - **Metodos de arquitectura y propuestas**:
+    - `set_architecture_manager`: Conectar el ArchitecturalEvolutionManager al motor
+    - `update_architecture_state`: Actualizar el estado arquitectonico del motor
+    - `update_components`: Actualizar la lista de componentes recientes
+    - `process_architectural_result`: Registrar un resultado arquitectonico en la base de conocimiento
+    - `process_evidence_registration`: Registrar y evaluar evidencia de verificacion contra el contrato de evidencia minima
+    - `on_proposal_created`: Registrar la creacion de una propuesta de adaptacion en la base de conocimiento
+    - `minimum_evidence`: Devolver el contrato declarativo de la evidencia minima requerida
+  - **Metodos de gestion de reglas** (adicionales):
+    - `get_adaptation_rule`: Obtener una regla de adaptacion por su ID
+    - `list_adaptation_rules`: Listar reglas de adaptacion, opcionalmente solo las habilitadas, ordenadas por prioridad
+  - **Metodos de persistencia y recarga** (adicionales):
+    - `_hay_que_cargar`: Comprobar si hay al menos un fichero de persistencia que cargar
+    - `_unidades_obtenidas`: Unidades de datos utilizables que la ultima carga ha obtenido
+  - **Metodos de deteccion de corrupcion** (helpers internos):
+    - `_deteccion`: Construir un informe de desviacion detectada con los datos de la clase declarada
+    - `_detect_corruption_in`: Desviaciones detectadas en un fichero de persistencia (delega al detector correspondiente)
+    - `_detect_corruption_rules`: Desviaciones del FORMATO REAL de `contextual_adaptation_rules.json`
+    - `_detect_corruption_knowledge_base`: Desviaciones del FORMATO REAL de `contextual_knowledge_base.json`
+    - `_detect_corruption_feedback`: Desviaciones del FORMATO REAL de `goal_adaptation_feedback.json`
+    - `_detect_corruption_learning_results`: Desviaciones del FORMATO REAL de `goal_adaptation_learning_results.json`
+    - `_es_convertible_a_entero`: Comprobar si `int(value)` no lanza, como hace el cargador real
+    - `_es_marca_iso`: Comprobar si una marca de tiempo se puede leer como ISO
+    - `_campos_de_formato`: Campos del FORMATO REAL de las filas de un fichero de persistencia
+    - `_desviaciones_estrictas_de_regla`: Desviaciones de los campos de conversion ESTRICTA de una fila de regla
+  - **Funciones globales**:
+    - `_casa_target`: Helper global para resolver el target de una regla comparando con casos especiales
+    - `_tipo_de_valor`: Helper global que devuelve el tipo del FORMATO REAL para un valor por defecto (number, text, boolean, list, mapping, iso_date)
+    - `main`: Punto de entrada del script; ejecuta una demostracion del motor de adaptacion contextual
 - **Estructura de las estrategias aprendidas**:
   - Contenedor: `ContextualAdaptationEngine.knowledge_base["adaptation_strategies"]` con contrato `contexto -> lista` (los 9 contextos de `ContextType`), inicializado en `_initialize_knowledge_base()`
   - Forma canonica (estrategia aprendida, creada en `_update_adaptive_strategies()`): `strategy_id`, `strategy_type`, `strategy`, `context` (`goal_type`, `context_type`, `expected_metrics`), `pattern_id`, `metrics`, `confidence`, `success_rate`, `last_updated`, `description`, `applied_rules`, `failure_count`
@@ -3419,7 +3141,6 @@
   - Alcance: DECLARA el contrato y MIDE la distancia hasta el runtime. NO implementa la recuperacion: los 20 hallazgos son el INVENTARIO de lo que queda por implementar, no un defecto del motor detectado por esta sonda
 - **Recuperacion parcial**:
   - QUE VERIFICA: que el motor RECUPERA lo que el contrato de "Identificacion de datos recuperables" declara recuperable, y lo hace SIN inventar datos y SIN reescribir el fichero. Es la IMPLEMENTACION de la recuperacion y su prueba permanente
-  - PRINCIPIO: una corrupcion rechaza SOLO la unidad que corrompe; todo lo demas que el FORMATO REAL declara valido y que NO depende de la unidad corrupta debe SOBREVIVIR. La recuperacion NO inventa datos: el campo corrupto toma el valor por DEFECTO del formato y el resto de la unidad se conserva integro
   - IMPLEMENTACION (produccion): seis metodos nuevos en `src/utils/contextual_adaptation_engine.py`, aplicados en los cargadores reales (`load_adaptation_rules` y `load_knowledge_base`): `_valor_por_defecto_de_recuperacion` (toma el valor por DEFECTO del campo del CONTRATO declarado, sin inventar datos; `$rule_id` se resuelve con la identidad de la propia regla), `_recuperar_fila_de_regla` (rechaza SOLO el CAMPO que corrompe: ese campo toma su valor por defecto y el resto de la fila sobrevive intacto, de modo que los campos de conversion ESTRICTA ya no abortan el FICHERO entero), `_recuperar_grupos_de_base` (descarta SOLO el grupo que se aparta del formato y conserva sus HERMANOS, que son unidades independientes; una seccion cuyo valor por DEFECTO no es un MAPEO no tiene grupos que recuperar y se RECHAZA ENTERA en el NIVEL de la SECCION), `_registrar_recuperacion` (anota en el informe lo recuperado, en la UNIDAD que corrompe) y `recovery_report` (API publica de SOLO LECTURA)
   - IDENTIDAD DE LA FILA (produccion): el pipeline de carga de reglas esta UNIFICADO para la via de LISTA y la de CONTENEDOR en `_procesar_fila_de_regla`, y la identidad de la fila se comprueba ANTES de registrarla. La IDENTIDAD REGISTRABLE es un `rule_id` que sea una CADENA NO VACIA (`_identidad_de_regla`), tal como la declara el FORMATO REAL: una fila sin identidad utilizable NO se registra (el cargador NO inventa ninguna) y una fila cuya identidad YA usa otra fila se RECHAZA (la primera registrada sobrevive; la segunda ya no identifica a nadie). El campo de identidad NO se recupera: o vale o la fila se rechaza ENTERA y sus HERMANAS sobreviven
   - POLITICAS APLICADAS: se aplican las 5 POLITICAS del contrato segun el NIVEL de la unidad: `default_the_field` (el campo corrupto toma su valor por DEFECTO), `keep_valid_elements` (se conservan los disparadores validos y se descarta SOLO el invalido), `adapt_container` (se reconstruye el contenedor con sus filas validas), `preserve_siblings` (se conservan los grupos hermanos del grupo corrupto) y `none` (no hay nada recuperable)
@@ -3497,64 +3218,6 @@
   - `ContextSnapshot`, `ContextualFactor` de contextual_adaptation_engine.
 - **Dependencias**: json, logging, datetime, enum, typing, dataclasses, numpy.
 
-#### `src/utils/contextual_pattern_recognizer.py` [509 lineas] - Reconocedor de Patrones Contextuales
-- **Descripcion**: Reconocedor de patrones contextuales para JARVIS. Integra contexto con deteccion de patrones sin duplicar funcionalidad existente, conectando con PatternAnalyzer y el motor de adaptacion contextual.
-- **Clases principales**:
-  - `ContextualPatternType` (Enum): Tipos de patrones contextuales (CONTEXTUAL_ANOMALY, CONTEXTUAL_TREND, CONTEXTUAL_CORRELATION, CONTEXTUAL_SEASONAL, CONTEXTUAL_BURST, CONTEXTUAL_CHANGEPOINT).
-  - `ContextualPattern` (dataclass): Estructura de patron contextual detectado con severidad, confianza, snapshot de contexto, componentes afectados y acciones sugeridas.
-  - `ContextualPatternRecognizer`: Reconocedor de patrones relacionados con contexto integrado con PatternAnalyzer.
-- **Metodos principales**:
-  - `__init__`: Inicializa el reconocedor con un PatternAnalyzer y umbrales de compatibilidad.
-  - `add_contextual_pattern`: Agrega un patron contextual a partir de un snapshot de contexto.
-  - `_detect_contextual_pattern`: Detecta patrones contextuales generales.
-  - `_detect_contextual_anomaly`: Detecta anomalias contextuales.
-  - `_detect_contextual_trend`: Detecta tendencias contextuales.
-  - `_detect_contextual_correlation`: Detecta correlaciones contextuales.
-  - `_detect_contextual_seasonal`: Detecta patrones estacionales contextuales.
-  - `_detect_contextual_burst`: Detecta rafagas contextuales.
-  - `_detect_contextual_changepoint`: Detecta puntos de cambio contextuales.
-  - `_calculate_contextual_compatibility`: Calcula la compatibilidad contextual de un snapshot.
-  - `_get_affected_components`: Obtiene los componentes afectados por un snapshot.
-  - `get_contextual_patterns`: Obtiene patrones contextuales filtrados por tipo.
-  - `get_patterns_by_severity`: Obtiene patrones por severidad.
-  - `get_high_compatibility_patterns`: Obtiene patrones con alta compatibilidad.
-  - `clear_patterns`: Limpia patrones antiguos.
-  - `get_pattern_summary`: Obtiene un resumen de los patrones detectados.
-  - `export_patterns`: Exporta los patrones a un archivo JSON.
-- **Integraciones**:
-  - `PatternAnalyzer`, `PatternType`, `PatternSeverity` de pattern_analyzer.
-  - `ContextSnapshot`, `ContextualFactor` de contextual_adaptation_engine.
-- **Dependencias**: json, logging, datetime, enum, typing, dataclasses, numpy.
-
-#### `src/utils/contextual_pattern_recognizer.py` [509 lineas] - Reconocedor de Patrones Contextuales
-- **Descripcion**: Reconocedor de patrones contextuales para JARVIS. Integra contexto con deteccion de patrones sin duplicar funcionalidad existente, conectando con PatternAnalyzer y el motor de adaptacion contextual.
-- **Clases principales**:
-  - `ContextualPatternType` (Enum): Tipos de patrones contextuales (CONTEXTUAL_ANOMALY, CONTEXTUAL_TREND, CONTEXTUAL_CORRELATION, CONTEXTUAL_SEASONAL, CONTEXTUAL_BURST, CONTEXTUAL_CHANGEPOINT).
-  - `ContextualPattern` (dataclass): Estructura de patron contextual detectado con severidad, confianza, snapshot de contexto, componentes afectados y acciones sugeridas.
-  - `ContextualPatternRecognizer`: Reconocedor de patrones relacionados con contexto integrado con PatternAnalyzer.
-- **Metodos principales**:
-  - `__init__`: Inicializa el reconocedor con un PatternAnalyzer y umbrales de compatibilidad.
-  - `add_contextual_pattern`: Agrega un patron contextual a partir de un snapshot de contexto.
-  - `_detect_contextual_pattern`: Detecta patrones contextuales generales.
-  - `_detect_contextual_anomaly`: Detecta anomalias contextuales.
-  - `_detect_contextual_trend`: Detecta tendencias contextuales.
-  - `_detect_contextual_correlation`: Detecta correlaciones contextuales.
-  - `_detect_contextual_seasonal`: Detecta patrones estacionales contextuales.
-  - `_detect_contextual_burst`: Detecta rafagas contextuales.
-  - `_detect_contextual_changepoint`: Detecta puntos de cambio contextuales.
-  - `_calculate_contextual_compatibility`: Calcula la compatibilidad contextual de un snapshot.
-  - `_get_affected_components`: Obtiene los componentes afectados por un snapshot.
-  - `get_contextual_patterns`: Obtiene patrones contextuales filtrados por tipo.
-  - `get_patterns_by_severity`: Obtiene patrones por severidad.
-  - `get_high_compatibility_patterns`: Obtiene patrones con alta compatibilidad.
-  - `clear_patterns`: Limpia patrones antiguos.
-  - `get_pattern_summary`: Obtiene un resumen de los patrones detectados.
-  - `export_patterns`: Exporta los patrones a un archivo JSON.
-- **Integraciones**:
-  - `PatternAnalyzer`, `PatternType`, `PatternSeverity` de pattern_analyzer.
-  - `ContextSnapshot`, `ContextualFactor` de contextual_adaptation_engine.
-- **Dependencias**: json, logging, datetime, enum, typing, dataclasses, numpy.
-
 #### `src/utils/dynamic_resource_allocator.py` [1336 lineas] - Asignador Dinamico de Recursos
 - **Descripcion**: Sistema avanzado de asignacion de recursos dinamica segun contexto con priorizacion, deteccion de conflictos, preemption, gestion de recursos del sistema (CPU, memoria, disco, red), integracion con PerformanceMonitor y PerformanceOptimizer, soporte para trabajo diferido y notificacion de cambios. Implementa modelo de asignacion con solicitudes, asignaciones y disponibilidad de recursos.
 - **Enums principales**:
@@ -3586,6 +3249,8 @@
   - `integrate_with_planner_executor`: Integrar con Planner/Executor mediante contratos existentes
   - `_get_available_capabilities_for_planner`: Obtener capacidades disponibles para Planner
   - `_get_optimization_suggestions_for_planner`: Obtener sugerencias de optimizacion
+  - `get_allocation`: Obtiene una asignación específica por su ID (DynamicResourceAllocator).
+  - `cleanup`: Limpia todas las asignaciones y recursos disponibles y registra en log (DynamicResourceAllocator).
 - **Caracteristicas implementadas**:
   - Sistema completo de asignacion con priorizacion y deteccion de conflictos
   - Preemption inteligente evitando interrumpir trabajo de usuario sin consentimiento
@@ -3669,7 +3334,6 @@
   - `cleanup_old_errors`: Limpia registros de errores antiguos
   - `__str__`: Representacion string del gestor de recuperacion de errores
 - **Funciones globales**:
-  - `get_error_recovery_manager`: Obtiene instancia singleton del gestor de recuperacion de errores
   - `start_error_recovery`: Inicia el sistema de recuperacion de errores
   - `stop_error_recovery`: Detiene el sistema de recuperacion de errores
 - **Caracteristicas implementadas**:
@@ -3974,11 +3638,6 @@
   - `_save_integration`: Guardar integracion en base de datos
 - **Metodos principales de LogIntegrator**:
   - `__init__`: Inicializa wrapper con LogIntegrationSystem
-  - `add_log_source`: Anadir fuente de logs
-  - `remove_log_source`: Remover fuente de logs
-  - `start`: Iniciar sistema de integracion
-  - `stop`: Detener sistema de integracion
-  - `get_system_status`: Obtener estado del sistema
 - **Funciones globales**:
   - `log_integration`: Instancia global del sistema de integracion (LogIntegrationSystem)
   - `log_integrator`: Instancia global del wrapper (LogIntegrator)
@@ -4316,11 +3975,6 @@
 - **Metodos principales de PatternAnalyzer**:
   - `__init__`: Inicializa el detector de patrones interno
   - `get_pattern_analysis`: Obtener analisis completo de patrones
-  - `analyze_logs`: Analizar logs y detectar patrones
-  - `get_patterns_by_type`: Obtener patrones por tipo
-  - `get_active_patterns`: Obtener patrones activos
-  - `acknowledge_pattern`: Marcar patron como reconocido
-  - `get_pattern_statistics`: Obtener estadisticas de patrones
 - **Variables globales**:
   - `pattern_detector`: Instancia global del detector de patrones
   - `pattern_analyzer`: Instancia global del analizador de patrones
@@ -4348,8 +4002,6 @@
 - **Metodos principales de AlertSeverity**:
   - INFO, WARNING, ERROR, CRITICAL
 - **Metodos principales de PerformanceMetric**:
-  - `to_dict`: Convierte a diccionario
-- **Metodos principales de PerformanceAlert**:
   - `to_dict`: Convierte a diccionario
 - **Metodos principales de PerformanceCollector**:
   - `__init__`: Inicializa colector con intervalo y tamano de historial
