@@ -4348,3 +4348,29 @@ VERIFICACIÓN:
 DISCREPANCIAS: (D7) El registro 3.1.2.1 (línea 4320) afirma "`name` es el único campo obligatorio sin default (aplicaciones_core.py:140)" — INCORRECTO. `type: str` (línea 141) también carece de default. La presente unidad 3.1.2.2 corrige el contrato: los campos obligatorios son {name, type} tanto en ApplicationKnowledge como en UIElement. Documentado en inspeccion_unit3122.md. D1-D6 persisten sin cambios (ver 3.1.2.1). (D8) El registro 3.1.2.1 lista documentación `mejora/inspeccion_unit3121.md` y `mejora/construccion_unit3121.md` pero dichos archivos no existen en el directorio mejora/.
 PENDIENTES: 3.1.2.3 (definir datos opcionales / defaults canónicos), 3.1.2.4 (verificar no duplicación de campos), 3.1.3 (compatibilidad y tests del contrato end-to-end). D1-D8 persisten documentadas.
 ESTADO FINAL: 3.1.2.2 - IMPLEMENTADA
+
+====================================================================
+REGISTRO DE UNIDAD: 3.1.2.3
+FECHA: 2026-10-27
+OBJETIVO: Definir qué datos son opcionales / defaults canónicos para registrar una aplicación (inspección del contrato de datos opcionales y tests).
+TIPO DE TRABAJO: Inspección / verificación de contrato de datos.
+CAMBIOS / HALLAZGOS:
+- ApplicationKnowledge (applications_core.py:137-161): 13 campos total — 2 obligatorios (name, type) + 11 opcionales. Los 7 campos con default None (executable, url, icon, capabilities, ui_elements, states, calibration_policy, preflight_requirements, metadata) se normalizan en __post_init__ (None→[] / states→[CLOSED] / metadata→{}). Los 2 campos con default escalar: login_required: bool = False (línea 148), default_state: ApplicationState = ApplicationState.CLOSED (línea 151).
+- UIElement (applications_core.py:77-86): 6 campos total — 2 obligatorios (name, type) + 4 opcionales (coordinates=None, screen=0, calibration_data=None, required_capability=None). UIElement NO tiene __post_init__: los defaults son los declarados. Nota: si se pasa screen=None explícitamente, sobrescribe el default 0 (sin normalización). Documentado como comportamiento observado, no como bug.
+- ApplicationCapabilityDef (applications_core.py:117-133): 10 campos total — 7 obligatorios + 3 opcionales (timeout=30.0, retry_count=3, alternatives=None→[] vía __post_init__).
+- register_application (applications_core.py:351-375): PERSISTE 6 campos en Entity.properties {type, executable, url, login_required, capabilities}. 7 campos se PERDERAN (icon, ui_elements, states, calibration_policy, preflight_requirements, default_state, metadata) — no persistidos. Documentado como limitación conocida (heredada de D1-D6).
+- register_custom_application (applications_core.py:1016-1052): ACEPTA todos los campos opcionales en el dict (name, type obligatorios). Reconstruye enums desde strings (ApplicationCapability, ApplicationCapabilityDef, UIElement, ApplicationState). Contrato verdadero: {"name": ..., "type": ...} minimo; con opcionales todos aceptados.
+- CONTRATO CANÓNICO (opcionales): {executable, url, icon, capabilities, ui_elements, states, login_required, calibration_policy, preflight_requirements, default_state, metadata} — 11 campos opcionales con defaults declarados y/o normalizados.
+ARCHIVOS MODIFICADOS:
+- PRODUCCIÓN: NA (ningún cambio en código de producción).
+- TESTS: tests/hands/test_application_optional_data.py (creado, 22 tests nuevos).
+- DOCUMENTACIÓN: NA (documentado inline en este registro; no se crean archivos .md externos).
+TESTS Y RESULTADOS: tests/hands/test_application_optional_data.py — 22/22 PASSED. Regresión: 1557/1557 tests de tests/hands/ pasan (1535 previos + 22 nuevos). Pytest exit code 0.
+VERIFICACIÓN:
+- SINTAXIS: OK (python -m py_compile src/hands/applications_core.py tests/hands/test_application_optional_data.py main.py → exit 0).
+- MAIN.PY: OK (compilado sin errores; no modificado).
+- BEHAVIOR: ApplicationKnowledge con name+type solo → todos los 11 campos opcionales toman defaults; UIElement con name+type solo → 4 campos opcionales a 0/None; ApplicationCapabilityDef con 7 campos obligatorios → timeout=30.0, retry_count=3, alternatives=[]; register_custom_application acepta dict minimo y dict con todos los campos opcionales.
+
+DISCREPANCIAS: D1-D8 persisten sin cambios (ver 3.1.2.1, 3.1.2.2). (D9) ApplicationKnowledge tiene 13 campos (no 11). El conteo correcto es 2 obligatorios + 11 opcionales. D8 se mantiene (el archivo test_application_identification.py sigue sin existir en disco).
+PENDIENTES: 3.1.2.4 (verificar no duplicación de campos), 3.1.3 (compatibilidad y tests del contrato end-to-end). D1-D9 persisten documentadas.
+ESTADO FINAL: 3.1.2.3 - IMPLEMENTADA
