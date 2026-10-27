@@ -6,8 +6,9 @@ Objetivo: "Evitar duplicados al registrar".
 Verifica que ``ApplicationManager.register_application`` evita registrar
 una aplicación que ya está presente en ``self.applications``, omitiendo
 la llamada a ``save_entity`` y devolviendo ``False`` en el segundo
-intento. La detección se basa en la clave ``app.name.lower()``
-(normalización por defecto), manteniendo consistencia con
+intento. La detección se basa en la clave ``self._normalize_name(app.name)``
+(case-insensitive + alias resolution), manteniendo consistencia con
+``get_application`` que también usa ``_normalize_name`` y con
 ``_load_custom_applications`` que ya omite apps ya registradas.
 
 Los tests usan un MemoryManager aislado (mock) que cuenta llamadas a

@@ -392,7 +392,7 @@ class ApplicationManager:
         que ya omite apps ya registradas.
         """
         try:
-            key = app.name.lower()
+            key = self._normalize_name(app.name)
             if key in self.applications:
                 logger._print_log(
                     "info",
@@ -652,7 +652,7 @@ class ApplicationManager:
                 app = self._reconstruct_application(entity)
                 if app is None:
                     continue
-                key = app.name.lower()
+                key = self._normalize_name(app.name)
                 if key in self.applications:
                     logger._print_log(
                         "info",
