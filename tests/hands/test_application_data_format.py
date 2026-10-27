@@ -16,7 +16,8 @@ alimentan (o no) al modelo Application Knowledge (ApplicationManager):
    conversation.py:172 (DomainKnowledge), con schema DISTINTO al modelo
    ApplicationKnowledge (D5/D6).
 4. `register_application` (applications_core.py:351-375): escribe Entity con
-   `properties` = {type, executable, url, login_required, capabilities},
+   `properties` = {type, executable, url, login_required, capabilities,
+   ui_elements, states},
    que NO coincide con el `properties` real de entities.json
    ({url, executable, category}) -> discrepancia D-ENTIDAD-PROPERTIES.
 
@@ -57,8 +58,10 @@ ENTITY_FIELDS = [f.name for f in dataclasses.fields(Entity)]
 CONTRACT_FIELDS = [f.name for f in dataclasses.fields(ApplicationKnowledge)]
 
 # Claves que register_application escribe en Entity.properties (applications_core.py:354-368).
+# 3.2.2.2: ui_elements y states se unen al conjunto persistido (antes se perdian).
 REGISTER_PROPERTIES_KEYS = {
-    "type", "executable", "url", "login_required", "capabilities",
+    "type", "executable", "url", "login_required",
+    "capabilities", "ui_elements", "states",
 }
 
 
@@ -395,13 +398,17 @@ class TestKnowledgeApplicationsJsonFormat:
 # ---------------------------------------------------------------------------
 class TestRegisterApplicationVsRealFormatDiscrepancy:
     """Documenta D-ENTIDAD-PROPERTIES: register_application (aplicaciones_core.py:354)
-    escribe Entity.properties = {type, executable, url, login_required, capabilities},
+    escribe Entity.properties = {type, executable, url, login_required,
+    capabilities, ui_elements, states},
     pero el formato REAL de entities.json tiene properties = {url, executable, category}.
-    Las dos representaciones son INCOMPATIBLES: _load_custom_applications (stub)
-    no reconstruye ApplicationKnowledge desde la Entity real."""
+    Las dos representaciones son INCOMPATIBLES en las claves: _load_custom_applications
+    reconstruye ApplicationKnowledge desde la Entity real usando defaults para
+    los campos ausentes (3.2.2.2)."""
 
     def test_register_application_writes_documented_properties_keys(self):
-        """register_application persiste exactamente las 5 claves documentadas."""
+        """register_application persiste exactamente las 7 claves documentadas
+        (type, executable, url, login_required, capabilities, ui_elements, states).
+        """
         manager = _make_minimal_manager()
         app = ApplicationKnowledge(
             name="RegApp", type="browser", executable="reg",
@@ -432,7 +439,8 @@ class TestRegisterApplicationVsRealFormatDiscrepancy:
     def test_real_entities_properties_differ_from_registered_schema(self):
         """properties REAL de entities.json: {url, executable, category};
         schema de register_application: {type, executable, url, login_required,
-        capabilities}. La intersecion es solo {executable, url}."""
+        capabilities, ui_elements, states}. La intersecion es solo
+        {executable, url}."""
         real_keys = {"url", "executable", "category"}
         registered_keys = REGISTER_PROPERTIES_KEYS
         shared = real_keys & registered_keys

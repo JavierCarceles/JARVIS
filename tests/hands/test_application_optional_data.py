@@ -46,11 +46,12 @@ Definicion verificada por inspeccion del codigo (src/hands/applications_core.py)
     - retry_count:            int = 3        (linea 128)
     - alternatives:           Optional[List[str]] = None -> []  (linea 129, __post_init__ linea 131-133)
 
-  register_application (lineas 351-375) persiste en la Entity SOLO:
-  id, type, name, properties{type, executable, url, login_required, capabilities},
-  aliases=[], confidence=1.0, tags=[].
-  Campos opcionales que SE PERDERAN al registrar: icon, ui_elements, states,
-  calibration_policy, preflight_requirements, default_state, metadata.
+  register_application (lineas 351-375) persiste en la Entity:
+  id, type, name, properties{type, executable, url, login_required,
+  capabilities, ui_elements, states}, aliases=[], confidence=1.0, tags=[].
+  3.2.2.2: ui_elements y states ahora se persisten (antes se perdian).
+  Campos opcionales que SE PERDERAN al registrar: icon, calibration_policy,
+  preflight_requirements, default_state, metadata.
 
   register_custom_application (lineas 1016-1052) acepta el dict completo;
   solo exige name y type; reconstruye enums (ApplicationCapability, ApplicationCapabilityDef,
@@ -221,10 +222,14 @@ class TestApplicationKnowledgeOptionalDefaults:
         assert props["login_required"] is False
         assert props["capabilities"] == []
 
+        # 3.2.2.2: ui_elements y states YA se persisten (defaults del __post_init__)
+        assert "ui_elements" in props
+        assert props["ui_elements"] == []
+        assert "states" in props
+        assert props["states"] == ["closed"]
+
         # Campos opcionales que register_application NO persiste (se pierden)
         assert "icon" not in props
-        assert "ui_elements" not in props
-        assert "states" not in props
         assert "calibration_policy" not in props
         assert "preflight_requirements" not in props
         assert "default_state" not in props

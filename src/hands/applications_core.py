@@ -209,6 +209,26 @@ def _reconstruct_metadata(entity: Entity) -> Dict[str, Any]:
     return metadata
 
 
+def _serialize_ui_element(element: "UIElement") -> Dict[str, Any]:
+    """Serializa un :class:`UIElement` a un dict JSON-friendly.
+
+    Convierte el ``required_capability`` (``ApplicationCapability``) a su
+    valor string para que la entidad resultante sea totalmente serializable.
+    """
+    return {
+        "name": element.name,
+        "type": element.type,
+        "coordinates": element.coordinates,
+        "screen": element.screen,
+        "calibration_data": element.calibration_data,
+        "required_capability": (
+            element.required_capability.value
+            if element.required_capability is not None
+            else None
+        ),
+    }
+
+
 class ApplicationManager:
     """Gestor del conocimiento estructurado de aplicaciones."""
 
@@ -376,6 +396,8 @@ class ApplicationManager:
                     "url": app.url,
                     "login_required": app.login_required,
                     "capabilities": [cap.capability.value for cap in app.capabilities],
+                    "ui_elements": [_serialize_ui_element(e) for e in app.ui_elements],
+                    "states": [s.value for s in app.states],
                 },
                 "aliases": [],
                 "confidence": 1.0,
@@ -449,13 +471,91 @@ class ApplicationManager:
             )
         return result
 
+    @staticmethod
+    def _reconstruct_ui_elements(elements_data: Any) -> List[UIElement]:
+        """Reconstruye la lista de :class:`UIElement` desde ``properties``.
+
+        Cada item debe ser un dict con al menos ``name`` y ``type``.
+        Items invalidos o incompletos se omiten sin error. El
+        ``required_capability`` se resuelve a ``ApplicationCapability``;
+        si el valor no es valido se deja a ``None``.
+        """
+        result: List[UIElement] = []
+        if not isinstance(elements_data, list):
+            return result
+
+        for item in elements_data:
+            if not isinstance(item, dict):
+                continue
+            name = item.get("name")
+            elem_type = item.get("type")
+            if not name or not elem_type:
+                continue
+
+            required_capability: Optional[ApplicationCapability] = None
+            cap_raw = item.get("required_capability")
+            if cap_raw is not None:
+                try:
+                    required_capability = ApplicationCapability(str(cap_raw).strip().lower())
+                except ValueError:
+                    logger._print_log(
+                        "info",
+                        f"Capability UI desconocida omitida: '{cap_raw}' "
+                        "[file:applications_core.py, method:_reconstruct_ui_elements]",
+                        "applications_core.py", "_reconstruct_ui_elements", 472,
+                    )
+
+            result.append(
+                UIElement(
+                    name=name,
+                    type=elem_type,
+                    coordinates=item.get("coordinates"),
+                    screen=item.get("screen", 0),
+                    calibration_data=item.get("calibration_data"),
+                    required_capability=required_capability,
+                )
+            )
+        return result
+
+    @staticmethod
+    def _reconstruct_states(states_data: Any) -> List[ApplicationState]:
+        """Reconstruye la lista de :class:`ApplicationState` desde ``properties``.
+
+        Cada item debe ser un string convertible a ``ApplicationState``.
+        Items invalidos se omiten sin error. Si no se puede reconstruir
+        ningun estado (entrada ausente o vacia), se devuelve el default
+        ``[ApplicationState.CLOSED]`` manteniendo el contrato de
+        ``ApplicationKnowledge.__post_init__``.
+        """
+        result: List[ApplicationState] = []
+        if not isinstance(states_data, list):
+            return [ApplicationState.CLOSED]
+
+        for item in states_data:
+            if not isinstance(item, str):
+                continue
+            try:
+                result.append(ApplicationState(item.strip().lower()))
+            except ValueError:
+                logger._print_log(
+                    "info",
+                    f"Estado desconocido omitido: '{item}' "
+                    "[file:applications_core.py, method:_reconstruct_states]",
+                    "applications_core.py", "_reconstruct_states", 472,
+                )
+
+        if not result:
+            return [ApplicationState.CLOSED]
+        return result
+
     def _reconstruct_application(self, entity: Entity) -> Optional[ApplicationKnowledge]:
         """Reconstruye un objeto ApplicationKnowledge desde una Entity.
 
         Lee entidades con dos formatos de ``properties``:
 
         - Formato ``register_application`` (applications_core.py:351):
-          ``{type, executable, url, login_required, capabilities}``.
+          ``{type, executable, url, login_required, capabilities,
+          ui_elements, states}``.
         - Formato legacy ``data/memory/entities.json``:
           ``{url, executable, category}``.
 
@@ -464,6 +564,11 @@ class ApplicationManager:
 
         Las capability strings (``properties.capabilities``) se convierten a
         ``ApplicationCapabilityDef`` validos. Strings invalidos se omiten.
+
+        Los ``properties.ui_elements`` (lista de dicts) y ``properties.states``
+        (lista de strings) se reconstruyen a ``UIElement`` y ``ApplicationState``
+        respectivamente. Si faltan, se usan los defaults de
+        ``ApplicationKnowledge`` (``[]`` y ``[CLOSED]``).
 
         Devuelve ``None`` si la entidad carece de nombre usable (name+id
         ambos vacios), permitiendo al llamador omitirla sin crash.
@@ -493,6 +598,8 @@ class ApplicationManager:
                 executable=properties.get("executable"),
                 url=properties.get("url"),
                 capabilities=capabilities,
+                ui_elements=self._reconstruct_ui_elements(properties.get("ui_elements")),
+                states=self._reconstruct_states(properties.get("states")),
                 login_required=bool(properties.get("login_required", False)),
                 metadata=_reconstruct_metadata(entity),
             )

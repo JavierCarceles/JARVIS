@@ -53,17 +53,27 @@ OPTIONAL_FIELDS = [f.name for f in dataclasses.fields(ApplicationKnowledge)
 
 # Campos opcionales que register_application PERSISTE en Entity.properties
 # (duplican el contrato). type es obligatorio, no opcional.
-DUPLICATED_OPTIONAL_FIELDS = {"executable", "url", "login_required", "capabilities"}
+# 3.2.2.2: ui_elements y states ahora se persisten (antes se perdian).
+DUPLICATED_OPTIONAL_FIELDS = {
+    "executable", "url", "login_required", "capabilities",
+    "ui_elements", "states",
+}
 
 # Campos opcionales que register_application NO persiste en Entity.properties
 # (se pierden al registrar). Heredado de 3.1.2.3 (test_application_optional_data.py:49-53).
+# 3.2.2.2: ui_elements y states dejaron de ser 'lost' al pasar al conjunto de
+# duplicados arriba.
 LOST_OPTIONAL_FIELDS = {
-    "icon", "ui_elements", "states", "calibration_policy",
+    "icon", "calibration_policy",
     "preflight_requirements", "default_state", "metadata",
 }
 
 # Las claves que register_application escribe en Entity.properties.
-ENTITY_PROPERTIES_KEYS = {"type", "executable", "url", "login_required", "capabilities"}
+# 3.2.2.2: ahora incluye ui_elements y states (7 claves en total).
+ENTITY_PROPERTIES_KEYS = {
+    "type", "executable", "url", "login_required",
+    "capabilities", "ui_elements", "states",
+}
 
 # Los 10 campos del modelo Entity (storage.py:46-58).
 ENTITY_FIELDS = [f.name for f in dataclasses.fields(Entity)]
@@ -181,8 +191,9 @@ class TestRegisterApplicationDuplicatesFields:
     """register_application copia campos del contrato a Entity.properties.
 
     Verificacion de aplicaciones_core.py:354-368: `entity_data["properties"]`
-    contiene exactamente {type, executable, url, login_required, capabilities}.
-    Estos DUPLICAN los campos homonimos de ApplicationKnowledge.
+    contiene exactamente {type, executable, url, login_required, capabilities,
+    ui_elements, states}. Estos DUPLICAN los campos homonimos de
+    ApplicationKnowledge.
     """
 
     def test_entity_properties_keys_are_duplicated_contract_fields(self):
@@ -204,18 +215,22 @@ class TestRegisterApplicationDuplicatesFields:
         manager.register_application(app)
 
         props = manager.memory_manager.saved[-1].properties
-        # Exactamente las 5 claves que register_application escribe en properties
+        # Exactamente las 7 claves que register_application escribe en properties
         assert set(props.keys()) == ENTITY_PROPERTIES_KEYS
         # Todas esas claves son campos del contrato (excepto 'type' que se
         # duplica como valor dentro de properties, no como campo top-level)
         assert ENTITY_PROPERTIES_KEYS <= set(CONTRACT_FIELDS) | {"type"}
 
-    def test_entity_properties_keys_count_is_five(self):
-        """register_application escribe exactamente 5 claves en Entity.properties."""
+    def test_entity_properties_keys_count_is_seven(self):
+        """register_application escribe exactamente 7 claves en Entity.properties.
+
+        3.2.2.2: ui_elements y states se unen al conjunto persistido, pasando
+        de 5 a 7 claves.
+        """
         manager = _make_minimal_manager()
         app = ApplicationKnowledge(name="CountApp", type="browser", executable="x")
         manager.register_application(app)
-        assert len(manager.memory_manager.saved[-1].properties) == 5
+        assert len(manager.memory_manager.saved[-1].properties) == 7
 
     def test_entity_name_duplicated_from_contract(self):
         """Entity.name es una copia directa de ApplicationKnowledge.name."""
