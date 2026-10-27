@@ -194,6 +194,21 @@ class ApplicationKnowledge:
         return [element for element in self.ui_elements if element.is_calibrated()]
 
 
+def _reconstruct_metadata(entity: Entity) -> Dict[str, Any]:
+    """Construye el dict de metadata para una ApplicationKnowledge reconstruida.
+
+    Almacena el ``entity.id`` original y los aliases para trazabilidad y
+    uso futuro por el normalizador de nombres.
+    """
+    metadata: Dict[str, Any] = {}
+    if entity.metadata and isinstance(entity.metadata, dict):
+        metadata.update(entity.metadata)
+    metadata["entity_id"] = entity.id
+    if entity.aliases:
+        metadata["aliases"] = list(entity.aliases)
+    return metadata
+
+
 class ApplicationManager:
     """Gestor del conocimiento estructurado de aplicaciones."""
 
@@ -388,18 +403,156 @@ class ApplicationManager:
         """Obtiene aplicaciones con una capacidad determinada."""
         return [app for app in self.applications.values() if app.is_capable(capability)]
 
+    @staticmethod
+    def _reconstruct_capabilities(
+        capability_strings: Any,
+    ) -> List["ApplicationCapabilityDef"]:
+        """Convierte una lista de strings de capacidad en ApplicationCapabilityDef.
+
+        Cada string valido se normaliza (strip + lower) y se intenta convertir
+        a ``ApplicationCapability``. Strings invalidos se omiten sin error.
+
+        Los ApplicationCapabilityDef reconstruidos usan defaults minimos
+        (cost=5.0, empty preconditions/effects/required_ui_elements) ya que
+        la Entity no almacena esa informacion detallada.
+        """
+        result: List[ApplicationCapabilityDef] = []
+        if not isinstance(capability_strings, list):
+            return result
+
+        for cap_str in capability_strings:
+            if not isinstance(cap_str, str):
+                continue
+            normalized = cap_str.strip().lower()
+            if not normalized:
+                continue
+            try:
+                cap_enum = ApplicationCapability(normalized)
+            except ValueError:
+                logger._print_log(
+                    "info",
+                    f"Capacidad desconocida omitida: '{normalized}' "
+                    "[file:applications_core.py, method:_reconstruct_capabilities]",
+                    "applications_core.py", "_reconstruct_capabilities", 405,
+                )
+                continue
+            result.append(
+                ApplicationCapabilityDef(
+                    capability=cap_enum,
+                    name=f"cap_{normalized}",
+                    description=f"Capacidad: {normalized}",
+                    required_ui_elements=[],
+                    preconditions=[],
+                    effects=[],
+                    cost=5.0,
+                )
+            )
+        return result
+
+    def _reconstruct_application(self, entity: Entity) -> Optional[ApplicationKnowledge]:
+        """Reconstruye un objeto ApplicationKnowledge desde una Entity.
+
+        Lee entidades con dos formatos de ``properties``:
+
+        - Formato ``register_application`` (applications_core.py:351):
+          ``{type, executable, url, login_required, capabilities}``.
+        - Formato legacy ``data/memory/entities.json``:
+          ``{url, executable, category}``.
+
+        El campo ``type`` del ApplicationKnowledge se resuelve con prioridad:
+        ``properties.type`` → ``properties.category`` → ``"application"``.
+
+        Las capability strings (``properties.capabilities``) se convierten a
+        ``ApplicationCapabilityDef`` validos. Strings invalidos se omiten.
+
+        Devuelve ``None`` si la entidad carece de nombre usable (name+id
+        ambos vacios), permitiendo al llamador omitirla sin crash.
+        """
+        try:
+            name = entity.name or entity.id
+            if not name:
+                return None
+
+            properties = entity.properties
+            if not isinstance(properties, dict):
+                properties = {}
+
+            app_type = (
+                properties.get("type")
+                or properties.get("category")
+                or "application"
+            )
+
+            capabilities = self._reconstruct_capabilities(
+                properties.get("capabilities", []),
+            )
+
+            app = ApplicationKnowledge(
+                name=name,
+                type=app_type,
+                executable=properties.get("executable"),
+                url=properties.get("url"),
+                capabilities=capabilities,
+                login_required=bool(properties.get("login_required", False)),
+                metadata=_reconstruct_metadata(entity),
+            )
+            return app
+        except Exception as exc:
+            logger._print_log(
+                "info",
+                f"Error reconstruyendo aplicacion desde entidad "
+                f"(id={getattr(entity, 'id', '?')}): {exc} "
+                f"[file:applications_core.py, method:_reconstruct_application]",
+                "applications_core.py", "_reconstruct_application", 402,
+            )
+            return None
+
     def _load_custom_applications(self) -> None:
-        """Carga aplicaciones personalizadas persistidas en memoria."""
+        """Carga aplicaciones personalizadas persistidas en memoria.
+
+        Lee todas las entities de tipo ``"application"`` y materializa
+        ``ApplicationKnowledge`` mediante :meth:`_reconstruct_application`.
+        Las aplicaciones ya registradas (p.ej. Chrome, Spotify) se omiten
+        para evitar duplicados.
+        """
         try:
             entities = self.memory_manager.get_entities_by_type("application")
             if not isinstance(entities, list):
-                logger._print_log("info", "Las entidades no son una lista [file:applications_core.py, method:load_applications_from_memory, line:396]", "applications_core.py", "method", 396)
+                logger._print_log(
+                    "info",
+                    "Las entidades no son una lista "
+                    "[file:applications_core.py, method:_load_custom_applications]",
+                    "applications_core.py", "_load_custom_applications", 396,
+                )
                 return
 
             for entity in entities:
-                logger._print_log("info", "Procesando solicitud", "applications_core.py", "method", 371)
+                app = self._reconstruct_application(entity)
+                if app is None:
+                    continue
+                key = app.name.lower()
+                if key in self.applications:
+                    logger._print_log(
+                        "info",
+                        f"Aplicacion '{key}' ya registrada, se omite "
+                        "[file:applications_core.py, method:_load_custom_applications]",
+                        "applications_core.py", "_load_custom_applications", 402,
+                    )
+                    continue
+                self.applications[key] = app
+                logger._print_log(
+                    "info",
+                    f"Aplicacion '{key}' cargada desde entidad "
+                    "[file:applications_core.py, method:_load_custom_applications]",
+                    "applications_core.py", "_load_custom_applications", 402,
+                )
         except Exception as exc:
-            logger._print_log("info", f"Error cargando aplicaciones desde memoria: {str(exc, "applications_core.py", "method", 402)} [file:applications_core.py, method:load_applications_from_memory, line:405]")
+            logger._print_log(
+                "info",
+                f"Error cargando aplicaciones desde memoria: {exc} "
+                f"[file:applications_core.py, method:_load_custom_applications]",
+                "applications_core.py", "_load_custom_applications", 405,
+            )
 
     def get_application_capabilities(self, app_name: str) -> Dict[str, Any]:
         """Obtiene capacidades de una aplicación en formato de planificación."""

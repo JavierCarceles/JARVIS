@@ -4566,3 +4566,40 @@ VERIFICACION: SINTAXIS: OK (python -m py_compile tests/hands/test_application_da
 DISCREPANCIAS: (D5/D6) reconfirmadas: data/knowledge/applications.json no leido por ApplicationManager.__init__ (schema distinto). (D-ENTIDAD-PROPERTIES) register_application escribe properties {type, executable, url, login_required, capabilities} pero entities.json real tiene properties {url, executable, category}. (D-KNOWLEDGE-ENTITIES-DUP) data/knowledge/entities.json y data/memory/entities.json contenido identico, canales distintos. (D-ENTITIES-PERSIST-BUG) save_entity pasa dicts a _process_data_for_save que solo procesa instancias Entity -> entidades no persistidas. (D-NULL-PROPERTIES) NUEVA: Entity.from_dict admite properties=None sin error, pero downstream (p.ej. entity.properties.keys() o matches_query) fallaria con AttributeError; no es un crash en la capa probada pero es un riesgo silencioso. D1-D4/D11 persisten documentadas (ver 3.1.2.x / 3.1.3.x / 3.2.1.1 / 3.2.1.2 / 3.2.1.3).
 PENDIENTES: NINGUNO a nivel de esta hoja. D-NULL-PROPERTIES queda documentado como riesgo silencioso para fase posterior. D-ENTIDAD-PROPERTIES, D-ENTITIES-PERSIST-BUG, D1-D4/D11 persisten para fases posteriores. Siguiente hoja: 3.2.2.1 (Carga).
 ESTADO FINAL: 3.2.1.4 - IMPLEMENTADA
+
+===
+REGISTRO DE UNIDAD: 3.2.2.1
+FECHA: 2026-10-27
+OBJETIVO: Implementar o verificar lectura de una aplicacion. Materializar entities de tipo "application" del almacen de memoria (data/memory/entities.json) en objetos ApplicationKnowledge, manejando los dos formatos reales de Entity.properties: (1) formato register_application {type, executable, url, login_required, capabilities} y (2) formato legacy entities.json {url, executable, category}.
+TIPO DE TRABAJO: IMPLEMENTACION | RECONSTRUCCION DE ENTIDADES → ApplicationKnowledge | CARGA
+CAMBIOS / HALLAZGOS:
+- SE CREO _reconstruct_application(entity: Entity) -> Optional[ApplicationKnowledge] (applications_core.py:452): metodo que lee UNA sola Entity y reconstruye un ApplicationKnowledge. Maneja ambos formatos de properties:
+  - properties.type → app.type (formato register_application)
+  - properties.category → app.type (formato legacy entities.json, fallback)
+  - properties.type y properties.category ausentes → app.type = "application"
+  - properties.executable → app.executable
+  - properties.url → app.url
+  - properties.login_required → app.login_required (default False)
+  - properties.capabilities (List[str]) → List[ApplicationCapabilityDef] via _reconstruct_capabilities (applications_core.py:407); strings invalidos se omiten sin error
+  - entity.metadata → app.metadata (merged con entity_id y aliases)
+  - Si entity.name es None/empty, se usa entity.id como fallback; si ambos son falsy, devuelve None
+  - properties=None o properties no dict → tratado como {} (graceful degradation)
+- SE IMPLEMENTO _load_custom_applications() (applications_core.py:510): reemplaza el stub previo (que tenia errores de indentacion, sintaxis en str(exc, ...) y no materializaba nada). El nuevo metodo:
+  1. Obtiene entities via memory_manager.get_entities_by_type("application")
+  2. Para cada entity, llama _reconstruct_application
+  3. Omite apps ya registradas (key = app.name.lower()) para evitar duplicados (Chrome, Spotify)
+  4. Registra las apps reconstruidas en self.applications[key]
+  5. Devuelve None (consistente con la firma)
+- SE CREO _reconstruct_metadata(entity: Entity) -> Dict[str, Any] (aplicaciones_core.py:197): funcion module-level que construye el metadata dict con entity_id y aliases para trazabilidad.
+- ERRORES CORREGIDOS en el stub previo: (a) indentacion del for-loop dentro del if-not-list block; (b) str(exc, "applications_core.py", "method", 402) con 4 args → TypeError; (c) for-loop solo hacía logging sin materializar.
+- La implementacion respeta el contrato minimo (name + type) consolidado en 3.1.3.3.
+- NO se modifica el comportamiento de register_application (preserva D-ENTIDAD-PROPERTIES).
+- La implementacion permite que _load_custom_applications materialice apps preexistentes en entities.json (YouTube, GitHub, Twitch) durante ApplicationManager.__init__(), salvo que sean skip por duplicacion (Spotify, Chrome).
+- VERIFICACION IMPORTANTE: el D-ENTITIES-PERSIST-BUG sigue activo. save_entity pasa List[dict] a JSONStorage.save, pero _process_data_for_save(ENTITIES) solo procesa List[Entity] → el archivo entities.json NO refleja las entities agregadas por register_application. La CACHE del MemoryManager se actualiza correctamente (save_entity llama _update_cache con la lista completa), por lo que get_entities_by_type devuelve las entities correctamente. El bug afecta solo a la persistencia en disco, no al runtime en memoria.
+- VERIFICACION IMPORTANTE: get_entities_by_type tiene try/except que captura TypeError de Entity.from_dict → si UNA entity incompleta (falta campo name) esta en el cache, SE PIERDEN TODAS las entities del tipo. Esto significa que en escenarios con entities invalidas mezcladas, _load_custom_applications podria no cargar nada. Documentado como comportamiento del canal de lectura.
+ARCHIVOS MODIFICADOS: PRODUCCION: src/hands/applications_core.py (agregados _reconstruct_capabilities, _reconstruct_application, _load_custom_applications; funcion _reconstruct_metadata). TESTS: tests/hands/test_application_read.py (NEW, 28 tests). DOCUMENTACION: mejora/prompt_JARVIS_fases_estado.txt
+TESTS Y RESULTADOS: UNITARIOS: 28/28 PASSED (test_application_read.py, nuevo). NO REGRESION: 1811/1811 PASSED (tests/hands/ incluyendo 118 planner/application_integration, 30 source_missing, 48 data_incomplete, 120 data_format, 54 minimal_contract, 56 mandatory_data, 50 optional_data, 24 identification, 32 preflight, 8 contract_no_duplication). 139/139 PASSED (tests/brain/, tests/ear/). Total verificado: 28 nuevos + 1950 existentes = 1978 PASSED.
+VERIFICACION: SINTAXIS: OK (python -m py_compile src/hands/applications_core.py → exit 0). MAIN.PY: OK (py_compile main.py → exit 0; no modificado). COMPORTAMIENTO: verificado mediante MemoryManager aislado en tmp_path (sandbox) con entities.json escrito directamente y con _FakeMemoryManager inyectado via __new__; 28 tests cubren reconstruccion de ambos formatos, type fallback, capabilities validas/invalidas, properties None/no-dict, name fallback a id, metadata/entity_id/aliases, carga multiple, skip duplicados, entities vacias, mixed formats, error handling.
+DISCREPANCIAS: (D-ENTIDAD-PROPERTIES) CONFIRMADA y MANEJADA: register_application escribe properties {type, executable, url, login_required, capabilities} pero entities.json real tiene {url, executable, category}. _reconstruct_application resuelve type via properties.type OR properties.category OR "application". (D-ENTITIES-PERSIST-BUG) CONFIRMADA y DOCUMENTADA: save_entity→_process_data_for_save(ENTITIES) no persiste List[dict] a archivo, pero la cache funciona. (D-NULL-PROPERTIES) CONFIRMADA: properties=None handled gracefully (no crash). D5/D6 persisten: data/knowledge/applications.json no leido por ApplicationManager. D1-D4/D11 persisten documentadas.
+PENDIENTES: (1) Corregir D-ENTITIES-PERSIST-BUG en save_entity/JSONStorage.save para que entities.json refleje el estado real (persistencia en disco). (2) Mejorar _normalize_name para usar aliases de entities (p.ej. get_application("github") funciona, pero get_application("gh") no). (3) Persistir capabilities/ui_elements/states en entities para reconstruccion completa (actualmente solo type/executable/url/login_required). (4) Unificar el formato de properties entre register_application y entities.json. Siguiente hoja: 3.2.2.2.
+ESTADO FINAL: 3.2.2.1 - IMPLEMENTADA

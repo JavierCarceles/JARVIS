@@ -15,7 +15,7 @@ ficheros fuente no existen en el sistema de archivos:
    rompe cuando la fuente (entities.json) no existe; las apps hardcodeadas
    (Chrome, Spotify) permanecen disponibles.
 4. `src/hands/applications_core.py` — `_load_custom_applications()` (stub,
-   aplicaciones_core.py:391-403) no lanza excepciones cuando las entidades
+   aplicaciones_core.py:510) no lanza excepciones cuando las entidades
    no existen.
 5. `src/memory/conversation.py` — `DomainMemory` con `knowledge/applications.json`
    ausente deja `self.applications` como `{}`.
@@ -207,7 +207,7 @@ class TestApplicationManagerWhenSourceMissing:
         assert set(manager.applications.keys()) == {"chrome", "spotify"}
 
     def test_load_custom_applications_returns_none(self, isolated_manager):
-        """_load_custom_applications() (aplicaciones_core.py:391) devuelve
+        """_load_custom_applications() (aplicaciones_core.py:510) devuelve
         None y no lanza excepcion cuando las entidades no existen."""
         manager, _, _ = isolated_manager
         result = manager._load_custom_applications()

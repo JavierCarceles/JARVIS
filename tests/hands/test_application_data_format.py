@@ -6,7 +6,7 @@ Verifica el formato REAL (no el esperado) de los ficheros/canaux que
 alimentan (o no) al modelo Application Knowledge (ApplicationManager):
 
 1. `data/memory/entities.json`: fuente REAL que lee `_load_custom_applications`
-   (applications_core.py:391-403) via `memory_manager.get_entities_by_type("application")`
+   (applications_core.py:510) via `memory_manager.get_entities_by_type("application")`
    (storage.py:718-753, MemoryType.ENTITIES -> "entities.json").
    Formato: lista JSON de entidades Entity.
 2. `data/memory/applications.json`: mapeado a MemoryType.APPLICATIONS en
