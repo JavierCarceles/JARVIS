@@ -5,7 +5,16 @@
 Verifica el comportamiento REAL (no el esperado) del modelo Application
 Knowledge (ApplicationManager) y de las fuentes de datos cuando los
 ficheros fuente EXISTEN pero contienen datos parciales, malformados o
-mal tipificados. No modifica codigo de produccion.
+mal tipificados.
+
+NOTA 3.2.3.2: Las secciones 3, 4 y 5 se actualizaron para reflejar el cambio
+de contrato introducido por la unidad 3.2.3.2 ("Definir resultado ante
+aplicacion invalida"): `get_entities_by_type`, `get_entity` y `find_entities`
+ahora manejan errores per-item (un entidad invalida se omite individualmente
+en lugar de perder todas las entidades del tipo o propagar TypeError). La
+sección 6 también se actualizo porque `_load_custom_applications` no es un
+stub: procesa entities reales y, con el manejo per-item, omite las apps
+invalidas manteniendo las validas.
 
 Resumen de comportamientos verificados:
 
@@ -28,30 +37,37 @@ Resumen de comportamientos verificados:
    - `properties` con tipo incorrecto (lista en vez de dict) → no lanza
      error; se almacena sin validacion.
 
-3. `src/memory/storage.py` — `get_entities_by_type()`:
-   - Si alguna entity con `type` que coincide carece de un campo obligatorio
-     (p.ej. `name` o `properties`), `Entity.from_dict()` lanza `TypeError`,
-     capturado por el `except Exception` externo → devuelve `[]` (SE
-     PIERDEN TODAS las entidades del tipo, incluso las validas).
+3. `src/memory/storage.py` — `get_entities_by_type()` (actualizado por 3.2.3.2):
+   - Cada entity se reconstruye con `Entity.from_dict()` dentro de un
+     try/except per-item: una entity invalida (campos obligatorios ausentes)
+     se omite individualmente (registro de error) y NO provoca la perdida
+     de las demas entities validas del mismo tipo.
    - Items no dict en la lista (string, None, int) → omitidos por el filtro
      `isinstance(entity_data, dict)`.
    - Entity con `properties=None` → cargada sin error, `properties` queda None.
 
-4. `src/memory/storage.py` — `get_entity()`:
-   - NO tiene try/except. Si la entity con el ID buscado carece de campos
-     obligatorios, `Entity.from_dict()` propaga `TypeError` al llamador.
+4. `src/memory/storage.py` — `get_entity()` (actualizado por 3.2.3.2):
+   - `Entity.from_dict()` para la entity encontrada esta envuelto en
+     try/except per-item: si la entity es invalida, se registra el error y
+     se devuelve `None` (no se propaga `TypeError`).
    - Si otra entity (no la buscada) es incompleta, `get_entity` no se
      rompe (solo parsea la entity que coincide por ID).
 
-5. `src/memory/storage.py` — `find_entities()`:
-   - NO tiene try/except. Llama `Entity.from_dict()` a TODAS las entities
-     dict de la lista → cualquier entity incompleta propaga `TypeError`.
+5. `src/memory/storage.py` — `find_entities()` (actualizado por 3.2.3.2):
+   - Cada entity se reconstruye con `Entity.from_dict()` dentro de un
+     try/except per-item: una entity invalida se omite (registro de error)
+     y no propaga `TypeError`; las entities validas que coinciden con la
+     query se devuelven normalmente.
 
 6. `src/hands/applications_core.py` — `ApplicationManager.__init__()`:
    - No se rompe con datos incompletos en entities.json; las apps
      hardcodeadas (Chrome, Spotify) permanecen disponibles.
-   - `_load_custom_applications()` (stub) no procesa entities reales, por
-     lo que datos incompletos no afectan el modelo ApplicationKnowledge.
+   - `_load_custom_applications()` procesa entities reales invocando
+     `get_entities_by_type("application")` y `_reconstruct_application()`
+     por entity. Con el cambio de 3.2.3.2, una entity application invalida
+     se omite individualmente: las apps validas se cargan y la invalida se
+     registra y descarta. `_reconstruct_application` devuelve `None` para
+     apps sin nombre usable, omitidas por el bucle.
 
 7. `src/memory/conversation.py` — `DomainMemory.load_domain_knowledge()`:
    - `knowledge/applications.json`: entries incompletos se almacenan tal
@@ -347,15 +363,15 @@ class TestEntityFromDictWithNullAndWrongTypeProperties:
 
 
 # ---------------------------------------------------------------------------
-# 6. get_entities_by_type(): entity incompleta causa perdida total
+# 6. get_entities_by_type(): entity incompleta omitida per-item (3.2.3.2)
 # ---------------------------------------------------------------------------
 class TestGetEntitiesByTypeWithIncompleteData:
-    """get_entities_by_type() con datos incompletos.
+    """get_entities_by_type() con datos incompletos (actualizado por 3.2.3.2).
 
-    Si una entity con `type` que coincide carece de un campo obligatorio,
-    Entity.from_dict() lanza TypeError, capturado por el except externo →
-    se devuelve [] (TODAS las entities del tipo se pierden, incluso las
-    validas). Esto es porque el loop no tiene manejo por-item.
+    Con el manejo per-item introducido en 3.2.3.2, si una entity con `type`
+    que coincide carece de un campo obligatorio, `Entity.from_dict()` lanza
+    `TypeError` capturado per-item: la entity invalida se omite (registro de
+    error) y NO se pierden las entities validas del mismo tipo.
     """
 
     @pytest.fixture
@@ -369,9 +385,10 @@ class TestGetEntitiesByTypeWithIncompleteData:
         assert len(entities) == 1
         assert entities[0].id == "valid_app"
 
-    def test_incomplete_entity_missing_name_loses_all(self, tmp_path):
-        """Una entity application que falta `name` causa que get_entities_by_type
-        devuelva [] (todos los entities application se pierden)."""
+    def test_incomplete_entity_missing_name_skipped_valid_loaded(self, tmp_path):
+        """Una entity application que falta `name` se omite per-item (TypeError
+        capturado); la entity valida 'ok' se carga correctamente. No se pierden
+        las applications validas. (Contrato definido por 3.2.3.2.)"""
         incomplete = {
             "id": "bad_app",
             "type": "application",
@@ -383,11 +400,14 @@ class TestGetEntitiesByTypeWithIncompleteData:
         _write_entities_json(tmp_path, [_make_valid_entity("ok", "Good"), incomplete])
         mm = MemoryManager(tmp_path)
         result = mm.get_entities_by_type("application")
-        # El TypeError se propaga al except externo → devuelve []
-        assert result == []
+        # La entity invalida se omite; la valida 'ok' se carga
+        assert len(result) == 1
+        assert result[0].id == "ok"
 
-    def test_incomplete_entity_missing_properties_loses_all(self, tmp_path):
-        """Una entity application que falta `properties` causa [] (perdida total)."""
+    def test_incomplete_entity_missing_properties_skipped_valid_loaded(self, tmp_path):
+        """Una entity application que falta `properties` se omite per-item;
+        la entity valida 'ok' se carga. No se pierden las applications validas.
+        (Contrato definido por 3.2.3.2.)"""
         incomplete = {
             "id": "bad_app",
             "type": "application",
@@ -398,10 +418,13 @@ class TestGetEntitiesByTypeWithIncompleteData:
         _write_entities_json(tmp_path, [_make_valid_entity("ok", "Good"), incomplete])
         mm = MemoryManager(tmp_path)
         result = mm.get_entities_by_type("application")
-        assert result == []
+        assert len(result) == 1
+        assert result[0].id == "ok"
 
-    def test_incomplete_entity_missing_id_loses_all(self, tmp_path):
-        """Una entity application que falta `id` causa [] (perdida total)."""
+    def test_incomplete_entity_missing_id_skipped_valid_loaded(self, tmp_path):
+        """Una entity application que falta `id` se omite per-item;
+        la entity valida 'ok' se carga. No se pierden las applications validas.
+        (Contrato definido por 3.2.3.2.)"""
         incomplete = {
             "type": "application",
             "name": "BadNoId",
@@ -412,7 +435,8 @@ class TestGetEntitiesByTypeWithIncompleteData:
         _write_entities_json(tmp_path, [_make_valid_entity("ok", "Good"), incomplete])
         mm = MemoryManager(tmp_path)
         result = mm.get_entities_by_type("application")
-        assert result == []
+        assert len(result) == 1
+        assert result[0].id == "ok"
 
     def test_non_dict_items_skipped_valid_entity_loaded(self, tmp_path):
         """Items no-dict en la lista (string, None, int) son omitidos por el
@@ -461,16 +485,20 @@ class TestGetEntitiesByTypeWithIncompleteData:
 
 
 # ---------------------------------------------------------------------------
-# 7. get_entity(): entity incompleta propaga TypeError (sin try/except)
+# 7. get_entity(): entity incompleta devuelve None (manejo per-item, 3.2.3.2)
 # ---------------------------------------------------------------------------
 class TestGetEntityWithIncompleteData:
-    """get_entity() NO tiene try/except. Si la entity con el ID buscado es
-    incompleta, Entity.from_dict() propaga TypeError al llamador.
+    """get_entity() con datos incompletos (actualizado por 3.2.3.2).
+
+    Con el manejo per-item introducido en 3.2.3.2, si la entity con el ID
+    buscado carece de campos obligatorios, `Entity.from_dict()` captura el
+    `TypeError` y devuelve `None` (no lo propaga al llamador).
     """
 
-    def test_get_entity_incomplete_propagates_type_error(self, tmp_path):
+    def test_get_entity_incomplete_returns_none(self, tmp_path):
         """get_entity('bad_app') con una entity incompleta (falta name)
-        → TypeError propagado (no capturado)."""
+        → devuelve None (TypeError capturado per-item, no propagado).
+        (Contrato definido por 3.2.3.2.)"""
         incomplete = {
             "id": "bad_app",
             "type": "application",
@@ -483,8 +511,8 @@ class TestGetEntityWithIncompleteData:
             incomplete,
         ])
         mm = MemoryManager(tmp_path)
-        with pytest.raises(TypeError, match="name"):
-            mm.get_entity("bad_app")
+        result = mm.get_entity("bad_app")
+        assert result is None
 
     def test_get_entity_valid_returns_entity(self, tmp_path):
         """get_entity() sobre una entity completa funciona normalmente."""
@@ -528,16 +556,22 @@ class TestGetEntityWithIncompleteData:
 
 
 # ---------------------------------------------------------------------------
-# 8. find_entities(): cualquier entity incompleta propaga TypeError
+# 8. find_entities(): entity incompleta omitida per-item (3.2.3.2)
 # ---------------------------------------------------------------------------
 class TestFindEntitiesWithIncompleteData:
-    """find_entities() NO tiene try/except. Llama Entity.from_dict() a TODAS
-    las entities dict de la lista → cualquier entity incompleta propaga
-    TypeError, incluso si no coincide con la query.
+    """find_entities() con datos incompletos (actualizado por 3.2.3.2).
+
+    Con el manejo per-item introducido en 3.2.3.2, cada entity se reconstruye
+    con `Entity.from_dict()` dentro de un try/except per-item: una entity
+    incompleta se omite (registro de error) y no propaga `TypeError`; las
+    entities validas que coinciden con la query se devuelven normalmente.
     """
 
-    def test_find_entities_incomplete_propagates_type_error(self, tmp_path):
-        """find_entities() con una entity incompleta (falta name) → TypeError."""
+    def test_find_entities_incomplete_skipped_valid_loaded(self, tmp_path):
+        """find_entities() con una entity incompleta (falta name) → la entity
+        invalida se omite per-item; la entity valida 'ok' que coincide con la
+        query se devuelve. No se propaga TypeError.
+        (Contrato definido por 3.2.3.2.)"""
         incomplete = {
             "id": "bad_app",
             "type": "application",
@@ -550,8 +584,9 @@ class TestFindEntitiesWithIncompleteData:
             incomplete,
         ])
         mm = MemoryManager(tmp_path)
-        with pytest.raises(TypeError, match="name"):
-            mm.find_entities(query="ok")
+        results = mm.find_entities(query="good")
+        assert len(results) == 1
+        assert results[0].id == "ok"
 
     def test_find_entities_all_valid_returns_matches(self, tmp_path):
         """find_entities() con entities completas funciona normalmente."""
@@ -572,15 +607,16 @@ class TestFindEntitiesWithIncompleteData:
 
 
 # ---------------------------------------------------------------------------
-# 9. ApplicationManager: init con datos incompletos
+# 9. ApplicationManager: init con datos incompletos (actualizado por 3.2.3.2)
 # ---------------------------------------------------------------------------
 class TestApplicationManagerWithIncompleteData:
     """ApplicationManager.__init__() con datos incompletos en entities.json.
 
     __init__ llama _initialize_applications() (hardcoded Chrome/Spotify) y
-    luego _load_custom_applications() (stub). Los datos incompletos en
-    entities.json no afectan el modelo porque el stub no reconstruye
-    ApplicationKnowledge desde las entities.
+    luego _load_custom_applications() que procesa entities reales. Con el
+    manejo per-item de 3.2.3.2, una entity application invalida (falta name)
+    se omite individualmente: la app valida 'Good' se carga desde entities
+    y la invalida se registra y descarta, sin afectar a Chrome/Spotify.
     """
 
     @pytest.fixture
@@ -624,23 +660,32 @@ class TestApplicationManagerWithIncompleteData:
         assert names == {"Chrome", "Spotify"}
 
     def test_load_custom_applications_returns_none(self, manager_with_incomplete):
-        """_load_custom_applications() (stub) devuelve None, no lanza."""
+        """_load_custom_applications() devuelve None (metodo void), no lanza.
+        Procesa entities reales con manejo per-item: omite la invalida."""
         manager, _, _ = manager_with_incomplete
         result = manager._load_custom_applications()
         assert result is None
 
-    def test_only_hardcoded_apps_in_model(self, manager_with_incomplete):
-        """Solo Chrome y Spotify en el modelo (el stub no materializa entities)."""
+    def test_valid_custom_app_loaded_invalid_skipped(self, manager_with_incomplete):
+        """La app valida 'Good' (entity 'ok') se carga desde entities; la
+        entity incompleta (falta name) se omite per-item y no aparece en el
+        modelo. Chrome y Spotify permanecen. (Contrato definido por 3.2.3.2.)"""
         manager, _, _ = manager_with_incomplete
-        assert set(manager.applications.keys()) == {"chrome", "spotify"}
+        assert set(manager.applications.keys()) == {"chrome", "spotify", "good"}
+        # La entity invalida (bad_app, sin name) no se materializa
+        assert "bad_app" not in manager.applications
+        assert "badapp" not in manager.applications
+        # La app valida 'Good' esta disponible
+        assert manager.applications["good"].name == "Good"
 
     def test_repeated_load_no_effect(self, manager_with_incomplete):
-        """Llamar _load_custom_applications() explicitamente no anade apps."""
+        """Llamar _load_custom_applications() explicitamente no anade apps
+        duplicadas (solo carga las ya registradas)."""
         manager, _, _ = manager_with_incomplete
         before = set(manager.applications.keys())
         manager._load_custom_applications()
         after = set(manager.applications.keys())
-        assert before == after == {"chrome", "spotify"}
+        assert before == after == {"chrome", "spotify", "good"}
 
 
 # ---------------------------------------------------------------------------

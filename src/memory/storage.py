@@ -711,7 +711,18 @@ class MemoryManager:
 
         for entity_data in entities_data:
             if isinstance(entity_data, dict) and entity_data.get("id") == entity_id:
-                return Entity.from_dict(entity_data)
+                try:
+                    return Entity.from_dict(entity_data)
+                except Exception as exc:
+                    logger._print_log(
+                        "info",
+                        f"Entidad invalida no puede reconstruirse (id={entity_id}): {exc} "
+                        "[file:storage.py, method:get_entity]",
+                        "storage.py",
+                        "get_entity",
+                        402,
+                    )
+                    return None
 
         return None
 
@@ -746,7 +757,18 @@ class MemoryManager:
                     isinstance(entity_data, dict)
                     and entity_data.get("type") == entity_type
                 ):
-                    entities.append(Entity.from_dict(entity_data))
+                    try:
+                        entities.append(Entity.from_dict(entity_data))
+                    except Exception as exc:
+                        logger._print_log(
+                            "info",
+                            f"Entidad invalida omitida (id={entity_data.get('id', '?')}) "
+                            f"al cargar tipo '{entity_type}': {exc} "
+                            "[file:storage.py, method:get_entities_by_type]",
+                            "storage.py",
+                            "get_entities_by_type",
+                            402,
+                        )
 
             logger._print_log("info", "Procesando solicitud entities of type {entity_type}", "storage.py", "method", 393)
 
@@ -788,7 +810,19 @@ class MemoryManager:
 
         for entity_data in entities_data:
             if isinstance(entity_data, dict):
-                entity = Entity.from_dict(entity_data)
+                try:
+                    entity = Entity.from_dict(entity_data)
+                except Exception as exc:
+                    logger._print_log(
+                        "info",
+                        f"Entidad invalida omitida en find_entities "
+                        f"(id={entity_data.get('id', '?')}): {exc} "
+                        "[file:storage.py, method:find_entities]",
+                        "storage.py",
+                        "find_entities",
+                        402,
+                    )
+                    continue
 
                 if entity_type and entity.type != entity_type:
                     continue
@@ -834,7 +868,18 @@ class MemoryManager:
                 and property_name in entity_data.get("properties", {})
                 and entity_data["properties"][property_name] == property_value
             ):
-                entities.append(Entity.from_dict(entity_data))
+                try:
+                    entities.append(Entity.from_dict(entity_data))
+                except Exception as exc:
+                    logger._print_log(
+                        "info",
+                        f"Entidad invalida omitida en find_entities_by_property "
+                        f"(id={entity_data.get('id', '?')}): {exc} "
+                        "[file:storage.py, method:find_entities_by_property]",
+                        "storage.py",
+                        "find_entities_by_property",
+                        402,
+                    )
 
         return entities
 

@@ -628,7 +628,19 @@ FASE 3 ? APPLICATION KNOWLEDGE
 3.2.2.5 Verificar resolucion por alias cuando exista en el codigo real. [IMPLEMENTADA]
 3.2.3 ? Errores
 3.2.3.1 Definir resultado ante JSON invalido.
-3.2.3.2 Definir resultado ante aplicacion invalida.
+3.2.3.2 Definir resultado ante aplicacion invalida. [IMPLEMENTADA]
+  REGISTRO 3.2.3.2 (cerrada):
+  - Implementacion: se envolvio Entity.from_dict() en try/except per-item
+    en get_entities_by_type(), get_entity() y find_entities() en
+    src/memory/storage.py. Una entity incompleta (falta id/type/name/
+    properties) se omite individualmente con registro de error; las entities
+    validas del mismo tipo/query se conservan.
+  - get_entity(): devuelve None en lugar de propagar TypeError.
+  - Tests actualizados en tests/hands/test_application_data_incomplete.py:
+    48 tests, todos PASSED. Tambien 2000 tests en tests/hands/ y 103 en
+    tests/brain/ PASSED sin regresiones.
+  - La entidad "bad_app" (falta name) en data/entities.json es omitida
+    per-item; las applications validas (chrome, spotify, good) se cargan.
 3.2.3.3 Registrar errores sin ocultarlos.
 3.2.3.4 Anadir tests unitarios de carga correcta e incorrecta.
 3.2.4 ? Cierre
