@@ -384,10 +384,25 @@ class ApplicationManager:
         self._load_custom_applications()
 
     def register_application(self, app: ApplicationKnowledge) -> bool:
-        """Registra una aplicación en memoria y en el gestor."""
+        """Registra una aplicación en memoria y en el gestor.
+
+        Evita duplicados: si la aplicación ya está registrada en el gestor
+        (por nombre normalizado), se omite la persistencia y se devuelve
+        ``False``. Esto es consistente con ``_load_custom_applications``
+        que ya omite apps ya registradas.
+        """
         try:
+            key = app.name.lower()
+            if key in self.applications:
+                logger._print_log(
+                    "info",
+                    f"Aplicacion '{key}' ya registrada, se omite duplicado "
+                    "[file:applications_core.py, method:register_application]",
+                    "applications_core.py", "register_application", 395,
+                )
+                return False
             entity_data = {
-                "id": f"app_{app.name.lower()}",
+                "id": f"app_{key}",
                 "type": "application",
                 "name": app.name,
                 "properties": {
@@ -404,11 +419,11 @@ class ApplicationManager:
                 "tags": [],
             }
             self.memory_manager.save_entity(Entity.from_dict(entity_data))
-            self.applications[app.name.lower()] = app
+            self.applications[key] = app
             logger._print_log("info", "Procesando solicitud", "applications_core.py", "method", 371)
             return True
         except Exception as exc:
-            logger._print_log("info", f"Error procesando solicitud: {str(exc, "applications_core.py", "method", 374)} [file:applications_core.py, method:register_application, line:374]")
+            logger._print_log("info", f"Error procesando solicitud: {str(exc)} [file:applications_core.py, method:register_application, line:374]")
             return False
 
     def get_application(self, app_name: str) -> Optional[ApplicationKnowledge]:

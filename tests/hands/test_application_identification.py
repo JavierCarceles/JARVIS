@@ -134,25 +134,40 @@ class TestEntityIdUsesName:
 
 
 class TestNameUniquenessBehavior:
-    """El nombre lowercased es la única clave; registro duplicado sobrescribe."""
+    """El nombre lowercased es la única clave; registro duplicado se omite.
 
-    def test_same_name_overwrites(self):
+    Unidad 3.2.2.3 (Evitar duplicados al registrar): si el nombre normalizado
+    (name.lower()) ya está en ``self.applications``, ``register_application``
+    omite la persistencia y devuelve ``False`` sin sobreescribir la app existente.
+    Esto reemplaza al comportamiento PREVIO de sobrescritura (overwrite), que
+    esta clase de tests documentaba antes de 3.2.2.3.
+    """
+
+    def test_same_name_skipped(self):
+        """Registro duplicado (misma clave name.lower()) se omite, no sobreescribe."""
         manager = ApplicationManager.__new__(ApplicationManager)
         manager.applications = {}
 
         class FakeMM:
+            def __init__(self):
+                self.save_calls = 0
+
             def save_entity(self, entity):
-                pass
-        manager.memory_manager = FakeMM()
+                self.save_calls += 1
+        mm = FakeMM()
+        manager.memory_manager = mm
 
         app1 = ApplicationKnowledge(name="DupApp", type="utility", executable="dup1")
         app2 = ApplicationKnowledge(name="dupapp", type="browser", executable="dup2")
-        manager.register_application(app1)
-        manager.register_application(app2)
+        assert manager.register_application(app1) is True
+        assert manager.register_application(app2) is False
         # Ambos se resuelven a la misma clave "dupapp"
         assert len(manager.applications) == 1
-        assert manager.applications["dupapp"] is app2
-        assert manager.applications["dupapp"].executable == "dup2"
+        # La app original NO se sobreescribe por la duplicada
+        assert manager.applications["dupapp"] is app1
+        assert manager.applications["dupapp"].executable == "dup1"
+        # save_entity no se llama para la app duplicada
+        assert mm.save_calls == 1
 
     def test_distinct_names_cohabit(self):
         manager = ApplicationManager.__new__(ApplicationManager)
