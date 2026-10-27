@@ -725,7 +725,74 @@ FASE 3 ? APPLICATION KNOWLEDGE
 3.7.3.1 Ejecutar tests pertinentes.
 3.7.3.2 Corregir codigo ante fallos de tests correctos.
 3.7.3.3 Verificar main.py.
-3.7.3.4 Cerrar FASE 3 solo con todas las hojas completadas.
+
+3.8 ? DETECCION Y DESCUBRIMIENTO UNIVERSAL DE APLICACIONES
+3.8.1 ? INSPECCION Y FUENTES DE DESCUBRIMIENTO
+3.8.1.1 Inspeccionar el descubrimiento de aplicaciones ya existente antes de implementar otro mecanismo.
+3.8.1.2 Identificar fuentes reales disponibles en Windows: aplicaciones instaladas, accesos directos, rutas registradas, PATH y procesos/ventanas activos cuando proceda.
+3.8.1.3 Distinguir aplicacion instalada, aplicacion en ejecucion, aplicacion registrada en ApplicationManager y aplicacion disponible para automatizacion.
+3.8.1.4 Evitar busquedas indiscriminadas o recursivas por todo el disco como mecanismo por defecto.
+3.8.1.5 Registrar cobertura, permisos y limitaciones de cada fuente.
+3.8.1.6 Tests con resultados reales de las fuentes, fuentes inaccesibles y resultados vacios.
+3.8.2 ? RESOLUCION DE LA APLICACION OBJETIVO
+3.8.2.1 Reutilizar ApplicationManager y EntityResolver donde sus contratos sean adecuados.
+3.8.2.2 Resolver nombres normalizados, nombres alternativos y nombres imperfectos procedentes de la peticion ya normalizada.
+3.8.2.3 Calcular y conservar evidencia/confianza de la coincidencia usando mecanismos existentes cuando sea posible.
+3.8.2.4 Detectar coincidencias ambiguas y no seleccionar silenciosamente una aplicacion incorrecta.
+3.8.2.5 Diferenciar aplicacion desconocida, no instalada, no localizable y no automatizable.
+3.8.2.6 Tests de nombres, alias, errores de escritura, ambiguedad y ausencia de coincidencias.
+3.8.3 ? DESCUBRIMIENTO DEL EJECUTABLE
+3.8.3.1 Reutilizar ApplicationPreflight.resolve_executable y sus estrategias reales antes de crear nuevas.
+3.8.3.2 Resolver rutas a partir de fuentes verificables sin asumir que el nombre del proceso coincide con el nombre comercial.
+3.8.3.3 Validar que la ruta o destino resuelto existe y corresponde al tipo de lanzamiento admitido.
+3.8.3.4 Diferenciar ejecutable, acceso directo, URI de aplicacion, paquete y lanzador cuando el codigo soporte esa distincion.
+3.8.3.5 Rechazar rutas inexistentes, resultados ambiguos y destinos no verificables; no ejecutar comandos arbitrarios construidos a partir de la peticion.
+3.8.3.6 Tests de ruta valida, ruta inexistente, destinos ambiguos y resolucion fallida.
+3.8.4 ? CONOCIMIENTO DINAMICO SIN ALTERAR ENTITIES.JSON
+3.8.4.1 Definir como representar temporalmente una aplicacion descubierta que no exista en el catalogo conocido.
+3.8.4.2 Reutilizar ApplicationKnowledge/ApplicationManager y los mecanismos de persistencia existentes solo si su contrato real lo permite.
+3.8.4.3 Separar hechos observados, datos inferidos y capacidades aun no verificadas.
+3.8.4.4 No cambiar el esquema, las siete entidades originales ni el contenido de data/memory/entities.json como parte de esta funcionalidad.
+3.8.4.5 No convertir automaticamente cualquier aplicacion instalada en una aplicacion segura o totalmente automatizable.
+3.8.4.6 Evitar duplicados y preservar el conocimiento previo al registrar conocimiento dinamico.
+3.8.4.7 Tests de descubrimiento no persistente, persistencia admitida, duplicados y preservacion exacta de entities.json.
+3.8.5 ? PREFLIGHT Y APERTURA SEGURA
+3.8.5.1 Pasar toda aplicacion descubierta por ApplicationPreflight y las politicas de seguridad reales.
+3.8.5.2 Rechazar aplicaciones bloqueadas, elevacion no permitida o destinos de ejecucion no verificables.
+3.8.5.3 Comprobar si la aplicacion ya esta abierta y reutilizarla cuando el contrato lo permita.
+3.8.5.4 Abrir una aplicacion cerrada mediante la API real de ejecucion, sin cerrar ni alterar ventanas ajenas.
+3.8.5.5 Verificar proceso, ventana y estado posterior a la apertura.
+3.8.5.6 Tests de preflight rechazado, aplicacion abierta/cerrada, fallo de lanzamiento y proteccion de ventanas existentes.
+3.8.6 ? CALIBRACION DE APLICACIONES DESCUBIERTAS
+3.8.6.1 Conectar el descubrimiento con el requisito de calibracion de 3.5 y el CalibrationManager/UniversalVisualCalibrator existentes.
+3.8.6.2 Calibrar la ventana real de la aplicacion objetivo sin depender de coordenadas o plantillas codificadas para cada programa.
+3.8.6.3 Usar Vision para detectar elementos visibles y relevantes para la tarea concreta.
+3.8.6.4 Rechazar o detenerse ante politicas de bloqueo, pantalla inaccesible, deteccion insuficiente o confianza inadecuada.
+3.8.6.5 Verificar que las coordenadas/resultados pertenecen a la ventana y monitor correctos.
+3.8.6.6 Persistir la calibracion solo mediante el mecanismo existente y tras validar el resultado.
+3.8.6.7 Tests de calibracion valida, interfaz no reconocida, confianza insuficiente, monitor incorrecto y politica de bloqueo.
+3.8.7 ? CAPACIDADES DISPONIBLES PARA PLANIFICACION
+3.8.7.1 Exponer al Planner solo capacidades sustentadas por acciones reales registradas.
+3.8.7.2 No inferir que una aplicacion puede rellenar formularios, enviar, guardar o borrar datos solo por estar instalada.
+3.8.7.3 Relacionar aplicacion, elementos UI observados, acciones disponibles y resultado esperado sin duplicar registros.
+3.8.7.4 Informar que capacidad falta cuando no exista una accion ejecutable o no se pueda calibrar un elemento.
+3.8.7.5 Tests contra capacidades declaradas pero no ejecutables y contra acciones no registradas.
+3.8.8 ? ERRORES, EVIDENCIA Y RECUPERACION
+3.8.8.1 Propagar errores concretos de deteccion, resolucion, preflight, apertura y calibracion.
+3.8.8.2 Registrar fuente utilizada, ruta validada, resultado de preflight y evidencia de calibracion sin exponer secretos.
+3.8.8.3 Evitar reintentos ilimitados o repetir una apertura que ya tuvo exito.
+3.8.8.4 Permitir reintento o solicitud de aclaracion cuando el fallo sea recuperable y la seleccion no sea segura.
+3.8.8.5 Tests de fallos parciales, timeouts, reintentos y ausencia de doble ejecucion.
+3.8.9 ? INTEGRACION Y CIERRE DE LA RAMA
+3.8.9.1 Integrar con Brain/Goal/Planner/Executor sin introducir rutas paralelas que dupliquen la ejecucion.
+3.8.9.2 Verificar flujo completo para una aplicacion conocida.
+3.8.9.3 Verificar flujo completo para una aplicacion instalada que inicialmente no este registrada.
+3.8.9.4 Verificar aplicacion no instalada, ejecutable no localizable, aplicacion bloqueada y UI no calibrable.
+3.8.9.5 Ejecutar tests unitarios, integracion, regresion y verificacion real permitida.
+3.8.9.6 Actualizar README unicamente con comportamiento implementado y verificado.
+3.8.9.7 Cerrar la rama solo con evidencia de que no altera entities.json ni rompe capacidades existentes.
+
+3.7.3.4 Cerrar FASE 3 solo con todas las hojas completadas, incluidas todas las hojas de 3.8.
 FASE 4 ? GOAL + TASK/HTN
 
 4.1 ? GOAL
@@ -841,6 +908,23 @@ FASE 4 ? GOAL + TASK/HTN
 4.5.5.3 Entidad -> Goal.
 4.5.5.4 Accion directa.
 4.5.5.5 Imagen cuando aplique.
+4.5.6 ? NORMALIZACION DE TRANSCRIPCION CON UNA SEGUNDA INFERENCIA LLM
+4.5.6.1 Inspeccionar el contrato real que Ear entrega a Brain y qué metadatos de transcripcion/confianza existen; no inventarlos.
+4.5.6.2 Conservar siempre el texto original reconocido y tratar la normalizacion como una representacion derivada.
+4.5.6.3 Definir criterios verificables para activar la segunda inferencia ante texto incompleto, ruido, errores probables o ambiguedad.
+4.5.6.4 Usar una llamada LLM diferenciada de normalizacion, con modelo configurable y reutilizando la infraestructura real disponible; no acoplarla a un modelo fijo sin comprobar configuracion.
+4.5.6.5 Corregir errores probables de reconocimiento y ordenar la peticion sin cambiar la intencion ni inventar aplicacion, parametros o acciones.
+4.5.6.6 Devolver salida estructurada con texto normalizado, aplicacion mencionada si puede determinarse, tarea solicitada, ambiguedades y confianza solo cuando existan datos para ello.
+4.5.6.7 Separar normalizacion linguistica de resolucion de entidades, planificacion y ejecucion; la segunda inferencia no debe ejecutar acciones.
+4.5.6.8 Ante respuesta invalida, timeout, modelo no disponible o baja confianza, usar un fallback controlado y conservar el texto original.
+4.5.6.9 No elegir una aplicacion por conjetura si existen varios candidatos; propagar la ambiguedad para que Brain solicite aclaracion cuando sea necesario.
+4.5.6.10 Integrar la normalizacion antes de la interpretacion de intencion y creacion de Goal, evitando llamadas duplicadas y doble ejecucion.
+4.5.6.11 Probar errores de transcripcion en espanol, nombres de aplicaciones mal reconocidos, orden incorrecto de palabras, peticion ambigua, texto vacio y texto correcto que no debe alterarse.
+4.5.6.12 Probar JSON/salida invalida, omission de campos, timeout, excepcion del proveedor, respuesta que inventa detalles y fallback al texto original.
+4.5.6.13 Verificar el comportamiento real de la normalizacion: los tests no pueden limitarse a simular que el modelo devuelve la correccion esperada; separar tests deterministas de contrato de una prueba de integracion con el modelo configurado cuando este disponible.
+4.5.6.14 Verificar que la normalizacion no ejecuta acciones, no modifica entities.json y no elimina evidencia del texto original.
+4.5.6.15 Registrar metricas minimas de exito/fallo y coste/latencia solo si existe infraestructura compatible.
+4.5.6.16 Cerrar la unidad tras pruebas unitarias, integracion y no regresion de Brain/Ear.
 4.6 ? STATE
 4.6.1 ? Entrada al HTN
 4.6.1.1 Obtener estado actual.
@@ -1679,6 +1763,22 @@ FASE 15 ? HIGH LEVEL GOALS
 15.7.4 Verification -> State.
 15.7.5 Replan cuando proceda.
 15.7.6 Tests end-to-end.
+15.7.7 Resolver la aplicacion objetivo desde la peticion normalizada y el Goal.
+15.7.8 Consultar primero el conocimiento registrado y activar el descubrimiento de 3.8 solo cuando sea necesario.
+15.7.9 Verificar que la aplicacion existe, que su destino/ejecutable se ha resuelto y que la ejecucion esta permitida antes de abrirla.
+15.7.10 Reutilizar la aplicacion abierta o abrirla de forma segura conforme a los contratos existentes.
+15.7.11 Determinar qué elementos UI necesita la tarea y calibrarlos cuando no exista calibracion valida reutilizable.
+15.7.12 Crear un plan con acciones realmente registradas y capacidades confirmadas; no generar una macro improvisada ni inventar acciones para la aplicacion.
+15.7.13 Ejecutar paso a paso, validando precondiciones, estado de ventana y resultado antes de continuar.
+15.7.14 Verificar visualmente/mediante estado que cada paso produjo el efecto esperado y replanificar solo si existe una alternativa segura.
+15.7.15 Detenerse y comunicar el motivo si faltan permisos, la aplicacion no existe, no se localiza su ejecutable, la UI no puede reconocerse o la accion necesaria no esta disponible.
+15.7.16 Distinguir operaciones reversibles de acciones con efectos externos o destructivos; solicitar confirmacion cuando la politica existente lo requiera.
+15.7.17 Registrar resultado, errores y evidencia util para mejorar futuras resoluciones sin afirmar aprendizaje no persistido.
+15.7.18 Guardar conocimiento reutilizable solo mediante el mecanismo de memoria/aplicaciones que haya sido verificado; no cambiar el esquema ni el contenido original de entities.json.
+15.7.19 Tests integrados del flujo completo con aplicacion ya conocida y con aplicacion instalada pero inicialmente desconocida.
+15.7.20 Tests negativos: aplicacion ausente, nombre ambiguo, ejecutable no verificable, preflight bloqueado, calibracion fallida, accion inexistente, cancelacion y fallo durante un paso.
+15.7.21 Comprobar que no se repiten aperturas, clics, envios o acciones con efectos externos tras un timeout o replanificacion.
+15.7.22 Verificar integracion real entre transcripcion normalizada, deteccion de aplicacion, preflight, calibracion, Planner, Executor y verificacion del resultado.
 15.8 ? REGRESION / LEGACY
 15.8.1 Comando existente.
 15.8.2 Accion legacy.
