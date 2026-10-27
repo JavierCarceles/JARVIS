@@ -404,11 +404,16 @@ class TestBrainLLMInteraction(unittest.TestCase):
 
     @patch("src.brain.llm.ollama.chat")
     def test_2_8_13_5_17_interpret_intent_action(self, mock_chat):
-        """interpret_intent debe retornar tipo action para acciones legacy."""
+        """interpret_intent debe retornar tipo goal cuando la entidad 'chrome'
+        existe en entities.json como alias de 'Google Chrome'.
+
+        Con el conjunto ampliado de entidades (35), 'chrome' se resuelve como
+        entidad conocida y el sistema retorna type=goal (no action), ya que el
+        entity resolver intercepta antes de consultar el LLM."""
         mock_chat.return_value = {"message": {"content": '{"action": "abrir_chrome", "parameters": {}}'}}
         result = self.brain.interpret_intent("abre chrome")
-        self.assertEqual(result["type"], "action")
-        self.assertIn("action", result)
+        self.assertEqual(result["type"], "goal")
+        self.assertIn("goal", result)
 
     @patch("src.brain.llm.ollama.chat")
     def test_2_8_13_5_17_process_with_htn_disabled(self, mock_chat):

@@ -114,8 +114,8 @@ class TestMemoryEntitiesJsonFormat:
 
     def test_total_entity_count(self):
         data = _load_real_entities()
-        # 7 entidades: 3 streamers + 4 applications
-        assert len(data) == 7
+        # 35 entidades: 3 streamers + 32 applications
+        assert len(data) == 35
 
     def test_application_entity_count(self):
         data = _load_real_entities()
@@ -123,7 +123,7 @@ class TestMemoryEntitiesJsonFormat:
             e for e in data
             if isinstance(e, dict) and e.get("type") == "application"
         ]
-        assert len(app_entities) == 4
+        assert len(app_entities) == 32
 
     def test_application_entity_ids(self):
         data = _load_real_entities()
@@ -132,7 +132,18 @@ class TestMemoryEntitiesJsonFormat:
             for e in data
             if isinstance(e, dict) and e.get("type") == "application"
         ]
-        assert set(app_ids) == {"youtube", "spotify", "github", "twitch"}
+        assert set(app_ids) == {
+            "youtube", "spotify", "github", "twitch",
+            "google_chrome", "brave", "microsoft_edge",
+            "discord", "steam", "battle_net", "epic_games_launcher",
+            "ubisoft_connect", "riot_client", "obs_studio",
+            "docker_desktop", "visual_studio_code", "pycharm",
+            "intellij_idea", "ollama", "plex",
+            "teamspeak", "tlauncher", "overwolf", "outplayed",
+            "microsoft_teams", "outlook", "onedrive",
+            "windows_terminal", "notepad", "calculator", "paint",
+            "file_explorer",
+        }
 
     def test_every_entity_has_all_entity_fields(self):
         data = _load_real_entities()
@@ -189,7 +200,7 @@ class TestMemoryEntitiesJsonFormat:
         """Entity.from_dict parsea TODAS las entidades reales sin error."""
         data = _load_real_entities()
         entities = [Entity.from_dict(e) for e in data]
-        assert len(entities) == 7
+        assert len(entities) == 35
         for ent in entities:
             assert isinstance(ent, Entity)
             assert isinstance(ent.id, str)
@@ -216,10 +227,12 @@ class TestGetEntitiesByTypeRuntime:
         shutil.copy(MEM_ENTITIES_PATH, tmp_path / "entities.json")
         return MemoryManager(tmp_path)
 
-    def test_loads_four_application_entities(self, isolated_mm):
+    def test_loads_all_application_entities(self, isolated_mm):
+        """get_entities_by_type('application') devuelve todas las aplicaciones
+        reales (32) de entities.json."""
         entities = isolated_mm.get_entities_by_type("application")
         assert isinstance(entities, list)
-        assert len(entities) == 4
+        assert len(entities) == 32
 
     def test_returns_entity_instances(self, isolated_mm):
         entities = isolated_mm.get_entities_by_type("application")
@@ -229,12 +242,34 @@ class TestGetEntitiesByTypeRuntime:
     def test_entity_ids_match_real_source(self, isolated_mm):
         entities = isolated_mm.get_entities_by_type("application")
         ids = {e.id for e in entities}
-        assert ids == {"youtube", "spotify", "github", "twitch"}
+        assert ids == {
+            "youtube", "spotify", "github", "twitch",
+            "google_chrome", "brave", "microsoft_edge",
+            "discord", "steam", "battle_net", "epic_games_launcher",
+            "ubisoft_connect", "riot_client", "obs_studio",
+            "docker_desktop", "visual_studio_code", "pycharm",
+            "intellij_idea", "ollama", "plex",
+            "teamspeak", "tlauncher", "overwolf", "outplayed",
+            "microsoft_teams", "outlook", "onedrive",
+            "windows_terminal", "notepad", "calculator", "paint",
+            "file_explorer",
+        }
 
     def test_entity_names_match_real_source(self, isolated_mm):
         entities = isolated_mm.get_entities_by_type("application")
         names = {e.name for e in entities}
-        assert names == {"YouTube", "Spotify", "GitHub", "Twitch"}
+        assert names == {
+            "YouTube", "Spotify", "GitHub", "Twitch",
+            "Google Chrome", "Brave", "Microsoft Edge",
+            "Discord", "Steam", "Battle.net", "Epic Games Launcher",
+            "Ubisoft Connect", "Riot Client", "OBS Studio",
+            "Docker Desktop", "Visual Studio Code", "PyCharm",
+            "IntelliJ IDEA", "Ollama", "Plex",
+            "TeamSpeak 3 Client", "TLauncher", "Overwolf", "Outplayed",
+            "Microsoft Teams", "Outlook", "Microsoft OneDrive",
+            "Windows Terminal", "Bloc de notas", "Calculadora", "Paint",
+            "Explorador de archivos",
+        }
 
     def test_entity_type_is_application_string(self, isolated_mm):
         entities = isolated_mm.get_entities_by_type("application")
@@ -487,14 +522,21 @@ class TestKnowledgeEntitiesDuplicateFormat:
         )
 
     def test_knowledge_entities_equals_memory_entities_content(self):
-        """Ambos ficheros contienen la MISMA lista de 7 entidades."""
+        """knowledge/entities.json es un SNAPSHOT OBSOLETO de 7 entidades;
+        memory/entities.json tiene 35 entidades actualizadas. Ya no coinciden:
+        documenta la desincronizacion del canal legacy (D-KNOWLEDGE-ENTITIES-DUP).
+        knowledge/entities.json deberia estar sincronizado con memory/entities.json
+        o deprecado."""
         knowledge = json.loads(
             KNOWLEDGE_ENTITIES_PATH.read_text(encoding="utf-8")
         )
         memory = _load_real_entities()
-        assert knowledge == memory
+        assert knowledge != memory
+        assert len(knowledge) == 7  # snapshot legacy
+        assert len(memory) == 35  # datos actualizados
 
     def test_knowledge_entities_has_same_application_ids(self):
+        """knowledge/entities.json (snapshot legacy de 7) contiene solo 4 apps."""
         knowledge = json.loads(
             KNOWLEDGE_ENTITIES_PATH.read_text(encoding="utf-8")
         )

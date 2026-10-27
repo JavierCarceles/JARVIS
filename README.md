@@ -1,4295 +1,6896 @@
-# JARVIS - Asistente de IA con Planificacion Jerarquica
-## Arquitectura del Proyecto
-
-### 📁 Modulo `src/` - Directorio Principal del Sistema
-
-#### `src/__init__.py` [1 linea] - Inicializacion del Directorio Principal
-- **Descripcion**: Modulo raiz del sistema JARVIS que sirve como punto de entrada y organizacion principal para todos los componentes del sistema. Este archivo esta vacio pero establece la estructura del paquete src.
-- **Caracteristicas**:
-  - Punto de entrada principal del sistema
-  - Organizacion jerarquica de modulos
-  - Base para importaciones de alto nivel
-  - Estructura modular escalable
-
-### 🧠 Modulo `src/brain/` - Cerebro Central
-
-#### `src/brain/__init__.py` [10 lineas] - Inicializacion del Modulo Cerebro
-- **Descripcion**: Modulo cerebro de JARVIS con procesamiento de lenguaje natural y planificacion jerarquica.
-- **Metodos principales**:
-  - `Brain`: Clase principal del cerebro para procesamiento de lenguaje natural.
-  - `HTNBrainIntegration`: Integracion del sistema HTN con el cerebro principal.
-  - `get_htn_integration`: Funcion para obtener instancia de integracion HTN.
-
-#### `src/brain/htn_integration.py` [488 lineas] - Integracion HTN con Brain
-- **Descripcion**: Integra la descomposicion jerarquica de objetivos con HTNManager y TaskExecutor, manteniendo compatibilidad con el Brain existente.
-- **Clases principales**:
-  - `HTNIntegrationResult` (dataclass): Resultado estructurado de la integracion HTN-Brain con metadatos de ejecucion.
-  - `HTNBrainIntegration`: Clase principal que integra interpretacion de objetivos, HTN y ejecucion de tareas.
-- **Metodos principales**:
-  - `process_goal_through_htn`: Descompone y ejecuta un objetivo completo mediante HTN con manejo de errores.
-  - `create_and_execute_htn_goal`: Crea un objetivo basico desde texto y lo procesa mediante HTN.
-  - `_create_goal_from_input`: Crea un objetivo compatible con los tipos usados por HTNManager desde input del usuario.
-  - `_process_execution_results`: Procesa el resultado, actualiza el estado y registra memoria.
-  - `_register_goal_completion`: Registra la finalizacion exitosa en la memoria conversacional.
-  - `_register_goal_failure`: Registra el fallo en la memoria conversacional.
-  - `_register_goal_memory`: Registra resultados del objetivo en memoria con contexto completo.
-  - `_serialize_task`: Serializa tareas HTN a formato diccionario para estructuracion.
-  - `_serialize_execution_result`: Serializa resultados de ejecucion a formato estructurado.
-  - `_record_integration`: Registra metricas de ejecucion de integraciones.
-  - `get_integration_statistics`: Obtiene estadisticas completas de la integracion HTN-Brain.
-  - `enable_integration`: Habilita o deshabilita la integracion HTN.
-  - `get_htn_insights`: Obtiene informacion agregada del sistema HTN con estado de salud.
-- **Funciones globales**:
-  - `get_htn_integration`: Obtiene la instancia global de la integracion HTN-Brain.
-
-#### `src/brain/llm.py` [1039 lineas] - Cerebro Principal y Comunicacion con LLM
-- **Descripcion**: Cerebro de JARVIS con interpretacion de lenguaje natural, objetivos y sistema HTN. Gestiona la comunicacion con el modelo LLM (Ollama) y la conversion de intenciones del usuario en acciones ejecutables.
-- **Claves de Accion y Normalizacion**: El modulo incluye un diccionario de aliases (`ACTION_ALIASES`) para normalizar nombres de acciones que el LLM pueda generar (ej. "calibrar_chrome" → "calibrar_chrome"). Detecta comandos directos como "calibrar aplicaciones" o "calibrar Chrome" y ejecuta acciones correspondientes sin necesidad de procesamiento complejo.
-- **Contexto del Sistema**: Construye un contexto para el LLM que incluye informacion sobre el sistema (estado general), aplicaciones disponibles y capacidades (ej. "calibrar_aplicaciones", "abrir_chrome").
-- **Procesamiento de Intenciones**: Interpreta la intencion del usuario:
-  - Detecta acciones directas (como calibracion de navegadores).
-  - Extrae entidades del input (streamers, plataformas, aplicaciones).
-  - Crea objetivos a partir de la entidad detectada.
-  - Procesa objetivos a traves del sistema HTN si esta disponible.
-- **Comunicacion con LLM**: Utiliza la API de chat de Ollama para generar respuestas, con configuracion de temperatura, top_p y penalizacion de repeticion.
-- **Ejecucion de Objetivos**:
-  - Convierte objetivos en acciones legacy (ej. "navigate_to_url").
-  - Soporta objetivos especificos como "navegar a stream", "abrir aplicacion".
-  - Maneja la ejecucion a traves del sistema HTN para descomposicion jerarquica de tareas complejas.
-- **Insights del Sistema HTN**: Proporciona estadisticas y metricas sobre la ejecucion del sistema HTN.
-- **Extraccion de Parametros**: Extrae parametros del input basado en el tipo de entidad (ej. calidad HD para streamers, busqueda para plataformas).
-- **Metodos principales**:
-  - `__init__`: Inicializa el cerebro con modelo LLM, memoria y sistema HTN.
-  - `interpret_intent`: Interpreta la intencion del usuario detectando acciones directas o entidades.
-  - `think`: Procesa el input del usuario y crea objetivos o acciones.
-  - `generate_response`: Genera respuesta usando el modelo LLM.
-  - `parse_model_response`: Parsea respuestas del modelo a formato estructurado.
-  - `_extract_entities_from_input`: Extrae entidades del input usando EntityResolver.
-  - `_create_goal_from_entity`: Crea objetivos desde entidades detectadas.
-  - `_detect_direct_action`: Detecta acciones deterministas como calibracion.
-  - `think_with_image`: Procesa prompts con imagenes.
-  - `analyze_image`: Analiza imagenes para calibracion.
-  - `_normalize_action_name`: Convierte nombres conocidos producidos por el LLM a nombres registrados.
-  - `_build_system_instruction`: Construye instrucciones del sistema con contexto y acciones disponibles.
-  - `_get_system_context`: Obtiene contexto del sistema combinando informacion general y de aplicaciones.
-  - `_get_available_actions`: Obtiene acciones registradas en el sistema para el modelo LLM.
-  - `_get_application_knowledge`: Obtiene conocimiento estructurado de aplicaciones disponibles.
-  - `_get_domain_entities`: Obtiene entidades del dominio (streamers, plataformas) desde memoria.
-  - `_chat_text`: Comunica con el modelo Ollama usando el chat API.
-  - `execute_goal`: Ejecuta objetivos del sistema convirtiendolos en acciones legacy cuando es posible.
-  - `process_intent_to_execution`: Procesa intencion y convierte en resultados de ejecucion con HTN si esta disponible.
-  - `process_with_htn`: Procesa prompts usando el sistema HTN integrado para descomposicion jerarquica.
-  - `get_htn_insights`: Obtiene insights estadisticos del sistema HTN integrado.
-  - `_extract_parameters_from_input`: Extrae parametros del input del usuario basado en tipo de entidad.
-  - `_extract_search_query`: Extrae consultas de busqueda del input usando patrones regex.
-  - `_clean_json_response`: Limpia respuestas JSON del modelo eliminando markdown y formato incorrecto.
-  - `_extract_entities_fallback`: Metodo fallback para extraccion de entidades cuando el resolver falla.
-  - `_create_system_goal`: Crea objetivos del sistema a partir de datos estructurados.
-  - `_get_entity_capabilities`: Obtiene capacidades requeridas para un tipo de objetivo y entidad.
-  - `_calculate_entity_goal_cost`: Calcula coste base para objetivos basados en entidad y tipo.
-  - `_calculate_entity_complexity`: Calcula complejidad para objetivos basados en entidad y tipo.
-  - `process_action_response`: Procesa respuestas del modelo que contienen acciones y las ejecuta.
-  - `clear_memory`: Limpia la memoria conversacional del cerebro.
-  - `get_conversation_history`: Obtiene historial de conversaciones desde memoria.
-  - `get_current_goals`: Obtiene objetivos actuales del sistema.
-  - `get_system_state`: Obtiene el estado actual del sistema desde memoria.
-  - `get_domain_entities`: Obtiene entidades del dominio (streamers, plataformas) desde memoria.
-  - `create_goal_from_user_input`: Crea un objetivo a partir del input del usuario extrayendo entidades.
-  - `get_planner_ready_data`: Obtiene datos estructurados para el sistema de planificacion incluyendo objetivos, entidades, estado y acciones.
-  - `register_node`: Registra un nodo en el sistema de planificacion.
-  - `register_task`: Registra una tarea en el sistema de planificacion.
-  - `get_jarvis_context`: Funcion global que obtiene el contexto del sistema Jarvis.
-
-### 👂 Modulo `src/ear/` - Sistema de Escucha
-
-#### `src/ear/__init__.py` [4 lineas] - Inicializacion del Modulo Escucha
-- **Descripcion**: Modulo de escucha de JARVIS con importacion del sistema auditivo.
-- **Metodos principales**:
-  - `Ear`: Clase principal del sistema de escucha importada desde listener.
-
-#### `src/ear/listener.py` [587 lineas] - Sistema de Escucha y Reconocimiento de Voz
-- **Descripcion**: Sistema de escucha y reconocimiento de voz para capturar comandos de voz con pipeline de nodos modular y soporte para activacion por palabra. Utiliza Whisper para transcripcion y procesamiento de audio en tiempo real.
-- **Clases principales**:
-  - `AudioCapabilities` (dataclass): Configuracion de capacidades de audio (sample_rate, channels, block_duration, silence_threshold).
-  - `AudioNode`: Nodo base para procesamiento de audio con precondiciones, efectos y coste.
-  - `CalibrationNode`: Nodo para calibracion de umbral de deteccion de voz mediante medicion de ruido.
-  - `TranscriptionNode`: Nodo para transcripcion de audio a texto usando WhisperModel.
-  - `DetectionNode`: Nodo para deteccion de voz en cola de audio con threshold configurable.
-  - `RecordingNode`: Nodo para grabacion de audio con deteccion de silencio y timeout.
-  - `Ear`: Clase principal del sistema de escucha con pipeline completo de procesamiento.
-- **Metodos principales**:
-  - `Ear.__init__`: Inicializa el sistema auditivo con capacidades modulares y nodos de pipeline.
-  - `get_audio_pipeline`: Devuelve la lista de nodos del pipeline de procesamiento de audio.
-  - `get_pipeline_cost`: Calcula el coste total del pipeline de audio.
-  - `get_pipeline_preconditions`: Devuelve las precondiciones necesarias para ejecutar el pipeline.
-  - `get_pipeline_effects`: Devuelve los efectos de ejecutar el pipeline.
-  - `listen`: Escucha el audio del usuario y transcribe usando el pipeline de nodos en modo alerta continua.
-  - `_check_activation_word`: Verifica si el texto contiene una variante de "Jarvis" (jarvis, jarves, jarbez, garbez, garves, jarbes).
-  - `process_audio_batch`: Procesa un lote de audios pregrabados directamente sin deteccion de voz.
-  - `get_audio_status`: Devuelve el estado actual del sistema de audio con informacion de pipeline y nodos.
-- **Funciones globales**:
-  - `AudioNode.execute`: Ejecuta el procesamiento de audio (heredado).
-  - `AudioNode.get_preconditions`: Devuelve precondiciones del nodo (heredado).
-  - `AudioNode.get_effects`: Devuelve efectos del nodo (heredado).
-  - `AudioNode.get_cost`: Devuelve el coste del nodo (heredado).
-  - `CalibrationNode.execute`: Calibra el umbral de deteccion de voz (heredado).
-  - `TranscriptionNode.execute`: Transcribe el audio a texto (heredado).
-  - `DetectionNode.execute`: Detecta voz en la cola de audio (heredado).
-  - `RecordingNode.execute`: Graba el audio detectado (heredado).
-  - `_rms`: Calcula el nivel de amplitud RMS del audio (metodo privado).
-
-### 👁 Modulo `src/eyes/` - Sistema de Vision
-
-#### `src/eyes/__init__.py` - Inicializacion del Modulo Vision
-- **Descripcion**: Modulo de vision de JARVIS que exporta las clases principales para el sistema de vision y captura de pantalla. Importa `Vision` desde `vision_only` y `ScreenCapture` desde `screen_capture`.
-- **Exportaciones Principales**:
-  - `Vision`: Clase principal del sistema de vision simplificado.
-  - `ScreenCapture`: Clase principal del sistema de captura de pantalla.
-  - `get_screen_capture`: Funcion para obtener la instancia global del sistema de captura de pantalla.
-
-#### `src/eyes/screen.py` [972 lineas] - Captura y Analisis de Pantalla
-- **Descripcion**: Captura de pantalla y analisis para JARVIS con arquitectura de planificacion. Proporciona captura de pantalla completa y regional, analisis del estado del mundo, deteccion de aplicaciones activas, verificacion basica de elementos UI calibrados e integracion con memoria de dominio.
-- **Clases principales**:
-  - `ApplicationState` (Enum): Estados conocidos de una aplicacion (CLOSED, OPEN, ACTIVE, MINIMIZED, MAXIMIZED).
-  - `ApplicationInfo` (dataclass): Informacion de una aplicacion detectada con estado, posicion, tamano y elementos visibles.
-  - `WorldState` (dataclass): Estado del mundo usado por las APIs legacy con aplicaciones, monitor activo, elementos calibrados y URLs conocidas.
-  - `ScreenAnalyzer`: Analizador de pantallas integrado con la capa Vision para analisis de aplicaciones y estado del mundo.
-  - `ScreenCapture`: Sistema de captura con geometria delegada a ScreenManager para capturas de monitor, region, elemento y ventana.
-- **Metodos principales**:
-  - `ScreenAnalyzer.__init__`: Inicializa el analizador de pantallas con memoria y vision diferida.
-  - `ScreenAnalyzer.analyze_application_state`: Analiza una aplicacion en todos los monitores disponibles.
-  - `ScreenAnalyzer.build_world_state`: Construye el estado del mundo usando la capa Vision cuando esta disponible.
-  - `ScreenAnalyzer._convert_visual_world_state`: Adapta el WorldState de memoria de Vision a la API legacy de este modulo.
-  - `ScreenAnalyzer._get_known_applications`: Obtiene aplicaciones conocidas desde memoria y descubrimiento global.
-  - `ScreenAnalyzer._detect_focused_application`: Detecta la aplicacion enfocada mediante la ventana foreground.
-  - `ScreenAnalyzer._get_active_monitor`: Obtiene el monitor de la ventana foreground desde ScreenManager.
-  - `ScreenAnalyzer._get_calibrated_elements`: Obtiene elementos calibrados desde memoria.
-  - `ScreenAnalyzer._get_known_urls`: Obtiene URLs conocidas desde memoria de dominio.
-  - `ScreenAnalyzer._get_system_resources`: Obtiene recursos basicos del sistema.
-  - `ScreenCapture.__init__`: Inicializa sistema de captura de pantalla.
-  - `ScreenCapture.capture_monitor`: Captura exactamente el monitor indicado mediante ScreenManager.
-  - `ScreenCapture.capture_region`: Captura una region expresada en coordenadas absolutas del escritorio.
-  - `ScreenCapture.capture_element`: Captura una region descrita por x/y/width/height.
-  - `ScreenCapture.capture_active_window`: Captura la ventana foreground actual.
-  - `ScreenCapture.capture_desktop`: Captura el rectangulo completo del escritorio virtual.
-  - `ScreenCapture.get_world_state`: Obtiene el estado del mundo actual.
-  - `ScreenCapture.get_application_state`: Obtiene el estado de una aplicacion especifica.
-  - `ScreenCapture.check_element_visibility`: Comprueba visibilidad a partir del estado visual disponible.
-  - `ScreenCapture.clean_temp_files`: Elimina capturas temporales del directorio actual.
-  - `capture_screen`: Funcion de compatibilidad que captura el escritorio virtual completo.
-  - `capture_captcha_area`: Captura una region del escritorio para compatibilidad legacy.
-  - `get_screen_capture`: Obtiene la instancia global de captura.
-
-#### `src/eyes/screen_capture.py` [350 lineas] - Sistema de Captura de Pantalla
-- **Descripcion**: Sistema de captura de pantalla con soporte multi-monitor y captura de regiones. Version simplificada que no usa ScreenAnalyzer para evitar circular imports con el cerebro principal.
-- **Caracteristicas principales**:
-  - Captura multi-monitor con soporte para monitores especificos
-  - Captura de regiones personalizadas con coordenadas absolutas
-  - Captura de elementos UI basada en coordenadas
-  - Captura de ventana activa actual
-  - Sistema de fallback usando pyautogui e ImageGrab
-  - Lazy initialization de ScreenAnalyzer para evitar circular imports
-  - Manejo completo de errores y logging detallado
-  - Soporte para rutas personalizadas de guardado
-- **Metodos principales**:
-  - `__init__`: Inicializa el sistema de captura.
-  - `_get_analyzer`: Lazy initialization de ScreenAnalyzer para evitar circular imports.
-  - `capture_monitor`: Captura un monitor especifico.
-  - `capture_region`: Captura una region del escritorio virtual.
-  - `capture_element`: Captura un elemento a partir de sus coordenadas absolutas.
-  - `capture_active_window`: Captura la ventana activa actualmente.
-  - `get_world_state`: Obtiene el estado actual del mundo.
-  - `get_application_state`: Obtiene el estado de una aplicacion especifica.
-  - `get_screen_capture`: Obtiene la instancia global del sistema de captura.
-
-#### `src/eyes/vision.py` [923 lineas] - Procesamiento de Vision y Analisis de Imagenes
-- **Descripcion**: Vision por computadora usando Qwen3-VL mediante Ollama. La capa de vision es generica: no contiene coordenadas, offsets, resoluciones ni logica especifica de Chrome u otra aplicacion. La geometria de monitores pertenece a ScreenManager y la calibracion universal pertenece a UniversalVisualCalibrator / CalibrationManager.
-- **Clases principales**:
-  - `VisionNodeType` (Enum): Tipos de nodos de vision para planificacion (SCREEN_ANALYSIS, UI_DETECTION, ELEMENT_VERIFICATION, STATE_VERIFICATION, CALIBRATION_ANALYSIS, APPLICATION_DETECTION).
-  - `VisionNode`: Nodo de percepcion visual reutilizable por el planificador con ID, tipo, nombre, descripcion, precondiciones, efectos y coste.
-  - `UIElement` (dataclass): Elemento UI detectado por vision con propiedades de tipo, texto, bounding box, centro, interactividad y confianza.
-  - `VisionResponse` (BaseModel): Respuesta estructurada del modelo de vision con lista de elementos UI.
-  - `Vision`: Clase principal del sistema de vision integrado con arquitectura de planificacion jerarquica.
-- **Metodos principales**:
-  - `__init__`: Inicializa sistema de vision con modelo, captura de pantalla y memoria.
-  - `_create_vision_nodes`: Crea nodos de vision para planificacion.
-  - `get_vision_nodes`: Obtiene todos los nodos de vision.
-  - `get_vision_node`: Obtiene nodo especifico por ID.
-  - `get_nodes_by_type`: Obtiene nodos por tipo.
-  - `get_total_vision_cost`: Calcula coste total de nodos de vision.
-  - `_get_available_monitor_numbers`: Obtiene numeros de monitores disponibles.
-  - `_get_default_monitor_number`: Obtiene monitor por defecto.
-  - `analyze_screen_for_world_state`: Analiza pantallas para construir estado del mundo.
-  - `detect_ui_elements`: Detecta elementos UI en imagenes.
-  - `analyze_image`: Analiza imagenes para calibracion.
-  - `verify_element_visibility`: Verifica visibilidad de elementos.
-  - `verify_action_result`: Verifica resultados de acciones.
-  - `_build_verification_prompt`: Construye prompts de verificacion.
-  - `detect_application_state`: Detecta estado de aplicaciones.
-  - `_chat_json`: Comunica con Ollama en formato JSON.
-  - `_safe_json_loads`: Carga JSON seguro con manejo de errores.
-  - `_clamp_float`: Normaliza valores flotantes entre 0.0 y 1.0.
-  - `_normalize_int_list`: Normaliza listas de enteros.
-  - `_coordinates_match`: Compara coordenadas con tolerancia.
-  - `get_vision_capabilities`: Obtiene capacidades del sistema de vision.
-
-#### `src/eyes/vision_only.py` [438 lineas] - Sistema de Vision Simplificado
-- **Descripcion**: Vision por computadora usando Qwen3-VL mediante Ollama. Version simplificada sin dependencias circulares.
-- **Clases principales**:
-  - `VisionNodeType` (Enum): Tipos de nodos de vision para el planificador (SCREEN_ANALYSIS, UI_DETECTON, ELEMENT_VERIFICATION, STATE_VERIFICATION, CALIBRATION_ANALYSIS, APPLICATION_DETECTION).
-  - `UIElement` (dataclass): Elemento UI detectado por vision con propiedades de nombre, tipo, texto, bounding box, centro, interactividad y confianza.
-  - `VisionResponse` (BaseModel): Respuesta estructurada del modelo de vision con lista de elementos UI.
-  - `Vision`: Clase principal del sistema de vision integrado con arquitectura de planificacion jerarquica.
-- **Metodos principales**:
-  - `Vision.__init__`: Inicializa sistema de vision con modelo, captura de pantalla y memoria, creando nodos de vision para el planificador.
-  - `_create_vision_nodes`: Crea los nodos de vision estandar para el planificador.
-  - `analyze_image`: Analiza una imagen usando el modelo de vision con prompt personalizado y formato JSON.
-  - `verify_action_result`: Verifica si una accion tuvo el resultado esperado visualmente con tolerancia configurable.
-  - `detect_application_state`: Detecta el estado de una aplicacion especifica visualmente (active/open/minimized/maximized/closed).
-  - `get_vision_capabilities`: Devuelve las capacidades de vision disponibles para el planificador.
-  - `get_total_vision_cost`: Calcula el costo total de las capacidades de vision.
-
-### 🤖 Modulo `src/hands/` - Sistema de Ejecucion
-
-#### `src/hands/__init__.py` [30 lineas] - Inicializacion del Modulo Ejecucion
-- **Descripcion**: Modulo principal de ejecucion de JARVIS con importacion y registro de sistemas de control, calibracion, coordenadas y aplicaciones.
-- **Metodos principales**:
-  - `Executor`: Clase principal del sistema de ejecucion importada desde executor.
-  - `get_action_registry`: Funcion para obtener el registro de acciones del sistema.
-  - `register_action`: Funcion para registrar nuevas acciones en el sistema.
-  - `register_module`: Funcion para registrar nuevos modulos en el sistema.
-  - `ActionType`: Enumeracion que define los tipos de acciones disponibles en el sistema.
-  - `get_calibration_manager`: Funcion para obtener el gestor de calibracion del sistema.
-  - `CalibrationManager`: Clase principal del gestor de calibracion importada desde calibration_manager.
-  - `get_coordinate_manager`: Funcion para obtener el gestor de coordenadas del sistema.
-  - `CoordinateManager`: Clase principal del gestor de coordenadas importada desde coordinate_manager.
-  - `get_application_manager`: Funcion para obtener el gestor de aplicaciones del sistema.
-  - `get_applications_by_capability`: Funcion para obtener aplicaciones disponibles por capacidad especifica.
-  - `register_custom_application`: Funcion para registrar aplicaciones personalizadas en el sistema.
-
-#### `src/hands/action_registry.py` [936 lineas] - Registro y Ejecucion de Acciones
-- **Descripcion**: Registro centralizado de acciones para JARVIS con sistema de planificacion, validacion de parametros y monitoreo.
-- **Clases principales**:
-  - `ActionType` (Enum): Tipos de acciones (APPLICATION, SYSTEM, NAVIGATION, INTERACTION, CALIBRATION)
-  - `ActionInfo` (dataclass): Metadatos y contrato ejecutable de acciones registradas
-  - `ActionRegistry`: Registro y acceso a todas las acciones/capacidades disponibles
-- **Metodos principales**:
-  - `_serialize_rule`: Serializa condiciones/efectos sin serializar callbacks
-  - `_get_state_value`: Obtiene valores de estado desde dict, objetos o atributos
-  - `_condition_from_dict`: Convierte diccionarios a modelo canonico de condiciones
-  - `_match_condition`: Evalua condiciones simples, compuestas, funcionales u objetos Condition
-  - `_matches_conditions`: Evalua coleccion de precondiciones con semantica AND
-  - `_apply_effect_value`: Aplica efectos mediante modelo canonico o compatibilidad legacy
-  - `_normalize_cost`: Normaliza valores de coste a finitos y no negativos
-  - `_normalize_confidence`: Normaliza valores de confianza entre 0.0 y 1.0
-  - `_resolve_action_type`: Resuelve tipos de accion desde strings o enums
-  - `_extract_parameters`: Extrae metadatos basicos de parametros de funciones
-  - `_validate_value_type`: Validacion de tipos basicos y anotaciones parametrizadas
-  - `_store_action_info`: Almacena informacion de accion manteniendo categorias
-  - `get_action`: Obtiene informacion de accion por nombre
-  - `get_actions_by_category`: Obtiene acciones filtradas por categoria
-  - `get_all_actions`: Devuelve copia de todas las acciones registradas
-  - `get_plannable_actions`: Obtiene acciones habilitadas para planificacion
-  - `get_actions_for_planner`: Formatea acciones para el sistema de planificacion
-  - `get_actions_for_llama`: Formatea acciones para modelos LLM
-  - `validate_action`: Valida presencia, nombres y tipos de parametros
-  - `can_execute`: Determina si una accion esta disponible en un estado dado
-  - `get_action_cost`: Obtiene coste asociado a una accion
-  - `execute_action`: Ejecuta capacidad real registrada con manejo de errores
-  - `list_actions`: Lista acciones disponibles, opcionalmente por categoria
-  - `get_action_categories`: Obtiene lista de categorias disponibles
-  - `get_optimization_stats`: Obtiene estadisticas para monitoreo y optimizacion
-  - `optimize_logging`: Optimiza el sistema de logging eliminando mensajes redundantes
-  - `ActionRegistry.__init__`: Inicializa el registro de acciones con un diccionario vacío de acciones, diccionario de categorías, conjunto de módulos registrados, contadores de ejecución (éxitos, errores) y un lock de re-entrada para acceso thread-safe. Registra la inicialización en el logger.
-  - `ActionRegistry._record_execution`: Registra el resultado de una ejecución (éxito o fallo) incrementando los contadores de ejecución, aciertos y errores bajo un lock de thread-safety, y emite un mensaje de log con el número de ejecución y si fue correcta o fallida.
-- **Funciones globales**:
-  - `get_action_registry`: Obtiene instancia singleton del registro de acciones
-  - `register_action`: Decorador de conveniencia para registrar acciones
-  - `register_module`: Importa modulo y registra sus acciones decoradas
-
-#### `src/hands/application_preflight.py` [894 lineas] - Sistema de Preflight de Aplicaciones
-- **Descripcion**: Sistema de verificacion previa de aplicaciones antes de su apertura y calibracion. Bloquea aplicaciones administrativas/tecnicas, resuelve ejecutables, inspecciona manifiestos y detecta requisitos de elevacion. No ejecuta aplicaciones ni realiza capturas.
-- **Clases principales**:
-  - `PreflightResult` (dataclass): Resultado estructurado del chequeo preflight con estado de permisos, razonamiento y metadatos.
-  - `ApplicationPreflight`: Clase principal para analisis seguro de aplicaciones sin ejecucion.
-- **Metodos principales**:
-  - `check`: Analiza una aplicacion sin ejecutarla, verificando bloqueos, login y recursos.
-  - `check_application`: Version tipada del chequeo principal que devuelve PreflightResult.
-  - `is_safe_to_calibrate`: Indica si el resultado actual permite iniciar una calibracion.
-  - `check_login_state`: Evalua unicamente el conocimiento explicito de login disponible.
-  - `check_resources`: Evalua recursos explicitamente conocidos por la aplicacion.
-  - `resolve_executable`: Resuelve la ruta del ejecutable a partir del nombre y app_id usando PowerShell.
-  - `_resolve_from_apps_folder`: Busca ejecutables en la carpeta de aplicaciones de Windows.
-  - `_resolve_from_target_string`: Resuelve ejecutable desde cadena de destino.
-  - `_is_executable`: Verifica si una ruta corresponde a un ejecutable valido (.exe).
-  - `inspect_executable_manifest`: Inspecciona manifiesto de ejecutable para detectar elevacion.
-  - `_parse_manifest_file`: Parsea archivo de manifiesto desde ruta.
-  - `_parse_manifest_xml`: Parsea XML de manifiesto con manejo de codificaciones.
-  - `_extract_embedded_manifest`: Extrae RT_MANIFEST del PE sin ejecutar el binario.
-  - `clear_cache`: Limpia resultados de resolucion y manifest del cache.
-  - `_name_is_blocked`: Verifica si el nombre de aplicacion esta bloqueado.
-  - `_app_id_is_blocked`: Verifica si el app_id de aplicacion esta bloqueado.
-  - `_resolve_resources_status`: Resuelve estado de recursos requeridos por la aplicacion.
-  - `_optional_bool`: Convierte valores a booleano opcional con manejo de cadenas.
-  - `_normalized_values`: Normaliza valores para comparacion consistente.
-  - `_normalize`: Normaliza cadenas para eliminacion de acentos y case-insensitive.
-- **Funciones globales**:
-  - `get_application_preflight`: Obtiene instancia singleton del sistema de preflight.
-- **Bloqueos conocidos**:
-  - Nombres: application verifier, administrator, task scheduler, event viewer, computer management, device manager, registry editor, hyper v, active directory, windows defender firewall, services, iscsi.
-  - AppIDs: application_verifier, task_scheduler, event_viewer, computer_management, device_manager, registry, hyper_v, active_directory, security_policy, firewall, services, administrative, elevated.
-- **Niveles de ejecucion riesgosos**:
-  - `requireadministrator`, `highestavailable`.
-- **Modulos externos**:
-  - `pefile`: Para extraccion de manifest embebido en binarios PE.
-
-#### `src/hands/applications_core.py` [1055 lineas] - Nucleo de Aplicaciones
-- **Descripcion**: Sistema de conocimiento estructurado de aplicaciones para planificacion jerarquica con capacidades reutilizables, integracion con calibracion especifica y global, soporte para preflight y login, y compatibilidad con comandos legacy.
-- **Clases principales**:
-  - `ApplicationCapability` (Enum): Tipos de capacidades que puede ofrecer una aplicacion
-  - `ApplicationState` (Enum): Estados posibles de una aplicacion
-  - `UIElement` (dataclass): Elemento UI de una aplicacion con coordenadas y calibracion
-  - `ApplicationCapabilityDef` (dataclass): Definicion de una capacidad de aplicacion
-  - `ApplicationKnowledge` (dataclass): Conocimiento estructurado de una aplicacion
-  - `ApplicationManager`: Gestor del conocimiento estructurado de aplicaciones
-- **Metodos principales**:
-  - `ApplicationManager.__init__`: Inicializa el gestor con aplicaciones base y memoria
-  - `ApplicationManager._normalize_name`: Normaliza nombres habituales de aplicaciones a clave interna
-  - `ApplicationManager._initialize_applications`: Inicializa conocimiento de aplicaciones base (Chrome, Spotify)
-  - `ApplicationManager.register_application`: Registra aplicacion en memoria y gestor
-  - `ApplicationManager.get_application`: Obtiene aplicacion por nombre o alias; primero resuelve mediante alias estaticos (_normalize_name), luego busca coincidencias en aliases dinamicos almacenados en metadata['aliases'] de aplicaciones registradas (provenientes de Entity.aliases al materializar desde entities.json)
-  - `ApplicationManager.get_applications_by_type`: Obtiene aplicaciones por tipo
-  - `ApplicationManager.get_applications_by_capability`: Obtiene aplicaciones con capacidad determinada
-  - `ApplicationManager._load_custom_applications`: Carga aplicaciones personalizadas persistidas en memoria
-  - `ApplicationManager.get_application_capabilities`: Obtiene capacidades en formato de planificacion
-  - `ApplicationManager.get_application_ui_elements`: Obtiene elementos UI conocidos de aplicacion
-  - `ApplicationKnowledge.get_capability`: Obtiene capacidad por nombre
-  - `ApplicationKnowledge.get_ui_element`: Obtiene elemento UI por nombre
-  - `ApplicationKnowledge.is_capable`: Comprueba si aplicacion posee capacidad especifica
-  - `ApplicationKnowledge.get_calibrated_elements`: Obtiene elementos UI calibrados
-  - `UIElement.is_calibrated`: Comprueba si existe informacion de coordenadas utilizable
-  - `UIElement._is_coordinate_pair`: Valida pareja de coordenadas sin asumir formato unico
-- **Funciones globales**:
-  - `get_application_manager`: Obtiene instancia global del gestor de aplicaciones
-  - `open_application`: Abre aplicacion conocida y valida disponibilidad
-  - `close_application`: Cierra aplicacion por proceso sin afectar otras
-  - `wait_for_application_state`: Espera a que aplicacion alcance estado especifico
-  - `calibrate_application_ui`: Calibra elementos UI de aplicacion especifica
-  - `calibrar_aplicaciones`: Inicia calibracion global de aplicaciones soportadas
-  - `calibrate_applications`: Alias programatico de calibrar_aplicaciones
-  - `_call_calibrate_all_applications`: Invoca calibracion global compatible con managers antiguos y nuevos
-  - `_check_application_available`: Comprueba si ejecutable configurado esta disponible
-  - `_check_application_login`: Comprueba estado de login cuando exista backend
-  - `_looks_like_global_report`: Identifica contrato agregado del orquestador global
-  - `_build_global_calibration_report`: Convierte resultados de CalibrationManager en informe estable
-  - `get_application_knowledge`: Obtiene conocimiento estructurado de aplicacion
-  - `get_applications_by_capability`: Obtiene aplicaciones que tienen capacidad especifica
-  - `register_custom_application`: Registra aplicacion personalizada
-- **Funciones legacy**:
-  - `get_available_commands`: Obtiene comandos registrados
-  - `navigate_to_url`: Abre URL en navegador predeterminado
-  - `abrir_youtube`: Abre YouTube
-  - `abrir_gmail`: Abre Gmail
-
-#### `src/hands/calibration_manager.py` [2343 lineas] - Gestor Universal de Calibracion de Aplicaciones
-- **Descripcion**: Sistema coordinador universal de calibracion multiaplicacion y multimonitor. Gestiona descubrimiento, preflight, apertura segura, preparacion de ventanas, captura de monitor y persistencia de coordenadas.
-- **Clases principales**:
-  - `ApplicationType` (Enum): Tipos de aplicaciones soportadas (CHROME, EDGE, FIREFOX, NOTEPAD, CALCULATOR, PAINT, EXPLORER, CMD, SPOTIFY, GENERIC).
-  - `CalibrationPreflightResult` (dataclass): Resultado estructurado del chequeo preflight con permisos, razonamiento y metadatos.
-  - `CalibrationResult` (dataclass): Resultado estructurado de calibracion con estado, elementos y datos.
-  - `_WindowStateSnapshot` (dataclass): Instantanea del estado de ventana para restauracion.
-  - `CalibrationManager`: Clase principal coordinadora universal de calibracion multiaplicacion.
-- **Metodos principales**:
-  - `__init__`: Inicializa gestor con screen manager, visual calibrator y configuracion.
-  - `register_calibrator`: Registra calibradores especificos para aplicaciones.
-  - `get_available_applications`: Obtiene aplicaciones GUI descubiertas.
-  - `get_supported_applications`: Obtiene aplicaciones soportadas (alias de available).
-  - `set_preflight_checker`: Establece checker externo de preflight.
-  - `preflight_application`: Realiza chequeo preflight de aplicacion.
-  - `get_application_calibration_capability`: Obtiene capacidad de calibracion de aplicacion.
-  - `discover_applications`: Descubre aplicaciones GUI sin limitarse a lista conocida.
-  - `_should_ignore_application`: Verifica si aplicacion debe ser ignorada.
-  - `_is_game_application`: Detecta aplicaciones de juegos.
-  - `_is_elevation_risk_application`: Detecta aplicaciones con riesgo de elevacion.
-  - `_is_vscode_application`: Detecta Visual Studio Code.
-  - `_is_game_launcher_application`: Detecta lanzadores de juegos.
-  - `_get_window_handles`: Obtiene manejos de ventana validos.
-  - `_win32_is_gui_window`: Verifica si ventana es GUI valida.
-  - `_window_is_usable`: Verifica si ventana es utilizable.
-  - `_get_window_geometry`: Obtiene geometria utilizable incluso minimizada.
-  - `_capture_window_state`: Captura estado de ventana para restauracion.
-  - `_restore_window_state`: Restaura estado previo de ventana.
-  - `_find_existing_application_window`: Busca ventana existente de aplicacion.
-  - `launch_application`: Reutiliza ventana existente o lanza aplicacion genericamente.
-  - `_wait_for_application_window`: Espera ventana de aplicacion despues de lanzamiento.
-  - `_set_window_position`: Posiciona ventana en coordenadas especificas.
-  - `_maximize_window`: Maximiza ventana.
-  - `_window_center`: Obtiene centro de ventana.
-  - `_window_is_on_monitor`: Verifica si ventana esta en monitor especifico.
-  - `_open_temporary_browser_tab`: Abre pestana temporal en navegador.
-  - `_close_temporary_browser_tab`: Cierra pestana temporal creada.
-  - `_prepare_window_for_calibration`: Prepara ventana (restaura/maximiza) y detecta monitor.
-  - `move_window_to_monitor`: Mueve ventana temporalmente a monitor indicado.
-  - `_post_close_message`: Envia mensaje de cierre a ventana.
-  - `_post_system_close`: Envia comando de cierre del sistema.
-  - `close_application_window`: Cierra ventana de aplicacion de forma segura.
-  - `_close_all_owned_windows`: Cierra todas las ventanas propiedad del proceso.
-  - `_force_terminate_process`: Fuerza terminacion de proceso.
-  - `is_application_calibrated`: Verifica si aplicacion ya esta calibrada.
-  - `_get_registered_calibrator`: Obtiene calibrador registrado para aplicacion.
-  - `_instantiate_registered_calibrator`: Instancia calibrador registrado.
-  - `_invoke_registered_calibrator`: Ejecuta API de calibrador registrado.
-  - `_normalize_registered_result`: Normaliza resultado de calibrador registrado.
-  - `_calibrate_registered_application`: Calibra aplicacion usando calibrador registrado.
-  - `calibrate_application`: Metodo principal de calibracion universal para cualquier aplicacion.
-  - `_get_monitors_to_calibrate`: Obtiene monitores para calibracion.
-  - `_calibrate_open_window`: Calibra ventana ya abierta en monitor especifico.
-  - `calibrate_all_applications`: Calibra multiples aplicaciones con reporte consolidado.
-  - `_extract_elements`: Extrae elementos de analisis de calibracion.
-  - `_extract_element_center`: Extrae coordenadas centrales de elemento.
-  - `_build_application_coordinates`: Construye mapa de coordenadas de aplicacion.
-  - `_save_application_calibration`: Guarda resultados de calibracion de aplicacion.
-  - `_save_coordinate_map`: Guarda mapa de coordenaciones persistente.
-  - `get_calibration_statistics`: Obtiene estadisticas del sistema de calibracion.
-  - `_resolve_application`: Resuelve informacion de aplicacion desde input.
-  - `_resolve_application_list`: Resuelve lista de aplicaciones.
-  - `_get_application_type`: Obtiene tipo de aplicacion.
-  - `_get_storage_application_key`: Obtiene clave de almacenamiento para aplicacion.
-  - `_normalize_application_name`: Normaliza nombre de aplicacion.
-  - `_normalize_element_name`: Normaliza nombre de elemento.
-  - `_expected_process_names`: Obtiene nombres de proceso esperados para aplicacion.
-  - `_score_window_for_application`: Puntua ventana para aplicacion especifica.
-  - `_get_window_by_handle`: Obtiene ventana por manejador.
-  - `_get_window_process_id`: Obtiene ID de proceso de ventana.
-  - `_get_window_process_name`: Obtiene nombre de proceso de ventana.
-  - `_get_process_ids`: Obtiene IDs de proceso actuales.
-  - `_get_process_tree`: Obtiene arbol de procesos hijo.
-  - `_is_process_alive`: Verifica si proceso esta activo.
-  - `_is_process_elevated`: Verifica si proceso esta elevado.
-  - `_reset_launch_context`: Reinicia contexto de lanzamiento.
-  - `_looks_like_game_launch_arguments`: Detecta argumentos de lanzamiento de juegos.
-  - `_is_game_launcher_executable`: Detecta ejecutables de lanzadores de juegos.
-  - `_is_game_installation_path`: Detecta rutas de instalacion de juegos.
-  - `_looks_like_console_or_cli_launcher`: Detecta lanzadores de consola/CLI.
-  - `_reset_application_metadata_cache`: Reinicia cache de metadatos de aplicacion.
-  - `_normalize_filesystem_path`: Normaliza rutas del sistema de archivos.
-  - `_normalize_executable_name`: Normaliza nombre de ejecutable.
-  - `_register_application_metadata`: Registra metadatos de aplicacion.
-  - `_load_application_installation_metadata`: Carga metadatos de instalacion de aplicaciones.
-  - `_get_application_metadata`: Obtiene metadatos de aplicacion por nombre y app_id.
-- **Funciones globales**:
-  - `get_calibration_manager`: Obtiene instancia singleton del gestor de calibracion.
-
-#### `src/hands/calibrator.py` [1010 lineas] - Fachada y Capacidades de Calibracion
-- **Descripcion**: Fachada y capacidades de calibracion para JARVIS. Mantiene la API historica de Calibrator y la capa de capacidades jerarquicas, pero delega la calibracion real en CalibrationManager.
-- **Clases principales**:
-  - `CalibrationPolicy` (Enum): Politicas de calibracion (NEVER, ASK, AUTOMATIC, REQUIRED).
-  - `CalibrationStatus` (Enum): Estados de calibracion (UNKNOWN, NOT_CALIBRATED, CALIBRATED, OUTDATED, INVALID).
-  - `CalibrationElement` (dataclass): Elemento de calibracion con ID, nombre, aplicacion, coordenadas, estado y metadatos.
-  - `CalibrationCapability` (dataclass): Capacidad de calibracion con ID, nombre, descripcion, elementos soportados y metodo.
-  - `CalibrationStrategy` (ABC): Estrategia abstracta para calibracion de elementos.
-  - `UniversalVisualCalibrationStrategy`: Estrategia visual delegada por completo al CalibrationManager.
-  - `KeyboardShortcutStrategy`: Estrategia alternativa basada en atajos de teclado.
-  - `EnhancedCalibrator`: Sistema de capacidades de calibracion compatible con el planner.
-  - `Calibrator`: Fachada de compatibilidad para el sistema mejorado.
-- **Metodos principales**:
-  - `CalibrationPolicy`: NEVER, ASK, AUTOMATIC, REQUIRED
-  - `CalibrationStatus`: UNKNOWN, NOT_CALIBRATED, CALIBRATED, OUTDATED, INVALID
-  - `CalibrationElement.__init__`: Inicializa elemento de calibracion con propiedades basicas
-  - `CalibrationCapability.__init__`: Inicializa capacidad de calibracion con metadatos
-  - `CalibrationStrategy.can_calibrate`: Verifica si la estrategia puede calibrar un elemento
-  - `CalibrationStrategy.calibrate`: Ejecuta calibracion del elemento
-  - `CalibrationStrategy.get_applicable_applications`: Obtiene aplicaciones soportadas por la estrategia
-  - `UniversalVisualCalibrationStrategy.__init__`: Inicializa estrategia visual universal
-  - `UniversalVisualCalibrationStrategy.can_calibrate`: Verifica si puede calibrar elemento (excluye juegos, IDEs, terminales)
-  - `UniversalVisualCalibrationStrategy.calibrate`: Ejecuta calibracion visual delegada a CalibrationManager
-  - `UniversalVisualCalibrationStrategy._resolve_monitor_number`: Obtiene monitor asociado o monitor activo
-  - `UniversalVisualCalibrationStrategy.get_applicable_applications`: Obtiene aplicaciones disponibles del manager
-  - `UniversalVisualCalibrationStrategy._result_to_dict`: Convierte resultado a diccionario estructurado
-  - `UniversalVisualCalibrationStrategy._find_element_coordinates`: Extrae coordenadas de elemento del resultado
-  - `UniversalVisualCalibrationStrategy._find_element_confidence`: Extrae confianza del elemento calibrado
-  - `UniversalVisualCalibrationStrategy._normalize_element_name`: Normaliza nombre de elemento para comparacion
-  - `KeyboardShortcutStrategy.can_calibrate`: Verifica si puede usar atajos (tiene alternativas)
-  - `KeyboardShortcutStrategy.calibrate`: Retorna informacion sobre requerimiento de atajos
-  - `KeyboardShortcutStrategy.get_applicable_applications`: Retorna lista vacia (no aplica a apps especificas)
-  - `EnhancedCalibrator.__init__`: Inicializa sistema mejorado con estrategias y capacidades
-  - `EnhancedCalibrator._initialize_capabilities`: Define capacidades disponibles de calibracion
-  - `EnhancedCalibrator.get_calibration_capability`: Obtiene capacidad especifica por ID
-  - `EnhancedCalibrator.get_available_capabilities`: Obtiene todas las capacidades disponibles
-  - `EnhancedCalibrator.check_element_calibration`: Verifica estado de calibracion de elemento
-  - `EnhancedCalibrator.can_use_element`: Determina si elemento puede usarse segun estado y politica
-  - `EnhancedCalibrator.calibrate_element_if_needed`: Calibra elemento si es necesario segun politica
-  - `EnhancedCalibrator._find_alternative_strategy`: Busca estrategia alternativa cuando falla la principal
-  - `EnhancedCalibrator.register_element`: Registra elemento en el sistema de calibracion
-  - `EnhancedCalibrator.get_element_coordinates`: Obtiene coordenadas calibradas de elemento
-  - `EnhancedCalibrator.create_calibration_node`: Crea nodo de calibracion para el planner
-  - `EnhancedCalibrator.get_calibration_requirements_for_goal`: Obtiene elementos requeridos para un objetivo
-  - `EnhancedCalibrator.calibrate_applications`: Entrada legacy global compatible con CalibrationManager
-  - `EnhancedCalibrator._calibrate_single_application`: Califica aplicacion individual con manejo de errores
-  - `EnhancedCalibrator._build_single_application_report`: Construye reporte de calibracion individual
-  - `EnhancedCalibrator._call_global_manager`: Llama a metodo del manager con manejo de firma
-  - `EnhancedCalibrator._normalize_global_result`: Normaliza resultado global a formato estructurado
-  - `EnhancedCalibrator._looks_like_global_report`: Verifica si resultado tiene formato global esperado
-  - `EnhancedCalibrator._result_to_dict`: Convierte resultado a diccionario
-  - `EnhancedCalibrator._extract_element_count`: Extrae cantidad de elementos de resultado
-  - `EnhancedCalibrator.calibrate_chrome_both_screens`: Compatibilidad legacy para Chrome en ambos monitores
-  - `EnhancedCalibrator._verify_system`: Verifica compatibilidad del sistema para calibracion
-  - `EnhancedCalibrator.get_calibration_statistics`: Obtiene estadisticas del sistema de calibracion
-  - `EnhancedCalibrator._is_already_calibrated`: Verifica si aplicacion ya esta calibrada
-  - `EnhancedCalibrator._save_organized_results`: Compatibilidad legacy (delegada al manager)
-  - `EnhancedCalibrator._build_setup_info`: Construye informacion de configuracion del sistema
-  - `EnhancedCalibrator._has_calibration_command`: Verifica si manager tiene comando de calibracion
-  - `EnhancedCalibrator._open_app_on_monitor`: Abre aplicacion en monitor especifico (compatibilidad legacy)
-  - `EnhancedCalibrator._close_app`: Cierra recursos creados por flujo de calibracion
-  - `EnhancedCalibrator._get_calibration_manager`: Obtiene instancia del CalibrationManager
-  - `EnhancedCalibrator._normalize_name`: Normaliza nombre de aplicacion/elemento
-  - `EnhancedCalibrator._single_failure_report`: Construye reporte de fallo para aplicacion individual
-  - `EnhancedCalibrator._failure_report`: Construye reporte de fallo general
-  - `Calibrator.__init__`: Inicializa fachada de compatibilidad con sistema mejorado
-  - `Calibrator.calibrate_applications`: Delega calibracion al sistema mejorado
-  - `Calibrator.calibrate_chrome_both_screens`: Delega calibracion Chrome al sistema mejorado
-  - `Calibrator._build_setup_info`: Delega construccion de setup al sistema mejorado
-  - `Calibrator._verify_system`: Delega verificacion de sistema al sistema mejorado
-  - `Calibrator._has_calibration_command`: Delega verificacion de comando al sistema mejorado
-  - `Calibrator._open_app_on_monitor`: Delega apertura en monitor al sistema mejorado
-  - `Calibrator._close_app`: Delega cierre de app al sistema mejorado
-- **Funciones globales**:
-  - `get_enhanced_calibrator`: Obtiene instancia singleton del calibrador mejorado
-  - `calibrate_chrome_both_screens`: Funcion global legacy para calibrar Chrome en ambos monitores
-
-#### `src/hands/chrome/__init__.py` [75 lineas] - Inicializacion del Modulo Chrome
-- **Descripcion**: Modulo especifico para Google Chrome con sistema de acciones registrado.
-- **Importaciones principales**:
-  - `chrome`: Modulo con funciones de Chrome (abrir_chrome, abrir_chrome_pantalla, etc.)
-  - `chrome_calibrator`: Modulo con ChromeCalibrator y calibrar_chrome
-  - `action_registry`: Sistema de registro de acciones
-  - `ActionType`: Tipos de acciones disponibles
-- **Acciones registradas**:
-  - `abrir_chrome_action`: Abre Google Chrome en el navegador (APPLICATION, navegacion, ["chrome", "web", "navegador"])
-  - `abrir_chrome_pantalla_action`: Abre Google Chrome en una pantalla especifica (APPLICATION, navegacion, ["chrome", "multi-monitor", "pantalla"])
-  - `calibrar_chrome_action`: Calibra Google Chrome con sistema mejorado y nombres semanticos (APPLICATION, calibracion, ["chrome", "calibracion", "qwen3vl", "multi-monitor"])
-- **Funciones globales**:
-  - `abrir_chrome`: Abre Google Chrome en el navegador.
-  - `abrir_chrome_pantalla`: Abre Google Chrome en una pantalla especifica.
-  - `get_chrome_commands`: Obtiene los comandos especificos de Chrome.
-  - `calibrar_chrome`: Calibra Google Chrome con sistema mejorado y nombres semanticos.
-- **Exportaciones principales**:
-  - `ChromeCalibrator`: Clase principal del calibrador de Chrome.
-  - `abrir_chrome`, `abrir_chrome_pantalla`, `get_chrome_commands`: Funciones basicas de Chrome.
-  - `abrir_chrome_action`, `abrir_chrome_pantalla_action`, `calibrar_chrome_action`: Acciones registradas en el sistema.
-- **Modulo registrado**: `src.hands.chrome`
-
-#### `src/hands/chrome/chrome.py` [501 lineas] - Funciones Especificas de Google Chrome
-- **Descripcion**: Modulo con acciones especificas para Google Chrome que maneja apertura, cierre, movimiento, maximizacion y calibracion del navegador. La logica universal de calibracion, deteccion de aplicaciones y geometria de monitores pertenece a CalibrationManager y ScreenManager respectivamente.
-- **Clases principales**:
-  - Ninguna clase principal, solo funciones utilitarias.
-- **Metodos principales**:
-  - `abrir_chrome`: Abre Google Chrome en la pantalla predeterminada con multiples metodos de fallback.
-  - `abrir_chrome_pantalla`: Abre Chrome en un monitor especifico con validacion de numero de pantalla.
-  - `cerrar_chrome`: Cierra todas las ventanas de Google Chrome mediante ScreenManager.
-  - `calibrar_chrome`: Calibra elementos de Chrome usando el flujo universal de aplicaciones con seleccion automatica o manual de monitor.
-  - `mover_chrome_pantalla`: Mueve ventana de Chrome a una pantalla especifica con deteccion de ventanas existentes.
-  - `maximizar_chrome`: Maximiza la ventana de Chrome preferentemente la que esta en primer plano.
-- **Funciones internas**:
-  - `_get_chrome_executable`: Busca chrome.exe en ubicaciones habituales de Windows.
-  - `_abrir_chrome_desde_ruta`: Abre Chrome directamente usando multiples metodos de fallback.
-  - `_get_chrome_windows`: Obtiene ventanas de Chrome mediante ScreenManager.
-  - `_select_preferred_chrome_window`: Selecciona la ventana Chrome en primer plano.
-  - `_verificar_chrome_abierto`: Verifica si existe al menos una ventana visible de Chrome.
-  - `_verificar_chrome_instalado`: Verifica si Chrome esta instalado o resoluble en el sistema.
-  - `_capturar_chrome`: Captura una ventana de Chrome (API legacy).
-- **Acciones registradas**:
-  - `abrir_chrome`: Abre Google Chrome (APPLICATION)
-  - `abrir_chrome_pantalla`: Abre Chrome en pantalla especifica (APPLICATION)
-  - `cerrar_chrome`: Cierra todas las ventanas de Chrome (APPLICATION)
-  - `calibrar_chrome`: Calibra elementos de Chrome (CALIBRATION)
-  - `mover_chrome_pantalla`: Mueve Chrome a pantalla especifica (NAVIGATION)
-  - `maximizar_chrome`: Maximiza ventana de Chrome (NAVIGATION)
-- **Caracteristicas principales**:
-  - Multiples metodos de apertura con fallback (subprocess, webbrowser)
-  - Soporte multi-monitor con validacion de numeros de pantalla
-  - Integracion con ScreenManager para deteccion y manejo de ventanas
-  - Manejo robusto de errores con logging detallado
-  - Seleccion inteligente de ventanas (preferir ventana en primer plano)
-  - API legacy para captura de pantalla (reemplazada por flujo universal)
-- **Dependencias**: pyautogui, subprocess, webbrowser, os, pathlib, time, typing.
-
-#### `src/hands/chrome/chrome_calibrator.py` [57 lineas] - Calibrador Especifico para Chrome
-- **Descripcion**: Adaptador de compatibilidad para la calibracion de Google Chrome. La calibracion real se realiza mediante el sistema universal: CalibrationManager -> descubrimiento de aplicacion -> apertura/enfoque -> ScreenManager -> deteccion de monitor real -> captura -> UniversalVisualCalibrator -> Qwen3-VL 8B Instruct -> coordenadas absolutas -> guardado centralizado.
-- **Clases principales**:
-  - `ChromeCalibrator`: Adaptador legacy que usa exactamente el flujo universal.
-- **Metodos principales**:
-  - `ChromeCalibrator.__init__`: Inicializacion del calibrador de Chrome (vacio, delega en el manager)
-  - `ChromeCalibrator.calibrate_chrome()`: Metodo principal de calibracion que delega en el CalibrationManager universal
-  - `ChromeCalibrator._calibrate_chrome()`: Implementacion interna que obtiene el manager y realiza la calibracion
-- **Funciones globales**:
-  - `calibrar_chrome()`: Funcion publica de compatibilidad legacy para calibrar Chrome
-- **Caracteristicas implementadas**:
-  - Delegacion completa al sistema universal de calibracion
-  - Manejo robusto de errores con mensajes descriptivos
-  - Procesamiento de resultados del manager para extraer coordenadas y elementos
-  - Soporte para multiples monitores con deteccion automatica
-  - Formato estructurado de resultados con exito/fracaso, monitor, elementos y coordenadas
-  - Compatibilidad con APIs legacy del proyecto
-
-#### `src/hands/edge/__init__.py` - Inicializacion del Modulo Edge
-- **Descripcion**: Modulo especifico para Microsoft Edge con importacion del sistema de calibracion y funciones especificas de Edge.
-- **Metodos principales**:
-  - `EdgeCalibrator`: Clase principal del calibrador de Edge importada desde calibrator_edge.
-  - `get_edge_calibrator`: Funcion para obtener el calibrador de Edge.
-
-#### `src/hands/edge/calibrator_edge.py` [233 lineas] - Calibrador de Compatibilidad para Microsoft Edge
-- **Descripcion**: Adaptador de compatibilidad para la calibracion de Microsoft Edge que delega en el sistema universal de calibracion. Mantiene API legacy para compatibilidad con codigo antiguo.
-- **Arquitectura**: Delegating pattern hacia CalibrationManager → UniversalVisualCalibrator → Qwen3-VL
-- **Clases principales**:
-  - `EdgeCalibrator`: Adaptador legacy hacia CalibrationManager con metodos de compatibilidad.
-- **Metodos principales**:
-  - `calibrate_edge_both_screens()`: API legacy por compatibilidad (mantiene nombre historico pero trabaja con cualquier numero de monitores).
-  - `calibrate_edge()`: API moderna de compatibilidad que delega directamente en CalibrationManager.
-  - `_calibrate_edge_universal()`: Metodo de delegacion universal que intenta multiples nombres de aplicacion ("Microsoft Edge", "Edge").
-- **Funciones globales**:
-  - `calibrate_edge()`: Funcion publica de compatibilidad que devuelve mensajes de estado de calibracion.
-- **Caracteristicas principales**:
-  - Mantiene compatibilidad con codigo antiguo que importe EdgeCalibrator o calibrate_edge()
-  - No asume numero especifico de monitores ni resoluciones
-  - No calcula offsets ni coordenadas manualmente
-  - Utiliza sistema universal de calibracion con Qwen3-VL
-  - Soporte multi-monitor sin limitaciones
-  - Manejo robusto de errores con logging detallado
-- **Integraciones**:
-  - `CalibrationManager` para calibracion real
-  - `UniversalVisualCalibrator` para analisis visual
-  - `Qwen3-VL` para deteccion de elementos
-  - `ScreenManager` para informacion de monitores
-- **Limitaciones**:
-  - No genera coordenadas manuales
-  - No analiza elementos uno por uno
-  - No escribe macros_coords.json directamente
-  - No utiliza pyautogui.size() para determinar monitores
-  - No asume DPI o resoluciones especificas
-
-#### `src/hands/edge/edge.py` [554 lineas] - Funciones Especificas de Microsoft Edge
-- **Descripcion**: Modulo con acciones especificas para Microsoft Edge que maneja apertura, cierre, movimiento, maximizacion y calibracion del navegador. La geometria de monitores se obtiene exclusivamente de ScreenManager. Este modulo conserva funciones antiguas por compatibilidad, pero no genera coordenadas artificiales, no asume dos monitores y no utiliza una resolucion ni un DPI fijo.
-- **Funciones principales**:
-  - `abrir_edge_pantalla`: Abre Microsoft Edge y lo posiciona en la pantalla solicitada.
-  - `abrir_edge_pestana`: Abre una nueva pestana de Edge en la pantalla solicitada.
-  - `_get_edge_windows`: Obtiene las ventanas visibles/localizables de Microsoft Edge.
-  - `_get_edge_window_info`: Obtiene metadatos y geometria actual de una ventana de Edge.
-  - `_find_edge_window_on_monitor`: Busca una ventana de Edge cuyo centro este dentro del monitor indicado.
-  - `_select_edge_window`: Selecciona una ventana Edge, priorizando el monitor indicado.
-  - `_abrir_edge_desde_ruta`: Abre Edge desde una instalacion local conocida.
-  - `_verificar_edge_abierto`: Verifica si Edge esta abierto y visible.
-  - `_verificar_edge_instalado`: Verifica si Microsoft Edge esta instalado.
-  - `_move_edge_window`: Mueve una ventana Edge al origen del monitor y trata de maximizarla.
-  - `_mover_edge_a_pantalla`: Mueve una ventana de Edge al monitor solicitado.
-  - `_cerrar_edge`: Cierra una ventana visible de Edge.
-  - `_calibrar_edge`: Compatibilidad con la implementacion antigua (legacy).
-  - `_generar_coordenadas_edge`: Compatibilidad con codigo antiguo; no genera coordenadas artificiales.
-  - `_capturar_edge`: Captura la ventana visible de Edge (compatibilidad).
-  - `get_edge_commands`: Obtiene los comandos legacy de Edge.
-- **Caracteristicas principales**:
-  - Soporte multi-monitor con validacion de numeros de pantalla
-  - Integracion con ScreenManager para deteccion y manejo de ventanas
-  - Multiples metodos de apertura con fallback (subprocess, busqueda de rutas)
-  - Seleccion inteligente de ventanas (priorizar ventana en primer plano)
-  - Manejo robusto de errores con logging detallado
-  - Funciones legacy para compatibilidad con sistemas antiguos
-  - Soporte para deteccion de instalacion de Edge mediante multiples metodos
-- **Acciones registradas**:
-  - `abrir_edge_pantalla`: Abre Microsoft Edge en pantalla especifica (APPLICATION)
-  - `abrir_edge_pestana`: Abre nueva pestana de Edge en pantalla especifica (APPLICATION)
-- **Funciones legacy (deprecated)**:
-  - `_calibrar_edge`: La calibracion especifica legacy ha sido desactivada. Utiliza el calibrador universal de aplicaciones.
-  - `_generar_coordenadas_edge`: No genera coordenadas artificiales por diseno.
-- **Integraciones**:
-  - `ScreenManager` para informacion de monitores y geometria
-  - `pyautogui` para captura de pantalla
-  - `pygetwindow` para deteccion de ventanas
-  - `utils.logger` para logging detallado
-- **Dependencias**: pyautogui, pygetwindow, subprocess, os, pathlib, time, typing.
-
-#### `src/hands/executor.py` [1373 lineas] - Ejecutor Central del Sistema
-- **Descripcion**: Ejecutor mejorado de JARVIS con arquitectura de planificacion jerarquica. Responsabilidades: ejecutar acciones individuales con verificacion de precondiciones y efectos, ejecutar planes completos, manejar estado del mundo, soportar replanificacion cuando una accion falla, integrarse con el sistema de nodos y objetivos, mantener compatibilidad con acciones legacy.
-- **Clases principales**:
-  - `ExecutionStatus` (Enum): Estados de ejecucion de un nodo o plan (PENDING, RUNNING, SUCCESS, FAILED, RETRYING, ALTERNATIVE)
-  - `ExecutionResult` (dataclass): Resultado de ejecucion de un nodo o plan con metadatos
-  - `ExecutionState` (dataclass): Estado actual del mundo para ejecucion con timestamp y estados de aplicaciones
-  - `Executor`: Clase principal del ejecutor mejorado con soporte para planificacion jerarquica y replanificacion
-- **Metodos principales**:
-  - `__init__`: Inicializa el ejecutor mejorado con registro de acciones, memoria y estado del mundo
-  - `get_executor`: Obtiene la instancia global del ejecutor (metodo estatico)
-  - `_initialize_state`: Inicializa el estado del mundo con aplicaciones, elementos UI y acciones disponibles
-  - `execute_plan`: Ejecuta un plan completo (lista de nodos) con replanificacion y manejo de fallos
-  - `_execute_node`: Ejecuta un nodo individual con reintentos y replanificacion
-  - `_verify_node_success`: Verifica si la ejecucion de un nodo fue exitosa basado en efectos esperados
-  - `_replan_after_failure`: Realiza replanificacion despues de un fallo en un nodo
-  - `_find_alternative_nodes`: Encuentra nodos alternativos que proporcionen la misma capacidad
-  - `_extract_capability_from_action`: Extrae la capacidad principal de un nombre de accion
-  - `_action_provides_capability`: Verifica si una accion proporciona una capacidad especifica
-  - `_should_replan`: Determina si se debe replanificar despues de un fallo
-  - `execute_plan_with_replan`: Ejecuta un plan completo con replanificacion dinamica
-  - `_update_world_state_after_failure`: Actualiza estado del mundo despues de un fallo
-  - `_goal_achieved`: Verifica si un objetivo ha sido alcanzado en el estado actual
-  - `_execute_node_action`: Ejecuta la accion especifica de un nodo
-  - `_check_node_preconditions`: Verifica si las precondiciones de un nodo se cumplen
-  - `_evaluate_condition`: Evalua una condicion simple contra el estado actual
-  - `_try_alternative`: Intenta una alternativa cuando un nodo falla
-  - `_update_world_state`: Actualiza el estado del mundo despues de una ejecucion exitosa
-  - `execute_action`: Ejecuta una accion registrada con mejoras de estado y verificacion
-  - `can_execute`: Comprueba si una accion puede ejecutarse en el estado actual
-  - `process_and_execute`: Procesa respuesta LLM y ejecuta comando (mantenido para compatibilidad)
-  - `_execute_legacy_or_registered`: Ejecuta mediante ActionRegistry o fallback legacy
-  - `_positional_to_named_parameters`: Convierte argumentos posicionales a nombrados
-  - `_parse_args`: Parsea argumentos mediante ast.literal_eval
-  - `_get_legacy_function`: Busca funcion legacy en modulos
-  - `get_current_state`: Obtiene el estado actual del mundo
-  - `update_state`: Actualiza el estado del mundo
-  - `get_action_stats`: Obtiene estadisticas de ejecucion de acciones
-  - `_record_action_execution`: Registra ejecucion de accion para estadisticas
-  - `_get_screen_state`: Obtiene estado actual de la pantalla para aprendizaje
-  - `get_learning_insights`: Obtiene insights del sistema de aprendizaje
-  - `get_action_learning_insights`: Obtiene insights especificos de una accion
-  - `get_cost_adjustments`: Obtiene ajustes de coste aprendidos
-  - `export_learning_data`: Exporta datos de aprendizaje
-  - `import_learning_data`: Importa datos de aprendizaje
-  - `clear_learning_data`: Limpia datos de aprendizaje
-  - `enable_learning`: Habilita o deshabilita el aprendizaje
-  - `_record_command_execution`: Registra ejecucion de comando legacy
-  - `list_commands`: Lista todas las acciones conocidas
-  - `get_plannable_actions`: Obtiene acciones disponibles para planificacion
-  - `get_action_info`: Obtiene informacion de una accion especifica
-  - `execute_goal`: Ejecuta un objetivo usando el planificador integrado
-  - `_get_state_for_planning`: Obtiene estado actual en formato para planificacion
-  - `create_goal_from_command`: Crea un objetivo a partir de un comando legacy
-- **Funciones globales**:
-  - `get_executor`: Obtiene la instancia global del ejecutor
-
-#### `src/hands/firefox/__init__.py` [3 lineas] - Inicializacion del Modulo Firefox
-- **Descripcion**: Modulo especifico para Mozilla Firefox con sistema de acciones registrado.
-- **Metodos principales**:
-  - `Firefox`: Clase principal del sistema de Firefox importada desde firefox.
-  - `abrir_firefox_action`: Accion wrapper para abrir Firefox.
-  - `abrir_firefox_pantalla_action`: Accion wrapper para abrir Firefox en pantalla especifica.
-  - `calibrar_firefox_action`: Accion wrapper para calibrar Firefox.
-- **Funciones globales**:
-  - `abrir_firefox`: Abre Mozilla Firefox en el navegador.
-  - `abrir_firefox_pantalla`: Abre Mozilla Firefox en una pantalla especifica.
-  - `get_firefox_commands`: Obtiene los comandos especificos de Firefox.
-  - `calibrar_firefox`: Calibra Mozilla Firefox con sistema mejorado y nombres semanticos.
-- **Exportaciones principales**:
-  - `FirefoxCalibrator`: Clase principal del calibrador de Firefox.
-  - `abrir_firefox`, `abrir_firefox_pantalla`, `get_firefox_commands`: Funciones basicas de Firefox.
-  - `abrir_firefox_action`, `abrir_firefox_pantalla_action`, `calibrar_firefox_action`: Acciones registradas en el sistema.
-
-#### `src/hands/firefox/calibrator_firefox.py` [227 lineas] - Calibrador de Compatibilidad para Mozilla Firefox
-- **Descripcion**: Adaptador de compatibilidad para la calibracion de Mozilla Firefox que delega en el sistema universal de calibracion. Mantiene API legacy para compatibilidad con codigo antiguo.
-- **Arquitectura**: Delegating pattern hacia CalibrationManager → UniversalVisualCalibrator → Qwen3-VL
-- **Clases principales**:
-  - `FirefoxCalibrator`: Adaptador legacy hacia CalibrationManager con metodos de compatibilidad.
-- **Metodos principales**:
-  - `calibrate_firefox_both_screens()`: API legacy por compatibilidad (mantiene nombre historico pero trabaja con cualquier numero de monitores).
-  - `calibrate_firefox()`: API moderna de compatibilidad que delega directamente en CalibrationManager.
-  - `_calibrate_firefox_universal()`: Metodo de delegacion universal que intenta multiples nombres de aplicacion ("Mozilla Firefox", "Firefox").
-- **Funciones globales**:
-  - `calibrate_firefox()`: Funcion publica de compatibilidad que devuelve mensajes de estado de calibracion.
-- **Caracteristicas principales**:
-  - Mantiene compatibilidad con codigo antiguo que importe FirefoxCalibrator o calibrate_firefox()
-  - No asume numero especifico de monitores ni resoluciones
-  - No calcula offsets ni coordenadas manualmente
-  - Utiliza sistema universal de calibracion con Qwen3-VL
-  - Soporte multi-monitor sin limitaciones
-  - Manejo robusto de errores con logging detallado
-- **Integraciones**:
-  - `CalibrationManager` para calibracion real
-  - `UniversalVisualCalibrator` para analisis visual
-  - `Qwen3-VL` para deteccion de elementos
-  - `ScreenManager` para informacion de monitores
-- **Limitaciones**:
-  - No genera coordenadas manuales
-  - No analiza elementos uno por uno
-  - No escribe macros_coords.json directamente
-  - No utiliza pyautogui.size() para determinar monitores
-  - No asume DPI o resoluciones especificas
-
-#### `src/hands/firefox/firefox.py` [637 lineas] - Funciones Especificas para Mozilla Firefox
-- **Descripcion**: Funciones especificas para Mozilla Firefox con apertura, cierre, calibracion, movimiento y maximizacion de ventanas. Utiliza ScreenManager para gestion de monitores y CalibrationManager para calibracion universal. La geometria de monitores se obtiene exclusivamente de ScreenManager. Este modulo conserva funciones antiguas por compatibilidad, pero no genera coordenadas artificiales, no asume dos monitores y no utiliza una resolucion ni un DPI fijo. La calibracion real de aplicaciones debe pasar por el flujo universal: CalibrationManager -> ScreenManager -> UniversalVisualCalibrator -> Qwen3-VL.
-- **Acciones Registradas**:
-  - `abrir_firefox_pantalla`: Abre Mozilla Firefox en la pantalla solicitada.
-  - `abrir_firefox_pestana`: Abre una nueva pestana de Firefox en la pantalla solicitada.
-  - `cerrar_firefox`: Cierra una ventana visible de Firefox.
-  - `mover_firefox_a_pantalla`: Mueve una ventana de Firefox al monitor solicitado.
-- **Funciones Principales**:
-  - `abrir_youtube()`: Abre YouTube en el navegador predeterminado.
-  - `abrir_spotify()`: Abre Spotify Web en el navegador predeterminado.
-  - `abrir_firefox_pantalla(pantalla: int = 1)`: Abre Mozilla Firefox y lo posiciona en la pantalla solicitada.
-  - `abrir_firefox_pestana(pantalla: int = 1)`: Abre una nueva pestana de Firefox en la pantalla solicitada.
-  - `_verificar_firefox_abierto()`: Verifica si Firefox esta abierto y visible.
-  - `_verificar_firefox_instalado()`: Verifica si Mozilla Firefox esta instalado.
-  - `_move_firefox_window(window, monitor)`: Mueve una ventana Firefox al origen del monitor y trata de maximizarla.
-  - `_cerrar_firefox()`: Cierra una ventana visible de Firefox.
-  - `_calibrar_firefox()`: Compatibilidad con la implementacion antigua. La calibracion real utiliza el flujo universal.
-  - `_generar_coordenadas_firefox(tipo_elemento: str)`: Compatibilidad con codigo legacy; no genera coordenadas artificiales.
-  - `_capturar_firefox()`: Captura la ventana visible de Firefox para compatibilidad.
-- **Funciones Auxiliares**:
-  - `_get_firefox_windows()`: Obtiene las ventanas localizables de Mozilla Firefox.
-  - `_get_firefox_window_info(window)`: Obtiene metadatos y geometria actual de una ventana de Firefox.
-  - `_find_firefox_window_on_monitor(pantalla)`: Busca una ventana de Firefox cuyo centro este dentro del monitor indicado.
-  - `_select_firefox_window(preferred_monitor)`: Selecciona una ventana Firefox, priorizando el monitor indicado.
-  - `_candidate_firefox_paths()`: Devuelve rutas habituales donde puede estar instalado Firefox.
-  - `_abrir_firefox_desde_ruta()`: Abre Firefox desde una instalacion local conocida.
-  - `_mover_firefox_a_pantalla(pantalla_num: int)`: Mueve una ventana de Firefox al monitor solicitado.
-- **Caracteristicas implementadas**:
-  - Deteccion multi-monitor integrada con ScreenManager
-  - Soporte para multiples ventanas de Firefox
-  - Verificacion de instalacion y disponibilidad
-  - Movimiento y posicionamiento preciso
-  - Compatibilidad con API legacy
-  - No genera coordenadas artificiales
-  - Utiliza calibracion universal a traves de CalibrationManager
-  - Manejo robusto de errores con logging estructurado
-  - Busqueda de ventanas por multiples patrones de titulo
-  - Integracion con pyautogui para capturas de pantalla
-  - Soporte para rutas de instalacion multiples en Windows
-  - Funciones de compatibilidad legacy para calibracion y coordenadas
-
-#### `src/hands/keyboard.py` [901 lineas] - Control del Teclado con Capacidades de Planificacion
-- **Descripcion**: Control del teclado transformado de acciones primitivas a capacidades reutilizables para el sistema de planificacion jerarquica de JARVIS. Integrado con el sistema de registro de acciones y soporte para precondiciones, efectos y costes.
-- **Clases principales**:
-  - `KeyModifier` (Enum): Modificadores de tecla soportados (CTRL, ALT, SHIFT, WIN)
-  - `KeyboardCapabilities` (dataclass): Capacidades del teclado para el sistema de planificacion
-  - `KeyboardCapabilitySystem`: Sistema de capacidades del teclado para la planificacion jerarquica
-- **Metodos principales**:
-  - `keyboard_capability`: Decorador para registrar capacidades del teclado en el sistema de planificacion
-  - `type_text`: Escribir texto en el campo activo con intervalo configurable y verificacion de exito
-  - `press_key`: Presionar una tecla individual con tiempo de espera configurable
-  - `execute_hotkey`: Ejecutar combinacion de teclas (hotkeys) con validacion de combinaciones
-  - `copy_text`: Copiar texto seleccionado (Ctrl+C) con verificacion de portapapeles
-  - `paste_text`: Pegar texto desde el portapapeles (Ctrl+V) con verificacion de campo enfocado
-  - `cut_text`: Cortar texto seleccionado (Ctrl+X) con verificacion de seleccion
-  - `select_all_text`: Seleccionar todo el texto (Ctrl+A) con verificacion de campo enfocado
-  - `navigate_tab`: Navegar entre campos con Tabulador (forward/backward)
-  - `navigate_enter`: Confirmar accion con la tecla Enter
-  - `switch_window`: Cambiar de ventana (Alt+Tab) con verificacion de multiples ventanas
-  - `close_window`: Cerrar ventana (Alt+F4) con verificacion de datos no guardados
-  - `open_start_menu`: Abrir menu de inicio (Tecla Windows) con espera de estabilidad
-  - `get_keyboard_capability_system`: Obtener la instancia global del sistema de capacidades del teclado
-- **Capacidades del Sistema**:
-  - **Text Operations**: type_text, copy_text, paste_text, cut_text, select_all_text
-  - **Navigation**: navigate_tab, navigate_enter
-  - **Shortcuts**: execute_hotkey, switch_window, close_window, open_start_menu
-  - **Basic**: press_key
-- **Funciones de Compatibilidad**:
-  - `escribir_texto`: Escribe texto en el campo activo (mantenido por compatibilidad)
-  - `presionar_enter`: Presiona la tecla Enter (mantenido por compatibilidad)
-  - `presionar_tecla`: Presiona una tecla especifica (mantenido por compatibilidad)
-  - `copiar`: Ejecuta Ctrl+C (Copiar) (mantenido por compatibilidad)
-  - `pegar`: Ejecuta Ctrl+V (Pegar) (mantenido por compatibilidad)
-  - `cortar`: Ejecuta Ctrl+X (Cortar) (mantenido por compatibilidad)
-  - `seleccionar_todo`: Ejecuta Ctrl+A (Seleccionar todo) (mantenido por compatibilidad)
-  - `cambiar_ventana`: Ejecuta Alt+Tab (Cambiar ventana) (mantenido por compatibilidad)
-  - `cerrar_ventana`: Ejecuta Alt+F4 (Cerrar ventana) (mantenido por compatibilidad)
-  - `tecla_super`: Presiona la tecla Windows (Super) (mantenido por compatibilidad)
-  - `abrir_menu_inicio`: Abre el menu de inicio de Windows (mantenido por compatibilidad)
-- **Caracteristicas del Sistema**:
-  - Integracion con ActionRegistry para registro de capacidades
-  - Soporte para precondiciones y efectos en capacidades
-  - Sistema de costes para planificacion A*
-  - Validacion de teclas y combinaciones
-  - Manejo de errores con logging estructurado
-  - Configuracion global de PyAutoGUI desde config.json
-  - Soporte para contextos de aplicacion y estado del sistema
-  - Sistema de capacidades reutilizables para el planificador
-
-#### `src/hands/mouse.py` [129 lineas] - Control del Raton con Capacidades de Planificacion
-- **Descripcion**: Control basico del raton para JARVIS con capacidades fundamentales de interaccion grafica. Proporciona funciones esenciales de movimiento, clic y scroll integradas con el sistema de registro de acciones y soporte para planificacion jerarquica.
-- **Clases principales**:
-  - Ninguna clase principal, implementacion funcional pura
-- **Metodos principales**:
-  - `move_to_position(x: float, y: float, duration: float = 0.1)`: Mueve el raton a una posicion especifica con validacion de coordenadas y manejo de errores
-  - `click_element(button: str = "left", wait_after: float = 0.1)`: Realiza un clic con el raton en el boton especificado (left, right, middle) con validacion y espera posterior
-  - `scroll_at_position(x: float, y: float, clicks: int, wait_after: float = 0.1)`: Realiza scroll en una posicion especifica con numero de clicks configurable (positivo para arriba, negativo para abajo)
-  - `register_mouse_capabilities()`: Registra las capacidades del raton en el sistema de acciones
-- **Acciones Registradas**:
-  - `move_mouse`: Mover raton a posicion con parametros de coordenadas y duracion
-  - `click_mouse`: Hacer clic con el raton con seleccion de boton y tiempo de espera
-  - `scroll_mouse`: Hacer scroll con el raton en posicion especifica con numero de clicks
-- **Caracteristicas del Sistema**:
-  - Integracion con ActionRegistry para registro automatico de capacidades
-  - Validacion robusta de parametros (coordenadas, botones, clicks)
-  - Manejo estructurado de errores con logging detallado
-  - Configuracion global de PyAutoGUI desde config.json
-  - Soporte para multiples botones de raton (left, right, middle)
-  - Control de tiempo de espera configurable para operaciones
-  - Registro automatico al importar el modulo
-  - Funcionalidad basica pero completa para interacciones graficas
-
-#### `src/hands/planner/__init__.py` [96 lineas] - Inicializacion del Modulo de Planificacion
-- **Descripcion**: Modulo principal de planificacion que carga componentes pesados de forma perezosa para evitar ciclos de importacion y mantener compatibilidad con action_registry.
-- **Clases principales**:
-  - `Node`: Modelo conceptual comun para todos los elementos del sistema (importado de node)
-  - `Goal`: Objetivos de alto nivel alcanzables mediante planificacion (importado de node)
-  - `Task`: Tareas jerarquicas descomponibles en otras tareas o nodos (importado de node)
-  - `NodeType`: Tipos de nodos en el sistema de planificacion (importado de node)
-  - `TaskStatus`: Estados de ejecucion de tareas (importado de node)
-  - `StateGraph`: Sistema de grafos de estados para planificacion (importado perezoso de graph)
-  - `GraphNode`: Nodo del grafo de estados (importado perezoso de graph)
-  - `GraphEdge`: Arista del grafo de estados (importado perezoso de graph)
-  - `GraphBuilder`: Constructor de grafos predefinidos (importado perezoso de graph)
-  - `HTNManager`: Gestor de descomposicion jerarquica de tareas (importado perezoso de htn_manager)
-  - `TaskExecutor`: Ejecutor de tareas jerarquicas (importado perezoso de task_executor)
-- **Metodos principales**:
-  - `get_htn_manager`: Obtiene la instancia global del HTN Manager mediante importacion perezosa
-  - `get_application_knowledge_integrator`: Obtiene la instancia global del integrador de conocimiento de aplicaciones
-  - `get_task_executor`: Obtiene la instancia global del TaskExecutor mediante importacion perezosa
-  - `__getattr__`: Carga componentes pesados del planner solo cuando se solicitan (StateGraph, GraphNode, GraphEdge, GraphBuilder, HTNManager, TaskExecutor)
-  - `__dir__`: Expone nombres disponibles mediante carga perezosa para autocompletado
-- **Funciones globales**:
-  - `get_htn_manager`: Obtiene instancia singleton del gestor HTN
-  - `get_application_knowledge_integrator`: Obtiene instancia global del integrador de conocimiento
-  - `get_task_executor`: Obtiene instancia global del ejecutor de tareas
-- **Constantes**:
-  - `__all__`: Lista de exportaciones del modulo incluyendo clases y funciones principales
-
-- **Funciones globales adicionales del módulo planner**:
-  - `get_applications_by_capability`: Busca aplicaciones que poseen una capacidad específica mediante importación diferida de application_integration.
-  - `get_application_knowledge`: Obtiene las capacidades declaradas de una aplicación específica mediante importación diferida.
-  - `get_learning_system`: Obtiene el singleton del sistema de aprendizaje del planificador mediante importación diferida.
-  - `get_preconditions_effects_manager`: Obtiene el singleton del gestor de precondiciones y efectos mediante importación diferida.
-
-#### `src/hands/planner/application_integration.py` - Integracion de Conocimiento de Aplicaciones
-- **Descripcion**: Convierte conocimiento declarativo de aplicaciones en Nodes compatibles con el modelo canonico de planificacion, manteniendo separadas planificacion y ejecucion.
-- **Clases principales**:
-  - `ApplicationKnowledgeIntegrator`: Integrador de conocimiento estructurado de aplicaciones con el planificador
-- **Metodos principales**:
-  - `__init__`: Inicializa integrador con gestor de aplicaciones y memoria
-  - `_normalize_name`: Normaliza nombres para IDs/keys de estado
-  - `_capability_value`: Obtiene el valor estable de una capacidad o su representacion textual
-  - `_as_list`: Normaliza listas/tuplas/conjuntos y valores individuales
-  - `_get_application`: Obtiene aplicacion del gestor por nombre
-  - `convert_application_to_nodes`: Convierte una aplicacion y sus capacidades en Nodes canonicos
-  - `_create_application_node`: Crea el nodo declarativo principal de la aplicacion
-  - `_create_capability_node`: Crea un nodo de accion para una capacidad de aplicacion
-  - `_create_ui_element_node`: Crea un nodo declarativo para un elemento UI requerido
-  - `_safe_cost`: Calcula coste seguro con valores por defecto
-  - `_get_application_current_state`: Obtiene estado persistido de la aplicacion cuando existe
-  - `_generate_application_preconditions`: Genera precondiciones reales de preparacion de la aplicacion
-  - `_generate_application_effects`: Genera efectos declarativos de disponibilidad/authenticacion
-  - `get_applications_by_capability`: Obtiene aplicaciones que exponen una capacidad
-  - `get_application_capabilities`: Obtiene capacidades de una aplicacion en formato declarativo
-  - `get_ui_elements_for_capability`: Obtiene elementos UI requeridos por una capacidad
-  - `is_application_capable`: Verifica si una aplicacion ofrece una capacidad
-  - `register_application_knowledge`: Registra conocimiento de una aplicacion mediante applications_core
-- **Funciones globales**:
-  - `get_application_knowledge_integrator`: Obtiene la instancia global del integrador
-  - `get_applications_by_capability`: Compatibilidad legacy usando ApplicationCapability cuando existe
-  - `get_application_knowledge`: Compatibilidad legacy para consultar el conocimiento de una aplicacion
-
-#### `src/hands/planner/goal_state_mapper.py` [1498 lineas] - Mapeo de Goal y World State al Grafo de Estados
-- **Descripcion**: Mapea objetivos y estado del mundo al grafo de estados para planificacion jerarquica, creando relaciones explicitas entre objetivos, capacidades, acciones y estado.
-- **Clases principales**:
-  - `MappingType` (Enum): Tipos de mapeo (GOAL_TO_NODES, STATE_TO_NODES, CAPABILITY_TO_NODES, HYBRID)
-  - `MappingResult` (dataclass): Resultado estructurado de operaciones de mapeo
-  - `GoalStateMapper`: Mapeador principal de objetivos y estado al grafo
-- **Metodos principales**:
-  - `__init__`: Inicializa mapeador con grafo de estados y capacidades base
-  - `map_goal_to_graph`: Mapea un Goal y contexto del World State al grafo
-  - `map_world_state_to_graph`: Mapea el World State actual al grafo
-  - `map_capabilities_to_graph`: Mapea capacidades abstractas a Nodes reutilizables
-  - `map_goal_and_world_state_to_graph`: Mapeo hibrido combinado de Goal + World State
-  - `get_mapping_history`: Devuelve copia del historial de mapeos
-  - `clear_mapping_history`: Limpia el historial de mapeos
-  - `_create_goal_node`: Crea nodo raiz de un Goal sin dependencias externas
-  - `_create_capability_nodes`: Crea nodos para capacidades conocidas
-  - `_build_capability_node`: Construye Node a partir de plantilla de capacidad
-  - `_create_goal_specific_nodes`: Crea acciones concretas asociadas al objetivo
-  - `_create_navigation_nodes`: Crea acciones especificas para navegacion
-  - `_create_open_app_nodes`: Crea acciones especificas para abrir aplicaciones
-  - `_create_close_app_nodes`: Crea acciones especificas para cerrar aplicaciones
-  - `_create_search_nodes`: Crea acciones de busqueda asociadas al objetivo
-  - `_map_goal_specific_nodes`: Anade especializaciones conocidas del dominio
-  - `_create_youtube_specific_nodes`: Crea acciones especificas para YouTube
-  - `_create_browser_specific_nodes`: Crea acciones especificas de navegador
-  - `_create_spotify_specific_nodes`: Crea acciones especificas para Spotify
-  - `_create_application_state_nodes`: Crea nodos STATE por aplicacion conocida
-  - `_create_resource_nodes`: Crea nodos RESOURCE para monitores y recursos
-  - `_create_calibrated_element_nodes`: Crea nodos UI_ELEMENT para elementos calibrados
-  - `_establish_goal_transitions`: Crea relaciones de descomposicion del Goal
-  - `_find_relevant_capability`: Encuentra capacidad base que mejor encaja con accion
-  - `_establish_state_transitions`: Relaciona nodos de estado con semantica
-  - `_calculate_mapping_quality`: Calcula cobertura del mapeo de Goal
-  - `_calculate_state_mapping_quality`: Calcula cobertura del estado representado
-  - `_add_node`: Anade nodo al grafo y actualiza resultado
-  - `_add_edge`: Anade arista al grafo y actualiza resultado
-  - `_get_graph_node`: Obtiene nodo del grafo con manejo de errores
-  - `_iter_graph_edges`: Itera sobre aristas del grafo
-  - `_update_graph_with_nodes`: Compatibilidad: asegura nodos en el grafo
-  - `_update_graph_with_state_nodes`: Compatibilidad: nodos ya agregados al crear
-  - `_get_required_capabilities`: Obtiene capacidades requeridas por objetivo
-  - `_capability_exists`: Verifica existencia de capacidad en el grafo
-  - `_get_goal_metadata`: Obtiene metadatos del objetivo
-  - `_get_goal_base_cost`: Obtiene coste base del objetivo
-  - `_get_goal_name`: Obtiene nombre del objetivo
-  - `_get_state_value`: Obtiene valor de estado de aplicacion
-  - `_extract_screen_id`: Extrae ID de pantalla de nodo
-  - `_is_action_node`: Verifica si nodo es de tipo accion
-  - `_unique_preserve_order`: Elimina duplicados preserving orden
-  - `_unique_edges`: Elimina aristas duplicadas
-  - `_record_history`: Registra operacion en historial de mapeo
-  - `_update_last_history_execution_time`: Actualiza tiempo de ejecucion en historial
-  - `_safe_getattr`: Obtiene atributo con manejo de errores
-  - `_get_required_id`: Obtiene ID requerido con validacion
-  - `_as_dict`: Convierte valor a diccionario
-  - `_safe_iterable`: Convierte valor a iterable seguro
-  - `_normalize_target_name`: Normaliza nombre de destino
-  - `_safe_id_component`: Limpia componente de ID para seguridad
-
-#### `src/hands/planner/graph.py` [1872 lineas] - Sistema de Grafos de Estados y Busqueda de Rutas
-- **Descripcion**: Sistema avanzado de grafos de estados para planificacion con multiples estrategias de busqueda, gestion de precondiciones/efectos, cache de rendimiento y serializacion completa. Mantiene separacion entre planificacion y ejecucion, simulando transiciones sobre copias de estado para no alterar el estado real durante la busqueda.
-- **Clases principales**:
-  - `SearchStrategy` (Enum): Estrategias de busqueda (A_STAR, DIJKSTRA, BFS, DFS, GREEDY) con alias historicos
-  - `GraphNode` (dataclass): Nodo auxiliar de busqueda con costes (g_cost, h_cost, f_cost) y estado
-  - `GraphEdge` (dataclass): Arista con condiciones, precondiciones, efectos y coste con evaluacion robusta
-  - `RouteResult` (dataclass): Resultado estructurado con metadatos, alternativas, estadisticas y estado final
-  - `StateGraph`: Grafo principal con algoritmos de busqueda, validacion, exportacion/importacion JSON
-  - `GraphBuilder`: Constructores predefinidos para navegacion y aplicaciones
-  - `CacheEntry`: Entrada de cache LRU con expiracion, acceso y metricas
-  - `PerformanceMetrics`: Metricas acumuladas de busqueda, cache y rendimiento
-  - `AdvancedStateGraph`: Grafo optimizado con cache inteligente, auto-optimizacion y estadisticas avanzadas
-- **Metodos principales**:
-  - `SearchStrategy`: A_STAR, DIJKSTRA, BFS, DFS, GREEDY
-  - `GraphNode.__init__`: Inicializa nodo con costes y estado
-  - `GraphNode.__lt__`: Comparacion para prioridad en heap
-  - `GraphEdge.__init__`: Inicializa arista con condiciones y efectos
-  - `GraphEdge._values_equal`: Compara valores con normalizacion
-  - `GraphEdge.can_traverse`: Verifica si se puede atravesar arista con estado actual
-  - `GraphEdge.apply_effects`: Aplica efectos de la arista al estado
-  - `GraphEdge.get_total_cost`: Calcula coste total de la arista
-  - `RouteResult.__init__`: Inicializa resultado de ruta con metadatos
-  - `RouteResult.length`: Propiedad de longitud del camino
-  - `RouteResult.edge_count`: Propiedad de numero de aristas
-  - `RouteResult.to_dict`: Conversion a diccionario serializable
-  - `StateGraph.__init__`: Inicializa grafo con heuristica y componentes
-  - `StateGraph.add_node`: Anade nodo al grafo
-  - `StateGraph.get_node`: Obtiene nodo por ID
-  - `StateGraph.has_node`: Verifica existencia de nodo
-  - `StateGraph.add_edge`: Anade arista entre nodos con condiciones
-  - `StateGraph.get_edges_from`: Obtiene aristas desde un nodo
-  - `StateGraph.get_edge`: Obtiene arista especifica
-  - `StateGraph.find_route`: Metodo principal de busqueda de rutas
-  - `StateGraph.build_route`: Alias para find_route
-  - `StateGraph.find_path_astar`: Busqueda A* con alternativas
-  - `StateGraph._find_path_astar_internal`: Implementacion interna A*
-  - `StateGraph._reconstruct_state_path`: Reconstruye camino desde estado
-  - `StateGraph.find_path_dijkstra`: Busqueda Dijkstra
-  - `StateGraph.find_path_bfs`: Busqueda en anchura
-  - `StateGraph.find_path_dfs`: Busqueda en profundidad
-  - `StateGraph.find_path_greedy`: Busqueda voraz
-  - `StateGraph.get_edges_for_path`: Obtiene aristas para un camino
-  - `StateGraph.apply_path_effects`: Aplica efectos de un camino
-  - `StateGraph.get_node_path_cost`: Calcula coste de un camino
-  - `StateGraph.get_neighbors`: Obtiene vecinos accesibles
-  - `StateGraph.add_edge_with_preconditions`: Anade arista con precondiciones
-  - `StateGraph.create_conditional_edge`: Crea arista condicional
-  - `StateGraph.create_effect_edge`: Crea arista con efecto
-  - `StateGraph.validate_graph`: Valida integridad del grafo
-  - `StateGraph.validate_graph_advanced`: Validacion avanzada con metricas
-  - `StateGraph._has_circular_path`: Detecta caminos circulares
-  - `StateGraph.get_graph_stats`: Obtiene estadisticas del grafo
-  - `StateGraph.clear_search_cache`: Limpia cache de busqueda
-  - `StateGraph.export_to_json`: Exporta grafo a JSON
-  - `StateGraph.import_from_json`: Importa grafo desde JSON
-  - `StateGraph.export_graph`: Exporta grafo a archivo
-  - `StateGraph.import_graph`: Importa grafo desde archivo
-  - `StateGraph._serialize_node`: Serializa nodo para JSON
-  - `StateGraph._serialize_edge`: Serializa arista para JSON
-  - `StateGraph._serialize_condition`: Serializa condicion para JSON
-  - `StateGraph._serialize_effect`: Serializa efecto para JSON
-  - `StateGraph._deserialize_node`: Deserializa nodo desde JSON
-  - `StateGraph._deserialize_condition`: Deserializa condicion desde JSON
-  - `StateGraph._deserialize_effect`: Deserializa efecto desde JSON
-  - `StateGraph._json_safe`: Convierte valor a JSON seguro
-  - `StateGraph._normalize_strategy`: Normaliza estrategia de busqueda
-  - `StateGraph._create_goal_from_node`: Crea objetivo desde nodo
-  - `StateGraph._estimate_heuristic`: Estima coste heuristico
-  - `StateGraph._state_signature`: Genera firma de estado
-  - `GraphBuilder.build_navigation_graph`: Construye grafo de navegacion
-  - `GraphBuilder.build_application_graph`: Construye grafo de aplicaciones
-  - `CacheEntry.__init__`: Inicializa entrada de cache
-  - `CacheEntry.is_expired`: Verifica si entrada ha expirado
-  - `CacheEntry.increment_access`: Incrementa contador de accesos
-  - `PerformanceMetrics.__init__`: Inicializa metricas de rendimiento
-  - `PerformanceMetrics.record_search`: Registra busqueda realizada
-  - `PerformanceMetrics.record_cache_hit`: Registra acierto de cache
-  - `PerformanceMetrics.record_cache_miss`: Registra fallo de cache
-  - `PerformanceMetrics.get_hit_rate`: Obtiene tasa de aciertos
-  - `PerformanceMetrics.get_average_search_time`: Obtiene tiempo promedio
-  - `PerformanceMetrics.to_dict`: Convierte a diccionario
-  - `AdvancedStateGraph.__init__`: Inicializa grafo avanzado con cache
-  - `AdvancedStateGraph.find_path_with_strategy`: Busqueda con cache y metricas
-  - `AdvancedStateGraph._execute_strategy`: Ejecuta estrategia especifica
-  - `AdvancedStateGraph.find_route`: Busqueda con resultado estructurado
-  - `AdvancedStateGraph.build_route`: Alias para find_route
-  - `AdvancedStateGraph._build_cache_key`: Construye clave de cache
-  - `AdvancedStateGraph._get_from_cache`: Obtiene entrada de cache
-  - `AdvancedStateGraph._add_to_cache`: Anade entrada a cache
-  - `AdvancedStateGraph._cleanup_cache`: Limpia cache expirada
-  - `AdvancedStateGraph.get_advanced_stats`: Obtiene estadisticas avanzadas
-  - `AdvancedStateGraph.optimize_graph_for_performance`: Optimiza para rendimiento
-
-#### `src/hands/planner/heuristic.py` [894 lineas] - Heuristicas para Algoritmo de Busqueda A*
-- **Descripcion**: Sistema avanzado de heuristicas para A* con cache LRU determinista, serializacion robusta, pesos ajustables y fallbacks seguros. Proporciona estimaciones finitas y no negativas, con soporte para objetivos estructurados y compatibilidad con formatos legacy.
-- **Clases principales**:
-  - `HeuristicType` (Enum): Tipos de heuristicas con alias historicos (MANHATTAN, EUCLIDEAN, UNIFORM, ZERO, GOAL_DISTANCE, CAPABILITY_BASED, STATE_SIMILARITY)
-  - `Heuristic`: Heuristica principal con cache LRU, pesos, serializacion segura y evaluacion robusta con copias de estado
-  - `HeuristicFactory`: Factoria para crear heuristicas preconfiguradas (uniform, goal_distance, capability_based, state_similarity, custom)
-- **Metodos principales**:
-  - `Heuristic.__init__`: Inicializa heuristica con tipo, peso y configuracion de cache
-  - `Heuristic.estimate_cost`: Estima coste desde un nodo hasta el objetivo con cache
-  - `Heuristic._apply_heuristic`: Aplica la heuristica seleccionada segun el tipo
-  - `Heuristic._manhattan_distance`: Estimacion discreta inspirada en distancia Manhattan
-  - `Heuristic._euclidean_distance`: Ajuste continuo de la estimacion Manhattan
-  - `Heuristic._goal_distance_heuristic`: Estima trabajo minimo restante para satisfacer objetivo
-  - `Heuristic._capability_based_heuristic`: Estima coste restante a partir de capacidades requeridas
-  - `Heuristic._state_similarity_heuristic`: Estima coste segun similitud entre estados actual y esperado
-  - `Heuristic._build_cache_key`: Construye clave de cache segura y determinista
-  - `Heuristic._cache_get/_cache_set`: Operaciones de cache con politica LRU
-  - `Heuristic.clear_cache`: Limpia la cache de heuristicas
-  - `Heuristic.get_cache_stats`: Obtiene estadisticas de la cache
-  - `Heuristic._normalize_heuristic_type`: Normaliza tipo de heuristica con manejo de errores
-  - `Heuristic._normalize_weight`: Normaliza peso a numero finito no negativo
-  - `Heuristic._stable_serialize`: Serializa valores de forma estable para claves de cache
-  - `Heuristic._json_fallback`: Representacion estable de objetos no serializables
-  - `Heuristic._get_required_capabilities`: Obtiene capacidades requeridas con tolerancia a APIs antiguas
-  - `Heuristic._get_current_url`: Obtiene URL actual desde varias representaciones compatibles
-  - `Heuristic._application_flag`: Obtiene flag de aplicacion de formatos de estado compatibles
-  - `Heuristic._capability_fulfilled`: Verifica si capacidad esta satisfecha en estado actual
-  - `Heuristic._get_state_value`: Obtiene valor de estado admitiendo claves directas y anidadas
-  - `Heuristic._get_expected_state`: Obtiene estado esperado basico de un objetivo
-  - `Heuristic._capability_costs`: Costes unitarios conservadores por capacidad
-- **Metodos de HeuristicFactory**:
-  - `create_uniform_heuristic`: Crea heuristica uniforme
-  - `create_goal_distance_heuristic`: Crea heuristica basada en distancia al objetivo
-  - `create_capability_based_heuristic`: Crea heuristica basada en capacidades
-  - `create_state_similarity_heuristic`: Crea heuristica basada en similitud de estado
-  - `create_custom_heuristic`: Crea heuristica personalizada
-
-#### `src/hands/planner/htn_manager.py` - Gestor de Descomposicion Jerarquica de Tareas
-- **Descripcion**: Gestor central de reglas HTN y ejecucion jerarquica con integracion de grafos de estados y estrategias de descomposicion.
-- **Clases principales**:
-  - `HTNStatus` (Enum): Estados del gestor HTN (IDLE, DECOMPOSING, EXECUTING, COMPLETED, FAILED, RESTARTING)
-  - `TaskDecompositionStrategy` (Enum): Estrategias de descomposicion (SEQUENTIAL, PARALLEL, CONDITIONAL, ITERATIVE)
-  - `TaskExecutionResult` (dataclass): Resultado estructurado de ejecucion de tareas con metadatos
-  - `HTNDecompositionRule` (dataclass): Reglas de descomposicion con patrones y precondiciones
-  - `HTNManager`: Gestor central de reglas HTN y ejecucion jerarquica con integracion de grafos
-- **Metodos principales**:
-  - `__init__`: Inicializa gestor HTN con planner, tareas disponibles y reglas de descomposicion
-  - `initialize_decomposition_rules`: Inicializa reglas de descomposicion predefinidas por prioridad
-  - `set_planner/set_state_graph`: Establece planner y grafo de estados para integracion
-  - `enable_graph_decomposition`: Habilita descomposicion con grafos con umbral configurable
-  - `decompose_and_execute`: Metodo principal de descomposicion y ejecucion de objetivos
-  - `_decompose_and_execute_with_graph`: Descomposicion avanzada con integracion de grafos
-  - `_decompose_with_graph_advanced`: Descomposicion compleja con optimizacion de dependencias
-  - `_convert_htn_tasks_to_graph_nodes`: Convierte tareas HTN a nodos de grafo preserving referencias
-  - `_optimize_task_sequence_with_graph`: Optimiza secuencia de tareas usando algoritmo topologico
-  - `_convert_graph_sequence_to_execution_plan`: Convierte secuencia de grafo a plan ejecutable
-  - `_node_to_execution_dict`: Convierte nodo a formato ejecutable con metadatos
-  - `_convert_tasks_to_execution_plan`: Convierte lista de tareas a plan ejecutable
-  - `_execute_optimized_plan`: Ejecuta plan optimizado con integracion de planner
-  - `_call_planner`: Llama al planner externo con manejo de diferentes firmas
-  - `_execute_with_graph_only`: Ejecucion fallback usando solo grafo de estados
-  - `_estimate_task_cost`: Estima coste de tarea basado en nombre, metadatos o heuristicas
-  - `_execute_plan_directly`: Ejecucion directa cuando no hay planner disponible
-  - `load_task_library`: Carga biblioteca predefinida de tareas para descomposicion
-  - `decompose_goal`: Descompone objetivo usando reglas y estrategias disponibles
-  - `execute_goal_hierarchy`: Ejecuta jerarquia completa de tareas desde objetivo
-  - `_find_decomposition_rule`: Busca regla de descompcion compatible con objetivo
-  - `_application_catalog_available`: Verifica disponibilidad de catalogo de aplicaciones
-  - `_check_preconditions`: Evalua precondiciones de regla usando estado actual y especiales
-  - `_browser_available`: Verifica disponibilidad de navegador en estado actual
-  - `_entity_available`: Verifica disponibilidad de entidades en estado actual
-  - `_task_from_pattern`: Crea tarea desde patron con metadatos y dependencias
-  - `_decompose_sequential`: Descompone objetivo usando estrategia secuencial
-  - `_decompose_parallel`: Descompone objetivo usando estrategia paralela
-  - `_decompose_conditional`: Descompone objetivo usando estrategia condicional
-  - `_decompose_iterative`: Descompone objetivo usando estrategia iterativa
-  - `_establish_hierarchy`: Establece jerarquia padre-hijo entre tareas descompuestas
-  - `_order_tasks_by_dependencies`: Ordena tareas por dependencias usando algoritmo topologico
-  - `_get_task_executor`: Obtiene TaskExecutor perezoso para evitar ciclos de importacion
-  - `_execute_task_hierarchy`: Ejecuta jerarquia completa de tareas con manejo de estado
-  - `_execute_single_task`: Ejecuta tarea individual con manejo de errores y estado
-  - `_simulate_task_execution`: Metodo obsoleto para simulacion de ejecucion (no utilizado)
-  - `get_execution_statistics`: Obtiene estadisticas completas de ejecucion del sistema
-  - `get_task_execution_history`: Devuelve historial completo de ejecuciones realizadas
-- **Funciones globales**:
-  - `get_htn_manager`: Obtiene instancia singleton del gestor HTN
-
-#### `src/hands/planner/learning_system.py` [872 lineas] - Sistema de Aprendizaje para Planificacion
-- **Descripcion**: Sistema central de registro y aprendizaje de planificacion que registra ejecuciones reales, costes, tiempos, rutas y patrones para que el planificador pueda disponer de datos historicos sin mezclar el aprendizaje con la ejecucion de acciones.
-- **Clases principales**:
-  - `LearningEventType` (Enum): Tipos de eventos de aprendizaje (ACTION_EXECUTION, PLAN_EXECUTION, NODE_EXECUTION, REPLANIFICATION, ALTERNATIVE_FOUND, GOAL_ACHIEVED, GOAL_FAILED, COST_ADJUSTMENT)
-  - `LearningEvent` (dataclass): Evento estructurado con metadatos de ejecucion, timestamp, exito, tiempo y costes
-  - `LearningStatistics` (dataclass): Estadisticas agregadas de eventos con tasas de exito, tiempos y patrones
-  - `LearningSystem`: Sistema central de registro y aprendizaje de planificacion con memoria persistente
-- **Metodos principales**:
-  - `__init__`: Inicializa sistema de aprendizaje con tamano maximo de memoria y tasa de aprendizaje configurable
-  - `record_action_execution`: Registra ejecucion de acciones individuales con exito, tiempo y costes
-  - `record_plan_execution`: Registra ejecucion completa de planes con secuencia de acciones
-  - `record_node_execution`: Registra ejecucion de nodos individuales en la jerarquia de planificacion
-  - `record_replanification`: Registra eventos de replanificacion con rutas originales y nuevas
-  - `get_action_insights`: Obtiene insights detallados para una accion especifica con tendencias de mejora
-  - `get_system_insights`: Obtiene vision general del sistema con estadisticas globales y salud
-  - `get_cost_adjustments`: Devuelve costes aprendidos para acciones con ajustes historicos
-  - `export_learning_data`: Exporta todos los datos de aprendizaje a archivo JSON
-  - `import_learning_data`: Importa datos de aprendizaje desde archivo JSON con validacion
-  - `clear_learning_data`: Limpia todos los datos de aprendizaje y estadisticas
-  - `enable_learning`: Habilita o deshabilita el sistema de aprendizaje global
-  - `_build_event`: Construye evento estructurado con validacion de tipos y normalizacion
-  - `_store_event`: Almacena evento en memoria con gestion de tamano maximo y estadisticas
-  - `_update_statistics`: Actualiza estadisticas agregadas por accion, aplicacion o nodo
-  - `_learn_action_cost`: Aprende costes ajustados usando algoritmo de promedio movil ponderado
-  - `_discover_patterns`: Descubre patrones de exito/fracaso y patrones temporales por hora
-  - `_register_optimal_route`: Registra rutas optimas para objetivos con metricas de rendimiento
-  - `_learn_from_replanification`: Aprende de eventos de replanificacion para mejorar futuras ejecuciones
-  - `_calculate_improvement_trend`: Calcula tendencia de mejora basada en ejecuciones recientes
-  - `_count_events_by_type`: Contabiliza eventos por tipo para analisis de actividad
-  - `_assess_system_health`: Evalua salud del sistema con recomendaciones automaticas
-  - `_generate_health_recommendations`: Genera recomendaciones basadas en estado del sistema
-  - `_build_application_insights`: Construye insights por aplicacion con metricas especificas
-  - `_build_action_insights_summary`: Resume estadisticas de acciones para analisis comparativo
-  - `_rebuild_statistics_from_events`: Reconstruye estadisticas completas desde eventos historicos
-  - `_count_unique_patterns`: Cuenta patrones unicos descubiertos en ejecuciones
-  - `_safe_float`: Convierte valores a float seguro con manejo de errores
-  - `_cost_error`: Calcula error relativo entre coste estimado y real
-- **Funciones globales**:
-  - `get_learning_system`: Obtiene instancia singleton del sistema de aprendizaje
-
-#### `src/hands/planner/node.py` [1138 lineas] - Modelo Canonico de Nodos para Planificacion Jerarquica
-- **Descripcion**: Fuente unica de verdad para el sistema de planificacion jerarquica de JARVIS. Implementa un modelo de nodos completo con soporte para multiples niveles del sistema, aprendizaje automatico, grafos de estados, y ejecucion con replanificacion. El sistema soporta desde nodos simples hasta estructuras jerarquicas complejas con dependencias, precondiciones, efectos y gestion de estado.
-
-**Arquitectura Integrada:**
-- **Estado del mundo**: `state_requirements` y `state_modifications`
-- **Grafo de acciones**: `in_edges`, `out_edges` y `edge_costs`
-- **Precondiciones y efectos avanzados**: funciones callback
-- **Acciones reutilizables**: con categorias y marcado
-- **Aprendizaje automatico**: con metricas de ejecucion
-
-- **Clases principales**:
-  - `NodeType` (Enum): Tipos de nodos en el sistema de planificacion
-    - INTENTION, GOAL, TASK, ACTION, CONDITION, STATE, RESOURCE, APPLICATION, UI_ELEMENT, RESULT, PLAN
-  - `TaskStatus` (Enum): Estados de ejecucion de tareas
-    - PENDING, EXECUTING, COMPLETED, FAILED, ABORTED
-  - `Node`: Modelo conceptual central para todos los elementos del sistema
-  - `Goal`: Objetivos de alto nivel con verificacion de logro y estimacion de coste
-  - `Task`: Tareas jerarquicas con descomposicion recursiva y deteccion de ciclos
-  - `WorldState`: Estado del mundo canonico ligero para planificacion
-
-- **Sistema de Node (Clase Principal)**:
-  - **Propiedades Esenciales**: `id`, `type`, `name`, `description`, `cost`, `dependencies`
-  - **Precondiciones y Efectos**: Soporte para declarativas (`preconditions`, `effects`) y funcionales (`preconditions_functions`, `effects_functions`)
-  - **Gestion de Estado**: `state_requirements` (precondiciones de estado) y `state_modifications` (efectos de estado)
-  - **Grafo de Acciones**: `in_edges`, `out_edges`, `edge_costs` para navegacion y planificacion
-  - **Ejecucion Avanzada**: `execute_callback`, `success_criteria`, manejo de errores y metricas
-  - **Aprendizaje Automatico**: `execution_history`, `success_rate`, `average_execution_time`, `last_executed`
-  - **Acciones Reutilizables**: `reusable_action`, `action_category` para componentes modulares
-
-- **Metodos Principales de Node**:
-  - `__init__`: Inicializacion normalizada con validacion de tipos y valores
-  - `_evaluate_precondition`: Evaluacion robusta de precondiciones (simple, compuesta, funciones, custom)
-  - `can_execute`: Verificacion completa de precondiciones, funciones y estado del mundo
-  - `_apply_effect`: Aplicacion determinista de efectos con soporte para multiples tipos
-  - `execute`: Ejecucion con registro historico, manejo de errores y actualizacion de estado
-  - `_update_learning_metrics`: Calculo automatico de metricas de aprendizaje
-  - `verify_success`: Verificacion de exito mediante criterios configurados
-  - `to_dict/from_dict`: Serializacion completa con manejo de funciones no serializables
-  - `add_edge/add_in_edge`: Gestion de transiciones con costes normalizados
-  - `get_valid_transitions`: Devuelve transiciones ejecutables en estado actual
-  - `add_precondition_function/add_effect_function`: Integracion con callbacks funcionales
-  - `set_state_requirement/set_state_modification`: Gestion declarativa de estado
-  - `mark_as_reusable_action`: Marcado para acciones reutilizables con categorias
-  - `get_execution_stats`: Estadisticas agregadas con manejo robusto de datos
-
-- **Sistema de Goal (Objetivos Inteligentes)**:
-  - **Propiedades**: `id`, `type`, `target`, `description`, `priority`, `deadline`, `constraints`
-  - **Verificacion de Logro**: `is_achieved` con soporte para multiples tipos (navigate, open_application, etc.)
-  - **Estimacion de Coste**: `estimate_cost` con factores de complejidad y estado actual
-  - **Gestion de Capacidades**: `get_required_capabilities` con capacidades por defecto y personalizadas
-  - **Expiracion**: `is_expired` con manejo de deadlines
-  - **Serializacion**: `to_dict/from_dict` para persistencia
-
-- **Sistema de Task (Tareas Jerarquicas)**:
-  - **Jerarquia y Ciclos**: Deteccion automatica de ciclos en `can_execute` y `decompose_task`
-  - **Descomposicion Recursiva**: `decompose_task` convierte tareas complejas en nodos hoja
-  - **Plan de Ejecucion**: `get_execution_plan` genera secuencia respetando dependencias
-  - **Estimacion de Coste**: `estimate_task_cost` calcula coste de hijos ejecutables
-  - **Gestion de Estado**: `status`, timestamps, y validacion de dependencias
-  - **Serializacion**: Completa con manejo de estados y dependencias
-
-- **Sistema de WorldState (Estado del Mundo)**:
-  - **Operaciones Atomicas**: `get`, `set`, `update` con copias profundas seguras
-  - **Inmutabilidad**: `copy` crea estados independientes para evitar efectos colaterales
-  - **Serializacion**: `to_dict/from_dict` para persistencia y transferencia
-
-- **Funciones Globales de Creacion**:
-  - `create_action_node`: Crea nodos de accion reutilizables con categorias
-  - `create_application_node`: Crea nodos que representan aplicaciones
-  - `create_state_node`: Crea nodos de requisito de estado declarativo
-  - `create_condition_node`: Crea nodos de condicion mediante callbacks
-
-- **Caracteristicas Avanzadas**:
-  - **Sistema de Aprendizaje**: Registro historico automatico con metricas de exito y tiempo de ejecucion
-  - **Gestion de Grafos**: Soporte completo para grafos de estados con aristas ponderadas
-  - **Serializacion Inteligente**: Maneja funciones no serializables y referencias circulares
-  - **Validacion Robusta**: Normalizacion automatica de tipos, flotantes y estructuras de datos
-  - **Manejo de Errores**: Logging estructurado y recuperacion graceful ante fallos
-  - **Integracion HTN**: Disenado para trabajar con sistemas de descomposicion jerarquica de tareas
-  - **Estado del Mundo**: Integracion completa con sistemas de memoria y estado persistente
-
-#### `src/hands/planner/optimization_config.py` [355 lineas] - Configuracion del Sistema de Optimizacion
-- **Descripcion**: Configuracion tipada y validada del sistema de optimizacion con modos predefinidos, configuraciones por subsistema y serializacion segura.
-- **Clases principales**:
-  - `OptimizationMode` (Enum): Modos de operacion del sistema de optimizacion (AGGRESSIVE, BALANCED, CONSERVATIVE, LEARNING_ONLY)
-  - `RouteCacheConfig`: Configuracion del cache de rutas con LRU, precarga y compresion
-  - `CostLearningConfig`: Configuracion del aprendizaje de costes con tasa de aprendizaje y factor de descuento
-  - `RedundancyRemovalConfig`: Configuracion de eliminacion de redundancias con analisis de efectos y alternativas
-  - `ContextAwareConfig`: Configuracion de optimizacion basada en contexto con patrones temporales y de usuario
-  - `AlternativeSelectionConfig`: Configuracion de seleccion de alternativas con comparacion multidimensional
-  - `PerformanceMonitoringConfig`: Configuracion de monitoreo de rendimiento con deteccion de cuellos de botella
-  - `OptimizationConfig`: Configuracion completa del sistema de optimizacion con validacion automatica
-- **Metodos principales**:
-  - `OptimizationMode`: AGGRESSIVE, BALANCED, CONSERVATIVE, LEARNING_ONLY
-  - `RouteCacheConfig.__init__`: Inicializa configuracion de cache de rutas con valores por defecto
-  - `CostLearningConfig.__init__`: Inicializa configuracion de aprendizaje de costes con hiperparametros
-  - `RedundancyRemovalConfig.__init__`: Inicializa configuracion de eliminacion de redundancias
-  - `ContextAwareConfig.__init__`: Inicializa configuracion de optimizacion contextual
-  - `AlternativeSelectionConfig.__init__`: Inicializa configuracion de seleccion de alternativas
-  - `PerformanceMonitoringConfig.__init__`: Inicializa configuracion de monitoreo de rendimiento
-  - `OptimizationConfig.__init__`: Inicializa configuracion completa con normalizacion automatica
-  - `OptimizationConfig.__post_init__`: Normaliza valores basicos y valida configuracion anidada
-  - `OptimizationConfig._coerce_nested`: Convierte y valida configuraciones anidadas desde diccionarios
-  - `OptimizationConfig.get_aggressive_config`: Obtiene configuracion optimizada para modo agresivo
-  - `OptimizationConfig.get_conservative_config`: Obtiene configuracion para modo conservador
-  - `OptimizationConfig.get_learning_only_config`: Obtiene configuracion para modo solo aprendizaje
-  - `OptimizationConfig.get_optimization_enabled`: Obtiene estado efectivo de cada tecnica de optimizacion
-  - `OptimizationConfig.validate_config`: Valida configuracion completa y devuelve advertencias
-  - `OptimizationConfig.to_dict`: Convierte configuracion a diccionario serializable
-  - `OptimizationConfig.from_dict`: Crea configuracion desde diccionario parcial o completo
-
-#### `src/hands/planner/optimization.py` [938 lineas] - Sistema de Optimizacion de Planificacion
-- **Descripcion**: Sistema avanzado de optimizacion para el planificador JARVIS con cache LRU de rutas, eliminacion de redundancias, seleccion de alternativas y optimizacion contextual. Integracion completa con LearningSystem para costes aprendidos y persistencia robusta de datos.
-- **Clases principales**:
-  - `OptimizationType` (Enum): Tipos de optimizacion disponibles (ROUTE_CACHE, COST_LEARNING, REDUNDANCY_REMOVAL, CONTEXT_AWARE, ALTERNATIVE_SELECTION, PERFORMANCE_MONITORING)
-  - `RouteCacheEntry` (dataclass): Entrada del cache de rutas con metadatos de calidad y acceso
-  - `CostLearningData` (dataclass): Dato individual de aprendizaje de coste con contexto y metricas
-  - `ContextData` (dataclass): Datos contextuales usados por la optimizacion (preferencias, patrones, exito)
-  - `OptimizationManager`: Gestor principal de optimizacion sobre el Planner existente
-- **Metodos principales**:
-  - `__init__`: Inicializa gestor de optimizacion con planner, cache LRU y sistemas de aprendizaje
-  - `set_learning_system`: Establece sistema de aprendizaje externo para costes aprendidos
-  - `optimize_planning`: Metodo principal de planificacion optimizada con multiples estrategias
-  - `_check_route_cache`: Verifica cache de rutas para objetivo y estado actual
-  - `_add_to_route_cache`: Anade resultado de planificacion al cache con gestion de tamano
-  - `_build_cache_key`: Construye clave de cache estable basada en objetivo y estado
-  - `_hash_state`: Genera hash estable del estado ignorando campos volatiles
-  - `_stable_hash`: Metodo estatico para hash estable de valores complejos
-  - `_normalize_for_json`: Normaliza valores para serializacion JSON estable
-  - `_strip_volatile_state`: Elimina campos volatiles del estado para hash
-  - `_remove_redundancies`: Elimina redundancias conservadoras de planes
-  - `_select_optimal_alternatives`: Selecciona alternativas optimas basadas en coste y compatibilidad
-  - `_apply_context_optimization`: Aplica optimizacion contextual basada en preferencias y patrones
-  - `_create_optimized_node`: Crea nodo optimizado con metodo preferido
-  - `_calculate_state_compatibility`: Calcula compatibilidad de plan con estado actual
-  - `_evaluate_condition_with_state`: Evalua condiciones con estado actual
-  - `_get_nested_state_value`: Obtiene valor anidado del estado con manejo de errores
-  - `_get_learned_cost_for_plan`: Obtiene coste aprendido para plan externo o interno
-  - `record_execution_result`: Registra resultado de ejecucion para aprendizaje y actualizacion de modelos
-  - `_update_cost_model`: Actualiza modelo de coste con datos de ejecucion
-  - `_update_context_patterns`: Actualiza patrones contextuales con ejecuciones recientes
-  - `get_optimization_stats`: Obtiene estadisticas completas del sistema de optimizacion
-  - `clear_cache`: Limpia cache de rutas y estadisticas
-  - `enable_optimization`: Habilita/deshabilita tipos especificos de optimizacion
-  - `export_optimization_data`: Exporta todos los datos de optimizacion a archivo JSON
-  - `import_optimization_data`: Importa datos de optimizacion desde archivo JSON con validacion
-  - `_node_identifier`: Obtiene identificador unico de nodo
-  - `_node_cost`: Obtiene coste de nodo con manejo de errores
-  - `_plan_signature`: Genera firma estable de plan para comparacion
-- **Caracteristicas implementadas**:
-  - Cache LRU inteligente de rutas validas por objetivo y estado relevante
-  - Comparacion y seleccion automatica de alternativas optimas
-  - Eliminacion conservadora de redundancias sin afectar funcionalidad
-  - Optimizacion contextual basada en preferencias de usuario y patrones temporales
-  - Integracion completa con LearningSystem para costes aprendidos
-  - Persistencia robusta de datos de optimizacion con exportacion/importacion JSON
-  - Sistema de metricas detallado para monitoreo y mejora continua
-  - Manejo thread-safe de cache y datos compartidos
-  - Soporte para multiples estrategias de optimizacion configurables
-
-#### `src/hands/planner/planner.py` - Planificador Principal de JARVIS
-- **Descripcion**: Planificador central de JARVIS con capacidades avanzadas de planificacion jerarquica, integracion HTN, optimizacion de rutas, aprendizaje automatico y gestion de recursos UI. Coordina todas las operaciones de planificacion y ejecucion del sistema.
-- **Clases principales**:
-  - `PlannerStatus` (Enum): Estados del planificador (IDLE, PLANNING, EXECUTING, COMPLETED, FAILED, REPLANNING)
-  - `PlanQuality` (Enum): Calidad de planes (OPTIMAL, SUBOPTIMAL, MINIMAL, UNCERTAIN)
-  - `PlanningResult` (dataclass): Resultado estructurado de planificacion con metadatos
-  - `Planner`: Planificador principal con integracion HTN, grafos de estados y optimizacion
-- **Metodos principales**:
-  - `__init__`: Inicializa planificador con executor, nodos disponibles y sistemas de optimizacion
-  - `get_learning_insights`: Obtiene insights del sistema de aprendizaje
-  - `get_action_learning_insights`: Obtiene insights de aprendizaje para accion especifica
-  - `get_cost_adjustments`: Obtiene ajustes de coste del sistema de aprendizaje
-  - `export_learning_data`: Exporta datos de aprendizaje a archivo
-  - `import_learning_data`: Importa datos de aprendizaje desde archivo
-  - `clear_learning_data`: Limpia datos de aprendizaje
-  - `enable_learning`: Habilita/deshabilita sistema de aprendizaje
-  - `initialize_htn_manager`: Inicializa gestor HTN
-  - `set_htn_manager`: Establece gestor HTN externo
-  - `plan_with_htn_integration`: Planificacion integrada HTN + grafo de estados
-  - `_plan_with_graph_optimized`: Planificacion con optimizacion de grafo
-  - `_plan_with_htn_traditional`: Planificacion tradicional con HTN
-  - `_plan_complex_htn_graph`: Planificacion compleja HTN + grafo
-  - `_convert_htn_result_to_plan`: Convierte resultados HTN a formato plan
-  - `set_state_graph`: Establece grafo de estados
-  - `get_state_graph`: Obtiene grafo de estados
-  - `create_graph_from_nodes`: Crea grafo desde nodos disponibles
-  - `_build_graph_edges`: Construye aristas del grafo
-  - `_should_create_edge`: Determina si debe crear arista entre nodos
-  - `_calculate_edge_cost_for_graph`: Calcula coste de arista en grafo
-  - `_get_edge_conditions`: Obtiene condiciones de arista
-  - `integrate_graph_with_htn`: Integra grafo con HTN
-  - `validate_graph_integration`: Valida integracion grafo-HTN
-  - `get_graph_integration_status`: Obtiene estado de integracion
-  - `configure_astar_planning`: Configura planificacion A*
-  - `_create_graph_edges_from_nodes`: Construye aristas desde nodos
-  - `set_custom_graph`: Establece grafo personalizado
-  - `plan`: Metodo principal de planificacion con optimizacion y alternativas
-  - `_plan_with_optional_optimization`: Planificacion con optimizacion opcional
-  - `_create_plan_astar`: Planificacion usando algoritmo A*
-  - `_create_plan`: Planificacion deterministica basica
-  - `_get_available_nodes`: Obtiene nodos disponibles
-  - `_create_compatibility_nodes`: Crea nodos de compatibilidad
-  - `_get_start_node_for_goal`: Obtiene nodo de inicio para objetivo
-  - `_get_goal_node_for_goal`: Obtiene nodo de objetivo
-  - `_convert_path_to_plan`: Convierte ruta a plan ejecutable
-  - `_convert_node_to_execution_node`: Convierte nodo a formato ejecutable
-  - `_build_hierarchical_plan`: Construye plan jerarquico
-  - `_find_nodes_for_capability`: Busca nodos por capacidad
-  - `_node_provides_capability`: Verifica si nodo proporciona capacidad
-  - `_select_best_node`: Selecciona mejor nodo disponible
-  - `_optimize_plan`: Optimiza plan existente
-  - `validate_ui_resources_for_plan`: Valida recursos UI para planes
-  - `get_optimal_ui_strategy`: Obtiene estrategia UI optima
-  - `resolve_ui_conflicts`: Resuelve conflictos de recursos UI
-  - `check_ui_readiness`: Verifica preparacion UI
-  - `_find_alternative_plans_astar`: Busca planes alternativos con A*
-  - `_find_alternatives_for_node`: Busca alternativas para nodo especifico
-  - `_select_best_alternative`: Selecciona mejor alternativa
-  - `_calculate_plan_similarity`: Calcula similitud entre planes
-  - `_calculate_state_compatibility`: Calcula compatibilidad con estado
-  - `_evaluate_condition_with_state`: Evalua condiciones con estado actual
-  - `replan`: Replanificacion ante fallos
-  - `_evaluate_plan_quality`: Evalua calidad de planes
-  - `_optimize_integrated_plan`: Optimiza plan integrado
-  - `_remove_redundancies`: Elimina redundancias en plan
-  - `_apply_learned_cost_adjustments`: Aplica ajustes de coste aprendidos
-  - `_ensure_optimization_systems`: Asegura sistemas de optimizacion
-  - `load_application_knowledge`: Carga conocimiento de aplicaciones
-  - `get_applications_by_capability`: Obtiene aplicaciones por capacidad
-  - `get_application_capabilities`: Obtiene capacidades de aplicacion
-  - `find_application_for_goal`: Busca aplicacion para objetivo
-  - `build_application_aware_plan`: Construye plan consciente de aplicaciones
-  - `is_application_available`: Verifica disponibilidad de aplicacion
-  - `get_application_ui_requirements`: Obtiene requisitos UI de aplicacion
-  - `get_planning_stats`: Obtiene estadisticas de planificacion
-  - `execute_plan`: Ejecuta plan (compatibilidad)
-  - `record_execution_result`: Registra resultado de ejecucion
-  - `get_optimization_stats`: Obtiene estadisticas de optimizacion
-  - `clear_optimization_cache`: Limpia cache de optimizacion
-  - `enable_optimization`: Habilita tipo de optimizacion
-  - `export_optimization_data`: Exporta datos de optimizacion
-  - `import_optimization_data`: Importa datos de optimizacion
-  - `get_optimization_recommendations`: Obtiene recomendaciones de optimizacion
-  - `_record_planning_history`: Registra historial de planificacion
-  - `_get_default_state`: Obtiene estado por defecto
-  - `_safe_required_capabilities`: Obtiene capacidades requeridas de forma segura
-  - `_is_goal_expired`: Verifica si objetivo ha expirado
-  - `_is_goal_achieved`: Verifica si objetivo ya esta alcanzado
-  - `_node_type_value`: Obtiene valor de tipo de nodo
-  - `_status_value`: Obtiene valor de estado
-  - `_normalize_identifier`: Normaliza identificador
-  - `_state_node_matches_context`: Verifica si nodo coincide con contexto
-- `_node_can_satisfy_goal`: Verifica si nodo de accion puede satisfacer objetivo
-- `_goal_satisfied_by_effects`: Verifica si objetivo esta satisfecho por efectos
-- `_effects_support_preconditions`: Determina si efectos pueden habilitar precondiciones
-- `_normalize_route_result`: Normaliza resultados de busqueda a formato consistente
-- `_create_sequential_navigation_edges`: Crea aristas de navegacion secuenciales
-
-#### `src/hands/planner/planner_integration.py` [1215 lineas] - Integracion del StateGraph con el Sistema de Planificacion
-- **Descripcion**: Puente entre Goal/estado actual y StateGraph. Inicializa y prepara el grafo, construye transiciones de planificacion a partir de precondiciones/efectos, resuelve nodos inicial/final sin depender de IDs inventados, obtiene una ruta del StateGraph/AdvancedStateGraph y devuelve un resultado estructurado sin ejecutar acciones reales.
-- **Clases principales**:
-  - `IntegrationMode` (Enum): Modos de integracion (GRAPH_ONLY, HTN_PLUS_GRAPH, FULL_INTEGRATION)
-  - `GraphPlanningResult` (dataclass): Resultado estructurado de planificacion con grafo
-  - `GraphPlannerIntegration`: Puente entre Goal/estado actual y StateGraph
-- **Metodos principales**:
-  - `__init__`: Inicializa integracion con modo, heuristica y metricas de rendimiento
-  - `initialize_graph`: Crea el grafo y anade las transiciones declaradas y derivadas
-  - `_configure_advanced_edges`: Configura aristas avanzadas desde configuracion
-  - `_create_compatibility_edges`: Crea aristas de compatibilidad predefinidas
-  - `_create_sequence_edges`: Crea aristas secuenciales con costes definidos
-  - `_prepare_planning_edges`: Conecta estados/acciones cuando existe una relacion planificable
-  - `_connect_if_plannable`: Conecta nodos si precondiciones se satisfacen
-  - `_add_planning_edge`: Anade arista de planificacion entre nodos
-  - `_add_edge_if_missing`: Anade arista si no existe ya
-  - `create_plan_with_graph`: Construye una ruta y sus metadatos, sin convertirla aun en Plan ejecutable
-  - `_validate_planning_input`: Valida entrada para planificacion
-  - `_determine_search_strategy`: Determina estrategia de busqueda segun complejidad
-  - `_calculate_goal_complexity`: Calcula complejidad del objetivo basada en tipo y estado
-  - `_execute_search`: Invoca la API real del grafo respetando sus nombres de parametros
-  - `_select_search_method`: Selecciona metodo de busqueda compatible del grafo
-  - `_build_search_kwargs`: Construye parametros para busqueda con inspeccion de firma
-  - `_call_search_positionally`: Llama a busqueda con parametros posicionales como fallback
-  - `_normalize_route_result`: Normaliza resultados de busqueda a formato consistente
-  - `_normalize_edge_ids`: Normaliza identificadores de aristas
-  - `_prepare_contextual_planning_edges`: Prepara aristas de planificacion contextual
-  - `_get_start_node_for_goal`: Obtiene nodo de inicio para objetivo
-  - `_score_state_node`: Calcula puntuacion de nodo de estado segun contexto
-  - `_get_goal_node_for_goal`: Obtiene nodo de objetivo para Goal
-  - `_node_can_satisfy_goal`: Verifica si nodo de accion puede satisfacer objetivo
-  - `_goal_type_matches_effects`: Verifica si tipo de objetivo coincide con efectos
-  - `_calculate_path_cost`: Calcula coste total de un camino en el grafo
-  - `_find_edge`: Encuentra arista especifica entre nodos
-  - `_get_edges_used_in_path`: Obtiene aristas usadas en un camino
-  - `_convert_path_to_plan_metadata`: Convierte ruta a metadatos de plan
-  - `_update_performance_metrics`: Actualiza metricas de rendimiento
-  - `_preconditions_satisfied`: Verifica si precondiciones se satisfacen con estado actual
-  - `_effects_support_preconditions`: Determina si efectos pueden habilitar precondiciones
-  - `_condition_supported_by_effects`: Verifica si condicion especifica es soportada por efectos
-  - `_has_effect_key`: Verifica si efecto contiene clave especifica
-  - `_key_value_supported`: Verifica si efecto soporta clave-valor especifico
-  - `_goal_satisfied_by_effects`: Verifica si objetivo esta satisfecho por efectos
-  - `_calculate_graph_metrics`: Calcula metricas del grafo (densidad, grado medio)
-  - `get_integration_statistics`: Obtiene estadisticas completas de la integracion
-  - `export_graph_state`: Exporta estado del grafo a archivo
-  - `import_graph_state`: Importa estado del grafo desde archivo
-  - `validate_graph_consistency`: Valida consistencia del grafo
-  - `build_route`: Metodo publico compatible para construir rutas
-  - `_safe_float`: Convierte valor a float de forma segura
-  - `_node_can_satisfy_goal`: Verifica si nodo puede satisfacer objetivo
-  - `_goal_satisfied_by_effects`: Verifica si objetivo satisfecho por efectos
-  - `_effects_support_preconditions`: Verifica si efectos soportan precondiciones
-  - `_normalize_route_result`: Normaliza resultado de ruta
-  - `_create_sequential_navigation_edges`: Crea aristas de navegacion secuenciales
-
-#### `src/hands/planner/preconditions_effects.py` [1077 lineas] - Sistema Avanzado de Precondiciones y Efectos
-- **Descripcion**: Sistema avanzado de precondiciones y efectos para planificacion jerarquica con gestion centralizada de condiciones y efectos, evaluacion segura y aplicacion determinista sobre estados del mundo.
-- **Clases principales**:
-  - `PreconditionsEffectsManager`: Gestor centralizado de precondiciones y efectos con registro y reutilizacion.
-  - `Condition`: Representa condiciones evaluables sobre el estado del mundo.
-  - `Effect`: Representa efectos que modifican el estado del mundo.
-- **Metodos principales**:
-  - `create_condition()`: Crea y registra condiciones para reutilizacion.
-  - `create_effect()`: Crea y registra efectos para reutilizacion.
-  - `create_composite_condition()`: Crea condiciones compuestas AND/OR.
-  - `verify_action_preconditions()`: Verifica si todas las precondiciones de una accion se cumplen.
-  - `evaluate_condition()`: Evalua condiciones individuales o funcionales de forma segura.
-  - `apply_action_effects()`: Aplica los efectos de una accion y devuelve un nuevo estado.
-  - `apply_effect()`: Aplica un efecto individual sobre el estado.
-  - `get_state_requirements_for_action()`: Extrae precondiciones representables como requisitos escalares.
-  - `get_state_modifications_from_action()`: Extrae modificaciones de estado estaticas de los efectos.
-  - `create_action_with_preconditions_effects()`: Crea ActionInfo compatible con el registro central.
-- **Funciones globales**:
-  - `get_preconditions_effects_manager()`: Obtiene la instancia global del gestor.
-  - `create_application_open_condition()`: Crea condicion de aplicacion abierta.
-  - `create_application_active_condition()`: Crea condicion de aplicacion activa.
-  - `create_ui_element_calibrated_condition()`: Crea condicion de elemento UI calibrado.
-  - `create_application_open_effect()`: Crea efecto de aplicacion abierta.
-  - `create_ui_element_calibrate_effect()`: Crea efecto de calibracion de elemento UI.
-- **Caracteristicas principales**:
-  - Construccion y reutilizacion de condiciones y efectos
-  - Evaluacion segura de precondiciones simples, compuestas y funcionales
-  - Aplicacion determinista y acumulativa de efectos sobre estados
-  - Integracion con ActionInfo/ActionType del registro central de acciones
-  - Utilidades comunes para acciones de aplicaciones y elementos UI
-  - Manejo robusto de errores y logging detallado
-  - Soporte para condiciones compuestas con operadores AND/OR
-  - Sistema de plantillas para condiciones y efectos comunes
-- **Integraciones**:
-  - `ActionInfo` y `ActionType` del registro central de acciones
-  - `Condition` y `Effect` de preconditions_effects_types
-  - Sistema de logging para depuracion y monitoreo
-- **Dependencias**: copy, math, typing, hands.action_registry, hands.planner.preconditions_effects_types, utils.logger
-
-#### `src/hands/planner/preconditions_effects_types.py` [822 lineas] - Sistema de Tipos para Precondiciones y Efectos
-- **Descripcion**: Sistema avanzado de tipos base para precondiciones y efectos con copias de estado seguras, evaluacion robusta y aplicacion determinista. Proporciona estructuras de datos fundamentales para definir condiciones que deben cumplirse antes de ejecutar acciones y efectos que modifican el estado tras la ejecucion. Evita importaciones circulares con action_registry y mantiene separacion entre planificacion y ejecucion.
-- **Clases principales**:
-  - `ConditionType` (Enum): Tipos de condiciones con aliases historicos (STATE_EQUALS, STATE_EXISTS, STATE_TRUE, STATE_GREATER_THAN, STATE_LESS_THAN, APPLICATION_OPEN, APPLICATION_ACTIVE, UI_ELEMENT_AVAILABLE, UI_ELEMENT_CALIBRATED, CUSTOM_FUNCTION, COMPOSITE_AND, COMPOSITE_OR).
-  - `Condition` (dataclass): Condicion robusta con evaluacion segura, soporte para funciones personalizadas y condiciones compuestas con proteccion contra ciclos.
-  - `Effect` (dataclass): Efecto determinista que devuelve nuevos estados sin mutar el original, soportando multiples tipos como state_set, state_increment, state_decrement, state_append, state_remove, application_open/close/activate, ui_element_calibrate/focus, custom_function, composite.
-  - `State` (type alias): Tipo alias para diccionario que representa el estado del sistema.
-  - `ConditionFunction` (type alias): Tipo alias para funcion de evaluacion de condiciones.
-  - `EffectFunction` (type alias): Tipo alias para funcion de aplicacion de efectos.
-- **Metodos principales**:
-  - `Condition.evaluate`: Evalua condiciones contra estado actual con copias seguras, soporte para condiciones anidadas y manejo robusto de errores.
-  - `Effect.apply`: Aplica efectos deterministas con copias de estado, manejo de ejecucion y multiples tipos de efectos con acumulacion opcional.
-  - `_safe_copy`: Copia defensiva de valores tolerando objetos no copiables.
-  - `_normalize_name`: Normalizacion consistente de nombres para claves de estado.
-  - `_get_nested_state_value`: Acceso a valores por ruta con puntos en estado anidado.
-  - `_get_application_state`: Busqueda flexible de estado de aplicacion en multiples formatos.
-  - `_get_boolean_application_flag`: Evaluacion de flags de aplicacion con normalizacion.
-  - `_get_ui_element_state`: Gestion de estado de elementos UI con aislamiento por aplicacion.
-  - `_get_ui_element_state`: Busca el estado de un elemento UI en varios formatos compatibles.
-  - `_resolve_condition_type`: Convierte el tipo recibido a ConditionType aceptando miembros del enum, valores string y alias historicos.
-  - `_coerce_condition`: Convierte una condicion soportada a `Condition`.
-  - `_coerce_effect`: Convierte un efecto soportado a `Effect`.
-  - `_update_application_state`: Actualiza, cuando existe, el formato anidado `applications`.
-  - `_update_ui_element_state`: Actualiza, cuando existe, el formato anidado `ui_elements`.
-- **Caracteristicas**:
-  - Sistema de tipos robusto para condiciones y efectos con soporte para operaciones compuestas
-  - Manejo de estado anidado y normalizacion de nombres para consistencia
-  - Soporte para aplicaciones y elementos UI con multiples formatos compatibles
-  - Sistema de condiciones compuestas (AND/OR) para logica compleja
-  - Manejo de errores robusto con fallbacks seguros
-  - Acumulacion de efectos para operaciones incrementales
-  - Integracion con el sistema de planificacion jerarquica
-
-#### `src/hands/planner/task_executor.py` [1107 lineas] - Ejecutor de Tareas para HTN
-- **Descripcion**: Convierte tareas HTN en unidades ejecutables y delega la ejecucion real en las capacidades registradas o en el executor principal de JARVIS. El modulo no simula ejecuciones exitosas: cuando no existe una capacidad real disponible, la tarea termina en FAILED.
-- **Clases principales**:
-  - `TaskExecutorStatus` (Enum): Estados del ejecutor de tareas (IDLE, PREPARING, EXECUTING, COMPLETED, FAILED, RETRYING)
-  - `TaskExecutionMode` (Enum): Modos de ejecucion (SEQUENTIAL, PARALLEL, CONDITIONAL, FALLBACK)
-  - `TaskExecutionConfig` (dataclass): Configuracion de ejecucion con reintentos, timeout y paralelismo
-  - `TaskExecutor`: Ejecutor principal de tareas HTN integrado con las capacidades reales de JARVIS
-- **Metodos principales**:
-  - `TaskExecutor.__init__`: Inicializa ejecutor con configuracion y sistemas dependientes
-  - `execute_task`: Prepara y ejecuta una tarea individual sin simular exito
-  - `execute_task_with_retry`: Ejecuta una tarea con reintentos limitados
-  - `execute_task_hierarchy`: Ejecuta jerarquia de tareas en modo secuencial, paralelo, condicional o fallback
-  - `_prepare_task_execution`: Prepara ejecucion verificando precondiciones
-  - `_check_task_preconditions`: Verifica dependencias, disponibilidad de aplicaciones y recursos UI
-  - `_convert_task_to_node`: Convierte tarea HTN a nodo ejecutable del modelo canonico
-  - `_calculate_task_cost`: Calcula coste de tarea basado en metadatos, registry o heuristicas
-  - `_resolve_action_name`: Resuelve nombre de accion desde metadatos o tarea
-  - `_create_execution_callback`: Crea callback de ejecucion para el nodo
-  - `_normalize_execution_result`: Normaliza resultados de ejecucion a formato consistente
-  - `_execute_real_capability`: Ejecuta capacidad real registrada o delega en executor principal
-  - `_delegate_to_executor`: Adapta varias convenciones conocidas del executor sin inventar APIs
-  - `_signature_accepts`: Verifica si firma de metodo acepta argumentos especificos
-  - `_create_success_criteria`: Crea criterio de exito personalizado o usa criterio por defecto
-  - `_execute_node`: Ejecuta nodo con callback y aplica modificaciones de estado
-  - `_apply_result_to_state`: Aplica resultado de ejecucion al estado actual del sistema
-  - `_execute_fallback`: Ejecuta estrategia fallback cuando la ejecucion principal falla
-  - `_execute_legacy_task_capability`: Compatibilidad: intenta ejecutar capacidad real con ID de tarea
-  - `_execute_resolve_entity`: Resuelve entidad mediante el resolver real de memoria
-  - `_get_conversation_history`: Obtiene historial de conversacion desde memoria
-  - `_get_current_intent`: Obtiene intencion actual desde contexto de ejecucion
-  - `_get_recent_entities`: Obtiene entidades recientes desde estado del mundo
-  - `_get_user_preferences`: Obtiene preferencias de usuario desde memoria
-  - `_get_session_info`: Obtiene informacion de sesion actual
-  - `_update_world_state_with_entity`: Actualiza estado del mundo con entidad resuelta
-  - `_execute_sequential`: Ejecuta tareas en modo secuencial deteniendose en fallos
-  - `_execute_parallel`: Ejecuta tareas en paralelo con copias independientes del estado
-  - `_execute_conditional`: Ejecuta tareas solo si se satisfacen condiciones especificas
-  - `_execute_with_fallback`: Ejecuta tareas con reintentos automaticos
-  - `_should_execute_conditionally`: Determina si tarea debe ejecutarse segun condiciones
-  - `_update_execution_statistics`: Actualiza estadisticas de ejecucion con promedio movil
-  - `get_execution_statistics`: Devuelve estadisticas completas de ejecucion del sistema
-- **Funciones globales**:
-  - `get_task_executor`: Obtiene instancia singleton del ejecutor de tareas
-  - `get_htn_manager`: Obtiene el HTN Manager mediante importacion diferida
-  - `get_application_knowledge_integrator`: Obtiene el integrador de conocimiento de aplicaciones
-  - `get_executor`: Obtiene el executor principal de JARVIS mediante importacion diferida
-  - `get_action_registry`: Obtiene el registro central de acciones mediante importacion diferida
-
-#### `src/hands/universal_visual_calibrator.py` [916 lineas] - Calibrador Visual Universal
-- **Descripcion**: Calibrador visual universal para la arquitectura de planificacion jerarquica. Esta capa realiza exclusivamente percepcion/calibracion visual. No abre ni mueve aplicaciones y no persiste macros_coords.json directamente. El resultado de `calibrate()` utiliza coordenadas absolutas del escritorio virtual y asocia cada elemento al monitor fisico real (`s1`, `s2`, ...).
-- **Clases principales**:
-  - `CalibrationPolicy` (Policy): Politica centralizada de seguridad, no una allowlist de aplicaciones. La calibracion visual es universal: una aplicacion GUI no bloqueada puede ser analizada. Las aplicaciones peligrosas/protegidas se rechazan aqui y en el preflight del CalibrationManager cuando corresponde.
-  - `UICapability` (dataclass): Representa un elemento UI calibrado y consumible por acciones con propiedades de nombre, tipo, centro, bounding box, pantalla, confianza y timestamp.
-  - `CalibrationState`: Estado en memoria de los elementos calibrados con soporte para multipantalla (app -> sN -> element -> capability).
-  - `UniversalVisualCalibrator`: Calibrador visual universal integrado con las capas superiores que usa Qwen3-VL para analisis visual y normalizacion de coordenadas.
-- **Metodos principales**:
-  - `__init__`: Inicializa UniversalVisualCalibrator con Vision (Qwen3-VL), CalibrationPolicy, CalibrationState y ConversationMemory; registra la inicialización en log.
-  - `get_ui_capability`: Obtiene una capacidad UI especifica para una aplicacion y elemento en un monitor concreto con cache automatico.
-  - `calibrate_application_elements`: Calibra todos los elementos de una aplicacion en un monitor especifico aplicando politica de filtrado.
-  - `calibrate`: Metodo principal que realiza calibracion completa de una aplicacion usando captura de pantalla y analisis con Qwen3-VL.
-  - `_calibrate_element`: Metodo interno para calibrar un elemento especifico dentro de una aplicacion ya calibrada.
-  - `_build_prompt`: Construye prompt personalizado para Qwen3-VL basado en el nombre de la aplicacion.
-  - `_parse_response`: Parsea respuesta JSON de Qwen3-VL con manejo robusto de errores y formato libre.
-  - `_normalize_elements`: Normaliza elementos crudos del modelo con transformacion de coordenadas y deduplicacion.
-  - `_normalize_single_element`: Normaliza un elemento individual con validacion de coordenadas y confianza.
-  - `_extract_image_bbox`: Extrae bounding box de imagen normalizada (0-1000) y lo convierte a pixeles.
-  - `_image_bbox_to_monitor_bbox`: Convierte coordenadas de imagen a coordenadas absolutas del monitor.
-  - `_deduplicate_elements`: Elimina duplicados por nombre, centro y tipo manteniendo el de mayor confianza.
-- **Caracteristicas principales**:
-  - Politica de seguridad con listas de aplicaciones bloqueadas (juegos, herramientas sensibles, terminales, etc.) y tipos de elemento filtrados.
-  - Soporte multi-monitor con coordenadas absolutas del escritorio virtual asociadas a monitores fisicos.
-  - Cache automatico de elementos calibrados con historial y timestamps.
-  - Analisis visual con Qwen3-VL mediante Ollama para deteccion de elementos interactivos.
-  - Normalizacion robusta de coordenadas, nombres y confianza con validacion exhaustiva.
-  - Sistema de deduplicacion basado en nombre, centro y tipo de elemento.
-  - Maximo de 80 elementos por calibracion con confianza minima del 20%.
-- **Constantes de configuracion**:
-  - `MODEL`: "qwen3-vl:8b-instruct" - Modelo de vision por computadora.
-  - `NORMALIZED_MAX`: 1000 - Valor maximo para coordenadas normalizadas.
-  - `MAX_ELEMENTS`: 80 - Maximo numero de elementos detectables.
-  - `MIN_CONFIDENCE`: 0.20 - Confianza minima para elementos detectados.
-- **Funciones globales**:
-  - `get_calibrator`: Obtiene instancia singleton del calibrador visual universal.
-  - `get_ui_capability`: Funcion de conveniencia para obtener capacidades UI especificas.
-- **Integraciones**:
-  - `Vision` para analisis de imagenes mediante Qwen3-VL.
-  - `ConversationMemory` para estado y cache de calibraciones.
-  - `ScreenManager` para informacion de monitores y geometria.
-  - `utils.logger` para logging detallado del proceso de calibracion.
-- **Dependencias**: PIL para procesamiento de imagenes, json para manejo de respuestas, regex para normalizacion, unicodedata para normalizacion de texto.
-
-#### `src/hands/windows/__init__.py` - Inicializacion del Modulo Windows
-- **Descripcion**: Modulo especifico para aplicaciones de Windows. Archivo de inicializacion del paquete Windows que contiene solo la documentacion del modulo.
-- **Contenido**: Archivo `__init__.py` basico con docstring que define el modulo Windows para JARVIS.
-
-#### `src/hands/windows/calibrator_windows.py` - Calibrador Especifico para Windows
-- **Descripcion**: Adaptador de compatibilidad para la calibracion de aplicaciones Windows. La calibracion real se realiza mediante el sistema universal: CalibrationManager -> descubrimiento de aplicacion -> apertura/enfoque -> ScreenManager -> deteccion de monitor real -> captura -> UniversalVisualCalibrator -> Qwen3-VL 8B Instruct -> coordenadas absolutas -> guardado centralizado.
-- **Clases principales**:
-  - `WindowsCalibrator`: Adaptador legacy que usa exactamente el flujo universal.
-- **Metodos principales**:
-  - `__init__`: Inicializa WindowsCalibrator creando una instancia de CalibrationManager y registrando el uso del flujo universal en log.
-  - `get_calibration_prompt()`: Mantiene la API antigua por compatibilidad. El flujo universal actual no depende de este prompt.
-  - `calibrate_app_both_screens()`: Mantiene el nombre antiguo por compatibilidad. Delegando en CalibrationManager.
-  - `calibrate_app()`: API de compatibilidad para calibrar Windows. La calibracion la realiza integramente CalibrationManager.
-  - `_calibrate_universal()`: Delega la calibracion en CalibrationManager. No realiza deteccion, captura ni calculo de coordenadas.
-- **Funciones globales**:
-  - `calibrate_app()`: Funcion publica de compatibilidad. No escribe macros_coords.json.
-- **Caracteristicas**:
-  - Deteccion multi-monitor integrada con ScreenManager
-  - Soporte para cualquier numero de monitores (no limitado a 1 o 2)
-  - Verificacion de instalacion y disponibilidad
-  - Movimiento y posicionamiento preciso
-  - Compatibilidad con API legacy
-  - No genera coordenadas artificiales
-  - Utiliza calibracion universal a traves de CalibrationManager
-
-#### `src/hands/windows/windows.py` [678 lineas] - Funciones Especificas para Windows
-- **Funciones principales**:
-  - `actualizar_api_key_riot`: Abre Riot Developer Portal y solicita un analisis visual.
-  - `_capturar_pantalla`: Captura el escritorio completo. Se delega primero en ScreenManager para mantener una unica implementacion de captura dentro de Jarvis.
-  - `_abrir_aplicacion_windows`: Intenta abrir una aplicacion de Windows. Esta funcion es legacy. La gestion universal de aplicaciones para calibracion la realiza CalibrationManager.
-  - `_get_window_search_patterns`: Devuelve patrones de titulo compatibles con aplicaciones comunes.
-  - `_get_application_windows`: Busca ventanas de una aplicacion por titulo.
-  - `_verificar_aplicacion_abierta`: Verifica si una aplicacion tiene al menos una ventana visible.
-  - `_mover_aplicacion_a_pantalla`: Mueve una aplicacion a un monitor concreto.
-  - `_cerrar_aplicacion_windows`: Cierra una ventana de la aplicacion.
-  - `_get_default_calibration_screen_number`: Obtiene un monitor real de referencia para una API legacy.
-  - `_calibrar_aplicacion_windows`: API legacy. La calibracion real de aplicaciones Windows se realiza mediante CalibrationManager.
-  - `_obtener_elementos_aplicacion`: API legacy. Ya no existe una lista fija de elementos por aplicacion.
-  - `_generar_coordenadas_aplicacion`: API legacy. Nunca genera coordenadas artificiales.
-  - `_capturar_aplicacion_windows`: Captura la ventana de una aplicacion.
-  - `_safe_filename`: Convierte un nombre de aplicacion en un nombre de archivo seguro.
-  - `get_windows_commands`: Devuelve las funciones publicas/legacy asociadas a Windows.
-
-#### `src/hands/coordinate_manager.py` [1113 lineas] - Gestor Unificado de Coordenadas
-- **Descripcion**: Gestor unificado de coordenadas para JARVIS. Responsabilidades: administrar recursos UI calibrados, proporcionar capacidades de UI al planificador, gestionar estado de calibracion, convertir y validar sistemas de coordenadas, leer datos existentes de macros_coords.json, mantener compatibilidad con APIs legacy.
-- **Clases principales**:
-  - `ResourceType` (Enum): Tipos de recursos UI gestionados por el coordinate manager (ELEMENT, REGION, APPLICATION, WINDOW, MONITOR)
-  - `CalibrationStrategy` (Enum): Estrategias de calibracion disponibles (VISUAL_DETECTION, WINDOW_DETECTION, SCREEN_CAPTURE, KEYBOARD_SHORTCUT, HOTKEY)
-  - `UIResource` (dataclass): Recurso UI calibrado utilizable por acciones del planificador
-  - `UICapability` (Clase): Capacidad UI que puede ser utilizada por una accion
-  - `CoordinateSystem` (Enum): Sistemas de coordenadas soportados por JARVIS (RELATIVE_SCREEN, ABSOLUTE_DESKTOP, WINDOW_RELATIVE)
-  - `BoundingBox` (dataclass): Rectangulo delimitador de un elemento
-  - `ElementInfo` (dataclass): Informacion de un elemento calibrado (compatibilidad)
-  - `CoordinateManager`: Gestor centralizado de conocimiento UI y coordenadas calibradas
-- **Metodos principales**:
-  - `CoordinateManager.__init__`: Inicializa el gestor con screen manager, UI resources, UI capabilities, UI knowledge y calibration policies
-  - `UIResource.__post_init__`: Inicializa recursos UI con normalizacion de valores y verificacion de calibracion
-  - `UIResource.is_usable`: Propiedad que verifica si el recurso esta disponible y calibrado
-  - `UIResource.get_coordinates_for_screen`: Obtiene coordenadas para un monitor especifico
-  - `UIResource.get_region_for_screen`: Obtiene regiones para un monitor especifico
-  - `UIResource.get_best_coordinates`: Devuelve coordenadas del monitor activo o de cualquier monitor calibrado
-  - `UIResource.get_alternatives`: Obtiene recursos alternativos para el recurso actual
-  - `UIResource.can_use_fallback_strategy`: Verifica si se puede usar una estrategia de fallback
-  - `UICapability.__init__`: Inicializa capacidad UI con nombre, descripcion y recursos requeridos
-  - `UICapability.can_execute_with_resources`: Verifica si la capacidad puede ejecutarse con recursos disponibles
-  - `CoordinateManager._initialize_base_capabilities`: Inicializa capacidades base (focus_element, click_element, type_in_element)
-  - `CoordinateManager._load_ui_knowledge`: Carga conocimiento UI desde macros_coords.json
-  - `CoordinateManager._process_ui_knowledge`: Procesa conocimiento UI y crea recursos correspondientes
-  - `CoordinateManager._create_resource_from_knowledge`: Crea recurso UI a partir de datos de conocimiento
-  - `CoordinateManager._resource_type_for_element`: Determina tipo de recurso para un elemento
-  - `CoordinateManager._parse_screen_data`: Parsea datos de pantallas para extraer coordenadas y regiones
-  - `CoordinateManager.register_ui_resource`: Registra un recurso UI en el sistema
-  - `CoordinateManager.get_ui_resource`: Obtiene un recurso UI por ID
-  - `CoordinateManager.get_available_resources`: Obtiene recursos UI disponibles, opcionalmente filtrados por aplicacion
-  - `CoordinateManager.find_resources_by_type`: Encuentra recursos por tipo y aplicacion
-  - `CoordinateManager.has_resource`: Verifica si existe un recurso usable por ID
-  - `CoordinateManager.get_resource_alternatives`: Obtiene alternativas para un recurso especifico
-  - `CoordinateManager.get_fallback_strategies`: Obtiene estrategias de fallback para un recurso
-  - `CoordinateManager.get_capabilities_for_resources`: Obtiene capacidades que pueden usar los recursos especificados
-  - `CoordinateManager.can_execute_capability`: Verifica si una capacidad puede ejecutarse con recursos disponibles
-  - `CoordinateManager.get_capability_alternatives`: Obtiene alternativas para una capacidad especifica
-  - `CoordinateManager.get_calibration_strategy`: Devuelve estrategia permitida para aplicacion/elemento
-  - `CoordinateManager.is_application_calibrable`: Verifica si una aplicacion puede ser calibrada
-  - `CoordinateManager.can_calibrate_element`: Verifica si un elemento puede ser calibrado
-  - `CoordinateManager.get_execution_strategy_for_action`: Obtiene estrategia de ejecucion para una accion
-  - `CoordinateManager.get_resource_coordinates`: Obtiene coordenadas de un recurso para pantalla especifica o mejor disponible
-  - `CoordinateManager.validate_resource_for_action`: Valida si un recurso es adecuado para una accion especifica
-  - `CoordinateManager.load_from_macros_coords`: Carga recursos desde calibraciones o datos legacy
-  - `CoordinateManager._create_legacy_resource`: Crea recurso a partir de datos legacy de macros_coords.json
-  - `CoordinateManager._infer_element_type`: Inferir tipo de elemento basado en nombre
-  - `CoordinateManager.get_calibrated_coordinate`: Obtiene coordenadas calibradas con compatibilidad legacy
-  - `CoordinateManager._get_legacy_calibrated_coordinate`: Obtiene coordenadas legacy del sistema antiguo
-  - `CoordinateManager._case_insensitive_dict_get`: Obtiene valor de diccionario sin distinguir mayusculas/minusculas
-  - `CoordinateManager.monitor_number_from_object`: Extrae numero de monitor de objeto sin asumir atributo concreto
-  - `CoordinateManager.get_screen_key`: Genera clave de pantalla (sN) para numero especifico
-  - `CoordinateManager.screen_number_from_key`: Convierte clave de pantalla (sN) a numero
-  - `CoordinateManager.get_screen_number_from_key`: Obtiene numero de pantalla desde clave
-  - `CoordinateManager._read_coordinate_value`: Lee y valida valor de coordenada
-  - `CoordinateManager.validate_coordinates`: Valida coordenadas dentro de limites de pantalla
-  - `CoordinateManager.validate_bounding_box`: Valida rectangulo delimitador dentro de limites de pantalla
-  - `CoordinateManager.get_window_bounding_box`: Obtiene rectangulo delimitador de ventana por titulo (compatibilidad legacy)
-  - `CoordinateManager._get_window_rect`: Obtiene geometria de ventana priorizando rectangulo normal de Win32
-- **Funciones globales**:
-  - `get_coordinate_manager`: Obtiene la instancia global del gestor de coordenadas
-- **Caracteristicas implementadas**:
-  - Administracion centralizada de recursos UI calibrados
-  - Sistema de capacidades UI para planificacion jerarquica
-  - Gestion de estrategias de calibracion (visual, deteccion de ventanas, captura de pantalla, atajos)
-  - Soporte para multiples sistemas de coordenadas
-  - Carga persistente desde macros_coords.json
-  - Sistema de alternativas y fallbacks para robustez
-  - Validacion de coordenadas y regiones
-  - Compatibilidad con APIs legacy del sistema anterior
-  - Deteccion automatica de tipos de elementos
-  - Manejo de multiples monitores con sistema sN
-  - Integracion con ScreenManager para geometria de monitores
-
-### 🗃 Modulo `src/memory/` - Sistema de Memoria y Planificacion
-
-#### `src/memory/__init__.py` [78 lineas] - Inicializacion del Modulo Memoria
-- **Descripcion**: Modulo de memoria mejorado para soportar planificacion jerarquica con separacion de memoria conversacional y conocimiento permanente, gestion de entidades de dominio, estado del mundo explicito y soporte para planificacion jerarquica.
-- **Importaciones Principales**:
-  - Desde `storage`: MemoryType, Entity, ConversationalMemory, MemoryManager, JSONStorage, get_memory_manager, save_entity, get_entity, get_entities_by_type, add_conversational_memory, get_world_state, update_world_state, y funciones de resolucion de entidades (resolve_entity_to_url, get_entity_attributes, create_goal_from_entity, verify_entity_integrity)
-  - Desde `entity_resolver`: EntityResolver, EntityResolutionResult, ResolutionContext, entity_resolver (Sistema de resolucion de entidades)
-  - Compatibilidad con sistema existente: ConversationMemory como Memory y JSONStorage como Storage
-- **Exportaciones Principales**:
-  - Nuevas clases mejoradas: MemoryType, Entity, ConversationalMemory, MemoryManager, JSONStorage
-  - Funciones de gestion: get_memory_manager, save_entity, get_entity, get_entities_by_type, add_conversational_memory, get_world_state, update_world_state
-  - Funciones de resolucion de entidades: resolve_entity_to_url, get_entity_attributes, create_goal_from_entity, verify_entity_integrity
-  - Sistema de resolucion de entidades: EntityResolver, EntityResolutionResult, ResolutionContext, entity_resolver
-  - Compatibilidad legacy: Memory, Storage
-
-#### `src/memory/conversation.py` [1129 lineas] - Memoria de Conversaciones y Sistema de Planificacion
-- **Descripcion**: Memoria de conversaciones y sistema de planificacion jerarquica. Transforma el sistema de texto→comando→funcion a intencion→objetivo→plan→ejecucion. Incluye: modelo de nodos, nodos jerarquicos, memoria de dominio, comandos de alto nivel y compatibilidad con el sistema legacy.
-- **Clases principales**:
-  - `NodeType` (Enum): Tipos de nodos en el sistema de planificacion (INTENTION, GOAL, TASK, ACTION, CONDITION, STATE, RESOURCE, APPLICATION, UI_ELEMENT, RESULT, PLAN).
-  - `TaskStatus` (Enum): Estado de ejecucion de tareas (PENDING, EXECUTING, COMPLETED, FAILED, ABORTED).
-  - `Node`: Modelo basico de nodo para memoria.
-  - `Goal`: Modelo basico de objetivo para memoria.
-  - `Task`: Tarea jerarquica.
-  - `DomainMemory`: Memoria de conocimiento del dominio.
-  - `ConversationMemory`: Sistema de memoria transformado para planificacion jerarquica.
-- **Metodos principales**:
-  - `NodeType`: INTENTION, GOAL, TASK, ACTION, CONDITION, STATE, RESOURCE, APPLICATION, UI_ELEMENT, RESULT, PLAN
-  - `TaskStatus`: PENDING, EXECUTING, COMPLETED, FAILED, ABORTED
-  - `Node.__init__`: Inicializa nodo con propiedades basicas para sistema de planificacion
-  - `Goal.__init__`: Inicializa objetivo con tipo, target, descripcion, prioridad y constraints
-  - `Task.__init__`: Inicializa tarea jerarquica con status, nodes, parent, children, dependencies y timestamps
-  - `Task.can_execute`: Verifica si la tarea puede ejecutarse basado en dependencias y estado actual
-  - `DomainMemory.__init__`: Inicializa memoria de dominio con entidades, aplicaciones, capacidades y preferencias
-  - `DomainMemory.load_domain_knowledge`: Carga conocimiento del dominio desde archivos
-  - `DomainMemory.load_user_preferences`: Carga preferencias del usuario desde archivo persistente
-  - `DomainMemory.save_user_preferences`: Guarda preferencias del usuario de forma persistente
-  - `DomainMemory.get_entity`: Obtiene una entidad por nombre o alias
-  - `DomainMemory.get_application_capabilities`: Obtiene capacidades de una aplicacion
-  - `DomainMemory.get_capability_definition`: Obtiene definicion detallada de una capacidad
-  - `DomainMemory.record_user_interaction`: Registra interaccion del usuario para aprendizaje y preferencias
-  - `DomainMemory._update_preferences_from_interaction`: Actualiza preferencias basadas en interacciones exitosas
-  - `DomainMemory.get_user_preferences`: Obtiene preferencias del usuario
-  - `DomainMemory.get_preferred_entities`: Obtiene entidades preferidas por el usuario
-  - `DomainMemory.get_preferred_application`: Obtiene aplicacion preferida para un tipo de accion
-  - `DomainMemory.add_knowledge_update`: Anade actualizacion de conocimiento para persistencia futura
-  - `DomainMemory.get_suggested_entities`: Obtiene sugerencias de entidades basadas en nombre parcial y preferencias
-  - `DomainMemory.reason_about_entities`: Realiza razonamiento basico sobre entidades basado en contexto y preferencias
-  - `DomainMemory._normalize_text`: Normaliza texto para busqueda
-  - `ConversationMemory.__init__`: Inicializa sistema de memoria para planificacion jerarquica
-  - `ConversationMemory._normalize_text`: Normaliza texto para busqueda
-  - `ConversationMemory._remove_wake_word`: Elimina 'jarvis' inicial
-  - `ConversationMemory._load_aliases`: Carga aliases (mantener compatibilidad legacy)
-  - `ConversationMemory.parse_user_input`: Transforma entrada de usuario en objetivo
-  - `ConversationMemory._extract_intention`: Extrae intencion del texto normalizado
-  - `ConversationMemory._create_goal_from_intention`: Crea objetivo a partir de intencion
-  - `ConversationMemory.create_plan_from_goal`: Crea un plan a partir de un objetivo
-  - `ConversationMemory.update_world_state`: Actualiza el estado del mundo
-  - `ConversationMemory.add_user_message`: Anade mensaje de usuario a la memoria conversacional (compatibilidad)
-  - `ConversationMemory.get_current_state`: Obtiene estado actual del mundo
-  - `ConversationMemory._check_achieved_goals`: Verifica si algun objetivo ha sido alcanzado
-  - `ConversationMemory.create_node`: Crea un nodo en el sistema de planificacion
-  - `ConversationMemory.create_task`: Crea una tarea jerarquica
-  - `ConversationMemory.get_applicable_nodes`: Obtiene nodos aplicables en el estado actual
-  - `ConversationMemory.get_alias`: Metodo de compatibilidad para aliases antiguos
-  - `ConversationMemory.record_command_usage`: Registra uso de comando para analisis predictivo (compatibilidad)
-  - `ConversationMemory.save_conversation`: Guarda conversacion con informacion de planificacion
-  - `ConversationMemory.get_conversation_history`: Obtiene historial con informacion de planificacion
-  - `ConversationMemory.clear_history`: Borra historial de conversaciones
-  - `ConversationMemory.clear_predictive_data`: Borra datos predictivos
-  - `ConversationMemory.get_learning_insights`: Obtiene insights de aprendizaje del nuevo sistema
-  - `ConversationMemory.save_domain_knowledge_persistence`: Guarda el estado completo del conocimiento de dominio para persistencia
-  - `ConversationMemory._get_most_used_entities`: Obtiene las entidades mas usadas basadas en interacciones
-  - `ConversationMemory._get_most_used_actions`: Obtiene las acciones mas usadas basadas en interacciones
-  - `ConversationMemory.load_domain_knowledge_persistence`: Carga conocimiento de dominio persistido
-
-#### `src/memory/entity_resolver.py` [825 lineas] - Sistema de Resolucion Avanzada de Entidades
-- **Descripcion**: Sistema avanzado de resolucion de entidades para la memoria de dominio. Implementa resolucion de entidades con contexto, manejo de ambiguedades, busqueda semantica e integracion con HTN y Goals.
-- **Clases principales**:
-  - `EntityResolutionResult` (dataclass): Resultado de la resolucion de entidad con entidad, confianza, metodo de resolucion, alternativas, contexto usado y timestamp.
-  - `ResolutionContext` (dataclass): Contexto para resolucion de entidades con historial conversacional, intencion actual, entidades recientes, preferencias de usuario y informacion de sesion.
-  - `EntityResolver`: Sistema avanzado de resolucion de entidades con busqueda exacta, difusa, por propiedades y aprendizaje continuo.
-- **Metodos principales**:
-  - `EntityResolver.__init__`: Inicializa el sistema de resolucion con gestor de memoria, umbral de resolucion, maximas alternativas y usuario por defecto.
-  - `EntityResolver.resolve_entity`: Resuelve una referencia de entidad a una entidad especifica usando busqueda exacta, difusa, por propiedades y creacion temporal.
-  - `EntityResolver.resolve_entities_batch`: Resuelve multiples entidades en lote con contexto compartido.
-  - `EntityResolver._normalize_reference`: Normaliza una referencia de entidad eliminando espacios extra, convirtiendo a minusculas y eliminando caracteres especiales.
-  - `EntityResolver._find_exact_matches`: Busca coincidencias exactas por nombre, aliases y tags en el gestor de memoria.
-  - `EntityResolver._find_fuzzy_matches`: Busca coincidencias difusas usando similitud de secuencias con umbral configurable.
-  - `EntityResolver._find_by_properties`: Busca entidades por propiedades como URL, dominio, username, channel.
-  - `EntityResolver._select_best_match`: Selecciona la mejor coincidencia basada en contexto y desambiguacion con preferencias aprendidas.
-  - `EntityResolver._disambiguate_with_context`: Usa contexto para desambiguar entre multiples entidades verificando preferencias, entidades recientes e historial conversacional.
-  - `EntityResolver._create_temporary_entity`: Crea una entidad temporal para referencias no encontradas con metadata basica.
-  - `EntityResolver.get_entity_suggestions`: Obtiene sugerencias de entidades basadas en texto parcial con limite configurable.
-  - `EntityResolver.resolve_url`: Resuelve una URL a una entidad especifica parseando informacion y buscando por dominio, plataforma o canal.
-  - `EntityResolver.extract_urls_from_text`: Extrae todas las URLs de un texto usando patrones regex conservadores.
-  - `EntityResolver._normalize_url`: Normaliza una URL de entrada anadiendo protocolo si es necesario y limpiando caracteres finales.
-  - `EntityResolver._parse_url`: Parsea una URL y extrae informacion estructurada como dominio, plataforma, nombre de canal y parametros.
-  - `EntityResolver._create_entity_from_url`: Crea una entidad basada en informacion de URL con tipo, propiedades y aliases.
-  - `EntityResolver.get_url_suggestions`: Obtiene sugerencias de entidades basadas en URL parcial buscando en dominios y URLs almacenadas.
-  - `EntityResolver.learn_from_resolution`: Aprende de resultados de resolucion ajustando confianza segun feedback del usuario.
-  - `EntityResolver.set_user_preference`: Establece una preferencia de usuario para una entidad con tipo de preferencia y valor.
-  - `EntityResolver.get_user_preferences_for_entity`: Obtiene todas las preferencias del usuario para una entidad especifica.
-  - `EntityResolver.get_preferred_entities`: Obtiene entidades preferidas por el usuario con umbral de confianza.
-  - `EntityResolver.set_entity_attribute`: Establece un atributo extendido para una entidad con nombre, valor, tipo, fuente y metadata.
-  - `EntityResolver.get_entity_attributes`: Obtiene todos los atributos extendidos de una entidad.
-  - `EntityResolver.get_entities_with_attribute`: Busca entidades que tienen un atributo especifico.
-  - `EntityResolver.learn_entity_interaction`: Aprende de interacciones con entidades actualizando contadores y scores de preferencia.
-- **Funciones globales**:
-  - (Instancia global para uso facil)
-
-#### `src/memory/prediction.py` [1081 lineas] - Memoria Predictiva Mejorada
-- **Descripcion**: Memoria predictiva mejorada para sistema de planificacion jerarquica. Integra predicciones con el nuevo sistema de intenciones y objetivos. Cubre memoria de dominio mejorada, comandos de alto nivel, compatibilidad, optimizacion y aprendizaje.
-- **Clases principales**:
-  - `PredictionResult` (dataclass): Resultado de prediccion para planificacion con goal predicho, confianza, razonamiento, alternativas, probabilidad de ejecucion, coste estimado y tasa de exito historica.
-  - `ExecutionMetrics` (dataclass): Metricas de ejecucion para aprendizaje con goal_id, exito, tiempo de ejecucion, coste real, timestamp, contexto, mensaje de error y replanificaciones.
-  - `EnhancedPredictionMemory`: Clase principal de memoria predictiva mejorada que integra predicciones de objetivos, aprendizaje de rutas exitosas, optimizacion de costes y compatibilidad con sistema legacy.
-- **Metodos principales**:
-  - `__init__`: Inicializa memoria predictiva mejorada con estructura de datos mejorada y limites de eventos, historial de goals y metricas.
-  - `_load`: Carga datos con migracion a nuevo formato e inicializacion de plantillas de objetivos.
-  - `_initialize_goal_templates`: Inicializa plantillas de objetivos para prediccion rapida (open_application, navigate, navigate_stream, search).
-  - `_migrate_enhanced_data`: Migra datos al nuevo formato mejorado manteniendo datos legacy y nueva estructura.
-  - `_can_migrate_to_goal`: Verifica si un evento puede migrarse a goal.
-  - `_migrate_event_to_goal`: Migr evento a formato goal.
-  - `_infer_goal_type_from_command`: Infere tipo de goal desde comando legacy.
-  - `predict_goal_from_input`: Predice objetivo basado en entrada de usuario con analisis de patrones historicos, estado actual y entidades.
-  - `_normalize_input`: Normaliza texto para analisis.
-  - `_analyze_historical_patterns`: Analiza patrones historicos para prediccion.
-  - `_analyze_state_influence`: Analiza como el estado actual influye en la prediccion.
-  - `_predict_entity_usage`: Predice uso de entidades basado en entrada.
-  - `_combine_predictions`: Combina diferentes predicciones para crear goal.
-  - `_determine_goal_type`: Determina el tipo de goal mas probable.
-  - `_extract_goal_target`: Extrae target del goal basado en entrada y entidades.
-  - `_calculate_prediction_confidence`: Calcula confianza en la prediccion.
-  - `_find_alternative_goals`: Busca goals alternativos basados en entrada.
-  - `_generate_synonym_goals`: Genera goals alternativos usando sinonimos.
-  - `_generate_state_based_goals`: Genera goals alternativos basados en estado actual.
-  - `_estimate_goal_cost`: Estima coste de ejecucion del goal.
-  - `_estimate_execution_probability`: Estima probabilidad de exito del goal.
-  - `_get_historical_success_rate`: Obtiene tasa de exito historica para tipo de goal.
-  - `_get_command_success_rate`: Obtiene tasa de exito para comando legacy.
-  - `_generate_prediction_reasoning`: Genera explicacion de la prediccion.
-  - `record_goal_execution`: Registra ejecucion de goal para aprendizaje.
-  - `_update_success_patterns`: Actualiza patrones de exito por tipo de goal.
-  - `_update_cost_estimations`: Actualiza estimaciones de coste.
-  - `_update_path_cache`: Actualiza cache de rutas exitosas.
-  - `_update_entity_usage`: Actualiza estadisticas de uso de entidades.
-  - `get_goal_prediction_history`: Obtiene historial de predicciones de goals.
-  - `get_cached_path`: Obtiene ruta cacheada para goal especifico.
-  - `get_cost_estimation`: Obtiene estimacion de coste para tipo de goal.
-  - `get_success_rate`: Obtiene tasa de exito para tipo de goal.
-  - `record_command`: Metodo legacy para registrar comandos que integra con nuevo sistema pero mantiene compatibilidad.
-  - `_create_legacy_event`: Crea evento en formato legacy.
-  - `_get_open_windows`: Obtiene ventanas abiertas (legacy).
-  - `_get_active_window`: Obtiene ventana activa (legacy).
-  - `_get_system_state`: Obtiene estado del sistema (legacy).
-  - `_get_idle_seconds`: Obtiene segundos de inactividad (legacy).
-  - `_save`: Guarda datos en archivo.
-- **Funciones globales**:
-  - `get_enhanced_prediction_memory`: Obtiene instancia singleton de memoria predictiva mejorada.
-- **Clases de compatibilidad legacy**:
-  - `PredictionMemory`: Clase legacy para compatibilidad que wrapper sobre EnhancedPredictionMemory.
-  - `get_prediction_memory`: Funcion singleton legacy para compatibilidad.
-
-#### `src/memory/storage.py` [1984 lineas] - Sistema de Almacenamiento Mejorado
-- **Descripcion**: Sistema de almacenamiento mejorado para soportar planificacion jerarquica con manejo avanzado de memoria, cache y persistencia. Implementa estado del mundo, memoria de dominio avanzada, soporte para planes y ejecuciones, estadisticas de aprendizaje y manejo avanzado de cache para rendimiento.
-- **Clases principales**:
-  - `MemoryType` (Enum): Tipos de memoria en el sistema mejorado (CONVERSATIONAL, DOMAIN_KNOWLEDGE, ENTITIES, APPLICATIONS, STATE, PLANS, EXECUTIONS, LEARNING_STATS, RELATIONSHIPS, PREFERENCES).
-  - `Entity` (dataclass): Entidad mejorada para memoria de dominio con id, type, name, properties, metadata, aliases, confidence y tags.
-  - `ConversationalMemory` (dataclass): Memoria conversacional mejorada con id, message, response, timestamp, context, intent, entities, confidence, execution_time y success.
-  - `WorldState` (dataclass): Estado del mundo mejorado con timestamp, applications, ui_elements, system_info, constraints, last_actions y active_goals.
-  - `Plan` (dataclass): Plan de ejecucion con id, goal, nodes, created_at, updated_at, status, execution_time, success, cost y heuristic_value.
-  - `ExecutionRecord` (dataclass): Registro de ejecucion para aprendizaje con id, plan_id, action_name, parameters, start_time, end_time, success, execution_time, error, retries, alternatives_tried y context.
-  - `LearningStat` (dataclass): Estadistica de aprendizaje con action_name, total_executions, successful_executions, average_execution_time, success_rate y last_updated.
-  - `UserPreference` (dataclass): Preferencia de usuario con user_id, preference_type, preference_key, preference_value, confidence, created_at, updated_at, context y usage_count.
-  - `EntityAttribute` (dataclass): Atributo extendido de entidad con entity_id, attribute_name, attribute_value, attribute_type, source, confidence, created_at, updated_at y metadata.
-  - `MemoryStorage` (ABC): Interfaz abstracta para almacenamiento de memoria con metodos save, load y exists.
-  - `JSONStorage` (Clase): Almacenamiento en archivos JSON con manejo avanzado, cache y procesamiento inteligente de datos segun tipo de memoria.
-  - `MemoryManager` (Clase): Gestor de memoria mejorado con cache, soporte completo para arquitectura y metodos especificos para cada tipo de memoria.
-- **Metodos principales**:
-  - `MemoryType.__init__`: Tipos de memoria en el sistema mejorado.
-  - `Entity.__init__`: Inicializa entidad mejorada para memoria de dominio.
-  - `Entity.to_dict`: Convierte entidad a diccionario.
-  - `Entity.from_dict`: Crea entidad desde diccionario.
-  - `Entity.matches_query`: Verifica si la entidad coincide con una busqueda.
-  - `ConversationalMemory.__init__`: Inicializa memoria conversacional mejorada.
-  - `ConversationalMemory.to_dict`: Convierte memoria conversacional a diccionario.
-  - `ConversationalMemory.from_dict`: Crea memoria conversacional desde diccionario.
-  - `WorldState.__init__`: Inicializa estado del mundo mejorado.
-  - `WorldState.to_dict`: Convierte estado del mundo a diccionario.
-  - `WorldState.from_dict`: Crea estado del mundo desde diccionario.
-  - `WorldState.get_application_state`: Obtiene el estado de una aplicacion especifica.
-  - `WorldState.get_ui_element_state`: Obtiene el estado de un elemento UI especifico.
-  - `Plan.__init__`: Inicializa plan de ejecucion.
-  - `Plan.to_dict`: Convierte plan a diccionario.
-  - `Plan.from_dict`: Crea plan desde diccionario.
-  - `ExecutionRecord.__init__`: Inicializa registro de ejecucion para aprendizaje.
-  - `ExecutionRecord.to_dict`: Convierte registro de ejecucion a diccionario.
-  - `ExecutionRecord.from_dict`: Crea registro de ejecucion desde diccionario.
-  - `LearningStat.__init__`: Inicializa estadistica de aprendizaje.
-  - `LearningStat.update`: Actualiza estadisticas con nueva ejecucion.
-  - `UserPreference.__init__`: Inicializa preferencia de usuario.
-  - `UserPreference.to_dict`: Convierte preferencia de usuario a diccionario.
-  - `UserPreference.from_dict`: Crea preferencia de usuario desde diccionario.
-  - `EntityAttribute.__init__`: Inicializa atributo extendido de entidad.
-  - `EntityAttribute.to_dict`: Convierte atributo de entidad a diccionario.
-  - `EntityAttribute.from_dict`: Crea atributo de entidad desde diccionario.
-  - `MemoryStorage.__init__`: Interfaz abstracta para almacenamiento de memoria.
-  - `MemoryStorage.save`: Guarda datos (abstracto).
-  - `MemoryStorage.load`: Carga datos (abstracto).
-  - `MemoryStorage.exists`: Verifica si existe (abstracto).
-  - `JSONStorage.__init__`: Inicializa almacenamiento en archivos JSON con manejo avanzado.
-  - `JSONStorage.get_file_path`: Obtiene la ruta del archivo para un tipo de memoria.
-  - `JSONStorage.save`: Guarda datos en archivo JSON con manejo inteligente.
-  - `JSONStorage._load_existing_data`: Carga datos existentes del archivo.
-  - `JSONStorage._process_data_for_save`: Procesa datos segun el tipo de memoria.
-  - `JSONStorage.load`: Carga datos desde archivo JSON.
-  - `JSONStorage._get_default_value`: Obtiene valor por defecto para un tipo de memoria.
-  - `JSONStorage.exists`: Verifica si el archivo existe.
-  - `MemoryManager.__init__`: Inicializa gestor de memoria mejorado con cache y soporte completo.
-  - `MemoryManager._warm_cache`: Inicializa el cache con datos frecuentes.
-  - `MemoryManager._get_from_cache`: Obtiene datos del cache si estan frescos.
-  - `MemoryManager._update_cache`: Actualiza el cache con nuevos datos.
-  - `MemoryManager.save_entity`: Guarda una entidad en la memoria de dominio.
-  - `MemoryManager.get_entity`: Obtiene una entidad por su ID.
-  - `MemoryManager.get_entities_by_type`: Obtiene todas las entidades de un tipo especifico.
-  - `MemoryManager.find_entities`: Busca entidades por texto en nombre, aliases, tags y propiedades.
-  - `MemoryManager.find_entities_by_property`: Busca entidades por propiedad especifica.
-  - `MemoryManager.add_conversational_memory`: Anade un registro mejorado a la memoria conversacional.
-  - `MemoryManager.get_conversational_memory`: Obtiene la memoria conversacional con filtros.
-  - `MemoryManager.save_world_state`: Guarda el estado actual del mundo.
-  - `MemoryManager.get_world_state`: Obtiene el estado actual del mundo.
-  - `MemoryManager.update_world_state`: Actualiza una propiedad del estado del mundo.
-  - `MemoryManager.save_plan`: Guarda un plan.
-  - `MemoryManager.get_plan`: Obtiene un plan por su ID.
-  - `MemoryManager.save_execution_record`: Guarda un registro de ejecucion.
-  - `MemoryManager.update_learning_stats`: Actualiza estadisticas de aprendizaje para una accion.
-  - `MemoryManager.get_learning_stats`: Obtiene estadisticas de aprendizaje.
-  - `MemoryManager.clear_memory`: Limpia la memoria especificada o toda la memoria.
-  - `MemoryManager.get_memory_stats`: Obtiene estadisticas detalladas de la memoria.
-  - `MemoryManager.save_user_preference`: Guarda una preferencia de usuario.
-  - `MemoryManager.get_user_preference`: Obtiene una preferencia especifica del usuario.
-  - `MemoryManager.get_user_preferences`: Obtiene todas las preferencias de un usuario.
-  - `MemoryManager.update_user_preference`: Actualiza o crea una preferencia de usuario.
-  - `MemoryManager.learn_user_preference`: Aprende preferencias de usuario basadas en interacciones.
-  - `MemoryManager.save_entity_attribute`: Guarda un atributo extendido de entidad.
-  - `MemoryManager.get_entity_attribute`: Obtiene un atributo especifico de una entidad.
-  - `MemoryManager.get_entity_attributes`: Obtiene todos los atributos extendidos de una entidad.
-  - `MemoryManager.update_entity_attribute`: Actualiza o crea un atributo extendido de entidad.
-  - `MemoryManager.get_entities_by_attribute`: Busca entidades por atributo y valor.
-  - `MemoryManager.export_memory`: Exporta toda la memoria a un archivo JSON.
-  - `get_memory_manager`: Obtiene la instancia global del gestor de memoria.
-  - `save_entity`: Guarda una entidad.
-  - `get_entity`: Obtiene una entidad.
-  - `get_entities_by_type`: Obtiene entidades.
-  - `find_entities`: Busca entidades.
-  - `add_conversational_memory`: Anade memoria conversacional.
-  - `get_world_state`: Obtiene el estado del mundo.
-  - `update_world_state`: Actualiza el estado del mundo.
-  - `save_plan`: Guarda un plan.
-  - `get_plan`: Obtiene un plan.
-  - `update_learning_stats`: Actualiza estadisticas de aprendizaje.
-  - `resolve_entity_to_url`: Resuelve una entidad a una URL.
-  - `get_entity_attributes`: Obtiene atributos extendidos de una entidad.
-  - `create_goal_from_entity`: Integracion entidad -> Goal.
-  - `verify_entity_integrity`: Verifica la integridad de una entidad.
-
-### 🗣 Modulo `src/mouth/` - Sistema de Voz
-
-#### `src/mouth/__init__.py` [4 lineas] - Inicializacion del Modulo Voz
-- **Descripcion**: Modulo principal de voz de JARVIS con importacion del sistema de sintesis de voz.
-- **Metodos principales**:
-  - `Mouth`: Clase principal del sistema de voz importada desde speaker.
-
-#### `src/mouth/speaker.py` [680 lineas] - Sistema de Sintesis de Voz
-- **Descripcion**: Sistema de sintesis de voz usando motor Kokoro ONNX. Controla la generacion y reproduccion de audio con multiples voces y capacidades de tokenizacion.
-- **Clases principales**:
-  - `Mouth`: Clase principal que gestiona la sintesis de voz con capacidades de inicializacion, gestion de voces, tokenizacion y sintesis.
-- **Metodos principales**:
-  - `__init__`: Inicializa el motor de sintesis de voz con configuracion y parametros basicos.
-  - `_initialize_session`: Inicializa la sesion ONNX para el modelo de voz.
-  - `_load_parameters`: Carga los parametros necesarios del motor incluyendo mapa de tokens y configuracion de voces.
-  - `get_available_voices`: Devuelve los IDs de voz disponibles en models/voices excluyendo archivos de grupo.
-  - `has_voice`: Comprueba si existe una voz concreta verificando su disponibilidad en el sistema.
-  - `_load_voice_style_vector`: Carga el vector de estilo correspondiente a voice_id.
-  - `_load_voice`: Carga una voz y la establece como voz actual.
-  - `set_voice`: Cambia la voz actualmente utilizada en caliente sin requerir reiniciar Jarvis.
-  - `get_current_voice`: Devuelve el ID de la voz actualmente activa.
-  - `_load_token_map`: Carga el mapa de tokens desde el archivo de configuracion.
-  - `_text_to_tokens`: Convierte texto a tokens para el modelo con normalizacion y conversion fonetica.
-  - `speak`: Convierte texto a voz y lo reproduce con manejo de limites de tokens y reproduccion automatica.
-  - `speak_async`: Version asincrona de speak que no bloquea el hilo principal.
-- **Caracteristicas implementadas**:
-  - Motor de sintesis de voz Kokoro ONNX con soporte para multiples voces
-  - Sistema de tokenizacion avanzado con normalizacion de texto y conversion fonetica
-  - Gestion de voces con cache en memoria y persistencia de preferencias
-  - Soporte para voz asincrona con hilos daemon
-  - Manejo automatico de archivos temporales y limpieza
-  - Sistema de logging integrado para depuracion y monitoreo
-  - Gestion de limites de tokens y truncacion automatica
-  - Integracion con sistema de configuracion y preferencias de usuario
-
-### 🛠 Modulo `src/tools/` - Sistema de Herramientas
-
-#### `src/tools/__init__.py` [30 lineas] - Inicializacion del Modulo Herramientas
-- **Descripcion**: Paquete de herramientas de Jarvis que expone las clases y funciones principales del sistema de ejecucion y registro de acciones para facilitar sus imports desde otros modulos.
-- **Metodos principales**:
-  - `UnifiedExecutor`: Clase principal del sistema de ejecucion importada desde executor.
-  - `get_executor`: Funcion para obtener la instancia del executor.
-  - `process_and_execute`: Funcion para procesar y ejecutar acciones.
-  - `ActionInfo`: Informacion estructurada de acciones importada desde registry.
-  - `ActionRegistry`: Registro de acciones del sistema importado desde registry.
-  - `ActionType`: Enumeracion que define los tipos de acciones disponibles en el sistema importada desde registry.
-  - `get_action`: Funcion para obtener una accion especifica importada desde registry.
-  - `get_action_registry`: Funcion para obtener el registro de acciones del sistema importada desde registry.
-  - `get_available_actions`: Funcion para obtener todas las acciones disponibles importada desde registry.
-  - `register_action`: Funcion para registrar nuevas acciones en el sistema importada desde registry.
-
-#### `src/tools/executor.py` [559 lineas] - Fachada de Ejecucion Unificada
-- **Descripcion**: Fachada unificada para ejecutar acciones registradas. Mantiene compatibilidad con el formato historico [CMD:...], pero utiliza ActionRegistry como fuente unica de verdad para localizar y ejecutar acciones.
-- **Clases principales**:
-  - `UnifiedExecutor`: Fachada unificada para ejecutar acciones registradas con compatibilidad legacy.
-- **Metodos principales**:
-  - `UnifiedExecutor.__init__`: Inicializa la fachada de ejecucion con registro de acciones e historial.
-  - `UnifiedExecutor.process_and_execute`: Procesa una respuesta del LLM y ejecuta el primer comando detectado.
-  - `UnifiedExecutor.execute_action`: Ejecuta una accion registrada con validacion de parametros y precondiciones.
-  - `UnifiedExecutor.can_execute`: Comprueba si una accion puede ejecutarse en el estado indicado.
-  - `UnifiedExecutor.execute_plan_step`: Punto de entrada explicito para un futuro Planner.
-  - `UnifiedExecutor._extract_command`: Extrae un comando legacy del formato [CMD:nombre(args)].
-  - `UnifiedExecutor._normalize_action_name`: Normaliza pequenas variaciones de nombre sin cambiar su semantica.
-  - `UnifiedExecutor._parse_args`: Parsea argumentos legacy mediante ast.literal_eval.
-  - `UnifiedExecutor._args_to_dict`: Convierte argumentos posicionales legacy a parametros nombrados.
-  - `UnifiedExecutor.get_command_suggestions`: Obtiene sugerencias simples a partir de acciones registradas.
-  - `UnifiedExecutor._format_action_suggestion`: Convierte ActionInfo al formato historico de sugerencias.
-  - `UnifiedExecutor._record_history`: Registra una ejecucion para compatibilidad y diagnostico.
-  - `UnifiedExecutor.get_command_history`: Obtiene una copia del historial de comandos.
-  - `UnifiedExecutor.clear_command_history`: Limpia el historial de comandos.
-  - `UnifiedExecutor.list_available_commands`: Lista las acciones disponibles con sus metadatos.
-  - `UnifiedExecutor.get_command_info`: Obtiene informacion detallada de una accion registrada.
-  - `UnifiedExecutor.get_action_cost`: Obtiene el coste declarado de una accion para el planificador.
-  - `UnifiedExecutor.get_plannable_commands`: Obtiene las acciones habilitadas para planificacion.
-  - `UnifiedExecutor._get_timestamp`: Obtiene la fecha/hora actual en formato ISO.
-- **Funciones globales**:
-  - `get_executor`: Obtiene la instancia global del ejecutor unificado.
-  - `process_and_execute`: Funcion de compatibilidad para codigo existente que delega en la instancia global.
-
-#### `src/tools/os_info.py` [533 lineas] - Informacion del Sistema para Jarvis
-- **Descripcion**: Informacion del sistema para Jarvis con arquitectura de planificacion. Proporciona informacion estructurada del sistema para construir el estado del mundo y soportar la planificacion jerarquica. Recoge: uso de CPU y memoria, estado del disco, informacion de ventanas y aplicaciones, recursos del sistema y contexto para planificacion.
-- **Clases principales**:
-  - `SystemHealth` (Enum): Estados de salud del sistema (EXCELLENT, GOOD, WARNING, CRITICAL).
-  - `ApplicationWindow` (dataclass): Informacion de una ventana de aplicacion con title, process_name, handle, position, size, is_visible, is_minimized, is_maximized, monitor y metodo to_dict.
-  - `SystemResources` (dataclass): Recursos del sistema con cpu_percent, ram_total_gb, ram_used_percent, disk_free_gb, disk_total_gb, disk_used_percent, battery_percent, battery_power_plugged, system_health, timestamp y metodo to_dict.
-  - `SystemContext` (dataclass): Contexto completo del sistema para planificacion con resources, active_windows, focused_window, running_processes, system_time, uptime_seconds y metodo to_dict.
-- **Metodos principales**:
-  - `_get_system_drive`: Obtiene la unidad del sistema (SystemDrive en Windows, raiz en otros sistemas).
-  - `_calculate_system_health`: Calcula la salud del sistema basada en recursos (cpu_percent, ram_percent, disk_percent).
-  - `get_system_stats`: Lee el estado de CPU, memoria RAM y disco, retorna diccionario con cpu, ram_total, ram_percent, disk_free, disk_total, disk_percent.
-  - `get_battery_info`: Obtiene informacion de la bateria (percent, power_plugged, secsleft) o None si no esta disponible.
-  - `get_open_windows`: Obtiene informacion detallada de ventanas visibles, retorna lista de ApplicationWindow.
-  - `_get_monitor_from_position`: Determina que monitor contiene la posicion dada (x, y).
-  - `_get_process_name`: Obtiene el nombre del proceso de una ventana con fallback por titulo.
-  - `get_focused_window`: Obtiene la ventana actualmente enfocada o None.
-  - `get_running_processes`: Obtiene lista de procesos en ejecucion (sin duplicados).
-  - `get_system_resources`: Obtiene recursos del sistema con estado de salud calculado.
-  - `get_jarvis_system_context`: Empaqueta la informacion del sistema en texto para el contexto de Jarvis (compatibilidad legacy).
-  - `get_system_context`: Obtiene el contexto completo del sistema para planificacion, retorna SystemContext con toda la informacion estructurada.
-
-#### `src/tools/registry.py` [1072 lineas] - Registro Unificado de Acciones
-- **Descripcion**: Registro unificado de acciones para Jarvis mediante decoradores que combina registro basico de acciones (compatibilidad legacy) con metadatos avanzados para planificacion. Implementa un sistema de registro que reemplaza la duplicidad entre herramientas simples y sistemas completos.
-- **Clases principales**:
-  - `ActionType` (Enum): Tipos de acciones disponibles (APPLICATION, SYSTEM, NAVIGATION, INTERACTION, CALIBRATION).
-  - `ActionInfo` (dataclass): Metadatos completos de una accion ejecutable y planificable con propiedades como nombre, descripcion, tipo, parametros, precondiciones, efectos, coste, dependencias, etc.
-  - `ActionRegistry`: Clase principal que gestiona el registro unificado de acciones, manteniendo compatibilidad legacy con metadatos avanzados para planificacion.
-- **Metodos principales de ActionRegistry**:
-  - `__init__`: Inicializa el registro de acciones con estructuras de indexacion por categorias y tipos.
-  - `_normalize_name`: Normaliza el nombre de una accion.
-  - `_normalize_description`: Normaliza la descripcion de una accion.
-  - `_normalize_confidence`: Normaliza el umbral de confianza al rango [0.0, 1.0].
-  - `_normalize_action_type`: Convierte un ActionType o su valor textual a ActionType.
-  - `_extract_parameters`: Extrae un esquema basico de parametros desde la firma de una funcion.
-  - `register_action`: Decorador para registrar una accion con todos sus metadatos avanzados.
-  - `get_action`: Obtiene informacion de una accion por nombre.
-  - `get_available_actions`: Obtiene acciones disponibles en formato para el LLM, manteniendo compatibilidad legacy.
-  - `get_actions_for_planner`: Genera metadatos serializables de las acciones para el planificador.
-  - `get_plannable_actions`: Obtiene las acciones habilitadas para la capa de planificacion.
-  - `get_actions_by_category`: Obtiene todas las acciones de una categoria especifica.
-  - `list_all_actions`: Lista todas las acciones organizadas por tipo.
-  - `get_action_names_by_type`: Obtiene nombres de acciones por tipo de accion.
-  - `register_module`: Registra todas las acciones decoradas de un modulo.
-  - `_store_action_info`: Almacena una accion manteniendo sus indices internos.
-  - `get_action_suggestions`: Obtiene sugerencias de acciones a partir de un nombre parcial.
-  - `_validate_value_type`: Valida de forma segura un tipo de parametro.
-  - `validate_action`: Valida si una accion y sus parametros son validos.
-  - `can_execute`: Comprueba si una accion puede ejecutarse segun parametros y estado.
-  - `get_action_cost`: Obtiene el coste declarado de una accion.
-  - `execute_action`: Ejecuta una accion registrada con parametros nombrados (punto de compatibilidad).
-  - `execute_action_legacy`: Ejecuta una accion por su nombre (compatibilidad legacy con *args, **kwargs).
-  - `validate_parameters`: Valida los nombres de parametros definidos por la accion.
-  - `clear_actions`: Limpia todas las acciones registradas.
-- **Funciones globales**:
-  - `get_action_registry`: Obtiene la instancia global unica del registro de acciones.
-  - `register_action`: Atajo para registrar una accion usando la instancia global (version completa).
-  - `register_action_legacy`: Atajo para registrar una accion usando la instancia global (version legacy simplificada).
-  - `get_available_actions`: Atajo para obtener las acciones disponibles desde el registro global.
-  - `get_action`: Atajo para obtener una accion desde el registro global.
-- **Funciones helper**:
-  - `_get_state_value`: Obtiene un valor de estado desde dicts u objetos con atributos/get.
-  - `_match_condition`: Comprueba una unica condicion de estado.
-  - `_matches_conditions`: Comprueba un conjunto de condiciones de estado.
-
-### 🗂 Modulo `src/utils/` - Utilidades del Sistema
-
-#### `src/utils/__init__.py` - Sistema de Optimizacion Completo
-- **Descripcion**: Paquete principal de utilidades de Jarvis que integra todos los sistemas de optimizacion, aprendizaje automatico, monitoreo y automejora. Proporciona una interfaz unificada para el sistema de optimizacion completo con componentes principales de performance optimization, self-improvement, adaptive learning y orchestration.
-- **Importaciones Principales**:
-  - Desde `advanced_logger`: AdvancedLogger
-  - Desde `performance_optimizer`: PerformanceOptimizer, OptimizationStrategy, OptimizationLevel, OptimizationMetrics, OptimizationAction
-  - Desde `self_improvement_system`: SelfImprovementSystem, LearningMode, ImprovementType, LearningSession, ImprovementRule, KnowledgeGraph
-  - Desde `adaptive_learning_engine`: AdaptiveLearningEngine, LearningTask, NeuralArchitecture, LearningTaskConfig, ModelPerformance
-  - Desde `optimization_orchestrator`: OptimizationOrchestrator, OrchestrationMode, OptimizationPriority, OptimizationJob, OrchestrationMetrics
-  - Desde `pattern_analyzer`: PatternAnalyzer
-  - Desde `log_analytics`: LogAnalytics
-  - Desde `log_predictor`: LogPredictor
-  - Desde `log_dashboard`: LogDashboard
-  - Desde `performance_monitor`: PerformanceMonitor
-  - Desde `log_integration`: LogIntegrator
-- **Exportaciones Principales**:
-  - Core Optimization Components: PerformanceOptimizer, SelfImprovementSystem, AdaptiveLearningEngine, OptimizationOrchestrator
-  - Supporting Components: AdvancedLogger, PatternAnalyzer, LogAnalytics, LogPredictor, LogDashboard, PerformanceMonitor, LogIntegrator
-  - Enums and Data Classes: OptimizationStrategy, OptimizationLevel, OptimizationMetrics, OptimizationAction, LearningMode, ImprovementType, LearningSession, ImprovementRule, KnowledgeGraph, LearningTask, NeuralArchitecture, LearningTaskConfig, ModelPerformance, OrchestrationMode, OptimizationPriority, OptimizationJob, OrchestrationMetrics
-- **Clase Principal**:
-  - `OptimizationSystem`: Sistema completo de optimizacion y automejora que integra todos los componentes con inicializacion, gestion de estado, optimizacion manual/automatica, exportacion de reportes, recomendaciones y optimizacion de emergencia.
-- **Metodos Principales de OptimizationSystem**:
-  - `__init__`: Inicializa el sistema completo con componentes principales y de soporte.
-  - `get_system_status`: Obtiene estado completo del sistema con version, timestamp, estado de cada componente y salud general.
-  - `_calculate_system_health`: Calcula salud general basada en eficiencia, tasa de exito y utilizacion de recursos.
-  - `optimize_system`: Optimizacion manual coordinada a traves del orquestador.
-  - `start_auto_optimization`: Inicia optimizacion automatica de todos los componentes.
-  - `stop_auto_optimization`: Detiene optimizacion automatica.
-  - `export_system_report`: Exporta reporte completo del sistema en formato JSON.
-  - `get_optimization_recommendations`: Obtiene recomendaciones combinadas de todos los sistemas.
-  - `emergency_optimization`: Optimizacion de emergencia para situaciones criticas.
-- **Funciones de Conveniencia**:
-  - `get_system_status`: Obtiene estado del sistema de optimizacion.
-  - `optimize_system`: Optimiza el sistema manualmente.
-  - `start_auto_optimization`: Inicia optimizacion automatica.
-  - `get_optimization_recommendations`: Obtiene recomendaciones de optimizacion.
-  - `emergency_optimization`: Realiza optimizacion de emergencia.
-- **Variables Globales**:
-  - `optimization_system`: Instancia global del sistema de optimizacion completo.
-  - `__version__`: "2.7.0" - Version del sistema de optimizacion.
-  - `__author__`: "JARVIS AI System"
-  - `__description__`: "Sistema avanzado de optimizacion y automejora con inteligencia artificial"
-- **Caracteristicas Implementadas**:
-  - Sistema unificado de optimizacion con integracion de multiples componentes especializados
-  - Optimizacion manual y automatica con estrategias coordinadas
-  - Monitoreo continuo del estado del sistema y salud general
-  - Sistema de recomendaciones inteligentes combinando insights de multiples componentes
-  - Optimizacion de emergencia para situaciones criticas con estrategias prioritarias
-  - Exportacion completa de reportes con todos los datos del sistema
-  - Instancia global unica para acceso simplificado a todas las funcionalidades
-  - Soporte para diferentes niveles de optimizacion (BASIC, MODERATE, AGGRESSIVE, CRITICAL)
-
-#### `src/utils/adaptive_learning_engine.py` [1097 lineas] - Motor de Aprendizaje Adaptativo
-- **Descripcion**: Motor de aprendizaje adaptativo con deep learning y optimizacion de hiperparametros. Sistema avanzado que automatiza el entrenamiento, optimizacion y evaluacion de modelos de machine learning para mejorar continuamente el rendimiento del sistema JARVIS.
-- **Clases principales**:
-  - `LearningTask` (Enum): Tipos de tareas de aprendizaje (HYPERPARAMETER_OPTIMIZATION, MODEL_TRAINING, FEATURE_SELECTION, ARCHITECTURE_SEARCH, KNOWLEDGE_TRANSFER, ONLINE_LEARNING, BATCH_LEARNING, REINFORCEMENT_LEARNING)
-  - `NeuralArchitecture` (Enum): Arquitecturas neuronales disponibles (MLP, CNN, LSTM, TRANSFORMER, ATTENTION, RESNET, GAN)
-  - `LearningTaskConfig` (dataclass): Configuracion completa de tareas de aprendizaje con hiperparametros, datos y metricas
-  - `ModelPerformance` (dataclass): Registro estructurado de rendimiento de modelos con metricas detalladas
-  - `AdaptiveLearningEngine`: Clase principal del motor de aprendizaje con integracion completa de modelos, optimizacion y monitoreo
-- **Metodos principales**:
-  - `__init__`: Inicializa el motor de aprendizaje con configuracion, modelos y sistemas auxiliares
-  - `_load_config`: Carga configuracion del motor con valores por defecto y personalizacion
-  - `_initialize_model_registry`: Inicializa registro de modelos disponibles (MLP, Random Forest, Gradient Boosting)
-  - `_load_trained_models`: Carga modelos pre-entrenados desde almacenamiento persistente
-  - `_save_trained_models`: Guarda modelos entrenados y escaladores en disco
-  - `_start_learning_engine`: Inicia el bucle principal del motor de aprendizaje en hilo separado
-  - `_learning_engine_loop`: Bucle principal de procesamiento de tareas y optimizacion continua
-  - `_process_learning_queue`: Procesa cola de tareas concurrentes con gestion de hilos
-  - `_execute_learning_task`: Ejecutor principal de tareas de aprendizaje segun tipo especifico
-  - `_optimize_hyperparameters_task`: Optimizacion de hiperparametros usando Grid Search y Cross Validation
-  - `_train_model_task`: Entrenamiento de modelos con division de datos y evaluacion de rendimiento
-  - `_select_features_task`: Seleccion automatica de caracteristicas usando metodos estadisticos
-  - `_search_architecture_task`: Busqueda de arquitecturas neuronales optimas con comparacion automatica
-  - `_online_learning_task`: Aprendizaje online incremental con actualizaciones parciales del modelo
-  - `_batch_learning_task`: Aprendizaje por lotes con actualizaciones por lotes de datos
-  - `_prepare_training_data`: Preparacion y extraccion de caracteristicas de datos del sistema
-  - `_create_neural_model`: Factoria para creacion de modelos segun arquitectura solicitada
-  - `_create_mlp_model`: Constructor especifico para modelos MLP con configuracion flexible
-  - `_create_lstm_model`: Constructor especifico para modelos LSTM con secuencia temporal
-  - `_train_neural_model`: Entrenamiento de modelos neuronales con PyTorch y Early Stopping
-  - `_evaluate_model`: Evaluacion completa de modelos con metricas R², MSE, MAE y tiempo de inferencia
-  - `_auto_detect_learning_opportunities`: Deteccion automatica de necesidades de reentrenamiento y optimizacion
-  - `_optimize_hyperparameters`: Optimizacion automatica programada de hiperparametros para todos los modelos
-  - `_evaluate_model_performance`: Evaluacion continua del rendimiento de todos los modelos activos
-  - `_get_last_model_performance`: Recuperacion del ultimo registro de rendimiento para un modelo especifico
-  - `get_learning_engine_status`: Estado completo del motor de aprendizaje con metricas y tareas activas
-  - `_get_best_model`: Identificacion del modelo con mejor rendimiento historico
-  - `_get_average_performance`: Calculo del rendimiento promedio de todos los modelos
-  - `add_learning_task`: Interface para anadir tareas de aprendizaje manualmente al sistema
-  - `get_model_info`: Informacion detallada de modelos registrados con hiperparametros y estado
-  - `export_learning_report`: Exportacion completa de reportes de aprendizaje y rendimiento a formato JSON
-  - `stop_learning_engine`: Detencion segura del motor de aprendizaje con limpieza de recursos
-  - `start_learning_engine`: Reinicio del motor de aprendizaje con configuracion actual
-  - `__del__`: Destructor con limpieza segura de hilos y recursos del sistema
-
-#### `src/utils/advanced_logger.py` [1557 lineas] - Sistema Avanzado de Logging y Analisis de Patrones
-- **Descripcion**: Sistema avanzado de logging y analisis de patrones para Jarvis con capacidades de machine learning, deteccion de anomalias, metricas en tiempo real y almacenamiento persistente. Integracion con sistema de logging existente y capacidades predictivas.
-- **Clases principales**:
-  - `LogLevel` (Enum): Niveles de log extendidos (DEBUG, INFO, WARNING, ERROR, CRITICAL, SUCCESS, PERFORMANCE)
-  - `LogCategory` (Enum): Categorias de logs para analisis (SYSTEM, APPLICATION, NETWORK, PERFORMANCE, SECURITY, BUSINESS, DEBUG, ERROR)
-  - `PatternType` (Enum): Tipos de patrones detectables (ERROR_SPIKE, PERFORMANCE_DEGRADATION, ANOMALY, TREND, CYCLE, CORRELATION)
-  - `LogEntry` (dataclass): Estructura de entrada de log enriquecida con timestamp, nivel, categoria, mensaje, contexto y metadatos
-  - `LogAnalyzer`: Analizador de logs avanzado con machine learning y deteccion de patrones complejos
-  - `AdvancedLogger`: Logger avanzado con capacidades de analisis y patron detection
-  - `JsonFormatter`: Formateador JSON mejorado para logs estructurados
-  - `StatisticalAnomalyDetector`: Detector de anomalias usando metodos estadisticos
-  - `PatternRecognizer`: Reconocedor de patrones usando metodos de secuencia
-  - `AdvancedLogMetrics`: Metricas avanzadas de logging y analisis de rendimiento
-- **Metodos principales de LogAnalyzer**:
-  - `__init__`: Inicializa analizador con ventana de analisis, umbral de patrones y capacidades ML
-  - `analyze_log_entry`: Analizar una entrada de log y detectar patrones con ML
-  - `_collect_performance_metrics`: Recopilar metricas de rendimiento de logs
-  - `_detect_patterns`: Detectar patrones basicos en los logs
-  - `_detect_patterns_with_ml`: Detectar patrones con machine learning y analisis avanzado
-  - `_detect_error_spike`: Detectar picos de errores
-  - `_detect_performance_degradation`: Detectar degradacion de rendimiento
-  - `_detect_anomaly`: Detectar anomalias basicas en los logs
-  - `_detect_error_spike_ml`: Detectar picos de errores con ML
-  - `_detect_performance_degradation_ml`: Detectar degradacion de rendimiento con ML
-  - `_detect_anomaly_ml`: Detectar anomalias con ML
-  - `_detect_sequential_patterns`: Detectar patrones secuenciales
-  - `_detect_correlations`: Detectar correlaciones entre diferentes tipos de logs
-  - `_detect_advanced_anomalies`: Deteccion avanzada de anomalias
-  - `_detect_frequency_anomaly`: Detectar anomalias de frecuencia
-  - `_detect_context_anomaly`: Detectar anomalias de contexto
-  - `get_statistics`: Obtener estadisticas del analizador
-- **Metodos principales de AdvancedLogger**:
-  - `__init__`: Inicializa logger avanzado con nombre, nivel, directorio y base de datos
-  - `_setup_logging_infrastructure`: Configurar infraestructura de logging
-  - `_create_database`: Crear base de datos para logs con tablas de logs, patrones y metricas
-  - `_setup_handlers`: Configurar handlers del logger con formato JSON
-  - `_log_worker`: Worker asincrono para procesamiento de logs
-  - `_store_log_entry`: Almacenar entrada de log en base de datos
-  - `_store_pattern`: Almacenar patron detectado
-  - `_generate_alerts`: Generar alertas basadas en patrones detectados
-  - `log`: Metodo principal de logging - soporta ambas interfaces completa y simple
-  - `log_simple`: Interfaz simple de logging compatible con codigo existente
-  - `debug`: Log de nivel DEBUG
-  - `info`: Log de nivel INFO
-  - `warning`: Log de nivel WARNING
-  - `error`: Log de nivel ERROR
-  - `critical`: Log de nivel CRITICAL
-  - `success`: Log de nivel SUCCESS
-  - `performance`: Log de nivel PERFORMANCE
-  - `log_with_trace`: Log con trace ID para seguimiento distribuido
-  - `log_with_span`: Log con span ID para microservicios
-  - `query_logs`: Consultar logs desde la base de datos con filtros
-  - `get_patterns`: Obtener patrones detectados
-  - `acknowledge_pattern`: Marcar patron como reconocido
-  - `get_statistics`: Obtener estadisticas del sistema de logging
-  - `export_logs`: Exportar logs en formato especificado (JSON, CSV)
-  - `shutdown`: Detener el logger de forma graceful
-  - `add_custom_filter`: Anadir filtro personalizado
-  - `add_custom_formatter`: Anadir formateador personalizado
-  - `add_custom_handler`: Anadir handler personalizado
-  - `log_with_metrics`: Log con metricas asociadas
-  - `log_with_context`: Log con contexto enriquecido
-  - `log_batch`: Logear multiples entradas de forma eficiente
-  - `search_logs`: Buscar logs usando consulta de texto completo
-  - `get_real_time_metrics`: Obtener metricas en tiempo real
-  - `set_alert_threshold`: Establecer umbral de alerta para un tipo de patron
-  - `get_alerts`: Obtener alertas activas
-  - `acknowledge_alert`: Marcar alerta como reconocida
-  - `export_analytics`: Exportar analisis avanzado de logs
-  - `_get_top_errors`: Obtener errores mas frecuentes
-  - `_analyze_performance_logs`: Analizar logs de rendimiento
-  - `log_context`: Context manager para logging con contexto temporal
-  - `log_with_trace_context`: Log con contexto de trazado distribuido
-- **Metodos principales de JsonFormatter**:
-  - `format`: Formatear log record como JSON
-- **Metodos principales de StatisticalAnomalyDetector**:
-  - `__init__`: Inicializa detector con tamano de ventana y umbral
-  - `add_data_point`: Anadir punto de datos y detectar anomalia
-- **Metodos principales de PatternRecognizer**:
-  - `__init__`: Inicializa reconocedor con longitudes de patron
-  - `add_log_sequence`: Anadir secuencia de logs y detectar patrones
-  - `_detect_repetitive_pattern`: Detectar patrones repetitivos en secuencias
-- **Metodos principales de AdvancedLogMetrics**:
-  - `__init__`: Inicializa metricas avanzadas
-  - `add_metric`: Anadir metrica con analisis de tendencias
-  - `get_trend_analysis`: Analisis de tendencias para una metrica
-  - `_calculate_volatility`: Calcular volatilidad de una serie de valores
-- **Funciones globales**:
-  - `get_advanced_logger`: Obtener un logger avanzado
-- **Logger predeterminado**:
-  - `jarvis_logger`: Logger predeterminado para Jarvis
-
-#### `src/utils/alert_system.py` [620 lineas] - Sistema de Alertas Integrado
-- **Descripcion**: Sistema unificado de alertas que coordina diferentes sistemas de monitoreo, gestiona notificaciones y acciones con soporte multiple severidad y estado.
-- **Clases principales**:
-  - `AlertSeverity` (Enum): Severidad de las alertas (INFO, WARNING, CRITICAL, EMERGENCY)
-  - `AlertStatus` (Enum): Estado de las alertas (OPEN, ACKNOWLEDGED, RESOLVED, SUPPRESSED)
-  - `AlertRule` (dataclass): Regla de alerta configurada con condicion, severidad y acciones
-  - `AlertAction` (dataclass): Accion a realizar ante una alerta (email, webhook, log, command)
-  - `Alert` (dataclass): Alerta generada por el sistema con timestamp y estado
-  - `AlertSystem`: Sistema de alertas integrado para JARVIS con monitoreo y gestion
-- **Metodos principales**:
-  - `__init__`: Inicializa el sistema de alertas con reglas y acciones por defecto.
-  - `start_monitoring`: Inicia el monitoreo de alertas en segundo plano.
-  - `stop_monitoring`: Detiene el monitoreo de alertas.
-  - `_monitoring_loop`: Bucle principal de monitoreo de alertas.
-  - `_evaluate_alert_rules`: Evalua todas las reglas de alerta activas.
-  - `_evaluate_condition`: Evalua una condicion de alerta (simplificado).
-  - `_process_alert`: Procesa una alerta y ejecuta acciones asociadas.
-  - `_get_action`: Obtiene una accion por nombre.
-  - `_execute_action`: Ejecuta una accion de alerta segun su tipo.
-  - `_execute_log_action`: Ejecuta accion de logging.
-  - `_execute_email_action`: Ejecuta accion de email notificacion.
-  - `_execute_webhook_action`: Ejecuta accion de webhook HTTP.
-  - `_execute_command_action`: Ejecuta accion de comando del sistema.
-  - `_cleanup_old_alerts`: Limpia alertas antiguas resueltas.
-  - `acknowledge_alert`: Acepta una alerta especificada.
-  - `resolve_alert`: Resuelve una alerta especificada.
-  - `get_alerts`: Obtiene alertas filtradas por severidad, estado y fuente.
-  - `get_alert_statistics`: Obtiene estadisticas de alertas generales.
-  - `add_alert_callback`: Agrega un callback para recibir alertas.
-  - `add_acknowledgement_callback`: Agrega un callback para recibir aceptaciones.
-  - `add_resolution_callback`: Agrega un callback para recibir resoluciones.
-  - `add_alert_rule`: Agrega una regla de alerta personalizada.
-  - `add_alert_action`: Agrega una accion de alerta personalizada.
-  - `export_alerts`: Exporta alertas a un archivo JSON.
-  - `clear_resolved_alerts`: Limpia alertas resueltas del sistema.
-  - `__enter__`: Entry point para context manager.
-  - `__exit__`: Exit point para context manager.
-- **Funciones globales**:
-  - `get_alert_system`: Obtiene la instancia global del sistema de alertas.
-  - `start_alert_monitoring`: Inicia el monitoreo de alertas global.
-  - `stop_alert_monitoring`: Detiene el monitoreo de alertas global.
-
-#### `src/utils/app_utils.py` [804 lineas] - Utilidades para Aplicaciones
-- **Descripcion**: Utilidades comunes para aplicaciones y automatizacion. La geometria de monitores procede exclusivamente de ScreenManager. La deteccion visual de elementos se realiza mediante Vision/Qwen3-VL. Este modulo no genera coordenadas ficticias.
-- **Arquitectura principal**:
-  - **AppManager**: Gestor general de aplicaciones con capacidades de monitorizacion, apertura, cierre, movimiento y verificacion.
-  - **VisualAnalysis**: Sistema de deteccion visual de elementos mediante Vision/Qwen3-VL con analisis de capturas y normalizacion de coordenadas.
-  - **WindowManagement**: Gestion avanzada de ventanas con busqueda robusta y deteccion de monitores asociados.
-  - **CompatibilityLayer**: Interfaz simplificada para operaciones comunes con abstraccion de AppManager.
-- **Metodos principales de AppManager**:
-  - `__init__`: Inicializa gestor con ScreenManager y actualiza monitores.
-  - `open_app`: Abre aplicacion y la coloca en monitor solicitado con soporte para Chrome, Firefox, Edge, Notepad, Calculator, Paint y aplicaciones genericas.
-  - `close_app`: Cierra ventana encontrada para la aplicacion mediante busqueda de patrones de titulos.
-  - `move_window_to_screen`: Mueve ventana a monitor concreto mediante ScreenManager.
-  - `center_window`: Centra ventana en el monitor donde esta situada actualmente sin utilizar el escritorio virtual completo.
-  - `verify_app_open`: Comprueba si existe ventana visible asociada a la aplicacion.
-  - `_find_monitor_for_window`: Determina el monitor en el que se encuentra el centro de una ventana.
-  - `get_app_manager`: Obtiene instancia singleton del gestor de aplicaciones.
-- **Funciones de analisis visual**:
-  - `analyze_elements_in_screenshot`: Analiza captura mediante Vision/Qwen3-VL para detectar elementos interactivos (botones, campos, menus, enlaces, pestanas, checkboxes, radios, selectores, iconos interactivos, controles visibles).
-  - `_extract_json`: Extrae JSON incluso si Vision devuelve un bloque Markdown con manejo robusto de errores.
-  - `_normalize_bbox`: Valida bbox normalizada 0..1000 con verificacion de coordenadas validas.
-  - `_safe_confidence`: Normaliza confidence a 0..1 con manejo de valores invalidos.
-- **Funciones de gestion de ventanas**:
-  - `_find_application_windows`: Busca ventanas mediante varios nombres/patrones comunes con aliases para Chrome, Firefox, Edge, Notepad, Calculator, Paint, Explorer, CMD.
-- **Funciones de compatibilidad**:
-  - `open_app_on_screen`: Abre aplicacion en monitor (compatibilidad).
-  - `close_app`: Cierra aplicacion (compatibilidad).
-  - `move_window_to_screen`: Mueve ventana a monitor (compatibilidad).
-  - `center_window`: Centra ventana dentro de su monitor actual (compatibilidad).
-- **Caracteristicas implementadas**:
-  - Gestion multi-monitor con ScreenManager
-  - Deteccion visual avanzada con Qwen3-VL
-  - Busqueda robusta de ventanas con aliases
-  - Manejo de errores y logging extensivo
-  - Coordenadas normalizadas 0-1000
-  - Extraccion JSON robusta de respuestas Vision
-
-#### `src/utils/architectural_evolution_manager.py` [10766 lineas] - Gestor de Evolucion Arquitectonica
-- **Descripcion**: Sistema avanzado de gestion de evolucion arquitectonica que permite a JARVIS modificar sus estructuras internas, componentes y flujos de trabajo de forma controlada y segura con gestion de riesgos y rollback automatico.
-- **Clases principales**:
-  - `EvolutionStatus` (Enum): Estados del ciclo de vida de propuestas (PENDING, VALIDATING, APPROVED, REJECTED, EXECUTING, COMPLETED, FAILED, ROLLING_BACK, ROLLED_BACK)
-  - `ChangeType` (Enum): Tipos de cambios arquitectonicos (COMPONENT_ADDITION, COMPONENT_REMOVAL, COMPONENT_MODIFICATION, INTERFACE_ADDITION, INTERFACE_REMOVAL, INTERFACE_MODIFICATION, FLOW_MODIFICATION, CONFIGURATION_CHANGE, INTEGRATION_ADDITION, INTEGRATION_REMOVAL)
-  - `RiskLevel` (Enum): Niveles de riesgo (LOW, MEDIUM, HIGH, CRITICAL)
-  - `ComponentInfo` (dataclass): Informacion detallada de componentes del sistema
-  - `InterfaceInfo` (dataclass): Informacion de interfaces entre componentes
-  - `ArchitecturalChange` (dataclass): Representacion estructurada de cambios arquitectonicos
-  - `EvolutionProposal` (dataclass): Propuestas completas de evolucion con multiples cambios
-  - `ArchitecturalEvolutionManager`: Clase principal de gestion evolutiva del sistema
-- **Metodos principales**:
-  - `__init__`: Inicializa el gestor con configuracion y sistemas auxiliares de optimizacion y aprendizaje
-  - `get_component_info`: Obtiene informacion detallada de un componente especifico
-  - `list_components`: Lista todos los componentes con filtrado opcional por tipo
-  - `get_component_dependencies`: Obtiene dependencias de un componente
-  - `get_component_interfaces`: Obtiene interfaces de un componente
-  - `get_available_operations`: Devuelve operaciones de modificacion soportadas
-  - `validate_component_existence`: Verifica existencia de componentes
-  - `get_architecture_state`: Obtiene estado actual completo de la arquitectura
-  - `register_component`: Registra nuevos componentes en el sistema
-  - `update_component_status`: Actualiza estado de componentes existentes
-  - `get_interface_info`: Obtiene informacion de interfaces especificas
-  - `register_interface`: Registra nuevas interfaces en el sistema
-  - `get_architecture_inspection_report`: Genera reporte detallado de inspeccion arquitectonica
-  - `validate_compatibility_with_existing_apis`: Verifica compatibilidad con APIs existentes
-  - `get_proposal_input_requirements`: Define entrada minima para propuestas
-  - `get_proposal_output_requirements`: Define salida minima esperada
-  - `get_proposal_states`: Define estados posibles de propuestas
-  - `validate_proposal_contract`: Valida que propuestas cumplan con contrato minimo
-  - `run_minimum_tests`: Ejecuta tests minimos del contrato
-  - `test_application_methods`: Tests de aplicacion controlada
-  - `prepare_change`: Prepara cambios antes de aplicacion
-  - `apply_change`: Aplica cambios arquitectonicos verificables
-  - `detect_application_failure`: Detecta fallos durante aplicacion
-  - `register_application_result`: Registra resultados de aplicacion
-  - `verify_change_structure`: Verifica estructura resultante despues de cambios
-  - `verify_no_side_effects`: Verifica que no se modificaron componentes ajenos
-  - `validate_proposal_previa`: Valida propuesta antes de aplicacion
-  - `execute_syntax_check`: Ejecuta comprobacion sintactica post-ejecucion
-  - `execute_component_tests`: Ejecuta tests del componente afectado
-  - `check_direct_integrations`: Comprueba integraciones directas
-  - `check_configuration_state`: Comprueba estado de configuracion
-  - `check_application_startup`: Comprueba que la aplicacion sigue arrancando
-  - `register_real_evidence`: Registra evidencia real
-  - `test_post_verification_methods`: Tests de verificacion posterior
-  - `detect_rollback_need`: Detecta cuando un cambio debe revertirse
-  - `create_backup_for_rollback`: Crea copia de seguridad para rollback
-  - `perform_rollback`: Realiza el rollback de un cambio
-  - `run_compatibility_tests`: Ejecuta tests de compatibilidad
-  - `run_persistence_and_audit_tests`: Ejecuta tests de persistencia y auditoria
-  - `identify_persistence_locations`: Identifica ubicaciones de persistencia
-  - `persist_evolution`: Persiste evolucion en almacenamiento
-  - `recover_evolution`: Recupera evolucion desde almacenamiento
-  - `handle_corrupted_or_missing_data`: Maneja datos corruptos o faltantes
-  - `prevent_duplicates`: Evita duplicados en evoluciones
-  - `maintain_change_traceability`: Mantiene trazabilidad de cambios
-- **Metodos auxiliares de aplicacion controlada**:
-  - `_verify_precondition`: Verifica precondiciones especificas
-  - `_prepare_change_resources`: Prepara recursos necesarios para cambios
-  - `_execute_change_by_type`: Ejecuta cambios segun tipo especifico
-  - `_execute_component_addition`: Ejecucion de adicion de componentes
-  - `_execute_component_modification`: Ejecucion de modificacion de componentes
-  - `_execute_component_removal`: Ejecucion de remocion de componentes
-  - `_execute_interface_addition`: Ejecucion de adicion de interfaces
-  - `_execute_interface_modification`: Ejecucion de modificacion de interfaces
-  - `_execute_interface_removal`: Ejecucion de remocion de interfaces
-  - `_execute_flow_modification`: Ejecucion de modificacion de flujos
-  - `_execute_configuration_change`: Ejecucion de cambios de configuracion
-  - `_execute_integration_addition`: Ejecucion de adicion de integraciones
-  - `_execute_integration_removal`: Ejecucion de remocion de integraciones
-- **Metodos auxiliares de validacion**:
-  - `_test_component_integrity`: Verifica integridad de un componente
-  - `_test_component_interfaces`: Verifica interfaces de un componente
-  - `_test_component_dependencies`: Verifica dependencias de un componente
-  - `_test_component_capabilities`: Verifica capacidades de un componente
-  - `_check_circular_dependencies`: Verifica dependencias circulares
-  - `_check_system_configuration`: Verifica configuracion del sistema
-  - `_check_component_configuration`: Verifica configuracion de un componente
-  - `_check_interfaces_configuration`: Verifica configuracion de interfaces
-  - `_check_dependencies_configuration`: Verifica configuracion de dependencias
-- **Metodos auxiliares de persistencia**:
-  - `_get_directory_size_mb`: Obtiene tamano de directorio en MB
-  - `_validate_change_for_persistence`: Valida cambio para persistencia
-  - `_validate_proposal_for_persistence`: Valida propuesta para persistencia
-  - `_is_duplicate_evolution`: Verifica si evolucion es duplicada
-  - `_serialize_evolution_for_persistence`: Serializa evolucion para persistencia
-  - `_deserialize_evolution_from_persistence`: Deserializa evolucion desde persistencia
-  - `_update_evolution_index`: Actualiza indice de evoluciones
-  - `_add_audit_record`: Agrega registro al auditoria
-  - `_validate_evolution_data_integrity`: Valida integridad de datos de evolucion
-  - `_attempt_recovery_from_backup`: Intenta recuperar desde backup
-- **Caracteristicas implementadas**:
-  - Sistema completo de gestion evolutiva con control de riesgos y rollback
-  - Validacion automatica de compatibilidad con APIs existentes
-  - Deteccion de dependencias circulares y efectos secundarios
-  - Gestion de estados del ciclo de vida con transiciones controladas
-  - Integracion con sistemas de optimizacion y aprendizaje automatico
-  - Reportes detallados de arquitectura y metricas de evolucion
-  - Soporte para multiples tipos de cambios con estrategias especificas
-  - Sistema de pruebas integrado para validacion de cambios
-  - Gestion de recursos y permisos para operaciones criticas
-  - Persistencia de historial de cambios con metricas de rendimiento
-  - Sistema avanzado de persistencia y auditoria con manejo de datos corruptos
-  - Trazabilidad completa de todos los cambios arquitectonicos
-  - Recuperacion automatica desde backups en caso de fallos
-  - Prevencion de duplicados y consistencia de datos
-
-#### `src/utils/circuit_breaker.py` [197 lineas] - Patron Circuit Breaker para Resiliencia
-- **Descripcion**: Implementacion del patron circuit breaker para proporcionar resiliencia contra fallos en cascada y proteger servicios dependientes.
-- **Clases principales**:
-  - `CircuitState` (Enum): Estados del circuit breaker (CLOSED, OPEN, HALF_OPEN).
-  - `CircuitBreakerConfig` (dataclass): Configuracion para el circuit breaker con umbral de fallos, tiempo de recuperacion, excepciones esperadas, timeout y llamadas maximas en estado medio abierto.
-  - `CircuitBreaker`: Implementacion principal del circuit breaker con proteccion contra timeouts, manejo de estados y estadisticas.
-  - `CircuitBreakerOpenError` (Exception): Excepcion lanzada cuando el circuito esta abierto.
-  - `CircuitBreakerManager`: Gestor de multiples circuit breakers con operaciones globales.
-- **Metodos principales**:
-  - `CircuitBreaker.__init__`: Inicializa circuit breaker con nombre y configuracion.
-  - `CircuitBreaker.call`: Ejecuta funcion con proteccion de circuit breaker.
-  - `CircuitBreaker._should_attempt_reset`: Verifica si el circuito debe intentar resetearse.
-  - `CircuitBreaker._on_success`: Maneja llamada exitosa.
-  - `CircuitBreaker._on_failure`: Maneja llamada fallida.
-  - `CircuitBreaker._open_circuit`: Abre el circuit breaker.
-  - `CircuitBreaker._reset_circuit`: Resetea circuit breaker a estado cerrado.
-  - `CircuitBreaker.force_open`: Fuerza apertura del circuit breaker.
-  - `CircuitBreaker.force_close`: Fuerza cierre del circuit breaker.
-  - `CircuitBreaker.get_state`: Obtiene estado actual del circuit breaker.
-  - `CircuitBreaker.get_stats`: Obtiene estadisticas del circuit breaker.
-  - `CircuitBreakerManager.__init__`: Inicializa gestor de circuit breakers.
-  - `CircuitBreakerManager.get_breaker`: Obtiene o crea circuit breaker.
-  - `CircuitBreakerManager.get_all_stats`: Obtiene estadisticas de todos los circuit breakers.
-  - `CircuitBreakerManager.reset_all`: Resetea todos los circuit breakers.
-  - `CircuitBreakerManager.cleanup_stale`: Limpia circuit breakers obsoletos.
-- **Funciones globales**:
-  - `circuit_breaker`: Decorador para proteccion facil con circuit breaker.
-
-#### `src/utils/config.py` - Configuracion Centralizada
-- **Descripcion**: Gestion centralizada de configuracion del sistema JARVIS con configuracion unificada para todos los componentes, validacion automatica, sistema de herencia de configuraciones, gestion de perfiles de usuario e integracion con sistema de calibracion.
-- **Clases principales**:
-  - `SystemConfig`: Configuracion general del sistema Jarvis (nombre, version, modo debug, sistema de coordenadas)
-  - `LoggingConfig`: Configuracion del sistema de logging (nivel, formato, archivo)
-  - `KeyboardConfig`: Configuracion de teclas de atajo (fail-safe, pausa entre acciones)
-  - `VoiceConfig`: Configuracion de voz (voz por defecto, modelos, tokenizador)
-  - `MemoryConfig`: Configuracion de memoria (archivos de historial, aliases, longitud maxima)
-  - `PredictiveConfig`: Configuracion del sistema predictivo (aprendizaje, umbrales, memoria)
-  - `MonitorConfig`: Configuracion compatible de monitores (geometria, DPI, sistema de coordenadas)
-  - `ScreenConfig`: Configuracion auxiliar de pantallas (multi-monitor, calidad, limites)
-  - `TimeoutConfig`: Configuracion de timeouts (llamadas, captura, clics, escritura)
-  - `CalibrationConfig`: Configuracion del sistema de calibracion (intentos, confianza, coordenadas)
-  - `ChromeConfig`: Configuracion de Google Chrome para aperturas automaticas
-  - `Config`: Configuracion principal del sistema que agrupa todas las subconfiguraciones
-- **Metodos principales**:
-  - `load_config`: Carga la configuracion desde config/config.json con manejo de errores
-  - `_load_monitor`: Convierte bloque JSON de monitor en MonitorConfig
-  - `_load_default_monitors`: Retorna lista vacia de monitores por diseno
-  - `_voice_file_exists`: Comprueba si existe archivo .bin de una voz especifica
-  - `load_saved_voice_preference`: Carga ultima voz seleccionada por el usuario
-  - `save_voice_preference`: Guarda voz actualmente seleccionada
-  - `get_project_root`: Retorna la ruta raiz del proyecto
-  - `get_config_path`: Retorna la ruta del archivo de configuracion
-  - `get_models_path`: Retorna ruta al directorio de modelos
-  - `get_voices_path`: Retorna ruta al directorio de voces
-  - `get_macros_coords_path`: Retorna ruta al archivo de coordenadas de macros
-  - `get_voice_preference_path`: Retorna ruta de preferencia persistente de voz
-  - `get_system_config`: Retorna configuracion general del sistema
-  - `get_logging_config`: Retorna configuracion de logging
-  - `get_keyboard_config`: Retorna configuracion del teclado
-  - `get_voice_config`: Retorna configuracion de voz
-  - `get_memory_config`: Retorna configuracion de memoria
-  - `get_screen_config`: Retorna configuracion auxiliar de pantallas
-  - `get_timeout_config`: Retorna configuracion de timeouts
-  - `get_predictive_config`: Retorna configuracion predictiva
-  - `get_calibration_config`: Retorna configuracion de calibracion
-  - `get_chrome_config`: Retorna configuracion de Chrome
-  - `get_element_types`: Retorna tipos de elementos configurados
-  - `get_monitors`: Retorna monitores definidos en config.json
-  - `get_monitor_config`: Retorna monitor concreto del JSON
-  - `get_primary_monitor_config`: Retorna monitor principal definido en el JSON
-  - `get_monitor_count`: Retorna numero de monitores definidos en el JSON
-  - `MonitorConfig.right`: Propiedad que retorna la coordenada X final del monitor (x + width).
-  - `MonitorConfig.bottom`: Propiedad que retorna la coordenada Y final del monitor (y + height).
-  - `ScreenConfig.monitor_count`: Propiedad que retorna el numero de monitores configurados en el JSON.
-  - `ScreenConfig.get_monitor`: Obtiene un monitor por su ID.
-  - `ScreenConfig.get_primary_monitor`: Obtiene el monitor marcado como principal.
-- **Caracteristicas implementadas**:
-  - Sistema de configuracion unificada con herencia y valores por defecto
-  - Validacion automatica de tipos y rangos en todas las configuraciones
-  - Sistema persistente de preferencias de voz con fallback automatico
-  - Gestion avanzada de configuraciones de monitores con compatibilidad legacy
-  - Manejo robusto de errores con retorno de configuracion neutral por defecto
-  - Integracion completa con sistema de calibracion y coordenadas
-  - Soporte para configuracion predictiva y aprendizaje automatico
-  - Sistema de timeouts configurable para todas las operaciones del sistema
-
-#### `src/utils/contextual_adaptation_audit.py` [444 lineas] - Auditoria del Sistema de Adaptacion Contextual
-- **Descripcion**: Sistema avanzado de auditoria para el objetivo real de autoevolucion y adaptacion contextual. Evalua componentes existentes, identifica brechas del sistema, genera hallazgos detallados y proporciona recomendaciones para mejorar la arquitectura de adaptacion contextual del sistema JARVIS.
-- **Clases principales**:
-  - `ComponentStatus` (dataclass): Estado detallado de un componente del sistema con informacion de implementacion, funcionalidad, dependencias, nivel de integracion y capacidades
-  - `AuditFinding` (dataclass): Hallazgo estructurado de auditoria con categoria, severidad, componente, descripcion, evidencia, recomendacion e impacto
-  - `SystemGap` (dataclass): Brecha identificada en el sistema con area, componente faltante, funcionalidad requerida, prioridad, esfuerzo estimado y dependencias
-  - `ContextualAdaptationAuditor`: Sistema principal de auditoria contextual con evaluacion de componentes, deteccion de brechas y generacion de reportes
-- **Metodos principales**:
-  - `__init__`: Inicializa el sistema de auditoria con timestamp, registro de hallazgos y componentes
-  - `audit_existing_components`: Audita componentes existentes relacionados con adaptacion y evolucion (Adaptive Learning Engine, Self Improvement System, Optimization Orchestrator, Pattern Analyzer)
-  - `_audit_component`: Audita un componente especifico verificando existencia, implementacion, funcionalidad, capacidades, integracion y dependencias
-  - `_assess_functionality`: Evalua nivel de implementacion de funcionalidad basado en indicadores de codigo
-  - `_assess_capabilities`: Evalua capacidades implementadas comparando con capacidades esperadas
-  - `_assess_integration`: Evalua nivel de integracion basado en palabras clave de dependencia
-  - `_extract_dependencies`: Extrae dependencias del componente desde imports del codigo
-  - `_identify_issues`: Identifica posibles problemas en el componente (TODOs, FIXMEs, metodos no implementados)
-  - `_add_audit_finding`: Agrega hallazgo estructurado al sistema de auditoria
-  - `identify_system_gaps`: Identifica brechas criticas en el sistema de autoevolucion contextual
-  - `_add_system_gap`: Agrega brecha identificada al sistema con priorizacion y dependencias
-  - `generate_audit_report`: Genera reporte completo de auditoria con resumen de hallazgos y recomendaciones
-  - `_generate_recommendations`: Genera recomendaciones basadas en hallazgos criticos y estado de integracion
-  - `_generate_next_steps`: Genera pasos siguientes para implementacion ordenados por prioridad
-  - `_is_fully_integrated`: Verifica si el sistema esta completamente integrado
-  - `save_audit_report`: Guarda reporte de auditoria completo en formato JSON
-- **Funciones globales**:
-  - `main`: Ejecuta auditoria completa del sistema de adaptacion contextual con reporte final
-- **Caracteristicas implementadas**:
-  - Auditoria completa de componentes clave de adaptacion contextual
-  - Deteccion automatica de brechas en arquitectura de autoevolucion
-  - Sistema de hallazgos categorizados por severidad (CRITICAL, HIGH, MEDIUM, LOW)
-  - Evaluacion de funcionalidad, capacidades y nivel de integracion
-  - Generacion automatica de recomendaciones y pasos de implementacion
-  - Reportes estructurados en JSON con timestamp y versionado
-  - Priorizacion automatica de hallazgos y brechas por impacto critico
-  - Sistema de seguimiento de issues y dependencias entre componentes
-
-#### `src/utils/contextual_adaptation_engine.py` [4959 lineas] - Motor de Adaptacion Contextual
-- **Descripcion**: Motor de adaptacion contextual que permite a JARVIS evolucionar y adaptarse automaticamente a diferentes entornos, condiciones de uso y requerimientos cambiantes.
-- **Enums y dataclasses principales**:
-  - `ContextType` (Enum): Tipos de contexto (DEVELOPMENT, PRODUCTION, TESTING, MAINTENANCE, EMERGENCY, OPTIMIZATION, LEARNING, IDLE, RECOVERY)
-  - `AdaptationLevel` (Enum): Niveles de adaptacion (MINIMAL, MODERATE, SIGNIFICANT, RADICAL)
-  - `ContextualFactor` (Enum): Factores contextuales (SYSTEM_RESOURCES, USER_BEHAVIOR, ENVIRONMENTAL_CONDITIONS, PERFORMANCE_REQUIREMENTS, ERROR_RATES, USAGE_PATTERNS, TIME_OF_DAY, WORKLOAD, NETWORK_CONDITIONS, HARDWARE_CAPABILITIES)
-  - `ContextSnapshot` (dataclass): Instantanea del contexto actual con metricas y factores
-  - `AdaptationRule` (dataclass): Regla de adaptacion contextual con condiciones y acciones
-  - `KnowledgeTransfer` (dataclass): Transferencia de conocimiento entre contextos
-  - `AdaptationResult` (dataclass): Resultado de adaptacion con impacto y metricas
-  - `TransferEvaluation` (dict subclass): Resultado de evaluacion de transferencia con campos de exito, puntuacion, mensaje e informacion de feedback; itera sobre (success, evaluation_score, message)
-  - `_AdaptationHistoryEntry` (dict subclass): Entrada de historial de adaptacion con compatibilidad de atributos legacy; expone `__getattr__` para acceso por clave y `to_dict` para serializacion
-- **Metodos principales de `ContextualAdaptationEngine`**:
-  - `__init__`: Inicializa el motor con sistemas existentes, configuracion y modelos de aprendizaje
-  - `_load_config`: Cargar configuracion del motor de adaptacion contextual
-  - `_initialize_adaptation_rules`: Inicializar reglas de adaptacion contextual por defecto
-  - `_initialize_knowledge_base`: Inicializar base de conocimiento contextual
-  - `capture_context_snapshot`: Captura una instantanea del contexto actual del sistema
-  - `_collect_system_metrics`: Recopilar metricas del sistema usando psutil
-  - `_collect_performance_metrics`: Recopilar metricas de rendimiento usando PerformanceOptimizer
-  - `_collect_user_patterns`: Recopilar patrones de interaccion del usuario usando SelfImprovementSystem
-  - `_collect_environmental_conditions`: Recopilar condiciones ambientales del sistema
-  - `_determine_context_type`: Determinar el tipo de contexto actual basado en metricas
-  - `_evaluate_contextual_factors`: Evaluar factores contextuales del sistema
-  - `_calculate_context_confidence`: Calcular puntuacion de confianza en la determinacion del contexto
-  - `_record_context_pattern`: Grabar patron de contexto en la base de conocimiento
-  - `analyze_contextual_patterns`: Analizar patrones contextuales y determinar que reglas de adaptacion aplicar
-  - `_evaluate_rule_condition`: Evaluar si una regla de adaptacion se aplica al contexto actual
-  - `_get_contextual_value`: Obtener el valor de una clave contextual desde la instantanea
-  - `_parse_value`: Parsear un valor string a float para condiciones
-  - `execute_adaptation`: Ejecutar adaptaciones basadas en las reglas aplicadas
-  - `_determine_adaptation_level`: Determinar el nivel de adaptacion basado en las reglas aplicadas
-  - `_execute_adaptation_actions`: Ejecutar acciones de adaptacion de una regla
-  - `_execute_single_action`: Ejecutar una accion de adaptacion individual con integracion real
-  - `_set_optimization_interval`: Ajustar intervalo de optimizacion de sistemas existentes
-  - `_reduce_data_transfer_real`: Reducir transferencia de datos usando LogAnalytics
-  - `transfer_knowledge`: Transferir conocimiento entre contextos con estrategia avanzada
-  - `_validate_context_compatibility`: Validar compatibilidad entre contextos para transferencia
-  - `_get_historical_compatibility`: Obtener compatibilidad basada en transferencias historicas
-  - `_calculate_factor_similarity`: Calcular similitud basada en factores contextuales
-  - `_calculate_transfer_efficiency`: Calcular eficiencia de transferencia segun la estrategia seleccionada
-  - `_transform_knowledge_for_target`: Transformar conocimiento para adaptarlo al contexto destino
-  - `_update_transfer_patterns`: Actualizar patrones de transferencia basado en una transferencia exitosa
-  - `integrate_with_performance_optimizer`: Integrar con PerformanceOptimizer para optimizacion contextual
-  - `integrate_with_self_improvement_system`: Integrar con SelfImprovementSystem para aprendizaje continuo
-  - `integrate_with_adaptive_learning_engine`: Integrar con AdaptiveLearningEngine para aprendizaje adaptativo
-  - `integrate_with_pattern_analyzer`: Integrar con PatternAnalyzer para deteccion de patrones contextuales
-  - `set_meta_learning_system`: Conectar el MetaLearningSystem real; no lo instancia
-  - `integrate_with_meta_learning_system`: Observar el metaprendizaje (metricas, recomendaciones, evaluaciones y meta-reglas) y registrarlo en la base de conocimiento sin aplicarlo
-  - `full_system_integration`: Realizar integracion completa con todos los sistemas existentes
-  - `_map_optimization_to_adaptation`: Mapear recomendacion de optimizacion a accion de adaptacion
-  - `_determine_learning_mode`: Determinar modo de aprendizaje basado en contexto actual
-  - `_sync_adaptation_rules`: Sincronizar reglas de adaptacion con reglas de mejora
-  - `_calculate_adaptive_learning_rate`: Calcular tasa de aprendizaje adaptativa basada en contexto
-  - `_calculate_adaptive_batch_size`: Calcular tamano de lote adaptativo basado en contexto
-  - `_calculate_adaptive_max_epochs`: Calcular numero maximo de epocas adaptativo
-  - `_calculate_adaptive_patience`: Calcular paciencia adaptativa para early stopping
-  - `_create_adaptation_rule_from_pattern`: Crear regla de adaptacion a partir de patron detectado
-  - `get_integration_status`: Obtener estado actual de la integracion con sistemas existentes
-  - `update_system_configs`: Actualizar configuraciones de sistemas basadas en contexto actual
-  - `_extract_relevant_metrics`: Extraer metricas relevantes de un contexto especifico
-  - `_adapt_baselines_to_context`: Adaptar lineas base de rendimiento para un contexto destino
-  - `_filter_strategies_by_compatibility`: Filtrar estrategias de adaptacion segun compatibilidad
-  - `_filter_patterns_by_compatibility`: Filtrar patrones por compatibilidad con contexto destino
-  - `_calculate_strategy_applicability`: Calcular aplicabilidad de una estrategia en el contexto destino
-  - `_calculate_pattern_compatibility`: Calcular compatibilidad de un patron con un contexto destino
-  - `batch_knowledge_transfer`: Realizar transferencias de conocimiento en batch con priorizacion
-  - `auto_transfer_knowledge`: Transferir conocimiento automaticamente a un contexto destino
-  - `_calculate_transfer_potential`: Calcular potencial de transferencia entre contextos
-  - `transfer_knowledge_with_feedback`: Transferir conocimiento con mecanismo de feedback y ajuste
-  - `get_transfer_recommendations`: Obtener recomendaciones de transferencia de conocimiento inteligentes
-  - `_calculate_transfer_urgency`: Calcular urgencia de transferencia para un contexto y tipo de conocimiento
-  - `_generate_recommendation_reasoning`: Generar razonamiento para una recomendacion de transferencia
-  - `get_knowledge_transfers`: Obtener historial de transferencias de conocimiento con filtros avanzados
-  - `add_adaptation_rule`: Anadir una regla de adaptacion personalizada
-  - `remove_adaptation_rule`: Eliminar una regla de adaptacion
-  - `enable_rule`: Habilitar una regla de adaptacion
-  - `disable_rule`: Deshabilitar una regla de adaptacion
-  - `get_adaptation_rules`: Obtener lista de reglas de adaptacion
-  - `_update_rule_success_rate`: Actualizar la tasa de exito de una regla
-  - `save_adaptation_rules`: Guardar reglas de adaptacion en archivo
-  - `load_adaptation_rules`: Cargar reglas de adaptacion desde archivo
-  - `save_knowledge_base`: Guardar base de conocimiento en archivo
-  - `load_knowledge_base`: Cargar base de conocimiento desde archivo
-  - `_record_adaptation_result`: Grabar resultado de adaptacion en la base de conocimiento
-  - `_calculate_overall_impact`: Calcular impacto general de las adaptaciones
-  - `_calculate_adaptation_confidence`: Calcular confianza en la adaptacion realizada
-  - `start_contextual_adaptation_loop`: Iniciar el bucle de adaptacion contextual
-  - `stop_contextual_adaptation_loop`: Detener el bucle de adaptacion contextual
-  - `get_adaptation_summary`: Obtener resumen de adaptaciones realizadas
-  - `get_context_insights`: Obtener insights sobre los contextos detectados
-  - `get_engine_status`: Obtener estado completo del motor de adaptacion contextual
-  - `expected_storage_paths`: Devolver las rutas del almacenamiento de persistencia que el motor espera encontrar (ficheros)
-  - `detect_absent_storage`: Detectar que parte del almacenamiento esperado falta en disco; es de solo lectura y no crea ficheros
-  - `corruption_criteria`: Devolver el contrato declarativo de los criterios de corrupcion de la persistencia; es de solo lectura y no crea ficheros
-  - `recoverable_data`: Devolver el contrato declarativo de los DATOS RECUPERABLES (que dato se puede recuperar, a que nivel y con que politica); es de solo lectura y no crea ficheros
-  - `total_loss_fallback`: Devolver el CONTRATO del fallback por perdida TOTAL de los datos de persistencia (capas, invariantes, modos de perdida y pendientes); es de solo lectura, devuelve una COPIA defensiva y no crea ficheros
-  - `_cumple_tipo`: Comprobar que un valor pertenece al tipo que el formato real admite para ese campo
-  - `_desviaciones_de_regla`: Enumerar los campos en que una regla de adaptacion se aparta del formato real
-  - `_fila_valida`: Comprobar que una fila es un mapeo con los campos obligatorios y del tipo declarado
-  - `_seccion_de_conocimiento_valida`: Comprobar que una seccion de la base de conocimiento tiene el tipo declarado y no contiene claves desconocidas
-  - `_save_adaptation_rules`: Guardar reglas de adaptacion en archivo JSON
-  - `_load_adaptation_rules`: Cargar reglas de adaptacion desde archivo JSON
-  - `save_all_data`: Guardar todos los datos persistentes (reglas y knowledge base)
-  - `load_all_data`: Cargar todos los datos persistentes (reglas y knowledge base)
-  - `backup_data`: Crear una copia de seguridad de los datos persistentes
-  - `export_adaptation_history`: Exportar historial de adaptaciones a archivo JSON
-  - `_apply_transferred_knowledge`: Aplicar conocimiento transferido en el contexto destino
-  - `_apply_success_patterns`: Aplicar patrones de exito transferidos
-  - `_apply_adaptation_strategies`: Aplicar estrategias de adaptacion transferidas
-  - `_apply_performance_baselines`: Aplicar lineas base de rendimiento transferidas
-  - `_evaluate_knowledge_application`: Evaluar el resultado de la aplicacion de conocimiento transferido
-  - `_get_available_knowledge_types`: Obtener tipos de conocimiento disponibles en un contexto
-- **Recuperacion parcial de la corrupcion**:
-  - `recovery_report`: Devolver el INFORME de lo que el cargador ha RECUPERADO (la UNIDAD recuperada, la POLITICA aplicada y el valor por DEFECTO que ocupo el lugar del dato corrupto); es de solo lectura y devuelve una COPIA defensiva
-  - `_valor_por_defecto_de_recuperacion`: Obtener el valor por DEFECTO de un campo de regla segun el FORMATO REAL declarado en `recoverable_data()`; no inventa datos y resuelve `$rule_id` con la identidad de la propia regla
-  - `_recuperar_fila_de_regla`: RECUPERAR la fila de regla corrupta en el NIVEL del CAMPO: se rechaza solo el campo que corrompe (toma su valor por defecto) y el resto de la fila sobrevive intacto
-  - `_campo_de_identidad`: Obtener del FORMATO REAL declarado el campo que IDENTIFICA una fila; el formato lo declara ademas como cadena, de modo que un valor de otro tipo NO es una identidad
-  - `_identidad_de_regla`: Obtener la IDENTIDAD REGISTRABLE de una fila de regla (su `rule_id`, que debe ser una cadena NO VACIA); devuelve `None` cuando la fila no tiene identidad utilizable, porque el cargador NUNCA inventa una identidad
-  - `_procesar_fila_de_regla`: Procesar UNA fila por el pipeline COMUN a la via de LISTA y a la de CONTENEDOR: comprueba la identidad ANTES de registrar, RECHAZA la fila cuya identidad ya usa otra (la primera registrada sobrevive), y RECUPERA a nivel de CAMPO la que solo se aparta del FORMATO REAL
-  - `_valores_del_contenedor_de_reglas`: Obtener los VALORES del contenedor `rules` cuando el contenedor tiene FORMA de mapeo; cada valor pasa por el MISMO pipeline de fila que la via de LISTA y las claves NO se usan como identidad
-  - `_recuperar_grupos_de_base`: RECUPERAR los GRUPOS sanos de una seccion: se descarta solo el grupo que se aparta del formato y sus HERMANOS, que son unidades independientes, sobreviven. Una seccion cuyo valor por DEFECTO no es un MAPEO (una seccion de tipo LISTA, como `learning_results`) no tiene GRUPOS que recuperar: se RECHAZA ENTERA en el NIVEL de la SECCION, conserva su valor por DEFECTO y sus HERMANOS (las demas secciones del mismo fichero) sobreviven, de modo que la corrupcion de una seccion no determina el valor de otra ni aborta la carga del fichero
-  - `_registrar_recuperacion`: Anotar en el INFORME de recuperacion lo que se ha recuperado, en la UNIDAD que corrompe y con la POLITICA aplicada
-- **Persistencia de feedback de Goal**:
-  - `_initialize_goal_adaptation_persistence`: Inicializar la persistencia de feedback y aprendizaje de Goal
-  - `_save_goal_adaptation_feedback`: Guardar el feedback acumulado y el historial de adaptacion en `goal_adaptation_feedback.json`
-  - `_load_goal_adaptation_feedback`: Recuperar el feedback acumulado y el historial de adaptacion desde disco
-  - `_save_goal_adaptation_learning_results`: Guardar resultados de aprendizaje y estrategias en `goal_adaptation_learning_results.json`
-  - `_load_goal_adaptation_learning_results`: Recuperar resultados de aprendizaje y estrategias desde disco
-  - `_flatten_strategy_map`: Normalizar el mapa de estrategias al indice plano `strategy_id -> entrada` usado en disco
-  - `_project_strategies_by_context`: Proyectar el indice plano de estrategias sobre el mapa `contexto -> lista` del motor
-  - `_merge_strategies_by_context`: Restaurar el contexto exacto de cada estrategia aprendida desde `updated_strategies`
-  - **Metodos de utilidad y helpers**:
-    - `_safe_float`: Convertir un valor a float de forma segura, devolviendo un valor por defecto ante error, NaN o infinito
-    - `_bounded_float`: Ajustar un valor float entre un minimo y maximo usando `_safe_float`
-    - `_coerce_context`: Convertir un valor (ContextType o string) al enum ContextType correspondiente
-    - `_call_optional`: Llamar a un metodo opcional en un objeto, devolviendo un valor por defecto si no existe o falla
-    - `_json_default`: Serializador JSON por defecto para tipos no nativos (Enum, datetime, Path, objetos con `to_dict`)
-    - `_serializable_history`: Convertir una entrada de historial de adaptacion (AdaptationResult o dict) a un diccionario serializable
-    - `_resolve_path`: Resolver una ruta de configuracion contra el directorio de datos, respetando rutas absolutas y el prefijo `data/`
-  - **Metodos de ejecucion de adaptacion**:
-    - `_execute_single_action`: Ejecutar una accion de adaptacion individual con integracion real de los sistemas existentes (PerformanceOptimizer, AdaptiveLearningEngine, PatternAnalyzer)
-    - `_set_optimization_interval`: Ajustar el intervalo de optimizacion del PerformanceOptimizer
-    - `_reduce_data_transfer_real`: Reducir transferencia de datos consultando LogAnalytics
-    - `_calculate_overall_impact`: Normalizar el signo de los impactos de rendimiento evitando confundir aumentos buenos y malos
-    - `_calculate_adaptation_confidence`: Calcular la confianza en una adaptacion basada en la tasa de exito de reglas, el contexto y el impacto
-    - `_record_adaptation_result`: Grabar el resultado de una adaptacion en la base de conocimiento si supera el umbral de confianza
-    - `to_dict`: Serializar la dataclass (ContextSnapshot, AdaptationRule, KnowledgeTransfer, AdaptationResult, _AdaptationHistoryEntry) a un diccionario canónico
-  - **Metodos de transferencia de conocimiento adicionales**:
-    - `_extract_knowledge_from_context`: Extraer conocimiento de un contexto segun el tipo (patterns, estrategias, baselines, metricas)
-    - `_extract_contextual_metrics`: Extraer metricas contextuales agregadas (avg/min/max) de los snapshots de un contexto
-    - `_has_transfer_history`: Comprobar si existe historial de transferencia entre dos contextos
-    - `_get_context_adjustment_factor`: Factor de ajuste entre pares de contextos para transferencia de conocimiento
-    - `_adapt_baselines_to_context`: Adaptar lineas base de rendimiento para un contexto destino usando un factor de ajuste
-    - `_get_context_knowledge_amount`: Cantidad de conocimiento disponible en un contexto (patterns, estrategias, baselines)
-    - `_calculate_transfer_potential`: Calcular el potencial de transferencia entre contextos
-    - `_calculate_transfer_efficiency_with_strategy`: Calcular eficiencia de transferencia con una estrategia especifica (conservative/adaptive/aggressive)
-    - `_estimate_transfer_efficiency`: Estimar eficiencia de transferencia usando estrategia adaptativa
-    - `_identify_relevant_knowledge_types`: Identificar tipos de conocimiento disponibles entre dos contextos
-    - `_generate_transfer_reasoning`: Generar razonamiento descriptivo para una transferencia de conocimiento
-    - `_calculate_transfer_priority`: Calcular prioridad de transferencia basada en compatibilidad, potencial y tipo
-    - `_record_successful_transfer_pattern`: Registrar un patron de transferencia exitosa en la base de conocimiento
-    - `_resolve_transfer_confidence`: Resolver la confianza de una transferencia: feedback explicito > atributo > eficiencia
-    - `knowledge_transaptors`: Propiedad que devuelve un alias de `knowledge_transfers` para consumidores legacy
-    - `get_knowledge_transfer_objects`: Devolver objetos KnowledgeTransfer filtrados por contexto y eficiencia
-    - `register_feedback`: Registrar feedback y sincronizar el objeto de transferencia con su historial
-    - `record_resource_allocation`: Registrar una asignacion de recursos en la base de conocimiento
-    - `_update_resource_usage_patterns`: Actualizar patrones de uso de recursos tras una asignacion
-  - **Metodos de estrategia y validacion de Goals**:
-    - `represent_adaptation`: Crear una copia adaptada del Goal; acepta objetos y diccionarios
-    - `create_goal_adaptation_proposal`: Crear una propuesta de adaptacion de Goal con reglas y metadata
-    - `_goal_to_dict`: Serializar un Goal (objeto o diccionario) a un diccionario canonico
-    - `_rule_to_dict`: Serializar una regla de adaptacion (objeto o diccionario) a un diccionario
-    - `_snapshot_to_dict`: Serializar un ContextSnapshot (objeto o diccionario) a un diccionario
-    - `_validate_adaptation_constraints`: Validar que las restricciones de un Goal adaptado no son contradictorias
-    - `_are_constraints_contradictory`: Comprobar si dos restricciones son contradictorias (maximize/minimize, show/hide, enable/disable)
-    - `_check_intention_preservation`: Verificar que la adaptacion preserva la intencion original del Goal
-    - `_targets_equivalent`: Comprobar equivalencia de dos URLs/objetivos
-    - `_validate_goal_structure`: Validar que un Goal tiene id, tipo, target y prioridad validos
-    - `_validate_current_state`: Validar que el estado actual contiene las claves esperadas
-    - `_required_capabilities_for_goal`: Obtener las capacidades requeridas por el tipo de Goal
-    - `_validate_capabilities`: Comprobar que las capacidades disponibles cubren las requeridas
-    - `_validate_goal_preconditions`: Validar precondiciones del Goal (URL valida para navegacion, etc.)
-    - `_validate_planner_can_solve`: Verificar si el Planner puede resolver el Goal adaptado
-    - `validate_adapted_goal`: Validar estructura, intencion, capacidades, precondiciones y resolubilidad del Goal adaptado
-    - `_register_validation_result`: Registrar el resultado de validacion de un Goal adaptado en la base de conocimiento
-  - **Metodos de feedback y aprendizaje de Goal**:
-    - `_capture_feedback`: Capturar feedback de un resultado de adaptacion y registrarlo en la base de conocimiento
-    - `_analyze_adaptation_improvement`: Analizar mejoras de rendimiento entre metricas esperadas y actuales
-    - `_execute_goal_adaptation_learning_loop`: Ejecutar el bucle de aprendizaje de adaptacion de Goal (feedback, analisis, registro de resultados)
-    - `_analyze_learning_patterns`: Analizar patrones de aprendizaje y generar descripciones
-    - `_update_adaptive_strategies`: Actualizar estrategias adaptativas con patrones aprendidos
-    - `_calculate_learning_convergence`: Calcular metricas de convergencia del aprendizaje (status, puntuacion, tendencia)
-    - `_record_feedback_analysis`: Registrar analisis de feedback en la base de conocimiento
-    - `_record_adaptation_history`: Registrar entrada en el historial de adaptaciones
-    - `_extract_performance_improvement`: Extraer la mejora de rendimiento de una entrada de historial
-    - `_record_learning_results`: Registrar resultados de aprendizaje en la base de conocimiento
-    - `_generate_pattern_description`: Generar una descripcion para un patron de aprendizaje
-    - `_generate_strategy_description`: Generar una descripcion para una estrategia
-    - `_known_strategy_ids`: Identificadores de estrategias ya presentes en el mapa contexto -> lista
-    - `_pattern_identity`: Identidad estable de un patron (pattern_type + goal_type + context_type)
-    - `_count_pattern_observations`: Contar observaciones similares acumuladas por patron
-    - `_confidence_threshold`: Umbral de confianza configurado en el motor (por defecto 0.7)
-    - `_min_similar_observations`: Minimo de observaciones similares exigido por el motor
-    - `_is_validated_pattern`: Comprobar si un patron cumple el contrato de datos validados
-    - `_filter_validated_learning_results`: Dejar en `learning_results` unicamente los patrones validados
-    - `_recover_learning_patterns`: Recuperar unicamente los patrones de aprendizaje validados al cargar
-    - `_estrategia_aprendida_valida`: Comprobar que una entrada de estrategia aprendida aporta evidencia
-  - **Metodos de estrategia individual**:
-    - `apply_strategy`: Aplicar una estrategia al contexto destino, registrando el resultado y verificando consistencia
-    - `compare_strategies`: Comparar dos estrategias evaluadas por su puntuacion global y porcentaje de mejora
-    - `select_strategy`: Seleccionar la mejor estrategia de un conjunto evaluado, con razonamiento de decision
-    - `evaluate_candidate_strategy`: Evaluar una estrategia en su contexto destino sin comparar un contexto consigo mismo
-    - `validate_candidate_strategy`: Validar estructura y rangos de un candidato de estrategia
-    - `_verify_strategy_application`: Verificar la consistencia de la aplicacion de una estrategia
-    - `_revert_strategy_application`: Revertir la aplicacion de una estrategia que fallo la verificacion (idempotente)
-  - **Metodos de limpieza y reinicio del sistema**:
-    - `clear_conversational_memory`: Eliminar conversaciones antiguas de memoria conversacional (por defecto 30 dias)
-    - `clear_adaptation_history`: Eliminar registros antiguos de historial de adaptacion (por defecto 90 dias)
-    - `clear_knowledge_base_patterns`: Limpiar patrones de conocimiento con bajo rendimiento o contexto especifico
-    - `clear_corrupted_data`: Eliminar datos corruptos detectados por `detect_corruption`
-    - `reset_learning_data`: Reinicia datos de aprendizaje y metricas del sistema
-    - `manual_system_reset`: Reinicio manual completo del sistema, preservando opcionalmente la configuracion
-  - **Metodos de arquitectura y propuestas**:
-    - `set_architecture_manager`: Conectar el ArchitecturalEvolutionManager al motor
-    - `update_architecture_state`: Actualizar el estado arquitectonico del motor
-    - `update_components`: Actualizar la lista de componentes recientes
-    - `process_architectural_result`: Registrar un resultado arquitectonico en la base de conocimiento
-    - `process_evidence_registration`: Registrar y evaluar evidencia de verificacion contra el contrato de evidencia minima
-    - `on_proposal_created`: Registrar la creacion de una propuesta de adaptacion en la base de conocimiento
-    - `minimum_evidence`: Devolver el contrato declarativo de la evidencia minima requerida
-  - **Metodos de gestion de reglas** (adicionales):
-    - `get_adaptation_rule`: Obtener una regla de adaptacion por su ID
-    - `list_adaptation_rules`: Listar reglas de adaptacion, opcionalmente solo las habilitadas, ordenadas por prioridad
-  - **Metodos de persistencia y recarga** (adicionales):
-    - `_hay_que_cargar`: Comprobar si hay al menos un fichero de persistencia que cargar
-    - `_unidades_obtenidas`: Unidades de datos utilizables que la ultima carga ha obtenido
-  - **Metodos de deteccion de corrupcion** (helpers internos):
-    - `_deteccion`: Construir un informe de desviacion detectada con los datos de la clase declarada
-    - `_detect_corruption_in`: Desviaciones detectadas en un fichero de persistencia (delega al detector correspondiente)
-    - `_detect_corruption_rules`: Desviaciones del FORMATO REAL de `contextual_adaptation_rules.json`
-    - `_detect_corruption_knowledge_base`: Desviaciones del FORMATO REAL de `contextual_knowledge_base.json`
-    - `_detect_corruption_feedback`: Desviaciones del FORMATO REAL de `goal_adaptation_feedback.json`
-    - `_detect_corruption_learning_results`: Desviaciones del FORMATO REAL de `goal_adaptation_learning_results.json`
-    - `_es_convertible_a_entero`: Comprobar si `int(value)` no lanza, como hace el cargador real
-    - `_es_marca_iso`: Comprobar si una marca de tiempo se puede leer como ISO
-    - `_campos_de_formato`: Campos del FORMATO REAL de las filas de un fichero de persistencia
-    - `_desviaciones_estrictas_de_regla`: Desviaciones de los campos de conversion ESTRICTA de una fila de regla
-  - **Funciones globales**:
-    - `_casa_target`: Helper global para resolver el target de una regla comparando con casos especiales
-    - `_tipo_de_valor`: Helper global que devuelve el tipo del FORMATO REAL para un valor por defecto (number, text, boolean, list, mapping, iso_date)
-    - `main`: Punto de entrada del script; ejecuta una demostracion del motor de adaptacion contextual
-- **Estructura de las estrategias aprendidas**:
-  - Contenedor: `ContextualAdaptationEngine.knowledge_base["adaptation_strategies"]` con contrato `contexto -> lista` (los 9 contextos de `ContextType`), inicializado en `_initialize_knowledge_base()`
-  - Forma canonica (estrategia aprendida, creada en `_update_adaptive_strategies()`): `strategy_id`, `strategy_type`, `strategy`, `context` (`goal_type`, `context_type`, `expected_metrics`), `pattern_id`, `metrics`, `confidence`, `success_rate`, `last_updated`, `description`, `applied_rules`, `failure_count`
-  - Registro de aplicacion (creado en `apply_strategy()`): `strategy`, `confidence`, `strategy_id`, `description`, `knowledge_data`
-  - Registro de resultado de adaptacion (creado en `_record_adaptation_result()`): `adaptation_id`, `timestamp`, `applied_rules`, `confidence` (sin `strategy_id`)
-  - Lectores del contrato: `get_available_strategies()`, `generate_strategy_candidates()`, `_filter_strategies_by_compatibility()`, `_calculate_strategy_applicability()`, `transfer_knowledge()`, `get_engine_status()`
-  - Persistencia: `data/goal_adaptation_learning_results.json` = `learning_results` + indice plano `adaptation_strategies` (`strategy_id -> entrada`), escrito desde `_record_learning_results()` y leido con `_merge_strategies_by_context()` + `_project_strategies_by_context()`
-  - Contexto de aprendizaje: se conserva tras el reinicio (se restaura desde `updated_strategies` de cada resultado de aprendizaje) y las entradas sin `strategy_id` (forma C) no se duplican en otro contexto con identificador sintetizado, porque el guardado solo persiste las entradas que cumplen el contrato de datos criticos y por tanto nunca persiste esas formas
-  - Identificacion de estrategias aprendidas al guardar: `_save_goal_adaptation_learning_results()` las identifica por los campos identificadores y de evidencia (`strategy_id`, `confidence`, `success_rate`, `last_updated`) y normaliza `failure_count` a 0 cuando no existe, en vez de descartar la entrada por faltar ese contador; el registro persistido incluye los 5 campos obligatorios del contrato de datos criticos y las formas B (registro de aplicacion) y C (resultado de adaptacion) no se persisten
-  - Tests de referencia: `tests/test_goal_adaptation_strategy_restart_verification.py` comprueba que la estrategia recuperada conserva el conjunto canonico completo de la forma A (12 campos, no solo los obligatorios), que las estructuras anidadas (`context`, `metrics`, `applied_rules`) sobreviven intactas, que sigue siendo consumible por `get_available_strategies()` y `generate_strategy_candidates()`, y que un segundo reinicio no duplica ni degrada la entrada; `tests/test_goal_adaptation_persistence_simple.py` y `tests/test_goal_adaptation_learned_strategy_persistence.py` cubren la persistencia y la no regresion del contrato
-- **Estructura de los patrones de aprendizaje**:
-  - Contenedor canonico: `ContextualAdaptationEngine.knowledge_base["learning_results"][i]["learned_patterns"]` (lista de patrones por resultado de aprendizaje). No existe un contenedor de nivel superior `learning_patterns` en este motor
-  - Estructura real del patron (7 campos, producida por `_analyze_learning_patterns()`): `pattern_id`, `pattern_type`, `context` (`goal_type`, `context_type`, `expected_metrics`), `metrics` (`response_time`, `accuracy`, `success`, `verified`, `impact_score`), `confidence`, `timestamp`, `description` — contiene los 5 campos obligatorios del contrato de datos criticos
-  - `pattern_id` NO es estable: se genera como `pattern_{n}_{int(time.time()*1000)}` y cambia en cada llamada, de modo que no sirve para agrupar "observaciones similares" del mismo patron
-  - Cadena productora: `_capture_goal_adaptation_feedback()` (patron crudo de 5 campos, sin `pattern_id`) -> `_execute_goal_adaptation_learning_loop()` -> `_analyze_learning_patterns()` -> `_record_learning_results()` (tope 500 filas) -> `_save_goal_adaptation_learning_results()`
-  - Persistencia: `data/goal_adaptation_learning_results.json` (`learning_results`, `adaptation_strategies`, `last_updated`); `learning_results` se escribe filtrado (solo patrones validados) y la carga aplica el mismo filtro, de modo que los `learned_patterns` que llegan a disco son los validados y los que se recuperan son los mismos (`_load_goal_adaptation_learning_results()`)
-  - Contrato de validacion de patrones, aplicado al guardar y al cargar: solo se persisten y se recuperan los patrones validados, es decir con `confidence >= self.config["confidence_threshold"]` (0.7) y con un minimo de 3 observaciones similares; las observaciones de contextos distintos no se agrupan
-  - Identidad de agrupacion de un patron: `pattern_type` + `context` (`goal_type` y `context_type`)
-  - Los patrones no validados se descartan al escribir y al cargar, pero las filas de resultados de aprendizaje se conservan integras (de ellas depende la restauracion de estrategias aprendidas)
-  - El recuento de observaciones de la carga cuenta solo las que superan el umbral, igual que el guardado, por lo que el ciclo guardar/cargar es la inversa exacta y no puede perder ningun patron validado
-  - Contenedores sin persistencia propia: `context_patterns` (se escribe en produccion via `_record_context_pattern()`) se pierde al reiniciar; `success_patterns` y `failure_patterns` nunca se escriben (contenedores muertos); `applied_patterns` y `transfer_patterns` tampoco se persisten; `save_knowledge_base()` vuelca todo el `knowledge_base` pero solo lo invoca `save_all_data()`, que no tiene llamador en produccion — verificado en runtime: `save_knowledge_base()` funciona cuando se llama explicitamente, lo que falta es la invocacion en el flujo, por lo que tras reiniciar los contenedores reaparecen con la forma normalizada (una clave vacia por `ContextType`) pero con el contenido perdido
-  - Implementacion paralela sin persistencia: `AdaptiveLearningEngine.knowledge_base["learning_patterns"]` (`src/utils/adaptive_learning_engine.py`, misma estructura de 7 campos) — su `knowledge_base` no se guarda en ningun sitio y `_execute_learning_loop()` no tiene llamador en produccion
-  - Mecanismo reutilizable ya existente: `self.config["confidence_threshold"]` = 0.7 (ya usado en `adaptation_readiness`)
-  - Aislamiento de los tests: el motor debe instanciarse con `data_dir=str(tmp_path)`. `tests/utils/contextual_adaptation_engine/test_goal_adaptation_feedback.py` lo creaba sin `data_dir` y por eso escribia sobre el `data/` real — CORREGIDO (ver "Correccion de la contaminacion de los ficheros de persistencia de Goal" mas abajo)
-  - Tests de referencia: `tests/test_goal_adaptation_pattern_persistence.py` (persistencia de patrones validados), `tests/utils/contextual_adaptation_engine/test_goal_adaptation_pattern_load.py` (carga de patrones validados) y `tests/utils/contextual_adaptation_engine/test_load_goal_adaptation_feedback.py` (carga de resultados y estrategias), todos aislados con `data_dir=str(tmp_path)`
-- Verificacion de reinicio de los patrones: `tests/utils/contextual_adaptation_engine/test_goal_adaptation_pattern_restart_verification.py` comprueba que el patron recuperado tras reiniciar el motor conserva el conjunto canonico completo (7 campos, no solo los 5 obligatorios), que las estructuras anidadas (`context`, `metrics`) sobreviven intactas, que los valores no se degradan, que sigue siendo consumible por los consumidores publicos del `knowledge_base`, que un segundo reinicio no lo duplica ni lo altera, que un patron no validado no contamina los recuperados y que la carga no reescribe el fichero persistido (compara contenido, tamano y `st_mtime_ns` antes/despues)
-- Comprobacion por mutacion de los patrones: `tests/utils/contextual_adaptation_engine/mutation_check_pattern_restart.py` aplica sobre `src/utils/contextual_adaptation_engine.py` cinco mutaciones (carga verbatim sin filtro de validacion, recorte a los 5 datos criticos, vaciado del contexto anidado, filas de aprendizaje sin metricas de convergencia y reescritura del fichero al cargar) y exige que cada una la detecte al menos un test; restaura el fichero original tras cada mutacion
-- Verificacion en runtime de la recuperacion tras el reinicio: `tests/utils/contextual_adaptation_engine/verify_pattern_restart_real.py` ejecuta el ciclo real del motor (feedback -> aprendizaje -> persistencia -> reinicio) sobre un directorio temporal y comprueba con evidencia impresa que los patrones validados se recuperan sin perdida (conjunto canonico completo, estructuras anidadas intactas, filas de resultados y metricas de convergencia conservadas, estabilidad ante un segundo reinicio y conservacion de lo recuperado tras un nuevo ciclo de aprendizaje), que la carga no reescribe el fichero persistido y que una COPIA del fichero real de produccion no se modifica; no escribe nunca en `data/`
-- **Correccion de la contaminacion de los ficheros de persistencia de Goal**:
-  - Fallo real corregido: los ficheros de persistencia de Goal de `data/` contenian EXCLUSIVAMENTE datos de test, y el conjunto de tests seguia reproduciendo la contaminacion en cada ejecucion
-  - Causa activa: `tests/utils/contextual_adaptation_engine/test_goal_adaptation_feedback.py` creaba el motor SIN `data_dir`, de modo que `_capture_goal_adaptation_feedback()` escribia en `data/goal_adaptation_feedback.json` de produccion en cada ejecucion de la suite (verificado: sha256, tamano y `st_mtime_ns` del fichero cambiaban en cada ejecucion)
-  - Contaminacion residual retirada: `data/goal_adaptation_feedback.json` (18 registros y 18 entradas de historial, todos `test_adaptation_001`) y `data/goal_adaptation_learning_results.json` (fila `test_load_001` con el patron `pattern_001` y la estrategia `strategy_001`, ambos artefactos del fixture de `test_load_goal_adaptation_feedback.py`); 38 artefactos de test eliminados y ambos ficheros quedaron en su payload canonico vacio
-  - Test de guarda: `tests/utils/contextual_adaptation_engine/test_goal_adaptation_production_data_clean.py` (3 tests) comprueba que los ficheros de produccion de Goal no contienen artefactos de test, que el ciclo real de persistencia de patrones con `data_dir` temporal no reescribe los ficheros de produccion y, por chequeo estatico, que ningun test que ejecute la via de escritura de Goal crea el motor sin `data_dir`
-  - Verificado en runtime: tras la correccion la suite completa deja `data/goal_adaptation_feedback.json` y `data/goal_adaptation_learning_results.json` byte a byte identicos (sha256, tamano y `st_mtime_ns`)
-- **Deteccion del almacenamiento ausente**:
-  - Almacenamiento esperado: cuatro ficheros, con su origen real en el motor: `goal_adaptation_feedback.json` y `goal_adaptation_learning_results.json` (persistencia de Goal, escritos por `_save_goal_adaptation_feedback` / `_save_goal_adaptation_learning_results`), `contextual_adaptation_rules.json` (`_save_adaptation_rules`) y `contextual_knowledge_base.json` (`save_knowledge_base`)
-  - `expected_storage_paths()`: devuelve el mapa `nombre -> ruta` del almacenamiento que el motor espera encontrar. Las rutas de reglas y base de conocimiento se resuelven con `_resolve_path()`, que respeta `adaptation_rules_file` y `knowledge_base_file` de la configuracion; las de Goal se resuelven contra `self.data_dir`
-  - `detect_absent_storage()`: detecta que parte del almacenamiento esperado falta en disco. Es de SOLO LECTURA: no crea ficheros, no altera el estado del motor y no escribe nunca en `data/`. Devuelve `expected`, `present`, `absent`, `absent_count` y `has_absent`; cada ausencia informa su `path` y su `reason`, que distingue `file_not_found` (no existe) de `not_a_file` (la ruta existe pero no es un fichero)
-  - `get_engine_status()` expone el resultado en la clave `storage` (`absent` y `absent_count`), de forma aditiva: no altera ninguna clave previa
-  - Alcance: detecta la ausencia de FICHEROS. La ausencia de una SECCION dentro de un fichero existente se detecta aparte, en "Deteccion de la seccion ausente"
-  - Comportamiento verificado en runtime con el almacenamiento ausente: el motor arranca sin fallar, `load_adaptation_rules()` y `load_knowledge_base()` devuelven `True` sin fichero, se conservan las 5 reglas por defecto, `goal_adaptation_feedback` / `learning_results` quedan como listas vacias, `adaptation_strategies` conserva la forma normalizada por contexto y la CARGA NO crea los ficheros ausentes
-  - Sonda de verificacion: `tests/utils/contextual_adaptation_engine/detect_absent_storage_real.py` (27 comprobaciones) inventaria el almacenamiento esperado y su origen, comprueba el comportamiento en runtime sin almacenamiento y valida la API de deteccion (ausencia total, total, parcial y ruta que no es un fichero). Es independiente de la suite pytest, solo LEE el `data/` de produccion mediante rutas absolutas y mueve su CWD a un temporal ANTES de construir cualquier motor, sin restaurarlo, porque `SelfImprovementSystem` escribe `data/knowledge_graph.json` con ruta RELATIVA desde un hilo asincrono
-  - Hallazgo de produccion: en `data/` faltan `contextual_adaptation_rules.json` y `contextual_knowledge_base.json`; los dos ficheros de Goal si estan presentes
-- **Deteccion de la seccion ausente**:
-  - Secciones de primer nivel que el motor espera dentro de cada fichero de persistencia, con su origen real y su clase (`data` = la consume un cargador real; `metadata` = informativa): `goal_adaptation_feedback.json` -> `goal_adaptation_feedback` (data), `adaptation_history` (data), `last_updated` (metadata); `goal_adaptation_learning_results.json` -> `learning_results` (data), `adaptation_strategies` (data), `last_updated` (metadata); `contextual_adaptation_rules.json` -> `rules` (data), `total_rules` / `version` / `last_updated` (metadata); `contextual_knowledge_base.json` -> `data` (data), `context_snapshots` / `adaptation_history` / `knowledge_transfers` / `version` / `last_updated` (metadata)
-  - `expected_storage_sections()`: devuelve el mapa `fichero -> {seccion: clase}`. Devuelve una COPIA profunda de un nivel: mutar el resultado no altera la tabla del motor
-  - `detect_absent_sections()`: detecta que seccion falta dentro de los ficheros de persistencia EXISTENTES. Es de SOLO LECTURA: no crea ficheros, no reescribe los existentes y no altera el estado del motor. Devuelve `expected`, `checked`, `absent`, `absent_count`, `has_absent`, `missing_files` y `unreadable`; cada ausencia informa su `path`, su `reason` (`section_not_found`) y su `kind` (`data` o `metadata`)
-  - Alcance: los ficheros que NO existen se listan en `missing_files` (la deteccion de los ficheros ausentes es la de "Deteccion del almacenamiento ausente", no se reportan como seccion ausente) y los ficheros presentes pero ilegibles o con un payload que no es un diccionario se listan en `unreadable` (la corrupcion del contenido se detecta en "Criterios de corrupcion")
-  - `get_engine_status()` expone el resultado en la clave `storage_sections` (`absent` y `absent_count`), de forma aditiva: no altera ninguna clave previa, incluida `storage` de "Deteccion del almacenamiento ausente"
-  - Comportamiento verificado en runtime: una seccion presente pero VACIA no se reporta como ausente; el formato heredado de `contextual_adaptation_rules.json` (lista de reglas en la raiz del fichero) se considera con la seccion de DATOS `rules` presente y sigue siendo legible por `load_adaptation_rules()`; con una seccion ausente el motor sigue cargando sin fallar y conserva su estado
-  - Sonda de verificacion: `tests/utils/contextual_adaptation_engine/detect_absent_sections_real.py` (43 comprobaciones) inventaria las secciones esperadas y su origen real, comprueba la deteccion en runtime (seccion de DATOS ausente, de METADATA ausente, varias a la vez, seccion vacia, formato heredado, fichero ilegible, payload no mapeo, lista sin formato heredado, fichero ausente) y valida la API de deteccion. Es independiente de la suite pytest, solo LEE el `data/` de produccion mediante rutas absolutas y mueve su CWD a un temporal ANTES de construir cualquier motor, sin restaurarlo, porque `SelfImprovementSystem` escribe `data/knowledge_graph.json` con ruta RELATIVA desde un hilo asincrono
-  - Hallazgo de produccion: los dos ficheros de Goal de `data/` tienen todas sus secciones; `contextual_adaptation_rules.json` y `contextual_knowledge_base.json` no existen en `data/`
-- **Comportamiento sin datos**:
-  - `no_data_behavior()`: devuelve el CONTRATO DECLARATIVO del comportamiento del motor cuando el almacenamiento de persistencia esta AUSENTE ("Deteccion del almacenamiento ausente") o le falta una SECCION ("Deteccion de la seccion ausente"). Es de SOLO LECTURA: no crea ficheros, no escribe y no altera el estado del motor. Devuelve una COPIA profunda, de modo que el llamante no pueda mutar el contrato de la clase
-  - Contenido del contrato: `principle` (la ausencia de datos nunca es un error fatal) y seis secciones: `startup` (si el arranque lanza, si crea el `data_dir`, si crea ficheros de persistencia y los valores por defecto), `read_apis` (las 10 APIs de lectura con su tipo de retorno), `write_apis` (las 5 APIs de escritura con el fichero que crean), `detection` (que informa la deteccion y de que no escribe), `recovery` (que el almacenamiento se recrea al escribir) e `invariants` (4 invariantes)
-  - Principio declarado: la ausencia de datos nunca es un error fatal. El motor arranca, expone valores por defecto seguros, la deteccion informa de la ausencia y el almacenamiento se recrea en el momento en que alguien escribe
-  - La DECLARACION no sustituye a la VERIFICACION: la sonda `tests/utils/contextual_adaptation_engine/no_data_behavior_real.py` contrasta el contrato contra el comportamiento OBSERVADO en runtime. Si lo observado se desvia, el contraste falla y el contrato queda obsoleto: es intencional, un contrato que nunca falla no prueba nada
-  - Alcance: DECLARA y VERIFICA el comportamiento; NO lo cambia. El test pytest de ausencia ("Test de ausencia") no se adelanta aqui. La deteccion de corrupcion ("Criterios de corrupcion") tampoco
-  - Sonda de verificacion: `tests/utils/contextual_adaptation_engine/no_data_behavior_real.py` (77 comprobaciones) cubre la forma del contrato, la AUSENCIA TOTAL del almacenamiento (arranque, defaults, las 10 APIs de lectura, la deteccion y la no escritura), la AUSENCIA PARCIAL (una seccion ausente dentro de un fichero existente) y la ESCRITURA y RECUPERACION (cada API de escritura crea el fichero que declara). Es independiente de la suite pytest, solo LEE el `data/` de produccion mediante rutas absolutas y trabaja sobre directorios temporales
-  - Verificado por mutacion que la sonda NO es vacua: `data/temp/nodata_mutation_check.py` altera el contrato declarado (tipo de retorno incorrecto, `creates_persistence_files`, fichero creado por una API de escritura y `detection_writes`) y exige que las 4 mutaciones sean detectadas y que el contrato original pase
-  - Sondas de verificacion complementarias: `data/temp/nodata_isolation_check.py` comprueba por sha256 que la sonda NO modifica el `data/` de produccion (los 4 ficheros de persistencia y `data/knowledge_graph.json` deben quedar byte a byte identicos)
-- **Test de ausencia**:
-  - Modulo de tests: `tests/utils/contextual_adaptation_engine/test_absent_storage_and_sections.py` — 29 tests en un unico modulo. Es un modulo de VERIFICACION: `src/utils/contextual_adaptation_engine.py` no se modifica
-  - Ausencia total: el motor arranca sin lanzar con el almacenamiento ausente, la carga NO crea los ficheros de persistencia, los valores por defecto son listas vacias (no `None`) y las 10 APIs de lectura no lanzan excepcion
-  - Almacenamiento ausente ("Deteccion del almacenamiento ausente"): las cuatro rutas esperadas, las cuatro ausencias informadas con su `reason`, la distincion `not_a_file`, el modo de solo lectura, el almacenamiento parcial y el completo, y la clave `storage` de `get_engine_status()` sin alterar ninguna clave previa
-  - Seccion ausente ("Deteccion de la seccion ausente"): seccion de DATOS y de METADATA ausentes, varias a la vez, seccion presente pero vacia (no se reporta como ausente), formato heredado (seccion de DATOS presente), fichero ilegible y payload que no es un mapeo (ambos en `unreadable`), ficheros ausentes listados aparte en `missing_files`, solo lectura, y la clave `storage_sections` de `get_engine_status()` sin alterar ninguna clave previa
-  - Recuperacion: la escritura recrea el almacenamiento ausente y la seccion ausente no impide la carga de los datos presentes
-  - Test de guarda de produccion (3 tests, dentro del mismo modulo): comprueban por sha256 que el modulo NO modifica el `data/` de produccion — los 4 ficheros de persistencia y los 4 ficheros de los subsistemas ajenos (`knowledge_graph.json`, `learning_history.json`, `improvement_rules.json`, `adaptive_performance.json`)
-  - Aislamiento del modulo: los motores se crean con `data_dir` temporal y se parchean por ambas partes (`_load_config` y `_save_knowledge_graph`) las rutas RELATIVAS de `SelfImprovementSystem`, que escribe `data/knowledge_graph.json` desde un hilo asincrono y contaminaba el `data/` real; al importar el modulo tambien se redirigen las instancias vivas que el paquete `utils` crea en el import
-  - Aislamiento de la suite (`tests/conftest.py`): toda la sesion se ejecuta en un temporal (`_SANDBOX_DIR`) con `data`, `models`, `logs` y `config` dentro, de modo que ninguna ruta relativa resuelta contra el CWD pueda tocar el repo; los argumentos de coleccion se absolutizan ANTES del cambio de CWD porque pytest los resuelve de forma relativa durante la recoleccion, que ocurre despues del hook
-  - Hallazgo y correccion: `pytest.main.wrap_session` restaura el CWD original en su `finally` ANTES de `pytest_sessionfinish`, con lo que los hilos vivos de `AdvancedLogger` escribian `logs/jarvis_logs.db` (ruta RELATIVA) en el repo de produccion. Corregido con un `pytest_sessionfinish` que devuelve el CWD al sandbox, y verificado con `sys.addaudithook` sobre `sqlite3.connect`: 17.558 conexiones durante la suite, todas en el temporal, 0 en el repo
-- **Criterios de corrupcion**:
-  - `corruption_criteria()`: devuelve el CONTRATO DECLARATIVO de los criterios de CORRUPCION de la persistencia, segun el FORMATO REAL que el motor escribe y sabe leer. Es de SOLO LECTURA: no crea ficheros, no escribe y no altera el estado del motor. Devuelve una COPIA profunda, de modo que el llamante no pueda mutar el contrato de la clase
-  - Principio declarado: la corrupcion es la DESVIACION del formato real de la persistencia en un contenido que esta PRESENTE: el dato existe, pero no es el que el motor escribe ni el que el motor sabe leer. La AUSENCIA de datos es otro fenomeno ("Deteccion del almacenamiento ausente" y "Deteccion de la seccion ausente") y no se considera corrupcion
-  - Formato real: el de los escritores y cargadores reales del motor (`_save_adaptation_rules`/`load_adaptation_rules`, `save_knowledge_base`/`load_knowledge_base`, `_save_goal_adaptation_feedback`/`_load_goal_adaptation_feedback`, `_save_goal_adaptation_learning_results`/`_load_goal_adaptation_learning_results`), no un formato idealizado
-  - Frontera declarada: `boundary` declara lo que NO es corrupcion y el dueno de su deteccion - `missing_file` ("Deteccion del almacenamiento ausente"), `missing_section`, `unreadable_file` y `root_not_a_mapping` ("Deteccion de la seccion ausente"). La deteccion de corrupcion es "Criterios de corrupcion", de modo que no se duplique lo ya detectado
-  - Contenido del contrato: `version`, `principle`, `boundary`, `effect_vocabulary` (8 efectos observables), `severity_vocabulary` (4 severidades), `violation_vocabulary` (4 violaciones), `files` (los 4 ficheros de persistencia, con su escritor, su cargador, su `real_format` y sus clases de corrupcion) e `invariants` (5 invariantes)
-  - Clases de corrupcion declaradas: 27, repartidas en `adaptation_rules` (14), `knowledge_base` (5), `goal_adaptation_feedback` (3) y `goal_adaptation_learning_results` (5). Cada una declara `id`, `target`, `violation`, `severity`, `expected` (efectos observables) y `reason` anclado en el codigo real
-  - La DECLARACION no sustituye a la VERIFICACION: la sonda `tests/utils/contextual_adaptation_engine/corruption_criteria_real.py` contrasta el contrato contra el comportamiento OBSERVADO en runtime. Si lo observado se desvia, el contraste falla y el contrato queda obsoleto: es intencional, un contrato que nunca falla no prueba nada
-  - Sonda de verificacion: `tests/utils/contextual_adaptation_engine/corruption_criteria_real.py` contrasta las 27 clases una a una contra el comportamiento real del motor, comprueba la FORMA del contrato (target, violation, severity y expected en toda clase, efectos del vocabulario, identificadores unicos, copia defensiva y que consultarlo NO crea ficheros) y valida la COBERTURA CRUZADA (todo declarado tiene caso en la sonda y viceversa) y la invariante `corruption_is_never_absence` (el contenido corrupto esta PRESENTE, no ausente)
-  - Hallazgo de la verificacion: el contraste corrigio tres expectativas - `adaptation_rules.priority_not_castable` y `adaptation_rules.execution_count_not_castable` abortan el FICHERO ENTERO (el `ValueError` de la conversion no se captura), `goal_adaptation_learning_results.row_not_mapping` PROPAGA la corrupcion al disco al guardar, y `goal_adaptation_learning_results.strategy_missing_identity` llega al estado con una confianza INVENTADA (el contrato de identidad de la estrategia se exige al guardar pero no al cargar)
-  - Alcance: DECLARA y VERIFICA los criterios de corrupcion; NO los detecta. El test de datos corruptos y la deteccion quedan fuera (la deteccion vive en "Deteccion de corrupcion")
-- **Test de datos corruptos**:
-  - `tests/utils/contextual_adaptation_engine/test_corrupt_data.py`: modulo UNICO de 86 tests que MATERIALIZA el caso de corrupcion para las 27 clases declaradas en "Criterios de corrupcion" y fija el CONTRATO de rechazo
-  - CASO DE CORRUPCION: cada clase se construye con el FORMATO REAL declarado por el contrato de corrupcion (payload sano + UNA desviacion) y se materializa en un `data/` temporal por parametro; el motor se construye con `data_dir` propio, de modo que el `data/` de produccion no se toca
-  - CONTRATO DE RECHAZO: `test_el_dato_corrupto_no_se_usa_como_si_fuera_valido` exige, para las 27 clases, que ninguno de los 5 efectos que SI usan el dato corrupto aparezca (`value_coerced`, `state_contaminated`, `read_api_raises`, `write_api_breaks`, `corruption_persisted`). Los 3 efectos seguros (`silently_ignored`, `record_dropped`, `rejected_whole_file`) si admitidos
-  - TEST DE GUARDA propio: comprueba por sha256 que los 4 ficheros de persistencia y los 4 ficheros de subsistemas ajenos del `data/` de PRODUCCION no cambian al ejecutarse el modulo
-  - CONTROL DE NO VACIO: `test_el_control_con_payload_valido_no_muestra_efectos_inseguros` comprueba que los MISMOS ficheros de persistencia con payload VALIDO no producen ningun efecto inseguro; sin el, el contrato no distinguiria el dato corrupto del dato sano
-  - NO VACIO VERIFICADO POR MUTACION: al mutar el motor para que el dato corrupto NO llegue al estado, el test pasa; el contrato discrimina y no es un test que falla siempre
-  - Alcance: CREA el caso y el contrato; la DETECCION que el contrato exige vive en "Deteccion de corrupcion" y su VERIFICACION en "Verificacion del rechazo"
-- **Deteccion de corrupcion**:
-  - QUE DETECTA: el dato que se aparta del FORMATO REAL de los 4 ficheros de persistencia, de modo que no se use como si fuera valido. Es el mecanismo que decide, al cargar, que una fila, una seccion o un campo no es del formato que el motor escribe y sabe leer
-  - SOBRE EL FORMATO REAL, NO IDEALIZADO: los cuatro helpers leen el FORMATO REAL desde la declaracion de "Criterios de corrupcion" (`_CORRUPTION_CRITERIA["files"][clave]["real_format"]`) en lugar de una lista escrita a mano, de modo que el formato de referencia y el codigo que lo aplica no pueden divergir sin que la sonda lo note
-  - `_cumple_tipo(value, tipo)`: comprueba que un valor pertenezca al tipo que el formato admite para ese campo (numero, texto, booleano, lista, mapeo, fecha ISO)
-  - `_desviaciones_de_regla(row)`: enumera, campo a campo, en que se aparta una regla de adaptacion del formato real; una regla sin desviaciones se carga, una regla con desviaciones se descarta
-  - `_fila_valida(fila, clave)`: exige que una fila sea un mapeo, que tenga los campos obligatorios y que cada uno sea del tipo declarado; las filas que no son filas validas se descartan, no se guardan
-  - `_seccion_de_conocimiento_valida(clave, valor)`: exige que una seccion de la base tenga el tipo que la base declara y que no contenga claves desconocidas
-  - APLICADA EN LOS 4 CARGADORES REALES: `load_adaptation_rules`, `load_knowledge_base`, `_load_goal_adaptation_feedback` y `_load_goal_adaptation_learning_results`. El dato que se aparta del formato NO llega al estado ni se persiste. Se admiten los 3 efectos seguros (`record_dropped`, `silently_ignored`, `rejected_whole_file`); ninguno de los 5 inseguros (`value_coerced`, `state_contaminated`, `read_api_raises`, `write_api_breaks`, `corruption_persisted`) puede aparecer tras cargar un fichero corrupto
-  - SOLO LECTURA: no crea ficheros, no escribe y no altera las APIs publicas. No anade ninguna API nueva
-  - Sonda de verificacion: `tests/utils/contextual_adaptation_engine/detect_corruption_real.py` cubre la FORMA de la API (la deteccion no altera el estado del motor y es de solo lectura), la DETECCION clase a clase de las 27 clases declaradas, la FRONTERA con la AUSENCIA (la corrupcion no se reporta como fichero ausente ni como seccion ausente) y la NO CONTAMINACION del `data/` de produccion
-  - Banco de mutacion: `tests/utils/contextual_adaptation_engine/mutation_check_2_8_8_9_6_3.py` aplica 11 mutaciones, una por cada pieza de la deteccion (desviaciones de formato de las reglas, guarda de identidad, campos estrictos, seccion `rules` corrupta, validacion de secciones de la base, `data` que no es mapeo, validacion de filas, estrategia sin evidencia, seccion de feedback, historial y seccion de aprendizaje) y exige que la sonda falle en cada una. Las mutaciones se aplican a una COPIA del arbol `src/` en un directorio temporal, de modo que el repositorio nunca se modifica
-- **Verificacion del rechazo**:
-  - QUE VERIFICA: que el dato corrupto NO se usa como si fuera valido en RUNTIME. Es la comprobacion observable de que el rechazo se produce de hecho y de que el dato corrupto no llega ni al estado ni al disco
-  - Sonda de verificacion: `tests/utils/contextual_adaptation_engine/verify_rejection_real.py` es un script INDEPENDIENTE de la suite pytest, con sus PROPIOS 27 escenarios -cada uno con un SENTINELA propio incrustado en el punto exacto que se corrompe- y sus PROPIOS instrumentos de observacion (escaneo del estado operativo, escaneo del disco y ejercicio de las APIs). No reutiliza el registro de escenarios de "Criterios de corrupcion": el rechazo se comprueba con un instrumento que no comparte puntos ciegos con el que lo declara
-  - Test pytest permanente: `tests/utils/contextual_adaptation_engine/test_2_8_8_9_6_4_rejection_runtime.py` (60 tests) carga la sonda por RUTA y exige el resultado clase a clase - 27 de rechazo en runtime, 27 de selectividad, 1 de cobertura del contrato declarado, 4 controles de no-vacuidad y 1 test de guarda de produccion
-  - EXIGIDO POR CLASE: el motor ARRANCA con el fichero corrupto, el contenido corrupto sigue PRESENTE en disco (la corrupcion es CONTENIDO, no AUSENCIA), el dato corrupto NO llega al estado operativo, NINGUNA API de lectura ni de escritura lanza, NINGUNA devuelve el dato corrupto, la corrupcion se DETECTA y se REPORTA por su clase, y al escribir el dato corrupto NO llega al estado ni se PERSISTE en disco
-  - SELECTIVIDAD DEL RECHAZO: un rechazo que se limitara a no propagar la corrupcion, pero perdiera datos sanos, tambien es un rechazo incorrecto. Cada escenario declara su ALCANCE (`fila`, `contenedor` o `fichero`) y de el se DERIVA si el contenido sano que acompana a la corrupcion debe sobrevivir; el contraste se hace contra un motor de REFERENCIA sin ficheros corruptos, de modo que lo que la corrupcion destruye tiene que quedar en el valor por DEFECTO
-  - ALCANCE CONTRASTADO CON EL EFECTO DECLARADO: el `alcance` de cada escenario se contrasta con el efecto que el motor declara en `corruption_criteria()` (`record_dropped`, `silently_ignored`, `rejected_whole_file`), y se exige que ningun efecto declarado sea uno de los que CONSUMEN el dato corrupto (`value_coerced`, `state_contaminated`, `read_api_raises`, `write_api_breaks`, `corruption_persisted`)
-  - Hallazgo de la verificacion: la comprobacion de deteccion se ejecutaba DESPUES de las APIs de escritura, que sanean el fichero y hacen desaparecer la corrupcion del disco, de modo que la deteccion salia vacia por un artefacto del propio instrumento. Movida ANTES, mientras el fichero corrupto sigue presente
-  - Hallazgo de la verificacion: el informe de deteccion NOMBRA la desviacion encontrada, de modo que su `location` puede contener el identificador de la clave o de la fila corrupta. Eso es INFORMAR, no USAR: la comprobacion de "no devuelve el dato corrupto" ignora las `location` y la deteccion se exige por su clase en un bloque aparte. No se relaja el contrato: se distingue el dato USADO del dato NOMBRADO
-  - NO VACUO: cuatro CONTROLES con el sentinela como dato VALIDO (regla sana, seccion sana, fila de feedback sana y fila de aprendizaje sana) exigen que el sentinela SI llega al estado y que la API de lectura lo ofrece; sin ellos, una sonda que no mirase el estado pasaria todas sus comprobaciones sin comprobar nada
-  - AISLAMIENTO: todos los motores se crean con `data_dir` temporal y la sonda se ejecuta con el CWD en un temporal, de modo que las rutas RELATIVAS de los subsistemas ajenos (`data/knowledge_graph.json`, `data/improvement_rules.json`, `models/...`) caen en el temporal y no en el repo. La sonda incluye ademas un TEST DE GUARDA por sha256 de los 4 ficheros de persistencia de produccion
-  - Banco de mutacion: `tests/utils/contextual_adaptation_engine/mutation_check_2_8_8_9_6_4.py` aplica 3 mutaciones al motor (M1: `_desviaciones_de_regla` no detecta ninguna desviacion; M2: `_seccion_de_conocimiento_valida` acepta cualquier seccion; M3: `detect_corruption` no informa de nada) y exige que el test falle en cada una. El motor se restaura byte a byte al terminar
-  - Alcance: VERIFICA el rechazo; NO lo implementa. El motor no se modifica y el rechazo verificado es el que "Deteccion de corrupcion" ya implemento
-- **Identificacion de datos recuperables**:
-  - QUE VERIFICA: que dentro de una corrupcion hay PARTE que si se puede recuperar, distinguida de la parte que no. Es el INVENTARIO de lo que el motor PERDE al rechazar, medido en RUNTIME
-  - CONTRATO DECLARADO (produccion): `src/utils/contextual_adaptation_engine.py` expone `recoverable_data()`, que declara para las 27 clases de corrupcion QUE dato es recuperable, A QUE NIVEL y CON QUE POLITICA: 7 NIVELES (`fichero`, `bloque`, `seccion`, `grupo`, `fila`, `entrada`, `campo`), 5 POLITICAS (`none`, `preserve_siblings`, `default_the_field`, `keep_valid_elements`, `adapt_container`), un vocabulario cerrado de 4 TOKENS de lo recuperable (`siblings`, `row_fields`, `elements`, `container_values`), el valor por DEFECTO de los 15 campos de una fila de regla segun el FORMATO REAL, la lista de EXCEPCIONES conservadoras (`enabled`) y la REGLA DE INDEPENDENCIA
-  - PRINCIPIO: una corrupcion rechaza SOLO la unidad que corrompe; todo lo demas que el FORMATO REAL declara valido y que NO depende de la unidad corrupta debe SOBREVIVIR. La recuperacion NO inventa datos: el campo corrupto toma el valor por DEFECTO del formato y el resto de la unidad se conserva integro
-  - Sonda de verificacion: `tests/utils/contextual_adaptation_engine/identify_recoverable_real.py` (20 HALLAZGOS) es un script INDEPENDIENTE de la suite pytest, con sus PROPIOS 27 escenarios y sus PROPIOS instrumentos de observacion. Mide, clase a clase y sobre el ESTADO OPERATIVO real: (a) que el dato corrupto NO llega al estado, (b) que las unidades declaradas recuperables LLEGAN, (c) que el campo corrupto toma su valor por DEFECTO, (d) que lo declarado coincide con lo OBSERVADO y (e) que la REGLA DE INDEPENDENCIA se respeta
-  - HALLAZGO REAL: 13 de las 27 clases PERDER en RUNTIME un dato que el contrato declara recuperable (20 hallazgos). Lo perdido se reparte en: los CAMPOS VALIDOS de la fila corrompida (11 clases de `adaptation_rules`, 11 hallazgos), las unidades INDEPENDIENTES que acompanan a la unidad corrompida (7 hallazgos: las 2 filas sanas de `execution_count_not_castable`, las 2 de `metadata_not_mapping`, las 2 de `priority_not_castable` y el grupo `idle` de `context_patterns` en `knowledge_base.section_partial`), el VALOR VALIDO de un mapeo reconstruible (`rules_wrong_type`, 1) y los ELEMENTOS validos de un campo de lista (`trigger_invalid_value`, 1). 13 clases se recuperan ya y 1 (`knowledge_base.data_not_mapping`) no tiene nada recuperable
-  - NO VACUO: cuatro CONTROLES (datos sanos, sentinela inexistente, perdida real y fila intacta) exigen que la medicion discrimina, de modo que una sonda que no mirase el estado pasaria todas sus comprobaciones sin comprobar nada
-  - AISLAMIENTO: todos los motores se crean con `data_dir` temporal y la sonda se ejecuta con el CWD en un temporal, de modo que las rutas RELATIVAS de los subsistemas ajenos caen en el temporal y no en el repo. La sonda incluye ademas un TEST DE GUARDA por sha256 de los 4 ficheros de persistencia de produccion
-  - BANCO DE MUTACION: `tests/utils/contextual_adaptation_engine/mutation_check_2_8_8_9_7_1.py` aplica 6 mutaciones (4 sobre el CONTRATO: una clase sin declarar, el valor por defecto de `enabled` no conservador, la REGLA DE INDEPENDENCIA ausente, un valor por defecto que no respeta el TIPO del formato; 2 sobre el MOTOR: las reglas dejan de detectar la desviacion de formato, una seccion corrupta de la base se aplica al estado) y exige que la sonda falle en cada una. Las mutaciones del motor se aplican a una COPIA del arbol `src/` en un temporal, de modo que el repositorio nunca se toca
-  - Alcance: DECLARA el contrato y MIDE la distancia hasta el runtime. NO implementa la recuperacion: los 20 hallazgos son el INVENTARIO de lo que queda por implementar, no un defecto del motor detectado por esta sonda
-- **Recuperacion parcial**:
-  - QUE VERIFICA: que el motor RECUPERA lo que el contrato de "Identificacion de datos recuperables" declara recuperable, y lo hace SIN inventar datos y SIN reescribir el fichero. Es la IMPLEMENTACION de la recuperacion y su prueba permanente
-  - IMPLEMENTACION (produccion): seis metodos nuevos en `src/utils/contextual_adaptation_engine.py`, aplicados en los cargadores reales (`load_adaptation_rules` y `load_knowledge_base`): `_valor_por_defecto_de_recuperacion` (toma el valor por DEFECTO del campo del CONTRATO declarado, sin inventar datos; `$rule_id` se resuelve con la identidad de la propia regla), `_recuperar_fila_de_regla` (rechaza SOLO el CAMPO que corrompe: ese campo toma su valor por defecto y el resto de la fila sobrevive intacto, de modo que los campos de conversion ESTRICTA ya no abortan el FICHERO entero), `_recuperar_grupos_de_base` (descarta SOLO el grupo que se aparta del formato y conserva sus HERMANOS, que son unidades independientes; una seccion cuyo valor por DEFECTO no es un MAPEO no tiene grupos que recuperar y se RECHAZA ENTERA en el NIVEL de la SECCION), `_registrar_recuperacion` (anota en el informe lo recuperado, en la UNIDAD que corrompe) y `recovery_report` (API publica de SOLO LECTURA)
-  - IDENTIDAD DE LA FILA (produccion): el pipeline de carga de reglas esta UNIFICADO para la via de LISTA y la de CONTENEDOR en `_procesar_fila_de_regla`, y la identidad de la fila se comprueba ANTES de registrarla. La IDENTIDAD REGISTRABLE es un `rule_id` que sea una CADENA NO VACIA (`_identidad_de_regla`), tal como la declara el FORMATO REAL: una fila sin identidad utilizable NO se registra (el cargador NO inventa ninguna) y una fila cuya identidad YA usa otra fila se RECHAZA (la primera registrada sobrevive; la segunda ya no identifica a nadie). El campo de identidad NO se recupera: o vale o la fila se rechaza ENTERA y sus HERMANAS sobreviven
-  - POLITICAS APLICADAS: se aplican las 5 POLITICAS del contrato segun el NIVEL de la unidad: `default_the_field` (el campo corrupto toma su valor por DEFECTO), `keep_valid_elements` (se conservan los disparadores validos y se descarta SOLO el invalido), `adapt_container` (se reconstruye el contenedor con sus filas validas), `preserve_siblings` (se conservan los grupos hermanos del grupo corrupto) y `none` (no hay nada recuperable)
-  - INFORME: `recovery_report()` devuelve `recoveries` (la lista de lo recuperado, con `fichero`, `unidad`, `campo`/`grupo`/`clave`, `politica` y `valor`), `count` (el numero de recuperaciones) y `files` (los ficheros afectados). Es de SOLO LECTURA: no crea ficheros, no escribe, no altera el estado del motor y devuelve una COPIA DEFENSIVA, de modo que mutar lo devuelto no filtra al motor
-  - Test pytest permanente: `tests/utils/contextual_adaptation_engine/test_2_8_8_9_7_2_recovery_partial.py` (139 tests) comprueba que la API devuelve un INFORME bien formado, que la API es de SOLO LECTURA, que sin corrupcion NO hay nada que recuperar (CONTROL de no-vacuo), que la recuperacion se REGISTRA en la UNIDAD que corrompe con la POLITICA declarada, que el valor por DEFECTO que ocupa el lugar del dato corrupto es el DECLARADO, que el ESTADO guarda ese valor por defecto, que lo declarado recuperable LLEGA al estado y que el INFORME no contiene el dato corrupto. Reutiliza de la sonda `identify_recoverable_real.py` sus ESCENARIOS y sus OBSERVADORES (no su codigo de salida), cargada por RUTA
-  - HALLAZGO REAL: los 20 HALLAZGOS de dato recuperable perdido en runtime quedan RESUELTOS por la recuperacion. El modulo de recuperacion mide la MISMA condicion que la sonda de identificacion de datos recuperables (la unidad declarada recuperable esta PRESENTE en el estado) y la exige para las 27 clases: las 13 clases que perdian datos recuperables los CONSERVAN
-  - BANCO DE MUTACION: `tests/utils/contextual_adaptation_engine/mutation_check_2_8_8_9_7_2.py` aplica 9 mutaciones (2 sobre la DETECCION de la unidad que corrompe: los campos de conversion ESTRICTA dejan de detectarse, el grupo corrupto de la base se aplica al estado; 5 sobre la RECUPERACION en el nivel de la UNIDAD: el campo corrupto conserva su valor, la fila se descarta entera, se pierden los disparadores validos, el contenedor no se reconstruye, la seccion se descarta entera; 2 sobre el INFORME: lo recuperado no se informa, el informe no es una copia defensiva) y exige que los tests de `test_2_8_8_9_7_1_recoverable.py` y `test_2_8_8_9_7_2_recovery_partial.py`fallen en cada una, cada una con los tests concretos que deben fallar. Las mutaciones se aplican a una COPIA del arbol `src/` en un temporal, de modo que el repositorio nunca se toca. El banco ejecuta primero una LINEA BASE sin mutar: si esa no pasa, el arnes no demuestra nada
-  - AISLAMIENTO: todos los motores se crean con `data_dir` temporal y el modulo incluye un TEST DE GUARDA que comprueba por sha256 que los ficheros de produccion vigilados no cambian
-  - Alcance: IMPLEMENTA la recuperacion y la PRUEBA. NO relaja el contrato de corrupcion: los 5 efectos inseguros siguen prohibidos y los 3 seguros siguen admitidos
-- **Rechazo de seccion corrupta de la base**:
-  - QUE VERIFICA: que una SECCION de la base de conocimiento cuyo FORMATO REAL es una LISTA (por ejemplo `learning_results`) y que llega como MAPEO no ABORTA la carga del fichero. La seccion se RECHAZA ENTERA en el NIVEL de la SECCION y el resto de secciones SANAS del MISMO fichero sobreviven: la corrupcion de una seccion no puede determinar el valor de otra
-  - IMPLEMENTACION (produccion): `src/utils/contextual_adaptation_engine.py`, en `_recuperar_grupos_de_base`. Una seccion cuyo valor por DEFECTO no es un MAPEO no tiene GRUPOS que recuperar, de modo que se rechaza en el NIVEL de la SECCION: conserva su valor por DEFECTO (una lista vacia), su contenido corrupto NO llega al estado y las demas secciones del mismo fichero se cargan con normalidad. Antes, esa via iteraba los grupos de un valor por defecto de tipo LISTA y lanzaba una EXCEPCION que abortaba la carga del FICHERO entero, con lo que las secciones sanas del mismo se perdian
-  - Test pytest permanente: `tests/utils/contextual_adaptation_engine/test_2_8_8_9_8_4_1_seccion_lista_corrupta.py` (30 tests) comprueba que la carga NO lanza y DECLARA lo que ocurrio, que las secciones sanas del MISMO fichero LLEGAN al estado con su SENTINELA, que la seccion corrupta NO llega al estado y conserva su valor por DEFECTO, que el contenido corrupto no aparece en el estado ni en el INFORME, que el fichero corrupto NO se reescribe, que la cuenta de unidades cargadas EXCLUYE la seccion rechazada, que con un payload SANO LLEGAN todas las secciones (CONTROL de no-vacuo) y que una seccion MAPEADA con un GRUPO corrupto sigue recuperandose como antes (REGRESION del camino de los grupos). Las secciones de tipo LISTA no se escriben a mano: se DERIVAN del FORMATO REAL que declara el motor
-  - BANCO DE MUTACION: `tests/utils/contextual_adaptation_engine/mutation_check_2_8_8_9_8_4_1.py` aplica 3 mutaciones (la recuperacion vuelve a iterar los grupos de un valor por defecto de tipo LISTA; la seccion corrupta se RECUPERA falsamente; el cargador APLICA la seccion que ha descartado) y exige que el test permanente falle en cada una, con los tests concretos que deben fallar identificados. Las mutaciones se aplican a una COPIA del arbol `src/` en un temporal, de modo que el repositorio nunca se toca. El banco ejecuta primero una LINEA BASE sin mutar: si esa no pasa, el arnes no demuestra nada
-  - AISLAMIENTO: todos los motores se crean con `data_dir` temporal, la sesion se ejecuta dentro del sandbox de CWD de `tests/conftest.py` y el modulo incluye un TEST DE GUARDA que comprueba por sha256 que los ficheros de produccion vigilados no cambian
-- **Fallback por corrupcion total**:
-  - QUE DECLARA: el comportamiento REAL que el motor ofrece HOY ante la perdida TOTAL de los datos de persistencia. Es el CONTRATO del fallback, con lo que el runtime SATISFACE
-  - API PUBLICA (produccion): `total_loss_fallback()` devuelve una COPIA profunda del contrato `_TOTAL_LOSS_FALLBACK`. Es de SOLO LECTURA: no crea ficheros, no escribe y no altera el estado del motor
-  - PRINCIPIO: ante la perdida TOTAL de datos JARVIS DEBE poder seguir operando. El motor conserva su estado por DEFECTO en memoria, el ciclo de captura-analisis-ejecucion continua, los ficheros corruptos NO se reescriben (su contenido sigue intacto para su diagnostico) y la perdida se REPORTA de forma que el consumidor puede saber que esta usando defaults en lugar de datos reales. El fallback NO inventa datos: el estado por defecto es el que el motor declara en CODIGO, no un dato inventado a partir del fichero roto
-  - DEFINICION OPERATIVA: `total_loss` son los cuatro ficheros de persistencia existentes pero NINGUNO aportando una sola unidad de datos utilizable al estado; `not_total_loss` es un fichero que aporta datos utilizables, porque la perdida es TOTAL solo si TODOS han perdido sus datos
-  - MODOS DE PERDIDA TOTAL (vocabulario CERRADO de 4): `unreadable_file` (el contenido no se puede parsear como JSON), `non_mapping_root` (el JSON se parsea pero su raiz no es un mapeo), `list_root_without_valid_rows` (la raiz es una lista que no aporta ninguna fila valida) y `empty_mapping_root` (la raiz es un mapeo vacio)
-  - CAPAS DE FALLBACK (lo que el motor REALMENTE ofrece hoy): `defaults_in_memory`, `continuity_of_operation`, `non_destructive_load`, `detection_available` y `full_backup` (el respaldo cubre los CUATRO ficheros de persistencia)
-  - INVARIANTES: 7 invariantes, cada uno con su `statement`, su `layer` y su veredicto `satisfied`. Los SIETE estan SATISFECHOS: `state_equals_fresh_defaults`, `operation_continues`, `files_not_overwritten`, `loss_is_detectable`, `loss_visible_in_status` (el estado agregado declara la perdida), `load_result_is_truthful` (la carga declara lo que ocurrio) y `backup_covers_all_persistence` (el respaldo cubre los cuatro ficheros de persistencia). No queda ninguno PENDIENTE
-  - DETERMINACION: el motor ofrece un fallback COMPLETO: los siete invariantes se satisfacen en runtime y `pending` esta vacio
-  - IMPLEMENTACION (produccion): el fallback por perdida TOTAL esta IMPLEMENTADO en `src/utils/contextual_adaptation_engine.py`. La CARGA DECLARA lo que ocurrio: `load_all_data()` lleva la CUENTA de las unidades de datos obtenidas de la persistencia (`_unidades_cargadas`) y devuelve FALSO cuando los ficheros EXISTEN pero NO aportan ninguna unidad utilizable, en lugar de devolver VERDADERO y hacer CREER al consumidor que los datos estan cargados; con el almacenamiento AUSENTE devuelve VERDADERO, porque no habia nada que cargar. El ESTADO AGREGADO declara la perdida: `get_engine_status()` cuenta los ficheros ILEGIBLES como anomalias de la persistencia y expone el desglose en `corruption.unreadable` y `corruption.unreadable_count`, de modo que una perdida TOTAL no se presente como un estado limpio. El RESPALDO cubre TODA la persistencia: `backup_data()` copia los CUATRO ficheros que declara `expected_storage_paths()` (reglas, base de conocimiento, feedback y resultados de aprendizaje), por la CLAVE de persistencia y no por el nombre del fichero, y es una COPIA: no altera el contenido de los ficheros de origen, que quedan intactos para su diagnostico. El fallback NO inventa datos: el estado por defecto es el que el motor declara en CODIGO
-  - Sonda de verificacion: `tests/utils/contextual_adaptation_engine/identify_fallback_real.py` es un script INDEPENDIENTE de la suite pytest, con sus PROPIOS 4 escenarios de perdida total y sus PROPIOS instrumentos de observacion. Contrasta la DECLARACION contra lo OBSERVADO en runtime, invariante a invariante, con un VINCULO explicito entre cada invariante del contrato y el observador que lo mide: si se cambiara el vinculo, la medicion mediria otra cosa y la declaracion dejaria de describir el runtime
-  - OBSERVADORES: `estado_igual_a_fresco` (el estado tras la perdida es el de un motor recien creado), `operacion_continua` (capturar, analizar y ejecutar siguen funcionando), `ficheros_intactos` (los ficheros conservan su contenido byte a byte), `perdida_detectable` (alguna API de deteccion informa de la perdida), `perdida_visible_en_status` (el estado AGREGADO la informa), `carga_veraz` (`load_all_data()` devuelve FALSO si no se cargo nada) y `respaldo_cubre_cuatro` (el respaldo cubre los cuatro ficheros, medido por la CLAVE de persistencia que declara `expected_storage_paths()` y no por el nombre del fichero)
-  - HALLAZGO REAL: la carga se mide ANTES del ciclo de ejecucion, porque el ciclo escribe en la base de conocimiento y en el historial: medida despues, un exito FALSO de la carga quedaria tapado por lo que el propio ciclo produce. La firma de DATOS se separa de la firma de ESTADO por la misma razon
-  - Test pytest permanente: `tests/utils/contextual_adaptation_engine/test_2_8_8_9_8_1_total_loss_fallback.py` (15 tests) comprueba que el contrato esta bien formado, que los MODOS declarados son los MEDIDOS, que todo invariante declara CAPA, enunciado y veredicto, que los PENDIENTES son exactamente los invariantes NO satisfechos, que los invariantes declarados SATISFECHOS se cumplen EN TODO MODO, que la perdida es DETECTABLE y el estado CONTINUO en todo modo, que la DETERMINACION no es vacia y que los ficheros de produccion no cambian
-  - BANCO DE MUTACION: `tests/utils/contextual_adaptation_engine/mutation_check_2_8_8_9_8_1.py` aplica 12 mutaciones (6 sobre la DECLARACION: un invariante declarado desaparece, un PENDIENTE se declara SATISFECHO, un SATISFECHO se declara PENDIENTE, una CAPA declarada deja de existir, la version del contrato cambia, un MODO de perdida total deja de declararse; 6 sobre el MOTOR: los defaults no se conservan al cargar, el motor no sigue operando tras la perdida, la carga declara siempre FALSO, la carga SOBREESCRIBE los ficheros corruptos, el respaldo se amplia a los cuatro ficheros de persistencia, el estado agregado cuenta lo ILEGIBLE como anomalia) y exige que la sonda y el test permanente fallen en cada una, cada una con los tests concretos que deben fallar identificados. La ultima mutacion es la MAS IMPORTANTE: amplia el respaldo a los cuatro ficheros, es decir, IMPLEMENTA una de las piezas PENDIENTES del fallback, de modo que la medicion tiene que verla. Las mutaciones se aplican a una COPIA del arbol `src/` en un temporal, de modo que el repositorio nunca se toca. El banco ejecuta primero una LINEA BASE sin mutar: si esa no pasa, el arnes no demuestra nada
-  - AISLAMIENTO: todos los motores se crean con `data_dir` temporal y la sesion se ejecuta dentro del sandbox de CWD de `tests/conftest.py`. El modulo incluye un TEST DE GUARDA por sha256 de los 4 ficheros de persistencia y de los 4 ficheros de subsistemas ajenos del `data/` de PRODUCCION
-  - Test pytest permanente del fallback implementado: `tests/utils/contextual_adaptation_engine/test_2_8_8_9_8_2_total_loss_fallback_implemented.py` (12 tests) comprueba que la carga DECLARE el fracaso cuando la persistencia existe pero no aporta ninguna unidad de datos, que la carga NO reescribe los ficheros corruptos, que el estado agregado declara la perdida y CUENTA los ficheros ilegibles como anomalia, que el respaldo cubre los cuatro ficheros de persistencia y NO altera su contenido, que el estado tras la perdida es el de un motor recien creado, que los ficheros de produccion no cambian y que la RECONCILIACION del contrato declara lo implementado
-  - BANCO DE MUTACION del fallback implementado: `tests/utils/contextual_adaptation_engine/mutation_check_2_8_8_9_8_2.py` aplica 10 mutaciones (4 sobre la CARGA: declara siempre VERDADERO, declara siempre FALSO, INVENTA una regla a partir del fichero roto y SOBREESCRIBE los ficheros corruptos; 1 sobre el ESTADO AGREGADO: deja de contar lo ILEGIBLE como anomalia; 2 sobre el RESPALDO: vuelve a cubrir solo dos ficheros y ALTERA el fichero de origen; 3 sobre el CONTRATO: declara un invariante PENDIENTE, la entrada de la hoja declara un invariante PENDIENTE y la entrada deja de declarar un invariante RESUELTO) y exige que el test permanente falle en cada una, con los tests concretos que deben fallar identificados. Las mutaciones se aplican a una COPIA del arbol `src/` en un temporal, de modo que el repositorio nunca se toca. El banco ejecuta primero una LINEA BASE sin mutar: si esa no pasa, el arnes no demuestra nada
-  - Alcance: DECLARA el contrato del fallback, lo IMPLEMENTA y lo MIDE contra el runtime. Los siete invariantes quedan SATISFECHOS y no queda ninguno pendiente
-- **Metodos de feedback y confianza**:
-  - `get_transfer_confidence`: Obtener confianza existente para una transferencia especifica (0.0-1.0)
-  - `register_transfer_feedback`: Registrar feedback de una transferencia completada con exito, puntuacion y comentarios
-  - `evaluate_transfer_result`: Evaluar resultado de una transferencia y actualizar confianza automaticamente
-  - `adjust_transfer_confidence`: Ajustar confianza de una transferencia mediante factor o feedback
-  - `evaluate_transfer_result__internal`: Metodo interno de evaluacion para compatibilidad
-  - `register_transfer_feedback` (alias): Alias de register_transfer_feedback para compatibilidad con tests
-  - `_update_global_confidence_metrics`: Actualizar metricas de confianza globales basadas en feedback
-- **Metodos de registro de recursos**:
-  - `record_resource_allocation`: Registrar una asignacion de recursos para adaptacion contextual
-  - `_update_resource_usage_patterns`: Actualizar patrones de uso de recursos basados en asignaciones
-- **Funciones globales**:
-  - `main`: Demo del motor de adaptacion contextual
-
-#### `src/utils/contextual_pattern_recognizer.py` [509 lineas] - Reconocedor de Patrones Contextuales
-- **Descripcion**: Reconocedor de patrones contextuales para JARVIS. Integra contexto con deteccion de patrones sin duplicar funcionalidad existente, conectando con PatternAnalyzer y el motor de adaptacion contextual.
-- **Clases principales**:
-  - `ContextualPatternType` (Enum): Tipos de patrones contextuales (CONTEXTUAL_ANOMALY, CONTEXTUAL_TREND, CONTEXTUAL_CORRELATION, CONTEXTUAL_SEASONAL, CONTEXTUAL_BURST, CONTEXTUAL_CHANGEPOINT).
-  - `ContextualPattern` (dataclass): Estructura de patron contextual detectado con severidad, confianza, snapshot de contexto, componentes afectados y acciones sugeridas.
-  - `ContextualPatternRecognizer`: Reconocedor de patrones relacionados con contexto integrado con PatternAnalyzer.
-- **Metodos principales**:
-  - `__init__`: Inicializa el reconocedor con un PatternAnalyzer y umbrales de compatibilidad.
-  - `add_contextual_pattern`: Agrega un patron contextual a partir de un snapshot de contexto.
-  - `_detect_contextual_pattern`: Detecta patrones contextuales generales.
-  - `_detect_contextual_anomaly`: Detecta anomalias contextuales.
-  - `_detect_contextual_trend`: Detecta tendencias contextuales.
-  - `_detect_contextual_correlation`: Detecta correlaciones contextuales.
-  - `_detect_contextual_seasonal`: Detecta patrones estacionales contextuales.
-  - `_detect_contextual_burst`: Detecta rafagas contextuales.
-  - `_detect_contextual_changepoint`: Detecta puntos de cambio contextuales.
-  - `_calculate_contextual_compatibility`: Calcula la compatibilidad contextual de un snapshot.
-  - `_get_affected_components`: Obtiene los componentes afectados por un snapshot.
-  - `get_contextual_patterns`: Obtiene patrones contextuales filtrados por tipo.
-  - `get_patterns_by_severity`: Obtiene patrones por severidad.
-  - `get_high_compatibility_patterns`: Obtiene patrones con alta compatibilidad.
-  - `clear_patterns`: Limpia patrones antiguos.
-  - `get_pattern_summary`: Obtiene un resumen de los patrones detectados.
-  - `export_patterns`: Exporta los patrones a un archivo JSON.
-- **Integraciones**:
-  - `PatternAnalyzer`, `PatternType`, `PatternSeverity` de pattern_analyzer.
-  - `ContextSnapshot`, `ContextualFactor` de contextual_adaptation_engine.
-- **Dependencias**: json, logging, datetime, enum, typing, dataclasses, numpy.
-
-#### `src/utils/dynamic_resource_allocator.py` [1336 lineas] - Asignador Dinamico de Recursos
-- **Descripcion**: Sistema avanzado de asignacion de recursos dinamica segun contexto con priorizacion, deteccion de conflictos, preemption, gestion de recursos del sistema (CPU, memoria, disco, red), integracion con PerformanceMonitor y PerformanceOptimizer, soporte para trabajo diferido y notificacion de cambios. Implementa modelo de asignacion con solicitudes, asignaciones y disponibilidad de recursos.
-- **Enums principales**:
-  - `ResourceType`: Tipos de recursos gestionables (SYSTEM_CPU, SYSTEM_MEMORY, SYSTEM_DISK, SYSTEM_NETWORK, PROCESS_CPU, PROCESS_MEMORY, PROCESS_THREADS, EXECUTION_REGISTRY, EXECUTION_HISTORY, STORAGE_DATABASE, STORAGE_CACHE, THREAD_POOL)
-  - `ResourcePriority`: Prioridades de recurso (LOW, MEDIUM, HIGH, CRITICAL)
-  - `AllocationStatus`: Estados de asignacion (PENDING, ASSIGNED, IN_USE, AVAILABLE, UNAVAILABLE, CONFLICT)
-- **Clases principales**:
-  - `ResourceRequest`: Solicitud de recurso con validacion, contexto y prioridad
-  - `ResourceAllocation`: Asignacion de recurso con estado, cantidad usada y metadatos
-  - `ResourceAvailability`: Disponibilidad de recurso con verificacion de satisfaccion
-  - `DynamicResourceAllocator`: Sistema principal de asignacion con bucle de monitoreo
-- **Metodos principales de DynamicResourceAllocator**:
-  - `__init__`: Inicializa asignador con monitor y optimizer opcionales
-  - `register_resource`: Registrar recurso disponible con cantidad y limites
-  - `create_request`: Crear solicitud de recurso con validacion completa
-  - `allocate`: Asignar recurso con manejo de conflictos y prioridad
-  - `get_conflicts`: Identificar conflictos reales con asignaciones existentes
-  - `_contexts_conflict`: Verificar conflictos entre contextos (identicos o incompatibles)
-  - `_can_preempt`: Verificar si asignacion existente puede ser preemptada
-  - `_try_preempt`: Intentar preemptar asignaciones segun prioridad
-  - `defer_request`: Aplazar solicitud cuando no hay recurso disponible
-  - `process_deferred`: Intentar asignar solicitudes diferidas por prioridad
-  - `release`: Liberar asignacion con manejo de doble liberacion
-  - `get_availability`: Obtener disponibilidad de recurso especifico
-  - `get_all_allocations`: Obtener todas las asignaciones activas
-  - `update_usage`: Actualizar uso real de asignacion
-  - `update_system_resources`: Actualizar recursos del sistema desde PerformanceMonitor
-  - `get_resource_allocation_status`: Obtener estado completo con metricas y recomendaciones
-  - `integrate_with_planner_executor`: Integrar con Planner/Executor mediante contratos existentes
-  - `_get_available_capabilities_for_planner`: Obtener capacidades disponibles para Planner
-  - `_get_optimization_suggestions_for_planner`: Obtener sugerencias de optimizacion
-  - `get_allocation`: Obtiene una asignación específica por su ID (DynamicResourceAllocator).
-  - `cleanup`: Limpia todas las asignaciones y recursos disponibles y registra en log (DynamicResourceAllocator).
-- **Caracteristicas implementadas**:
-  - Sistema completo de asignacion con priorizacion y deteccion de conflictos
-  - Preemption inteligente evitando interrumpir trabajo de usuario sin consentimiento
-  - Trabajo diferido con procesamiento automatico cuando hay recursos disponibles
-  - Integracion con PerformanceMonitor y PerformanceOptimizer para monitoreo y optimizacion
-  - Gestion de multiples tipos de recursos del sistema y de proceso
-  - Notificacion de cambios mediante callbacks
-  - Persistencia de estado con manejo de concurrencia con threading.RLock
-  - Compatibilidad con contratos existentes de Planner/Executor
-
-#### `src/utils/error_dashboard.py` [592 lineas] - Dashboard de Recuperacion de Errores
-- **Descripcion**: Dashboard visual para monitoreo y gestion de operaciones de recuperacion de errores. Proporciona interfaz para visualizar errores activos, historial de recuperacion, estado del sistema y alertas con actualizacion en tiempo real y cache de datos.
-- **Clases principales**:
-  - `DashboardView` (Enum): Tipos de vistas del dashboard (OVERVIEW, ACTIVE_ERRORS, RECOVERY_HISTORY, SYSTEM_HEALTH, ALERTS)
-  - `ErrorSeverity` (Enum): Niveles de severidad de errores (LOW, MEDIUM, HIGH, CRITICAL)
-  - `ErrorRecoveryDashboard`: Clase principal del dashboard para monitoreo de recuperacion de errores
-- **Metodos principales**:
-  - `__init__`: Inicializa el dashboard con ruta de base de datos e intervalo de actualizacion
-  - `start_dashboard`: Inicia el hilo de actualizacion del dashboard
-  - `stop_dashboard`: Detiene el hilo de actualizacion del dashboard
-  - `_update_loop`: Bucle principal de actualizacion del dashboard
-  - `_update_all_data`: Actualiza todos los datos en cache
-  - `_get_cached_data`: Obtiene datos en cache si estan disponibles y no expirados
-  - `_cache_data`: Almacena datos en cache con TTL opcional
-  - `_get_overview_data`: Obtiene datos generales del dashboard
-  - `_get_active_errors_data`: Obtiene datos de errores activos
-  - `_get_recovery_history_data`: Obtiene historial de recuperacion
-  - `_get_system_health_data`: Obtiene estado de salud del sistema
-  - `_get_alerts_data`: Obtiene datos de alertas
-  - `_get_error_statistics`: Obtiene estadisticas de errores desde base de datos
-  - `_get_recovery_statistics`: Obtiene estadisticas de recuperacion desde base de datos
-  - `_get_system_health`: Obtiene estado actual del sistema
-  - `_get_active_recoveries`: Obtiene lista de recuperaciones activas
-  - `_count_errors_by_severity`: Cuenta errores por severidad
-  - `_count_errors_by_component`: Cuenta errores por componente
-  - `_count_recoveries_by_action`: Cuenta recuperaciones por accion
-  - `_count_recoveries_by_component`: Cuenta recuperaciones por componente
-  - `_count_alerts_by_severity`: Cuenta alertas por severidad
-  - `_count_alerts_by_source`: Cuenta alertas por fuente
-  - `get_dashboard_data`: Obtiene datos del dashboard para vista especificada
-  - `get_dashboard_views`: Obtiene vistas disponibles del dashboard
-  - `refresh_data`: Fuerza actualizacion de todos los datos en cache
-  - `log_view_access`: Registra acceso a vistas del dashboard
-  - `get_view_statistics`: Obtiene estadisticas de acceso a vistas
-  - `__str__`: Representacion string del dashboard
-- **Funciones globales**:
-  - `get_error_dashboard`: Obtiene instancia singleton del dashboard de errores
-  - `start_error_dashboard`: Inicia el dashboard de errores
-  - `stop_error_dashboard`: Detiene el dashboard de errores
-
-#### `src/utils/error_recovery.py` [522 lineas] - Sistema de Recuperacion de Errores
-- **Descripcion**: Sistema avanzado de deteccion, registro y recuperacion de errores para JARVIS con estrategias automaticas, estadisticas detalladas y persistencia en base de datos SQLite.
-- **Enums principales**:
-  - `ErrorSeverity`: Niveles de severidad (LOW, MEDIUM, HIGH, CRITICAL)
-  - `ErrorType`: Categorias de errores (NETWORK, DATABASE, FILESYSTEM, MEMORY, PROCESS, EXTERNAL, SYSTEM)
-  - `RecoveryStrategy`: Tipos de estrategias (RETRY, FALLBACK, CIRCUIT_BREAKER, TIMEOUT, ROLLBACK, RESTART)
-- **Clases principales**:
-  - `ErrorRecoveryManager`: Gestor principal de recuperacion de errores con base de datos SQLite y estrategias integradas
-- **Metodos principales**:
-  - `__init__`: Inicializa el gestor con ruta de base de datos y estrategias por defecto
-  - `get_error_recovery_manager`: Obtiene instancia singleton del gestor de recuperacion de errores
-  - `_init_database`: Inicializa base de datos con tablas de errores, estadisticas y estrategias
-  - `_register_default_strategies`: Registra estrategias de recuperacion por defecto
-  - `register_strategy`: Registra una estrategia de recuperacion personalizada
-  - `register_handler`: Registra un manejador especifico para tipos de errores
-  - `log_error`: Registra un error en la base de datos con detalles y contexto
-  - `_update_error_stats`: Actualiza estadisticas de errores con conteo y recuperacion
-  - `recover_from_error`: Intenta recuperar de un error registrado con estrategia especifica
-  - `_get_error_details`: Obtiene informacion detallada de un error por ID
-  - `_determine_best_strategy`: Determina la mejor estrategia basada en tipo y severidad
-  - `_execute_recovery_strategy`: Ejecuta una estrategia de recuperacion especifica
-  - `_retry_strategy`: Estrategia de reintento con retroceso exponencial
-  - `_fallback_strategy`: Estrategia de alternativa con implementacion secundaria
-  - `_circuit_breaker_strategy`: Estrategia de disyuntor para fallos repetitivos
-  - `_timeout_strategy`: Estrategia de timeout para operaciones colgadas
-  - `_restart_strategy`: Estrategia de reinicio para fallos criticos
-  - `_update_recovery_status`: Actualiza estado de recuperacion del error
-  - `_update_execution_time`: Actualiza tiempo de ejecucion del intento de recuperacion
-  - `get_error_statistics`: Obtiene estadisticas de errores para periodo especificado
-  - `get_active_errors`: Obtiene lista de errores activos (no recuperados)
-  - `cleanup_old_errors`: Limpia registros de errores antiguos
-  - `__str__`: Representacion string del gestor de recuperacion de errores
-- **Funciones globales**:
-  - `start_error_recovery`: Inicia el sistema de recuperacion de errores
-  - `stop_error_recovery`: Detiene el sistema de recuperacion de errores
-- **Caracteristicas implementadas**:
-  - Sistema completo de gestion de errores con persistencia SQLite
-  - Estrategias de recuperacion automaticas y personalizables
-  - Sistema de circuit breaker para proteccion contra fallos en cascada
-  - Estadisticas detalladas con tasas de recuperacion y tiempos
-  - Manejo de diferentes tipos y severidades de errores
-  - Soporte para reintento con retroceso exponencial
-  - Estrategias de fallback, timeout y reinicio
-  - Limpieza automatica de registros antiguos
-  - Interfaz singleton para acceso global al sistema
-
-#### `src/utils/get_coords.py` [501 lineas] - Calibrador Manual de Riot API
-- **Descripcion**: Calibrador manual de la macro riot_api. Registra coordenadas absolutas del escritorio y las guarda asociadas al monitor real (s1, s2, ...). La topologia, posicion y resolucion de los monitores se obtienen de config/config.json mediante ScreenManager. Este modulo es especifico de la calibracion manual de la macro riot_api. No modifica otras macros ni otras calibraciones existentes.
-- **Metodos principales**:
-  - `_get_macros_coords_path`: Obtiene la ruta de macros_coords.json.
-  - `_screen_key`: Convierte el ID logico del monitor a la clave sN del JSON.
-  - `_format_monitor`: Devuelve una descripcion legible del monitor.
-  - `_get_monitor_for_screen_number`: Obtiene un monitor configurado por su numero logico 1-based.
-  - `_detect_monitor_from_mouse`: Obtiene el monitor que contiene actualmente el puntero.
-  - `_capture_point_on_monitor`: Espera a que el raton permanezca quieto IDLE_SECONDS sobre el monitor.
-  - `_calculate_capture_region`: Calcula [x, y, ancho, alto] usando las cuatro esquinas.
-  - `_build_calibration_data`: Construye el bloque de datos de calibracion.
-  - `imprimir_resultados`: Muestra por consola los datos capturados.
-  - `_load_json`: Carga el JSON existente o crea una estructura raiz vacia.
-  - `_atomic_write_json`: Escribe el JSON de forma atomica para evitar archivos incompletos.
-  - `gestionar_json`: Actualiza unicamente riot_api para el monitor indicado.
-  - `calibrar_api_key_riot_macro`: Ejecuta la calibracion manual de riot_api.
-  - `calibrarApiKeyRiotMacro`: Alias compatible con la funcion historica del proyecto.
-
-#### `src/utils/health_checker.py` [498 lineas] - Sistema de Verificacion de Salud
-- **Descripcion**: Sistema avanzado de verificacion de salud para JARVIS con monitoreo continuo de componentes criticos, deteccion de problemas, generacion de reportes y capacidad de adaptacion.
-- **Clases principales**:
-  - `HealthStatus` (Enum): Estados de salud de un componente (HEALTHY, WARNING, CRITICAL, UNKNOWN)
-  - `HealthCheck` (dataclass): Resultado estructurado de una verificacion de salud con timestamp, mensaje y detalles
-  - `HealthCheckConfig` (dataclass): Configuracion completa para verificaciones de salud con umbrales, tiempos de espera y componentes a monitorizar
-  - `HealthChecker`: Sistema principal de verificacion de salud con monitoreo periodico, historial y callbacks de notificacion
-- **Metodos principales**:
-  - `HealthChecker.__init__`: Inicializa el verificador de salud con configuracion personalizable
-  - `HealthChecker.start_health_checks`: Inicia verificaciones periodicas en hilo separado
-  - `HealthChecker.stop_health_checks`: Detiene el monitoreo de salud
-  - `HealthChecker.perform_comprehensive_health_check`: Realiza verificacion completa de todos los componentes
-  - `HealthChecker.check_component_health`: Verifica salud especifica de un componente con importacion dinamica
-  - `HealthChecker.check_system_health`: Verifica recursos del sistema (CPU, memoria, disco)
-  - `HealthChecker._get_component_module_path`: Mapea nombres de componentes a rutas de modulos
-  - `HealthChecker._process_health_check`: Procesa resultados y actualiza historial
-  - `HealthChecker._notify_health_change`: Notifica callbacks sobre cambios de salud
-  - `HealthChecker.add_health_change_callback`: Anade callback para notificaciones de cambios
-  - `HealthChecker.get_health_status`: Obtiene estado actual de salud de componentes
-  - `HealthChecker.get_health_summary`: Genera resumen con estado general y contadores
-  - `HealthChecker.get_component_health_history`: Obtiene historial de un componente especifico
-  - `HealthChecker.export_health_report`: Exporta reporte completo a JSON
-  - `HealthChecker.clear_history`: Limpia historial de verificaciones
-  - `HealthChecker.is_component_healthy`: Verifica si componente esta saludable
-  - `HealthChecker.get_unhealthy_components`: Lista componentes no saludables
-  - `HealthChecker.__enter__/__exit`: Context manager para uso con with
-- **Funciones globales**:
-  - `get_health_checker`: Obtiene instancia global del verificador de salud
-  - `start_health_checks`: Inicia verificaciones globales
-  - `stop_health_checks`: Detiene verificaciones globales
-- **Caracteristicas implementadas**:
-  - Monitoreo continuo con intervalo configurable de componentes criticos y opcionales
-  - Sistema de umbrales de respuesta (warning, critical) basado en tiempo y recursos
-  - Importacion dinamica de componentes con verificacion de metodos check_health
-  - Historial configurable con tamano maximo y exportacion a JSON
-  - Sistema de callbacks para notificaciones de cambios de estado
-  - Verificacion de recursos del sistema (CPU, memoria, disco) con umbrales configurables
-  - Context manager para integracion con bloques de codigo
-  - Mapeo automatico de nombres de componentes a rutas de modulos
-
-#### `src/utils/health_monitor.py` [418 lineas] - Sistema de Monitoreo de Salud
-- **Descripcion**: Sistema avanzado de monitoreo de salud para JARVIS con deteccion proactiva de errores, metricas en tiempo real, almacenamiento persistente y capacidades de alerta. Proporciona monitoreo continuo de componentes criticos del sistema con umbrales configurables y recuperacion automatica.
-- **Enums principales**:
-  - `HealthStatus`: Niveles de salud (HEALTHY, WARNING, CRITICAL, UNKNOWN)
-  - `ComponentType`: Tipos de componentes (CORE, DATABASE, NETWORK, MEMORY, DISK, PROCESS, EXTERNAL)
-- **Clases principales**:
-  - `HealthMetric`: Metrica individual de salud con valor, umbral y estado
-  - `HealthMonitor`: Sistema principal de monitoreo de salud con base de datos SQLite
-- **Metodos principales de HealthMetric**:
-  - `__init__`: Inicializa metrica con nombre, valor, umbral, componente y tipo
-  - `is_healthy`: Verifica si metrica esta dentro de limites saludables
-  - `get_status`: Obtiene estado de salud basado en valor actual
-- **Metodos principales de HealthMonitor**:
-  - `__init__`: Inicializa sistema de monitoreo con ruta de base de datos e intervalo de verificacion
-  - `_init_database`: Inicializa base de datos SQLite con tablas de metricas, historial y alertas
-  - `_register_default_metrics`: Registra metricas por defecto (CPU, memoria, disco, red)
-  - `register_metric`: Registra una nueva metrica de salud personalizada
-  - `register_health_callback`: Registra callback para cambios de estado de salud
-  - `check_metric`: Verifica una metrica especifica y actualiza su estado
-  - `check_all_metrics`: Verifica todas las metricas registradas del sistema
-  - `_log_metric`: Registra metrica en base de datos persistente
-  - `_log_health_summary`: Registra resumen general de salud del sistema
-  - `_trigger_health_callbacks`: Dispara callbacks registrados por cambios de estado
-  - `_create_alert`: Crea alerta para cambios de estado criticos
-  - `start_monitoring`: Inicia monitoreo continuo en hilo separado
-  - `stop_monitoring`: Detiene monitoreo continuo
-  - `_monitor_loop`: Bucle principal de monitoreo periodico
-  - `get_current_health`: Obtiene estado actual completo del sistema
-  - `get_health_history`: Obtiene historial de salud para periodo especificado
-  - `get_active_alerts`: Obtiene lista de alertas activas (no resueltas)
-  - `resolve_alert`: Resuelve una alerta especifica
-  - `cleanup_old_data`: Limpia datos antiguos de la base de datos
-  - `__str__`: Representacion string del monitor de salud
-- **Funciones globales**:
-  - `get_health_monitor`: Obtiene instancia singleton del monitor de salud
-  - `start_health_monitoring`: Inicia monitoreo de salud global
-  - `stop_health_monitoring`: Detiene monitoreo de salud global
-- **Caracteristicas implementadas**:
-  - Monitoreo continuo con intervalo configurable de componentes criticos
-  - Sistema de umbrales de salud (healthy, warning, critical) basado en porcentajes
-  - Almacenamiento persistente en SQLite con historial completo
-  - Sistema de alertas con resolucion y seguimiento
-  - Callbacks notificacion para cambios de estado de componentes
-  - Monitoreo de recursos del sistema (CPU, memoria, disco, red)
-  - Limpieza automatica de datos historicos
-  - Instancia singleton para acceso global al sistema
-
-#### `src/utils/jarvis_logging_system.py` [487 lineas] - Sistema Avanzado de Logging para JARVIS
-- **Descripcion**: Sistema unificado de logging avanzado para JARVIS con capacidades predictivas, dashboard interactivo, analisis de patrones y gestion de alertas. Integracion completa con machine learning para deteccion de anomalias y optimizacion continua del sistema.
-- **Clases principales**:
-  - `JarvisLoggingSystem`: Clase principal del sistema de logging avanzado con integracion completa de predictores, dashboard y gestion de alertas
-- **Metodos principales**:
-  - `__init__`: Inicializa el sistema de logging con configuracion personalizable, directorios y componentes principales
-  - `start`: Iniciar el sistema de logging avanzado con entrenamiento de modelos e hilos de prediccion
-  - `stop`: Detener el sistema de logging avanzado con limpieza segura de recursos
-  - `_prediction_worker`: Worker para predicciones automaticas periodicas
-  - `_dashboard_worker`: Worker para dashboard interactivo
-  - `_perform_periodic_predictions`: Realizar predicciones periodicas basadas en caracteristicas de logs recientes
-  - `_extract_recent_features`: Extraer caracteristicas de logs recientes para predicciones
-  - `_check_and_retrain`: Verificar si es necesario reentrenar modelos predictivos
-  - `_cleanup_old_logs`: Limpiar logs antiguos segun politica de retencion
-  - `_process_alert`: Procesar alerta generada por el sistema predictivo
-  - `_trigger_event`: Disparar evento a callbacks registrados
-  - `register_event_callback`: Registrar callback para evento especifico
-  - `log`: Metodo principal de logging con niveles y categorias
-  - `log_error`: Loggear error en el sistema
-  - `log_warning`: Loggear warning en el sistema
-  - `log_info`: Loggear informacion en el sistema
-  - `log_debug`: Loggear debug en el sistema
-  - `log_performance`: Loggear metrica de rendimiento en el sistema
-  - `log_with_trace`: Loggear con trace ID para seguimiento distribuido
-  - `log_with_span`: Loggear con span ID para microservicios
-  - `get_logs`: Obtener logs desde la base de datos con filtros
-  - `get_statistics`: Obtener estadisticas completas del sistema de logging
-  - `get_predictions`: Obtener predicciones actuales del sistema
-  - `get_alerts`: Obtener alertas activas generadas
-  - `acknowledge_alert`: Reconocer alerta especifica
-  - `resolve_alert`: Resolver alerta especifica
-  - `export_logs`: Exportar logs en formato especificado
-  - `export_predictions`: Exportar datos de prediccion
-  - `get_dashboard_url`: Obtener URL del dashboard interactivo
-  - `train_models`: Entrenar modelos predictivos manualmente
-  - `analyze_trends`: Analizar tendencias en los datos de logging
-  - `get_patterns`: Obtener patrones detectados en los logs
-- **Funciones globales**:
-  - `get_jarvis_logger`: Obtener instancia del sistema de logging de JARVIS
-  - `log_jarvis`: Loggear mensaje en el sistema de logging de JARVIS
-  - `log_jarvis_error`: Loggear error en el sistema de logging de JARVIS
-  - `log_jarvis_warning`: Loggear warning en el sistema de logging de JARVIS
-  - `log_jarvis_info`: Loggear informacion en el sistema de logging de JARVIS
-  - `log_jarvis_performance`: Loggear metrica de rendimiento en el sistema de logging de JARVIS
-- **Variables globales**:
-  - `jarvis_logging_system`: Instancia global unica del sistema de logging de JARVIS
-
-#### `src/utils/log_analytics.py` [966 lineas] - Sistema Avanzado de Analisis de Logs
-- **Descripcion**: Sistema avanzado de analisis de logs para Jarvis con capacidades de business intelligence, deteccion de patrones, analisis de tendencias, correlaciones y metricas de rendimiento con visualizaciones integradas.
-- **Clases principales**:
-  - `AnalyticsType` (Enum): Tipos de analisis (SUMMARY, TREND, PATTERN, CORRELATION, ANOMALY, PERFORMANCE, ERROR_ANALYSIS, BUSINESS_INTELLIGENCE, REAL_TIME)
-  - `TimeGranularity` (Enum): Granularidad temporal (MINUTE, HOUR, DAY, WEEK, MONTH)
-  - `AnalyticsResult` (dataclass): Resultado estructurado de analisis con timestamp, tipo, datos, insights, recomendaciones y visualizaciones
-  - `LogAnalyticsEngine`: Motor principal de analisis de logs con capacidades avanzadas de procesamiento, deteccion de patrones y generacion de informes
-  - `LogAnalytics`: Wrapper que proporciona interfaz simplificada para el motor de analisis
-- **Metodos principales de LogAnalyticsEngine**:
-  - `__init__`: Inicializa el motor con base de datos SQLite, cache y configuracion
-  - `_create_database`: Crea base de datos para analisis con tablas de resultados y metricas agregadas
-  - `generate_summary_analytics`: Genera analisis resumen con metricas totales, distribucion por categorias y modulos, insights y recomendaciones
-  - `generate_trend_analytics`: Genera analisis de tendencias con deteccion de tendencias significativas y visualizaciones temporales
-  - `generate_pattern_analytics`: Detecta patrones repetitivos en logs y agrupa por tipo con analisis estadistico
-  - `generate_correlation_analytics`: Calcula correlaciones entre variables como nivel de log y categoria con matriz de correlacion
-  - `generate_performance_analytics`: Analiza logs de rendimiento con tiempos de respuesta, tasas de exito y recomendaciones de optimizacion
-  - `_query_logs`: Consulta logs desde base de datos con filtros temporales
-  - `_group_logs_by_time`: Agrupa logs por granularidad temporal configurable
-  - `_analyze_trends`: Analiza tendencias temporales con calculo de tasas de error y deteccion de pendientes
-  - `_detect_significant_trends`: Detecta tendencias significativas con umbrales de severidad (high, medium, positive)
-  - `_detect_patterns`: Detecta patrones repetitivos en mensajes con simplificacion numerica y conteo de ocurrencias
-  - `_calculate_correlations`: Calcula correlaciones entre variables categoricas con umbrales de significancia
-  - `_create_summary_visualizations`: Crea graficos de distribucion de categorias y modulos con matplotlib
-  - `_create_trend_visualizations`: Genera graficos de lineas para tendencias temporales con marcadores y formato
-  - `_create_pattern_visualizations`: Crea graficos de barras para distribucion de tipos de patrones detectados
-  - `_create_correlation_visualizations`: Genera heatmap de matriz de correlacion con colormap y barra de color
-  - `_create_performance_visualizations`: Crea dashboard de rendimiento con histogramas, series temporales y graficos de dispersion
-  - `_store_analytics_result`: Almacena resultados de analisis en base de datos SQLite con serializacion JSON
-  - `get_analytics_history`: Obtiene historial de analisis con filtrado por tipo y limite de resultados
-  - `export_analytics`: Exporta resultados de analisis en formato JSON con filtros temporales
-- **Metodos principales de LogAnalytics**:
-  - `__init__`: Inicializa wrapper con instancia del motor de analisis
-  - `get_analytics_summary`: Obtiene resumen de analisis simplificado
-  - `generate_summary_analytics`: Genera analisis resumen con interfaz simplificada
-  - `generate_trend_analytics`: Genera analisis de tendencias con interfaz simplificada
-  - `generate_pattern_analytics`: Genera analisis de patrones con interfaz simplificada
-  - `generate_correlation_analytics`: Genera analisis de correlaciones con interfaz simplificada
-  - `generate_performance_analytics`: Genera analisis de rendimiento con interfaz simplificada
-  - `get_analytics_history`: Obtiene historial de analisis con interfaz simplificada
-  - `export_analytics`: Exporta resultados de analisis con interfaz simplificada
-- **Funciones globales**:
-  - `log_analytics`: Instancia global del motor de analisis de logs
-  - `log_analytics_wrapper`: Instancia global del wrapper para interfaz simplificada
-
-#### `src/utils/log_dashboard.py` [824 lineas] - Dashboard Interactivo de Logs
-- **Descripcion**: Dashboard interactivo para monitoreo y gestion de logs de Jarvis con visualizacion en tiempo real, widgets personalizables, alertas, analisis de metricas y multiples vistas (overview, real_time, analytics, patterns, predictions, performance, alerts, settings). Basado en Flask y SocketIO con integracion de Plotly para graficos interactivos y almacenamiento persistente en SQLite.
-- **Clases principales**:
-  - `DashboardView` (Enum): Vistas del dashboard (OVERVIEW, REAL_TIME, ANALYTICS, PATTERNS, PREDICTIONS, PERFORMANCE, ALERTS, SETTINGS)
-  - `DashboardWidget` (Enum): Tipos de widgets (METRIC_CARD, LINE_CHART, BAR_CHART, PIE_CHART, HEATMAP, TABLE, LOG_VIEWER, ALERT_LIST)
-  - `WidgetConfig` (dataclass): Configuracion de widgets con ID, tipo, titulo, fuente de datos, intervalo de refresco, posicion y opciones
-  - `DashboardAlert` (dataclass): Alertas con ID, titulo, mensaje, severidad, timestamp, acknowledged, source y metadata
-  - `RealTimeDataStreamer`: Flujo de datos en tiempo real con subscriptores y buffering circular
-  - `LogDashboard`: Dashboard principal de logs con servidor Flask, SocketIO y actualizacion periodica
-- **Metodos principales de RealTimeDataStreamer**:
-  - `__init__`: Inicializa flujo con max_points, data_streams, subscribers y lock de threading
-  - `add_data_point`: Anade punto de datos con timestamp y metadata a un flujo
-  - `get_stream_data`: Obtiene datos de un flujo con limite opcional
-  - `subscribe_to_stream`: Suscribe callback a un flujo de datos
-  - `unsubscribe_from_stream`: Desuscribe callback de un flujo de datos
-- **Metodos principales de LogDashboard**:
-  - `__init__`: Inicializa dashboard con db_path, port, host, app Flask, SocketIO, data_streamer y estado
-  - `_create_database`: Crea tablas de widgets, alertas y preferencias de usuario en SQLite
-  - `_setup_routes`: Configura rutas Flask y eventos WebSocket para API y comunicacion en tiempo real
-  - `_get_dashboard_template`: Genera plantilla HTML con JavaScript para dashboard interactivo
-  - `_update_loop`: Bucle de actualizacion que actualiza datos, widgets y verifica alertas cada 5 segundos
-  - `_update_real_time_data`: Actualiza metricas simuladas (cpu_usage, memory_usage, error_rate, response_time)
-  - `_update_widgets`: Actualiza todos los widgets y emite actualizaciones WebSocket a clientes
-  - `_get_widget_data`: Obtiene datos segun tipo de widget (metric_card, line_chart, bar_chart, pie_chart, table)
-  - `_get_metric_card_data`: Obtiene datos para widget de metrica con valor, unidad, tendencia y cambio
-  - `_get_line_chart_data`: Obtiene datos historicos para grafico de linea con timestamps y valores
-  - `_get_bar_chart_data`: Obtiene datos para grafico de barras con categorias y valores
-  - `_get_pie_chart_data`: Obtiene datos para grafico circular con labels y values
-  - `_get_table_data`: Obtiene datos para widget de tabla con columnas y filas de logs
-  - `_check_alerts`: Verifica umbrales de metricas y genera alertas si se superan
-  - `add_alert`: Anade alerta al sistema y emite evento WebSocket
-  - `_save_alert`: Guarda alerta en base de datos SQLite
-  - `_save_widget`: Guarda widget en base de datos SQLite
-  - `_delete_widget`: Elimina widget de base de datos
-  - `start`: Inicia dashboard, hilo de actualizacion, carga widgets por defecto y arranca servidor Flask con SocketIO
-  - `run`: Inicia el dashboard (alias de start())
-  - `stop`: Detiene dashboard y espera que el hilo de actualizacion termine
-  - `_load_default_widgets`: Carga 6 widgets por defecto (cpu_usage, memory_usage, error_rate, response_time, log_distribution, recent_logs)
-- **Funciones globales**:
-  - `get_log_dashboard`: Obtiene instancia global del dashboard de logs (instancia singleton)
-
-#### `src/utils/log_integration.py` [810 lineas] - Sistema de Integracion de Logs
-- **Descripcion**: Sistema completo de integracion de logs desde multiples fuentes con normalizacion, transformacion y almacenamiento persistente. Soporta multiples formatos (JSON, TEXT, CSV, SYSLOG, NGINX, APACHE) y fuentes de logs (APPLICATION, SYSTEM, DATABASE, NETWORK, SECURITY, PERFORMANCE, THIRD_PARTY, CUSTOM).
-- **Clases principales**:
-  - `LogSource` (Enum): Fuentes de logs soportadas (APPLICATION, SYSTEM, DATABASE, NETWORK, SECURITY, PERFORMANCE, THIRD_PARTY, CUSTOM)
-  - `LogFormat` (Enum): Formatos de logs soportados (JSON, TEXT, CSV, SYSLOG, NGINX, APACHE, CUSTOM)
-  - `IntegrationStatus` (Enum): Estados de integracion (ACTIVE, INACTIVE, ERROR, PAUSED)
-  - `LogSourceConfig` (dataclass): Configuracion de una fuente de logs con id, nombre, tipo, formato, connection_string, enabled, batch_size, timeout, retry_count, tags, metadata
-  - `LogIntegration` (dataclass): Integracion de logs con id, config, status, last_sync, total_processed, error_count, last_error, performance_metrics
-  - `LogNormalizer`: Normalizador de logs para diferentes formatos
-  - `LogCollector`: Colector de logs desde multiples fuentes con procesamiento concurrente
-  - `LogTransformer`: Transformador de logs para diferentes destinos
-  - `LogIntegrationSystem`: Sistema completo de integracion de logs con base de datos SQLite
-  - `LogIntegrator`: Wrapper para LogIntegrationSystem con interfaz simplificada
-- **Metodos principales de LogNormalizer**:
-  - `normalize_log`: Normalizar un log a formato estandar
-  - `_parse_json`: Parsear log en formato JSON
-  - `_parse_text`: Parsear log en formato de texto libre
-  - `_parse_csv`: Parsear log en formato CSV
-  - `_parse_syslog`: Parsear log en formato syslog
-  - `_parse_nginx`: Parsear log en formato Nginx
-  - `_parse_apache`: Parsear log en formato Apache
-  - `_parse_custom`: Parsear log en formato personalizado
-  - `_standardize_fields`: Estandarizar campos del log
-  - `_extract_additional_info`: Extraer informacion adicional usando regex
-- **Metodos principales de LogCollector**:
-  - `__init__`: Inicializa el colector con max_workers y cola de logs
-  - `add_integration`: Anadir integracion de logs
-  - `remove_integration`: Remover integracion de logs
-  - `start_collection`: Iniciar recoleccion de logs en hilos separados
-  - `stop_collection`: Detener recoleccion de logs
-  - `_collection_loop`: Bucle principal de recoleccion
-  - `_collect_from_integration`: Recolectar logs desde una integracion especifica
-  - `_simulate_log_fetch`: Simular obtencion de logs (para demostracion)
-  - `_processing_loop`: Bucle de procesamiento de logs
-  - `_process_log`: Procesar un log individual
-  - `get_integration_status`: Obtener estado de todas las integraciones
-  - `get_collection_metrics`: Obtener metricas de recoleccion
-- **Metodos principales de LogTransformer**:
-  - `add_destination`: Anadir destino de logs
-  - `add_transform_rule`: Anadir regla de transformacion
-  - `transform_log`: Transformar log para un destino especifico
-  - `_apply_transform_rule`: Aplicar una regla de transformacion
-  - `_apply_field_mapping`: Aplicar mapeo de campos
-- **Metodos principales de LogIntegrationSystem**:
-  - `__init__`: Inicializa el sistema con base de datos SQLite
-  - `_create_database`: Crear tablas de integraciones y processed_logs
-  - `add_log_source`: Anadir fuente de logs
-  - `remove_log_source`: Remover fuente de logs
-  - `start`: Iniciar sistema de integracion
-  - `stop`: Detener sistema de integracion
-  - `get_system_status`: Obtener estado del sistema
-  - `_save_integration`: Guardar integracion en base de datos
-- **Metodos principales de LogIntegrator**:
-  - `__init__`: Inicializa wrapper con LogIntegrationSystem
-- **Funciones globales**:
-  - `log_integration`: Instancia global del sistema de integracion (LogIntegrationSystem)
-  - `log_integrator`: Instancia global del wrapper (LogIntegrator)
-
-#### `src/utils/log_predictor.py` [749 lineas] - Sistema Predictivo de Logs con Machine Learning
-- **Descripcion**: Sistema predictivo de logs para JARVIS con machine learning y analisis de tendencias. Analiza entradas de log, extrae metricas, entrena modelos de regresion (Linear Regression, Random Forest, Gradient Boosting) para series temporales y un clasificador de fallos, y almacena las predicciones en SQLite.
-- **Clases principales**:
-  - `PredictionType` (Enum): Tipos de predicciones (ERROR_RATE, RESPONSE_TIME, THROUGHPUT, RESOURCE_USAGE, SYSTEM_HEALTH, FAILURE_PROBABILITY)
-  - `PredictionConfidence` (Enum): Niveles de confianza (LOW, MEDIUM, HIGH, CRITICAL)
-  - `Prediction` (dataclass): Estructura de prediccion con valor, confianza, horizonte temporal, modelo usado y acciones sugeridas
-  - `TimeSeriesPredictor`: Predictor de series temporales con seleccion automatica del mejor modelo por MAE
-  - `FailurePredictor`: Predictor de fallos del sistema con RandomForestClassifier balanceado
-  - `LogPredictor`: Sistema predictivo de logs integrado (series temporales + fallos + persistencia)
-- **Metodos principales de Prediction**:
-  - `to_dict`: Convierte a diccionario serializando timestamp, tipo, confianza y horizonte
-- **Metodos principales de TimeSeriesPredictor**:
-  - `__init__`: Inicializa con historial maximo por metrica, diccionarios de modelos, escaladores y accuracies
-  - `add_data_point`: Anade punto de datos (valor, timestamp, features) y dispara entrenamiento automatico con 100 muestras
-  - `_train_model`: Entrena LinearRegression, RandomForest y GradientBoosting,escalando con StandardScaler y quedandose con el menor MAE
-  - `_prepare_training_data`: Construye dataset con lag features (1, 2, 3, 6, 12) y features temporales (hora, dia de semana, dia del mes)
-  - `predict`: Realiza prediccion para un horizonte dado, calcula confianza segun MAE y genera sugerencias
-  - `_get_prediction_type`: Determinar el tipo de prediccion basado en el nombre de la metrica
-  - `_generate_suggested_actions`: Generar sugerencias basadas en la prediccion (tasa de error, latencia, uso de recursos y confianza)
-- **Metodos principales de FailurePredictor**:
-  - `__init__`: Inicializa patrones de fallo, metricas del sistema y modelo sin entrenar
-  - `add_system_metrics`: Anade metricas por timestamp, poda a 1000 mediciones y entrena con 100 muestras
-  - `_train_failure_model`: Entrena RandomForestClassifier (100 arboles, class_weight balanced) con 50 muestras minimas
-  - `_detect_failure_in_window`: Detectar si hubo fallos en un periodo de tiempo
-  - `predict_failure_probability`: Predice probabilidad de fallo, asigna confianza por umbral (0.4/0.6/0.8) y acciones preventivas
-- **Metodos principales de LogPredictor**:
-  - `__init__`: Inicializa predictores, historial y base de datos `logs/predictions.db`
-  - `_create_database`: Crea tabla `predictions` con valor real y precision calculada
-  - `add_log_data`: Extrae metricas de la entrada de log (time, success_rate, error_count) y las alimenta a ambos predictores
-  - `generate_predictions`: Genera y almacena predicciones de todas las metricas mas la de fallo
-  - `_store_prediction`: Inserta o reemplaza la prediccion en SQLite serializando features, metricas y acciones
-  - `update_prediction_accuracy`: Actualiza precision de prediccion con valor real
-  - `get_predictions_by_type`: Obtiene predicciones por tipo con limite
-  - `get_active_predictions`: Obtiene las predicciones validas de las ultimas 24 horas
-  - `get_prediction_statistics`: Obtiene estadisticas (total, activas, por tipo, por confianza, accuracies del modelo, recientes)
-  - `export_predictions`: Exporta predicciones a JSON con filtro por rango temporal (limite 1000)
-  - `add_prediction_result`: Agrega resultado de prediccion al historial
-  - `train_models`: Entrena todos los modelos predictivos
-  - `get_predictions`: Obtiene predicciones activas
-  - `last_training` (property): Obtiene tiempo de ultimo entrenamiento
-- **Variables globales**:
-  - `log_predictor`: Instancia global del predictor de logs
-- **Caracteristicas implementadas**:
-  - Persistencia de predicciones en SQLite con valor real y precision
-  - Seleccion automatica del mejor modelo por MAE entre tres algoritmos de regresion
-  - Extraccion de metricas desde logs de rendimiento mediante expresiones regulares
-  - Niveles de confianza derivados del error del modelo y de la probabilidad de fallo
-
-#### `src/utils/logger.py` [136 lineas] - Sistema de Logging Estructurado
-- **Descripcion**: Sistema de logging estructurado para Jarvis con soporte para JSON y mejores practicas de Python 2024.
-- **Clases principales**:
-  - `StructuredLogger`: Logger estructurado con soporte para JSON y mejores practicas
-  - `JsonFormatter`: Formateador que convierte logs a JSON
-- **Metodos principales de StructuredLogger**:
-  - `__init__`: Inicializa logger estructurado con nombre y nivel
-  - `debug`: Log de nivel DEBUG
-  - `info`: Log de nivel INFO
-  - `warning`: Log de nivel WARNING
-  - `error`: Log de nivel ERROR
-  - `critical`: Log de nivel CRITICAL
-  - `_log`: Log interno con contexto
-  - `_print_log`: Metodo de compatibilidad para logs antiguos
-- **Metodos principales de JsonFormatter**:
-  - `format`: Formatear un log record como JSON
-- **Funciones globales**:
-  - `get_logger`: Obtener un logger estructurado
-- **Logger predeterminado**:
-  - `logger`: Logger predeterminado para Jarvis
-
-#### `src/utils/meta_learning_system.py` [2401 lineas] - Sistema de Metaprendizaje
-- **Descripcion**: Sistema de metaprendizaje que observa el comportamiento de los sistemas de aprendizaje existentes (adaptive_learning_engine, self_improvement_system, performance_optimizer, pattern_analyzer y log_analytics), captura experiencias de aprendizaje, las analiza por niveles de metaprendizaje y genera insights accionables sobre seleccion de estrategias, adaptacion de parametros, optimizacion contextual, abstraccion de conocimiento y ajuste de la tasa de aprendizaje.
-- **Clases principales**:
-  - `MetaLearningLevel` (Enum): Niveles de metaprendizaje (STRATEGY_SELECTION, PARAMETER_ADAPTATION, CONTEXTUAL_OPTIMIZATION, KNOWLEDGE_ABSTRACTION, LEARNING_RATE_ADJUSTMENT)
-  - `MetaLearningResult` (Enum): Resultados del metaprendizaje (IMPROVEMENT_DETECTED, DEGRADATION_DETECTED, NO_CHANGE, INSUFFICIENT_DATA, CONFLICTING_SIGNALS)
-  - `LearningExperience` (dataclass): Experiencia de aprendizaje (sistema, tipo de tarea, contexto, estrategia, parametros, resultado, metricas de exito, confianza y metadata)
-  - `LearningEvaluation` (dataclass): Evaluacion de una estrategia con evidencia disponible (muestras, tasa de exito, confianza, consistencia, suficiencia de evidencia, patron estable, veredicto e indicadores)
-  - `MetaLearningInsight` (dataclass): Insight generado (nivel, descripcion, confianza, evidencias, recomendacion, impacto, validacion y estado de aplicacion)
-  - `MetaLearningSystem`: Sistema principal con cola y hilo de procesamiento asincrono
-- **Metodos principales de MetaLearningLevel**:
-  - STRATEGY_SELECTION, PARAMETER_ADAPTATION, CONTEXTUAL_OPTIMIZATION, KNOWLEDGE_ABSTRACTION, LEARNING_RATE_ADJUSTMENT
-- **Metodos principales de MetaLearningResult**:
-  - IMPROVEMENT_DETECTED, DEGRADATION_DETECTED, NO_CHANGE, INSUFFICIENT_DATA, CONFLICTING_SIGNALS
-- **Metodos principales de MetaLearningSystem**:
-  - `__init__`: Inicializa los sistemas de aprendizaje subyacentes, carga la configuracion y prepara experiencias, insights, cola y metricas
-  - `_load_config`: Cargar configuracion del sistema
-  - `_save_config`: Guardar configuracion actual
-  - `capture_learning_experience`: Capturar una experiencia de aprendizaje basica (sistema, tarea, contexto, estrategia, parametros, resultado, metricas y confianza)
-  - `capture_structured_experience`: Capturar experiencia estructurada con asociacion explicita contexto/accion-estrategia/resultado e indicadores de exito y fallo
-  - `capture_experience_with_context`: Capturar experiencia con contexto multi-nivel (entorno, usuario, sistema) y evaluacion de valor de aprendizaje
-  - `_get_current_system_state`: Obtiene el estado actual del sistema
-  - `_extract_success_indicators`: Extrae indicadores de exito de las metricas de rendimiento
-  - `_extract_failure_indicators`: Extrae indicadores de fallo del resultado de ejecucion
-  - `_calculate_experience_confidence`: Calcula la confianza de la experiencia basada en metricas de rendimiento
-  - `_assess_context_completeness`: Evalua la completitud del contexto
-  - `_assess_result_quality`: Evalua la calidad del resultado de ejecucion
-  - `_get_session_id`: Obtiene o genera un ID de sesion
-  - `_assess_task_complexity`: Evalua la complejidad de la tarea
-  - `_assess_resource_availability`: Evalua la disponibilidad de recursos del sistema
-  - `_extract_decision_points`: Extrae los puntos de decision de la accion ejecutada
-  - `_extract_resource_usage`: Extrae el uso de recursos de la accion ejecutada
-  - `_assess_learning_potential`: Evalua el potencial de aprendizaje de una tarea
-  - `_assess_reusability`: Evalua la reutilizacion de una experiencia
-  - `_validate_experience_utility`: Valida si una experiencia aporta utilidad real al metaprendizaje
-  - `get_learning_success_indicators`: Identifica los indicadores de exito realmente disponibles en las experiencias
-  - `_experience_success_score`: Extrae el valor de exito de una experiencia usando los indicadores existentes
-  - `_calculate_consistency`: Calcula la consistencia de los resultados (1.0 identicos, 0.0 maxima dispersion)
-  - `evaluate_learning_strategy`: Evalua una estrategia con evidencia disponible, separando resultado puntual de patron estable y rechazando muestras insuficientes
-  - `get_learning_evaluations`: Evalua todas las combinaciones sistema/tarea/estrategia presentes
-  - `analyze_learning_patterns`: Analiza patrones de las experiencias y genera insights por nivel
-  - `_analyze_strategy_selection`: Analisis de seleccion de estrategias
-  - `_analyze_parameter_adaptation`: Analisis de adaptacion de parametros
-  - `_analyze_contextual_optimization`: Analisis de optimizacion contextual
-  - `_analyze_learning_rate_adjustment`: Analisis de ajuste de la tasa de aprendizaje
-  - `_create_context_pattern`: Crear patron resumido a partir del contexto
-  - `apply_meta_learning_insights`: Aplicar insights al sistema y devolver el resumen de aplicacion
-  - `_apply_strategy_selection_insight`: Aplicar insight de seleccion de estrategias
-  - `_apply_parameter_adaptation_insight`: Aplicar insight de adaptacion de parametros
-  - `_apply_contextual_optimization_insight`: Aplicar insight de optimizacion contextual
-  - `_apply_learning_rate_adjustment_insight`: Aplicar insight de ajuste de la tasa de aprendizaje
-  - `get_meta_learning_metrics`: Obtener metricas globales del metaprendizaje
-  - `_calculate_confidence_distribution`: Calcular la distribucion de confianza
-  - `_get_system_coverage`: Calcular la cobertura por sistema de aprendizaje
-  - `_calculate_learning_progress`: Calcular el progreso del aprendizaje (reciente vs historico)
-  - `save_meta_learning_data`: Guardar experiencias, insights, metricas y configuracion en JSON
-  - `load_meta_learning_data`: Cargar datos de metaprendizaje desde archivo
-  - `start_meta_learning_process`: Iniciar el proceso asincrono de metaprendizaje
-  - `stop_meta_learning_process`: Detener el proceso asincrono de metaprendizaje
-  - `_meta_learning_loop`: Bucle principal de procesamiento de la cola de experiencias
-  - `_process_single_experience`: Procesa una experiencia individual y actualiza metricas
-  - `validate_meta_learning_insights`: Validar insights especificos por ID
-  - `get_recommendations`: Obtener recomendaciones filtradas por sistema y tipo de tarea, ordenadas por impacto y confianza
-  - `connect_component`: Conectar una instancia real de un componente de aprendizaje validando su API publica
-  - `connect_adaptive_learning_engine`: Integrar con AdaptiveLearningEngine compartiendo su instancia
-  - `connect_self_improvement_system`: Integrar con SelfImprovementSystem compartiendo su instancia
-  - `connect_contextual_adaptation_engine`: Integrar con ContextualAdaptationEngine con conexion bidireccional
-  - `get_integration_status`: Estado de integracion y deteccion de motores de aprendizaje duplicados
-- **Caracteristicas implementadas**:
-  - Tres vias de captura de experiencias: basica, estructurada y con contexto multi-nivel (entorno/usuario/sistema)
-  - Validacion de utilidad previa al registro (duplicados, contexto/outcome vacios, sistemas no soportados, tareas triviales)
-  - Analisis en cinco niveles de metaprendizaje con filtrado por umbral de confianza configurable
-  - Cola `queue.Queue` con hilo daemon y persistencia periodica cada 100 experiencias
-  - Aplicacion de insights sobre los sistemas subyacentes con metricas de aplicacion y tiempo de ejecucion
-  - Persistencia JSON con serializacion de datetimes, dataclasses y enums
-  - Configuracion por defecto: maximo de experiencias, minimo para analisis, umbral de confianza, intervalo de analisis, auto-aplicacion, exportacion y secciones de ajuste
-  - Integracion con AdaptiveLearningEngine, SelfImprovementSystem y ContextualAdaptationEngine compartiendo las instancias existentes, validando su API real y rechazando componentes que no la expongan; no se crean motores de aprendizaje nuevos
-
-#### `src/utils/metrics_collector.py` [592 lineas] - Sistema de Recoleccion de Metricas
-- **Descripcion**: Sistema de recoleccion de metricas para JARVIS con almacenamiento persistente en SQLite, recoleccion en hilo daemon con buffer por lotes, limpieza por retencion, copias de seguridad y exportacion a JSON.
-- **Clases principales**:
-  - `MetricData` (dataclass): Datos de una metrica individual con timestamp, nombre, valor, tags y metadata
-  - `MetricConfig` (dataclass): Configuracion de base de datos, retencion, recoleccion y metricas predeterminadas
-  - `MetricsCollector`: Recolector principal de metricas con buffer en memoria y persistencia
-- **Metodos principales de MetricData**:
-  - `to_dict`: Convierte los datos de la metrica a un diccionario
-  - `from_dict` (classmethod): Crea una instancia de MetricData desde un diccionario
-- **Metodos principales de MetricConfig**:
-  - `to_dict`: Convierte la configuracion a un diccionario
-- **Metodos principales de MetricsCollector**:
-  - `__init__`: Inicializa logger, configuracion, buffer con lock, base de datos y directorios
-  - `_initialize_database`: Crea la tabla `metrics` en SQLite con indices por timestamp, nombre y (nombre, timestamp)
-  - `_ensure_directories`: Asegura que existan los directorios de datos y backups
-  - `start_collection`: Inicia la recoleccion continua en hilo daemon
-  - `stop_collection`: Detiene la recoleccion, vacia el buffer y espera al hilo (timeout 5s)
-  - `_collection_loop`: Bucle principal que recolecta metricas por defecto,.flush del buffer por lote y espera el intervalo
-  - `_collect_custom_metrics`: Recolecta con psutil CPU, memoria, disco, red y numero de procesos
-  - `add_metric`: Anade una metrica al buffer con locking y volcado automatico al superar el doble del batch
-  - `_flush_buffer`: Vacia el buffer a la base de datos serializando tags y metadata en JSON
-  - `get_metrics`: Obtiene metricas filtradas por nombre, rango temporal, tags y limite
-  - `get_metric_statistics`: Obtiene estadisticas (count, min, max, mean, median, std_dev, primer y ultimo timestamp)
-  - `get_metric_names`: Obtiene todos los nombres de metricas disponibles
-  - `cleanup_old_metrics`: Limpia metricas antiguas segun retencion y limite por nombre
-  - `backup_metrics`: Realiza una copia de seguridad de la base de datos de metricas
-  - `export_metrics`: Exporta metricas a un archivo JSON con filtros opcionales
-  - `get_collector_status`: Obtiene estado del recolector (buffer, configuracion, ruta, totales, nombres, ultima limpieza)
-  - `_get_total_metrics_count`: Obtiene el total de metricas en la base de datos
-  - `_get_last_cleanup_time`: Obtiene la ultima fecha de limpieza
-  - `clear_all_metrics`: Elimina todas las metricas de la base de datos y del buffer
-  - `__enter__` / `__exit__`: Soporte como context manager (inicia/detiene la recoleccion)
-- **Funciones globales**:
-  - `get_metrics_collector`: Obtiene la instancia global del recolector de metricas
-  - `start_metrics_collection`: Inicia la recoleccion de metricas globales
-  - `stop_metrics_collection`: Detiene la recoleccion de metricas globales
-- **Variables globales**:
-  - `_metrics_collector`: Instancia global unica del recolector
-- **Caracteristicas implementadas**:
-  - Persistencia en SQLite (`data/metrics/jarvis_metrics.db`) con indices para consultas por nombre y tiempo
-  - Buffer en memoria con escritura por lotes (`batch_size`) y volcado final al detener
-  - Metricas predeterminadas configurables: CPU, memoria, disco, acciones ejecutadas/fallidas y tiempo de respuesta
-  - Metricas de sistema mediante psutil con tags y metadata
-  - Limpieza por retencion (30 dias) y limite de metricas por nombre (10000)
-  - Copia de seguridad y exportacion a JSON
-  - Context manager para integracion con `with`
-
-#### `src/utils/monitoring_dashboard.py` [417 lineas] - Dashboard Unificado de Monitoreo
-- **Descripcion**: Dashboard unificado para visualizar y gestionar todo el sistema de monitoreo de JARVIS (rendimiento, salud, metricas y alertas). Actualiza los datos periodicamente en un hilo daemon, mantiene historial y notifica a los callbacks registrados.
-- **Clases principales**:
-  - `DashboardConfig`: Configuracion del dashboard (intervalo de actualizacion, limites de alertas/metricas mostradas, flags de visualizacion y umbrales de alerta)
-  - `DashboardData`: Snapshot de los datos del dashboard en un instante (timestamp, metricas, estado de salud, alertas recientes, resumen del sistema)
-  - `MonitoringDashboard`: Dashboard unificado de monitoreo (hilo de actualizacion, historial, callbacks y export de reportes)
-- **Metodos principales de DashboardConfig**:
-  - `to_dict`: Convierte la configuracion a un diccionario
-- **Metodos principales de DashboardData**:
-  - `to_dict`: Convierte los datos del dashboard a un diccionario (timestamp en ISO)
-- **Metodos principales de MonitoringDashboard**:
-  - `__init__`: Inicializa dashboard con configuracion, monitor de rendimiento, verificador de salud y recolector de metricas
-  - `start_dashboard`: Inicia el hilo de actualizacion del dashboard
-  - `stop_dashboard`: Detiene el hilo del dashboard con timeout de 5s
-  - `_dashboard_loop`: Bucle principal de actualizacion periodica, historial y notificacion de callbacks
-  - `_update_dashboard_data`: Construye un `DashboardData` con metricas, salud, alertas y resumen
-  - `_get_current_performance_metrics`: Obtiene metricas actuales del monitor aplicando la configuracion de visualizacion
-  - `_get_current_health_status`: Obtiene el resumen de salud del health checker
-  - `_get_recent_alerts`: Obtiene y ordena alertas recientes por timestamp
-  - `_generate_system_summary`: Genera resumen con estado general, conteo de alertas y estado de monitoreo
-  - `get_dashboard_data`: Obtiene los datos actuales del dashboard
-  - `get_dashboard_history`: Obtiene el historial del dashboard con limite opcional
-  - `add_update_callback`: Registra callback para recibir actualizaciones
-  - `remove_update_callback`: Elimina un callback de actualizaciones
-  - `export_dashboard_report`: Exporta reporte JSON del dashboard con historial opcional
-  - `get_system_health_score`: Calcula puntaje de salud (0-100) segun estado general
-  - `get_critical_metrics`: Obtiene metricas que superan umbrales criticos (CPU, memoria, disco)
-  - `get_unhealthy_components`: Obtiene componentes con estado distinto de healthy
-  - `clear_dashboard_history`: Limpia el historial del dashboard
-  - `__enter__` / `__exit__`: Soporte como context manager (inicia/detiene el dashboard)
-- **Funciones globales**:
-  - `get_monitoring_dashboard`: Obtiene instancia singleton del dashboard de monitoreo
-  - `start_monitoring_dashboard`: Inicia el dashboard de monitoreo global
-  - `stop_monitoring_dashboard`: Detiene el dashboard de monitoreo global
-- **Caracteristicas implementadas**:
-  - Actualizacion periodica en hilo daemon con intervalo configurable
-  - Historial en memoria con tamano maximo (1000 snapshots)
-  - Sistema de callbacks para notificaciones de actualizacion
-  - Integracion con performance_monitor, health_checker y metrics_collector
-  - Filtrado de metricas por configuracion de visualizacion
-  - Resumen de estado general del sistema (healthy/warning/critical)
-  - Exportacion de reportes en JSON
-  - Puntuacion de salud del sistema y deteccion de metricas/componentes criticos
-  - Context manager para integracion con `with`
-  - Instancia singleton para acceso global al sistema
-
-#### `src/utils/optimization_orchestrator.py` [892 lineas] - Orquestador de Optimizacion
-- **Descripcion**: Orquestador de optimizacion que coordina todos los sistemas de optimizacion (performance_optimizer, self_improvement_system, adaptive_learning_engine, pattern_analyzer y log_analytics). Gestiona una cola de trabajos con prioridad, los agrupa por compatibilidad de recursos y los ejecuta en modos secuencial, paralelo, coordinado u optimizado, adaptando el modo dinamicamente.
-- **Clases principales**:
-  - `OrchestrationMode` (Enum): Modos de orquestacion (COORDINATED, SEQUENTIAL, PARALLEL, ADAPTIVE, OPTIMIZED)
-  - `OptimizationPriority` (Enum): Prioridades de optimizacion (CRITICAL, HIGH, MEDIUM, LOW, BACKGROUND)
-  - `OptimizationJob` (dataclass): Trabajo de optimizacion con prioridad, estrategias, dependencias, recursos, estado y resultado
-  - `OrchestrationMetrics` (dataclass): Metricas de orquestacion (trabajos por estado, duracion media, eficiencia, utilizacion, tasa de exito)
-  - `OptimizationOrchestrator`: Orquestador principal con bucle de orquestacion en hilo daemon
-- **Metodos principales de OrchestrationMode**:
-  - COORDINATED, SEQUENTIAL, PARALLEL, ADAPTIVE, OPTIMIZED
-- **Metodos principales de OptimizationPriority**:
-  - CRITICAL, HIGH, MEDIUM, LOW, BACKGROUND
-- **Metodos principales de OptimizationOrchestrator**:
-  - `__init__`: Inicializa sistemas de optimizacion, configuracion, cola de prioridad, metricas e inicia el bucle
-  - `_load_config`: Cargar configuracion del orquestador
-  - `_initialize_resource_monitor`: Inicializar monitor de recursos
-  - `_start_orchestration_loop`: Iniciar bucle de orquestacion
-  - `_orchestration_loop`: Bucle principal de orquestacion
-  - `_update_system_metrics`: Actualizar metricas del sistema
-  - `_calculate_resource_utilization`: Calcular utilizacion de recursos
-  - `_calculate_success_rate`: Calcular tasa de exito de optimizacion
-  - `_analyze_optimization_needs`: Analizar necesidades de optimizacion
-  - `_estimate_resources`: Estimar recursos requeridos para una estrategia
-  - `_add_optimization_job`: Anadir trabajo de optimizacion
-  - `_coordinate_optimization_strategies`: Coordinar estrategias de optimizacion
-  - `_group_compatible_jobs`: Agrupar trabajos compatibles
-  - `_are_jobs_compatible`: Verificar si dos trabajos son compatibles
-  - `_execute_sequential`: Ejecutar trabajos secuencialmente
-  - `_execute_parallel`: Ejecutar trabajos en paralelo
-  - `_execute_coordinated`: Ejecutar trabajos coordinados
-  - `_execute_optimized`: Ejecutar trabajos optimizados
-  - `_process_optimization_jobs`: Procesar trabajos de optimizacion
-  - `_execute_single_job`: Ejecutar un trabajo de optimizacion individual
-  - `_execute_coordinated_job`: Ejecutar trabajo coordinado con control de recursos
-  - `_execute_strategy`: Ejecutar una estrategia de optimizacion
-  - `_calculate_job_efficiency`: Calcular eficiencia esperada de un trabajo
-  - `_calculate_job_improvement`: Calcular mejora de un trabajo
-  - `_monitor_job_progress`: Monitorear progreso de trabajos
-  - `_adapt_orchestration_mode`: Adaptar modo de orquestacion segun condiciones del sistema
-  - `_optimize_orchestration_mode`: Optimizar modo de orquestacion
-  - `_calculate_mode_performance`: Calcular rendimiento de un modo de orquestacion
-  - `get_orchestration_status`: Obtener estado de orquestacion
-  - `_calculate_average_job_duration`: Calcular duracion promedio de trabajos
-  - `add_custom_optimization_job`: Anadir trabajo de optimizacion personalizado
-  - `get_job_status`: Obtener estado de un trabajo especifico
-  - `cancel_job`: Cancelar un trabajo
-  - `export_orchestration_report`: Exportar reporte de orquestacion
-  - `stop_orchestration`: Detener orquestacion
-  - `start_orchestration`: Iniciar orquestacion
-  - `__del__`: Destructor que detiene el bucle y une el hilo
-- **Caracteristicas implementadas**:
-  - Cola `PriorityQueue` ponderada por prioridad para ordenar los trabajos de optimizacion
-  - Agrupacion por compatibilidad de recursos (limite 80%), dependencias y estrategia
-  - Cuatro modos de ejecucion: secuencial, paralelo (hilos daemon), coordinado (lock de recursos) y optimizado por eficiencia
-  - Deteccion automatica de necesidades por umbrales de CPU, memoria, disco y red y por anomalias detectadas
-  - Adaptacion y optimizacion dinamica del modo de orquestacion segun carga y tasa de exito
-  - Timeout de trabajos, cancelacion y limpieza de trabajos completados
-  - Alertas de exito/fallo via log_analytics y exportacion de reporte JSON
-  - Configuracion por defecto: limites de recursos, pesos de prioridad, preferencias de estrategia, timeout y reintentos
-
-#### `src/utils/pattern_analyzer.py` [650 lineas] - Analizador Avanzado de Patrones con Machine Learning
-- **Descripcion**: Analizador avanzado de patrones para JARVIS con machine learning y deteccion de anomalias. Analiza logs para detectar picos de errores, degradacion de rendimiento, anomalias (estadisticas y Isolation Forest), tendencias, ciclos, correlaciones, bursts y changepoints, manteniendo historial de patrones.
-- **Clases principales**:
-  - `PatternType` (Enum): Tipos de patrones detectables (ERROR_SPIKE, PERFORMANCE_DEGRADATION, ANOMALY, TREND, CYCLE, CORRELATION, SEASONAL, BURST, CHANGEPONT)
-  - `PatternSeverity` (Enum): Severidad de patrones (LOW, MEDIUM, HIGH, CRITICAL)
-  - `Pattern` (dataclass): Estructura de patron detectado con tipo, severidad, confianza, datos, componentes afectados y acciones sugeridas
-  - `TimeSeriesAnalyzer`: Analizador de series temporales con StandardScaler e Isolation Forest
-  - `PatternDetector`: Detector de patrones con multiples algoritmos
-  - `PatternAnalyzer`: Wrapper de `PatternDetector` que proporciona la interfaz esperada
-- **Metodos principales de Pattern**:
-  - `to_dict`: Convertir a diccionario
-- **Metodos principales de TimeSeriesAnalyzer**:
-  - `__init__`: Inicializa con tamano de ventana, escalador, Isolation Forest (contaminacion 0.1) y estado de entrenamiento
-  - `add_data_point`: Anade punto de datos a la serie temporal y dispara entrenamiento automatico con 100 muestras
-  - `_train_model`: Entrena modelo de deteccion de anomalias con 100 valores normalizados
-  - `detect_anomalies`: Detecta anomalias en una serie temporal por z-score (>3) y por Isolation Forest (score < -0.5)
-- **Metodos principales de PatternDetector**:
-  - `__init__`: Inicializa analizador de series temporales, lista de patrones, historial por tipo y lock
-  - `analyze_logs`: Analizar logs y detectar patrones
-  - `_detect_error_spikes`: Detectar picos de errores por ventana horaria (umbral 30%, critico >50%)
-  - `_detect_performance_degradation`: Detectar degradacion de rendimiento comparando medias recientes vs anteriores (aumento >50%)
-  - `_detect_anomalies`: Detectar anomalias usando series temporales
-  - `_detect_trends`: Detectar tendencias en los logs
-  - `_detect_cycles`: Detectar patrones ciclicos
-  - `_detect_periodicity`: Detectar periodicidad en datos usando metodos simples
-  - `_detect_correlations`: Detectar correlaciones entre diferentes tipos de logs
-  - `_detect_bursts`: Detectar bursts de actividad
-  - `get_patterns_by_type`: Obtener patrones por tipo
-  - `get_active_patterns`: Obtener patrones activos
-  - `acknowledge_pattern`: Marcar patron como reconocido
-  - `get_pattern_statistics`: Obtener estadisticas de patrones
-- **Metodos principales de PatternAnalyzer**:
-  - `__init__`: Inicializa el detector de patrones interno
-  - `get_pattern_analysis`: Obtener analisis completo de patrones
-- **Variables globales**:
-  - `pattern_detector`: Instancia global del detector de patrones
-  - `pattern_analyzer`: Instancia global del analizador de patrones
-- **Caracteristicas implementadas**:
-  - Deteccion estadistica (z-score) y con machine learning (Isolation Forest) de anomalias
-  - Extraccion de metricas de rendimiento desde logs con expresiones regulares (`time=`)
-  - Analisis por ventanas horarias, de 5 minutos y por segundo para picos, correlaciones y bursts
-  - Deteccion de tendencias por regresion lineal simple sobre errores por hora
-  - Deteccion de ciclos por periodicidad con tolerancia de 2 unidades
-  - Historial de patrones por tipo y estadisticas (total, activos, por tipo, por severidad, recientes)
-
-#### `src/utils/performance_monitor.py` [856 lineas] - Sistema de Monitoreo de Rendimiento
-- **Descripcion**: Sistema avanzado de monitoreo de rendimiento para JARVIS con recoleccion de metricas, analisis de tendencias, deteccion de anomalias y alertas inteligentes. Incluye colector de metricas del sistema, analizador predictivo con Isolation Forest y sistema de alertas con reglas personalizables.
-- **Clases principales**:
-  - `MetricType` (Enum): Tipos de metricas (CPU, MEMORY, DISK, NETWORK, PROCESS, DATABASE, APPLICATION, CUSTOM)
-  - `AlertSeverity` (Enum): Severidad de alertas (INFO, WARNING, ERROR, CRITICAL)
-  - `PerformanceMetric` (dataclass): Estructura de metrica de rendimiento con valor, unidad, timestamp y metadatos
-  - `PerformanceAlert` (dataclass): Estructura de alerta con severidad, mensaje y estado
-  - `AlertRule` (dataclass): Regla de alerta con condicion, umbral y cooldown
-  - `PerformanceCollector`: Colector de metricas del sistema usando psutil
-  - `PerformanceAnalyzer`: Analizador con deteccion de anomalias (Isolation Forest) y analisis de tendencias
-  - `PerformanceMonitor`: Monitor principal con recoleccion, analisis y alertas
-- **Metodos principales de MetricType**:
-  - CPU, MEMORY, DISK, NETWORK, PROCESS, DATABASE, APPLICATION, CUSTOM
-- **Metodos principales de AlertSeverity**:
-  - INFO, WARNING, ERROR, CRITICAL
-- **Metodos principales de PerformanceMetric**:
-  - `to_dict`: Convierte a diccionario
-- **Metodos principales de PerformanceCollector**:
-  - `__init__`: Inicializa colector con intervalo y tamano de historial
-  - `start_collection`: Inicia recoleccion de metricas en hilo separado
-  - `stop_collection`: Detiene recoleccion de metricas
-  - `_collection_loop`: Bucle principal de recoleccion
-  - `_collect_system_metrics`: Recolecta metricas del sistema (CPU, memoria, swap, carga)
-  - `_collect_process_metrics`: Recolecta metricas del proceso actual (CPU, memoria, hilos, conexiones)
-  - `_collect_network_metrics`: Recolecta estadisticas de red (bytes, paquetes por interfaz)
-  - `_collect_disk_metrics`: Recolecta estadisticas de disco (lectura/escritura, uso por particion)
-  - `_add_metric`: Anade nueva metrica con locking
-  - `_get_metric_type`: Determina tipo de metrica por nombre
-  - `get_metric_history`: Obtiene historial de una metrica filtrado por tiempo
-  - `get_latest_metrics`: Obtiene las ultimas metricas de todas las categorias
-  - `get_metric_statistics`: Obtiene estadisticas (mean, median, std, min, max, p95, p99)
-- **Metodos principales de PerformanceAnalyzer**:
-  - `__init__`: Inicializa analizador con tamano de ventana
-  - `train_anomaly_detector`: Entrena detector Isolation Forest para una metrica
-  - `detect_anomalies`: Detecta anomalias en una metrica con score y severidad
-  - `analyze_trends`: Analiza tendencias (increasing, decreasing, stable) con regresion lineal
-- **Metodos principales de PerformanceMonitor**:
-  - `__init__`: Inicializa monitor con base de datos SQLite
-  - `_create_database`: Crea tablas de metricas, alertas y reglas de alerta
-  - `_load_default_alert_rules`: Carga reglas por defecto (CPU>90%, memoria>85%, disco>90%)
-  - `start_monitoring`: Inicia monitoreo (colector + bucle principal + procesamiento de alertas)
-  - `stop_monitoring`: Detiene monitoreo y espera hilos
-  - `_monitoring_loop`: Bucle principal que verifica alertas cada 5 segundos y entrena detectores periodicamente
-  - `_alert_processing_loop`: Bucle de procesamiento de alertas desde cola
-  - `_evaluate_alert_condition`: Evalua condicion (greater_than, less_than, equal_to, not_equal_to)
-  - `_create_alert`: Crea alerta a partir de regla y metrica
-  - `_process_alert`: Procesa alerta (guarda, notifica, genera acciones correctivas)
-  - `_generate_corrective_actions`: Genera acciones sugeridas segun tipo de metrica
-  - `_train_anomaly_detectors`: Entrena detectores con historial de 24 horas
-  - `_save_alert`: Guarda alerta en base de datos
-  - `_save_alert_rule`: Guarda regla de alerta en base de datos
-  - `add_alert_rule`: Anade regla de alerta nueva
-  - `remove_alert_rule`: Elimina regla de alerta
-  - `get_alerts`: Obtiene alertas filtradas por severidad y estado
-  - `acknowledge_alert`: Marca alerta como reconocida
-  - `resolve_alert`: Marca alerta como resuelta
-  - `get_performance_summary`: Obtiene resumen con metricas actuales, estadisticas y tendencias
-  - `export_performance_data`: Exporta datos de rendimiento a JSON (ultimos 10000 registros)
-- **Variables globales**:
-  - `performance_monitor`: Instancia global del monitor de rendimiento
-
-#### `src/utils/performance_optimizer.py` [1099 lineas] - Optimizador de Rendimiento con Machine Learning
-- **Descripcion**: Optimizador de rendimiento con machine learning y optimizacion predictiva. Monitoriza el sistema mediante PerformanceMonitor, PatternAnalyzer y LogAnalytics, calcula una puntuacion de eficiencia, analiza tendencias, identifica oportunidades de optimizacion (CPU, memoria, disco, tiempo de respuesta y tasa de errores), genera y ejecuta acciones con comando de ejecucion y rollback, y actualiza modelos ML con la mejora real obtenida.
-- **Clases principales**:
-  - `OptimizationStrategy` (Enum): Estrategias de optimizacion (CPU_OPTIMIZATION, MEMORY_OPTIMIZATION, DISK_OPTIMIZATION, NETWORK_OPTIMIZATION, PROCESS_OPTIMIZATION, CACHE_OPTIMIZATION, THREAD_POOL_OPTIMIZATION, ALGORITHM_OPTIMIZATION, RESOURCE_ALLOCATION, LOAD_BALANCING)
-  - `OptimizationLevel` (Enum): Niveles de optimizacion (BASIC, MODERATE, AGGRESSIVE, CRITICAL)
-  - `OptimizationMetrics` (dataclass): Metricas de optimizacion (CPU, memoria, disco, red, tiempo de respuesta, throughput, tasa de errores, eficiencia, ganancia y timestamp)
-  - `OptimizationAction` (dataclass): Accion de optimizacion con estrategia, nivel, mejora esperada, confianza, prioridad, recursos, comandos de ejecucion/rollback y estado de resultado
-  - `PerformanceOptimizer`: Optimizador principal con bucle de optimizacion en hilo y cola de acciones
-- **Metodos principales de OptimizationStrategy**:
-  - CPU_OPTIMIZATION, MEMORY_OPTIMIZATION, DISK_OPTIMIZATION, NETWORK_OPTIMIZATION, PROCESS_OPTIMIZATION, CACHE_OPTIMIZATION, THREAD_POOL_OPTIMIZATION, ALGORITHM_OPTIMIZATION, RESOURCE_ALLOCATION, LOAD_BALANCING
-- **Metodos principales de OptimizationLevel**:
-  - BASIC, MODERATE, AGGRESSIVE, CRITICAL
-- **Metodos principales de PerformanceOptimizer**:
-  - `__init__`: Inicializa monitor, analizador de patrones, analizador de logs, carga configuracion, inicializa modelos ML y arranca el bucle de optimizacion
-  - `_load_config`: Cargar configuracion del optimizador
-  - `_initialize_models`: Inicializar los modelos de machine learning y escaladores
-  - `_load_trained_models`: Cargar modelos entrenados desde disco
-  - `_save_trained_models`: Guardar modelos entrenados en disco
-  - `_start_optimization_loop`: Iniciar el hilo del bucle de optimizacion
-  - `_optimization_loop`: Bucle principal de optimizacion periodica
-  - `_analyze_system_performance`: Analizar el rendimiento actual del sistema y actualizar metricas
-  - `_calculate_efficiency_score`: Calcular la puntuacion de eficiencia del sistema
-  - `_analyze_performance_trends`: Analizar las tendencias de rendimiento historicas
-  - `_identify_optimization_opportunities`: Identificar oportunidades de optimizacion por umbral
-  - `_predict_optimization_opportunities`: Predecir oportunidades de optimizacion con modelos ML
-  - `_prepare_features_for_prediction`: Preparar el vector de caracteristicas para la prediccion
-  - `_create_cpu_optimization_action`: Crear accion de optimizacion de CPU
-  - `_create_memory_optimization_action`: Crear accion de optimizacion de memoria
-  - `_create_disk_optimization_action`: Crear accion de optimizacion de disco
-  - `_create_response_time_optimization_action`: Crear accion de optimizacion del tiempo de respuesta
-  - `_create_error_rate_optimization_action`: Crear accion de optimizacion de la tasa de errores
-  - `_create_ml_optimization_action`: Crear accion de optimizacion a partir de una prediccion ML
-  - `_execute_optimization_actions`: Ejecutar las acciones de optimizacion pendientes
-  - `_execute_single_action`: Ejecutar una accion de optimizacion individual
-  - `_execute_optimization_command`: Ejecutar el comando de shell de una accion
-  - `_calculate_improvement`: Calcular la mejora entre metricas previas y posteriores
-  - `_calculate_actual_improvement`: Calcular la mejora real obtenida por una accion
-  - `_update_ml_models`: Actualizar los modelos ML con la mejora obtenida
-  - `get_optimization_status`: Obtener el estado actual del optimizador
-  - `get_optimization_history`: Obtener el historial de optimizaciones (con limite)
-  - `get_current_actions`: Obtener las acciones de optimizacion en curso
-  - `add_custom_optimization_action`: Anadir una accion de optimizacion personalizada
-  - `stop_optimization`: Detener la optimizacion
-  - `start_optimization`: Iniciar la optimizacion
-  - `optimize_system`: Lanzar una optimizacion manual por estrategia y nivel
-  - `get_optimization_recommendations`: Obtener recomendaciones de optimizacion segun las metricas actuales
-  - `export_optimization_report`: Exportar reporte de optimizacion en JSON
-  - `__del__`: Destructor que detiene el bucle y une el hilo
-- **Caracteristicas implementadas**:
-  - Deteccion de oportunidades por umbrales configurables (CPU 80%, memoria 85%, disco 90%, respuesta 1000ms, errores 5%)
-  - Modelos de machine learning con escaladores y features, entrenados en base a las mejoras reales de cada accion
-  - Acciones con comando de ejecucion y comando de rollback, prioridad, recursos estimados y estado de resultado
-  - Cola `queue.Queue` de acciones y bucle periodico en hilo daemon con intervalo configurable
-  - Registro de historial de optimizaciones y exportacion de reporte con metricas, historial y recomendaciones
-  - Configuracion por defecto: activacion, auto-optimizacion, intervalo, concurrencia maxima, prioridades por estrategia, ruta de modelos ML e historial
-
-#### `src/utils/recovery_strategies.py` [514 lineas] - Estrategias de Recuperacion
-- **Descripcion**: Sistema de estrategias de recuperacion para los distintos tipos de fallos de JARVIS. Define acciones de recuperacion parametrizables (base de datos, sistema de ficheros, procesos, memoria y red), un gestor central con registro de acciones, ejecucion en hilos, persistencia SQLite del historial y estadisticas, y funciones factoria para crear acciones comunes.
-- **Clases principales**:
-  - `RecoveryType` (Enum): Tipos de recuperacion (AUTOMATIC, SEMI_AUTOMATIC, MANUAL)
-  - `RecoveryStatus` (Enum): Estados de la recuperacion (PENDING, IN_PROGRESS, COMPLETED, FAILED, CANCELLED)
-  - `RecoveryAction`: Clase base de accion de recuperacion con gestion de estado, tiempos, resultado y error
-  - `DatabaseRecoveryAction` (RecoveryAction): Restaura la base de datos desde backup o repara la base de datos corrompida
-  - `FilesystemRecoveryAction` (RecoveryAction): Restaura un fichero desde backup o lo recrea vacio
-  - `ProcessRecoveryAction` (RecoveryAction): Reinicia un proceso ejecutando un comando
-  - `MemoryRecoveryAction` (RecoveryAction): Termina un proceso por PID o limpia la cache de memoria del sistema
-  - `NetworkRecoveryAction` (RecoveryAction): Reinicia una interfaz de red o vacia la cache DNS
-  - `RecoveryManager`: Gestor central de recuperaciones con persistencia SQLite, hilos y estadisticas
-- **Metodos principales de RecoveryAction**:
-  - `__init__`: Inicializa nombre, descripcion, tipo de recuperacion, estado PENDING y marcas de tiempo
-  - `execute`: Ejecuta la accion, actualiza estado/resultado y captura excepciones
-  - `_do_execute`: Metodo a sobrescribir en las subclases
-  - `cancel`: Cancela la accion si esta en progreso
-  - `get_duration`: Devuelve la duracion de ejecucion en segundos
-- **Metodos principales de DatabaseRecoveryAction**:
-  - `__init__`: Inicializa con ruta de base de datos y backup por defecto `{db_path}.backup`
-  - `_do_execute`: Restaura desde backup si existe; si no, repara la base de datos
-  - `_repair_database`: Respalda la base de datos corrupta con timestamp y ejecuta `VACUUM`
-- **Metodos principales de FilesystemRecoveryAction**:
-  - `__init__`: Inicializa con ruta de fichero y backup opcional
-  - `_do_execute`: Restaura desde backup con `shutil.copy2` o crea el fichero vacio con `Path.touch()`
-- **Metodos principales de ProcessRecoveryAction**:
-  - `__init__`: Inicializa nombre de proceso y comando de reinicio (recuperacion SEMI_AUTOMATIC)
-  - `_do_execute`: Ejecuta el comando con shell, check y timeout de 30s; traduce errores a excepciones
-- **Metodos principales de MemoryRecoveryAction**:
-  - `__init__`: Inicializa con PID opcional
-  - `_do_execute`: Con PID termina el proceso (`kill -9`); sin PID limpia cache (`sync` + `drop_caches`)
-- **Metodos principales de NetworkRecoveryAction**:
-  - `__init__`: Inicializa con interfaz opcional (recuperacion SEMI_AUTOMATIC)
-  - `_do_execute`: Reinicia la interfaz (ifdown/ifup) o prueba sucesivamente comandos de flush DNS (systemctl flush-dns, dnsmasq, rndc)
-- **Metodos principales de RecoveryManager**:
-  - `__init__`: Inicializa ruta de BD, logger, registro de acciones, historial, recuperaciones activas, lock e inicializa la base de datos
-  - `_init_database`: Crea las tablas `recovery_actions` y `recovery_history` en SQLite
-  - `register_recovery_action`: Registra una accion de recuperacion bajo lock
-  - `execute_recovery`: Registra el intento en BD, ejecuta la accion en un hilo daemon y registra el historial
-  - `_log_recovery_history`: Inserta un registro en `recovery_history` con datos adicionales en JSON
-  - `get_recovery_history`: Devuelve el historial de los ultimos N dias en orden descendente
-  - `get_recovery_statistics`: Calcula intentos totales, exitosos, tasa de exito y tiempo medio de ejecucion
-  - `get_active_recoveries`: Lista las recuperaciones en curso con estado y duracion
-  - `cancel_recovery`: Cancela y elimina una recuperacion activa
-  - `get_available_actions`: Lista las acciones registradas con nombre, descripcion, tipo y estado
-  - `cleanup_old_history`: Elimina registros de historial mas antiguos de N dias y devuelve el numero borrado
-  - `setup_default_actions`: Registra las acciones por defecto de base de datos, sistema de ficheros, memoria y red
-- **Funciones factoria**:
-  - `create_database_recovery_action`: Crear `DatabaseRecoveryAction`
-  - `create_filesystem_recovery_action`: Crear `FilesystemRecoveryAction`
-  - `create_process_recovery_action`: Crear `ProcessRecoveryAction`
-  - `create_memory_recovery_action`: Crear `MemoryRecoveryAction`
-  - `create_network_recovery_action`: Crear `NetworkRecoveryAction`
-  - `get_recovery_manager`: Obtener la instancia singleton de `RecoveryManager`
-- **Caracteristicas implementadas**:
-  - Patron de accion base con subclases especializadas para BD, ficheros, procesos, memoria y red
-  - Persistencia del estado de cada accion e historial de recuperaciones en SQLite
-  - Ejecucion asincrona en hilos daemon con control de recuperaciones activas y cancelacion
-  - Estadisticas de tasa de exito y tiempo medio de ejecucion por periodo
-  - Limpieza programada del historial antiguo
-
-#### `src/utils/screen_manager.py` [1958 lineas] - Gestor de Pantallas
-- **Descripcion**: Gestor unificado de pantallas y configuracion del sistema Jarvis con deteccion nativa de Windows, gestion multi-monitor, Chrome integration y capturas de pantalla avanzadas.
-- **Clases principales**:
-  - `ScreenSetupType` (Enum): Tipos de configuracion de pantalla (SINGLE, DUAL_HORIZONTAL, DUAL_VERTICAL, ULTRAWIDE, UNKNOWN)
-  - `MonitorInfo` (dataclass): Informacion fisica/logica de un monitor en el escritorio virtual
-  - `ScreenManager`: Gestor centralizado de topologia, ventanas y capturas
-- **Metodos principales**:
-  - `__init__`: Inicializa gestor con deteccion de monitores Windows y configuracion
-  - `_make_dpi_aware`: Configura DPI awareness para Windows
-  - `_get_monitor_dpi`: Obtiene DPI de un monitor especifico
-  - `_load_monitors_from_windows`: Detecta monitores usando API Win32 nativa
-  - `_load_monitors_from_config`: Carga monitores desde config.json como fallback
-  - `refresh_monitors`: Actualiza topologia de monitores
-  - `_calculate_virtual_bounds`: Calcula limites virtuales del escritorio
-  - `_analyze_setup`: Analiza configuracion de pantalla (single, dual, ultrawide)
-  - `get_monitor`: Obtiene monitor por numero o indice
-  - `get_primary_monitor`: Obtiene monitor principal
-  - `get_monitor_by_point`: Obtiene monitor que contiene un punto especifico
-  - `_get_window_geometry`: Obtiene geometria real de ventana Win32
-  - `get_monitor_for_window`: Obtiene monitor fisico de una ventana
-  - `_get_window_handle`: Obtiene handle de ventana de varios formatos
-  - `get_foreground_window`: Obtiene ventana foreground activa
-  - `get_foreground_monitor`: Obtiene monitor de la ventana foreground
-  - `get_active_monitor`: Obtiene monitor activo (alias de get_foreground_monitor)
-  - `get_alternate_monitor`: Obtiene monitor alternativo al actual
-  - `_get_window_class`: Obtiene clase de ventana Win32
-  - `_get_window_process_id`: Obtiene ID de proceso de ventana
-  - `_get_window_process_name`: Obtiene nombre de proceso de ventana
-  - `_is_chrome_window`: Identifica ventana de Chrome por proceso real
-  - `_window_has_valid_size`: Verifica si ventana tiene tamano valido
-  - `_window_is_visible`: Comprueba visibilidad real mediante Win32
-  - `_window_is_minimized`: Comprueba si ventana esta minimizada segun Windows
-  - `_restore_and_maximize_window`: Restaura y maximiza temporalmente una ventana
-  - `get_chrome_windows`: Enumera ventanas reales de Chrome evitando depender del orden
-  - `get_chrome_window_on_monitor`: Obtiene ventana de Chrome en monitor especifico
-  - `get_chrome_monitor`: Detecta el monitor real de Chrome con manejo de ventanas minimizadas
-  - `_get_window_area`: Devuelve el area aproximada de una ventana en pixeles
-  - `get_calibration_monitor`: Obtiene monitor optimo para calibracion
-  - `is_window_minimized`: Indica si una ventana esta minimizada segun Win32
-  - `prepare_window_for_calibration`: Restaura/maximiza cualquier ventana y devuelve su monitor real
-  - `move_window_to_monitor`: Mueve ventana a monitor especifico
-  - `_find_chrome_executable`: Busca ejecutable de Chrome en rutas estandar
-  - `_snapshot_chrome_handles`: Captura handles actuales de ventanas de Chrome
-  - `_find_new_chrome_window`: Encuentra nueva ventana de Chrome despues de apertura
-  - `_activate_window`: Activa ventana especifica
-  - `_launch_chrome_for_calibration`: Inicia Chrome para calibracion en monitor especifico
-  - `open_chrome_calibration_tab`: Abre pestana de calibracion en Chrome existente o nueva
-  - `open_chrome_on_monitor`: Abre Chrome en monitor especifico
-  - `capture_monitor`: Captura exactamente el rectangulo fisico del monitor
-  - `close_chrome`: Cierra Chrome como accion explicita del usuario
-  - `move_window_to_screen`: Mueve ventana a pantalla (compatibilidad)
-- **Funciones globales**:
-  - `get_screen_manager`: Obtiene instancia singleton del gestor de pantallas
-  - `get_monitor_info`: Obtiene informacion del monitor especificado
-  - `get_monitor_setup`: Obtiene configuracion actual de monitores
-
-#### `src/utils/self_improvement_system.py` [1101 lineas] - Sistema de Automejora
-- **Descripcion**: Sistema de automejora con aprendizaje continuo y optimizacion adaptativa. Integra PerformanceOptimizer, PatternAnalyzer, LogAnalytics y LogPredictor, ejecuta un bucle de aprendizaje en hilo, recoge datos del sistema, extrae caracteristicas, entrena modelos de machine learning, identifica oportunidades de mejora, ejecuta reglas de mejora, actualiza un grafo de conocimiento y exporta reportes de aprendizaje.
-- **Clases principales**:
-  - `LearningMode` (Enum): Modos de aprendizaje (PASSIVE_LEARNING, ACTIVE_LEARNING, REINFORCEMENT_LEARNING, TRANSFER_LEARNING, FEDERATED_LEARNING)
-  - `ImprovementType` (Enum): Tipos de mejora (PERFORMANCE_IMPROVEMENT, ERROR_REDUCTION, EFFICIENCY_GAIN, RESOURCE_OPTIMIZATION, USER_EXPERIENCE, FEATURE_ENHANCEMENT, ALGORITHM_OPTIMIZATION, ARCHITECTURE_IMPROVEMENT)
-  - `LearningSession` (dataclass): Sesion de aprendizaje (session_id, modo, inicio/fin, duracion, puntos de datos, mejoras realizadas, tasa de exito, confianza, tasas de aprendizaje y exploracion, metricas)
-  - `ImprovementRule` (dataclass): Regla de mejora (rule_id, nombre, descripcion, condicion, accion, prioridad, habilitacion, tasa de exito, ejecuciones, ultima ejecucion y puntuacion de mejora)
-  - `KnowledgeGraph` (dataclass): Nodo del grafo de conocimiento (node_id, tipo, propiedades, conexiones, confianza y ultima actualizacion)
-  - `SelfImprovementSystem`: Sistema principal con colas de aprendizaje/mejora, modelos de aprendizaje e hilo de ejecucion
-- **Metodos principales de LearningMode**:
-  - PASSIVE_LEARNING, ACTIVE_LEARNING, REINFORCEMENT_LEARNING, TRANSFER_LEARNING, FEDERATED_LEARNING
-- **Metodos principales de ImprovementType**:
-  - PERFORMANCE_IMPROVEMENT, ERROR_REDUCTION, EFFICIENCY_GAIN, RESOURCE_OPTIMIZATION, USER_EXPERIENCE, FEATURE_ENHANCEMENT, ALGORITHM_OPTIMIZATION, ARCHITECTURE_IMPROVEMENT
-- **Metodos principales de SelfImprovementSystem**:
-  - `__init__`: Inicializa logger y sistemasunderlying (optimizador, analizador de patrones, analitica de logs, predictor), carga configuracion, inicializa modelos y reglas y arranca el bucle de aprendizaje
-  - `_load_config`: Cargar configuracion del sistema de automejora
-  - `_initialize_learning_models`: Inicializar los modelos de machine learning y escaladores
-  - `_load_trained_learning_models`: Cargar modelos entrenados desde disco
-  - `_save_trained_learning_models`: Guardar modelos entrenados en disco
-  - `_initialize_improvement_rules`: Inicializar el conjunto de reglas de mejora por defecto
-  - `_load_custom_rules`: Cargar reglas personalizadas desde archivo
-  - `_save_custom_rules`: Guardar las reglas personalizadas en archivo
-  - `_start_learning_loop`: Iniciar el hilo del bucle de aprendizaje
-  - `_learning_loop`: Bucle principal de aprendizaje periodico
-  - `_perform_passive_learning`: Ejecutar una iteracion de aprendizaje pasivo
-  - `_collect_system_data`: Recopilar los datos actuales del sistema
-  - `_calculate_system_load`: Calcular la carga actual del sistema
-  - `_extract_learning_features`: Extraer el vector de caracteristicas para el aprendizaje
-  - `_update_learning_models`: Actualizar los modelos ML con los datos nuevos
-  - `_determine_learning_labels`: Determinar las etiquetas de aprendizaje a partir de los datos
-  - `_identify_improvement_opportunities`: Identificar oportunidades de mejora
-  - `_execute_improvement_rules`: Ejecutar las reglas de mejora pendientes
-  - `_evaluate_rule_condition`: Evaluar la condicion de una regla de mejora
-  - `_execute_rule_action`: Ejecutar la accion de una regla de mejora
-  - `_analyze_learning_patterns`: Analizar los patrones de aprendizaje detectados
-  - `_update_knowledge_graph`: Actualizar el grafo de conocimiento con los patrones
-  - `_calculate_node_confidence`: Calcular la confianza de un nodo del grafo
-  - `_save_knowledge_graph`: Guardar el grafo de conocimiento
-  - `_start_learning_session`: Iniciar una sesion de aprendizaje en un modo dado
-  - `_end_learning_session`: Finalizar una sesion de aprendizaje
-  - `get_learning_status`: Obtener el estado actual del aprendizaje
-
-## 🚀 Modulo `main.py` - Punto de Entrada Principal
-
-- **Descripcion**: Punto de entrada principal del sistema JARVIS con inicializacion completa de componentes, sistema de logging avanzado, manejo de voz, y bucle principal de procesamiento de comandos.
-- **Funciones principales**:
-  - `main`: Funcion principal que inicializa componentes y ejecuta el bucle principal del sistema.
-  - `_normalize_voice_text`: Normaliza texto para reconocimiento de voz, eliminando caracteres especiales.
-  - `_resolve_voice_id`: Resuelve ID de voz a partir de solicitud del usuario buscando coincidencias.
-  - `_try_change_voice`: Intenta cambiar la voz del sistema segun la solicitud del usuario con patrones de activacion.
-- **Caracteristicas implementadas**:
-  - Inicializacion de Ear, Brain, Executor, Memory y Mouth (opcional)
-  - Sistema de logging avanzado con JarvisLogger
-  - Configuracion de DPI para Windows
-  - Manejo de calibracion de coordenadas
-  - Sistema de aliases para comandos directos
-  - Sistema de prediccion de comandos con confirmacion
-  - Integracion completa entre componentes
-  - Manejo de errores y logging detallado
-  - Soporte multilingue y normalizacion de voz
-  - Bucle principal continuo de escucha y procesamiento
-  - Guardado de conversaciones y aprendizaje de aliases
-
-## Caracteristicas Principales
-
-- 🧠 **Inteligencia Artificial**: Procesamiento de lenguaje natural con modelos LLM
-- 🎯 **Planificacion Jerarquica**: Sistema HTN para descomposicion de objetivos
-- 👁 **Vision por Computadora**: Analisis de imagenes y deteccion de elementos
-- 👂 **Reconocimiento de Voz**: Captura de comandos de voz
-- 🤖 **Automatizacion**: Control de aplicaciones, teclado y raton
-- 🧠 **Memoria Conversacional**: Almacenamiento y recuperacion de interacciones
-- 📊 **Sistema de Monitoreo**: Metricas, salud y alertas en tiempo real
-- 📈 **Optimizacion Continua**: Mejora automatica basada en ejecuciones pasadas
+# 📖 README — JARVIS (documentación exhaustiva del código fuente)
+
+> **Alcance:** documentación generada a partir del **código fuente real** (`src/`, 94 archivos, ~87 000 líneas).
+> Cada entrada se deriva de firmas y docstrings extraídos mediante AST; las descripciones largas provienen de los propios docstrings del proyecto cuando existen.
+
+## 🗺️ Índice
+
+- [Arquitectura por capas y flujo de ejecución](#arquitectura-por-capas-y-flujo-de-ejecución)
+- [Modelo de fases (FASE)](#modelo-de-fases-fase)
+- [Cómo ejecutar](#cómo-ejecutar)
+- [Documentación por módulo](#documentación-por-módulo)
+<!-- sección por directorio -->
+- [`src/__init__.py` (1 líneas)](#src-_init_-py)
+- [`src/brain/__init__.py` (10 líneas)](#src-brain-_init_-py)
+- [`src/brain/htn_integration.py` (487 líneas)](#src-brain-htn_integration-py)
+- [`src/brain/llm.py` (1039 líneas)](#src-brain-llm-py)
+- [`src/ear/__init__.py` (4 líneas)](#src-ear-_init_-py)
+- [`src/ear/listener.py` (587 líneas)](#src-ear-listener-py)
+- [`src/eyes/__init__.py` (5 líneas)](#src-eyes-_init_-py)
+- [`src/eyes/screen.py` (997 líneas)](#src-eyes-screen-py)
+- [`src/eyes/screen_capture.py` (368 líneas)](#src-eyes-screen_capture-py)
+- [`src/eyes/vision.py` (924 líneas)](#src-eyes-vision-py)
+- [`src/eyes/vision_only.py` (417 líneas)](#src-eyes-vision_only-py)
+- [`src/hands/__init__.py` (30 líneas)](#src-hands-_init_-py)
+- [`src/hands/action_registry.py` (1272 líneas)](#src-hands-action_registry-py)
+- [`src/hands/application_preflight.py` (894 líneas)](#src-hands-application_preflight-py)
+- [`src/hands/applications_core.py` (1357 líneas)](#src-hands-applications_core-py)
+- [`src/hands/calibration_manager.py` (2343 líneas)](#src-hands-calibration_manager-py)
+- [`src/hands/calibrator.py` (1059 líneas)](#src-hands-calibrator-py)
+- [`src/hands/chrome/__init__.py` (75 líneas)](#src-hands-chrome-_init_-py)
+- [`src/hands/chrome/chrome.py` (500 líneas)](#src-hands-chrome-chrome-py)
+- [`src/hands/chrome/chrome_calibrator.py` (56 líneas)](#src-hands-chrome-chrome_calibrator-py)
+- [`src/hands/coordinate_manager.py` (1113 líneas)](#src-hands-coordinate_manager-py)
+- [`src/hands/edge/__init__.py` (3 líneas)](#src-hands-edge-_init_-py)
+- [`src/hands/edge/calibrator_edge.py` (237 líneas)](#src-hands-edge-calibrator_edge-py)
+- [`src/hands/edge/edge.py` (568 líneas)](#src-hands-edge-edge-py)
+- [`src/hands/executor.py` (1861 líneas)](#src-hands-executor-py)
+- [`src/hands/firefox/__init__.py` (3 líneas)](#src-hands-firefox-_init_-py)
+- [`src/hands/firefox/calibrator_firefox.py` (235 líneas)](#src-hands-firefox-calibrator_firefox-py)
+- [`src/hands/firefox/firefox.py` (638 líneas)](#src-hands-firefox-firefox-py)
+- [`src/hands/keyboard.py` (901 líneas)](#src-hands-keyboard-py)
+- [`src/hands/mouse.py` (129 líneas)](#src-hands-mouse-py)
+- [`src/hands/planner/__init__.py` (235 líneas)](#src-hands-planner-_init_-py)
+- [`src/hands/planner/application_integration.py` (864 líneas)](#src-hands-planner-application_integration-py)
+- [`src/hands/planner/goal_state_mapper.py` (1485 líneas)](#src-hands-planner-goal_state_mapper-py)
+- [`src/hands/planner/graph.py` (1871 líneas)](#src-hands-planner-graph-py)
+- [`src/hands/planner/heuristic.py` (893 líneas)](#src-hands-planner-heuristic-py)
+- [`src/hands/planner/htn_manager.py` (1100 líneas)](#src-hands-planner-htn_manager-py)
+- [`src/hands/planner/learning_system.py` (899 líneas)](#src-hands-planner-learning_system-py)
+- [`src/hands/planner/node.py` (1137 líneas)](#src-hands-planner-node-py)
+- [`src/hands/planner/optimization.py` (951 líneas)](#src-hands-planner-optimization-py)
+- [`src/hands/planner/optimization_config.py` (475 líneas)](#src-hands-planner-optimization_config-py)
+- [`src/hands/planner/planner.py` (3129 líneas)](#src-hands-planner-planner-py)
+- [`src/hands/planner/planner_integration.py` (1923 líneas)](#src-hands-planner-planner_integration-py)
+- [`src/hands/planner/preconditions_effects.py` (1076 líneas)](#src-hands-planner-preconditions_effects-py)
+- [`src/hands/planner/preconditions_effects_types.py` (821 líneas)](#src-hands-planner-preconditions_effects_types-py)
+- [`src/hands/planner/task_executor.py` (1097 líneas)](#src-hands-planner-task_executor-py)
+- [`src/hands/universal_visual_calibrator.py` (922 líneas)](#src-hands-universal_visual_calibrator-py)
+- [`src/hands/windows/__init__.py` (3 líneas)](#src-hands-windows-_init_-py)
+- [`src/hands/windows/calibrator_windows.py` (263 líneas)](#src-hands-windows-calibrator_windows-py)
+- [`src/hands/windows/windows.py` (694 líneas)](#src-hands-windows-windows-py)
+- [`src/memory/__init__.py` (78 líneas)](#src-memory-_init_-py)
+- [`src/memory/conversation.py` (1129 líneas)](#src-memory-conversation-py)
+- [`src/memory/entity_resolver.py` (825 líneas)](#src-memory-entity_resolver-py)
+- [`src/memory/prediction.py` (1081 líneas)](#src-memory-prediction-py)
+- [`src/memory/storage.py` (1984 líneas)](#src-memory-storage-py)
+- [`src/mouth/__init__.py` (4 líneas)](#src-mouth-_init_-py)
+- [`src/mouth/speaker.py` (680 líneas)](#src-mouth-speaker-py)
+- [`src/tools/__init__.py` (30 líneas)](#src-tools-_init_-py)
+- [`src/tools/executor.py` (559 líneas)](#src-tools-executor-py)
+- [`src/tools/os_info.py` (533 líneas)](#src-tools-os_info-py)
+- [`src/tools/registry.py` (1072 líneas)](#src-tools-registry-py)
+- [`src/utils/__init__.py` (333 líneas)](#src-utils-_init_-py)
+- [`src/utils/adaptive_learning_engine.py` (1269 líneas)](#src-utils-adaptive_learning_engine-py)
+- [`src/utils/advanced_logger.py` (1577 líneas)](#src-utils-advanced_logger-py)
+- [`src/utils/alert_system.py` (620 líneas)](#src-utils-alert_system-py)
+- [`src/utils/app_utils.py` (1030 líneas)](#src-utils-app_utils-py)
+- [`src/utils/architectural_evolution_manager.py` (10766 líneas)](#src-utils-architectural_evolution_manager-py)
+- [`src/utils/circuit_breaker.py` (197 líneas)](#src-utils-circuit_breaker-py)
+- [`src/utils/config.py` (1348 líneas)](#src-utils-config-py)
+- [`src/utils/contextual_adaptation_audit.py` (444 líneas)](#src-utils-contextual_adaptation_audit-py)
+- [`src/utils/contextual_adaptation_engine.py` (4958 líneas)](#src-utils-contextual_adaptation_engine-py)
+- [`src/utils/contextual_pattern_recognizer.py` (509 líneas)](#src-utils-contextual_pattern_recognizer-py)
+- [`src/utils/dynamic_resource_allocator.py` (1336 líneas)](#src-utils-dynamic_resource_allocator-py)
+- [`src/utils/error_dashboard.py` (592 líneas)](#src-utils-error_dashboard-py)
+- [`src/utils/error_recovery.py` (522 líneas)](#src-utils-error_recovery-py)
+- [`src/utils/get_coords.py` (456 líneas)](#src-utils-get_coords-py)
+- [`src/utils/health_checker.py` (498 líneas)](#src-utils-health_checker-py)
+- [`src/utils/health_monitor.py` (418 líneas)](#src-utils-health_monitor-py)
+- [`src/utils/jarvis_logging_system.py` (487 líneas)](#src-utils-jarvis_logging_system-py)
+- [`src/utils/log_analytics.py` (966 líneas)](#src-utils-log_analytics-py)
+- [`src/utils/log_dashboard.py` (887 líneas)](#src-utils-log_dashboard-py)
+- [`src/utils/log_integration.py` (810 líneas)](#src-utils-log_integration-py)
+- [`src/utils/log_predictor.py` (749 líneas)](#src-utils-log_predictor-py)
+- [`src/utils/logger.py` (180 líneas)](#src-utils-logger-py)
+- [`src/utils/meta_learning_system.py` (2401 líneas)](#src-utils-meta_learning_system-py)
+- [`src/utils/metrics_collector.py` (592 líneas)](#src-utils-metrics_collector-py)
+- [`src/utils/monitoring_dashboard.py` (417 líneas)](#src-utils-monitoring_dashboard-py)
+- [`src/utils/optimization_orchestrator.py` (892 líneas)](#src-utils-optimization_orchestrator-py)
+- [`src/utils/pattern_analyzer.py` (650 líneas)](#src-utils-pattern_analyzer-py)
+- [`src/utils/performance_monitor.py` (856 líneas)](#src-utils-performance_monitor-py)
+- [`src/utils/performance_optimizer.py` (1099 líneas)](#src-utils-performance_optimizer-py)
+- [`src/utils/recovery_strategies.py` (514 líneas)](#src-utils-recovery_strategies-py)
+- [`src/utils/screen_manager.py` (1958 líneas)](#src-utils-screen_manager-py)
+- [`src/utils/self_improvement_system.py` (1261 líneas)](#src-utils-self_improvement_system-py)
+- [`src/utils/ui_element_model.py` (181 líneas)](#src-utils-ui_element_model-py)
+
+## 🏗️ Arquitectura por capas y flujo de ejecución
+
+JARVIS se organiza en capas de bajo a alto nivel: `utils` → `brain` → `memory` → `hands` (planner+executor+actuación) y los sentidos `eyes`/`ear`/`mouth`.
+
+```
+microphone ──► ear/listener.py  (VAD + Whisper) ──► texto
+screen   ──► eyes/{screen,vision}.py (mss + OpenCV/Qwen-VL) ──► estado visual
+                                                          │
+                         brain/llm.py  ──► intención + entidad
+                        memory/{prediction,entity_resolver}.py
+                                                          │  Goal
+                         hands/planner/planner.py  (HTN/A*) ──► Plan (Node[])
+                                                          │  plan
+                         hands/executor.py  (precond → acción → verify → effects → replan)
+                                                          │  acciones
+     hands/{mouse,keyboard,applications_core,chrome/*,edge/*,firefox/*,windows/*,calibration_manager}
+                                                          │
+     eyes/screen.py ──► feedback visual ──► mouth/speaker.py
+```
+
+Puntos de integración clave:
+- `action_registry.ActionRegistry` es el **contrato** entre planificador y actuador; `register_action` (decorador o función) registra cada capacidad como `ActionInfo` con `preconditions`/`effects`/`cost`/`success_checker`.
+- El planificador (`hands/planner/*`) y el ejecutor (`hands/executor.py`) comparten el **mismo modelo** de precondiciones/efectos (`preconditions_effects.py` / `preconditions_effects_types.py` / `action_registry._match_condition`/`_apply_effect_value`), garantizando coherencia entre planificación y ejecución.
+- `Executor` construye `Planner(self)` mediante **importación diferida** para romper el ciclo Executor↔Planner.
+- La memoria (`memory/storage.py` `MemoryManager`) persiste todo bajo JSON indexado por `MemoryType`; `ConversationMemory` la unifica con el histórico de chat y el dominio.
+
+## 📊 Modelo de fases (FASE)
+
+| FASE | Concern | Dónde |
+|---|---|---|
+| 1–4 | Primitivas legacy directas | `memory/conversation.py`, `hands/mouse.py`, `tools/*` |
+| 5 | Domain Memory (entidades/apps/capacidades/objetivos) | `memory/conversation.py` `DomainMemory`, `knowledge/*.json` |
+| 6 | Redes de tareas HTN | `brain/htn_integration.py`, `hands/planner/htn_manager.py` |
+| 7–9 | Compilación plan → ejecución con estado | `hands/planner/*`, `hands/executor.py` |
+| 10 | Calibración de percepción | `calibration_manager`, `calibrator*` |
+| 13 | Gestor unificado de coordenadas | `hands/coordinate_manager.py` |
+| 15 | Comandos de alto nivel | `memory/prediction.py` |
+| 16 | Compatibilidad (aliases, formatos legacy) | `command_aliases.json`, `jarvis_learned_aliases.json`, ramas compat |
+| 17 | Optimización | `hands/planner/optimization.py`, `optimization_orchestrator.py` |
+| 18 | Aprendizaje / meta-aprendizaje | `hands/planner/learning_system.py`, `meta_learning_system.py`, `prediction.py` |
+
+## ▶️ Cómo ejecutar
+
+```bash
+pip install -r requirements.txt   # pyautogui, mss, opencv-python, pygetwindow,
+                                  # torch/transformers ó ollama, openai, etc.
+python main.py                  # punto de entrada real (ver sección de bucle principal)
+```
+Windows‑only: ratón/teclado (`pyautogui`), gestión de ventanas (`pygetwindow`) y utilidades del registro requieren Windows. Visión (`OpenCV`+`mss`) y razonamiento (`LLM`) son multi‑plataforma.
+
+## 🚪 Punto de entrada y bucle principal (`main.py`)
+
+`main.py` (raíz del repositorio, **353 líneas**) es el punto de arranque real de JARVIS. Lo invocas con **`python main.py`** y orquesta los componentes de alto nivel mediante un **bucle de escucha → ejecución → habla**.
+
+**Wiring de componentes (importaciones):**
+- `src.ear.Ear` — entrada de voz (ASR Whisper).
+- `src.brain.Brain` — LLM de razonamiento (Ollama; modelo `llama3`).
+- `src.memory.Memory` — memoria conversacional *legacy* (aliases, histórico, estadísticas de uso).
+- `src.tools.executor.UnifiedExecutor` (vía `get_executor()`) — **fachada de ejecución** que despacha comandos `[CMD: nombre(args)]`.
+- `src.mouth.Mouth` — TTS (opcional; si no está disponible pasa al **modo texto**).
+- `src.utils.jarvis_logging_system` (`JarvisLoggingSystem`) — logging estructurado.
+- DPI awareness vía `ctypes` (`SetProcessDpiAwareness` / `SetProcessDPIAware`).
+
+**Arquitectura *legacy* vs. *nueva* (importante):** `main.py` utiliza la **API legacy** (`Brain`/`Memory`/`UnifiedExecutor`) basada en comandos `[CMD: …]` y aliases. Paralelamente existe la **arquitectura nueva** documentada en `src/hands/` (`ActionRegistry`/`ActionInfo`, `hands/executor.Executor` con planificación A*, y `hands/planner/*`). Ambas conviven: `UnifiedExecutor.execute_action` y `Executor.execute_plan` validan precondiciones/efectos contra los mismos modelos (`action_registry` / `preconditions_effects`). `Brain.interpret_intent` puede delegar a `HTNBrainIntegration` (FASE 4/6) cuando está disponible, y `UnifiedExecutor` expone `execute_plan_step` como punto de entrada explícito hacia un planificador futuro.
+
+**Bucle principal (`main()`):**
+1. Inicializa `Ear(model_size="medium")`, `Brain(model="llama3")`, `get_executor()`, `Memory()` y, opcionalmente, `Mouth()`; selecciona la voz por defecto desde `get_voice_config()` y verifica calibración (`macros_coords.json`).
+2. Bucle infinito:
+   a. `jarvis_ear.listen()` → texto con wake-word `jarvis`.
+   b. Si el texto dispara un cambio de voz (`cambia la voz`, `usa la voz…`, etc.) → cambia voz en `Mouth` y guarda la conversación; continúa.
+   c. `jarvis_memory.get_alias(texto)` → si hay alias → ejecuta `[CMD: alias]` vía `UnifiedExecutor.process_and_execute` y registra uso (`record_command_usage`).
+   d. Si no, `UnifiedExecutor.get_command_suggestions(text, history)` → si `score ≥ 0.8`: propone vía voz, escucha confirmación (`sí`/`si`/`claro`/`ok`/`vale`/`dale`/`hazlo`) → ejecuta o rechaza (registrando el rechazo).
+   e. Si no se acepta predicción: `Brain.think(texto, use_legacy_execution=False)` → si la respuesta contiene `[CMD: x]` → `process_and_execute`; si no, es respuesta conversacional → se habla tal cual.
+   f. Registra aliases aprendidos (`save_alias`) y estadísticas de uso.
+   g. Habla la respuesta con `Mouth.speak()`, registra `JARVIS: …` y persiste la conversación (`save_conversation`).
+3. En `KeyboardInterrupt` apaga los subsistemas guardando logs (`jarvis_logger.stop()`).
+
+**Ejecutores (no confundir):**
+- `tools/executor.UnifiedExecutor` / `get_executor()` — fachata *legacy* de despacho de comandos `[CMD:…]`; usado por `main.py`.
+- `src/hands/executor.Executor` — motor de planificación HTN/A*: recibe un `Plan` (lista de `Node`) y ejecuta con precondiciones, verificación, efectos, alternativas y replanificación (FASE 7–9 + FASE 18).
+## 📚 Documentación por módulo
+
+## 📁 `src/`
+
+<!-- src -->
+
+<a name="src-__init__-py"></a>
+### `src/__init__.py` [1 líneas] — Inicialización del Directorio Principal
+
+**Descripción:** Archivo marcador de posición que establece el paquete `src` raíz e importa los subpaquetes `brain`, `memory`, `hands`, `eyes`, `ear`, `mouth`, `tools` y `utils`.
+
+**Características:**
+
+- Punto de entrada principal del sistema
+- Organización jerárquica de módulos
+- Base para importaciones de alto nivel
+- Estructura modular escalable
+
+**Importaciones:** 0.
+
+_Archivo de marcador de posición / inicialización de paquete._
+
+## 🧠 `src/brain/`
+
+<!-- src/brain -->
+
+<a name="src-brain-__init__-py"></a>
+### `src/brain/__init__.py` [10 líneas] — Inicialización del módulo Cerebro
+
+**Descripción:** Inicializa el paquete `brain` y expone `Brain`, `HTNBrainIntegration`, `get_htn_integration`.
+
+**Importaciones:** 2.
+
+_Archivo de marcador de posición / inicialización de paquete._
+
+<a name="src-brain-htn_integration-py"></a>
+### `src/brain/htn_integration.py` [487 líneas] — Integración HTN con Brain
+
+**Descripción:** Integra la descomposición jerárquica de objetivos (HTN) con `HTNManager` y `TaskExecutor`, manteniendo compatibilidad con el `Brain` legacy. Convierte la intención en un objetivo, lo descompone mediante HTN, ejecuta nodo a nodo y persiste resultados/completado/fallo en memoria conversacional.
+
+**Características:**
+
+- Descomposición y ejecución de objetivos HTN
+- Serialización de tareas y resultados
+- Registro de métricas de integración (FASE 18)
+- Toggle y observabilidad de la integración
+
+**Importaciones:** 10.
+
+`class HTNIntegrationResult`  (línea 26) — Resultado de la integración HTN-Brain.
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class HTNBrainIntegration`  (línea 40) — Integra interpretación de objetivos, HTN y ejecución de tareas.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__()` |  |
+| `def process_goal_through_htn(goal, current_state)` | Descompone y ejecuta un objetivo completo mediante HTN. |
+| `def create_and_execute_htn_goal(user_input, current_state)` | Crea un objetivo básico desde texto y lo procesa mediante HTN. |
+| `def _create_goal_from_input(user_input, current_state)` | Crea un objetivo compatible con los tipos usados por HTNManager. |
+| `def _process_execution_results(goal, execution_result, current_state)` | Procesa el resultado, actualiza el estado y registra memoria. |
+| `def _register_goal_completion(goal, execution_result)` | Registra la finalización exitosa en la memoria conversacional. |
+| `def _register_goal_failure(goal, execution_result)` | Registra el fallo en la memoria conversacional. |
+| `def _register_goal_memory(goal, execution_result)` |  |
+| `def _serialize_task(task)` |  |
+| `def _serialize_execution_result(result)` |  |
+| `def _record_integration(execution_time, success)` |  |
+| `def get_integration_statistics()` | Obtiene estadísticas de la integración HTN-Brain. |
+| `def enable_integration(enabled)` | Habilita o deshabilita la integración HTN. |
+| `def get_htn_insights()` | Obtiene información agregada del sistema HTN. |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def get_htn_integration()`  (L475) | Obtiene la instancia global de la integración HTN-Brain. |
+
+<a name="src-brain-llm-py"></a>
+### `src/brain/llm.py` [1039 líneas] — Cerebro principal y comunicación con LLM
+
+**Descripción:** Cerebro de JARVIS: interpretación de intenciones, extracción de entidades, creación de objetivos y comunicación con el modelo LLM (Ollama) vía API de chat. Normaliza aliases de acción, detecta acciones directas (p. ej. calibración), construye contexto del sistema y, cuando HTN está disponible, delega la planificación compleja a `HTNBrainIntegration`.
+
+**Características:**
+
+- Action aliases / normalización de nombres del LLM
+- Detección de acciones directas (calibrar Chrome, etc.)
+- Extracción de entidades (streamers/plataformas/aplicaciones)
+- Construcción del contexto del sistema para el LLM
+- Integración con HTN para objetivos complejos
+- Soporte multimodal (think_with_image/analyze_image)
+
+**Importaciones:** 17.
+
+`class Brain`  (línea 32) — Cerebro de JARVIS con interpretación, objetivos y compatibilidad legacy.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(model)` |  |
+| `def _normalize_action_name(action_name)` | Convierte nombres conocidos producidos por el LLM a nombres registrados. |
+| `def _detect_direct_action(prompt)` | Detecta comandos del sistema que deben resolverse de forma |
+| `def _get_system_context()` |  |
+| `def _get_available_actions()` |  |
+| `def _get_application_knowledge()` |  |
+| `def _get_domain_entities()` |  |
+| `def _build_system_instruction(use_legacy_mode)` |  |
+| `def _chat_text(messages)` |  |
+| `def generate_response(prompt, use_legacy_mode)` |  |
+| `def execute_goal(goal_data)` |  |
+| `def process_intent_to_execution(prompt)` |  |
+| `def process_with_htn(prompt)` |  |
+| `def get_htn_insights()` |  |
+| `def _extract_parameters_from_input(user_input, entity)` |  |
+| `def _extract_search_query(user_input)` |  |
+| `def _clean_json_response(response_text)` |  |
+| `def parse_model_response(llm_response)` |  |
+| `def _extract_entities_from_input(user_input)` |  |
+| `def _extract_entities_fallback(user_input)` |  |
+| `def _create_goal_from_entity(entity, user_input, resolution_result)` |  |
+| `def _get_entity_capabilities(entity, goal_type)` |  |
+| `def _calculate_entity_goal_cost(entity, goal_type)` |  |
+| `def _calculate_entity_complexity(entity, goal_type)` |  |
+| `def interpret_intent(prompt)` |  |
+| `def _create_system_goal(goal_data, user_input)` |  |
+| `def think(prompt, use_legacy_execution)` |  |
+| `def _execute_legacy_action(action_name, parameters)` |  |
+| `def process_action_response(llm_response)` |  |
+| `def think_with_image(prompt, image_path)` |  |
+| `def analyze_image(image_path, analysis_prompt)` |  |
+| `def clear_memory()` |  |
+| `def get_conversation_history()` |  |
+| `def get_available_actions()` |  |
+| `def get_current_goals()` |  |
+| `def get_system_state()` |  |
+| `def get_domain_entities()` |  |
+| `def create_goal_from_user_input(user_input)` |  |
+| `def get_planner_ready_data()` |  |
+| `def register_node(node_config)` |  |
+| `def register_task(task_config)` |  |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def get_jarvis_context()`  (L1035) |  |
+
+## 👂 `src/ear/`
+
+<!-- src/ear -->
+
+<a name="src-ear-__init__-py"></a>
+### `src/ear/__init__.py` [4 líneas] — Módulo de sistema
+
+**Descripción:** Módulo de sistema.
+
+**Importaciones:** 1.
+
+_Archivo de marcador de posición / inicialización de paquete._
+
+<a name="src-ear-listener-py"></a>
+### `src/ear/listener.py` [587 líneas] — Percepción auditiva y transcripción
+
+**Descripción:** Pipeline de audio con nodos (`AudioNode`): calibración de umbral (RMS), grabación con detección de voz, transcripción Whisper a texto, y wake-word detection para “Jarvis”.
+
+**Características:**
+
+- Pipeline de nodos de audio
+- Whisper ASR
+- Wake-word
+- Detección/grabación con VAD
+
+**Importaciones:** 10.
+
+`class AudioCapabilities`  (línea 22) — Capacidades del sistema de audio.
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class AudioNode`  (línea 35) — Nodo básico para procesamiento de audio.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(name)` |  |
+| `def execute(audio_data)` | Ejecuta el procesamiento de audio. |
+| `def get_preconditions()` | Devuelve las precondiciones necesarias para ejecutar este nodo. |
+| `def get_effects()` | Devuelve los efectos de ejecutar este nodo. |
+| `def get_cost()` | Devuelve el coste estimado de ejecutar este nodo. |
+
+`class CalibrationNode(AudioNode)`  (línea 80) — Nodo para calibración de audio.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def execute(audio_queue)` | Calibra el umbral de detección de voz. |
+| `def _rms(audio)` | Calcula el nivel de amplitud RMS del audio. |
+
+`class TranscriptionNode(AudioNode)`  (línea 129) — Nodo para transcripción de audio a texto.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(name, model_size, language)` |  |
+| `def _load_model()` |  |
+| `def execute(audio)` | Transcribe el audio a texto. |
+
+`class DetectionNode(AudioNode)`  (línea 217) — Nodo para detección de voz en audio.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def execute(audio_queue, threshold)` | Detecta voz en la cola de audio. |
+| `def _rms(audio)` | Calcula el nivel de amplitud RMS del audio. |
+
+`class RecordingNode(AudioNode)`  (línea 272) — Nodo para grabación de audio.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def execute(audio_queue, threshold)` | Graba el audio detectado. |
+| `def _rms(audio)` | Calcula el nivel de amplitud RMS del audio. |
+
+`class Ear`  (línea 329) — Sistema de percepción auditiva integrado con la arquitectura de planificación jerárquica.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(model_size, language)` |  |
+| `def _load_model()` |  |
+| `def get_audio_pipeline()` | Devuelve el pipeline de procesamiento de audio. |
+| `def get_pipeline_cost()` | Calcula el coste total del pipeline de audio. |
+| `def get_pipeline_preconditions()` | Devuelve las precondiciones del pipeline de audio. |
+| `def get_pipeline_effects()` | Devuelve los efectos del pipeline de audio. |
+| `def _load_model()` | Carga el modelo Whisper (método heredado para compatibilidad). |
+| `def listen(activation_word)` | Escucha el audio del usuario y transcribe usando el pipeline de nodos. |
+| `def _check_activation_word(text)` | Verifica si el texto contiene una variante de "Jarvis". |
+| `def process_audio_batch(audio_chunks)` | Procesa un lote de audios pregrabados. |
+| `def get_audio_status()` | Devuelve el estado actual del sistema de audio. |
+
+## 👁️ `src/eyes/`
+
+<!-- src/eyes -->
+
+<a name="src-eyes-__init__-py"></a>
+### `src/eyes/__init__.py` [5 líneas] — Módulo de sistema
+
+**Descripción:** Módulo de sistema.
+
+**Importaciones:** 2.
+
+_Archivo de marcador de posición / inicialización de paquete._
+
+<a name="src-eyes-screen-py"></a>
+### `src/eyes/screen.py` [997 líneas] — Captura de pantalla y análisis para JARVIS con arquitectura de planificación.
+
+**Descripción:** Captura de pantalla y análisis para JARVIS con arquitectura de planificación.
+
+**Importaciones:** 21.
+
+`class ApplicationState(Enum)`  (línea 41) — Estados conocidos de una aplicación.
+
+_Sin métodos definidos en el AST._
+
+`class ApplicationInfo`  (línea 52) — Información de una aplicación detectada.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __post_init__()` |  |
+| `def to_dict()` |  |
+| `def from_dict(cls, data)` |  |
+
+`class WorldState`  (línea 119) — Estado del mundo usado por las APIs legacy de este módulo.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __post_init__()` |  |
+| `def to_dict()` |  |
+| `def from_dict(cls, data)` |  |
+
+`class ScreenAnalyzer`  (línea 253) — Analizador de pantallas integrado con la capa Vision.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__()` |  |
+| `def _get_vision()` | Inicializa Vision de forma diferida para evitar importaciones circulares. |
+| `def analyze_application_state(app_name)` | Analiza una aplicación en todos los monitores disponibles. |
+| `def _fallback_detect_application_state(app_name)` | Fallback no visual usando la ventana foreground cuando sea posible. |
+| `def build_world_state()` | Construye el estado del mundo usando la capa Vision cuando está disponible. |
+| `def _convert_visual_world_state(visual_state, monitor_numbers, timestamp)` | Adapta el WorldState de memoria de Vision a la API legacy de este módulo. |
+| `def _get_known_applications()` | Obtiene aplicaciones conocidas desde memoria y descubrimiento global. |
+| `def _detect_focused_application(applications)` | Detecta la aplicación enfocada mediante la ventana foreground. |
+| `def _get_active_monitor()` | Obtiene el monitor de la ventana foreground desde ScreenManager. |
+| `def _get_calibrated_elements()` | Obtiene elementos calibrados desde memoria. |
+| `def _get_known_urls()` | Obtiene URLs conocidas desde memoria de dominio. |
+| `def _get_system_resources()` | Obtiene recursos básicos del sistema. |
+
+`class ScreenCapture`  (línea 659) — Sistema de captura con geometría delegada a ScreenManager.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__()` |  |
+| `def _get_analyzer()` |  |
+| `def capture_monitor(monitor_num, save_path)` | Captura exactamente el monitor indicado mediante ScreenManager. |
+| `def capture_region(x, y, width, height, save_path)` | Captura una región expresada en coordenadas absolutas del escritorio. |
+| `def capture_element(element_coords, save_path)` | Captura una región descrita por x/y/width/height. |
+| `def capture_active_window(save_path)` | Captura la ventana foreground actual. |
+| `def _prepare_output_path(save_path, prefix)` | Prepara la ruta de salida para una captura. |
+| `def capture_desktop(save_path)` | Captura el rectángulo completo del escritorio virtual. |
+| `def get_world_state()` |  |
+| `def get_application_state(app_name)` |  |
+| `def check_element_visibility(element_name)` | Comprueba visibilidad a partir del estado visual disponible. |
+| `def clean_temp_files(pattern)` | Elimina capturas temporales del directorio actual. |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def _get_available_monitor_numbers()`  (L200) | Obtiene todos los monitores reales detectados por ScreenManager. |
+| `def _get_monitor_number(monitor)`  (L230) | Obtiene el identificador lógico de un MonitorInfo sin asumir un campo único. |
+| `def capture_screen(filepath)`  (L944) | Captura el escritorio virtual completo. |
+| `def capture_captcha_area(pantalla, region_captcha, img_captcha_path)`  (L951) | Captura una región del escritorio para compatibilidad legacy. |
+| `def get_screen_capture()`  (L979) | Obtiene la instancia global de captura. |
+
+<a name="src-eyes-screen_capture-py"></a>
+### `src/eyes/screen_capture.py` [368 líneas] — Sistema de captura de pantalla sin dependencias del cerebro.
+
+**Descripción:** Sistema de captura de pantalla sin dependencias del cerebro.
+
+**Importaciones:** 12.
+
+`class ScreenCapture`  (línea 25) — Sistema de captura de pantalla con soporte multipantalla.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__()` | Inicializa el sistema de captura. |
+| `def _get_analyzer()` | Lazy initialization of ScreenAnalyzer to avoid circular imports. |
+| `def capture_monitor(monitor_num, save_path)` | Captura un monitor específico. |
+| `def capture_region(x, y, width, height, save_path)` | Captura una región del escritorio virtual. |
+| `def capture_element(element_coords, save_path)` | Captura un elemento a partir de sus coordenadas absolutas. |
+| `def capture_active_window(save_path)` | Captura la ventana activa actualmente. |
+| `def get_world_state()` | Obtiene el estado actual del mundo. |
+| `def get_application_state(app_name)` | Obtiene el estado de una aplicación específica. |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def get_screen_capture()`  (L361) | Obtiene la instancia global del sistema de captura. |
+
+<a name="src-eyes-vision-py"></a>
+### `src/eyes/vision.py` [924 líneas] — Visión por computadora (Qwen3-VL/Ollama)
+
+**Descripción:** Sistema de visión basado en modelo VL vía Ollama. Analiza pantallas, detecta elementos UI, verifica visibilidad y resultados de acciones, detecta estado de aplicaciones y genera nodos de visión para el planificador.
+
+**Características:**
+
+- Detección de elementos UI
+- Verificación visual de resultados
+- Nodos de visión para el planificador
+- Multi-monitor
+
+**Importaciones:** 15.
+
+`class VisionNodeType(Enum)`  (línea 31) — Tipos de nodos de visión disponibles para planificación.
+
+_Sin métodos definidos en el AST._
+
+`class VisionNode`  (línea 45) — Nodo de percepción visual reutilizable por el planificador.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` |  |
+| `def from_dict(cls, data)` |  |
+| `def get_preconditions()` |  |
+| `def get_effects()` |  |
+| `def get_cost()` |  |
+
+`class UIElement(UIElementData)`  (línea 85) — Elemento UI detectado por el modelo de visión (forma canónica).
+
+_Sin métodos definidos en el AST._
+
+`class VisionResponse(BaseModel)`  (línea 98) — Respuesta estructurada de detección UI.
+
+_Sin métodos definidos en el AST._
+
+`class Vision`  (línea 104) — Sistema de visión genérico integrado con la arquitectura de Jarvis.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(model)` |  |
+| `def _create_vision_nodes()` |  |
+| `def get_vision_nodes()` |  |
+| `def get_vision_node(node_id)` |  |
+| `def get_nodes_by_type(node_type)` |  |
+| `def get_total_vision_cost()` |  |
+| `def _get_available_monitor_numbers()` | Obtiene los identificadores lógicos reales desde ScreenManager. |
+| `def _get_default_monitor_number()` | Selecciona el monitor activo y, como fallback, el principal. |
+| `def analyze_screen_for_world_state()` | Analiza todas las pantallas disponibles y construye un WorldState válido. |
+| `def detect_ui_elements(image_path, application)` | Detecta elementos interactivos visibles en una imagen. |
+| `def analyze_image(image_path, prompt, calibration_target)` | Analiza una captura para calibración universal. |
+| `def verify_element_visibility(element_name, application, expected_coords)` | Verifica visualmente si un elemento está presente. |
+| `def verify_action_result(expected_state, application, tolerance)` | Verifica visualmente el resultado esperado de una acción. |
+| `def _build_verification_prompt(expected_type, expected_state, application)` |  |
+| `def detect_application_state(app_name)` | Busca una aplicación en todas las pantallas disponibles. |
+| `def _chat_json(image_path, prompt, response_format, num_ctx, num_predict, temperature)` |  |
+| `def _safe_json_loads(value)` |  |
+| `def _clamp_float(value)` |  |
+| `def _normalize_int_list(value, minimum, maximum)` |  |
+| `def _coordinates_match(expected_coords, center, bbox, tolerance)` |  |
+| `def get_vision_capabilities()` |  |
+
+<a name="src-eyes-vision_only-py"></a>
+### `src/eyes/vision_only.py` [417 líneas] — Visión por computadora usando Qwen3-VL mediante Ollama.
+
+**Descripción:** Visión por computadora usando Qwen3-VL mediante Ollama.
+
+**Importaciones:** 16.
+
+`class VisionNodeType(Enum)`  (línea 27) — Tipos de nodos de visión para el planificador.
+
+_Sin métodos definidos en el AST._
+
+`class UIElement(UIElementData)`  (línea 37) — Elemento UI detectado por visión (forma canónica unificada).
+
+_Sin métodos definidos en el AST._
+
+`class VisionResponse(BaseModel)`  (línea 47) — Respuesta estructurada del modelo de visión.
+
+_Sin métodos definidos en el AST._
+
+`class Vision`  (línea 55) — Sistema de visión integrado con la arquitectura de planificación jerárquica.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(model)` |  |
+| `def _create_vision_nodes()` | Crea los nodos de visión estándar para el planificador. |
+| `def analyze_image(image_path, prompt)` | Analiza una imagen usando el modelo de visión. |
+| `def verify_action_result(expected_state, tolerance)` | Verifica si una acción tuvo el resultado esperado visualmente. |
+| `def detect_application_state(app_name)` | Detecta el estado de una aplicación específica visualmente. |
+| `def get_vision_capabilities()` | Devuelve las capacidades de visión disponibles para el planificador. |
+| `def get_total_vision_cost()` | Calcula el costo total de las capacidades de visión. |
+
+## 🖐️ `src/hands/`
+
+<!-- src/hands -->
+
+<a name="src-hands-__init__-py"></a>
+### `src/hands/__init__.py` [30 líneas] — Módulo de sistema
+
+**Descripción:** Módulo de sistema.
+
+**Importaciones:** 9.
+
+_Archivo de marcador de posición / inicialización de paquete._
+
+<a name="src-hands-action_registry-py"></a>
+### `src/hands/action_registry.py` [1272 líneas] — Registro centralizado de acciones
+
+**Descripción:** Contrato entre capacidades ejecutables y el planificador. `ActionInfo` modela una acción con parámetros, precondiciones/efectos (modelo canónico `Condition`/`Effect`), coste, dependencias, recursos, verificador de éxito y metadatos; `ActionRegistry` registra (decorador o llamada), valida tipos, comprueba precondiciones y ejecuta. Las funciones/callbacks no se serializan; las reglas declarativas sí.
+
+**Características:**
+
+- Modelo declarativo `ActionInfo` con precondiciones/efectos
+- Evaluador canónico de condiciones y efectos
+- Validación de tipos de parámetros
+- Singleton `ActionRegistry` + decorador `register_action`
+
+**Importaciones:** 16.
+
+`class ActionType(Enum)`  (línea 46)
+
+_Sin métodos definidos en el AST._
+
+`class ActionInfo`  (línea 471) — Metadatos y contrato ejecutable de una acción registrada.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __post_init__()` |  |
+| `def to_dict()` | Devuelve metadatos serializables; nunca expone callbacks ejecutables. |
+| `def matches_preconditions(state)` | Comprueba todas las precondiciones declarativas y funcionales. |
+| `def verify_success(result)` | Ejecuta el verificador configurado sin invocarlo más de una vez. |
+| `def apply_effects(current_state, execution_result)` | Aplica efectos de forma acumulativa o devuelve el estado original. |
+
+`class ActionRegistry`  (línea 721) — Registro central, thread-safe, de acciones/capacidades disponibles.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__()` |  |
+| `def _extract_parameters(func)` | Extrae tipo, valor por defecto y obligatoriedad de la firma real. |
+| `def register_action(name, description, action_type, category, tags, parameters, confidence_threshold, preconditions, effects, cost, dependencies, capability, application, required_resources, requires_ui_element, success_checker, planner_enabled, preconditions_functions, effects_functions)` | Devuelve un decorador que registra una función como acción. |
+| `def register_module(module_path)` | Importa un módulo y registra sus funciones decoradas una sola vez. |
+| `def _store_action_info(action_info)` | Guarda la acción y conserva la coherencia entre acciones y categorías. |
+| `def get_action(name)` |  |
+| `def get_actions_by_category(category)` |  |
+| `def get_all_actions()` |  |
+| `def get_plannable_actions()` |  |
+| `def get_actions_for_planner()` |  |
+| `def get_actions_for_llama()` |  |
+| `def _validate_value_type(value, expected_type)` | Valida tipos Python y anotaciones parametrizadas habituales. |
+| `def validate_action(action_name, parameters)` | Comprueba presencia, nombres y tipos de parámetros sin ejecutar la acción. |
+| `def can_execute(action_name, parameters, state, check_preconditions)` | Determina si una acción registrada se puede ejecutar en el estado dado. |
+| `def get_action_cost(action_name)` |  |
+| `def _record_execution(success)` |  |
+| `def _record_prediction(prediction_memory, action_name, success)` |  |
+| `def execute_action(action_name, parameters)` | Ejecuta la función registrada y propaga sus excepciones originales. |
+| `def list_actions(category)` |  |
+| `def get_action_categories()` |  |
+| `def get_optimization_stats()` | Devuelve estadísticas del registro a partir de contadores reales. |
+| `def optimize_logging()` | Punto de compatibilidad para configurar logging sin cambiar el contrato. |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def _log(level, message)`  (L61) | Usa el logger del proyecto sin hacer que un fallo de logging rompa JARVIS. |
+| `def _call_compatible(callback, candidates)`  (L79) | Elige una firma compatible antes de invocar, sin repetir callbacks. |
+| `def _state_to_mapping(state)`  (L109) | Obtiene una vista de estado compatible con los evaluadores declarativos. |
+| `def _format_type_name(value)`  (L140) | Devuelve un nombre legible de tipo y apto para serialización JSON. |
+| `def _serialize_rule(value, _seen)`  (L162) | Serializa reglas sin intentar serializar callbacks ni ciclos de objetos. |
+| `def _get_state_value(state, key, default)`  (L261) | Obtiene un valor de un mapping, un objeto con ``get`` o un atributo. |
+| `def _condition_from_dict(condition)`  (L285) | Convierte un diccionario tipado al modelo canónico ``Condition``. |
+| `def _evaluate_condition_object(state, condition)`  (L328) |  |
+| `def _match_condition(state, condition)`  (L336) | Evalúa una condición simple, compuesta, funcional o canónica. |
+| `def _matches_conditions(state, conditions)`  (L392) | Evalúa una colección de precondiciones con semántica AND por defecto. |
+| `def _apply_effect_value(effect, current_state, execution_result)`  (L403) | Aplica un efecto canónico, funcional o legacy sobre una copia del estado. |
+| `def _normalize_cost(cost)`  (L599) |  |
+| `def _normalize_confidence(value)`  (L609) |  |
+| `def _resolve_action_type(raw_type)`  (L619) |  |
+| `def _parse_type_string(type_name)`  (L629) | Resuelve formas habituales de anotaciones expresadas como texto. |
+| `def _split_type_arguments(value)`  (L695) | Divide argumentos de tipo respetando corchetes anidados. |
+| `def get_action_registry()`  (L1204) | Obtiene el singleton de ActionRegistry con inicialización segura. |
+| `def register_action(name, description, action_type, category, tags, parameters, confidence_threshold, preconditions, effects, cost, dependencies, capability, application, required_resources, requires_ui_element, success_checker, planner_enabled, preconditions_functions, effects_functions)`  (L1213) | Decorador de conveniencia para registrar acciones en el singleton. |
+| `def register_module(module_path)`  (L1258) | Registra acciones decoradas que se encuentren en el módulo indicado. |
+
+<a name="src-hands-application_preflight-py"></a>
+### `src/hands/application_preflight.py` [894 líneas] — Preflight de aplicaciones para JARVIS.
+
+**Descripción:** Preflight de aplicaciones para JARVIS.
+
+**Importaciones:** 12.
+
+`class PreflightResult`  (línea 41) — Resultado estructurado del preflight.
+
+**Decoradores:** `@dataclass(frozen=True)`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` |  |
+
+`class ApplicationPreflight`  (línea 70) — Analiza una aplicación antes de que CalibrationManager la abra.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__()` |  |
+| `def check(application)` | Analiza una aplicación sin ejecutarla. |
+| `def check_application(application)` | Versión tipada del chequeo principal. |
+| `def is_safe_to_calibrate(application)` | Indica si el resultado actual permite iniciar una calibración. |
+| `def check_login_state(application)` | Evalúa únicamente el conocimiento explícito de login disponible. |
+| `def check_resources(application)` | Evalúa recursos explícitamente conocidos por la aplicación. |
+| `def _name_is_blocked(name)` |  |
+| `def _app_id_is_blocked(app_id)` |  |
+| `def _resolve_resources_status(application)` |  |
+| `def _optional_bool(value)` |  |
+| `def resolve_executable(name, app_id)` |  |
+| `def _resolve_from_apps_folder(name, app_id)` |  |
+| `def _resolve_from_target_string(target)` |  |
+| `def _is_executable(path)` |  |
+| `def inspect_executable_manifest(executable_path)` |  |
+| `def _parse_manifest_file(path)` |  |
+| `def _parse_manifest_xml(raw)` |  |
+| `def _extract_embedded_manifest(executable_path)` | Extrae RT_MANIFEST del PE sin ejecutar el binario. |
+| `def _result(allowed, reason, executable_path, requires_elevation, confidence, availability, login_required, logged_in, resources_available, blocked_by)` |  |
+| `def clear_cache()` | Limpia resultados de resolución y manifest. |
+| `def _normalized_values(values)` |  |
+| `def _normalize(value)` |  |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def get_application_preflight()`  (L888) |  |
+
+<a name="src-hands-applications_core-py"></a>
+### `src/hands/applications_core.py` [1357 líneas] — Sistema de conocimiento de aplicaciones para planificación jerárquica.
+
+**Descripción:** Sistema de conocimiento de aplicaciones para planificación jerárquica.
+
+**Importaciones:** 16.
+
+`class ApplicationCapability(Enum)`  (línea 35) — Capacidades que puede ofrecer una aplicación.
+
+_Sin métodos definidos en el AST._
+
+`class ApplicationState(Enum)`  (línea 63) — Estados posibles de una aplicación.
+
+_Sin métodos definidos en el AST._
+
+`class UIElement`  (línea 77) — Elemento UI de una aplicación.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def is_calibrated()` | Comprueba si existe información de coordenadas utilizable. |
+| `def _is_coordinate_pair(value, y_value)` | Valida una pareja de coordenadas sin asumir un formato único. |
+
+`class ApplicationCapabilityDef`  (línea 117) — Definición de una capacidad de aplicación.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __post_init__()` |  |
+
+`class ApplicationKnowledge`  (línea 137) — Conocimiento estructurado de una aplicación.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __post_init__()` |  |
+| `def get_capability(capability_name)` | Obtiene una capacidad por nombre. |
+| `def get_ui_element(element_name)` | Obtiene un elemento UI por nombre. |
+| `def is_capable(capability)` | Comprueba si la aplicación posee una capacidad específica. |
+| `def get_calibrated_elements()` | Obtiene los elementos UI calibrados. |
+
+`class ApplicationManager`  (línea 232) — Gestor del conocimiento estructurado de aplicaciones.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__()` |  |
+| `def _normalize_name(app_name)` | Normaliza nombres habituales de aplicaciones a una clave interna. |
+| `def _initialize_applications()` | Inicializa el conocimiento de las aplicaciones base. |
+| `def register_application(app)` | Registra una aplicación en memoria y en el gestor. |
+| `def get_application(app_name)` | Obtiene una aplicación por nombre o alias. |
+| `def _resolve_alias(normalized_name)` | Resuelve un alias dinámico contra las aplicaciones ya registradas. |
+| `def get_applications_by_type(app_type)` | Obtiene aplicaciones por tipo. |
+| `def get_applications_by_capability(capability)` | Obtiene aplicaciones con una capacidad determinada. |
+| `def _reconstruct_capabilities(capability_strings)` | Convierte una lista de strings de capacidad en ApplicationCapabilityDef. |
+| `def _reconstruct_ui_elements(elements_data)` | Reconstruye la lista de :class:`UIElement` desde ``properties``. |
+| `def _reconstruct_states(states_data)` | Reconstruye la lista de :class:`ApplicationState` desde ``properties``. |
+| `def _reconstruct_application(entity)` | Reconstruye un objeto ApplicationKnowledge desde una Entity. |
+| `def _load_custom_applications()` | Carga aplicaciones personalizadas persistidas en memoria. |
+| `def get_application_capabilities(app_name)` | Obtiene capacidades de una aplicación en formato de planificación. |
+| `def get_application_ui_elements(app_name)` | Obtiene los elementos UI conocidos de una aplicación. |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def _reconstruct_metadata(entity)`  (L197) | Construye el dict de metadata para una ApplicationKnowledge reconstruida. |
+| `def _serialize_ui_element(element)`  (L212) | Serializa un :class:`UIElement` a un dict JSON-friendly. |
+| `def get_application_manager()`  (L754) | Obtiene la instancia global del gestor de aplicaciones. |
+| `def open_application(app_name)`  (L785) | Abre una aplicación conocida y valida su disponibilidad. |
+| `def close_application(app_name)`  (L831) | Cierra una aplicación por proceso sin tocar otras aplicaciones. |
+| `def wait_for_application_state(app_name, target_state, timeout)`  (L889) | Espera un estado de aplicación conocido. |
+| `def calibrate_application_ui(app_name, elements, screen)`  (L941) | Calibra una aplicación específica mediante CalibrationManager. |
+| `def calibrar_aplicaciones(force)`  (L1021) | Ejecuta la acción global de calibración. |
+| `def calibrate_applications(force)`  (L1066) | Alias programático de calibrar_aplicaciones(). |
+| `def _call_calibrate_all_applications(manager, force)`  (L1075) | Invoca la calibración global compatible con managers antiguos y nuevos. |
+| `def _check_application_available(app)`  (L1101) | Comprueba si el ejecutable configurado está disponible. |
+| `def _check_application_login(app)`  (L1115) | Comprueba el estado de login cuando exista un backend para ello. |
+| `def _looks_like_global_report(value)`  (L1123) | Identifica el contrato agregado del orquestador global. |
+| `def _build_global_calibration_report(raw_results)`  (L1131) | Convierte resultados del CalibrationManager en un informe estable. |
+| `def get_available_commands()`  (L1242) | Obtiene los comandos registrados. |
+| `def navigate_to_url(url)`  (L1247) | Abre una URL en el navegador predeterminado. |
+| `def abrir_youtube()`  (L1266) |  |
+| `def abrir_gmail()`  (L1273) |  |
+| `def get_application_knowledge(app_name)`  (L1284) | Obtiene conocimiento estructurado de una aplicación. |
+| `def get_applications_by_capability(capability_name)`  (L1307) | Obtiene aplicaciones que tienen una capacidad específica. |
+| `def register_custom_application(app_config)`  (L1318) | Registra una aplicación personalizada. |
+
+<a name="src-hands-calibration_manager-py"></a>
+### `src/hands/calibration_manager.py` [2343 líneas] — Gestor universal de calibración de aplicaciones para JARVIS.
+
+**Descripción:** Gestor universal de calibración de aplicaciones para JARVIS.
+
+**Importaciones:** 27.
+
+`class WINDOWPLACEMENT(ctypes.Structure)`  (línea 73)
+
+_Sin métodos definidos en el AST._
+
+`class ApplicationType(Enum)`  (línea 89)
+
+_Sin métodos definidos en el AST._
+
+`class CalibrationPreflightResult`  (línea 103)
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` |  |
+
+`class CalibrationResult`  (línea 123)
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def get(key, default)` |  |
+| `def to_dict()` |  |
+
+`class _WindowStateSnapshot`  (línea 152)
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class CalibrationManager`  (línea 170) — Coordinador universal de calibración multiaplicación y multimonitor.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__()` |  |
+| `def _register_builtin_calibrators()` | Prepara el registro de extensiones específicas sin usarlas como flujo principal. |
+| `def register_calibrator(application_name, calibrator)` |  |
+| `def get_available_applications()` |  |
+| `def get_supported_applications()` |  |
+| `def set_preflight_checker(checker)` |  |
+| `def _normalize_preflight_result(result, application, source)` |  |
+| `def preflight_application(application)` |  |
+| `def get_application_calibration_capability(application)` |  |
+| `def _reset_application_metadata_cache()` |  |
+| `def _normalize_filesystem_path(path)` |  |
+| `def _normalize_executable_name(path)` |  |
+| `def _register_application_metadata(metadata)` |  |
+| `def _load_application_installation_metadata()` |  |
+| `def _get_application_metadata(name, app_id)` |  |
+| `def discover_applications()` | Descubre aplicaciones GUI sin limitarse a una lista de apps conocidas. |
+| `def _is_vscode_application(name, app_id)` |  |
+| `def _is_game_launcher_application(name, app_id)` |  |
+| `def _is_game_launcher_executable(path)` |  |
+| `def _looks_like_game_launch_arguments(name, arguments)` |  |
+| `def _is_game_installation_path(path)` |  |
+| `def _is_game_application(name, app_id)` |  |
+| `def _is_elevation_risk_application(name, app_id)` |  |
+| `def _looks_like_console_or_cli_launcher(normalized_name)` |  |
+| `def _should_ignore_application(name, app_id)` |  |
+| `def _get_windows()` |  |
+| `def _get_window_handle(window)` |  |
+| `def _get_window_handles()` |  |
+| `def _win32_is_window(hwnd)` |  |
+| `def _win32_is_visible(hwnd)` |  |
+| `def _win32_is_enabled(hwnd)` |  |
+| `def _win32_get_class_name(hwnd)` |  |
+| `def _win32_get_window_title(hwnd)` |  |
+| `def _win32_get_window_rect(hwnd)` |  |
+| `def _win32_get_owner(hwnd)` |  |
+| `def _win32_get_style(hwnd)` |  |
+| `def _win32_get_exstyle(hwnd)` |  |
+| `def _win32_is_gui_window(cls, hwnd, allow_console)` |  |
+| `def _window_is_usable(cls, window, allow_console)` |  |
+| `def _get_window_geometry(window)` | Devuelve geometría utilizable incluso cuando la ventana está minimizada. |
+| `def _capture_window_state(hwnd)` |  |
+| `def _restore_window_state(hwnd, snapshot)` |  |
+| `def _get_window_by_handle(hwnd)` |  |
+| `def _get_window_process_id(window)` |  |
+| `def _get_window_process_name(cls, window)` |  |
+| `def _get_process_ids()` |  |
+| `def _get_process_tree(root_pid, before_pids)` |  |
+| `def _is_process_alive(pid)` |  |
+| `def _is_process_elevated(pid)` |  |
+| `def _expected_process_names(application_name, app_id)` | Obtiene nombres de proceso esperados para una aplicación. |
+| `def _score_window_for_application(window, application_name, app_id)` |  |
+| `def _find_existing_application_window(application_name, app_id)` |  |
+| `def _reset_launch_context()` |  |
+| `def launch_application(application)` | Reutiliza una ventana existente o lanza la aplicación de forma genérica. |
+| `def _wait_for_application_window(application_name, app_id, before_hwnds, before_pids, timeout)` |  |
+| `def _set_window_position(hwnd, x, y)` |  |
+| `def _maximize_window(hwnd)` |  |
+| `def _window_center(hwnd)` |  |
+| `def _window_is_on_monitor(hwnd, monitor)` |  |
+| `def _is_browser_application(application_name)` |  |
+| `def _open_temporary_browser_tab(window, application_name)` | Abre una pestaña temporal en una ventana de navegador existente. |
+| `def _close_temporary_browser_tab()` | Cierra únicamente la pestaña temporal creada por JARVIS. |
+| `def _prepare_window_for_calibration(window, application_name)` | Restaura/maximiza una ventana y devuelve su monitor real. |
+| `def move_window_to_monitor(window, monitor_number, application_name)` | Mueve temporalmente cualquier ventana calibrable al monitor indicado. |
+| `def _post_close_message(hwnd)` |  |
+| `def _post_system_close(hwnd)` |  |
+| `def close_application_window(window, owned_hwnds)` |  |
+| `def _get_visible_windows_for_pids(pids)` |  |
+| `def _force_terminate_process(pid)` |  |
+| `def _close_all_owned_windows(primary_window, owned_hwnds, owned_pids)` |  |
+| `def is_application_calibrated(application)` |  |
+| `def _get_registered_calibrator(application_name)` |  |
+| `def _instantiate_registered_calibrator(entry)` |  |
+| `def _invoke_registered_calibrator(calibrator, monitor_number)` | Ejecuta una API de calibrador registrado sin acoplar el gestor a una app. |
+| `def _normalize_registered_result(application_name, screen_number, raw_result)` |  |
+| `def _calibrate_registered_application(application_name, screen_number)` |  |
+| `def calibrate_application(application, screen_number)` | Calibra cualquier aplicación mediante un único flujo universal. |
+| `def _get_monitors_to_calibrate(screen_number)` |  |
+| `def _calibrate_open_window(application_name, window, screen_number)` |  |
+| `def calibrate_all_applications(applications, force)` |  |
+| `def _extract_elements(analysis)` |  |
+| `def _extract_element_center(element)` |  |
+| `def _build_application_coordinates(application_results)` |  |
+| `def _save_application_calibration(application_name, calibration_results)` |  |
+| `def _save_coordinate_map(application_name, coordinates)` |  |
+| `def _resolve_application(application)` |  |
+| `def _resolve_application_list(applications)` |  |
+| `def _get_application_type(application_name)` |  |
+| `def _get_storage_application_key(cls, application_name)` |  |
+| `def _normalize_application_name(name)` |  |
+| `def _normalize_element_name(name)` |  |
+| `def get_calibration_statistics()` |  |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def get_calibration_manager()`  (L2339) |  |
+
+<a name="src-hands-calibrator-py"></a>
+### `src/hands/calibrator.py` [1059 líneas] — Fachada y capacidades de calibración para JARVIS.
+
+**Descripción:** Fachada y capacidades de calibración para JARVIS.
+
+**Importaciones:** 21.
+
+`class CalibrationPolicy(Enum)`  (línea 36)
+
+_Sin métodos definidos en el AST._
+
+`class CalibrationStatus(Enum)`  (línea 43)
+
+_Sin métodos definidos en el AST._
+
+`class CalibrationElement`  (línea 52)
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class CalibrationCapability`  (línea 67)
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class CalibrationStrategy(ABC)`  (línea 78)
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def can_calibrate(element)` |  |
+| `def calibrate(element)` |  |
+| `def get_applicable_applications()` |  |
+
+`class UniversalVisualCalibrationStrategy(CalibrationStrategy)`  (línea 92) — Estrategia visual delegada por completo al CalibrationManager.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__()` |  |
+| `def can_calibrate(element)` |  |
+| `def calibrate(element)` |  |
+| `def _resolve_monitor_number(element)` |  |
+| `def get_applicable_applications()` |  |
+| `def _result_to_dict(result)` |  |
+| `def _find_element_coordinates(result, element_name, monitor_number)` |  |
+| `def _find_element_confidence(cls, result, element_name)` |  |
+| `def _normalize_element_name(value)` |  |
+| `def _get_calibration_manager()` |  |
+
+`class KeyboardShortcutStrategy(CalibrationStrategy)`  (línea 340) — Estrategia alternativa basada en atajos de teclado.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def can_calibrate(element)` |  |
+| `def calibrate(element)` |  |
+| `def get_applicable_applications()` |  |
+
+`class EnhancedCalibrator`  (línea 361) — Sistema de capacidades de calibración compatible con el planner.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__()` |  |
+| `def _initialize_capabilities()` |  |
+| `def get_calibration_capability(capability_id)` |  |
+| `def get_available_capabilities()` |  |
+| `def check_element_calibration(element_id)` |  |
+| `def can_use_element(element_id, current_state)` |  |
+| `def calibrate_element_if_needed(element_id, current_state)` |  |
+| `def _find_alternative_strategy(element)` |  |
+| `def register_element(element)` |  |
+| `def get_element_coordinates(element_id)` |  |
+| `def create_calibration_node(element_id)` |  |
+| `def get_calibration_requirements_for_goal(goal)` |  |
+| `def calibrate_applications(app_name, force)` | Entrada legacy y global compatible con CalibrationManager. |
+| `def _calibrate_single_application(manager, app_name, force)` |  |
+| `def _build_single_application_report(app_name, results, monitor_count)` |  |
+| `def _call_global_manager(method, force)` |  |
+| `def _normalize_global_result(result)` |  |
+| `def _looks_like_global_report(value)` |  |
+| `def _result_to_dict(result)` |  |
+| `def _extract_element_count(result)` |  |
+| `def calibrate_chrome_both_screens()` | Compatibilidad legacy; delega en la misma API de aplicación. |
+| `def _verify_system()` |  |
+| `def get_calibration_statistics()` |  |
+| `def _is_already_calibrated(app_name)` |  |
+| `def _save_organized_results(app_name, results)` | Compatibilidad legacy; la persistencia pertenece al manager. |
+| `def _build_setup_info()` |  |
+| `def _has_calibration_command(app_name)` |  |
+| `def _open_app_on_monitor(app_name, monitor_num)` | Compatibilidad legacy con flujo genérico del CalibrationManager. |
+| `def _close_app(app_name)` | Solo cierra recursos creados por el flujo de calibración, nunca una app del usuario por nombre. |
+| `def _get_calibration_manager()` |  |
+| `def _normalize_name(value)` |  |
+| `def _single_failure_report(app_name, error)` |  |
+| `def _failure_report(error)` |  |
+
+`class Calibrator`  (línea 1023) — Fachada de compatibilidad para el sistema mejorado.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__()` |  |
+| `def calibrate_applications(app_name, force)` |  |
+| `def calibrate_chrome_both_screens()` |  |
+| `def _build_setup_info()` |  |
+| `def _verify_system()` |  |
+| `def _has_calibration_command(app_name)` |  |
+| `def _open_app_on_monitor(app_name, monitor_num)` |  |
+| `def _close_app(app_name)` |  |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def get_enhanced_calibrator()`  (L1016) |  |
+| `def calibrate_chrome_both_screens()`  (L1057) | Función global legacy. |
+
+## 🌐 `src/hands/chrome/`
+
+<!-- src/hands/chrome -->
+
+<a name="src-hands-chrome-__init__-py"></a>
+### `src/hands/chrome/__init__.py` [75 líneas] — Módulo específico para Google Chrome con sistema de acciones registrado.
+
+**Descripción:** Módulo específico para Google Chrome con sistema de acciones registrado.
+
+**Importaciones:** 4.
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def abrir_chrome_action()`  (L31) | Acción wrapper para abrir Chrome. |
+| `def abrir_chrome_pantalla_action(pantalla)`  (L42) | Acción wrapper para abrir Chrome en pantalla específica. |
+| `def calibrar_chrome_action()`  (L53) | Acción wrapper para calibrar Chrome. |
+
+<a name="src-hands-chrome-chrome-py"></a>
+### `src/hands/chrome/chrome.py` [500 líneas] — Funciones específicas para Google Chrome.
+
+**Descripción:** Funciones específicas para Google Chrome.
+
+**Importaciones:** 13.
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def abrir_chrome()`  (L39) | Abre específicamente Google Chrome, sin depender del navegador predeterminado. |
+| `def abrir_chrome_pantalla(pantalla)`  (L66) | Abre Chrome en un monitor específico. |
+| `def cerrar_chrome()`  (L110) | Cierra las ventanas de Google Chrome. |
+| `def calibrar_chrome(pantalla)`  (L151) | Calibra Chrome usando el flujo universal de aplicaciones. |
+| `def mover_chrome_pantalla(pantalla)`  (L203) | Mueve una ventana de Chrome al monitor solicitado. |
+| `def maximizar_chrome()`  (L260) | Maximiza la ventana de Chrome preferentemente la que está en primer plano. |
+| `def _get_chrome_executable()`  (L291) | Busca chrome.exe en ubicaciones habituales de Windows. |
+| `def _abrir_chrome_desde_ruta()`  (L313) | Abre Chrome directamente; solo usa webbrowser como último fallback. |
+| `def _get_chrome_windows(screen_manager)`  (L338) | Obtiene ventanas de Chrome mediante ScreenManager, si está disponible. |
+| `def _select_preferred_chrome_window(screen_manager, chrome_windows)`  (L352) | Selecciona la ventana Chrome en primer plano cuando sea posible. |
+| `def _verificar_chrome_abierto()`  (L371) | Verifica si existe al menos una ventana visible de Chrome. |
+| `def _verificar_chrome_instalado()`  (L394) | Verifica si Chrome está instalado o resoluble en el sistema. |
+| `def _capturar_chrome()`  (L416) | Captura una ventana de Chrome. |
+| `def get_chrome_commands()`  (L459) | Obtiene los comandos específicos de Chrome. |
+| `def get_chrome_action_commands()`  (L471) | Escanea el módulo y devuelve las funciones registradas como acciones. |
+
+<a name="src-hands-chrome-chrome_calibrator-py"></a>
+### `src/hands/chrome/chrome_calibrator.py` [56 líneas] — Compatibilidad para Chrome sobre el calibrador universal de aplicaciones.
+
+**Descripción:** Compatibilidad para Chrome sobre el calibrador universal de aplicaciones.
+
+**Importaciones:** 4.
+
+`class ChromeCalibrator`  (línea 23) — Adaptador legacy que usa exactamente el flujo universal.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def calibrate_chrome(monitor_num)` |  |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def calibrar_chrome()`  (L13) | Compatibilidad legacy: delega en el flujo universal. |
+
+## 🖐️ `src/hands/`
+
+<!-- src/hands -->
+
+<a name="src-hands-coordinate_manager-py"></a>
+### `src/hands/coordinate_manager.py` [1113 líneas] — Gestor unificado de coordenadas (FASE 13)
+
+**Descripción:** Fuente única de verdad de coordenadas UI calibradas. Lee `data/macros_coords.json` construyendo `UIResource`s por monitor `sN`; gestiona capacidades UI (`focus_element`/`click_element`/`type_in_element`) con precondiciones/efectos/alternativas; convierte entre `RELATIVE_SCREEN`, `ABSOLUTE_DESKTOP` y `WINDOW_RELATIVE`.
+
+**Características:**
+
+- FASE 13: coordinación multi-monitor
+- `UIResource` con coordenadas/regiones por monitor
+- Capacidades UI pre/e post-condicionadas
+- Lectura de `macros_coords.json` + formato legacy
+
+**Importaciones:** 12.
+
+`class ResourceType(Enum)`  (línea 37) — Tipos de recursos UI gestionados por el coordinate manager.
+
+_Sin métodos definidos en el AST._
+
+`class CalibrationStrategy(Enum)`  (línea 47) — Estrategias de calibración disponibles.
+
+_Sin métodos definidos en el AST._
+
+`class UIResource`  (línea 58) — Recurso UI calibrado utilizable por acciones del planificador.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __post_init__()` |  |
+| `def is_usable()` |  |
+| `def get_coordinates_for_screen(screen_number)` |  |
+| `def get_region_for_screen(screen_number)` |  |
+| `def get_best_coordinates()` | Devuelve coordenadas del monitor activo o, en su defecto, de cualquier monitor calibrado. |
+| `def get_alternatives()` |  |
+| `def can_use_fallback_strategy(strategy_name)` |  |
+
+`class UICapability`  (línea 148) — Capacidad UI que puede ser utilizada por una acción.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(name, description, required_resources)` |  |
+| `def can_execute_with_resources(available_resources)` |  |
+
+`class CoordinateSystem(Enum)`  (línea 166) — Sistemas de coordenadas soportados por JARVIS.
+
+_Sin métodos definidos en el AST._
+
+`class BoundingBox`  (línea 175) — Rectángulo delimitador de un elemento.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def right()` |  |
+| `def bottom()` |  |
+| `def center_x()` |  |
+| `def center_y()` |  |
+| `def center()` |  |
+| `def to_dict()` |  |
+
+`class ElementInfo`  (línea 215) — Información de un elemento calibrado (compatibilidad).
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def get_absolute_coordinates()` |  |
+
+`class CoordinateManager`  (línea 254) — Gestor centralizado de conocimiento UI y coordenadas calibradas.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__()` |  |
+| `def _initialize_base_capabilities()` |  |
+| `def macros_coords_path()` |  |
+| `def _load_ui_knowledge()` |  |
+| `def _process_ui_knowledge()` |  |
+| `def _create_resource_from_knowledge(resource_id, app_name, element_name, element_data)` |  |
+| `def _resource_type_for_element(element_type)` |  |
+| `def _parse_screen_data(element_data)` |  |
+| `def register_ui_resource(resource)` |  |
+| `def get_ui_resource(resource_id)` |  |
+| `def get_available_resources(application)` |  |
+| `def find_resources_by_type(resource_type, application)` |  |
+| `def has_resource(resource_id)` |  |
+| `def get_resource_alternatives(resource_id)` |  |
+| `def get_fallback_strategies(resource_id)` |  |
+| `def get_capabilities_for_resources(resource_ids)` |  |
+| `def can_execute_capability(capability_name, resource_ids)` |  |
+| `def get_capability_alternatives(capability_name)` |  |
+| `def get_calibration_strategy(application, element_type)` | Devuelve la estrategia permitida para una aplicación/elemento. |
+| `def is_application_calibrable(application)` |  |
+| `def can_calibrate_element(application, element_type)` |  |
+| `def get_execution_strategy_for_action(action_id, resource_id)` |  |
+| `def get_resource_coordinates(resource_id, screen_number)` |  |
+| `def validate_resource_for_action(action_id, resource_id)` |  |
+| `def load_from_macros_coords(calibration_data)` | Carga recursos desde ``calibraciones`` o, para compatibilidad, desde ``legacy_data.macros``. |
+| `def _create_legacy_resource(resource_id, app_name, element_name, element_data)` |  |
+| `def _infer_element_type(element_name)` |  |
+| `def get_calibrated_coordinate(calibration_data, application_name, element_name, screen_number)` |  |
+| `def _get_legacy_calibrated_coordinate(calibration_data, application_name, element_name, screen_number)` |  |
+| `def _case_insensitive_dict_get(data, key)` |  |
+| `def monitor_number_from_object(monitor)` | Extrae un número de monitor sin asumir un atributo concreto. |
+| `def get_screen_key(screen_number)` |  |
+| `def screen_number_from_key(screen_key)` |  |
+| `def get_screen_number_from_key(screen_key)` |  |
+| `def _read_coordinate_value(value)` |  |
+| `def validate_coordinates(x, y, screen_width, screen_height)` |  |
+| `def validate_bounding_box(bbox, screen_width, screen_height)` |  |
+| `def get_window_bounding_box(window_title)` | Compatibilidad legacy: obtiene una ventana por título. |
+| `def _get_window_rect(window)` | Obtiene geometría de ventana priorizando el rectángulo normal de Win32. |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def get_coordinate_manager()`  (L1095) | Obtiene la instancia global del gestor de coordenadas. |
+
+## 🌐 `src/hands/edge/`
+
+<!-- src/hands/edge -->
+
+<a name="src-hands-edge-__init__-py"></a>
+### `src/hands/edge/__init__.py` [3 líneas] — Módulo específico para Microsoft Edge.
+
+**Descripción:** Módulo específico para Microsoft Edge.
+
+**Importaciones:** 0.
+
+_Archivo de marcador de posición / inicialización de paquete._
+
+<a name="src-hands-edge-calibrator_edge-py"></a>
+### `src/hands/edge/calibrator_edge.py` [237 líneas] — Adaptador de compatibilidad para la calibración de Microsoft Edge.
+
+**Descripción:** Adaptador de compatibilidad para la calibración de Microsoft Edge.
+
+**Importaciones:** 3.
+
+`class EdgeCalibrator`  (línea 43) — Adaptador legacy hacia CalibrationManager.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__()` |  |
+| `def calibrate_edge_both_screens()` | Mantiene la API antigua por compatibilidad. |
+| `def calibrate_edge()` | API moderna de compatibilidad. |
+| `def _calibrate_edge_universal()` | Delega Edge en CalibrationManager. |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def calibrate_edge()`  (L196) | Función pública de compatibilidad. |
+
+<a name="src-hands-edge-edge-py"></a>
+### `src/hands/edge/edge.py` [568 líneas] — Funciones específicas para Microsoft Edge.
+
+**Descripción:** Funciones específicas para Microsoft Edge.
+
+**Importaciones:** 11.
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def _get_edge_windows()`  (L32) | Obtiene las ventanas visibles/localizables de Microsoft Edge. |
+| `def _get_edge_window_info(window)`  (L61) | Obtiene metadatos y geometría actual de una ventana de Edge. |
+| `def _find_edge_window_on_monitor(pantalla)`  (L86) | Busca una ventana de Edge cuyo centro esté dentro del monitor indicado. |
+| `def _select_edge_window(preferred_monitor)`  (L110) | Selecciona una ventana Edge, priorizando el monitor indicado. |
+| `def abrir_edge_pantalla(pantalla)`  (L131) | Abre Microsoft Edge y lo posiciona en la pantalla solicitada. |
+| `def abrir_edge_pestana(pantalla)`  (L189) | Abre una nueva pestaña de Edge en la pantalla solicitada. |
+| `def _candidate_edge_paths()`  (L257) | Devuelve rutas habituales donde puede estar instalado Edge. |
+| `def _abrir_edge_desde_ruta()`  (L285) | Abre Edge desde una instalación local conocida. |
+| `def _verificar_edge_abierto()`  (L318) | Verifica si Edge está abierto y visible. |
+| `def _verificar_edge_instalado()`  (L336) | Verifica si Microsoft Edge está instalado. |
+| `def _move_edge_window(window, monitor)`  (L385) | Mueve una ventana Edge al origen del monitor y trata de maximizarla. |
+| `def _mover_edge_a_pantalla(pantalla_num)`  (L402) | Mueve una ventana de Edge al monitor solicitado. |
+| `def _cerrar_edge()`  (L444) | Cierra una ventana visible de Edge. |
+| `def _calibrar_edge()`  (L466) | Compatibilidad con la implementación antigua. |
+| `def _generar_coordenadas_edge(tipo_elemento)`  (L497) | Compatibilidad con código antiguo; no genera coordenadas artificiales. |
+| `def _capturar_edge()`  (L512) | Captura la ventana visible de Edge. |
+| `def get_edge_commands()`  (L554) | Obtiene los comandos legacy de Edge. |
+
+## 🖐️ `src/hands/`
+
+<!-- src/hands -->
+
+<a name="src-hands-executor-py"></a>
+### `src/hands/executor.py` [1861 líneas] — Ejecutor mejorado con HTN
+
+**Descripción:** Corazón de la ejecución: recibe un plan (lista de nodos), ejecuta nodo a nodo (timeout vía `ThreadPoolExecutor`), verifica éxito (success_checker o `ActionInfo.verify_success`), aplica efectos a `ExecutionState`, y re-planifica o intenta alternativas tras fallo. Registra nodo/plan en `LearningSystem` (FASE 18).
+
+**Características:**
+
+- Ejecución serial con bloqueo reentrante
+- Verificación de precondiciones/efectos consensuados con el planificador
+- Timeout por nodo vía `ThreadPoolExecutor`
+- Alternativas + replanificación por fallo
+- Integración con `LearningSystem` (FASE 18)
+- Compatibilidad legacy (FASE 16)
+
+**Importaciones:** 21.
+
+`class ExecutionStatus(Enum)`  (línea 82) — Estados de ejecución de un nodo o plan.
+
+_Sin métodos definidos en el AST._
+
+`class ExecutionResult`  (línea 99) — Resultado de ejecución de un nodo o plan.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __bool__()` | Permite que los adaptadores legacy respeten el estado real del resultado. |
+| `def to_dict()` |  |
+
+`class ExecutionState`  (línea 133) — Estado actual del mundo para ejecución.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def update(update_data)` | Actualiza el estado y fusiona los diccionarios anidados. |
+| `def to_dict()` | Devuelve una instantánea independiente del estado, incluidos campos extendidos. |
+
+`class Executor`  (línea 162) — Ejecutor mejorado con soporte para planificación jerárquica y replanificación.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(action_registry)` | Inicializa el ejecutor sin importar Planner durante la carga del módulo. |
+| `def _initialize_state()` | Inicializa el estado del mundo. |
+| `def execute_plan(plan, plan_id, max_retries, timeout_per_node)` | Ejecuta un plan de forma secuencial; no declara éxito ante un fallo. |
+| `def _execute_plan_serial(plan, plan_id, max_retries, timeout_per_node)` |  |
+| `def _normalize_plan_node(raw_node, index)` |  |
+| `def _execute_node(node, node_id, max_retries, timeout)` | Ejecuta un paso y solo reintenta cuando se declara seguro. |
+| `def _safe_cost(value, default)` |  |
+| `def _verify_node_success(node, result)` | Verifica confirmaciones explícitas sin confundir el estado previo con el posterior. |
+| `def _replan_after_failure(plan, failed_node_index, current_state)` | Construye un plan alternativo sin tocar el plan original. |
+| `def _find_alternative_nodes(failed_node, current_state)` | Encuentra hasta tres acciones registradas que ofrezcan capacidad compatible. |
+| `def _extract_capability_from_action(action_name)` | Extrae la capacidad principal de un nombre de acción. |
+| `def _action_provides_capability(action_info, capability)` | Comprueba compatibilidad por nombre, tipo, categoría o capacidades declaradas. |
+| `def _should_replan(plan, failed_node_index)` | Determina si se debe replanificar después de un fallo. |
+| `def execute_plan_with_replan(plan, goal, max_replan_attempts)` | Ejecuta un plan con replanificación local y registro del resultado real. |
+| `def _update_world_state_after_failure(node, result)` | Registra el fallo y su timestamp sin alterar estados de éxito. |
+| `def _goal_achieved(goal, current_state)` | Comprueba objetivos conocidos usando tanto estado plano como estado anidado. |
+| `def _execute_node_action(node, timeout)` | Ejecuta callback explícito o acción registrada vinculada al nodo. |
+| `def _check_node_preconditions(node)` | Evalúa todas las precondiciones; las desconocidas no se consideran verdaderas. |
+| `def _evaluate_condition(condition)` | Evalúa condiciones tipadas, callbacks, diccionarios o claves de estado. |
+| `def _get_nested_value(state, key)` |  |
+| `def _try_alternative(node, failed_result)` | Prueba alternativas declaradas, sin repetir la acción original. |
+| `def _update_world_state(node, result)` | Actualiza el mundo únicamente tras confirmar el éxito del nodo. |
+| `def _apply_state_updates(updates)` | Fusiona actualizaciones explícitas con el estado runtime. |
+| `def execute_action(action_name, parameters, state, verify, timeout)` | Ejecuta una acción registrada y verifica su resultado antes de confirmarlo. |
+| `def _record_learning_action(action_name, success, execution_time, action_info, verify, parameters)` | Registra aprendizaje sin convertir un fallo de telemetría en fallo de acción. |
+| `def can_execute(action_name, parameters, state)` | Comprueba si una acción registrada puede ejecutarse ahora. |
+| `def process_and_execute(llm_response)` | Procesa respuesta LLM y ejecuta comando (mantenido para compatibilidad). |
+| `def _execute_legacy_or_registered(command_name, positional_args)` | Ejecuta mediante ActionRegistry o fallback legacy. |
+| `def _positional_to_named_parameters(action_info, positional_args)` | Convierte argumentos posicionales a nombrados. |
+| `def _parse_args(args_str)` | Parsea argumentos mediante ast.literal_eval. |
+| `def _get_legacy_function(command_name)` | Busca función legacy en módulos. |
+| `def get_current_state()` | Obtiene el estado actual del mundo. |
+| `def update_state(update_data)` | Actualiza el estado del mundo. |
+| `def get_action_stats()` | Obtiene estadísticas de ejecución de acciones. |
+| `def _record_action_execution(action_name, success, execution_time)` | Registra ejecución de acción para estadísticas. |
+| `def _get_screen_state()` | Obtiene estado actual de la pantalla para aprendizaje. |
+| `def get_learning_insights()` | Obtiene insights del sistema de aprendizaje (FASE 18). |
+| `def get_action_learning_insights(action_name)` | Obtiene insights específicos de una acción (FASE 18). |
+| `def get_cost_adjustments()` | Obtiene ajustes de coste aprendidos (FASE 18). |
+| `def export_learning_data(filepath)` | Exporta datos de aprendizaje (FASE 18). |
+| `def import_learning_data(filepath)` | Importa datos de aprendizaje (FASE 18). |
+| `def clear_learning_data()` | Limpia datos de aprendizaje (FASE 18). |
+| `def enable_learning(enabled)` | Habilita o deshabilita el aprendizaje (FASE 18). |
+| `def _record_command_execution(command_name, success)` | Registra ejecución de comando legacy. |
+| `def list_commands()` | Lista todas las acciones conocidas. |
+| `def get_plannable_actions()` | Obtiene acciones disponibles para planificación. |
+| `def get_action_info(action_name)` | Obtiene información de una acción específica. |
+| `def execute_goal(goal, max_planning_time, find_alternatives, plan_id, enable_learning)` | Planifica y ejecuta un objetivo, devolviendo el resultado confirmado. |
+| `def _get_state_for_planning()` | Devuelve una instantánea independiente y compatible del estado actual. |
+| `def create_goal_from_command(command_name, parameters)` | Crea un objetivo a partir de un comando legacy. |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def _log(level, message)`  (L61) | Compatibilidad con llamadas antiguas al logger que incluían metadatos de línea. |
+| `def get_executor()`  (L1852) | Obtiene el singleton global de Executor de manera segura ante concurrencia. |
+
+## 🦊 `src/hands/firefox/`
+
+<!-- src/hands/firefox -->
+
+<a name="src-hands-firefox-__init__-py"></a>
+### `src/hands/firefox/__init__.py` [3 líneas] — Módulo específico para Mozilla Firefox.
+
+**Descripción:** Módulo específico para Mozilla Firefox.
+
+**Importaciones:** 0.
+
+_Archivo de marcador de posición / inicialización de paquete._
+
+<a name="src-hands-firefox-calibrator_firefox-py"></a>
+### `src/hands/firefox/calibrator_firefox.py` [235 líneas] — Adaptador de compatibilidad para la calibración de Mozilla Firefox.
+
+**Descripción:** Adaptador de compatibilidad para la calibración de Mozilla Firefox.
+
+**Importaciones:** 3.
+
+`class FirefoxCalibrator`  (línea 46) — Adaptador legacy hacia CalibrationManager.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__()` |  |
+| `def calibrate_firefox_both_screens()` | Mantiene el nombre antiguo por compatibilidad. |
+| `def calibrate_firefox()` | API moderna de compatibilidad. |
+| `def _calibrate_firefox_universal()` | Delega Firefox al CalibrationManager universal. |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def calibrate_firefox()`  (L194) | Función pública de compatibilidad. |
+
+<a name="src-hands-firefox-firefox-py"></a>
+### `src/hands/firefox/firefox.py` [638 líneas] — Funciones específicas para Mozilla Firefox.
+
+**Descripción:** Funciones específicas para Mozilla Firefox.
+
+**Importaciones:** 12.
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def _get_firefox_windows()`  (L36) | Obtiene las ventanas localizables de Mozilla Firefox. |
+| `def _get_firefox_window_info(window)`  (L65) | Obtiene metadatos y geometría actual de una ventana de Firefox. |
+| `def _find_firefox_window_on_monitor(pantalla)`  (L94) | Busca una ventana de Firefox cuyo centro esté dentro del monitor indicado. |
+| `def _select_firefox_window(preferred_monitor)`  (L119) | Selecciona una ventana Firefox, priorizando el monitor indicado. |
+| `def abrir_youtube()`  (L142) | Abre YouTube en el navegador predeterminado. |
+| `def abrir_spotify()`  (L152) | Abre Spotify Web en el navegador predeterminado. |
+| `def abrir_firefox_pantalla(pantalla)`  (L167) | Abre Mozilla Firefox y lo posiciona en la pantalla solicitada. |
+| `def abrir_firefox_pestana(pantalla)`  (L223) | Abre una nueva pestaña de Firefox en la pantalla solicitada. |
+| `def _candidate_firefox_paths()`  (L292) | Devuelve rutas habituales donde puede estar instalado Firefox. |
+| `def _abrir_firefox_desde_ruta()`  (L323) | Abre Firefox desde una instalación local conocida. |
+| `def _verificar_firefox_abierto()`  (L358) | Verifica si Firefox está abierto y visible. |
+| `def _verificar_firefox_instalado()`  (L376) | Verifica si Mozilla Firefox está instalado. |
+| `def _move_firefox_window(window, monitor)`  (L432) | Mueve una ventana Firefox al origen del monitor y trata de maximizarla. |
+| `def _mover_firefox_a_pantalla(pantalla_num)`  (L455) | Mueve una ventana de Firefox al monitor solicitado. |
+| `def _cerrar_firefox()`  (L504) | Cierra una ventana visible de Firefox. |
+| `def _calibrar_firefox()`  (L526) | Compatibilidad con la implementación antigua. |
+| `def _generar_coordenadas_firefox(tipo_elemento)`  (L554) | Compatibilidad con código legacy; no genera coordenadas artificiales. |
+| `def _capturar_firefox()`  (L569) | Captura la ventana visible de Firefox. |
+| `def get_firefox_commands()`  (L622) | Obtiene los comandos legacy de Firefox. |
+
+## 🖐️ `src/hands/`
+
+<!-- src/hands -->
+
+<a name="src-hands-keyboard-py"></a>
+### `src/hands/keyboard.py` [901 líneas] — Control del teclado
+
+**Descripción:** Capa de capacidades migrada sobre `pyautogui` (`FAILSAFE`/`PAUSE` desde config). Cada acción (`type_text`, `press_key`, `hotkey`, ops de texto, navegación, shortcuts) es un `@keyboard_capability` con precondiciones/efectos/coste y se registra en `ActionRegistry`.
+
+**Características:**
+
+- Decorator `@keyboard_capability`
+- Configuración de pyautogui desde config
+- Integración con ActionRegistry
+
+**Importaciones:** 9.
+
+`class KeyModifier(Enum)`  (línea 69) — Modificadores de tecla soportados.
+
+_Sin métodos definidos en el AST._
+
+`class KeyboardCapabilities`  (línea 78) — Capacidades del teclado para el sistema de planificación.
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class KeyboardCapabilitySystem`  (línea 734) — Sistema de capacidades del teclado para la planificación jerárquica.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__()` | Inicializar el sistema de capacidades. |
+| `def _initialize_capabilities()` | Inicializar el catálogo de capacidades. |
+| `def get_capabilities_for_context(context)` | Obtener capacidades que se pueden ejecutar con el contexto dado. |
+| `def _check_conditions(conditions, context)` | Verificar si las condiciones se cumplen en el contexto dado. |
+| `def can_execute_capability(capability_name, context)` | ¿Se puede ejecutar una capacidad con el contexto dado? |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def keyboard_capability(name, description, preconditions, effects, cost, required_resources, application, success_checker, planner_enabled, keyboard_action)`  (L99) | Decorador para registrar capacidades del teclado en el sistema de planificación. |
+| `def type_text(text, interval, field_id)`  (L184) | Escribir texto en el campo activo o en un campo específico. |
+| `def press_key(key, hold_time)`  (L230) | Presionar una tecla individual. |
+| `def execute_hotkey()`  (L272) | Ejecutar combinación de teclas (hotkeys). |
+| `def copy_text()`  (L321) | Copiar texto seleccionado al portapapeles. |
+| `def paste_text()`  (L344) | Pegar texto desde el portapapeles. |
+| `def cut_text()`  (L367) | Cortar texto seleccionado al portapapeles. |
+| `def select_all_text()`  (L391) | Seleccionar todo el texto en el campo activo. |
+| `def navigate_tab(forward)`  (L415) | Navegar entre campos con Tabulador. |
+| `def navigate_enter()`  (L448) | Confirmar acción con la tecla Enter. |
+| `def switch_window()`  (L473) | Cambiar a la siguiente ventana con Alt+Tab. |
+| `def close_window()`  (L496) | Cerrar la ventana activa con Alt+F4. |
+| `def open_start_menu()`  (L519) | Abrir el menú de inicio de Windows. |
+| `def _get_typing_interval(interval)`  (L540) | Obtiene el intervalo de escritura (mantenido por compatibilidad). |
+| `def escribir_texto(texto, interval)`  (L553) | Escribe texto en el campo activo (mantenido por compatibilidad). |
+| `def presionar_enter()`  (L573) | Presiona la tecla Enter (mantenido por compatibilidad). |
+| `def presionar_tecla(tecla)`  (L588) | Presiona una tecla específica (mantenido por compatibilidad). |
+| `def copiar()`  (L609) | Ejecuta Ctrl+C (Copiar) (mantenido por compatibilidad). |
+| `def pegar()`  (L624) | Ejecuta Ctrl+V (Pegar) (mantenido por compatibilidad). |
+| `def cortar()`  (L639) | Ejecuta Ctrl+X (Cortar) (mantenido por compatibilidad). |
+| `def seleccionar_todo()`  (L654) | Ejecuta Ctrl+A (Seleccionar todo) (mantenido por compatibilidad). |
+| `def cambiar_ventana()`  (L669) | Ejecuta Alt+Tab (Cambiar ventana) (mantenido por compatibilidad). |
+| `def cerrar_ventana()`  (L684) | Ejecuta Alt+F4 (Cerrar ventana) (mantenido por compatibilidad). |
+| `def tecla_super()`  (L700) | Presiona la tecla Windows (Super) (mantenido por compatibilidad). |
+| `def abrir_menu_inicio()`  (L713) | Abre el menú de inicio de Windows (mantenido por compatibilidad). |
+| `def get_keyboard_capability_system()`  (L894) | Obtener la instancia global del sistema de capacidades del teclado. |
+
+<a name="src-hands-mouse-py"></a>
+### `src/hands/mouse.py` [129 líneas] — Control del ratón
+
+**Descripción:** Primitivas `pyautogui` para mover, hacer clic y hacer scroll; auto-registradas como capacidades al importar.
+
+**Características:**
+
+- pyautogui
+- registro automático de capacidades
+
+**Importaciones:** 8.
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def move_to_position(x, y, duration)`  (L16) | Mueve el ratón a una posición específica. |
+| `def click_element(button, wait_after)`  (L44) | Realiza un clic con el ratón. |
+| `def scroll_at_position(x, y, clicks, wait_after)`  (L74) | Realiza scroll en una posición específica. |
+| `def register_mouse_capabilities()`  (L110) | Registra las capacidades del ratón en el sistema. |
+
+## 🗺️ `src/hands/planner/`
+
+<!-- src/hands/planner -->
+
+<a name="src-hands-planner-__init__-py"></a>
+### `src/hands/planner/__init__.py` [235 líneas] — Paquete de planificación de JARVIS.
+
+**Descripción:** Paquete de planificación de JARVIS.
+
+**Importaciones:** 11.
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def get_htn_manager()`  (L128) | Obtiene el singleton HTN sin importar el gestor al cargar el paquete. |
+| `def get_application_knowledge_integrator()`  (L135) | Obtiene el singleton del integrador de aplicaciones. |
+| `def get_applications_by_capability(capability_name)`  (L144) | Busca aplicaciones por capacidad mediante el módulo correspondiente. |
+| `def get_application_knowledge(app_name)`  (L151) | Obtiene las capacidades declaradas de una aplicación. |
+| `def get_task_executor()`  (L158) | Obtiene el singleton TaskExecutor mediante importación diferida. |
+| `def get_learning_system()`  (L165) | Obtiene el singleton del sistema de aprendizaje cuando se necesita. |
+| `def get_preconditions_effects_manager()`  (L172) | Obtiene el singleton del gestor de precondiciones y efectos. |
+| `def __getattr__(name)`  (L179) | Carga un componente bajo demanda y conserva el atributo en el paquete. |
+| `def __dir__()`  (L200) | Incluye los componentes de carga perezosa en dir(paquete). |
+
+<a name="src-hands-planner-application_integration-py"></a>
+### `src/hands/planner/application_integration.py` [864 líneas] — Integración declarativa del conocimiento de aplicaciones con el planificador.
+
+**Descripción:** Integración declarativa del conocimiento de aplicaciones con el planificador.
+
+**Importaciones:** 12.
+
+`class ApplicationKnowledgeIntegrator`  (línea 35) — Integra conocimiento estructurado de aplicaciones con el planificador.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__()` |  |
+| `def _import_application_manager_factory()` | Carga la fábrica del gestor sin imponer una única ruta de importación. |
+| `def _get_value(obj, key, default)` | Lee una clave tanto de diccionarios como de objetos/dataclasses. |
+| `def _safe_copy(value, default)` |  |
+| `def _normalize_name(value)` | Normaliza un nombre para IDs y claves de estado deterministas. |
+| `def _capability_value(cls, capability)` | Obtiene el valor de una capacidad Enum, objeto, diccionario o string. |
+| `def _capability_key(cls, capability)` |  |
+| `def _as_list(value)` | Normaliza un valor o colección sin dividir strings/diccionarios. |
+| `def _normalized_conditions(cls, value)` | Copia precondiciones/efectos evitando mutar el catálogo de origen. |
+| `def _unique_nodes(nodes)` | Deduplica Nodes por ID preservando orden y datos ya recogidos. |
+| `def _safe_cost(value, default)` | Convierte costes a números finitos no negativos. |
+| `def _get_application(app_name)` |  |
+| `def convert_application_to_nodes(app_name)` | Convierte una aplicación y sus capacidades en Nodes canónicos. |
+| `def _create_application_node(app)` | Crea el nodo declarativo principal de la aplicación. |
+| `def _create_capability_node(app, capability_def)` | Crea un nodo de acción reutilizable para una capacidad declarada. |
+| `def _create_ui_element_node(app, element_name, capability_def)` | Crea un nodo declarativo para un elemento UI conocido o requerido. |
+| `def _is_element_calibrated(cls, element)` |  |
+| `def _validate_node_references(nodes)` | Comprueba las relaciones jerárquicas creadas durante la conversión. |
+| `def _get_application_current_state(app_name)` | Obtiene propiedades persistidas de la aplicación si existen. |
+| `def _generate_application_preconditions(app, current_state)` | Genera las condiciones de preparación declaradas para la aplicación. |
+| `def _generate_application_effects(app)` | Declara que la aplicación está registrada/disponible, no abierta. |
+| `def get_applications_by_capability(capability)` | Devuelve las aplicaciones que declaran una capacidad. |
+| `def get_application_capabilities(app_name)` | Obtiene capacidades en formato declarativo, con fallback al catálogo. |
+| `def get_ui_elements_for_capability(app_name, capability)` | Obtiene los elementos UI requeridos por una capacidad declarada. |
+| `def is_application_capable(app_name, capability)` | Comprueba una capacidad utilizando el gestor o el catálogo de la app. |
+| `def register_application_knowledge(app_config)` | Registra conocimiento mediante la API pública de applications_core. |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def get_application_knowledge_integrator()`  (L810) | Obtiene la instancia global del integrador, inicializada una sola vez. |
+| `def get_applications_by_capability(capability_name)`  (L820) | Compatibilidad legacy; utiliza ApplicationCapability cuando está disponible. |
+| `def get_application_knowledge(app_name)`  (L854) | Compatibilidad legacy para consultar conocimiento de una aplicación. |
+
+<a name="src-hands-planner-goal_state_mapper-py"></a>
+### `src/hands/planner/goal_state_mapper.py` [1485 líneas] — Responsabilidades:
+
+**Descripción:** Responsabilidades:
+
+**Importaciones:** 9.
+
+`class MappingType(Enum)`  (línea 30) — Tipos de mapeo soportados.
+
+_Sin métodos definidos en el AST._
+
+`class MappingResult`  (línea 40) — Resultado de una operación de mapeo.
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class GoalStateMapper`  (línea 51) — Mapea Goal y World State al StateGraph.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(state_graph)` |  |
+| `def map_goal_to_graph(goal, world_state)` | Mapea un objetivo y su contexto al grafo sin ejecutar acciones. |
+| `def map_world_state_to_graph(world_state)` | Mapea el estado del mundo, tanto en formato canónico como legacy. |
+| `def map_capabilities_to_graph(capabilities)` | Mapea capacidades declaradas a nodos reutilizables conocidos. |
+| `def map_goal_and_world_state_to_graph(goal, world_state)` | Realiza el mapeo híbrido y agrega sus resultados sin duplicados. |
+| `def get_mapping_history()` | Devuelve una copia del historial de mapeos. |
+| `def clear_mapping_history()` | Limpia el historial de mapeos. |
+| `def _create_goal_node(goal, world_state)` | Crea el nodo raíz de un objetivo con metadatos normalizados. |
+| `def _create_capability_nodes(capabilities)` | Crea una única instancia de cada capacidad base reconocida. |
+| `def _build_capability_node(capability, template)` | Construye una acción reutilizable a partir de una plantilla validada. |
+| `def _create_goal_specific_nodes(goal, world_state)` | Crea acciones concretas según la intención y el tipo de objetivo. |
+| `def _create_navigation_nodes(goal, world_state)` | Crea la secuencia lógica de abrir el navegador y navegar a un destino. |
+| `def _create_open_app_nodes(goal, world_state)` | Crea los nodos de abrir y activar la aplicación objetivo. |
+| `def _create_close_app_nodes(goal, world_state)` | Crea la acción para cerrar la aplicación indicada por el objetivo. |
+| `def _create_search_nodes(goal, world_state)` | Crea la secuencia genérica de preparar navegador y realizar búsqueda. |
+| `def _map_goal_specific_nodes(goal, world_state)` | Añade una secuencia específica para búsquedas de plataformas conocidas. |
+| `def _create_youtube_specific_nodes(goal)` | Crea abrir navegador, acceder a YouTube y buscar en ese servicio. |
+| `def _create_browser_specific_nodes(goal)` | Compatibilidad para crear una secuencia genérica de navegador. |
+| `def _create_spotify_specific_nodes(goal)` | Crea abrir Spotify y buscar el contenido solicitado. |
+| `def _create_application_state_nodes(world_state)` | Crea nodos STATE por aplicación, aceptando objetos y diccionarios. |
+| `def _create_resource_nodes(world_state)` | Crea nodos RESOURCE para monitores y recursos declarados. |
+| `def _create_calibrated_element_nodes(world_state)` | Crea nodos UI_ELEMENT para elementos calibrados y su monitor. |
+| `def _establish_goal_transitions(goal_node_id, capability_nodes, specific_nodes, goal)` | Crea enlaces dirigidos de descomposición sin introducir ciclos. |
+| `def _find_relevant_capability(node_id, goal)` | Relaciona una acción concreta con la capacidad declarativa adecuada. |
+| `def _establish_state_transitions(app_nodes, resource_nodes, calibrated_nodes, world_state)` | Relaciona estado y recursos solo con identificadores semánticamente asociados. |
+| `def _calculate_mapping_quality(goal, created_nodes)` | Calcula cobertura del mapeo de Goal sin puntuar ejecución. |
+| `def _calculate_state_mapping_quality(world_state, created_nodes)` | Calcula cobertura de los elementos del estado realmente declarados. |
+| `def _add_node(node, result)` | Inserta un nodo solo si falta y registra el nodo usado por el mapeo. |
+| `def _add_edge(source_id, target_id)` | Añade una arista válida y reporta únicamente las transiciones nuevas. |
+| `def _get_graph_node(node_id)` |  |
+| `def _iter_graph_edges()` | Devuelve pares fuente/destino desde las representaciones de grafo conocidas. |
+| `def _update_graph_with_nodes(goal_node, capability_nodes, specific_nodes)` | Compatibilidad: asegura que los nodos indicados están en el grafo. |
+| `def _update_graph_with_state_nodes(app_nodes, resource_nodes, calibrated_nodes)` | Compatibilidad: los nodos ya se agregan al crearse. |
+| `def _get_required_capabilities(goal)` | Obtiene capacidades declaradas y añade las necesarias por intención. |
+| `def _capability_exists(capability)` |  |
+| `def _get_goal_metadata(goal)` |  |
+| `def _get_goal_base_cost(goal)` | Devuelve un coste finito y no negativo para representar el objetivo. |
+| `def _get_goal_name(goal, goal_type)` | Devuelve un nombre legible aun cuando Goal no incluya el campo name. |
+| `def _get_state_value(app_info)` | Normaliza el estado de aplicación cuando llega como enum, objeto o dict. |
+| `def _extract_screen_id(node)` | Busca identificadores de monitor en los metadatos del nodo. |
+| `def _is_action_node(node_id)` |  |
+| `def _unique_preserve_order(values)` |  |
+| `def _unique_edges(values)` |  |
+| `def _record_history()` |  |
+| `def _update_last_history_execution_time(result)` | Actualiza un registro coincidente sin corromper operaciones anteriores. |
+| `def _safe_getattr(obj, attribute, default)` | Lee atributos o claves de diccionario sin propagar errores externos. |
+| `def _get_required_id(obj, kind)` | Valida y normaliza el identificador requerido para un objeto. |
+| `def _as_dict(value)` |  |
+| `def _safe_iterable(value)` | Convierte valores iterables a lista sin dividir cadenas en caracteres. |
+| `def _normalize_target_name(value)` | Extrae un nombre de aplicación razonable de cadenas o targets estructurados. |
+| `def _safe_id_component(value)` |  |
+| `def _create_generic_state_nodes(world_state)` | Representa hechos libres del estado canónico que no son colecciones. |
+| `def _get_generic_state_entries(world_state)` | Obtiene el diccionario de hechos del WorldState canónico, si existe. |
+| `def _world_state_field(world_state, key, default)` | Lee primero modelos legacy con atributos y luego WorldState.state. |
+| `def _get_goal_target_value(goal, target_keys)` | Extrae datos de Goal.target (str/dict) y de metadata sin perder contexto. |
+| `def _normalize_goal_type(value)` | Normaliza tipos de goal que puedan llegar como Enum o texto. |
+| `def _read_field(value, key, default)` | Lee una clave en dict o atributo en objeto. |
+| `def _first_present()` | Retorna el primer valor no nulo/no vacío. |
+| `def _safe_copy(value)` | Copia datos de metadatos con fallback cuando un objeto no se puede copiar. |
+| `def _safe_nonnegative_float(value, default)` | Convierte a float finito no negativo. |
+| `def _safe_unit_float(cls, value)` | Normaliza una confianza al intervalo [0, 1]. |
+| `def _normalize_conditions(value)` | Normaliza condiciones preservando dicts y cadenas como elementos únicos. |
+
+<a name="src-hands-planner-graph-py"></a>
+### `src/hands/planner/graph.py` [1871 líneas] — Grafo de estados y búsqueda de rutas para la planificación de JARVIS.
+
+**Descripción:** Grafo de estados y búsqueda de rutas para la planificación de JARVIS.
+
+**Importaciones:** 21.
+
+`class SearchStrategy(Enum)`  (línea 39) — Estrategias de búsqueda soportadas por el grafo.
+
+_Sin métodos definidos en el AST._
+
+`class GraphNode`  (línea 52) — Estado auxiliar de búsqueda asociado a un nodo canónico.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __lt__(other)` |  |
+
+`class GraphEdge`  (línea 101) — Transición entre dos nodos, con condiciones y efectos declarativos.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __post_init__()` |  |
+| `def _values_equal(actual, expected)` | Compara valores de estado sin confundir True con 1. |
+| `def _evaluate_raw_condition(condition, state)` | Evalúa una condición compatible sin depender de una API única. |
+| `def can_traverse(current_state)` | Indica si se pueden satisfacer todas las condiciones de la arista. |
+| `def apply_effects(current_state)` | Aplica efectos a una copia del estado, registrando los fallos reales. |
+| `def get_total_cost(current_state)` | Calcula coste de transición y sobrecoste declarativo determinista. |
+
+`class RouteResult`  (línea 296) — Resultado estructurado de una búsqueda de ruta.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __post_init__()` |  |
+| `def length()` |  |
+| `def edge_count()` |  |
+| `def to_dict()` |  |
+
+`class StateGraph`  (línea 411) — Grafo de estados con búsqueda de rutas condicionada por el estado.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(heuristic)` |  |
+| `def graph_revision()` | Versión monotónica del grafo, usada para invalidar cachés. |
+| `def _invalidate_search_cache()` |  |
+| `def add_node(node)` |  |
+| `def get_node(node_id)` |  |
+| `def has_node(node_id)` |  |
+| `def add_edge(source_id, target_id, cost, conditions, transition_type, preconditions, effects)` |  |
+| `def _conditions_equivalent(left, right)` |  |
+| `def get_edges_from(node_id)` |  |
+| `def get_edge(source_id, target_id)` |  |
+| `def find_route(start_node_id, goal_node_id, current_state, strategy, max_iterations, find_alternatives, alternative_count)` |  |
+| `def _route_error(start_node_id, goal_node_id, strategy, state, message, started)` |  |
+| `def _normalize_max_iterations(value)` |  |
+| `def _normalize_alternative_count(value)` |  |
+| `def build_route()` | Alias compatible con las integraciones que usan `build_route`. |
+| `def find_path_astar(start_node_id, goal_node_id, current_state, max_iterations, find_alternatives, alternative_count)` |  |
+| `def _find_path_astar_internal(start_node_id, goal_node_id, current_state, max_iterations, blocked_edges)` |  |
+| `def _reconstruct_state_path(current_key, parent)` |  |
+| `def find_path_dijkstra(start_node_id, goal_node_id, current_state, max_iterations, find_alternatives, alternative_count)` |  |
+| `def find_path_bfs(start_node_id, goal_node_id, current_state, max_iterations, find_alternatives, alternative_count)` |  |
+| `def find_path_dfs(start_node_id, goal_node_id, current_state, max_iterations, find_alternatives, alternative_count)` |  |
+| `def find_path_greedy(start_node_id, goal_node_id, current_state, max_iterations, find_alternatives, alternative_count)` |  |
+| `def get_edges_for_path(path, current_state)` | Obtiene una arista por salto; con paralelas elige la primera válida. |
+| `def apply_path_effects(path, current_state)` |  |
+| `def get_node_path_cost(path)` |  |
+| `def get_neighbors(node_id, current_state)` |  |
+| `def add_edge_with_preconditions(source_id, target_id, cost, transition_type)` |  |
+| `def create_conditional_edge(source_id, target_id, cost, condition_type)` |  |
+| `def create_effect_edge(source_id, target_id, cost, effect_type)` |  |
+| `def validate_graph()` |  |
+| `def validate_graph_advanced()` |  |
+| `def _has_circular_path(start_node_id, max_depth)` |  |
+| `def get_graph_stats()` |  |
+| `def clear_search_cache()` |  |
+| `def export_to_json()` |  |
+| `def import_from_json(data)` | Importa de manera transaccional: un documento inválido no borra el grafo actual. |
+| `def export_graph(file_path, format)` |  |
+| `def import_graph(file_path, format)` |  |
+| `def _serialize_node(node)` |  |
+| `def _serialize_edge(edge)` |  |
+| `def _serialize_condition(condition)` |  |
+| `def _serialize_effect(effect)` |  |
+| `def _deserialize_node(node_data)` |  |
+| `def _deserialize_condition(data)` |  |
+| `def _deserialize_effect(data)` |  |
+| `def _json_safe(value)` | Alias histórico para la conversión JSON segura. |
+| `def _normalize_strategy(strategy)` |  |
+| `def _create_goal_from_node(node_id)` |  |
+| `def _estimate_heuristic(node_id, current_state, goal)` |  |
+| `def _state_signature(state)` |  |
+
+`class GraphBuilder`  (línea 1489) — Constructores de grafos básicos de navegación y estado de aplicación.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def build_navigation_graph(nodes)` |  |
+| `def build_application_graph(nodes)` |  |
+
+`class CacheEntry`  (línea 1546) — Entrada de caché con contexto, resultado y contador de accesos.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(path, cost, state, timestamp, final_state, strategy, alternative_paths, graph_revision)` |  |
+| `def is_expired(max_age_seconds)` |  |
+| `def increment_access()` |  |
+
+`class PerformanceMetrics`  (línea 1579) — Métricas acumuladas de búsqueda y caché.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__()` |  |
+| `def record_search(success, path_length, cost, search_time, iterations)` |  |
+| `def record_cache_hit()` |  |
+| `def record_cache_miss()` |  |
+| `def get_hit_rate()` |  |
+| `def get_average_search_time()` |  |
+| `def to_dict()` |  |
+
+`class AdvancedStateGraph(StateGraph)`  (línea 1635) — StateGraph con caché acotada y métricas de rendimiento.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(heuristic, cache_size, max_cache_age)` |  |
+| `def find_path_with_strategy(start_node_id, goal_node_id, current_state, strategy, max_iterations, find_alternatives, alternative_count)` |  |
+| `def _execute_strategy(start_node_id, goal_node_id, current_state, strategy, max_iterations, find_alternatives, alternative_count)` |  |
+| `def find_route(start_node_id, goal_node_id, current_state, strategy, max_iterations, find_alternatives, alternative_count)` |  |
+| `def build_route()` |  |
+| `def _build_cache_key(start_node_id, goal_node_id, current_state, strategy, find_alternatives, alternative_count, max_iterations)` |  |
+| `def _get_from_cache(cache_key, current_state)` |  |
+| `def _add_to_cache(cache_key, entry)` |  |
+| `def _cleanup_cache()` |  |
+| `def get_advanced_stats()` |  |
+| `def optimize_graph_for_performance()` | Limpia caché y ajusta su límite sin cambiar semántica de búsqueda. |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def _safe_float(value, default)`  (L73) | Convierte a float finito y usa *default* ante datos no válidos. |
+| `def _copy_state(state)`  (L82) | Crea una copia defensiva y tolera objetos no copiables. |
+| `def _type_value(value)`  (L95) | Devuelve el valor estable de un Enum sin modificar otros objetos. |
+| `def _json_safe(value, _active)`  (L357) | Convierte valores habituales a JSON sin romper ante ciclos u objetos raros. |
+
+<a name="src-hands-planner-heuristic-py"></a>
+### `src/hands/planner/heuristic.py` [893 líneas] — Heurísticas para algoritmo de búsqueda A* (FASE 8).
+
+**Descripción:** Heurísticas para algoritmo de búsqueda A* (FASE 8).
+
+**Importaciones:** 11.
+
+`class HeuristicType(Enum)`  (línea 36) — Tipos de heurísticas disponibles.
+
+_Sin métodos definidos en el AST._
+
+`class Heuristic`  (línea 73) — Heurística configurable para el algoritmo A*.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(heuristic_type, weight, custom_heuristic, max_cache_size)` | Inicializa la heurística y su caché LRU acotada. |
+| `def _normalize_heuristic_type(value)` | Normaliza un enum, su valor textual o su nombre simbólico. |
+| `def _normalize_weight(value)` | Normaliza el peso a un número finito no negativo. |
+| `def _normalize_for_json(value, active_ids)` | Normaliza objetos a tipos JSON, detectando referencias circulares. |
+| `def _stable_serialize(value)` | Serializa datos de forma estable para claves de caché. |
+| `def _json_fallback(value)` | Fallback compatible para serializadores JSON que lo utilicen. |
+| `def _build_cache_key(node_id, current_state, goal)` | Construye una clave que separa nodo, contexto, objetivo y configuración. |
+| `def _minimal_goal_data(goal)` | Obtiene los campos básicos del objetivo cuando no puede serializarse. |
+| `def _cache_get(key)` | Obtiene una estimación manteniendo el orden LRU. |
+| `def _cache_set(key, value)` | Guarda una estimación y elimina las entradas menos recientes. |
+| `def estimate_cost(node_id, current_state, goal, all_nodes)` | Estima el coste restante y siempre devuelve un float finito >= 0. |
+| `def _apply_heuristic(node_id, current_state, goal, all_nodes)` | Aplica la heurística seleccionada. |
+| `def _manhattan_distance(node, goal, current_state)` | Estimación discreta de navegación basada en el estado observable. |
+| `def _euclidean_distance(node, goal, current_state)` | Ajuste continuo de la estimación discreta disponible. |
+| `def _goal_distance_heuristic(node, goal, current_state)` | Estima un límite conservador del trabajo pendiente del objetivo. |
+| `def _capability_based_heuristic(node, goal, current_state)` | Estima el coste según las capacidades requeridas que faltan. |
+| `def _state_similarity_heuristic(node, goal, current_state)` | Estima la distancia al estado objetivo usando los campos declarados. |
+| `def _goal_type(goal)` |  |
+| `def _target_mapping(goal)` |  |
+| `def _get_target_url(cls, goal)` | Obtiene el destino URL admitiendo objetivos legacy y estructurados. |
+| `def _get_target_application(cls, goal)` | Obtiene la aplicación objetivo desde el target o los metadatos. |
+| `def _urls_match(actual, expected)` | Compara URLs sin distinguir una barra final, conservando el resto. |
+| `def _get_required_capabilities(goal)` | Obtiene capacidades requeridas y admite respuestas en formato string. |
+| `def _get_current_url(state)` | Obtiene la URL actual desde formatos de estado compatibles. |
+| `def _application_flag(state, application, flag)` | Obtiene un flag de aplicación de estado plano o anidado. |
+| `def _capability_fulfilled(capability, current_state, goal)` | Comprueba una capacidad usando el objetivo para evitar falsos positivos. |
+| `def _values_equal(actual, expected)` |  |
+| `def _get_state_value(state, key)` | Obtiene un valor de estado con claves directas, punteadas o anidadas. |
+| `def _get_expected_state(cls, goal)` | Obtiene una representación mínima y consistente del estado objetivo. |
+| `def _capability_costs()` | Costes unitarios orientativos por capacidad; no sustituyen los costes de arista. |
+| `def _cost_for_capability(capability, costs)` | Resuelve alias frecuentes manteniendo un coste por defecto conservador. |
+| `def clear_cache()` | Limpia la caché de estimaciones heurísticas. |
+| `def get_cache_stats()` | Devuelve estadísticas y configuración de la caché. |
+
+`class HeuristicFactory`  (línea 855) — Factoría para crear heurísticas con configuraciones frecuentes.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def create_uniform_heuristic(weight)` | Crea una heurística constante. |
+| `def create_goal_distance_heuristic(weight)` | Crea una heurística basada en la distancia al objetivo. |
+| `def create_capability_based_heuristic(weight)` | Crea una heurística basada en capacidades pendientes. |
+| `def create_state_similarity_heuristic(weight)` | Crea una heurística basada en similitud de estado. |
+| `def create_custom_heuristic(heuristic_func, weight)` | Crea una heurística personalizada validando su callback. |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def _log(level, message, method, line)`  (L53) | Emite un log sin permitir que un fallo del logger rompa la planificación. |
+
+<a name="src-hands-planner-htn_manager-py"></a>
+### `src/hands/planner/htn_manager.py` [1100 líneas] — Gestor de descomposición jerárquica de tareas (HTN) de JARVIS.
+
+**Descripción:** Gestor de descomposición jerárquica de tareas (HTN) de JARVIS.
+
+**Importaciones:** 17.
+
+`class HTNStatus(Enum)`  (línea 37)
+
+_Sin métodos definidos en el AST._
+
+`class TaskDecompositionStrategy(Enum)`  (línea 46)
+
+_Sin métodos definidos en el AST._
+
+`class TaskExecutionResult`  (línea 54)
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class HTNDecompositionRule`  (línea 65)
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class HTNManager`  (línea 76) — Gestor central de reglas HTN y jerarquías de tareas.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(planner)` |  |
+| `def initialize_decomposition_rules()` |  |
+| `def set_planner(planner)` |  |
+| `def set_state_graph(state_graph)` |  |
+| `def enable_graph_decomposition(enabled, threshold)` |  |
+| `def decompose_and_execute(goal, current_state)` | Compatibilidad pública: descompone y procesa la jerarquía resultante. |
+| `def _decompose_and_execute_with_graph(goal, current_state)` |  |
+| `def _decompose_with_graph_advanced(goal, htn_tasks, current_state)` | Usa las dependencias para ordenar tareas y delega ejecución a TaskExecutor. |
+| `def _convert_htn_tasks_to_graph_nodes(htn_tasks, goal)` | Convierte tareas HTN en nodos y mantiene las dependencias internas. |
+| `def _optimize_task_sequence_with_graph(graph_tasks, current_state, goal)` |  |
+| `def _convert_graph_sequence_to_execution_plan(graph_sequence, goal)` |  |
+| `def _node_to_execution_dict(node, goal)` |  |
+| `def _convert_tasks_to_execution_plan(tasks, goal)` |  |
+| `def _execute_optimized_plan(execution_plan, current_state, goal)` | Consulta al Planner cuando no hay tareas concretas que ejecutar. |
+| `def _call_planner(goal, current_state)` |  |
+| `def _execute_with_graph_only(goal, current_state)` |  |
+| `def _estimate_task_cost(task)` |  |
+| `def _execute_plan_directly(execution_plan, current_state, goal)` | Fallback de planificación que no ejecuta ni simula acciones. |
+| `def load_task_library()` |  |
+| `def decompose_goal(goal, current_state)` |  |
+| `def execute_goal_hierarchy(goal, current_state)` |  |
+| `def _find_decomposition_rule(goal, current_state)` |  |
+| `def _application_catalog_available()` |  |
+| `def _check_preconditions(rule, current_state)` |  |
+| `def _browser_available(state)` |  |
+| `def _entity_available(state)` |  |
+| `def _task_from_pattern(goal, pattern_id, parent)` |  |
+| `def _decompose_sequential(goal, rule)` |  |
+| `def _decompose_parallel(goal, rule)` |  |
+| `def _decompose_conditional(goal, rule, current_state)` |  |
+| `def _decompose_iterative(goal, rule)` |  |
+| `def _establish_hierarchy(tasks, goal)` |  |
+| `def _order_tasks_by_dependencies(tasks)` |  |
+| `def _validate_task_dependencies(tasks)` |  |
+| `def _get_task_executor()` | Carga TaskExecutor de manera perezosa para evitar importaciones circulares. |
+| `def _execute_task_hierarchy(tasks, current_state)` |  |
+| `def _execute_single_task(task, current_state)` |  |
+| `def _result_to_dict(result)` | Serializa el resultado de una subtarea sin exponer referencias mutables. |
+| `def _normalize_task_result(raw, task, current_state, started)` |  |
+| `def _normalize_task_status(status)` |  |
+| `def _simulate_task_execution(task, current_state)` |  |
+| `def _record_execution(goal, tasks, result, elapsed)` |  |
+| `def get_execution_statistics()` |  |
+| `def get_task_execution_history()` |  |
+| `def _valid_goal(goal)` |  |
+| `def _goal_type(goal)` |  |
+| `def _normalize_state(state)` |  |
+| `def _status_value(status)` |  |
+| `def _safe_cost(value, default)` |  |
+| `def _as_dict(value)` |  |
+| `def _as_list(value)` |  |
+| `def _evaluate_precondition(precondition, state)` |  |
+| `def _failed_result(task_id, message, state)` |  |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def get_htn_manager()`  (L1077) | Obtiene la instancia global de HTNManager de forma segura. |
+
+<a name="src-hands-planner-learning_system-py"></a>
+### `src/hands/planner/learning_system.py` [899 líneas] — Sistema de aprendizaje de JARVIS (FASE 18).
+
+**Descripción:** Sistema de aprendizaje de JARVIS (FASE 18).
+
+**Importaciones:** 13.
+
+`class LearningEventType(Enum)`  (línea 27)
+
+_Sin métodos definidos en el AST._
+
+`class LearningEvent`  (línea 39)
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` |  |
+| `def from_dict(cls, data)` |  |
+| `def _coerce_bool(value)` |  |
+| `def _optional_string(value)` |  |
+
+`class LearningStatistics`  (línea 130)
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class LearningSystem`  (línea 142) — Sistema centralizado, acotado y thread-safe de aprendizaje histórico.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(max_memory_size, learning_rate)` |  |
+| `def record_action_execution(action_name, success, execution_time, estimated_cost, context, application, screen_state, actual_cost)` |  |
+| `def record_plan_execution(plan_id, goal_id, plan, success, execution_time, total_estimated_cost, context, actual_cost)` | Registra el resultado real del plan; el caller debe aportar ``success`` observado. |
+| `def record_node_execution(node_id, success, execution_time, estimated_cost, context, application, actual_cost)` |  |
+| `def record_replanification(original_plan, new_plan, reason, success, execution_time)` |  |
+| `def record_goal_result(goal_id, success, context, execution_time)` | Registra explícitamente el resultado observado de un objetivo. |
+| `def get_action_insights(action_name)` |  |
+| `def get_system_insights()` |  |
+| `def get_cost_adjustments()` | Devuelve deltas respecto al último coste estimado (no costes absolutos). |
+| `def get_learned_costs()` | Devuelve los costes absolutos aprendidos por acción. |
+| `def get_route_performance(goal_id)` |  |
+| `def export_learning_data(filepath)` |  |
+| `def import_learning_data(filepath)` |  |
+| `def clear_learning_data()` |  |
+| `def enable_learning(enabled)` |  |
+| `def enable_cost_learning(enabled)` |  |
+| `def enable_pattern_learning(enabled)` |  |
+| `def enable_route_learning(enabled)` |  |
+| `def _build_event(event_type)` |  |
+| `def _store_event(event)` | Almacena evento e incrementa contadores agregados en la misma sección crítica. |
+| `def _update_statistics(stats, event)` |  |
+| `def _learn_action_cost(action_name, event)` |  |
+| `def _discover_patterns(event)` |  |
+| `def _update_route_performance(route_key, plan, event)` |  |
+| `def _register_optimal_route(goal_id, plan, event)` |  |
+| `def _learn_from_replanification(event)` |  |
+| `def _calculate_improvement_trend(events)` |  |
+| `def _count_events_by_type()` |  |
+| `def _assess_system_health(events)` |  |
+| `def _generate_health_recommendations(status, success_rate, cost_accuracy)` |  |
+| `def _build_application_insights(events)` |  |
+| `def _build_action_insights_summary(events)` |  |
+| `def _rebuild_statistics_from_events()` |  |
+| `def _count_unique_patterns()` |  |
+| `def _safe_float(value, default)` |  |
+| `def _cost_error(event)` |  |
+| `def _empty_route_performance()` |  |
+| `def _load_pattern_dict(value)` |  |
+| `def _load_temporal_patterns(value)` |  |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def get_learning_system()`  (L883) | Obtiene la instancia global del sistema de aprendizaje con inicialización segura. |
+
+<a name="src-hands-planner-node-py"></a>
+### `src/hands/planner/node.py` [1137 líneas] — Única fuente de verdad para:
+
+**Descripción:** Única fuente de verdad para:
+
+**Importaciones:** 8.
+
+`class NodeType(Enum)`  (línea 31) — Tipos de nodos en el sistema de planificación.
+
+_Sin métodos definidos en el AST._
+
+`class TaskStatus(Enum)`  (línea 47) — Estado de ejecución de tareas.
+
+_Sin métodos definidos en el AST._
+
+`class Node`  (línea 121) — Modelo conceptual común para todos los elementos del sistema.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __post_init__()` |  |
+| `def _evaluate_precondition(precondition, current_state)` | Evalúa una precondición declarativa o funcional sin acoplarse a otro módulo. |
+| `def can_execute(current_state)` | Verifica las precondiciones declarativas, funcionales y de estado del nodo. |
+| `def _apply_effect(effect, state, execution_result)` | Aplica un efecto declarativo/objeto manteniendo compatibilidad con Effect. |
+| `def execute()` | Ejecuta el callback y devuelve el resultado y el estado candidato actualizado. |
+| `def _update_learning_metrics(execution_record)` | Recalcula métricas desde los registros válidos del histórico acumulado. |
+| `def verify_success(result)` | Verifica el éxito mediante el criterio configurado. |
+| `def to_dict()` | Convierte el nodo a un diccionario serializable. |
+| `def from_dict(cls, data)` | Reconstruye un nodo desde datos serializados, sin restaurar callbacks. |
+| `def add_edge(target_node_id, cost)` | Añade o actualiza una transición saliente y su coste finito no negativo. |
+| `def add_in_edge(source_node_id, cost)` | Registra una transición entrante; el coste canónico reside en el emisor. |
+| `def get_edge_cost(target_node_id)` | Obtiene el coste de una transición. |
+| `def get_valid_transitions(current_state, all_nodes)` | Devuelve transiciones de salida cuyo nodo destino puede ejecutarse. |
+| `def add_precondition_function(precond_func)` | Añade una precondición funcional. |
+| `def add_effect_function(effect_func)` | Añade un efecto funcional. |
+| `def set_state_requirement(key, value)` | Define un requisito de estado. |
+| `def set_state_modification(key, value)` | Define una modificación de estado esperada. |
+| `def mark_as_reusable_action(category)` | Marca el nodo como acción reutilizable. |
+| `def get_execution_stats()` | Devuelve estadísticas agregadas sin fallar ante entradas históricas malformadas. |
+
+`class Goal`  (línea 674) — Objetivo de alto nivel alcanzable mediante planificación.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __post_init__()` |  |
+| `def _target_value(key, default)` |  |
+| `def is_achieved(current_state)` | Comprueba si el estado actual satisface el objetivo conocido. |
+| `def get_required_capabilities()` | Obtiene capacidades necesarias para el objetivo preservando el orden. |
+| `def estimate_cost(current_state)` | Estima el coste restante del objetivo. |
+| `def is_expired()` | Indica si se ha superado el deadline válido del objetivo. |
+| `def to_dict()` | Convierte el objetivo a un diccionario serializable. |
+| `def from_dict(cls, data)` | Reconstruye un objetivo desde un diccionario serializado. |
+
+`class Task`  (línea 837) — Tarea jerárquica descomponible en otras tareas o nodos.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __post_init__()` |  |
+| `def _dependency_satisfied(dependency_id, all_nodes, current_state)` | Comprueba una dependencia usando la semántica disponible en el modelo. |
+| `def can_execute(current_state, all_nodes)` | Verifica dependencias y disponibilidad de hijos, evitando ciclos jerárquicos. |
+| `def decompose_task(all_nodes)` | Descompone recursivamente la tarea en hojas sin quedar atrapada en ciclos. |
+| `def get_execution_plan(current_state, all_nodes)` | Obtiene candidatos ejecutables en el orden declarado y sin recursión cíclica. |
+| `def estimate_task_cost(current_state, all_nodes)` | Estima el coste de los hijos ejecutables sin contar ramas cíclicas. |
+| `def to_dict()` | Convierte la tarea a un diccionario serializable. |
+| `def from_dict(cls, data)` | Reconstruye una tarea desde un diccionario serializado. |
+
+`class WorldState`  (línea 1080) — Estado del mundo canónico para planificación.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __post_init__()` | Asegura que el estado interno siempre sea un diccionario independiente. |
+| `def get(key, default)` | Obtiene un valor del estado. |
+| `def set(key, value)` | Establece un valor evitando retener referencias mutables externas. |
+| `def update(other)` | Actualiza el estado con otro estado o diccionario. |
+| `def copy()` | Devuelve una copia independiente del estado. |
+| `def to_dict()` | Convierte el estado a una representación serializable. |
+| `def from_dict(cls, data)` | Reconstruye el estado desde un diccionario serializado. |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def _copy_state(state)`  (L58) | Copia el estado sin permitir que los efectos muten accidentalmente el original. |
+| `def _safe_float(value, default)`  (L71) | Convierte un valor a float finito y devuelve el valor por defecto si no es válido. |
+| `def _serialize_value(value, _seen)`  (L80) | Convierte valores habituales a datos serializables y evita ciclos de referencias. |
+| `def create_action_node(id, name, application, ui_element, cost)`  (L1033) | Crea un nodo de acción reutilizable. |
+| `def create_application_node(id, name, app_name)`  (L1055) | Crea un nodo que representa una aplicación. |
+| `def create_state_node(id, name, state_key, state_value)`  (L1060) | Crea un nodo que representa un requisito de estado. |
+| `def create_condition_node(id, name, condition_func)`  (L1067) | Crea un nodo de condición mediante callback. |
+
+<a name="src-hands-planner-optimization-py"></a>
+### `src/hands/planner/optimization.py` [951 líneas] — Sistema de optimización del planificador de JARVIS.
+
+**Descripción:** Sistema de optimización del planificador de JARVIS.
+
+**Importaciones:** 19.
+
+`class OptimizationType(Enum)`  (línea 40) — Tipos de optimización disponibles.
+
+_Sin métodos definidos en el AST._
+
+`class RouteCacheEntry`  (línea 75) — Entrada del caché de rutas/planes.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` |  |
+| `def from_dict(cls, data)` |  |
+
+`class CostLearningData`  (línea 125) — Muestra individual de aprendizaje de coste.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` |  |
+| `def from_dict(cls, data)` |  |
+
+`class ContextData`  (línea 156) — Datos contextuales usados por la optimización.
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class OptimizationManager`  (línea 165) — Gestor de optimización que opera sobre un Planner ya existente.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(planner, max_cache_size)` |  |
+| `def set_learning_system(learning_system)` |  |
+| `def optimize_planning(goal, current_state, available_nodes, max_planning_time)` |  |
+| `def _check_route_cache(goal, current_state)` |  |
+| `def _add_to_route_cache(goal, current_state, result)` |  |
+| `def record_route_execution(goal_id, current_state, success, execution_time)` | Actualiza métricas de la ruta cacheada después de observar su ejecución. |
+| `def _build_cache_key(goal, state_hash)` |  |
+| `def _safe_goal_capabilities(goal)` |  |
+| `def _hash_state(state)` |  |
+| `def _stable_hash(cls, value)` |  |
+| `def _normalize_for_json(cls, value)` |  |
+| `def _strip_volatile_state(state)` |  |
+| `def _remove_redundancies(plan, current_state)` | Elimina repeticiones evidentes, preservando acciones observables. |
+| `def _select_optimal_alternatives(alternatives, current_state)` |  |
+| `def _apply_context_optimization(plan, current_state)` | Ajusta metadatos/costes contextuales sin alterar el plan de entrada. |
+| `def _create_optimized_node(original_id, optimized_method, original_node)` | Compatibilidad legacy para generar una variante de nodo. |
+| `def _calculate_state_compatibility(plan, current_state)` |  |
+| `def _evaluate_condition_with_state(condition, state)` |  |
+| `def _get_nested_state_value(state, key, default)` |  |
+| `def _get_learned_cost_for_plan(plan)` |  |
+| `def record_execution_result(plan, execution_time, success, context)` | Registra un resultado observado; este método no ejecuta el plan. |
+| `def _update_cost_model(node_id, learning_data)` |  |
+| `def _update_context_patterns(plan, success, context)` |  |
+| `def get_optimization_stats()` |  |
+| `def clear_cache()` |  |
+| `def invalidate_cache_for_goal(goal_id)` | Invalida las entradas cacheadas de un objetivo tras cambios de dominio. |
+| `def enable_optimization(optimization_type, enabled)` |  |
+| `def export_optimization_data(filepath)` |  |
+| `def import_optimization_data(filepath)` |  |
+| `def _node_identifier(node)` |  |
+| `def _node_cost(node)` |  |
+| `def _plan_signature(cls, plan)` |  |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def _finite_float(value, default, minimum)`  (L51) | Convierte a float finito y aplica un límite inferior opcional. |
+| `def _string_list(value)`  (L64) |  |
+
+<a name="src-hands-planner-optimization_config-py"></a>
+### `src/hands/planner/optimization_config.py` [475 líneas] — Configuración tipada y validable del sistema de optimización de JARVIS.
+
+**Descripción:** Configuración tipada y validable del sistema de optimización de JARVIS.
+
+**Importaciones:** 7.
+
+`class OptimizationMode(Enum)`  (línea 19) — Modos de operación del sistema de optimización.
+
+_Sin métodos definidos en el AST._
+
+`class RouteCacheConfig`  (línea 93) — Configuración del caché de rutas (FASE 17.1).
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __post_init__()` |  |
+
+`class CostLearningConfig`  (línea 112) — Configuración del aprendizaje de costes (FASE 17.6).
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __post_init__()` |  |
+
+`class RedundancyRemovalConfig`  (línea 135) — Configuración de eliminación de redundancias (FASE 17.3).
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __post_init__()` |  |
+
+`class ContextAwareConfig`  (línea 155) — Configuración de optimización basada en contexto (FASE 17.5).
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __post_init__()` |  |
+
+`class AlternativeSelectionConfig`  (línea 178) — Configuración de selección de alternativas (FASE 17.4).
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __post_init__()` |  |
+
+`class PerformanceMonitoringConfig`  (línea 201) — Configuración de monitoreo de rendimiento (FASE 17.7).
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __post_init__()` |  |
+
+`class OptimizationConfig`  (línea 227) — Configuración completa del sistema de optimización (FASE 17).
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __post_init__()` |  |
+| `def _coerce_mode(value)` |  |
+| `def _coerce_nested(name, config_type)` |  |
+| `def get_aggressive_config(cls)` | Obtiene configuración para modo agresivo. |
+| `def get_conservative_config(cls)` | Obtiene configuración para modo conservador. |
+| `def get_learning_only_config(cls)` | Obtiene configuración para registrar aprendizaje sin aplicar optimizaciones. |
+| `def get_optimization_enabled()` | Devuelve el estado efectivo de cada técnica para el modo actual. |
+| `def validate_config()` | Valida rangos y coherencia; una lista vacía indica configuración válida. |
+| `def validate_or_raise()` | Lanza ValueError si validate_config detecta problemas. |
+| `def to_dict()` | Devuelve una copia serializable de toda la configuración. |
+| `def from_dict(cls, config_dict)` | Construye configuración desde un diccionario parcial o completo. |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def _coerce_bool(value, field_name)`  (L28) | Convierte booleanos habituales sin tratar cualquier texto como True. |
+| `def _coerce_int(value, field_name)`  (L43) | Convierte a entero y rechaza booleanos y valores fraccionarios. |
+| `def _coerce_float(value, field_name)`  (L56) | Convierte a float; la validación de rangos se realiza en validate_config. |
+| `def _coerce_string_list(value, field_name)`  (L66) |  |
+| `def _normalize_fields(instance, integers, floats, booleans)`  (L83) |  |
+
+<a name="src-hands-planner-planner-py"></a>
+### `src/hands/planner/planner.py` [3129 líneas] — Planificador principal de JARVIS.
+
+**Descripción:** Planificador principal de JARVIS.
+
+**Importaciones:** 34.
+
+`class PlannerStatus(Enum)`  (línea 60)
+
+_Sin métodos definidos en el AST._
+
+`class PlanQuality(Enum)`  (línea 69)
+
+_Sin métodos definidos en el AST._
+
+`class PlanningResult`  (línea 77) — Resultado estructurado de una solicitud de planificación.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __post_init__()` |  |
+
+`class Planner`  (línea 117) — Planificador central de JARVIS; no ejecuta físicamente sus planes.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(executor)` |  |
+| `def get_learning_insights()` |  |
+| `def get_action_learning_insights(action_name)` |  |
+| `def get_cost_adjustments()` |  |
+| `def export_learning_data(filepath)` |  |
+| `def import_learning_data(filepath)` |  |
+| `def clear_learning_data()` |  |
+| `def enable_learning(enabled)` |  |
+| `def initialize_htn_manager()` |  |
+| `def set_htn_manager(htn_manager)` |  |
+| `def plan_with_htn_integration(goal, current_state, available_nodes, max_planning_time, use_graph_optimization, htn_decomposition_threshold)` |  |
+| `def _plan_with_graph_optimized(goal, current_state, available_nodes, max_planning_time, htn_threshold)` |  |
+| `def _plan_with_htn_traditional(goal, current_state, available_nodes, max_planning_time)` |  |
+| `def _plan_complex_htn_graph(goal, current_state, available_nodes, max_planning_time)` |  |
+| `def _invoke_planner_method(method, goal, current_state, available_nodes, max_planning_time)` | Invoca una API HTN legacy sin repetirla si falla dentro de su cuerpo. |
+| `def _coerce_htn_result(raw, goal, current_state)` |  |
+| `def _normalize_dict_plan(raw_plan)` | Normaliza listas de nodos/diccionarios a pasos declarativos de plan. |
+| `def _convert_htn_result_to_plan(htn_result)` |  |
+| `def set_state_graph(state_graph)` |  |
+| `def get_state_graph()` |  |
+| `def create_graph_from_nodes(nodes)` |  |
+| `def _build_graph_edges(graph, nodes)` | Genera solo transiciones respaldadas por dependencias o semántica. |
+| `def _should_create_edge(source_node, target_node)` | No conecta nodos solo por compartir tipo o aplicación. |
+| `def _calculate_edge_cost_for_graph(source_node, target_node)` |  |
+| `def _get_edge_conditions(source_node, target_node)` |  |
+| `def integrate_graph_with_htn(graph, htn_manager)` |  |
+| `def validate_graph_integration()` |  |
+| `def get_graph_integration_status()` |  |
+| `def configure_astar_planning(heuristic_type, heuristic_weight, graph_type)` |  |
+| `def _create_graph_edges_from_nodes()` |  |
+| `def set_custom_graph(graph)` |  |
+| `def plan(goal, current_state, available_nodes, max_planning_time, find_alternatives, use_optimization)` |  |
+| `def _plan_with_optional_optimization(goal, current_state, available_nodes, max_planning_time, use_optimization)` |  |
+| `def _create_plan_astar(goal, current_state, available_nodes, max_planning_time)` |  |
+| `def _create_plan(goal, current_state, available_nodes, max_planning_time)` |  |
+| `def _get_available_nodes()` |  |
+| `def _create_compatibility_nodes()` | Nodos mínimos de compatibilidad; no representan ejecución ya realizada. |
+| `def _get_start_node_for_goal(goal, current_state)` |  |
+| `def _get_goal_node_for_goal(goal)` |  |
+| `def _convert_path_to_plan(path, available_nodes)` |  |
+| `def _convert_node_to_execution_node(node)` |  |
+| `def _build_hierarchical_plan(goal, current_state, available_nodes, required_capabilities)` |  |
+| `def _find_nodes_for_capability(capability, available_nodes, current_state)` |  |
+| `def _node_provides_capability(node, capability)` |  |
+| `def _select_best_node(nodes, current_state)` |  |
+| `def _optimize_plan(plan, current_state)` |  |
+| `def validate_ui_resources_for_plan(plan, current_state)` |  |
+| `def get_optimal_ui_strategy(action_id, resource_id)` |  |
+| `def resolve_ui_conflicts(plan, current_state)` |  |
+| `def check_ui_readiness(goal, current_state, available_nodes)` |  |
+| `def _find_alternative_plans_astar(goal, current_state, available_nodes, original_plan)` |  |
+| `def _find_alternatives_for_node(goal, current_state, available_nodes, original_plan, original_node, position)` |  |
+| `def _select_best_alternative(alternatives, current_state, goal, original_plan)` |  |
+| `def _calculate_plan_similarity(alt_plan, original_plan)` |  |
+| `def _calculate_state_compatibility(plan, current_state)` |  |
+| `def _evaluate_condition_with_state(condition, state)` |  |
+| `def replan(goal, current_state, failed_plan, failed_node_index)` |  |
+| `def _evaluate_plan_quality(plan, current_state, goal)` |  |
+| `def _optimize_integrated_plan(result, current_state, goal)` |  |
+| `def _remove_redundancies(plan)` |  |
+| `def _apply_learned_cost_adjustments(plan)` |  |
+| `def _ensure_optimization_systems()` |  |
+| `def load_application_knowledge()` |  |
+| `def get_applications_by_capability(capability_name)` |  |
+| `def get_application_capabilities(app_name)` |  |
+| `def find_application_for_goal(goal)` |  |
+| `def build_application_aware_plan(goal, current_state)` |  |
+| `def is_application_available(app_name)` |  |
+| `def get_application_ui_requirements(app_name, capability)` |  |
+| `def get_planning_stats()` |  |
+| `def execute_plan(plan, plan_id)` | Delegación explícita legacy. Nunca ejecuta acciones dentro del Planner. |
+| `def record_execution_result(plan, execution_time, success, context)` | Registra feedback tras una ejecución externa real; plan() no lo simula. |
+| `def get_optimization_stats()` |  |
+| `def clear_optimization_cache()` |  |
+| `def enable_optimization(optimization_type, enabled)` |  |
+| `def export_optimization_data(filepath)` |  |
+| `def import_optimization_data(filepath)` |  |
+| `def get_optimization_recommendations()` |  |
+| `def _record_planning_history(goal, current_state, result, method)` |  |
+| `def _get_default_state()` |  |
+| `def _safe_required_capabilities(goal)` |  |
+| `def _is_goal_expired(goal)` |  |
+| `def _is_goal_achieved(goal, current_state)` |  |
+| `def _node_type_value(node)` |  |
+| `def _status_value(status)` |  |
+| `def _normalize_identifier(value)` |  |
+| `def _state_node_matches_context(node, current_state)` |  |
+| `def _node_can_satisfy_goal(node, goal)` |  |
+| `def _goal_satisfied_by_effects(effects, goal)` |  |
+| `def _effects_support_preconditions(effects, preconditions)` |  |
+| `def _facts_support_conditions(facts, conditions)` |  |
+| `def _normalize_route_result(raw_result)` | Normaliza RouteResult, diccionarios, tuplas y listas legacy. |
+| `def _create_sequential_navigation_edges()` | Añade secuencia legacy únicamente cuando los nodos existen. |
+| `def _validate_goal_request(goal, max_planning_time)` |  |
+| `def _failure_result(message, goal, state, started)` |  |
+| `def _new_plan_id()` |  |
+| `def _normalize_state(value)` |  |
+| `def _goal_target_string(goal)` |  |
+| `def _node_effect_facts(node)` |  |
+| `def _node_state_facts(node)` |  |
+| `def _has_incoming_edge(node_id)` |  |
+| `def _edge_pairs()` |  |
+| `def _time_budget_to_iterations(max_planning_time)` |  |
+| `def _normalize_alternative_plans(alternatives, nodes)` |  |
+| `def _candidate_preconditions_compatible(node, current_state, preceding_plan)` |  |
+| `def _same_capability_or_category(candidate, original_node)` |  |
+| `def _capability_already_satisfied(capability, state)` |  |
+| `def _apply_declared_effects(state, effects)` |  |
+| `def _calculate_goal_complexity(goal, current_state)` |  |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def _normalize_text(value)`  (L3074) |  |
+| `def _slug(value)`  (L3084) | Normaliza nombres de capacidades sin perder el separador de palabras. |
+| `def _finite_float(value, default)`  (L3089) |  |
+| `def _finite_nonnegative(value, default)`  (L3097) |  |
+| `def _as_values(value)`  (L3102) |  |
+| `def _normalize_alternative_paths(value)`  (L3117) |  |
+
+<a name="src-hands-planner-planner_integration-py"></a>
+### `src/hands/planner/planner_integration.py` [1923 líneas] — Responsabilidades:
+
+**Descripción:** Responsabilidades:
+
+**Importaciones:** 14.
+
+`class IntegrationMode(Enum)`  (línea 37)
+
+_Sin métodos definidos en el AST._
+
+`class GraphPlanningResult`  (línea 44)
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class GraphPlannerIntegration`  (línea 57) — Puente entre Goal/estado actual y StateGraph.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(use_astar, integration_mode)` | Inicializa el puente de planificación sin ejecutar acciones. |
+| `def initialize_graph(nodes, edges_config)` | Construye un grafo nuevo y rechaza identificadores ambiguos. |
+| `def _configure_advanced_edges(edges_config)` |  |
+| `def _create_compatibility_edges()` |  |
+| `def _create_sequence_edges(sequences)` |  |
+| `def _prepare_planning_edges()` | Deriva aristas solo de dependencias o efectos que aportan evidencia. |
+| `def _connect_if_plannable(source_node, target_node, current_state)` |  |
+| `def _add_planning_edge(source_node, target_node)` |  |
+| `def _add_edge_if_missing(source_id, target_id, cost, transition_type, preconditions, effects)` |  |
+| `def create_plan_with_graph(goal, current_state, available_nodes, max_planning_time, start_node_id, goal_node_id)` | Planifica una ruta y devuelve metadatos; nunca ejecuta acciones. |
+| `def _validate_planning_input(goal, current_state, available_nodes)` |  |
+| `def _determine_search_strategy(goal, current_state)` |  |
+| `def _calculate_goal_complexity(goal, current_state)` |  |
+| `def _execute_search(start_node_id, goal_node_id, current_state, strategy, max_planning_time)` | Invoca la API de búsqueda compatible y normaliza el resultado. |
+| `def _select_search_method()` |  |
+| `def _build_search_kwargs(method, start_node_id, goal_node_id, current_state, strategy, max_iterations)` |  |
+| `def _call_search_positionally(method, start_node_id, goal_node_id, current_state, strategy, max_iterations)` |  |
+| `def _normalize_route_result(raw_result, strategy)` | Adapta RouteResult, dict, tupla y lista sin convertir errores en éxitos. |
+| `def _normalize_edge_ids(edges, path)` |  |
+| `def _prepare_contextual_planning_edges(start_node_id, goal_node_id, current_state, goal)` | Añade enlaces temporales para esta búsqueda según el estado observado. |
+| `def _get_start_node_for_goal(goal, current_state)` |  |
+| `def _score_state_node(node, current_state)` |  |
+| `def _get_goal_node_for_goal(goal)` |  |
+| `def _node_can_satisfy_goal(action_node, goal_node, current_state, goal)` | Comprueba compatibilidad con evidencia, priorizando el target exacto. |
+| `def _goal_type_matches_effects(goal_type, effects)` |  |
+| `def _calculate_path_cost(path, current_state)` |  |
+| `def _find_edge(source_id, target_id, state)` |  |
+| `def _get_edges_used_in_path(path)` |  |
+| `def _convert_path_to_plan_metadata(path, available_nodes)` |  |
+| `def _update_performance_metrics(plan_entries, execution_time, total_cost)` |  |
+| `def _preconditions_satisfied(preconditions, state)` |  |
+| `def _effects_support_preconditions(effects, preconditions)` | Indica si todos los requisitos podrían quedar garantizados por los efectos. |
+| `def _condition_supported_by_effects(condition, effects)` | Comprueba compatibilidad declarativa; no adivina el efecto de callbacks. |
+| `def _has_effect_key(key, effects)` |  |
+| `def _key_value_supported(key, expected, effects, stringify)` |  |
+| `def _goal_satisfied_by_effects(current_state, effects)` |  |
+| `def _calculate_graph_metrics()` |  |
+| `def get_integration_statistics()` |  |
+| `def export_graph_state(filepath)` |  |
+| `def import_graph_state(filepath)` |  |
+| `def validate_graph_consistency()` |  |
+| `def _as_sequence(value)` | Normaliza colecciones sin separar strings ni diccionarios en sus partes. |
+| `def _normalize_path(value)` | Normaliza una ruta y descarta entradas vacías/no textuales. |
+| `def _normalize_text(value)` |  |
+| `def _goal_target_terms(target)` | Extrae términos de target manteniendo las claves/valores existentes. |
+| `def _effect_fields(effect)` |  |
+| `def _condition_numeric_supported(key, kind, expected, effects)` |  |
+| `def _evaluate_condition_like(condition, state)` | Evalúa condiciones declarativas compatibles, fallando de forma segura. |
+| `def _copy_state(state)` |  |
+| `def _add_contextual_edge_if_missing(source_id, target_id, cost, transition_type, preconditions, effects)` |  |
+| `def _remove_contextual_planning_edges()` |  |
+| `def _invalidate_graph_caches()` |  |
+| `def _validate_route_path(path, start_node_id, goal_node_id, initial_state)` |  |
+| `def _record_integration_search(success, path_length, cost, elapsed)` |  |
+| `def build_route()` |  |
+| `def _safe_float(value, default)` |  |
+
+<a name="src-hands-planner-preconditions_effects-py"></a>
+### `src/hands/planner/preconditions_effects.py` [1076 líneas] — Sistema avanzado de precondiciones y efectos para planificación jerárquica.
+
+**Descripción:** Sistema avanzado de precondiciones y efectos para planificación jerárquica.
+
+**Importaciones:** 7.
+
+`class PreconditionsEffectsManager`  (línea 90) — Gestor centralizado de precondiciones y efectos.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__()` |  |
+| `def _initialize_templates()` | Inicializa plantillas comunes de condiciones y efectos. |
+| `def create_condition(condition_type, key, expected_value, function, description, parameters)` | Crea una condición y la registra para reutilización. |
+| `def create_effect(effect_type, key, value, function, description, parameters, cumulative)` | Crea un efecto y lo registra para reutilización. |
+| `def _make_registry_key(kind, key)` |  |
+| `def create_composite_condition(conditions, operator, description)` | Crea una condición compuesta AND u OR. |
+| `def verify_action_preconditions(action_info, current_state)` | Devuelve True cuando todas las precondiciones de la acción se cumplen. |
+| `def evaluate_condition(condition, current_state)` | Evalúa una condición individual o funcional de forma segura. |
+| `def _dict_condition_matches(condition, state)` |  |
+| `def _dict_to_condition(condition_dict)` |  |
+| `def _resolve_condition_type(raw_type)` |  |
+| `def apply_action_effects(action_info, current_state, execution_result)` | Aplica los efectos de la acción y devuelve un nuevo estado. |
+| `def apply_effect(effect, current_state, execution_result)` | Aplica un efecto individual. |
+| `def _dict_to_effect(effect_dict)` |  |
+| `def get_state_requirements_for_action(action_info)` | Extrae solo precondiciones representables como requisitos escalares. |
+| `def get_state_modifications_from_action(action_info)` | Extrae modificaciones de estado estáticas de los efectos. |
+| `def create_action_with_preconditions_effects(name, description, preconditions, effects, cost)` | Crea un ActionInfo compatible con el registro central de acciones. |
+| `def _normalize_sequence(value)` | Normaliza una colección sin alterar el orden de listas y tuplas. |
+| `def _ensure_condition(condition)` |  |
+| `def _resolve_action_type(raw_type)` |  |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def _safe_copy(value, memo)`  (L38) | Copia datos incluyendo contenedores cíclicos y valores no copiables. |
+| `def _safe_state_copy(state)`  (L82) | Devuelve una copia independiente del estado recibido. |
+| `def get_preconditions_effects_manager()`  (L968) | Obtiene la instancia global del gestor. |
+| `def create_application_open_condition(app_name)`  (L976) | Crea una condición que representa una aplicación abierta. |
+| `def create_application_active_condition(app_name)`  (L998) | Crea una condición que representa una aplicación activa. |
+| `def create_ui_element_calibrated_condition(app_name, element_name)`  (L1020) | Crea una condición que representa un elemento UI calibrado. |
+| `def create_application_open_effect(app_name)`  (L1044) | Crea un efecto que representa una aplicación abierta. |
+| `def create_ui_element_calibrate_effect(app_name, element_name)`  (L1056) | Crea un efecto que representa un elemento UI calibrado. |
+
+<a name="src-hands-planner-preconditions_effects_types-py"></a>
+### `src/hands/planner/preconditions_effects_types.py` [821 líneas] — Tipos base para el sistema de precondiciones y efectos.
+
+**Descripción:** Tipos base para el sistema de precondiciones y efectos.
+
+**Importaciones:** 7.
+
+`class ConditionType(Enum)`  (línea 31) — Tipos de condiciones de precondición/efecto.
+
+_Sin métodos definidos en el AST._
+
+`class Condition`  (línea 334) — Representa una condición que debe cumplirse para ejecutar una acción.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def evaluate(state)` | Evalúa la condición contra el estado actual sin mutarlo. |
+| `def _evaluate(state, active_conditions, depth)` |  |
+
+`class Effect`  (línea 484) — Representa un efecto que modifica el estado tras ejecutar una acción.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def apply(state, execution_result)` | Aplica el efecto y devuelve un estado nuevo sin mutar la entrada. |
+| `def _apply_internal(state, execution_result, active_effects, depth)` |  |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def _safe_copy(value, memo)`  (L48) | Copia valores comunes de forma defensiva, tolerando objetos no copiables. |
+| `def _normalize_name(value)`  (L120) | Normaliza nombres usados como claves de estado. |
+| `def _is_mapping(value)`  (L127) |  |
+| `def _safe_number(value)`  (L131) | Convierte a float únicamente valores numéricos finitos. |
+| `def _as_bool(value)`  (L142) | Interpreta flags comunes sin tratar la cadena ``'false'`` como cierta. |
+| `def _get_nested_state_value(state, key, default)`  (L170) | Obtiene una clave directa o una ruta sencilla separada por puntos. |
+| `def _get_application_state(state, app_name)`  (L196) | Busca el estado de una aplicación en varios formatos compatibles. |
+| `def _get_boolean_application_flag(state, app_name, flag)`  (L220) | Obtiene un flag de aplicación desde estado plano o anidado. |
+| `def _get_ui_element_state(state, app_name, element_name)`  (L248) | Busca el estado de un elemento UI sin confundir aplicaciones distintas. |
+| `def _resolve_condition_type(value)`  (L303) | Convierte un enum, valor textual o alias histórico a ``ConditionType``. |
+| `def _coerce_condition(value)`  (L681) | Convierte una condición soportada a ``Condition`` de forma segura. |
+| `def _coerce_effect(value)`  (L719) | Convierte un efecto soportado a ``Effect``. |
+| `def _update_application_state(state, app_name, changes)`  (L747) | Actualiza, cuando existe, el formato anidado ``applications``. |
+| `def _update_ui_element_state(state, app_name, element_name, changes)`  (L770) | Actualiza, cuando existe, el formato ``ui_elements`` compatible. |
+
+<a name="src-hands-planner-task_executor-py"></a>
+### `src/hands/planner/task_executor.py` [1097 líneas] — Ejecutor de tareas HTN integrado con las capacidades reales de JARVIS.
+
+**Descripción:** Ejecutor de tareas HTN integrado con las capacidades reales de JARVIS.
+
+**Importaciones:** 23.
+
+`class TaskExecutorStatus(Enum)`  (línea 80)
+
+_Sin métodos definidos en el AST._
+
+`class TaskExecutionMode(Enum)`  (línea 89)
+
+_Sin métodos definidos en el AST._
+
+`class TaskExecutionConfig`  (línea 97)
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __post_init__()` |  |
+| `def _safe_int(value, default)` |  |
+| `def _safe_float(value, default)` |  |
+
+`class TaskExecutor`  (línea 129) — Ejecutor HTN que delega las acciones sin simular ejecuciones.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(config)` |  |
+| `def _safe_get(factory, label)` |  |
+| `def _task_metadata(task)` |  |
+| `def _task_application(task)` |  |
+| `def _task_parameters(task)` |  |
+| `def execute_task(task, current_state)` | Prepara y ejecuta una tarea individual. |
+| `def _register_failure(task, error_message, started, result, current_state)` |  |
+| `def _failed_result(task, error_message, started, result, current_state)` |  |
+| `def execute_task_with_retry(task, current_state)` | Reintenta solo cuando la tarea declara explícitamente que es segura. |
+| `def execute_task_hierarchy(tasks, current_state, mode)` |  |
+| `def _prepare_task_execution(task, current_state)` |  |
+| `def _check_task_preconditions(task, current_state)` |  |
+| `def _evaluate_precondition(condition, state)` |  |
+| `def _convert_task_to_node(task, current_state)` |  |
+| `def _calculate_task_cost(task, current_state)` |  |
+| `def _resolve_action_name(task)` |  |
+| `def _create_execution_callback(task)` |  |
+| `def _call_callback(callback, kwargs)` |  |
+| `def _truthy_success(value)` |  |
+| `def _normalize_execution_result(result)` | Normaliza respuestas y exige evidencia explícita de éxito. |
+| `def _execute_real_capability(task, kwargs)` | Ejecuta una acción registrada o la delega en el executor principal. |
+| `def _delegate_to_executor(executor, task, action_name, parameters, current_state)` | Adapta firmas conocidas; no repite una llamada que ya fue invocada. |
+| `def _signature_accepts(signature, args, kwargs)` |  |
+| `def _create_success_criteria(task)` |  |
+| `def _execute_node(node, current_state)` |  |
+| `def _apply_result_to_state(current_state, result)` |  |
+| `def _execute_fallback(task, current_state)` |  |
+| `def _execute_prepare_navigator()` |  |
+| `def _execute_navigate_to_target()` |  |
+| `def _execute_check_availability()` |  |
+| `def _execute_open_application()` |  |
+| `def _execute_activate_window()` |  |
+| `def _execute_navigate_to_search_engine()` |  |
+| `def _execute_perform_search()` |  |
+| `def _execute_legacy_task_capability(task_id, kwargs)` | Compatibilidad para IDs HTN anteriores, delegando en capacidades reales. |
+| `def _execute_resolve_entity()` | Resuelve una entidad usando el resolver de memoria real. |
+| `def _get_conversation_history()` |  |
+| `def _get_current_intent()` |  |
+| `def _get_recent_entities()` |  |
+| `def _get_user_preferences()` |  |
+| `def _get_session_info()` |  |
+| `def _update_world_state_with_entity(resolution)` |  |
+| `def _execute_sequential(tasks, current_state)` |  |
+| `def _execute_parallel(tasks, current_state)` | Ejecuta tareas independientes en paralelo con estados aislados. |
+| `def _execute_conditional(tasks, current_state)` |  |
+| `def _execute_with_fallback(tasks, current_state)` |  |
+| `def _should_execute_conditionally(task, current_state)` |  |
+| `def _update_execution_statistics(execution_time)` |  |
+| `def get_execution_statistics()` |  |
+| `def _as_list(value)` |  |
+| `def _normalize_key(value)` |  |
+| `def _safe_number(value, default)` |  |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def get_htn_manager()`  (L34) | Obtiene el HTN Manager de forma diferida. |
+| `def get_application_knowledge_integrator()`  (L45) | Obtiene el integrador de conocimiento de aplicaciones. |
+| `def get_executor()`  (L58) | Obtiene el executor principal de JARVIS de forma diferida. |
+| `def get_action_registry()`  (L69) | Obtiene el registro central de acciones de forma diferida. |
+| `def get_task_executor()`  (L1077) | Obtiene el singleton de TaskExecutor con inicialización protegida. |
+
+## 🖐️ `src/hands/`
+
+<!-- src/hands -->
+
+<a name="src-hands-universal_visual_calibrator-py"></a>
+### `src/hands/universal_visual_calibrator.py` [922 líneas] — Calibrador visual universal para la arquitectura de planificación jerárquica.
+
+**Descripción:** Calibrador visual universal para la arquitectura de planificación jerárquica.
+
+**Importaciones:** 12.
+
+`class CalibrationPolicy`  (línea 30) — Política centralizada de seguridad, no una allowlist de aplicaciones.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def can_calibrate_application(cls, application_name)` |  |
+| `def can_calibrate_element(cls, element_type, confidence)` |  |
+| `def _normalize_name(name)` |  |
+
+`class UICapability`  (línea 202) — Representa un elemento UI calibrado y consumible por acciones.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(name, element_type, center, bbox, screen, confidence)` |  |
+| `def to_dict()` |  |
+
+`class CalibrationState`  (línea 234) — Estado en memoria de los elementos calibrados.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__()` |  |
+| `def get_element(application, element_name, monitor_number)` |  |
+| `def get_application_elements(application, monitor_number)` |  |
+| `def add_element(application, element, monitor_number)` |  |
+| `def is_element_calibrated(application, element_name, monitor_number)` |  |
+| `def get_calibration_age(application)` |  |
+| `def _normalize_application(value)` |  |
+| `def _normalize_element(value)` |  |
+
+`class UniversalVisualCalibrator`  (línea 332) — Calibrador visual universal integrado con las capas superiores.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(memory)` |  |
+| `def get_ui_capability(application, element_name, monitor_number, screenshot_path)` |  |
+| `def calibrate_application_elements(application, monitor_number, screenshot_path)` |  |
+| `def calibrate(application_name, monitor_number, screenshot_path)` |  |
+| `def _calibrate_element(application, monitor_number, screenshot_path, required_element)` |  |
+| `def _build_prompt(application_name)` |  |
+| `def _parse_response(response)` |  |
+| `def _get_image_size(screenshot_path)` |  |
+| `def _normalize_elements(raw_elements, monitor, image_width, image_height)` |  |
+| `def _normalize_single_element(raw_element, monitor, image_width, image_height)` |  |
+| `def _extract_image_bbox(raw_element, image_width, image_height)` |  |
+| `def _bbox_to_image_pixels(values, image_width, image_height)` |  |
+| `def _image_bbox_to_monitor_bbox(image_bbox, monitor, image_width, image_height)` |  |
+| `def _looks_normalized(values)` |  |
+| `def _normalize_element_name(value)` |  |
+| `def _normalize_confidence(value)` |  |
+| `def _deduplicate_elements(elements)` |  |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def get_calibrator(memory)`  (L892) |  |
+| `def get_ui_capability(application, element_name, monitor_number, screenshot_path)`  (L901) |  |
+
+## 🪟 `src/hands/windows/`
+
+<!-- src/hands/windows -->
+
+<a name="src-hands-windows-__init__-py"></a>
+### `src/hands/windows/__init__.py` [3 líneas] — Módulo específico para aplicaciones de Windows.
+
+**Descripción:** Módulo específico para aplicaciones de Windows.
+
+**Importaciones:** 0.
+
+_Archivo de marcador de posición / inicialización de paquete._
+
+<a name="src-hands-windows-calibrator_windows-py"></a>
+### `src/hands/windows/calibrator_windows.py` [263 líneas] — Adaptador de compatibilidad para la calibración de aplicaciones Windows.
+
+**Descripción:** Adaptador de compatibilidad para la calibración de aplicaciones Windows.
+
+**Importaciones:** 3.
+
+`class WindowsCalibrator`  (línea 43) — Adaptador legacy hacia CalibrationManager.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__()` |  |
+| `def get_calibration_prompt(app_name)` | Mantiene la API antigua por compatibilidad. |
+| `def calibrate_app_both_screens(app_name)` | Mantiene el nombre antiguo por compatibilidad. |
+| `def calibrate_app(app_name)` | API de compatibilidad para calibrar una aplicación concreta. |
+| `def _calibrate_universal(app_name)` | Delega la calibración en CalibrationManager. |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def calibrate_app(app_name)`  (L218) | Función pública de compatibilidad. |
+
+<a name="src-hands-windows-windows-py"></a>
+### `src/hands/windows/windows.py` [694 líneas] — Funciones auxiliares para aplicaciones de Windows.
+
+**Descripción:** Funciones auxiliares para aplicaciones de Windows.
+
+**Importaciones:** 16.
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def actualizar_api_key_riot()`  (L51) | Abre Riot Developer Portal y solicita un análisis visual. |
+| `def _capturar_pantalla(filepath)`  (L120) | Captura el escritorio completo. |
+| `def _abrir_aplicacion_windows(nombre_app)`  (L163) | Intenta abrir una aplicación de Windows. |
+| `def _get_window_search_patterns(nombre_app)`  (L231) | Devuelve patrones de título compatibles con aplicaciones comunes. |
+| `def _get_application_windows(nombre_app)`  (L271) | Busca ventanas de una aplicación por título. |
+| `def _verificar_aplicacion_abierta(nombre_app)`  (L296) | Verifica si una aplicación tiene al menos una ventana visible. |
+| `def _mover_aplicacion_a_pantalla(nombre_app, pantalla_num)`  (L329) | Mueve una aplicación a un monitor concreto. |
+| `def _cerrar_aplicacion_windows(nombre_app)`  (L428) | Cierra una ventana de la aplicación. |
+| `def _get_default_calibration_screen_number(screen_manager)`  (L486) | Obtiene un monitor real de referencia para una API legacy. |
+| `def _calibrar_aplicacion_windows(nombre_app)`  (L521) | API legacy. |
+| `def _obtener_elementos_aplicacion(nombre_app)`  (L578) | API legacy. |
+| `def _generar_coordenadas_aplicacion(nombre_app, tipo_elemento)`  (L593) | API legacy. |
+| `def _capturar_aplicacion_windows(nombre_app)`  (L616) | Captura la ventana de una aplicación. |
+| `def _safe_filename(value)`  (L667) | Convierte un nombre de aplicación en un nombre de archivo seguro. |
+| `def get_windows_commands()`  (L681) | Devuelve las funciones públicas/legacy asociadas a Windows. |
+
+## 🧠 `src/memory/`
+
+<!-- src/memory -->
+
+<a name="src-memory-__init__-py"></a>
+### `src/memory/__init__.py` [78 líneas] — Módulo de memoria mejorado para soportar planificación jerárquica.
+
+**Descripción:** Módulo de memoria mejorado para soportar planificación jerárquica.
+
+**Importaciones:** 4.
+
+_Archivo de marcador de posición / inicialización de paquete._
+
+<a name="src-memory-conversation-py"></a>
+### `src/memory/conversation.py` [1129 líneas] — Memoria conversacional y del dominio
+
+**Descripción:** Modelo de planificación en memoria (`Goal`/`Node`/`Task`) y gestor unificado `ConversationMemory`. `DomainMemory` (FASE 5) carga `knowledge/entities.json`, `applications.json`, `capabilities.json` y mantiene interacciones/preferencias; `ConversationMemory` combina chat, predictivo y dominio, y gestiona aliases estáticos y aprendidos (FASE 16).
+
+**Características:**
+
+- FASE 5: Domain Memory
+- Jerarquía Goal/Node/Task para planificación
+- Carga de conocimiento de dominio estático
+- Aliases estáticos + aprendidos (FASE 16 compat)
+- Insights de aprendizaje y stats de uso
+
+**Importaciones:** 13.
+
+`class NodeType(Enum)`  (línea 34) — Tipos de nodos en el sistema de planificación.
+
+_Sin métodos definidos en el AST._
+
+`class TaskStatus(Enum)`  (línea 49) — Estado de ejecución de tareas.
+
+_Sin métodos definidos en el AST._
+
+`class Node`  (línea 59) — Modelo básico de nodo para memoria.
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class Goal`  (línea 76) — Modelo básico de objetivo para memoria.
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class Task`  (línea 88) — Modelo básico de tarea para memoria.
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class Task`  (línea 104) — Tarea jerárquica (FASE 2).
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def can_execute(current_state, all_nodes)` | Verifica si la tarea puede ejecutarse. |
+
+`class DomainMemory`  (línea 130) — Memoria de conocimiento del dominio (FASE 5).
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__()` |  |
+| `def load_domain_knowledge()` | Carga conocimiento del dominio desde archivos. |
+| `def load_user_preferences()` | Carga preferencias del usuario desde archivo persistente. |
+| `def save_user_preferences()` | Guarda preferencias del usuario de forma persistente. |
+| `def get_entity(entity_name)` | Obtiene una entidad por nombre o alias. |
+| `def get_application_capabilities(app_name)` | Obtiene capacidades de una aplicación. |
+| `def get_capability_definition(category, capability)` | Obtiene definición detallada de una capacidad. |
+| `def record_user_interaction(user_input, entity_used, action_taken, success)` | Registra interacción del usuario para aprendizaje y preferencias. |
+| `def _update_preferences_from_interaction(interaction)` | Actualiza preferencias basadas en interacciones exitosas. |
+| `def get_user_preferences()` | Obtiene preferencias del usuario. |
+| `def get_preferred_entities(entity_type)` | Obtiene entidades preferidas por el usuario. |
+| `def get_preferred_application(action_type)` | Obtiene aplicación preferida para un tipo de acción. |
+| `def add_knowledge_update(update_type, content)` | Añade actualización de conocimiento para persistencia futura. |
+| `def get_suggested_entities(partial_name, limit)` | Obtiene sugerencias de entidades basadas en nombre parcial y preferencias. |
+| `def reason_about_entities(context)` | Realiza razonamiento básico sobre entidades basado en contexto y preferencias. |
+| `def _normalize_text(text)` | Normaliza texto para búsqueda. |
+
+`class ConversationMemory`  (línea 408) — Sistema de memoria transformado para planificación jerárquica.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__()` |  |
+| `def _normalize_text(text)` | Normaliza texto para búsqueda. |
+| `def _remove_wake_word(text)` | Elimina 'jarvis' inicial. |
+| `def _load_aliases()` | Carga aliases (mantener compatibilidad FASE 16). |
+| `def parse_user_input(user_input)` | Transforma entrada de usuario en objetivo (FASE 15). |
+| `def _extract_intention(normalized_text)` | Extrae intención del texto normalizado. |
+| `def _create_goal_from_intention(intention)` | Crea objetivo a partir de intención. |
+| `def create_plan_from_goal(goal)` | Crea un plan a partir de un objetivo (FASE 6, 7). |
+| `def update_world_state(state_update)` | Actualiza el estado del mundo. |
+| `def add_user_message(user_text)` | Añade mensaje de usuario a la memoria conversacional (compatibilidad). |
+| `def get_current_state()` | Obtiene estado actual del mundo. |
+| `def _check_achieved_goals()` | Verifica si algún objetivo ha sido alcanzado. |
+| `def create_node(node_config)` | Crea un nodo en el sistema de planificación. |
+| `def create_task(task_config)` | Crea una tarea jerárquica. |
+| `def get_applicable_nodes(current_state)` | Obtiene nodos aplicables en el estado actual. |
+| `def get_alias(transcribed_text)` | Método de compatibilidad para aliases antiguos. |
+| `def record_command_usage(user_input, command_executed, success)` | Registra uso de comando para análisis predictivo (compatibilidad). |
+| `def save_conversation(user_text, assistant_text, goal, plan, execution_result)` | Guarda conversación con información de planificación. |
+| `def get_conversation_history()` | Obtiene historial con información de planificación. |
+| `def clear_history()` | Borra historial de conversaciones. |
+| `def clear_predictive_data()` | Borra datos predictivos. |
+| `def get_learning_insights()` | Obtiene insights de aprendizaje del nuevo sistema. |
+| `def save_domain_knowledge_persistence()` | Guarda el estado completo del conocimiento de dominio para persistencia. |
+| `def _get_most_used_entities()` | Obtiene las entidades más usadas basadas en interacciones. |
+| `def _get_most_used_actions()` | Obtiene las acciones más usadas basadas en interacciones. |
+| `def load_domain_knowledge_persistence()` | Carga conocimiento de dominio persistido. |
+
+<a name="src-memory-entity_resolver-py"></a>
+### `src/memory/entity_resolver.py` [825 líneas] — Resolución avanzada de entidades
+
+**Descripción:** Resolución de entidades con contexto: extracción de URLs (twitch/youtube/github/spotify → plataforma e ID de canal), creación de entidades desde URL, coincidencia difusa (`difflib`) y manejo de ambigüedades con alternativas y umbral de confianza (0.7).
+
+**Características:**
+
+- Extracción y parseo de URLs
+- Creación de entidades desde URL
+- Coincidencia difusa y ambigüedades
+- Conteo de interacciones y scores de preferencia (FASE 18)
+
+**Importaciones:** 11.
+
+`class EntityResolutionResult`  (línea 28) — Resultado de la resolución de entidad.
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class ResolutionContext`  (línea 39) — Contexto para resolución de entidades.
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class EntityResolver`  (línea 48) — Sistema avanzado de resolución de entidades.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(memory_manager)` |  |
+| `def resolve_entity(entity_reference, context, entity_type)` | Resuelve una referencia de entidad a una entidad específica. |
+| `def resolve_entities_batch(entity_references, context)` | Resuelve múltiples entidades en lote. |
+| `def _normalize_reference(reference)` | Normaliza una referencia de entidad. |
+| `def _find_exact_matches(reference, entity_type)` | Busca coincidencias exactas. |
+| `def _find_fuzzy_matches(reference, entity_type)` | Busca coincidencias difusas. |
+| `def _find_by_properties(reference, entity_type)` | Busca entidades por propiedades. |
+| `def _select_best_match(matches, reference, context)` | Selecciona la mejor coincidencia basada en contexto. |
+| `def _disambiguate_with_context(matches, reference, context)` | Usa contexto para desambiguar entre múltiples entidades. |
+| `def _create_temporary_entity(reference, entity_type)` | Crea una entidad temporal para referencias no encontradas. |
+| `def get_entity_suggestions(partial_text, entity_type, limit)` | Obtiene sugerencias de entidades basadas en texto parcial. |
+| `def resolve_url(url_input, context)` | Resuelve una URL a una entidad específica del sistema. |
+| `def extract_urls_from_text(text)` | Extrae todas las URLs de un texto. |
+| `def _normalize_url(url_input)` | Normaliza una URL de entrada. |
+| `def _parse_url(url)` | Parsea una URL y extrae información estructurada. |
+| `def _create_entity_from_url(url_info, url, context)` | Crea una entidad basada en información de URL. |
+| `def get_url_suggestions(partial_url, limit)` | Obtiene sugerencias de entidades basadas en URL parcial. |
+| `def learn_from_resolution(result, user_feedback)` | Aprende de los resultados de resolución para mejorar futuras resoluciones. |
+| `def set_user_preference(entity_id, preference_type, preference_value, context)` | Establece una preferencia de usuario para una entidad. |
+| `def get_user_preferences_for_entity(entity_id)` | Obtiene todas las preferencias del usuario para una entidad específica. |
+| `def get_preferred_entities(preference_type)` | Obtiene entidades preferidas por el usuario. |
+| `def set_entity_attribute(entity_id, attribute_name, attribute_value, attribute_type, source, metadata)` | Establece un atributo extendido para una entidad. |
+| `def get_entity_attributes(entity_id)` | Obtiene todos los atributos extendidos de una entidad. |
+| `def get_entities_with_attribute(attribute_name, attribute_value)` | Busca entidades que tienen un atributo específico. |
+| `def learn_entity_interaction(entity_id, interaction_type, success, metadata)` | Aprende de interacciones con entidades y actualiza atributos. |
+
+<a name="src-memory-prediction-py"></a>
+### `src/memory/prediction.py` [1081 líneas] — Memoria predictiva
+
+**Descripción:** Inferencia predictiva de objetivos/acciones desde histórico de uso (FASE 15/17/18) e integración con `ConversationMemory`. Registra eventos de ejecución y mantiene `ExecutionMetrics` para el aprendizaje.
+
+**Características:**
+
+- FASE 15: comandos de alto nivel
+- FASE 17: optimización predictiva
+- FASE 18: métricas de ejecución
+- Compat con estadísticas legacy + formato nuevo
+
+**Importaciones:** 18.
+
+`class PredictionResult`  (línea 32) — Resultado de predicción para planificación.
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class ExecutionMetrics`  (línea 44) — Métricas de ejecución para aprendizaje (FASE 18).
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class EnhancedPredictionMemory`  (línea 56) — Memoria predictiva mejorada que integra:
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(filepath)` |  |
+| `def _load()` | Carga datos con migración a nuevo formato. |
+| `def _initialize_goal_templates()` | Inicializa plantillas de objetivos para predicción rápida. |
+| `def _migrate_enhanced_data(loaded)` | Migra datos al nuevo formato mejorado. |
+| `def _can_migrate_to_goal(event)` | Verifica si un evento puede migrarse a goal. |
+| `def _migrate_event_to_goal(event)` | Migra evento a formato goal. |
+| `def _infer_goal_type_from_command(command)` | Infiere tipo de goal desde comando legacy. |
+| `def predict_goal_from_input(user_input, current_state)` | Predice objetivo basado en entrada de usuario (FASE 15). |
+| `def _normalize_input(text)` | Normaliza texto para análisis. |
+| `def _analyze_historical_patterns(normalized_input)` | Analiza patrones históricos para predicción. |
+| `def _analyze_state_influence(current_state, normalized_input)` | Analiza cómo el estado actual influye en la predicción. |
+| `def _predict_entity_usage(normalized_input)` | Predice uso de entidades basado en entrada. |
+| `def _combine_predictions(normalized_input, historical, state, entity)` | Combina diferentes predicciones para crear goal. |
+| `def _determine_goal_type(normalized_input, historical, state, entity)` | Determina el tipo de goal más probable. |
+| `def _extract_goal_target(normalized_input, entity)` | Extrae target del goal basado en entrada y entidades. |
+| `def _calculate_prediction_confidence(goal, historical, state, entity)` | Calcula confianza en la predicción. |
+| `def _find_alternative_goals(normalized_input, current_state)` | Busca goals alternativos basados en entrada. |
+| `def _generate_synonym_goals(normalized_input)` | Genera goals alternativos usando sinónimos. |
+| `def _generate_state_based_goals(normalized_input, current_state)` | Genera goals alternativos basados en estado actual. |
+| `def _estimate_goal_cost(goal, current_state)` | Estima coste de ejecución del goal. |
+| `def _estimate_execution_probability(goal, current_state)` | Estima probabilidad de éxito del goal. |
+| `def _get_historical_success_rate(goal_type)` | Obtiene tasa de éxito histórica para tipo de goal. |
+| `def _get_command_success_rate(command)` | Obtiene tasa de éxito para comando legacy. |
+| `def _generate_prediction_reasoning(goal, historical, state)` | Genera explicación de la predicción. |
+| `def record_goal_execution(goal, success, execution_time, actual_cost, context, error_message, replanifications)` | Registra ejecución de goal para aprendizaje (FASE 18). |
+| `def _update_success_patterns(goal, success)` | Actualiza patrones de éxito por tipo de goal. |
+| `def _update_cost_estimations(goal, actual_cost)` | Actualiza estimaciones de coste. |
+| `def _update_path_cache(goal, success, execution_time, actual_cost)` | Actualiza caché de rutas exitosas. |
+| `def _update_entity_usage(goal, context)` | Actualiza estadísticas de uso de entidades. |
+| `def get_goal_prediction_history(goal_type)` | Obtiene historial de predicciones de goals. |
+| `def get_cached_path(goal_type, target)` | Obtiene ruta cacheada para goal específico. |
+| `def get_cost_estimation(goal_type)` | Obtiene estimación de coste para tipo de goal. |
+| `def get_success_rate(goal_type)` | Obtiene tasa de éxito para tipo de goal. |
+| `def record_command(command, success, source)` | Método legacy para registrar comandos (FASE 16). |
+| `def _create_legacy_event(command, success, source)` | Crea evento en formato legacy. |
+| `def _get_open_windows()` | Obtiene ventanas abiertas (legacy). |
+| `def _get_active_window()` | Obtiene ventana activa (legacy). |
+| `def _get_system_state(open_windows, active_window)` | Obtiene estado del sistema (legacy). |
+| `def _get_idle_seconds()` | Obtiene segundos de inactividad (legacy). |
+| `def _save()` | Guarda datos en archivo. |
+
+`class PredictionMemory(EnhancedPredictionMemory)`  (línea 1070) — Clase legacy para compatibilidad (FASE 16).
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(filepath)` |  |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def get_enhanced_prediction_memory()`  (L1055) | Obtiene instancia singleton de memoria predictiva mejorada. |
+| `def get_prediction_memory()`  (L1079) | Función singleton legacy para compatibilidad. |
+
+<a name="src-memory-storage-py"></a>
+### `src/memory/storage.py` [1984 líneas] — Sistema de almacenamiento y gestión de memoria
+
+**Descripción:** Núcleo duradero de JARVIS. `JSONStorage` guarda/carga JSON thread-safe con cache y retención; `MemoryManager` (singleton) lo abstrae indexando por `MemoryType` y añade CRUD de entidades/atributos/relaciones/preferencias y stats de aprendizaje, cache, locking y estadísticas.
+
+**Características:**
+
+- Soporte de todos los `MemoryType` del sistema
+- CRUD de entidades, atributos y relaciones con semántica de grafo
+- Gestión de preferencias de usuario y estadísticas de aprendizaje
+- Cache multi-nivel con coherencia (`cache_lock`)
+- Singleton vía `get_memory_manager()`
+
+**Importaciones:** 14.
+
+`class MemoryType(Enum)`  (línea 30) — Tipos de memoria en el sistema mejorado.
+
+_Sin métodos definidos en el AST._
+
+`class Entity`  (línea 46) — Entidad mejorada para memoria de dominio (FASE 5).
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` | Convierte a diccionario. |
+| `def from_dict(cls, data)` | Crea desde diccionario. |
+| `def matches_query(query)` | Verifica si la entidad coincide con una búsqueda. |
+
+`class ConversationalMemory`  (línea 95) — Memoria conversacional mejorada.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` | Convierte a diccionario. |
+| `def from_dict(cls, data)` | Crea desde diccionario. |
+
+`class WorldState`  (línea 123) — Estado del mundo mejorado (FASE 3).
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` | Convierte a diccionario. |
+| `def from_dict(cls, data)` | Crea desde diccionario. |
+| `def get_application_state(app_name)` | Obtiene el estado de una aplicación específica. |
+| `def get_ui_element_state(element_name)` | Obtiene el estado de un elemento UI específico. |
+
+`class Plan`  (línea 153) — Plan de ejecución (FASE 6-7).
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` | Convierte a diccionario. |
+| `def from_dict(cls, data)` | Crea desde diccionario. |
+
+`class ExecutionRecord`  (línea 188) — Registro de ejecución para aprendizaje (FASE 18).
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` | Convierte a diccionario. |
+| `def from_dict(cls, data)` | Crea desde diccionario. |
+
+`class LearningStat`  (línea 220) — Estadística de aprendizaje (FASE 18).
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def update(success, execution_time)` | Actualiza estadísticas con nueva ejecución. |
+
+`class UserPreference`  (línea 255) — Preferencia de usuario (SUBFASE 5.4).
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` | Convierte a diccionario. |
+| `def from_dict(cls, data)` | Crea desde diccionario. |
+
+`class EntityAttribute`  (línea 291) — Atributo extendido de entidad (SUBFASE 5.4).
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` | Convierte a diccionario. |
+| `def from_dict(cls, data)` | Crea desde diccionario. |
+
+`class MemoryStorage(ABC)`  (línea 324) — Interfaz abstracta para almacenamiento de memoria.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def save(data, memory_type)` | Guarda datos. |
+| `def load(memory_type)` | Carga datos. |
+| `def exists(memory_type)` | Verifica si existe. |
+
+`class JSONStorage(MemoryStorage)`  (línea 343) — Almacenamiento en archivos JSON con manejo avanzado.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(base_path)` |  |
+| `def get_file_path(memory_type)` | Obtiene la ruta del archivo para un tipo de memoria. |
+| `def save(data, memory_type)` | Guarda datos en archivo JSON con manejo inteligente. |
+| `def _load_existing_data(file_path)` | Carga datos existentes del archivo. |
+| `def _process_data_for_save(new_data, existing_data, memory_type)` | Procesa datos según el tipo de memoria. |
+| `def load(memory_type)` | Carga datos desde archivo JSON. |
+| `def _get_default_value(memory_type)` | Obtiene valor por defecto para un tipo de memoria. |
+| `def exists(memory_type)` | Verifica si el archivo existe. |
+
+`class MemoryManager`  (línea 581) — Gestor de memoria mejorado con caché y soporte completo para arquitectura.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(storage_path)` |  |
+| `def _warm_cache()` | Inicializa el caché con datos frecuentes. |
+| `def _get_from_cache(key, memory_type)` | Obtiene datos del caché si están frescos. |
+| `def _update_cache(key, data, memory_type)` | Actualiza el caché con nuevos datos. |
+| `def save_entity(entity)` | Guarda una entidad en la memoria de dominio. |
+| `def get_entity(entity_id)` | Obtiene una entidad por su ID. |
+| `def get_entities_by_type(entity_type)` | Obtiene todas las entidades de un tipo específico. |
+| `def find_entities(query, entity_type)` | Busca entidades por texto en nombre, aliases, tags y propiedades. |
+| `def find_entities_by_property(property_name, property_value)` | Busca entidades por propiedad específica. |
+| `def add_conversational_memory(message, response, context, intent, entities, success, execution_time, confidence)` | Añade un registro mejorado a la memoria conversacional. |
+| `def get_conversational_memory(limit, intent)` | Obtiene la memoria conversacional con filtros. |
+| `def save_world_state(state)` | Guarda el estado actual del mundo. |
+| `def get_world_state()` | Obtiene el estado actual del mundo. |
+| `def update_world_state(key, value)` | Actualiza una propiedad del estado del mundo. |
+| `def save_plan(plan)` | Guarda un plan. |
+| `def get_plan(plan_id)` | Obtiene un plan por su ID. |
+| `def save_execution_record(record)` | Guarda un registro de ejecución. |
+| `def update_learning_stats(action_name, success, execution_time)` | Actualiza estadísticas de aprendizaje para una acción. |
+| `def get_learning_stats(action_name)` | Obtiene estadísticas de aprendizaje. |
+| `def clear_memory(memory_type)` | Limpia la memoria especificada o toda la memoria. |
+| `def get_memory_stats()` | Obtiene estadísticas detalladas de la memoria. |
+| `def save_user_preference(preference)` | Guarda una preferencia de usuario. |
+| `def get_user_preference(user_id, preference_type, preference_key)` | Obtiene una preferencia específica del usuario. |
+| `def get_user_preferences(user_id, preference_type)` | Obtiene todas las preferencias de un usuario. |
+| `def update_user_preference(user_id, preference_type, preference_key, value, context)` | Actualiza o crea una preferencia de usuario. |
+| `def learn_user_preference(user_id, entity_id, interaction_type, success)` | Aprende preferencias de usuario basadas en interacciones. |
+| `def save_entity_attribute(attribute)` | Guarda un atributo extendido de entidad. |
+| `def get_entity_attribute(entity_id, attribute_name)` | Obtiene un atributo específico de una entidad. |
+| `def get_entity_attributes(entity_id)` | Obtiene todos los atributos extendidos de una entidad. |
+| `def update_entity_attribute(entity_id, attribute_name, value, attribute_type, source, metadata)` | Actualiza o crea un atributo extendido de entidad. |
+| `def get_entities_by_attribute(attribute_name, attribute_value)` | Busca entidades por atributo y valor. |
+| `def export_memory(export_path)` | Exporta toda la memoria a un archivo JSON. |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def get_memory_manager()`  (L1650) | Obtiene la instancia global del gestor de memoria. |
+| `def save_entity(entity)`  (L1660) | Guarda una entidad. |
+| `def get_entity(entity_id)`  (L1665) | Obtiene una entidad. |
+| `def get_entities_by_type(entity_type)`  (L1670) | Obtiene entidades. |
+| `def find_entities(query, entity_type)`  (L1675) | Busca entidades. |
+| `def add_conversational_memory(message, response)`  (L1686) | Añade memoria conversacional. |
+| `def get_world_state()`  (L1699) | Obtiene el estado del mundo. |
+| `def update_world_state(key, value)`  (L1704) | Actualiza el estado del mundo. |
+| `def save_plan(plan)`  (L1712) | Guarda un plan. |
+| `def get_plan(plan_id)`  (L1717) | Obtiene un plan. |
+| `def update_learning_stats(action_name, success, execution_time)`  (L1722) | Actualiza estadísticas de aprendizaje. |
+| `def resolve_entity_to_url(entity)`  (L1735) | Resuelve una entidad a una URL. |
+| `def get_entity_attributes(entity)`  (L1775) | Obtiene atributos extendidos de una entidad. |
+| `def create_goal_from_entity(entity, user_input)`  (L1831) | Integración entidad -> Goal. |
+| `def verify_entity_integrity(entity)`  (L1898) | Verifica la integridad de una entidad. |
+
+## 🗣️ `src/mouth/`
+
+<!-- src/mouth -->
+
+<a name="src-mouth-__init__-py"></a>
+### `src/mouth/__init__.py` [4 líneas] — Módulo de sistema
+
+**Descripción:** Módulo de sistema.
+
+**Importaciones:** 1.
+
+_Archivo de marcador de posición / inicialización de paquete._
+
+<a name="src-mouth-speaker-py"></a>
+### `src/mouth/speaker.py` [680 líneas] — Síntesis de voz
+
+**Descripción:** Síntesis de voz (TTS) multi-backend con control asíncrono, voz, velocidad y cancelación.
+
+**Características:**
+
+- TTS multi-backend
+- Habla asíncrona
+- Control de voz/velocidad
+
+**Importaciones:** 15.
+
+`class Mouth`  (línea 32) — Controla la síntesis de voz utilizando el motor Kokoro ONNX.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__()` | Inicializa el motor de síntesis de voz. |
+| `def _initialize_session()` | Inicializa la sesión ONNX. |
+| `def _load_parameters()` | Carga los parámetros necesarios del motor. |
+| `def get_available_voices()` | Devuelve los IDs de voz disponibles en models/voices. |
+| `def has_voice(voice_id)` | Comprueba si existe una voz concreta. |
+| `def _load_voice_style_vector(voice_id)` | Carga el vector de estilo correspondiente a voice_id. |
+| `def _load_voice(voice_id, persist)` | Carga una voz y la establece como voz actual. |
+| `def set_voice(voice_id)` | Cambia la voz actualmente utilizada. |
+| `def get_current_voice()` | Devuelve el ID de la voz actualmente activa. |
+| `def _load_token_map()` | Carga el mapa de tokens. |
+| `def _text_to_tokens(text, voice_id)` | Convierte texto a tokens para el modelo. |
+| `def speak(text, voice_id, output_file)` | Convierte texto a voz y lo reproduce. |
+| `def speak_async(text, voice_id, output_file)` | Versión async de speak que no bloquea. |
+
+## 🔧 `src/tools/`
+
+<!-- src/tools -->
+
+<a name="src-tools-__init__-py"></a>
+### `src/tools/__init__.py` [30 líneas] — Paquete de herramientas de Jarvis.
+
+**Descripción:** Paquete de herramientas de Jarvis.
+
+**Importaciones:** 2.
+
+_Archivo de marcador de posición / inicialización de paquete._
+
+<a name="src-tools-executor-py"></a>
+### `src/tools/executor.py` [559 líneas] — Fachada de ejecución compatible para JARVIS.
+
+**Descripción:** Fachada de ejecución compatible para JARVIS.
+
+**Importaciones:** 7.
+
+`class UnifiedExecutor`  (línea 42) — Fachada unificada para ejecutar acciones registradas.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__()` | Inicializa la fachada de ejecución. |
+| `def process_and_execute(llm_response, state)` | Procesa una respuesta del LLM y ejecuta el primer comando detectado. |
+| `def _extract_command(response)` | Extrae un comando legacy del formato [CMD:nombre(args)]. |
+| `def _normalize_action_name(action_name)` | Normaliza pequeñas variaciones de nombre sin cambiar su semántica. |
+| `def execute_action(action_name, parameters, state, verify_success)` | Ejecuta una acción registrada. |
+| `def can_execute(action_name, parameters, state)` | Comprueba si una acción puede ejecutarse en el estado indicado. |
+| `def execute_plan_step(action_name, parameters, state)` | Punto de entrada explícito para un futuro Planner. |
+| `def _parse_args(args_str)` | Parsea argumentos legacy mediante ast.literal_eval. |
+| `def _args_to_dict(args, parameters)` | Convierte argumentos posicionales legacy a parámetros nombrados. |
+| `def get_command_suggestions(user_input, context)` | Obtiene sugerencias simples a partir de acciones registradas. |
+| `def _format_action_suggestion(action_info, score)` | Convierte ActionInfo al formato histórico de sugerencias. |
+| `def _record_history(command_name, args, result, success)` | Registra una ejecución para compatibilidad y diagnóstico. |
+| `def get_command_history()` | Obtiene una copia del historial de comandos. |
+| `def clear_command_history()` | Limpia el historial de comandos. |
+| `def list_available_commands(planner_only)` | Lista las acciones disponibles con sus metadatos. |
+| `def get_command_info(command_name)` | Obtiene información detallada de una acción registrada. |
+| `def get_action_cost(action_name)` | Obtiene el coste declarado de una acción para el planificador. |
+| `def get_plannable_commands()` | Obtiene las acciones habilitadas para planificación. |
+| `def _get_timestamp()` | Obtiene la fecha/hora actual en formato ISO. |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def get_executor()`  (L536) | Obtiene la instancia global del ejecutor unificado. |
+| `def process_and_execute(llm_response)`  (L551) | Función de compatibilidad para código existente. |
+
+<a name="src-tools-os_info-py"></a>
+### `src/tools/os_info.py` [533 líneas] — Información del sistema para Jarvis con arquitectura de planificación.
+
+**Descripción:** Información del sistema para Jarvis con arquitectura de planificación.
+
+**Importaciones:** 11.
+
+`class SystemHealth(Enum)`  (línea 36) — Estados de salud del sistema.
+
+_Sin métodos definidos en el AST._
+
+`class ApplicationWindow`  (línea 45) — Información de una ventana de aplicación.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` | Convierte a diccionario. |
+
+`class SystemResources`  (línea 73) — Recursos del sistema.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` | Convierte a diccionario. |
+
+`class SystemContext`  (línea 103) — Contexto completo del sistema para planificación.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` | Convierte a diccionario para estado del mundo. |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def _get_system_drive()`  (L124) | Obtiene la unidad del sistema. |
+| `def _calculate_system_health(cpu_percent, ram_percent, disk_percent)`  (L139) | Calcula la salud del sistema basada en recursos. |
+| `def get_system_stats()`  (L151) | Lee el estado de CPU, memoria RAM y disco. |
+| `def get_battery_info()`  (L211) | Obtiene información de la batería. |
+| `def get_open_windows()`  (L227) | Obtiene información detallada de ventanas visibles. |
+| `def _get_monitor_from_position(x, y)`  (L313) | Determina qué monitor contiene la posición dada. |
+| `def _get_process_name(window)`  (L330) | Obtiene el nombre del proceso de una ventana. |
+| `def get_focused_window()`  (L364) | Obtiene la ventana actualmente enfocada. |
+| `def get_running_processes()`  (L380) | Obtiene lista de procesos en ejecución. |
+| `def get_system_resources()`  (L395) | Obtiene recursos del sistema con estado de salud. |
+| `def get_jarvis_system_context()`  (L437) | Empaqueta la información del sistema en un texto para el contexto |
+| `def get_system_context()`  (L469) | Obtiene el contexto completo del sistema para planificación. |
+
+<a name="src-tools-registry-py"></a>
+### `src/tools/registry.py` [1072 líneas] — Registro unificado de acciones para Jarvis - VERSIÓN INTEGRADA.
+
+**Descripción:** Registro unificado de acciones para Jarvis - VERSIÓN INTEGRADA.
+
+**Importaciones:** 8.
+
+`class ActionType(Enum)`  (línea 27) — Tipos de acciones disponibles.
+
+_Sin métodos definidos en el AST._
+
+`class ActionInfo`  (línea 125) — Metadatos completos de una acción ejecutable y planificable.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` | Devuelve una representación serializable de los metadatos. |
+| `def matches_preconditions(state)` | Comprueba las precondiciones de la acción contra un estado. |
+| `def verify_success(result)` | Comprueba el éxito de la acción mediante su verificador opcional. |
+
+`class ActionRegistry`  (línea 192) — Registro unificado de acciones para Jarvis.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__()` | Inicializa el registro de acciones. |
+| `def _normalize_name(name)` | Normaliza el nombre de una acción. |
+| `def _normalize_description(description)` | Normaliza la descripción de una acción. |
+| `def _normalize_confidence(value)` | Normaliza el umbral de confianza al rango [0.0, 1.0]. |
+| `def _normalize_action_type(action_type)` | Convierte un ActionType o su valor textual a ActionType. |
+| `def _extract_parameters(func)` | Extrae un esquema básico de parámetros desde la firma de una función. |
+| `def register_action(name, description, action_type, category, tags, parameters, confidence_threshold, preconditions, effects, cost, dependencies, capability, application, required_resources, requires_ui_element, success_checker, planner_enabled)` | Decorador para registrar una acción. |
+| `def get_action(name)` | Obtiene información de una acción por nombre. |
+| `def get_available_actions(action_type)` | Obtiene acciones disponibles en formato para el LLM. |
+| `def get_actions_for_planner()` | Genera metadatos serializables de las acciones para el planificador. |
+| `def get_plannable_actions()` | Obtiene las acciones habilitadas para la capa de planificación. |
+| `def get_actions_by_category(category)` | Obtiene todas las acciones de una categoría. |
+| `def list_all_actions()` | Lista todas las acciones organizadas por tipo. |
+| `def get_action_names_by_type(action_type)` | Obtiene nombres de acciones por tipo. |
+| `def register_module(module_path)` | Registra todas las acciones decoradas de un módulo. |
+| `def _store_action_info(action_info)` | Almacena una acción manteniendo sus índices internos. |
+| `def get_action_suggestions(partial_name, limit)` | Obtiene sugerencias de acciones a partir de un nombre parcial. |
+| `def _validate_value_type(value, expected_type)` | Valida de forma segura un tipo de parámetro. |
+| `def validate_action(action_name, parameters)` | Valida si una acción y sus parámetros son válidos. |
+| `def can_execute(action_name, parameters, state, check_preconditions)` | Comprueba si una acción puede ejecutarse según parámetros y estado. |
+| `def get_action_cost(action_name)` | Obtiene el coste declarado de una acción. |
+| `def execute_action(action_name, parameters)` | Ejecuta una acción registrada con parámetros nombrados. |
+| `def execute_action_legacy(name)` | Ejecuta una acción por su nombre (compatibilidad legacy). |
+| `def validate_parameters(name, parameters)` | Valida los nombres de parámetros definidos por la acción. |
+| `def clear_actions()` | Limpia todas las acciones registradas. |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def _get_state_value(state, key, default)`  (L46) | Obtiene un valor de estado desde dicts u objetos con atributos/get. |
+| `def _match_condition(state, condition)`  (L65) | Comprueba una única condición de estado. |
+| `def _matches_conditions(state, conditions)`  (L106) | Comprueba un conjunto de condiciones de estado. |
+| `def get_action_registry()`  (L966) | Obtiene la instancia global única del registro de acciones. |
+| `def register_action(name, description, action_type, category, tags, parameters, confidence_threshold, preconditions, effects, cost, dependencies, capability, application, required_resources, requires_ui_element, success_checker, planner_enabled)`  (L981) | Atajo para registrar una acción usando la instancia global. |
+| `def register_action_legacy(name, description, action_type, parameters, confidence_threshold)`  (L1030) | Atajo para registrar una acción usando la instancia global. |
+| `def get_available_actions(action_type)`  (L1055) | Atajo para obtener las acciones disponibles desde el registro global. |
+| `def get_action(name)`  (L1065) | Atajo para obtener una acción desde el registro global. |
+
+## 🛠️ `src/utils/`
+
+<!-- src/utils -->
+
+<a name="src-utils-__init__-py"></a>
+### `src/utils/__init__.py` [333 líneas] — Utils Package v2.7.0 - Sistema de optimización y automejora
+
+**Descripción:** Utils Package v2.7.0 - Sistema de optimización y automejora
+
+**Importaciones:** 14.
+
+`class OptimizationSystem`  (línea 60) — Sistema completo de optimización y automejora
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(config_path)` | Inicializar el sistema de optimización completo |
+| `def get_system_status()` | Obtener estado completo del sistema de optimización |
+| `def _calculate_system_health()` | Calcular salud general del sistema |
+| `def optimize_system(strategy, level)` | Optimizar el sistema manualmente |
+| `def start_auto_optimization()` | Iniciar optimización automática |
+| `def stop_auto_optimization()` | Detener optimización automática |
+| `def export_system_report(filepath)` | Exportar reporte completo del sistema |
+| `def get_optimization_recommendations()` | Obtener recomendaciones de optimización del sistema |
+| `def emergency_optimization()` | Optimización de emergencia para situaciones críticas |
+| `def __del__()` | Destructor |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def get_system_status()`  (L306) | Obtener estado del sistema de optimización |
+| `def optimize_system(strategy, level)`  (L310) | Optimizar el sistema |
+| `def start_auto_optimization()`  (L314) | Iniciar optimización automática |
+| `def stop_auto_optimization()`  (L318) | Detener optimización automática |
+| `def get_optimization_recommendations()`  (L322) | Obtener recomendaciones de optimización |
+| `def emergency_optimization()`  (L326) | Optimización de emergencia |
+
+<a name="src-utils-adaptive_learning_engine-py"></a>
+### `src/utils/adaptive_learning_engine.py` [1269 líneas] — Adaptive Learning Engine v2.7.0
+
+**Descripción:** Adaptive Learning Engine v2.7.0
+
+**Importaciones:** 32.
+
+`class LearningTask(Enum)`  (línea 39) — Tareas de aprendizaje
+
+_Sin métodos definidos en el AST._
+
+`class NeuralArchitecture(Enum)`  (línea 50) — Arquitecturas neuronales
+
+_Sin métodos definidos en el AST._
+
+`class LearningTaskConfig`  (línea 61) — Configuración de tarea de aprendizaje
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class ModelPerformance`  (línea 83) — Rendimiento del modelo
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class AdaptiveLearningEngine`  (línea 100) — Motor de aprendizaje adaptativo con deep learning y optimización de hiperparámetros
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(config_path)` |  |
+| `def _load_config(config_path)` | Cargar configuración del motor de aprendizaje |
+| `def _initialize_model_registry()` | Inicializar registro de modelos |
+| `def _load_trained_models()` | Cargar modelos pre-entrenados |
+| `def _save_trained_models()` | Guardar modelos entrenados |
+| `def _start_learning_engine()` | Iniciar motor de aprendizaje |
+| `def _learning_engine_loop()` | Bucle principal del motor de aprendizaje |
+| `def _process_learning_queue()` | Procesar cola de tareas de aprendizaje |
+| `def _execute_learning_task(task_config)` | Ejecutar tarea de aprendizaje |
+| `def _optimize_hyperparameters_task(task_config)` | Optimizar hiperparámetros de un modelo |
+| `def _train_model_task(task_config)` | Entrenar un modelo |
+| `def _select_features_task(task_config)` | Seleccionar características para un modelo |
+| `def _search_architecture_task(task_config)` | Buscar arquitectura neural óptima |
+| `def _online_learning_task(task_config)` | Aprendizaje online incremental |
+| `def _batch_learning_task(task_config)` | Aprendizaje por lotes |
+| `def _prepare_training_data(task_config)` | Preparar datos para entrenamiento |
+| `def _create_neural_model(architecture_name, config)` | Crear modelo neural según arquitectura |
+| `def _create_mlp_model(config)` | Crear modelo MLP |
+| `def _create_lstm_model(config)` | Crear modelo LSTM |
+| `def _train_neural_model(model, train_dataset, test_dataset, task_config)` | Entrenar modelo neural |
+| `def _evaluate_model(model, X, y, task_config)` | Evaluar rendimiento de un modelo |
+| `def _auto_detect_learning_opportunities()` | Detectar automáticamente oportunidades de aprendizaje |
+| `def _optimize_hyperparameters()` | Optimizar hiperparámetros automáticamente |
+| `def _evaluate_model_performance()` | Evaluar rendimiento de todos los modelos |
+| `def _get_last_model_performance(model_name)` | Obtener último rendimiento de un modelo |
+| `def _safe_float(value, default)` | Convertir un valor a float de forma segura. |
+| `def _capture_feedback(feedback_data)` | Capturar y analizar el feedback de una adaptación de Goal. |
+| `def _execute_learning_loop(feedback_result)` | Ejecutar el bucle de aprendizaje continuo sobre un feedback capturado. |
+| `def _analyze_goal_learning_patterns(patterns, metrics)` | Normalizar los patrones detectados a partir del análisis de feedback. |
+| `def _describe_goal_learning_pattern(pattern)` | Descripción legible de un patrón de aprendizaje. |
+| `def _update_goal_adaptation_strategies(learned_patterns, current_strategies)` | Actualizar las estrategias aprendidas a partir de los patrones de éxito. |
+| `def _calculate_goal_learning_convergence(metrics, improvement)` | Calcular las métricas de convergencia del aprendizaje. |
+| `def get_learning_engine_status()` | Obtener estado del motor de aprendizaje |
+| `def _get_best_model()` | Obtener mejor modelo |
+| `def _get_average_performance()` | Obtener rendimiento promedio |
+| `def add_learning_task(task_config)` | Añadir tarea de aprendizaje |
+| `def get_model_info(model_name)` | Obtener información de un modelo |
+| `def export_learning_report(filepath)` | Exportar reporte de aprendizaje |
+| `def stop_learning_engine()` | Detener motor de aprendizaje |
+| `def start_learning_engine()` | Iniciar motor de aprendizaje |
+| `def __del__()` | Destructor |
+
+<a name="src-utils-advanced_logger-py"></a>
+### `src/utils/advanced_logger.py` [1577 líneas] — Sistema avanzado de logging y análisis de patrones para Jarvis.
+
+**Descripción:** Sistema avanzado de logging y análisis de patrones para Jarvis.
+
+**Importaciones:** 23.
+
+`class LogLevel(Enum)`  (línea 28) — Niveles de log extendidos.
+
+_Sin métodos definidos en el AST._
+
+`class LogCategory(Enum)`  (línea 39) — Categorías de logs para análisis.
+
+_Sin métodos definidos en el AST._
+
+`class PatternType(Enum)`  (línea 51) — Tipos de patrones detectables.
+
+_Sin métodos definidos en el AST._
+
+`class LogEntry`  (línea 62) — Estructura de entrada de log enriquecida.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` | Convertir a diccionario para almacenamiento. |
+| `def from_dict(cls, data)` | Crear desde diccionario. |
+
+`class LogAnalyzer`  (línea 95) — Analizador de logs avanzado con machine learning y detección de patrones complejos.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(window_size, pattern_threshold, ml_enabled, anomaly_detection)` |  |
+| `def _initialize_ml_models()` | Inicializar modelos de machine learning para análisis avanzado. |
+| `def analyze_log_entry(entry)` | Analizar una entrada de log y detectar patrones con ML. |
+| `def _collect_performance_metrics(entry)` | Recopilar métricas de rendimiento. |
+| `def _detect_patterns()` | Detectar patrones básicos en los logs. |
+| `def _detect_patterns_with_ml()` | Detectar patrones con machine learning y análisis avanzado. |
+| `def _detect_error_spike()` | Detectar picos de errores. |
+| `def _detect_performance_degradation()` | Detectar degradación de rendimiento. |
+| `def _detect_anomaly()` | Detectar anomalías básicas en los logs. |
+| `def _detect_error_spike_ml()` | Detectar picos de errores con ML. |
+| `def _detect_performance_degradation_ml()` | Detectar degradación de rendimiento con ML. |
+| `def _detect_anomaly_ml()` | Detectar anomalías con ML. |
+| `def _detect_sequential_patterns()` | Detectar patrones secuenciales. |
+| `def _detect_correlations()` | Detectar correlaciones entre diferentes tipos de logs. |
+| `def _detect_advanced_anomalies()` | Detección avanzada de anomalías. |
+| `def _detect_frequency_anomaly()` | Detectar anomalías de frecuencia. |
+| `def _detect_context_anomaly()` | Detectar anomalías de contexto. |
+| `def get_statistics()` | Obtener estadísticas del analizador. |
+
+`class AdvancedLogger`  (línea 568) — Logger avanzado con capacidades de análisis y patrón detection.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(name, level, log_dir, db_path, ml_enabled, anomaly_detection)` |  |
+| `def _setup_logging_infrastructure()` | Configurar infraestructura de logging. |
+| `def _create_database()` | Crear base de datos para logs. |
+| `def _setup_handlers()` | Configurar handlers del logger. |
+| `def _log_worker()` | Worker asíncrono para procesamiento de logs. |
+| `def _store_log_entry(entry)` | Almacenar entrada de log en base de datos. |
+| `def _store_pattern(pattern)` | Almacenar patrón detectado. |
+| `def _generate_alerts(patterns, entry)` | Generar alertas basadas en patrones detectados. |
+| `def log(_level, category, message)` | Método principal de logging - soporta ambas interfaces: |
+| `def log_simple(message, level, category)` | Interfaz simple de logging compatible con código existente. |
+| `def _format_message(message, args)` | Aplicar formato estilo printf a un mensaje de log (compatibilidad con logging estándar). |
+| `def debug(message)` | Log de nivel DEBUG. |
+| `def info(message)` | Log de nivel INFO. |
+| `def warning(message)` | Log de nivel WARNING. |
+| `def error(message)` | Log de nivel ERROR. |
+| `def exception(message)` | Log de nivel ERROR incluyendo la excepción activa. |
+| `def critical(message)` | Log de nivel CRITICAL. |
+| `def success(message)` | Log de nivel SUCCESS. |
+| `def performance(message)` | Log de nivel PERFORMANCE. |
+| `def log_with_trace(message, category, trace_id)` | Log con trace ID para seguimiento distribuido. |
+| `def log_with_span(message, category, span_id, parent_span_id)` | Log con span ID para microservicios. |
+| `def query_logs(start_time, end_time, level, category, module, limit)` | Consultar logs desde la base de datos. |
+| `def get_patterns(acknowledged, limit)` | Obtener patrones detectados. |
+| `def acknowledge_pattern(pattern_id)` | Marcar patrón como reconocido. |
+| `def get_statistics()` | Obtener estadísticas del sistema de logging. |
+| `def export_logs(start_time, end_time, format)` | Exportar logs en formato especificado. |
+| `def shutdown()` | Detener el logger de forma graceful. |
+| `def add_custom_filter(filter_name, filter_func)` | Añadir filtro personalizado. |
+| `def add_custom_formatter(formatter_name, formatter)` | Añadir formateador personalizado. |
+| `def add_custom_handler(handler)` | Añadir handler personalizado. |
+| `def log_with_metrics(level, category, message, metrics)` | Log con métricas asociadas. |
+| `def log_with_context(level, category, message, context)` | Log con contexto enriquecido. |
+| `def log_batch(entries)` | Logear múltiples entradas de forma eficiente. |
+| `def search_logs(query, start_time, end_time, limit)` | Buscar logs usando consulta de texto completo. |
+| `def get_real_time_metrics()` | Obtener métricas en tiempo real. |
+| `def set_alert_threshold(pattern_type, threshold)` | Establecer umbral de alerta para un tipo de patrón. |
+| `def get_alerts(active_only)` | Obtener alertas activas. |
+| `def acknowledge_alert(alert_id)` | Marcar alerta como reconocida. |
+| `def export_analytics(start_time, end_time, format)` | Exportar análisis avanzado de logs. |
+| `def _get_top_errors(logs)` | Obtener errores más frecuentes. |
+| `def _analyze_performance_logs(logs)` | Analizar logs de rendimiento. |
+| `def log_context(context)` | Context manager para logging con contexto temporal. |
+| `def log_with_trace_context(message, trace_data)` | Log con contexto de trazado distribuido. |
+
+`class JsonFormatter(logging.Formatter)`  (línea 1354) — Formateador JSON mejorado.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def format(record)` | Formatear log record como JSON. |
+
+`class StatisticalAnomalyDetector`  (línea 1393) — Detector de anomalías usando métodos estadísticos.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(window_size, threshold)` |  |
+| `def add_data_point(metric_name, value)` | Añadir punto de datos y detectar anomalía. |
+
+`class PatternRecognizer`  (línea 1435) — Reconocedor de patrones usando métodos de secuencia.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(min_pattern_length, max_pattern_length)` |  |
+| `def add_log_sequence(category, level, module)` | Añadir secuencia de logs y detectar patrones. |
+| `def _detect_repetitive_pattern(sequence_key)` | Detectar patrones repetitivos en secuencias. |
+
+`class AdvancedLogMetrics`  (línea 1489) — Métricas avanzadas de logging y análisis de rendimiento.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__()` |  |
+| `def add_metric(name, value, tags)` | Añadir métrica con análisis de tendencias. |
+| `def get_trend_analysis(metric_name, window_size)` | Análisis de tendencias para una métrica. |
+| `def _calculate_volatility(values)` | Calcular volatilidad de una serie de valores. |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def get_advanced_logger(name, level, log_dir, db_path)`  (L1387) | Obtener un logger avanzado. |
+
+<a name="src-utils-alert_system-py"></a>
+### `src/utils/alert_system.py` [620 líneas] — Sistema de alertas integrado para JARVIS.
+
+**Descripción:** Sistema de alertas integrado para JARVIS.
+
+**Importaciones:** 13.
+
+`class AlertSeverity(Enum)`  (línea 22) — Severidad de las alertas.
+
+_Sin métodos definidos en el AST._
+
+`class AlertStatus(Enum)`  (línea 30) — Estado de las alertas.
+
+_Sin métodos definidos en el AST._
+
+`class AlertRule`  (línea 39) — Regla de alerta configurada.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` | Convierte la regla a un diccionario. |
+
+`class AlertAction`  (línea 62) — Acción a realizar ante una alerta.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` | Convierte la acción a un diccionario. |
+
+`class Alert`  (línea 79) — Alerta generada por el sistema.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` | Convierte la alerta a un diccionario. |
+
+`class AlertSystem`  (línea 113) — Sistema de alertas integrado para JARVIS.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__()` | Inicializa el sistema de alertas. |
+| `def _create_default_rules()` | Crea reglas de alerta por defecto. |
+| `def _create_default_actions()` | Crea acciones de alerta por defecto. |
+| `def start_monitoring()` | Inicia el monitoreo de alertas. |
+| `def stop_monitoring()` | Detiene el monitoreo de alertas. |
+| `def _monitoring_loop()` | Bucle principal de monitoreo de alertas. |
+| `def _evaluate_alert_rules()` | Evalúa todas las reglas de alerta activas. |
+| `def _evaluate_condition(condition)` | Evalúa una condición de alerta (simplificado). |
+| `def _process_alert(alert, rule)` | Procesa una alerta y ejecuta acciones. |
+| `def _get_action(action_name)` | Obtiene una acción por nombre. |
+| `def _execute_action(action, alert)` | Ejecuta una acción de alerta. |
+| `def _execute_log_action(action, alert)` | Ejecuta acción de logging. |
+| `def _execute_email_action(action, alert)` | Ejecuta acción de email. |
+| `def _execute_webhook_action(action, alert)` | Ejecuta acción de webhook. |
+| `def _execute_command_action(action, alert)` | Ejecuta acción de comando. |
+| `def _cleanup_old_alerts()` | Limpia alertas antiguas resueltas. |
+| `def acknowledge_alert(alert_id, acknowledged_by)` | Acepta una alerta. |
+| `def resolve_alert(alert_id, resolved_by)` | Resuelve una alerta. |
+| `def get_alerts(severity, status, source, limit)` | Obtiene alertas filtradas. |
+| `def get_alert_statistics()` | Obtiene estadísticas de alertas. |
+| `def add_alert_callback(callback)` | Agrega un callback para recibir alertas. |
+| `def add_acknowledgement_callback(callback)` | Agrega un callback para recibir aceptaciones de alertas. |
+| `def add_resolution_callback(callback)` | Agrega un callback para recibir resoluciones de alertas. |
+| `def add_alert_rule(rule)` | Agrega una regla de alerta. |
+| `def add_alert_action(action)` | Agrega una acción de alerta. |
+| `def export_alerts(filepath, severity, status, source)` | Exporta alertas a un archivo JSON. |
+| `def clear_resolved_alerts()` | Limpia alertas resueltas. |
+| `def __enter__()` | Context manager entry. |
+| `def __exit__(exc_type, exc_val, exc_tb)` | Context manager exit. |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def get_alert_system()`  (L603) | Obtiene la instancia global del sistema de alertas. |
+| `def start_alert_monitoring()`  (L611) | Inicia el monitoreo de alertas global. |
+| `def stop_alert_monitoring()`  (L617) | Detiene el monitoreo de alertas global. |
+
+<a name="src-utils-app_utils-py"></a>
+### `src/utils/app_utils.py` [1030 líneas] — Utilidades comunes para aplicaciones y automatización.
+
+**Descripción:** Utilidades comunes para aplicaciones y automatización.
+
+**Importaciones:** 12.
+
+`class AppManager`  (línea 54) — Gestor general de aplicaciones.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__()` |  |
+| `def open_app(app_name, screen_num)` | Abre una aplicación y, cuando es posible, la coloca en el monitor |
+| `def close_app(app_name)` | Cierra una ventana encontrada para la aplicación. |
+| `def move_window_to_screen(window_title, screen_num)` | Mueve una ventana a un monitor concreto mediante ScreenManager. |
+| `def center_window(window_title)` | Centra una ventana en el monitor donde está situada actualmente. |
+| `def verify_app_open(app_name)` | Comprueba si existe una ventana visible asociada a la aplicación. |
+| `def _find_monitor_for_window(window)` | Determina el monitor en el que se encuentra el centro de una ventana. |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def get_app_manager()`  (L460) | Obtiene una instancia del gestor de aplicaciones. |
+| `def analyze_elements_in_screenshot(screenshot_path, app_name)`  (L477) | Analiza una captura mediante Vision/Qwen3-VL. |
+| `def _extract_json(response)`  (L717) | Extrae JSON incluso si Vision devuelve un bloque Markdown. |
+| `def _normalize_bbox(bbox)`  (L812) | Valida bbox normalizada 0..1000. |
+| `def _safe_confidence(value)`  (L858) | Normaliza confidence a 0..1. |
+| `def _find_application_windows(app_name)`  (L892) | Busca ventanas mediante varios nombres/patrones comunes. |
+| `def open_app_on_screen(app_name, screen_num)`  (L977) | Abre una aplicación en un monitor. |
+| `def close_app(app_name)`  (L993) | Cierra una aplicación. |
+| `def move_window_to_screen(window_title, screen_num)`  (L1005) | Mueve una ventana a un monitor. |
+| `def center_window(window_title)`  (L1021) | Centra una ventana dentro de su monitor actual. |
+
+<a name="src-utils-architectural_evolution_manager-py"></a>
+### `src/utils/architectural_evolution_manager.py` [10766 líneas] — ArchitecturalEvolutionManager v2.8.0
+
+**Descripción:** ArchitecturalEvolutionManager v2.8.0
+
+**Importaciones:** 29.
+
+`class EvolutionStatus(Enum)`  (línea 32) — Estados posibles de una propuesta de evolución
+
+_Sin métodos definidos en el AST._
+
+`class ChangeType(Enum)`  (línea 44) — Tipos de cambios arquitectónicos permitidos
+
+_Sin métodos definidos en el AST._
+
+`class RiskLevel(Enum)`  (línea 57) — Niveles de riesgo asociados a cambios arquitectónicos
+
+_Sin métodos definidos en el AST._
+
+`class ComponentInfo`  (línea 65) — Información sobre un componente de la arquitectura
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __post_init__()` |  |
+
+`class InterfaceInfo`  (línea 81) — Información sobre interfaces entre componentes
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __post_init__()` |  |
+
+`class ArchitecturalChange`  (línea 97) — Representación de un cambio arquitectónico
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __post_init__()` |  |
+
+`class EvolutionProposal`  (línea 123) — Propuesta de evolución arquitectónica
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __post_init__()` |  |
+
+`class ArchitecturalEvolutionManager`  (línea 151) — Gestor de evolución de arquitectura interna que permite modificar
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(config, logger, performance_optimizer, self_improvement_system, adaptive_learning_engine, pattern_analyzer)` | Inicializa el gestor de evolución arquitectónica. |
+| `def get_component_info(component_name)` | Obtiene información detallada de un componente específico. |
+| `def list_components(component_type)` | Lista todos los componentes del sistema, filtrados por tipo opcional. |
+| `def get_component_dependencies(component_name)` | Obtiene las dependencias de un componente específico. |
+| `def get_component_interfaces(component_name)` | Obtiene las interfaces de un componente específico. |
+| `def get_available_operations()` | Obtiene las operaciones de modificación arquitectónica soportadas. |
+| `def validate_component_existence(component_name)` | Verifica si un componente existe en la arquitectura actual. |
+| `def get_architecture_state()` | Obtiene el estado actual de la arquitectura del sistema. |
+| `def _count_components_by_type()` | Cuenta componentes por tipo. |
+| `def get_proposal_input_requirements()` | Define la entrada mínima requerida para una propuesta de evolución. |
+| `def get_proposal_output_requirements()` | Define la salida mínima esperada de una propuesta de evolución. |
+| `def get_proposal_states()` | Define los estados posibles de una propuesta de evolución. |
+| `def validate_proposal_contract(proposal_data)` | Valida que una propuesta cumple con el contrato mínimo. |
+| `def register_component(component)` | Registra un nuevo componente en la arquitectura. |
+| `def update_component_status(component_name, status)` | Actualiza el estado de un componente. |
+| `def get_interface_info(interface_name)` | Obtiene información detallada de una interfaz específica. |
+| `def register_interface(interface)` | Registra una nueva interfaz en la arquitectura. |
+| `def get_architecture_inspection_report()` | Genera un reporte completo de inspección de la arquitectura actual. |
+| `def _count_components_by_status()` | Cuenta componentes por estado. |
+| `def _count_interfaces_by_status()` | Cuenta interfaces por estado. |
+| `def _count_proposals_by_status()` | Cuenta propuestas por estado. |
+| `def _count_changes_by_type()` | Cambia históricos por tipo. |
+| `def _get_recently_modified_components()` | Obtiene componentes modificados recientemente. |
+| `def _get_top_dependencies()` | Obtiene los componentes con más dependencias. |
+| `def _get_most_used_interfaces()` | Obtiene las interfaces más utilizadas. |
+| `def _get_recent_proposals()` | Obtiene propuestas recientes. |
+| `def validate_compatibility_with_existing_apis(proposal)` | Verifica la compatibilidad de una propuesta con APIs existentes. |
+| `def get_minimum_proposal_input()` | Define la entrada mínima requerida para una propuesta (2.8.2.1.6). |
+| `def get_minimum_proposal_output()` | Define la salida mínima esperada de una propuesta (2.8.2.1.7). |
+| `def get_proposal_states()` | Define los estados posibles de una propuesta (2.8.2.1.8). |
+| `def run_minimum_tests()` | Ejecuta tests mínimos del contrato (2.8.2.1.10). |
+| `def test_application_methods()` | Tests de la aplicación controlada (2.8.2.5.7). |
+| `def prepare_change(change)` | Prepara el cambio antes de su aplicación (2.8.2.5.1). |
+| `def apply_change(change)` | Aplica un único cambio verificable (2.8.2.5.2). |
+| `def detect_application_failure(change, execution_result)` | Detecta fallo durante la aplicación del cambio (2.8.2.5.3). |
+| `def register_application_result(change, execution_result)` | Registra el resultado de la aplicación del cambio (2.8.2.5.4). |
+| `def verify_change_structure(change)` | Verifica la estructura resultante después de aplicar el cambio (2.8.2.5.5). |
+| `def verify_no_side_effects(change)` | Verifica que no se modificaron componentes ajenos al cambio (2.8.2.5.6). |
+| `def test_application_methods()` | Tests de la aplicación controlada (2.8.2.5.7). |
+| `def _verify_precondition(precondition)` | Verifica una precondición específica. |
+| `def _prepare_change_resources(change)` | Prepara recursos necesarios para el cambio. |
+| `def _execute_change_by_type(change)` | Ejecuta el cambio según su tipo específico. |
+| `def _execute_component_addition(change)` | Ejecuta adición de componente. |
+| `def _execute_component_modification(change)` | Ejecuta modificación de componente. |
+| `def _execute_component_removal(change)` | Ejecuta remoción de componente. |
+| `def _execute_interface_addition(change)` | Ejecuta adición de interfaz. |
+| `def _execute_interface_modification(change)` | Ejecuta modificación de interfaz. |
+| `def _execute_interface_removal(change)` | Ejecuta remoción de interfaz. |
+| `def _execute_flow_modification(change)` | Ejecuta modificación de flujo. |
+| `def _execute_configuration_change(change)` | Ejecuta cambio de configuración. |
+| `def _execute_integration_addition(change)` | Ejecuta adición de integración. |
+| `def _execute_integration_removal(change)` | Ejecuta remoción de integración. |
+| `def _verify_effect(effect, execution_result)` | Verifica si un efecto específico se alcanzó. |
+| `def _verify_component_structure(component, change)` | Verifica la estructura de un componente después del cambio. |
+| `def _verify_architectural_consistency(change, execution_result)` | Verifica consistencia arquitectónica general. |
+| `def _register_change_execution(change, result)` | Registra la ejecución de un cambio en el historial. |
+| `def _notify_systems_of_change(change, result)` | Notifica sistemas relacionados sobre el cambio aplicado. |
+| `def _has_configuration_permissions()` | Verifica si se tienen permisos para cambios de configuración. |
+| `def _generate_rollback_plan(change)` | Genera un plan de rollback para un cambio de alto riesgo. |
+| `def _get_system_state_before_change(change)` | Obtiene el estado del sistema antes del cambio. |
+| `def _get_current_system_state()` | Obtiene el estado actual del sistema. |
+| `def _detect_unexpected_changes(previous_state, current_state, change)` | Detecta cambios no esperados entre estados. |
+| `def _component_changed_unexpectedly(previous_component, current_component)` | Verifica si un componente cambió inesperadamente. |
+| `def _interface_changed_unexpectedly(previous_interface, current_interface)` | Verifica si una interfaz cambió inesperadamente. |
+| `def _detect_circular_dependencies()` | Detecta dependencias circulares. |
+| `def _verify_interface_consistency()` | Verifica consistencia de interfaces. |
+| `def _verify_change_application(change)` | Verifica que el cambio se aplicó correctamente. |
+| `def _verify_component_dependencies(component)` | Verifica dependencias de un componente. |
+| `def _detect_circular_dependencies_for_component(component_name, visited, path)` | Detecta dependencias circulares para un componente específico. |
+| `def _verify_component_interfaces(component)` | Verifica interfaces de un componente. |
+| `def _verify_component_capabilities(component)` | Verifica capacidades de un componente. |
+| `def _create_test_change()` | Crea un cambio de prueba para tests. |
+| `def _create_invalid_test_change()` | Crea un cambio inválido para tests. |
+| `def validate_component_dependencies(change)` | Verificar dependencias del componente (2.8.2.4.1). |
+| `def validate_component_apis(change)` | Verificar APIs utilizadas por el componente (2.8.2.4.2). |
+| `def validate_required_capabilities(change)` | Verificar que el cambio no elimina una capacidad requerida (2.8.2.4.3). |
+| `def _are_capabilities_related(capability1, capability2)` | Verifica si dos capacidades están relacionadas (una depende de la otra). |
+| `def validate_state_compatibility(change)` | Verificar compatibilidad con State (2.8.2.4.4). |
+| `def _validate_state_precondition(precond)` | Valida una precondición de estado. |
+| `def _validate_state_effect(effect)` | Valida un efecto de estado. |
+| `def _validate_state_transition(transition)` | Valida una transición de estado. |
+| `def validate_planner_executor_compatibility(change)` | Verificar compatibilidad con Planner/Executor cuando afecte al flujo (2.8.2.4.5). |
+| `def _is_interface_executor_compatible(interface_info)` | Verifica si una interfaz es compatible con el Executor. |
+| `def _is_interface_planner_compatible(interface_info)` | Verifica si una interfaz es compatible con el Planner. |
+| `def _validate_planning_dependency(dependency)` | Valida una dependencia de planificación. |
+| `def _validate_planner_configuration(config)` | Valida una configuración del Planner. |
+| `def _validate_executor_configuration(config)` | Valida una configuración del Executor. |
+| `def validate_known_interfaces(change)` | Verificar que el cambio no rompe interfaces conocidas (2.8.2.4.6). |
+| `def _is_interface_in_known_contract(interface_name)` | Verifica si una interfaz es parte de un contrato conocido. |
+| `def _is_interface_modification_backward_compatible(interface_name, change)` | Verifica si una modificación de interfaz es compatible hacia atrás. |
+| `def validate_change_rejectability(change)` | Rechazar cambios que no puedan validarse (2.8.2.4.7). |
+| `def _has_circular_dependencies(change)` | Verifica si un cambio tiene dependencias circulares. |
+| `def _check_circular_dependencies_recursive(component_name, visited)` | Verifica recursivamente dependencias circulares. |
+| `def _violates_security_constraints(change)` | Verifica si un cambio viola restricciones de seguridad. |
+| `def validate_proposal_previa(proposal)` | Validación previa completa de una propuesta de evolución. |
+| `def test_validation_previa_methods()` | Ejecuta tests de validación previa (2.8.2.4.8). |
+| `def execute_syntax_check(change)` | Ejecuta comprobación sintáctica (2.8.2.6.1). |
+| `def execute_component_tests(change)` | Ejecuta tests del componente afectado (2.8.2.6.2). |
+| `def check_direct_integrations(change)` | Comprueba integraciones directas (2.8.2.6.3). |
+| `def check_configuration_state(change)` | Comprueba estado de configuración (2.8.2.6.4). |
+| `def check_application_startup(change)` | Comprueba que la aplicación sigue arrancando si el cambio lo requiere (2.8.2.6.5). |
+| `def register_real_evidence(change, verification_results)` | Registra evidencia real (2.8.2.6.6). |
+| `def test_post_verification_methods()` | Tests de verificación posterior (2.8.2.6.7). |
+| `def _test_component_integrity(component)` | Verifica integridad básica de un componente. |
+| `def _test_component_dependencies(component)` | Verifica dependencias de un componente. |
+| `def _test_component_interfaces(component)` | Verifica interfaces de un componente. |
+| `def _test_component_capabilities(component)` | Verifica capacidades de un componente. |
+| `def _test_component_status(component)` | Verifica estado de un componente. |
+| `def _test_component_modification_applied(change, component)` | Verifica que la modificación se aplicó correctamente. |
+| `def _check_component_integrations(component)` | Verifica integraciones de un componente. |
+| `def _check_component_interfaces_functionality(component)` | Verifica funcionalidad de interfaces de un componente. |
+| `def _check_component_dependencies_satisfiable(component)` | Verifica que las dependencias del componente son satisfacibles. |
+| `def _check_flows_functionality_after_change(change)` | Verifica funcionalidad de flujos después del cambio. |
+| `def _check_system_configuration()` | Verifica configuración del sistema. |
+| `def _check_new_configuration_valid(change)` | Verifica que la nueva configuración es válida. |
+| `def _check_affected_components_configuration(change)` | Verifica configuración de componentes afectados. |
+| `def _check_interfaces_configuration(change)` | Verifica configuración de interfaces. |
+| `def _check_configuration_conflicts(change)` | Verifica conflictos de configuración. |
+| `def _determines_if_change_requires_startup_check(change)` | Determina si el cambio requiere verificación de arrancabilidad. |
+| `def _simulate_application_startup_check(change)` | Simula verificación de arrancabilidad de la aplicación. |
+| `def _check_critical_components_functionality(change)` | Verifica funcionalidad de componentes críticos. |
+| `def _check_essential_services_availability(change)` | Verifica disponibilidad de servicios esenciales. |
+| `def _get_current_system_state()` | Obtiene estado actual del sistema. |
+| `def _get_components_status_summary()` | Obtiene resumen de estado de componentes. |
+| `def _get_interfaces_status_summary()` | Obtiene resumen de estado de interfaces. |
+| `def _get_configuration_status_summary()` | Obtiene resumen de estado de configuración. |
+| `def _get_current_performance_metrics()` | Obtiene métricas de rendimiento actuales. |
+| `def _notify_systems_of_verification_results(change, results)` | Notifica sistemas de resultados de verificación. |
+| `def _has_circular_dependency(component_name, visited)` | Verifica si hay dependencias circulares. |
+| `def _verify_effect_applied(effect, component)` | Verifica si un efecto se aplicó correctamente. |
+| `def _create_test_change()` | Crea un cambio de prueba. |
+| `def _has_configuration_permissions()` | Verifica permisos de configuración. |
+| `def process_adaptation_need(adaptation_need)` | Procesa una necesidad de adaptación y la convierte en una propuesta (2.8.2.3.1). |
+| `def validate_adaptation_need(adaptation_need)` | Valida que una necesidad de adaptación tenga el formato correcto. |
+| `def create_concrete_proposal(adaptation_need)` | Traduce una necesidad de adaptación a una propuesta concreta (2.8.2.3.2). |
+| `def _generate_expected_benefits(adaptation_need)` | Genera beneficios esperados basados en el tipo de necesidad. |
+| `def _generate_potential_risks(adaptation_need)` | Genera riesgos potenciales basados en el tipo de necesidad. |
+| `def validate_change_in_proposal_scope(change, proposal)` | Valida que un cambio esté dentro del scope de la propuesta (2.8.2.3.3). |
+| `def is_change_type_compatible_with_proposal(change_type, proposal)` | Verifica si un tipo de cambio es compatible con una propuesta. |
+| `def is_change_type_supported(change_type)` | Verifica si un tipo de cambio es soportado por el sistema (2.8.2.3.5). |
+| `def validate_change_type(change_type_str)` | Valida y convierte un string a tipo de cambio soportado. |
+| `def validate_change_in_proposal_scope_method(change, proposal)` | Método público para validar que un cambio está dentro del scope de la propuesta. |
+| `def get_current_change_representation()` | Identifica cómo se representa actualmente un cambio de arquitectura (2.8.2.2.1). |
+| `def create_minimal_change_representation(change_type, component_affected, description, rationale)` | Representa un cambio mínimo sin aplicarlo (2.8.2.2.2). |
+| `def associate_change_with_component(change)` | Asocia el cambio con su componente afectado (2.8.2.2.3). |
+| `def associate_context_with_change(change, context)` | Asocia motivo/contexto solo si existe soporte real (2.8.2.2.4). |
+| `def associate_constraints_with_change(change, constraints)` | Asocia restricciones existentes al cambio (2.8.2.2.5). |
+| `def associate_risk_with_change(change, risk_level, risk_details)` | Asocia riesgo solo si existe modelo real para expresarlo (2.8.2.2.6). |
+| `def associate_reversibility_with_change(change, is_reversible, rollback_plan)` | Asocia reversibilidad si existe soporte (2.8.2.2.7). |
+| `def verify_change_serialization(change)` | Verifica serialización del cambio arquitectónico (2.8.2.2.8). |
+| `def serialize_change_to_json(change)` | Serializa un cambio arquitectónico a formato JSON. |
+| `def deserialize_change_from_json(json_str)` | Deserializa un cambio arquitectónico desde formato JSON. |
+| `def test_change_representation_methods()` | Ejecuta tests de representación de cambios (2.8.2.2.9). |
+| `def detect_when_rollback_is_needed(change, execution_result)` | Detecta cuándo un cambio debe revertirse (2.8.2.7.1). |
+| `def recover_previous_version(change)` | Recupera la versión previa de un componente o sistema (2.8.2.7.2). |
+| `def avoid_partial_rollback(change)` | Evita rollback parcial asegurando que todas las operaciones se reviertan completamente (2.8.2.7.3). |
+| `def verify_state_after_rollback(change)` | Verifica el estado del sistema después del rollback (2.8.2.7.4). |
+| `def register_rollback_reason(change, reason, details)` | Registra el motivo del rollback (2.8.2.7.5). |
+| `def test_rollback_methods()` | Ejecuta tests de rollback (2.8.2.7.6). |
+| `def _rollback_component_addition(change)` | Revierte la adición de un componente. |
+| `def _rollback_component_removal(change)` | Revierte la remoción de un componente. |
+| `def _rollback_component_modification(change)` | Revierte la modificación de un componente. |
+| `def _rollback_interface_addition(change)` | Revierte la adición de una interfaz. |
+| `def _rollback_interface_removal(change)` | Revierte la remoción de una interfaz. |
+| `def _rollback_interface_modification(change)` | Revierte la modificación de una interfaz. |
+| `def _rollback_flow_modification(change)` | Revierte la modificación de flujo. |
+| `def _rollback_configuration_change(change)` | Revierte el cambio de configuración. |
+| `def _rollback_integration_addition(change)` | Revierte la adición de integración. |
+| `def _rollback_integration_removal(change)` | Revierte la remoción de integración. |
+| `def _get_operations_from_change(change)` | Obtiene las operaciones realizadas por un cambio. |
+| `def _has_rollback_counterpart(operation)` | Verifica si una operación tiene contraparte de rollback. |
+| `def _check_intermediate_state_consistency(change)` | Verifica consistencia del estado intermedio. |
+| `def _check_dependencies_reversibility(change)` | Verifica reversibilidad de dependencias. |
+| `def _verify_system_integrity_after_rollback(change)` | Verifica integridad del sistema después de rollback. |
+| `def _verify_components_consistency_after_rollback(change)` | Verifica consistencia de componentes después de rollback. |
+| `def _verify_interfaces_consistency_after_rollback(change)` | Verifica consistencia de interfaces después de rollback. |
+| `def _verify_configuration_consistency_after_rollback(change)` | Verifica consistencia de configuración después de rollback. |
+| `def _verify_performance_restored(change)` | Verifica si el rendimiento se restauró después de rollback. |
+| `def _verify_critical_services_available(change)` | Verifica disponibilidad de servicios críticos después de rollback. |
+| `def _verify_data_integrity_after_rollback(change)` | Verifica integridad de datos después de rollback. |
+| `def _verify_original_state_restored(change)` | Verifica si el estado original se restauró completamente. |
+| `def _register_rollback_in_history(change)` | Registra rollback en el historial de cambios. |
+| `def _notify_rollback_to_systems(change, reason, details)` | Notifica sistemas sobre el rollback. |
+| `def _create_test_change_for_rollback()` | Crea un cambio de prueba para tests de rollback. |
+| `def execute_syntax_check(change)` | Ejecuta comprobación sintáctica del cambio aplicado (2.8.2.6.1). |
+| `def execute_component_tests(change)` | Ejecuta tests del componente afectado (2.8.2.6.2). |
+| `def check_direct_integrations(change)` | Comprobar integraciones directas (2.8.2.6.3). |
+| `def check_configuration_state(change)` | Comprobar estado de configuración (2.8.2.6.4). |
+| `def check_application_startup(change)` | Comprobar que la aplicación sigue arrancando si el cambio lo requiere (2.8.2.6.5). |
+| `def register_verification_evidence(change, verification_results)` | Registrar evidencia real de verificación (2.8.2.6.6). |
+| `def test_post_verification_methods()` | Tests de verificación posterior (2.8.2.6.7). |
+| `def _test_component_integrity(component)` | Verifica integridad de un componente. |
+| `def _test_component_interfaces(component)` | Verifica interfaces de un componente. |
+| `def _test_component_dependencies(component)` | Verifica dependencias de un componente. |
+| `def _test_component_capabilities(component)` | Verifica capacidades de un componente. |
+| `def _check_circular_dependencies(component_name, warnings)` | Verifica dependencias circulares. |
+| `def _check_system_configuration()` | Verifica configuración del sistema. |
+| `def _check_component_configuration(component_name)` | Verifica configuración de un componente específico. |
+| `def _check_interfaces_configuration()` | Verifica configuración de interfaces. |
+| `def _check_dependencies_configuration()` | Verifica configuración de dependencias. |
+| `def _determine_if_change_affects_startup(change)` | Determina si un cambio afecta el arranque del sistema. |
+| `def _get_startup_dependencies()` | Obtiene dependencias de arranque. |
+| `def _has_circular_dependencies(dependencies)` | Verifica si hay dependencias circulares. |
+| `def _notify_verification_results(change, evidence_entry)` | Notifica resultados de verificación a sistemas relacionados. |
+| `def detect_rollback_need(change, execution_result)` | Detecta cuándo un cambio debe revertirse basado en el resultado de ejecución. |
+| `def create_backup_for_rollback(change)` | Crea una copia de seguridad de los componentes afectados antes de aplicar un cambio. |
+| `def perform_rollback(change, backup_data)` | Realiza el rollback de un cambio arquitectónico. |
+| `def verify_rollback_success(change, rollback_result)` | Verifica que el rollback se realizó correctamente. |
+| `def _check_dependencies_after_rollback(change, rollback_result)` | Verifica dependencias después de un rollback. |
+| `def register_rollback_reason(change, reason, additional_info)` | Registra el motivo por el cual se realizó un rollback. |
+| `def test_rollback_mechanism()` | Prueba el mecanismo de rollback con un cambio de prueba. |
+| `def test_rollback_failure_scenarios()` | Prueba escenarios de fallo durante el rollback. |
+| `def execute_syntax_check(component_name)` | Ejecuta comprobación sintáctica del componente afectado. |
+| `def execute_component_tests(component_name)` | Ejecuta tests del componente afectado. |
+| `def check_direct_integrations(component_name)` | Comprueba integraciones directas del componente afectado. |
+| `def check_configuration_state()` | Comprueba estado de configuración del sistema. |
+| `def check_application_startup(component_name)` | Comprueba que la aplicación sigue arrancando si el cambio lo requiere. |
+| `def register_real_evidence(verification_id, evidence_data)` | Registra evidencia real de la verificación. |
+| `def execute_post_verification_tests()` | Ejecuta tests de verificación posterior completos. |
+| `def _get_component_files(component)` | Obtiene archivos asociados a un componente. |
+| `def _find_component_test_files(component)` | Busca archivos de test para un componente. |
+| `def _execute_test_file(test_file, component_name)` | Ejecuta un archivo de test individual. |
+| `def _get_required_interfaces(component_name)` | Obtiene interfaces requeridas por un componente. |
+| `def _check_external_integrations(component_name)` | Verifica integraciones con sistemas externos. |
+| `def _get_config_files()` | Obtiene archivos de configuración. |
+| `def _validate_config_file(config_file, config_data)` | Valida un archivo de configuración específico. |
+| `def _validate_config_settings(config)` | Valida configuración en memoria. |
+| `def _get_contextual_config()` | Obtiene configuración del sistema contextual. |
+| `def _get_improvement_config()` | Obtiene configuración del sistema de automejora. |
+| `def _requires_startup_verification(component_name)` | Determina si se requiere verificación de arranque. |
+| `def _get_component_module_path(component)` | Obtiene la ruta del módulo de un componente. |
+| `def _check_critical_errors()` | Verifica errores críticos que impiden el arranque. |
+| `def _measure_startup_performance()` | Mide métricas de rendimiento durante el arranque. |
+| `def _mark_verification_as_verified(verification_id)` | Marca una verificación como verificada. |
+| `def _store_persistent_evidence(verification_id, evidence_data)` | Almacena evidencia de forma persistente. |
+| `def _notify_evidence_registration(verification_id, evidence_record)` | Notifica sistemas conectados sobre el registro de evidencia. |
+| `def _log_verification_event(event_type, result)` | Registra eventos de verificación. |
+| `def connect_contextual_adaptation_engine(contextual_engine, integration_config)` | Conecta el ContextualAdaptationEngine con el ArchitecturalEvolutionManager. |
+| `def connect_self_improvement_system(self_improvement_system, integration_config)` | Conecta el SelfImprovementSystem solo donde ya exista contrato. |
+| `def reuse_existing_configuration(config_path)` | Reutiliza mecanismos existentes de configuración. |
+| `def avoid_double_evolution_logic()` | Evita doble lógica de evolución entre sistemas conectados. |
+| `def propagate_result(result, source_system, target_systems)` | Propaga resultados entre sistemas conectados. |
+| `def run_integration_tests()` | Ejecuta tests de integración entre sistemas. |
+| `def _sync_contextual_state()` | Sincroniza estado con ContextualAdaptationEngine. |
+| `def _sync_improvement_rules()` | Sincroniza reglas de mejora con SelfImprovementSystem. |
+| `def _coordinate_evolution_systems(systems)` | Coordina múltiples sistemas de evolución para evitar conflictos. |
+| `def _propagate_to_contextual_engine(result, source_system)` | Propaga resultado a ContextualAdaptationEngine. |
+| `def _propagate_to_self_improvement(result, source_system)` | Propaga resultado a SelfImprovementSystem. |
+| `def _log_propagation_event(result, source, targets, success)` | Registra evento de propagación. |
+| `def _test_contextual_engine_connection()` | Test de conexión con ContextualAdaptationEngine. |
+| `def _test_self_improvement_connection()` | Test de conexión con SelfImprovementSystem. |
+| `def _test_result_propagation()` | Test de propagación de resultados. |
+| `def _test_configuration_reuse()` | Test de reutilización de configuración. |
+| `def identify_persistence_locations()` | Identifica dónde se persisten reglas/cambios (2.8.2.9.1). |
+| `def persist_evolution(evolution)` | Persiste una evolución válida (2.8.2.9.2). |
+| `def recover_evolution(evolution_id)` | Recupera una evolución persistida (2.8.2.9.3). |
+| `def handle_corrupted_or_missing_data(evolution_id)` | Maneja datos corruptos o ausentes (2.8.2.9.4). |
+| `def prevent_duplicates(evolution)` | Evita duplicados en la persistencia (2.8.2.9.5). |
+| `def maintain_change_traceability(change)` | Mantiene trazabilidad de cambios (2.8.2.9.6). |
+| `def run_persistence_and_audit_tests()` | Ejecuta tests de persistencia y auditoría (2.8.2.9.7). |
+| `def _get_directory_size_mb(directory_path)` | Obtiene el tamaño de un directorio en MB. |
+| `def _validate_change_for_persistence(change)` | Valida un cambio para persistencia. |
+| `def _validate_proposal_for_persistence(proposal)` | Valida una propuesta para persistencia. |
+| `def _is_duplicate_evolution(evolution)` | Verifica si una evolución es duplicada. |
+| `def _serialize_evolution_for_persistence(evolution)` | Serializa una evolución para persistencia. |
+| `def _deserialize_evolution_from_persistence(evolution_data)` | Deserializa una evolución desde datos persistidos. |
+| `def _update_evolution_index(evolution_id, evolution_file)` | Actualiza el índice de evoluciones. |
+| `def _add_audit_record(audit_record)` | Agrega un registro al auditoría. |
+| `def _validate_evolution_data_integrity(evolution_data)` | Valida la integridad de datos de evolución. |
+| `def _attempt_recovery_from_backup(evolution_id)` | Intenta recuperar desde backup. |
+| `def _check_data_corruption(file_path)` | Verifica si un archivo de datos está corrupto. |
+| `def _attempt_data_repair(file_path)` | Intenta reparar datos corruptos. |
+| `def _backup_corrupted_file(file_path)` | Crea backup de archivo corrupto. |
+| `def _are_evolution_data_equivalent(data1, data2)` | Verifica si dos conjuntos de datos de evolución son equivalentes. |
+| `def _is_evolution_update(old_data, new_data)` | Verifica si una evolución es una actualización válida. |
+| `def _find_similar_evolutions(evolution)` | Encuentra evoluciones similares. |
+| `def _calculate_evolution_similarity(evolution1, evolution2)` | Calcula similitud entre dos evoluciones. |
+| `def _generate_trace_id()` | Genera un ID de trazabilidad único. |
+| `def _categorize_change(change)` | Categoriza un cambio. |
+| `def _update_traceability_index(change_id, trace_id)` | Actualiza el índice de trazabilidad. |
+| `def _cleanup_test_evolution(evolution_id)` | Limpia datos de prueba de evolución. |
+| `def _create_test_change()` | Crea un cambio de prueba. |
+| `def run_unit_tests()` | Ejecuta tests unitarios del ArchitecturalEvolutionManager. |
+| `def run_integration_tests()` | Ejecuta tests de integración con sistemas conectados. |
+| `def verify_real_system_functionality()` | Realiza verificación real del sistema en ejecución. |
+| `def update_documentation()` | Actualiza la documentación del sistema. |
+| `def mark_completion()` | Marca la tarea 2.8.2.10 como completada y verifica que todas las hojas estén completas. |
+| `def run_closure_tests()` | Ejecuta todos los tests de cierre de forma coordinada. |
+
+<a name="src-utils-circuit_breaker-py"></a>
+### `src/utils/circuit_breaker.py` [197 líneas] — Circuit Breaker Pattern Implementation
+
+**Descripción:** Circuit Breaker Pattern Implementation
+
+**Importaciones:** 8.
+
+`class CircuitState(Enum)`  (línea 14) — Circuit breaker states
+
+_Sin métodos definidos en el AST._
+
+`class CircuitBreakerConfig`  (línea 21) — Configuration for circuit breaker
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class CircuitBreaker`  (línea 29) — Circuit breaker implementation
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(name, config)` |  |
+| `def call(func)` | Execute function with circuit breaker protection |
+| `def _should_attempt_reset()` | Check if circuit should attempt reset |
+| `def _on_success()` | Handle successful call |
+| `def _on_failure()` | Handle failed call |
+| `def _open_circuit()` | Open the circuit breaker |
+| `def _reset_circuit()` | Reset circuit breaker to closed state |
+| `def force_open()` | Force circuit breaker to open state |
+| `def force_close()` | Force circuit breaker to closed state |
+| `def get_state()` | Get current circuit breaker state |
+| `def get_stats()` | Get circuit breaker statistics |
+
+`class CircuitBreakerOpenError(Exception)`  (línea 146) — Exception raised when circuit is open
+
+_Sin métodos definidos en el AST._
+
+`class CircuitBreakerManager`  (línea 150) — Manages multiple circuit breakers
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__()` |  |
+| `def get_breaker(name, config)` | Get or create circuit breaker |
+| `def get_all_stats()` | Get statistics for all circuit breakers |
+| `def reset_all()` | Reset all circuit breakers |
+| `def cleanup_stale(max_age_hours)` | Clean up stale circuit breakers |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def circuit_breaker(name, config)`  (L189) | Decorator for circuit breaker protection |
+
+<a name="src-utils-config-py"></a>
+### `src/utils/config.py` [1348 líneas] — Módulo de sistema
+
+**Descripción:** Módulo de sistema.
+
+**Importaciones:** 8.
+
+`class SystemConfig`  (línea 55) — Configuración general del sistema Jarvis.
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class LoggingConfig`  (línea 65) — Configuración del sistema de logging.
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class KeyboardConfig`  (línea 75) — Configuración de teclas de atajo.
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class VoiceConfig`  (línea 83) — Configuración de voz.
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class MemoryConfig`  (línea 95) — Configuración de memoria.
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class PredictiveConfig`  (línea 104) — Configuración del sistema predictivo.
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class MonitorConfig`  (línea 118) — Configuración compatible de un monitor.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def right()` | Coordenada X final del monitor. |
+| `def bottom()` | Coordenada Y final del monitor. |
+
+`class ScreenConfig`  (línea 158) — Configuración auxiliar de pantallas.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def monitor_count()` | Número de monitores configurados en el JSON. |
+| `def get_monitor(monitor_id)` | Obtiene un monitor por ID. |
+| `def get_primary_monitor()` | Obtiene el monitor marcado como principal. |
+
+`class TimeoutConfig`  (línea 230) — Configuración de timeouts.
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class CalibrationConfig`  (línea 240) — Configuración del sistema de calibración.
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class ChromeConfig`  (línea 263) — Configuración de Google Chrome para aperturas automáticas.
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class Config`  (línea 284) — Configuración principal del sistema.
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def _voice_file_exists(voice_id, voice_styles_dir)`  (L315) | Comprueba si existe el archivo .bin de una voz. |
+| `def load_saved_voice_preference()`  (L333) | Carga la última voz seleccionada por el usuario. |
+| `def save_voice_preference(voice_id)`  (L371) | Guarda la voz actualmente seleccionada. |
+| `def _load_monitor(monitor_data)`  (L420) | Convierte el bloque JSON de un monitor en MonitorConfig. |
+| `def _load_default_monitors()`  (L547) | No inventa monitores. |
+| `def load_config()`  (L562) | Carga la configuración desde config/config.json. |
+| `def get_project_root()`  (L1220) | Retorna la ruta raíz del proyecto. |
+| `def get_config_path()`  (L1225) | Retorna la ruta del archivo de configuración. |
+| `def get_models_path()`  (L1235) | Retorna la ruta al directorio de modelos. |
+| `def get_voices_path()`  (L1240) | Retorna la ruta al directorio de voces. |
+| `def get_macros_coords_path()`  (L1245) | Retorna la ruta al archivo de coordenadas de macros. |
+| `def get_voice_preference_path()`  (L1250) | Retorna la ruta de la preferencia persistente de voz. |
+| `def get_system_config()`  (L1260) | Retorna la configuración general del sistema. |
+| `def get_logging_config()`  (L1265) | Retorna la configuración de logging. |
+| `def get_keyboard_config()`  (L1270) | Retorna la configuración del teclado. |
+| `def get_voice_config()`  (L1275) | Retorna la configuración de voz. |
+| `def get_memory_config()`  (L1280) | Retorna la configuración de memoria. |
+| `def get_screen_config()`  (L1285) | Retorna la configuración auxiliar de pantallas. |
+| `def get_timeout_config()`  (L1294) | Retorna la configuración de timeouts. |
+| `def get_predictive_config()`  (L1299) | Retorna la configuración predictiva. |
+| `def get_calibration_config()`  (L1304) | Retorna la configuración de calibración. |
+| `def get_chrome_config()`  (L1309) | Retorna la configuración de Chrome. |
+| `def get_element_types()`  (L1314) | Retorna los tipos de elementos configurados. |
+| `def get_monitors()`  (L1324) | Retorna los monitores definidos en config.json. |
+| `def get_monitor_config(monitor_id)`  (L1334) | Retorna un monitor concreto del JSON. |
+| `def get_primary_monitor_config()`  (L1341) | Retorna el monitor principal definido en el JSON. |
+| `def get_monitor_count()`  (L1346) | Retorna el número de monitores definidos en el JSON. |
+
+<a name="src-utils-contextual_adaptation_audit-py"></a>
+### `src/utils/contextual_adaptation_audit.py` [444 líneas] — Auditoría del Objetivo Real - Sistema de Autoevolución y Adaptación Contextual (Unidad 2.8.1)
+
+**Descripción:** Auditoría del Objetivo Real - Sistema de Autoevolución y Adaptación Contextual (Unidad 2.8.1)
+
+**Importaciones:** 8.
+
+`class ComponentStatus`  (línea 16) — Estado de un componente del sistema
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class AuditFinding`  (línea 29) — Hallazgo de auditoría
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class SystemGap`  (línea 40) — Brecha en el sistema
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class ContextualAdaptationAuditor`  (línea 49) — Auditoría del objetivo real para Sistema de Autoevolución y Adaptación Contextual
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__()` |  |
+| `def audit_existing_components()` | Auditar componentes existentes relacionados con adaptación y evolución |
+| `def _audit_component(name, path, expected_functionality, expected_capabilities)` | Auditar un componente específico |
+| `def _assess_functionality(content, expected)` | Evaluar funcionalidad implementada |
+| `def _assess_capabilities(content, expected_capabilities)` | Evaluar capacidades implementadas |
+| `def _assess_integration(content)` | Evaluar nivel de integración |
+| `def _extract_dependencies(content)` | Extraer dependencias del componente |
+| `def _identify_issues(content)` | Identificar posibles issues en el componente |
+| `def _add_audit_finding(category, severity, component, description, evidence, recommendation, impact)` | Agregar hallazgo de auditoría |
+| `def identify_system_gaps()` | Identificar brechas en el sistema de autoevolución contextual |
+| `def _add_system_gap(area, missing_component, required_functionality, priority, estimated_effort, dependencies)` | Agregar brecha identificada |
+| `def generate_audit_report()` | Generar reporte completo de auditoría |
+| `def _generate_recommendations()` | Generar recomendaciones basadas en la auditoría |
+| `def _generate_next_steps()` | Generar pasos siguientes para implementación |
+| `def _is_fully_integrated()` | Verificar si el sistema está completamente integrado |
+| `def save_audit_report(output_path)` | Guardar reporte de auditoría a archivo |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def main()`  (L414) | Ejecutar auditoría completa |
+
+<a name="src-utils-contextual_adaptation_engine-py"></a>
+### `src/utils/contextual_adaptation_engine.py` [4958 líneas] — Motor de adaptación contextual revisado de JARVIS.
+
+**Descripción:** Motor de adaptación contextual revisado de JARVIS.
+
+**Importaciones:** 38.
+
+`class ContextType(Enum)`  (línea 107)
+
+_Sin métodos definidos en el AST._
+
+`class AdaptationLevel(Enum)`  (línea 119)
+
+_Sin métodos definidos en el AST._
+
+`class ContextualFactor(Enum)`  (línea 126)
+
+_Sin métodos definidos en el AST._
+
+`class ContextSnapshot`  (línea 140)
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` |  |
+
+`class AdaptationRule`  (línea 165)
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` |  |
+
+`class KnowledgeTransfer`  (línea 198)
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` |  |
+
+`class TransferEvaluation(dict)`  (línea 220) — Evaluación de una transferencia.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __iter__()` |  |
+
+`class AdaptationResult`  (línea 234)
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` |  |
+
+`class _AdaptationHistoryEntry(dict)`  (línea 254) — Mantiene compatibilidad con el historial legado que se lee por atributo.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __getattr__(name)` |  |
+| `def to_dict()` |  |
+
+`class ContextualAdaptationEngine`  (línea 262) — Motor de adaptación contextual y transferencia de conocimiento de JARVIS.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(config_path, data_dir)` |  |
+| `def _load_config(config_path)` |  |
+| `def _resolve_path(configured_path, default_name)` |  |
+| `def _initialize_adaptation_rules()` |  |
+| `def _initialize_knowledge_base()` |  |
+| `def capture_context_snapshot()` |  |
+| `def _collect_system_metrics()` |  |
+| `def _collect_performance_metrics()` |  |
+| `def _collect_user_patterns()` |  |
+| `def _collect_environmental_conditions()` |  |
+| `def _determine_context_type(system_metrics, performance_metrics, user_patterns)` |  |
+| `def _evaluate_contextual_factors(system, performance, user, environment)` |  |
+| `def _calculate_context_confidence(factors, system, performance)` |  |
+| `def _record_context_pattern(snapshot)` |  |
+| `def analyze_contextual_patterns(snapshot)` |  |
+| `def _evaluate_rule_condition(rule, snapshot)` |  |
+| `def _get_contextual_value(key, snapshot)` |  |
+| `def _parse_value(value)` |  |
+| `def execute_adaptation(snapshot, rules)` |  |
+| `def _determine_adaptation_level(rules)` |  |
+| `def _execute_adaptation_actions(rule, snapshot)` |  |
+| `def _execute_single_action(action, snapshot)` |  |
+| `def _set_optimization_interval(interval)` |  |
+| `def _reduce_data_transfer_real()` |  |
+| `def _update_rule_success_rate(rule, success)` |  |
+| `def _calculate_overall_impact(data)` | Normalizar el signo de los impactos sin confundir aumentos buenos y malos. |
+| `def _calculate_adaptation_confidence(rules, snapshot, impact)` |  |
+| `def _record_adaptation_result(adaptation_id, snapshot, rules, confidence)` |  |
+| `def transfer_knowledge(source_context, target_context, knowledge_type, transfer_strategy, include_patterns, include_strategies, include_baselines, include_metrics)` |  |
+| `def _extract_knowledge_from_context(context, knowledge_type)` |  |
+| `def _extract_contextual_metrics(context)` |  |
+| `def _extract_relevant_metrics(context)` |  |
+| `def _validate_context_compatibility(source_context, target_context)` |  |
+| `def _has_transfer_history(source, target)` |  |
+| `def _get_historical_compatibility(source, target, use_fallback)` |  |
+| `def _calculate_factor_similarity(source, target)` |  |
+| `def _calculate_transfer_efficiency(source_context, target_context, knowledge_type, transfer_strategy)` |  |
+| `def _calculate_transfer_efficiency_with_strategy(source_context, target_context, knowledge_type, transfer_strategy)` |  |
+| `def _get_context_adjustment_factor(source, target)` |  |
+| `def _adapt_baselines_to_context(baselines, source_context, target_context)` |  |
+| `def _get_context_knowledge_amount(context)` |  |
+| `def _calculate_transfer_potential(source_context, target_context)` |  |
+| `def _filter_patterns_by_compatibility(patterns, target_context, strategy)` |  |
+| `def _filter_strategies_by_compatibility(strategies, target_context, strategy)` |  |
+| `def _calculate_pattern_compatibility(pattern, target_context, strategy)` |  |
+| `def _calculate_strategy_applicability(strategy, target_context)` |  |
+| `def _transform_knowledge_for_target(knowledge_data, source_context, target_context, strategy, transfer_strategy)` |  |
+| `def _update_transfer_patterns(transfer)` | Registrar una transferencia sin romper historiales JSON de versiones anteriores. |
+| `def _apply_success_patterns(patterns, transfer)` |  |
+| `def _apply_adaptation_strategies(strategies, transfer)` |  |
+| `def _apply_performance_baselines(baselines, transfer)` |  |
+| `def _apply_transferred_knowledge(transfer)` |  |
+| `def _evaluate_knowledge_application(transfer)` |  |
+| `def get_transfer_confidence(transfer_id, result)` | Obtener una confianza acotada usando primero la transferencia viva y después el historial persistido. |
+| `def _resolve_transfer_confidence(transfer_id, transfer, efficiency)` | Resolver la confianza de una transferencia viva: feedback explícito > atributo > eficiencia. |
+| `def register_feedback(transfer_id, feedback_data, result)` | Registrar feedback y sincronizar el objeto de transferencia con su historial. |
+| `def register_transfer_feedback(transfer_id, success, feedback_score, feedback_comments)` | Alias compatible que acepta el contrato público de feedback de transferencia. |
+| `def _update_global_confidence_metrics(success, feedback_score)` |  |
+| `def adjust_transfer_confidence(transfer_id, adjustment_factor, feedback_success, feedback_score, reason)` |  |
+| `def evaluate_transfer_result(transfer, execution_result)` | Evaluar una transferencia; acepta un KnowledgeTransfer o su identificador legacy. |
+| `def _record_successful_transfer_pattern(source_context, target_context, knowledge_type)` |  |
+| `def knowledge_transaptors()` | Alias de `knowledge_transfers` para los consumidores que expected este nombre. |
+| `def get_knowledge_transfer_objects(context_type, knowledge_type, min_efficiency)` | Devolver objetos KnowledgeTransfer; complemento al resumen serializable legacy. |
+| `def get_knowledge_transfers(context_type, knowledge_type, min_efficiency)` | Obtener transferencias filtradas. |
+| `def batch_knowledge_transfer(transfer_requests)` |  |
+| `def auto_transfer_knowledge(target_context, knowledge_types, min_compatibility, max_transfers)` |  |
+| `def transfer_knowledge_with_feedback(source_context, target_context, knowledge_type, feedback_callback)` |  |
+| `def get_transfer_recommendations(target_context, max_recommendations, min_efficiency)` |  |
+| `def _calculate_transfer_urgency(target_context, knowledge_type)` |  |
+| `def _generate_recommendation_reasoning(source_context, target_context, knowledge_type, compatibility, priority)` |  |
+| `def _estimate_transfer_efficiency(source, target, knowledge_type)` |  |
+| `def _identify_relevant_knowledge_types(source, target)` |  |
+| `def _generate_transfer_reasoning(source, target, knowledge_type)` |  |
+| `def _calculate_transfer_priority(compatibility, potential, knowledge_type)` |  |
+| `def _get_available_knowledge_types(context)` |  |
+| `def record_resource_allocation(allocation_data)` |  |
+| `def _update_resource_usage_patterns(resource_type, context, priority, status)` |  |
+| `def add_adaptation_rule(rule)` |  |
+| `def remove_adaptation_rule(rule_id)` |  |
+| `def enable_rule(rule_id)` |  |
+| `def disable_rule(rule_id)` |  |
+| `def get_adaptation_rule(rule_id)` |  |
+| `def get_adaptation_rules()` |  |
+| `def list_adaptation_rules(enabled_only)` |  |
+| `def save_adaptation_rules()` |  |
+| `def _save_adaptation_rules()` |  |
+| `def _campos_de_formato(clave)` | Campos del FORMATO REAL de las filas de un fichero de persistencia. |
+| `def _campo_de_identidad(clave)` | Campo que IDENTIFICA una fila en el FORMATO REAL de un fichero. |
+| `def _identidad_de_regla(row)` | IDENTIDAD REGISTRABLE de una fila de regla. |
+| `def _desviaciones_de_regla(row)` | Desviaciones de una fila de regla respecto del FORMATO REAL. |
+| `def _desviaciones_estrictas_de_regla(row)` | Desviaciones de los campos de conversión ESTRICTA de una fila de regla. |
+| `def _valor_por_defecto_de_recuperacion(campo, regla_id)` | Valor por DEFECTO de RECUPERACIÓN de un campo de regla. |
+| `def _recuperar_fila_de_regla(row, desviaciones)` | RECUPERA la fila de regla corrupta en el NIVEL del CAMPO. |
+| `def _procesar_fila_de_regla(row, identidades)` | Procesa UNA fila de regla por el pipeline COMUN a las dos vías. |
+| `def _valores_del_contenedor_de_reglas(rows)` | VALORES del contenedor `rules` cuando el contenedor tiene FORMA de mapeo. |
+| `def _recuperar_grupos_de_base(clave, valor)` | RECUPERA los GRUPOS sanos de una sección con un grupo corrupto. |
+| `def _registrar_recuperacion(fichero, unidad, recuperaciones)` | Anota en el INFORME de recuperación lo que se ha recuperado. |
+| `def recovery_report()` | INFORME de lo que el cargador ha RECUPERADO (2.8.8.9.7.2). |
+| `def _fila_valida(fila, clave)` | Comprobar que una fila de persistencia respeta el FORMATO REAL. |
+| `def _estrategia_aprendida_valida(entrada)` | Comprobar que una entrada de estrategia aprendida aporta EVIDENCIA. |
+| `def _seccion_de_conocimiento_valida(clave, valor)` | Comprobar que una sección de la base respeta el FORMATO REAL. |
+| `def load_adaptation_rules()` |  |
+| `def _load_adaptation_rules()` | Alias privado legacy de load_adaptation_rules. |
+| `def save_knowledge_base()` |  |
+| `def load_knowledge_base()` |  |
+| `def save_all_data()` |  |
+| `def load_all_data()` | Carga TODA la persistencia que lee esta carga y DECLARA lo que ocurrio. |
+| `def _hay_que_cargar()` | Hay AL MENOS UNO de los ficheros de persistencia que esta carga LEE. |
+| `def _unidades_obtenidas()` | Unidades de datos utilizables que la ultima carga ha OBTENIDO. |
+| `def backup_data(backup_dir)` | Respalda los CUATRO ficheros de persistencia (2.8.8.9.8.2). |
+| `def export_adaptation_history(export_file)` |  |
+| `def integrate_with_performance_optimizer()` |  |
+| `def integrate_with_self_improvement_system()` |  |
+| `def integrate_with_adaptive_learning_engine()` |  |
+| `def integrate_with_pattern_analyzer()` |  |
+| `def set_meta_learning_system(meta_learning_system)` |  |
+| `def integrate_with_meta_learning_system(meta_learning_system)` |  |
+| `def full_system_integration()` |  |
+| `def _map_optimization_to_adaptation(recommendation)` |  |
+| `def _determine_learning_mode()` |  |
+| `def _sync_adaptation_rules(improvement_rules)` |  |
+| `def _calculate_adaptive_learning_rate()` |  |
+| `def _calculate_adaptive_batch_size()` |  |
+| `def _calculate_adaptive_max_epochs()` |  |
+| `def _calculate_adaptive_patience()` |  |
+| `def _create_adaptation_rule_from_pattern(pattern)` |  |
+| `def get_integration_status()` |  |
+| `def update_system_configs()` |  |
+| `def get_available_strategies(context)` |  |
+| `def generate_strategy_candidates(target_context, max_candidates, min_confidence)` |  |
+| `def validate_candidate_strategy(candidate)` | Validar estructura y rangos de un candidato de estrategia. |
+| `def evaluate_candidate_strategy(candidate, target_context)` | Evaluar una estrategia en su contexto destino sin comparar un contexto consigo mismo como transferencia. |
+| `def select_strategy(evaluated_strategies, current_strategy)` |  |
+| `def compare_strategies(strategy1, strategy2)` |  |
+| `def apply_strategy(strategy, target_context)` |  |
+| `def _verify_strategy_application(strategy, target_context)` |  |
+| `def _revert_strategy_application(strategy, target_context)` |  |
+| `def represent_adaptation(original_goal, context_snapshot, adaptation_rules)` | Crear una copia adaptada del Goal; acepta objetos y diccionarios. |
+| `def _goal_to_dict(goal)` |  |
+| `def _rule_to_dict(rule)` |  |
+| `def _snapshot_to_dict(snapshot)` |  |
+| `def create_goal_adaptation_proposal(original_goal, context_snapshot, adaptation_rules)` |  |
+| `def _validate_adaptation_constraints(original_goal, adapted_goal, adaptation_rules)` |  |
+| `def _are_constraints_contradictory(constraint_a, constraint_b)` |  |
+| `def _check_intention_preservation(original_goal, adapted_goal)` |  |
+| `def _targets_equivalent(a, b)` |  |
+| `def _validate_goal_structure(goal)` |  |
+| `def _validate_current_state(state)` |  |
+| `def _required_capabilities_for_goal(goal)` |  |
+| `def _validate_capabilities(goal, available_capabilities)` |  |
+| `def _validate_goal_preconditions(goal, current_state)` |  |
+| `def _validate_planner_can_solve(goal, current_state)` |  |
+| `def validate_adapted_goal(original_goal, adapted_goal, current_state, available_capabilities)` | Validar estructura, intención, capacidades, precondiciones y resolubilidad del Goal adaptado. |
+| `def _register_validation_result(original_goal_id, adapted_goal_id, validation_result)` |  |
+| `def _capture_feedback(adaptation_result)` |  |
+| `def _analyze_adaptation_improvement(adaptation_result)` |  |
+| `def _capture_goal_adaptation_feedback(feedback_data)` |  |
+| `def _execute_goal_adaptation_learning_loop(feedback_result)` |  |
+| `def _analyze_learning_patterns(patterns, metrics)` |  |
+| `def _update_adaptive_strategies(learned_patterns, current_strategies)` | Actualizar estrategias manteniendo el contrato ``contexto -> lista``. |
+| `def _calculate_learning_convergence(metrics, improvement)` |  |
+| `def _record_feedback_analysis(adaptation_id, analysis)` |  |
+| `def _record_adaptation_history(adaptation_id, analysis, adaptation_context)` |  |
+| `def _extract_performance_improvement(entry)` |  |
+| `def _record_learning_results(adaptation_id, patterns, strategies, convergence)` |  |
+| `def _generate_pattern_description(pattern)` |  |
+| `def _generate_strategy_description(pattern)` |  |
+| `def _flatten_strategy_map(strategies)` | Normalizar el mapa de estrategias al índice plano ``strategy_id -> entrada``. |
+| `def _known_strategy_ids()` | Identificadores de estrategias ya presentes en el mapa ``contexto -> lista``. |
+| `def _project_strategies_by_context(flat)` | Proyectar el índice plano de estrategias sobre el mapa ``contexto -> lista`` del motor. |
+| `def _merge_strategies_by_context(source)` | Integrar un mapa ``contexto -> lista`` de estrategias en el mapa del motor. |
+| `def _save_goal_adaptation_feedback()` |  |
+| `def _pattern_identity(pattern)` | Identidad estable de un patrón de aprendizaje. |
+| `def _count_pattern_observations(learning_results)` | Contar las observaciones similares acumuladas por cada patrón. |
+| `def _confidence_threshold()` | Umbral de confianza configurado en el motor. |
+| `def _min_similar_observations()` | Mínimo de observaciones similares exigido por el motor. |
+| `def _is_validated_pattern(pattern, observations)` | Comprobar si un patrón cumple el contrato de datos validados. |
+| `def _filter_validated_learning_results(learning_results)` | Dejar en `learning_results` únicamente los patrones validados. |
+| `def _recover_learning_patterns(learning_results)` | Recuperar únicamente los patrones de aprendizaje validados (2.8.8.9.4.4). |
+| `def _save_goal_adaptation_learning_results()` |  |
+| `def _load_goal_adaptation_feedback()` |  |
+| `def _load_goal_adaptation_learning_results()` |  |
+| `def _initialize_goal_adaptation_persistence()` |  |
+| `def expected_storage_paths()` | Rutas del almacenamiento de persistencia que el motor espera encontrar. |
+| `def detect_absent_storage()` | Detecta que parte del almacenamiento esperado falta en disco. |
+| `def expected_storage_sections()` | Secciones de primer nivel que el motor espera en cada fichero de persistencia. |
+| `def detect_absent_sections()` | Detecta secciones ausentes dentro de los ficheros de persistencia existentes. |
+| `def detect_corruption()` | Detecta la corrupción del contenido en los ficheros de persistencia. |
+| `def _deteccion(class_id, location)` | Desviación detectada, con los datos de la clase declarada. |
+| `def _detect_corruption_in(name, payload)` | Desviaciones detectadas en un fichero de persistencia. |
+| `def _es_convertible_a_entero(value)` | Comprobar si `int(value)` no lanza, como hace el cargador real. |
+| `def _es_marca_iso(value)` | Comprobar si una marca de tiempo se puede leer como ISO. |
+| `def _detect_corruption_rules(payload)` | Desviaciones del FORMATO REAL de `contextual_adaptation_rules.json`. |
+| `def _detect_corruption_knowledge_base(payload)` | Desviaciones del FORMATO REAL de `contextual_knowledge_base.json`. |
+| `def _detect_corruption_feedback(payload)` | Desviaciones del FORMATO REAL de `goal_adaptation_feedback.json`. |
+| `def _detect_corruption_learning_results(payload)` | Desviaciones del FORMATO REAL de `goal_adaptation_learning_results.json`. |
+| `def no_data_behavior()` | Contrato DECLARATIVO del comportamiento del motor SIN DATOS (2.8.8.9.5.3). |
+| `def corruption_criteria()` | Contrato DECLARATIVO de los criterios de CORRUPCIÓN (2.8.8.9.6.1). |
+| `def recoverable_data()` | Contrato DECLARATIVO de los DATOS RECUPERABLES (2.8.8.9.7.1). |
+| `def total_loss_fallback()` | Contrato DECLARATIVO del FALLBACK por CORRUPCIÓN TOTAL (2.8.8.9.8.1). |
+| `def minimum_evidence()` | Contrato DECLARATIVO de la EVIDENCIA MINIMA (2.8.8.9.9.2). |
+| `def set_architecture_manager(architecture_manager)` |  |
+| `def update_architecture_state(architecture_state)` |  |
+| `def update_components(components)` |  |
+| `def process_architectural_result(architectural_result)` |  |
+| `def process_evidence_registration(verification_id, evidence_record)` |  |
+| `def on_proposal_created(proposal)` |  |
+| `def start_contextual_adaptation_loop()` |  |
+| `def stop_contextual_adaptation_loop()` |  |
+| `def get_adaptation_summary()` |  |
+| `def get_context_insights()` |  |
+| `def get_engine_status()` |  |
+| `def _safe_float(value, default)` |  |
+| `def _bounded_float(cls, value, minimum, maximum)` |  |
+| `def _coerce_context(value)` |  |
+| `def _call_optional(obj, method_name)` |  |
+| `def _json_default(value)` |  |
+| `def _serializable_history(cls, item)` |  |
+| `def clear_conversational_memory(days_old)` | Elimina conversaciones antiguas de memoria conversacional. |
+| `def clear_adaptation_history(days_old)` | Elimina registros antiguos de historial de adaptación. |
+| `def clear_knowledge_base_patterns(context_type, min_success_rate)` | Limpia patrones de conocimiento con bajo rendimiento o contexto específico. |
+| `def reset_learning_data()` | Reinicia datos de aprendizaje y métricas del sistema. |
+| `def clear_corrupted_data()` | Elimina datos corruptos detectados por el sistema. |
+| `def manual_system_reset(preserve_config)` | Reinicio manual completo del sistema. |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def _cumple_tipo(value, tipo)`  (L72) | Comprobar que un valor respeta el tipo declarado en el FORMATO REAL. |
+| `def _tipo_de_valor(value)`  (L78) | Tipo declarado en el FORMATO REAL que corresponde a un valor concreto. |
+| `def _casa_target(declarado, observados)`  (L88) | Comprobar si un `target` declarado casa con algún target observado. |
+| `def main()`  (L4941) | Demostración breve; los métodos de la clase permanecen fuera de main. |
+
+<a name="src-utils-contextual_pattern_recognizer-py"></a>
+### `src/utils/contextual_pattern_recognizer.py` [509 líneas] — Reconocedor de patrones contextuales para JARVIS.
+
+**Descripción:** Reconocedor de patrones contextuales para JARVIS.
+
+**Importaciones:** 9.
+
+`class ContextualPatternType(Enum)`  (línea 18) — Tipos de patrones contextuales específicos.
+
+_Sin métodos definidos en el AST._
+
+`class ContextualPattern`  (línea 29) — Estructura de patrón contextual detectado.
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class ContextualPatternRecognizer`  (línea 44) — Reconocedor de patrones relacionados con contexto y conectarlos con PatternAnalyzer.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(pattern_analyzer)` |  |
+| `def add_contextual_pattern(snapshot)` | Añadir snapshot de contexto y detectar patrones contextuales. |
+| `def _detect_contextual_pattern(snapshot)` | Detectar patrones contextuales específicos. |
+| `def _detect_contextual_anomaly(snapshot)` | Detectar anomalías contextuales. |
+| `def _detect_contextual_trend(snapshot)` | Detectar tendencias contextuales. |
+| `def _detect_contextual_correlation(snapshot)` | Detectar correlaciones contextuales. |
+| `def _detect_contextual_trend(snapshot)` | Detectar tendencias contextuales. |
+| `def _detect_contextual_seasonal(snapshot)` | Detectar patrones estacionales contextuales. |
+| `def _detect_contextual_burst(snapshot)` | Detectar patrones de burst contextuales. |
+| `def _detect_contextual_changepoint(snapshot)` | Detectar puntos de cambio contextuales. |
+| `def _generate_trend_actions(trend_factors)` | Generar acciones sugeridas para tendencias. |
+| `def _calculate_contextual_compatibility(snapshot)` | Calcular puntuación de compatibilidad del contexto. |
+| `def _get_affected_components(snapshot)` | Obtener componentes afectados basado en el contexto. |
+| `def _generate_anomaly_actions(anomalies)` | Generar acciones para anomalías. |
+| `def _generate_trend_actions(trend_factors)` | Generar acciones para tendencias. |
+| `def _generate_correlation_actions(correlations)` | Generar acciones para correlaciones. |
+| `def _generate_seasonal_actions(patterns)` | Generar acciones para patrones estacionales. |
+| `def _generate_burst_actions(burst_factors)` | Generar acciones para patrones de burst. |
+| `def _generate_changepoint_actions(extreme_changes)` | Generar acciones para puntos de cambio. |
+| `def get_contextual_patterns(pattern_type)` | Obtener patrones contextuales, filtrados por tipo si se especifica. |
+| `def get_patterns_by_severity(severity)` | Obtener patrones por severidad. |
+| `def get_high_compatibility_patterns(threshold)` | Obtener patrones con alta compatibilidad. |
+| `def clear_patterns(older_than_hours)` | Limpiar patrones antiguos. |
+| `def get_pattern_summary()` | Obtener resumen de patrones detectados. |
+| `def export_patterns(file_path)` | Exportar patrones a archivo JSON. |
+
+<a name="src-utils-dynamic_resource_allocator-py"></a>
+### `src/utils/dynamic_resource_allocator.py` [1336 líneas] — Dynamic Resource Allocator v2.8.4.2
+
+**Descripción:** Dynamic Resource Allocator v2.8.4.2
+
+**Importaciones:** 9.
+
+`class ResourceType(Enum)`  (línea 18) — Tipos de recursos gestionables
+
+_Sin métodos definidos en el AST._
+
+`class ResourcePriority(Enum)`  (línea 34) — Prioridades de recurso
+
+_Sin métodos definidos en el AST._
+
+`class AllocationStatus(Enum)`  (línea 42) — Estados de asignación
+
+_Sin métodos definidos en el AST._
+
+`class ResourceRequest`  (línea 53) — Representa una solicitud de recurso.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def validate()` | Validar la solicitud. |
+| `def to_dict()` | Convertir a diccionario. |
+
+`class ResourceAllocation`  (línea 132) — Representa una asignación de recurso.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` | Convertir a diccionario. |
+
+`class ResourceAvailability`  (línea 162) — Representa la disponibilidad de un recurso.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def can_satisfy(request_amount)` | Verificar si el recurso puede satisfacer la solicitud. |
+
+`class DynamicResourceAllocator`  (línea 198) — Sistema de asignación de recursos según contexto.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(monitor, optimizer)` | Inicializar el asignador de recursos. |
+| `def register_resource(resource_type, available, available_amount, maximum, unit)` | Registrar un recurso disponible. |
+| `def create_request(request_id, resource_type, amount, context, priority, required)` | Crear una solicitud de recurso. |
+| `def allocate(request)` | Asignar un recurso. |
+| `def _has_conflict(request)` | Verificar si hay conflictos con asignaciones existentes. |
+| `def _contexts_conflict(context1, context2)` | Verificar si dos contextos tienen conflictos. |
+| `def get_conflicts(request)` | Identificar conflictos reales con asignaciones existentes. |
+| `def _is_user_work(allocation)` | Determinar si una asignación es trabajo de usuario. |
+| `def _can_preempt(existing_allocation, new_request)` | Verificar si una asignación existente puede ser preemptada. |
+| `def _try_preempt(conflicts, new_request)` | Intentar preemptar asignaciones en conflicto según prioridad. |
+| `def defer_request(request)` | Aplazar una solicitud cuando no hay recurso disponible. |
+| `def get_pending_requests()` | Obtener solicitudes diferidas. |
+| `def process_deferred()` | Intentar asignar solicitudes diferidas. |
+| `def _allocate_direct(request)` | Intentar asignación directa sin verificación de conflictos (para deferred). |
+| `def release(allocation_id)` | Liberar una asignación. |
+| `def get_availability(resource_type)` | Obtener disponibilidad de un recurso. |
+| `def get_allocation(allocation_id)` | Obtener una asignación. |
+| `def get_all_allocations()` | Obtener todas las asignaciones. |
+| `def update_usage(allocation_id, used_amount)` | Actualizar el uso real de una asignación. |
+| `def cleanup()` | Limpieza de recursos. |
+| `def update_system_resources()` | Actualizar recursos del sistema desde PerformanceMonitor. |
+| `def update_execution_resources(registry_size)` | Actualizar recursos de ejecución. |
+| `def update_thread_pool_resources(max_workers)` | Actualizar recursos de pool de hilos. |
+| `def update_storage_resources(cache_size)` | Actualizar recursos de almacenamiento. |
+| `def connect_context(context)` | Conectar con el contexto actual. |
+| `def adjust_allocation_for_context(allocation_id)` | Ajustar una asignación usando solo datos disponibles en el contexto. |
+| `def adjust_all_allocations_for_context()` | Ajustar todas las asignaciones usando datos disponibles del contexto. |
+| `def recalculate_on_context_change(new_context)` | Recalcular asignaciones cuando el contexto cambia. |
+| `def set_contextual_adaptation_engine(engine)` | Conectar con el ContextualAdaptationEngine. |
+| `def get_contextual_adaptation_engine()` | Obtener la instancia conectada de ContextualAdaptationEngine. |
+| `def set_performance_optimizer(optimizer)` | Conectar con el PerformanceOptimizer. |
+| `def get_performance_optimizer()` | Obtener la instancia conectada de PerformanceOptimizer. |
+| `def notify_allocation_to_contextual_engine(allocation)` | Notificar una asignación al ContextualAdaptationEngine. |
+| `def request_optimization_from_performance_optimizer(optimization_request)` | Solicitar optimización al PerformanceOptimizer. |
+| `def get_resource_allocation_status_for_planner()` | Obtener estado de asignación de recursos para el Planner/Executor. |
+| `def integrate_with_planner_executor(planner_context)` | Integrar completamente con Planner/Executor mediante contratos existentes. |
+| `def _get_available_capabilities_for_planner()` | Obtener capacidades disponibles para el Planner en formato compatible. |
+| `def _get_optimization_suggestions_for_planner()` | Obtener sugerencias de optimización para el Planner. |
+
+<a name="src-utils-error_dashboard-py"></a>
+### `src/utils/error_dashboard.py` [592 líneas] — Error Recovery Dashboard for JARVIS System
+
+**Descripción:** Error Recovery Dashboard for JARVIS System
+
+**Importaciones:** 10.
+
+`class DashboardView(Enum)`  (línea 17) — Dashboard view types
+
+_Sin métodos definidos en el AST._
+
+`class ErrorSeverity(Enum)`  (línea 25) — Error severity levels
+
+_Sin métodos definidos en el AST._
+
+`class ErrorRecoveryDashboard`  (línea 32) — Main dashboard for error recovery monitoring
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(db_path, update_interval)` |  |
+| `def _init_database()` | Initialize dashboard database |
+| `def _setup_data_sources()` | Setup data sources for dashboard |
+| `def start_dashboard()` | Start the dashboard update thread |
+| `def stop_dashboard()` | Stop the dashboard update thread |
+| `def _update_loop()` | Main dashboard update loop |
+| `def _update_all_data()` | Update all cached data |
+| `def _get_cached_data(key)` | Get cached data if available and not expired |
+| `def _cache_data(key, data, ttl)` | Cache data with optional TTL |
+| `def _get_overview_data()` | Get dashboard overview data |
+| `def _get_active_errors_data()` | Get active errors data |
+| `def _get_recovery_history_data()` | Get recovery history data |
+| `def _get_system_health_data()` | Get system health data |
+| `def _get_alerts_data()` | Get alerts data |
+| `def _get_error_statistics()` | Get error statistics from database |
+| `def _get_recovery_statistics()` | Get recovery statistics from database |
+| `def _get_system_health()` | Get current system health |
+| `def _get_active_recoveries()` | Get list of active recoveries |
+| `def _count_errors_by_severity(errors)` | Count errors by severity |
+| `def _count_errors_by_component(errors)` | Count errors by component |
+| `def _count_recoveries_by_action(recoveries)` | Count recoveries by action |
+| `def _count_recoveries_by_component(recoveries)` | Count recoveries by component |
+| `def _count_alerts_by_severity(alerts)` | Count alerts by severity |
+| `def _count_alerts_by_source(alerts)` | Count alerts by source |
+| `def get_dashboard_data(view)` | Get dashboard data for specified view |
+| `def get_dashboard_views()` | Get available dashboard views |
+| `def refresh_data()` | Force refresh of all cached data |
+| `def log_view_access(view_name)` | Log dashboard view access |
+| `def get_view_statistics()` | Get dashboard view access statistics |
+| `def __str__()` |  |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def get_error_dashboard()`  (L576) | Get a singleton instance of ErrorRecoveryDashboard |
+| `def start_error_dashboard()`  (L583) | Start the error dashboard |
+| `def stop_error_dashboard()`  (L589) | Stop the error dashboard |
+
+<a name="src-utils-error_recovery-py"></a>
+### `src/utils/error_recovery.py` [522 líneas] — Error Recovery System for JARVIS
+
+**Descripción:** Error Recovery System for JARVIS
+
+**Importaciones:** 11.
+
+`class ErrorSeverity(Enum)`  (línea 18) — Error severity levels
+
+_Sin métodos definidos en el AST._
+
+`class ErrorType(Enum)`  (línea 25) — Error categories
+
+_Sin métodos definidos en el AST._
+
+`class RecoveryStrategy(Enum)`  (línea 35) — Recovery strategy types
+
+_Sin métodos definidos en el AST._
+
+`class ErrorRecoveryManager`  (línea 44) — Main error recovery management system
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(db_path)` |  |
+| `def get_error_recovery_manager()` | Get a singleton instance of ErrorRecoveryManager |
+| `def _init_database()` | Initialize error recovery database |
+| `def _register_default_strategies()` | Register default recovery strategies |
+| `def register_strategy(name, strategy_func)` | Register a recovery strategy |
+| `def register_handler(error_type, handler_func)` | Register an error handler for specific error types |
+| `def log_error(error_type, severity, component, error_message, stack_trace, additional_data)` | Log an error for tracking and analysis |
+| `def _update_error_stats(error_type, severity, recovered)` | Update error statistics |
+| `def recover_from_error(error_id, strategy, max_retries, retry_delay)` | Attempt to recover from a logged error |
+| `def _get_error_details(error_id)` | Get detailed information about an error |
+| `def _determine_best_strategy(error_details)` | Determine the best recovery strategy based on error type and severity |
+| `def _execute_recovery_strategy(error_id, strategy, max_retries, retry_delay)` | Execute a specific recovery strategy |
+| `def _retry_strategy(error_id, max_retries, retry_delay)` | Retry strategy with exponential backoff |
+| `def _fallback_strategy(error_id)` | Fallback to alternative implementation |
+| `def _circuit_breaker_strategy(error_id)` | Circuit breaker pattern for handling repeated failures |
+| `def _timeout_strategy(error_id)` | Timeout strategy for hanging operations |
+| `def _restart_strategy(error_id)` | Restart strategy for critical failures |
+| `def _update_recovery_status(error_id, success)` | Update the recovery status of an error |
+| `def _update_execution_time(error_id, execution_time)` | Update the execution time of a recovery attempt |
+| `def get_error_statistics(days)` | Get error statistics for the specified number of days |
+| `def get_active_errors()` | Get list of active (unrecovered) errors |
+| `def cleanup_old_errors(days)` | Clean up old error records |
+| `def __str__()` |  |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def get_error_recovery_manager()`  (L507) | Get a singleton instance of ErrorRecoveryManager |
+| `def start_error_recovery()`  (L514) | Start the error recovery system |
+| `def stop_error_recovery()`  (L520) | Stop the error recovery system |
+
+<a name="src-utils-get_coords-py"></a>
+### `src/utils/get_coords.py` [456 líneas] — Calibrador manual de la macro riot_api.
+
+**Descripción:** Calibrador manual de la macro riot_api.
+
+**Importaciones:** 11.
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def _get_macros_coords_path()`  (L47) | Obtiene la ruta de macros_coords.json. |
+| `def _screen_key(monitor)`  (L68) | Convierte el ID lógico del monitor a la clave sN del JSON. |
+| `def _format_monitor(monitor)`  (L73) | Devuelve una descripción legible del monitor. |
+| `def _get_monitor_for_screen_number(screen_number)`  (L83) | Obtiene un monitor configurado por su número lógico 1-based. |
+| `def _detect_monitor_from_mouse()`  (L101) | Obtiene el monitor que contiene actualmente el puntero. |
+| `def _capture_point_on_monitor(monitor, paso, paso_index)`  (L119) | Espera a que el ratón permanezca quieto IDLE_SECONDS sobre el monitor. |
+| `def _calculate_capture_region(corners)`  (L176) | Calcula [x, y, ancho, alto] usando las cuatro esquinas. |
+| `def _build_calibration_data(points, capture_region)`  (L207) | Construye el bloque de datos de calibración. |
+| `def imprimir_resultados(datos, screen_key)`  (L223) | Muestra por consola los datos capturados. |
+| `def _load_json(ruta_json)`  (L236) | Carga el JSON existente o crea una estructura raíz vacía. |
+| `def _atomic_write_json(ruta_json, data)`  (L249) | Escribe el JSON de forma atómica para evitar archivos incompletos. |
+| `def gestionar_json(nuevos_datos, screen_key, ruta_json)`  (L277) | Actualiza únicamente riot_api para el monitor indicado. |
+| `def calibrar_api_key_riot_macro(screen_number)`  (L342) | Ejecuta la calibración manual de riot_api. |
+| `def calibrarApiKeyRiotMacro(screen_number)`  (L448) | Alias compatible con la función histórica del proyecto. |
+
+<a name="src-utils-health_checker-py"></a>
+### `src/utils/health_checker.py` [498 líneas] — Sistema de verificación de salud para JARVIS.
+
+**Descripción:** Sistema de verificación de salud para JARVIS.
+
+**Importaciones:** 12.
+
+`class HealthStatus(Enum)`  (línea 21) — Estados de salud de un componente.
+
+_Sin métodos definidos en el AST._
+
+`class HealthCheck`  (línea 30) — Resultado de una verificación de salud.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` | Convierte el resultado a un diccionario serializable. |
+
+`class HealthCheckConfig`  (línea 53) — Configuración para las verificaciones de salud.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` | Convierte la configuración a un diccionario. |
+
+`class HealthChecker`  (línea 96) — Verificador de salud del sistema JARVIS.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(config)` | Inicializa el verificador de salud. |
+| `def start_health_checks()` | Inicia las verificaciones periódicas de salud. |
+| `def stop_health_checks()` | Detiene las verificaciones de salud. |
+| `def _health_check_loop()` | Bucle principal de verificación de salud. |
+| `def perform_comprehensive_health_check()` | Realiza una verificación completa de salud de todos los componentes. |
+| `def check_component_health(component_name)` | Verifica la salud de un componente específico. |
+| `def check_system_health()` | Verifica la salud general del sistema. |
+| `def _get_component_module_path(component_name)` | Obtiene la ruta del módulo para un componente. |
+| `def _process_health_check(result)` | Procesa un resultado de verificación de salud. |
+| `def _notify_health_change(result)` | Notifica callbacks sobre cambios en la salud. |
+| `def add_health_change_callback(callback)` | Agrega un callback para recibir notificaciones de cambios de salud. |
+| `def remove_health_change_callback(callback)` | Remueve un callback de notificaciones de salud. |
+| `def get_health_status(component_name)` | Obtiene el estado de salud de un componente o todos los componentes. |
+| `def get_health_summary()` | Obtiene un resumen del estado de salud actual. |
+| `def get_component_health_history(component_name, limit)` | Obtiene el historial de salud de un componente específico. |
+| `def export_health_report(filepath, include_history)` | Exporta un reporte de salud a un archivo JSON. |
+| `def clear_history()` | Limpia el historial de verificaciones de salud. |
+| `def is_component_healthy(component_name)` | Verifica si un componente está saludable. |
+| `def get_unhealthy_components()` | Obtiene una lista de componentes no saludables. |
+| `def __enter__()` | Context manager entry. |
+| `def __exit__(exc_type, exc_val, exc_tb)` | Context manager exit. |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def get_health_checker()`  (L481) | Obtiene la instancia global del verificador de salud. |
+| `def start_health_checks()`  (L489) | Inicia las verificaciones de salud globales. |
+| `def stop_health_checks()`  (L495) | Detiene las verificaciones de salud globales. |
+
+<a name="src-utils-health_monitor-py"></a>
+### `src/utils/health_monitor.py` [418 líneas] — Health Monitor for JARVIS System
+
+**Descripción:** Health Monitor for JARVIS System
+
+**Importaciones:** 11.
+
+`class HealthStatus(Enum)`  (línea 18) — Health status levels
+
+_Sin métodos definidos en el AST._
+
+`class ComponentType(Enum)`  (línea 25) — System component types
+
+_Sin métodos definidos en el AST._
+
+`class HealthMetric`  (línea 35) — Individual health metric
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(name, value, threshold, component, metric_type)` |  |
+| `def is_healthy()` | Check if metric is within healthy bounds |
+| `def get_status()` | Get health status based on value |
+
+`class HealthMonitor`  (línea 64) — Main health monitoring system
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(db_path, check_interval)` |  |
+| `def _init_database()` | Initialize health monitoring database |
+| `def _register_default_metrics()` | Register default health metrics |
+| `def register_metric(name, threshold, component, metric_type)` | Register a health metric |
+| `def register_health_callback(component, callback)` | Register callback for health status changes |
+| `def check_metric(name, value)` | Check a specific metric |
+| `def check_all_metrics()` | Check all registered metrics |
+| `def _log_metric(metric)` | Log metric to database |
+| `def _log_health_summary(metrics)` | Log overall health summary |
+| `def _trigger_health_callbacks(component, metric_name, old_status, new_status)` | Trigger registered health callbacks |
+| `def _create_alert(metric_name, status)` | Create health alert |
+| `def start_monitoring()` | Start continuous health monitoring |
+| `def stop_monitoring()` | Stop continuous health monitoring |
+| `def _monitor_loop()` | Main monitoring loop |
+| `def get_current_health()` | Get current health status |
+| `def get_health_history(hours)` | Get health history for specified hours |
+| `def get_active_alerts()` | Get list of active (unresolved) alerts |
+| `def resolve_alert(alert_id)` | Resolve a specific alert |
+| `def cleanup_old_data(days)` | Clean up old health data |
+| `def __str__()` |  |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def get_health_monitor()`  (L402) | Get a singleton instance of HealthMonitor |
+| `def start_health_monitoring()`  (L409) | Start health monitoring |
+| `def stop_health_monitoring()`  (L415) | Stop health monitoring |
+
+<a name="src-utils-jarvis_logging_system-py"></a>
+### `src/utils/jarvis_logging_system.py` [487 líneas] — Sistema de logging avanzado y análisis de patrones para JARVIS.
+
+**Descripción:** Sistema de logging avanzado y análisis de patrones para JARVIS.
+
+**Importaciones:** 15.
+
+`class JarvisLoggingSystem`  (línea 32) — Sistema unificado de logging avanzado para JARVIS.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(config)` |  |
+| `def _default_config()` | Configuración por defecto del sistema de logging. |
+| `def _create_logger()` | Crear logger avanzado. |
+| `def _create_predictor()` | Crear sistema predictivo. |
+| `def _create_alert_manager()` | Crear gestor de alertas. |
+| `def _create_dashboard()` | Crear dashboard interactivo. |
+| `def start()` | Iniciar el sistema de logging avanzado. |
+| `def stop()` | Detener el sistema de logging avanzado. |
+| `def _prediction_worker()` | Worker para predicciones automáticas. |
+| `def _dashboard_worker()` | Worker para dashboard. |
+| `def _perform_periodic_predictions()` | Realizar predicciones periódicas. |
+| `def _extract_recent_features()` | Extraer características de logs recientes. |
+| `def _check_and_retrain()` | Verificar si es necesario reentrenar modelos. |
+| `def _cleanup_old_logs()` | Limpiar logs antiguos. |
+| `def _process_alert(alert)` | Procesar alerta generada. |
+| `def _trigger_event(event_type, data)` | Disparar evento a callbacks registrados. |
+| `def register_event_callback(event_type, callback)` | Registrar callback para evento específico. |
+| `def log(message, level, category)` | Método principal de logging. |
+| `def log_error(message)` | Loggear error. |
+| `def log_warning(message)` | Loggear warning. |
+| `def log_info(message)` | Loggear info. |
+| `def log_debug(message)` | Loggear debug. |
+| `def log_performance(message)` | Loggear métrica de rendimiento. |
+| `def log_with_trace(message, trace_id)` | Loggear con trace ID. |
+| `def log_with_span(message, span_id, parent_span_id)` | Loggear con span ID. |
+| `def get_logs(start_time, end_time, level, category, module, limit)` | Obtener logs desde la base de datos. |
+| `def get_statistics()` | Obtener estadísticas del sistema de logging. |
+| `def get_predictions()` | Obtener predicciones actuales. |
+| `def get_alerts()` | Obtener alertas activas. |
+| `def acknowledge_alert(alert_id)` | Reconocer alerta. |
+| `def resolve_alert(alert_id)` | Resolver alerta. |
+| `def export_logs(start_time, end_time, format)` | Exportar logs. |
+| `def export_predictions(format)` | Exportar datos de predicción. |
+| `def get_dashboard_url()` | Obtener URL del dashboard. |
+| `def train_models()` | Entrenar modelos predictivos manualmente. |
+| `def analyze_trends(days)` | Analizar tendencias. |
+| `def get_patterns(acknowledged, limit)` | Obtener patrones detectados. |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def get_jarvis_logger()`  (L459) | Obtener instancia del sistema de logging de JARVIS. |
+| `def log_jarvis(message, level, category)`  (L464) | Loggear mensaje en el sistema de logging de JARVIS. |
+| `def log_jarvis_error(message)`  (L470) | Loggear error en el sistema de logging de JARVIS. |
+| `def log_jarvis_warning(message)`  (L475) | Loggear warning en el sistema de logging de JARVIS. |
+| `def log_jarvis_info(message)`  (L480) | Loggear info en el sistema de logging de JARVIS. |
+| `def log_jarvis_performance(message)`  (L485) | Loggear métrica de rendimiento en el sistema de logging de JARVIS. |
+
+<a name="src-utils-log_analytics-py"></a>
+### `src/utils/log_analytics.py` [966 líneas] — Sistema avanzado de análisis de logs para Jarvis con capacidades de business intelligence.
+
+**Descripción:** Sistema avanzado de análisis de logs para Jarvis con capacidades de business intelligence.
+
+**Importaciones:** 18.
+
+`class AnalyticsType(Enum)`  (línea 24) — Tipos de análisis.
+
+_Sin métodos definidos en el AST._
+
+`class TimeGranularity(Enum)`  (línea 37) — Granularidad temporal.
+
+_Sin métodos definidos en el AST._
+
+`class AnalyticsResult`  (línea 47) — Resultado de análisis.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` | Convertir a diccionario. |
+
+`class LogAnalyticsEngine`  (línea 68) — Motor de análisis de logs.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(db_path)` |  |
+| `def _create_database()` | Crear base de datos para análisis. |
+| `def generate_summary_analytics(start_time, end_time)` | Generar análisis resumen. |
+| `def generate_trend_analytics(start_time, end_time, granularity)` | Generar análisis de tendencias. |
+| `def generate_pattern_analytics(start_time, end_time)` | Generar análisis de patrones. |
+| `def generate_correlation_analytics(start_time, end_time)` | Generar análisis de correlaciones. |
+| `def generate_performance_analytics(start_time, end_time)` | Generar análisis de rendimiento. |
+| `def _query_logs(start_time, end_time)` | Consultar logs desde la base de datos. |
+| `def _group_logs_by_time(logs, granularity)` | Agrupar logs por tiempo. |
+| `def _analyze_trends(trend_data)` | Analizar tendencias. |
+| `def _detect_significant_trends(trend_analysis)` | Detectar tendencias significativas. |
+| `def _detect_patterns(logs)` | Detectar patrones en los logs. |
+| `def _calculate_correlations(logs)` | Calcular correlaciones entre variables. |
+| `def _create_summary_visualizations(category_counts, module_counts, error_count, total_logs)` | Crear visualizaciones para análisis resumen. |
+| `def _create_trend_visualizations(trend_data, significant_trends)` | Crear visualizaciones para análisis de tendencias. |
+| `def _create_pattern_visualizations(patterns)` | Crear visualizaciones para análisis de patrones. |
+| `def _create_correlation_visualizations(correlations)` | Crear visualizaciones para análisis de correlaciones. |
+| `def _create_performance_visualizations(response_times, success_rates, performance_stats)` | Crear visualizaciones para análisis de rendimiento. |
+| `def _store_analytics_result(result)` | Almacenar resultado de análisis en base de datos. |
+| `def get_analytics_history(analytics_type, limit)` | Obtener historial de análisis. |
+| `def export_analytics(start_time, end_time, format)` | Exportar resultados de análisis. |
+
+`class LogAnalytics`  (línea 922) — Wrapper para LogAnalyticsEngine que proporciona la interfaz esperada.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(db_path)` |  |
+| `def get_analytics_summary()` | Obtener resumen de análisis. |
+| `def generate_summary_analytics(start_time, end_time)` | Generar análisis resumen. |
+| `def generate_trend_analytics(start_time, end_time, granularity)` | Generar análisis de tendencias. |
+| `def generate_pattern_analytics(start_time, end_time)` | Generar análisis de patrones. |
+| `def generate_correlation_analytics(start_time, end_time)` | Generar análisis de correlaciones. |
+| `def generate_performance_analytics(start_time, end_time)` | Generar análisis de rendimiento. |
+| `def get_analytics_history(analytics_type, limit)` | Obtener historial de análisis. |
+| `def export_analytics(start_time, end_time, format)` | Exportar resultados de análisis. |
+
+<a name="src-utils-log_dashboard-py"></a>
+### `src/utils/log_dashboard.py` [887 líneas] — Dashboard interactivo para monitoreo y gestión de logs de Jarvis.
+
+**Descripción:** Dashboard interactivo para monitoreo y gestión de logs de Jarvis.
+
+**Importaciones:** 24.
+
+`class DashboardView(Enum)`  (línea 27) — Vistas del dashboard.
+
+_Sin métodos definidos en el AST._
+
+`class DashboardWidget(Enum)`  (línea 39) — Tipos de widgets del dashboard.
+
+_Sin métodos definidos en el AST._
+
+`class WidgetConfig`  (línea 52) — Configuración de widget.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` | Convertir a diccionario. |
+
+`class DashboardAlert`  (línea 71) — Alerta del dashboard.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` | Convertir a diccionario. |
+
+`class RealTimeDataStreamer`  (línea 89) — Flujo de datos en tiempo real.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(max_points)` |  |
+| `def add_data_point(stream_name, data)` | Añadir punto de datos a un flujo. |
+| `def get_stream_data(stream_name, limit)` | Obtener datos de un flujo. |
+| `def subscribe_to_stream(stream_name, callback)` | Suscribirse a un flujo de datos. |
+| `def unsubscribe_from_stream(stream_name, callback)` | Desuscribirse de un flujo de datos. |
+
+`class LogDashboard`  (línea 137) — Dashboard principal de logs.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(db_path, port, host)` |  |
+| `def _create_database()` | Crear base de datos del dashboard. |
+| `def _setup_routes()` | Configurar rutas de la aplicación Flask. |
+| `def _get_dashboard_template()` | Obtener plantilla HTML del dashboard. |
+| `def _update_loop()` | Bucle de actualización del dashboard. |
+| `def _update_real_time_data()` | Actualizar datos en tiempo real. |
+| `def _update_widgets()` | Actualizar widgets del dashboard. |
+| `def _get_widget_data(widget)` | Obtener datos para un widget específico. |
+| `def _get_metric_card_data(widget)` | Obtener datos para widget de métrica. |
+| `def _get_line_chart_data(widget)` | Obtener datos para widget de gráfico de línea. |
+| `def _get_bar_chart_data(widget)` | Obtener datos para widget de gráfico de barras. |
+| `def _get_pie_chart_data(widget)` | Obtener datos para widget de gráfico circular. |
+| `def _get_table_data(widget)` | Obtener datos para widget de tabla. |
+| `def _check_alerts()` | Verificar y generar alertas. |
+| `def add_alert(alert)` | Añadir alerta al dashboard. |
+| `def _save_alert(alert)` | Guardar alerta en base de datos. |
+| `def _save_widget(widget)` | Guardar widget en base de datos. |
+| `def _delete_widget(widget_id)` | Eliminar widget de base de datos. |
+| `def start()` | Iniciar el dashboard. |
+| `def _is_port_available(port, host)` | Comprobar si un puerto TCP puede enlazarse. |
+| `def _resolve_port()` | Elegir un puerto disponible, probando alternativas si hace falta. |
+| `def _run_server()` | Ejecutar el servidor Flask, tolerando fallos de bind. |
+| `def run()` | Iniciar el dashboard (alias de start()). |
+| `def stop()` | Detener el dashboard. |
+| `def get_dashboard_url()` | Obtener la URL del dashboard (usa el puerto realmente asignado). |
+| `def _load_default_widgets()` | Cargar widgets por defecto. |
+
+<a name="src-utils-log_integration-py"></a>
+### `src/utils/log_integration.py` [810 líneas] — Sistema de integración de logs para Jarvis con múltiples fuentes y normalización.
+
+**Descripción:** Sistema de integración de logs para Jarvis con múltiples fuentes y normalización.
+
+**Importaciones:** 17.
+
+`class LogSource(Enum)`  (línea 24) — Fuentes de logs soportadas.
+
+_Sin métodos definidos en el AST._
+
+`class LogFormat(Enum)`  (línea 37) — Formatos de logs soportados.
+
+_Sin métodos definidos en el AST._
+
+`class IntegrationStatus(Enum)`  (línea 49) — Estados de integración.
+
+_Sin métodos definidos en el AST._
+
+`class LogSourceConfig`  (línea 59) — Configuración de una fuente de logs.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` | Convertir a diccionario. |
+
+`class LogIntegration`  (línea 83) — Integración de logs.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` | Convertir a diccionario. |
+
+`class LogNormalizer`  (línea 103) — Normalizador de logs para diferentes formatos.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__()` |  |
+| `def normalize_log(raw_log, format_type, source_config)` | Normalizar un log a formato estándar. |
+| `def _parse_json(raw_log)` | Parsear log en formato JSON. |
+| `def _parse_text(raw_log)` | Parsear log en formato de texto libre. |
+| `def _parse_csv(raw_log)` | Parsear log en formato CSV. |
+| `def _parse_syslog(raw_log)` | Parsear log en formato syslog. |
+| `def _parse_nginx(raw_log)` | Parsear log en formato Nginx. |
+| `def _parse_apache(raw_log)` | Parsear log en formato Apache. |
+| `def _parse_custom(raw_log)` | Parsear log en formato personalizado. |
+| `def _standardize_fields(parsed_data, source_config)` | Estandarizar campos del log. |
+| `def _extract_additional_info(normalized)` | Extraer información adicional usando regex. |
+
+`class LogCollector`  (línea 348) — Colector de logs desde múltiples fuentes.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(max_workers)` |  |
+| `def add_integration(integration)` | Añadir integración de logs. |
+| `def remove_integration(integration_id)` | Remover integración de logs. |
+| `def start_collection()` | Iniciar recolección de logs. |
+| `def stop_collection()` | Detener recolección de logs. |
+| `def _collection_loop()` | Bucle principal de recolección. |
+| `def _collect_from_integration(integration)` | Recolectar logs desde una integración específica. |
+| `def _simulate_log_fetch(config)` | Simular obtención de logs (para demostración). |
+| `def _processing_loop()` | Bucle de procesamiento de logs. |
+| `def _process_log(log_item)` | Procesar un log individual. |
+| `def get_integration_status()` | Obtener estado de todas las integraciones. |
+| `def get_collection_metrics()` | Obtener métricas de recolección. |
+
+`class LogTransformer`  (línea 559) — Transformador de logs para diferentes destinos.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__()` |  |
+| `def add_destination(name, config)` | Añadir destino de logs. |
+| `def add_transform_rule(rule)` | Añadir regla de transformación. |
+| `def transform_log(log_data, destination)` | Transformar log para un destino específico. |
+| `def _apply_transform_rule(log_data, rule)` | Aplicar una regla de transformación. |
+| `def _apply_field_mapping(log_data, mapping)` | Aplicar mapeo de campos. |
+
+`class LogIntegrationSystem`  (línea 632) — Sistema completo de integración de logs.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(db_path)` |  |
+| `def _create_database()` | Crear base de datos para integración de logs. |
+| `def add_log_source(config)` | Añadir fuente de logs. |
+| `def remove_log_source(integration_id)` | Remover fuente de logs. |
+| `def start()` | Iniciar sistema de integración. |
+| `def stop()` | Detener sistema de integración. |
+| `def get_system_status()` | Obtener estado del sistema. |
+| `def _save_integration(integration)` | Guardar integración en base de datos. |
+
+`class LogIntegrator`  (línea 781) — Wrapper para LogIntegrationSystem que proporciona la interfaz esperada.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(db_path)` |  |
+| `def add_log_source(config)` | Añadir fuente de logs. |
+| `def remove_log_source(integration_id)` | Remover fuente de logs. |
+| `def start()` | Iniciar sistema de integración. |
+| `def stop()` | Detener sistema de integración. |
+| `def get_system_status()` | Obtener estado del sistema. |
+
+<a name="src-utils-log_predictor-py"></a>
+### `src/utils/log_predictor.py` [749 líneas] — Sistema predictivo de logs para Jarvis con machine learning y análisis de tendencias.
+
+**Descripción:** Sistema predictivo de logs para Jarvis con machine learning y análisis de tendencias.
+
+**Importaciones:** 19.
+
+`class PredictionType(Enum)`  (línea 24) — Tipos de predicciones.
+
+_Sin métodos definidos en el AST._
+
+`class PredictionConfidence(Enum)`  (línea 34) — Niveles de confianza de predicción.
+
+_Sin métodos definidos en el AST._
+
+`class Prediction`  (línea 43) — Estructura de predicción.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` | Convertir a diccionario. |
+
+`class TimeSeriesPredictor`  (línea 68) — Predictor de series temporales.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(max_history)` |  |
+| `def add_data_point(metric_name, value, timestamp, features)` | Añadir punto de datos para predicción. |
+| `def _train_model(metric_name)` | Entrenar modelo para una métrica específica. |
+| `def _prepare_training_data(series)` | Preparar datos de entrenamiento. |
+| `def predict(metric_name, time_horizon, features)` | Realizar predicción. |
+| `def _get_prediction_type(metric_name)` | Determinar el tipo de predicción basado en el nombre de la métrica. |
+| `def _generate_suggested_actions(metric_name, predicted_value, confidence)` | Generar sugerencias basadas en la predicción. |
+
+`class FailurePredictor`  (línea 328) — Predictor de fallos del sistema.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__()` |  |
+| `def add_system_metrics(timestamp, metrics)` | Añadir métricas del sistema para predicción de fallos. |
+| `def _train_failure_model()` | Entrenar modelo de predicción de fallos. |
+| `def _detect_failure_in_window(start_time, end_time)` | Detectar si hubo fallos en un período de tiempo. |
+| `def predict_failure_probability(time_horizon)` | Predecir probabilidad de fallo. |
+
+`class LogPredictor`  (línea 459) — Sistema predictivo de logs integrado.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(db_path)` |  |
+| `def _create_database()` | Crear base de datos para predicciones. |
+| `def add_log_data(log_entry)` | Añadir datos de log para predicción. |
+| `def generate_predictions(time_horizon)` | Generar predicciones para todas las métricas. |
+| `def _store_prediction(prediction)` | Almacenar predicción en base de datos. |
+| `def update_prediction_accuracy(prediction_id, actual_value)` | Actualizar precisión de predicción con valor real. |
+| `def get_predictions_by_type(prediction_type, limit)` | Obtener predicciones por tipo. |
+| `def get_active_predictions()` | Obtener predicciones activas (recientes). |
+| `def get_prediction_statistics()` | Obtener estadísticas de predicciones. |
+| `def export_predictions(start_time, end_time, format)` | Exportar predicciones. |
+| `def add_prediction_result(predictions)` | Agregar resultado de predicción al historial. |
+| `def train_models()` | Entrenar todos los modelos predictivos. |
+| `def get_predictions()` | Obtener predicciones activas. |
+| `def last_training()` | Obtener tiempo de último entrenamiento. |
+
+<a name="src-utils-logger-py"></a>
+### `src/utils/logger.py` [180 líneas] — Nuevo sistema de logging estructurado para Jarvis.
+
+**Descripción:** Nuevo sistema de logging estructurado para Jarvis.
+
+**Importaciones:** 6.
+
+`class StructuredLogger`  (línea 44) — Logger estructurado con soporte para JSON y mejores prácticas.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(name, level)` |  |
+| `def debug(message)` | Log de nivel DEBUG. |
+| `def info(message)` | Log de nivel INFO. |
+| `def warning(message)` | Log de nivel WARNING. |
+| `def error(message)` | Log de nivel ERROR. |
+| `def critical(message)` | Log de nivel CRITICAL. |
+| `def _log(level, message)` | Log interno con contexto. |
+| `def _print_log(level, message, file_name, method_name, method_start_line)` | Método de compatibilidad para logs antiguos. |
+| `def _print_log(level, message, file_name, method_name, method_start_line)` | Método compatible con el antiguo logger. |
+
+`class JsonFormatter(logging.Formatter)`  (línea 148) — Formateador que convierte logs a JSON.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def format(record)` | Formatear un log record como JSON. |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def get_logger(name, level)`  (L174) | Obtener un logger estructurado. |
+
+<a name="src-utils-meta_learning_system-py"></a>
+### `src/utils/meta_learning_system.py` [2401 líneas] — Meta Learning System v2.8.0
+
+**Descripción:** Meta Learning System v2.8.0
+
+**Importaciones:** 26.
+
+`class MetaLearningLevel(Enum)`  (línea 36) — Niveles de metaprendizaje
+
+_Sin métodos definidos en el AST._
+
+`class MetaLearningResult(Enum)`  (línea 45) — Resultados del metaprendizaje
+
+_Sin métodos definidos en el AST._
+
+`class LearningExperience`  (línea 55) — Representa una experiencia de aprendizaje
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class LearningEvaluation`  (línea 71) — Resultado de evaluar una estrategia de aprendizaje con evidencia disponible
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class MetaRuleStatus(Enum)`  (línea 88) — Resultado de evaluar/aplicar una meta-regla sobre una regla de aprendizaje
+
+_Sin métodos definidos en el AST._
+
+`class MetaRule`  (línea 100) — Meta-regla: una regla que actúa sobre otra regla de aprendizaje existente.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def is_valid()` |  |
+
+`class MetaRuleApplication`  (línea 129) — Registro de una aplicación de meta-regla, con estado previo para poder revertir
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class MetaLearningInsight`  (línea 143) — Representa un insight de metaprendizaje
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class MetaLearningSystem`  (línea 161) — Sistema de metaprendizaje que analiza el comportamiento de los sistemas de aprendizaje existentes
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(config_path)` |  |
+| `def _load_config()` | Cargar configuración del sistema |
+| `def _save_config()` | Guardar configuración actual |
+| `def capture_learning_experience(learning_system, task_type, context, strategy, parameters, outcome, success_metrics, confidence_score)` | Captura una experiencia de aprendizaje para análisis metaprendizaje |
+| `def capture_structured_experience(learning_system, task_type, context_features, action_taken, strategy_applied, strategy_parameters, execution_result, performance_metrics, contextual_factors)` | Captura una experiencia de aprendizaje estructurada con asociación explícita |
+| `def capture_experience_with_context(learning_system, task_type, environment_context, user_context, system_context, action_executed, strategy_info, outcome_data, learning_value)` | Captura una experiencia con asociación detallada de contexto completo |
+| `def _get_current_system_state()` | Obtiene el estado actual del sistema |
+| `def _extract_success_indicators(performance_metrics)` | Extrae indicadores de éxito de las métricas de rendimiento |
+| `def _extract_failure_indicators(execution_result)` | Extrae indicadores de fallo del resultado de ejecución |
+| `def _calculate_experience_confidence(performance_metrics)` | Calcula la confianza de la experiencia basada en métricas de rendimiento |
+| `def _assess_context_completeness(context)` | Evalúa la completitud del contexto |
+| `def _assess_result_quality(execution_result)` | Evalúa la calidad del resultado de ejecución |
+| `def _get_session_id()` | Obtiene o genera un ID de sesión |
+| `def _assess_task_complexity(task_type)` | Evalúa la complejidad de la tarea |
+| `def _assess_resource_availability(system_context)` | Evalúa la disponibilidad de recursos |
+| `def _extract_decision_points(action_executed)` | Extrae puntos de decisión de la acción ejecutada |
+| `def _extract_resource_usage(action_executed)` | Extrae uso de recursos de la acción ejecutada |
+| `def _assess_learning_potential(task_type, outcome_data)` | Evalúa el potencial de aprendizaje de la experiencia |
+| `def _assess_reusability(context, outcome)` | Evalúa la reutilidad de la experiencia |
+| `def _validate_experience_utility(learning_system, task_type, context, outcome)` | Valida si una experiencia tiene utilidad para el metaprendizaje |
+| `def get_learning_success_indicators()` | Identifica los indicadores de éxito realmente disponibles en las experiencias |
+| `def _experience_success_score(experience)` | Extrae el valor de éxito de una experiencia usando los indicadores existentes |
+| `def _calculate_consistency(scores)` | Consistencia de los resultados: 1.0 = resultados idénticos, 0.0 = máxima dispersión |
+| `def evaluate_learning_strategy(learning_system, task_type, strategy, experiences)` | Evalúa una estrategia de aprendizaje usando únicamente evidencia disponible. |
+| `def get_learning_evaluations(learning_system, task_type)` | Evalúa todas las combinaciones sistema/tarea/estrategia presentes en las experiencias |
+| `def analyze_learning_patterns()` | Analiza patrones en las experiencias de aprendizaje para generar insights |
+| `def _analyze_strategy_selection()` | Análisis de selección de estrategias |
+| `def _analyze_parameter_adaptation()` | Análisis de adaptación de parámetros |
+| `def _analyze_contextual_optimization()` | Análisis de optimización contextual |
+| `def _analyze_learning_rate_adjustment()` | Análisis de ajuste de tasa de aprendizaje |
+| `def _create_context_pattern(context)` | Crea un patrón de contexto para análisis |
+| `def apply_meta_learning_insights(insights)` | Aplica insights de metaprendizaje a los sistemas de aprendizaje |
+| `def get_security_limits()` | Límites de seguridad normalizados desde la configuración real |
+| `def reset_auto_change_cycle()` | Reinicia el contador de cambios automáticos del ciclo actual |
+| `def get_shared_components()` | Componentes cuyo motor es una instancia compartida (2.8.3.6) |
+| `def _component_for_insight(insight)` | Componente afectado por un insight según su sistema de origen real |
+| `def _record_security_decision(subject_type, subject_id, allowed, reason, detail)` | Registra una decisión de seguridad (2.8.3.7.3) |
+| `def get_security_decisions()` | Decisiones de seguridad registradas |
+| `def get_security_status()` | Estado de seguridad: límites, pendientes y decisiones por resultado |
+| `def check_insight_security(insight)` | Decide si un insight puede aplicarse automáticamente. |
+| `def check_meta_rule_security(meta_rule)` | Decide si una meta-regla puede aplicarse automáticamente |
+| `def auto_apply_insights(insights)` | Aplica insights de forma automática y limitada (2.8.3.7.1). |
+| `def auto_apply_meta_rules()` | Aplica las meta-reglas registradas de forma automática y limitada |
+| `def _target_store(engine, attribute)` | Devuelve el almacén real de estrategias/parámetros de un motor de aprendizaje. |
+| `def _apply_strategy_selection_insight(insight)` | Aplica insight de selección de estrategia |
+| `def _apply_parameter_adaptation_insight(insight)` | Aplica insight de adaptación de parámetros |
+| `def _apply_contextual_optimization_insight(insight)` | Aplica insight de optimización contextual |
+| `def _apply_learning_rate_adjustment_insight(insight)` | Aplica insight de ajuste de tasa de aprendizaje |
+| `def get_meta_learning_metrics()` | Obtiene métricas del sistema de metaprendizaje |
+| `def _calculate_confidence_distribution()` | Calcula distribución de confianza de los insights |
+| `def _get_system_coverage()` | Obtiene cobertura por sistema de aprendizaje |
+| `def _calculate_learning_progress()` | Calcula progreso de aprendizaje por sistema |
+| `def save_meta_learning_data()` | Guarda datos de metaprendizaje |
+| `def load_meta_learning_data(file_path)` | Carga datos de metaprendizaje desde archivo |
+| `def start_meta_learning_process()` | Inicia el proceso asíncrono de metaprendizaje |
+| `def stop_meta_learning_process()` | Detiene el proceso asíncrono de metaprendizaje |
+| `def _meta_learning_loop()` | Bucle principal de procesamiento de metaprendizaje |
+| `def _process_single_experience(experience)` | Procesa una experiencia individual |
+| `def validate_meta_learning_insights(insight_ids)` | Valida insights específicos |
+| `def get_recommendations(system_type, task_type)` | Obtiene recomendaciones basadas en insights de metaprendizaje |
+| `def get_learning_rules()` | Devuelve las ImprovementRule reales del SelfImprovementSystem |
+| `def get_meta_rules()` | Devuelve las meta-reglas registradas |
+| `def add_meta_rule(meta_rule)` | Registra una meta-regla si su contrato es válido y no está duplicada |
+| `def _compare_metric(value, operator, threshold)` |  |
+| `def _evaluate_meta_rule_condition(meta_rule, rule)` | Evalúa la condición de la meta-regla sobre el estado real de la regla |
+| `def _capture_rule_state(rule)` |  |
+| `def apply_meta_rule(meta_rule)` | Aplica una meta-regla sobre la ImprovementRule objetivo. |
+| `def verify_meta_rule_application(application)` | Verifica que el estado real de la regla coincide con el estado aplicado |
+| `def revert_meta_rule_application(application)` | Revierte una aplicación de meta-regla restaurando el estado previo completo. |
+| `def get_meta_rule_history()` |  |
+| `def _record_meta_rule(meta_rule, status, previous_state, new_state, message)` |  |
+| `def _experience_to_dict(experience)` |  |
+| `def _experience_from_dict(data)` |  |
+| `def _meta_rule_to_dict(meta_rule)` |  |
+| `def _meta_rule_from_dict(data)` |  |
+| `def _meta_rule_application_to_dict(application)` |  |
+| `def _restore_rule_state_dates(state)` | Devuelve el estado de una regla con last_execution novamente como datetime. |
+| `def _meta_rule_application_from_dict(data)` |  |
+| `def get_meta_learning_state()` | Estado serializable del metaprendizaje (experiencias, meta-reglas e historial) |
+| `def save_meta_learning_state(file_path)` | Guarda el estado de metaprendizaje en un archivo estable. |
+| `def load_meta_learning_state(file_path)` | Recupera el estado de metaprendizaje. |
+| `def connect_component(component, engine)` | Conecta una instancia real de un motor de aprendizaje existente. |
+| `def connect_adaptive_learning_engine(engine)` | Integra con AdaptiveLearningEngine (2.8.3.6.1) |
+| `def connect_self_improvement_system(system)` | Integra con SelfImprovementSystem (2.8.3.6.2) |
+| `def connect_contextual_adaptation_engine(engine)` | Integra con ContextualAdaptationEngine (2.8.3.6.3). |
+| `def get_integration_status()` | Estado de integración y comprobación de motores duplicados (2.8.3.6.4). |
+
+<a name="src-utils-metrics_collector-py"></a>
+### `src/utils/metrics_collector.py` [592 líneas] — Sistema de recolección de métricas para JARVIS.
+
+**Descripción:** Sistema de recolección de métricas para JARVIS.
+
+**Importaciones:** 13.
+
+`class MetricData`  (línea 22) — Datos de una métrica individual.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` | Convierte los datos de la métrica a un diccionario. |
+| `def from_dict(cls, data)` | Crea una instancia de MetricData desde un diccionario. |
+
+`class MetricConfig`  (línea 54) — Configuración para la recolección de métricas.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` | Convierte la configuración a un diccionario. |
+
+`class MetricsCollector`  (línea 92) — Recolector de métricas para JARVIS.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(config)` | Inicializa el recolector de métricas. |
+| `def _initialize_database()` | Inicializa la base de datos SQLite para métricas. |
+| `def _ensure_directories()` | Asegura que los directorios necesarios existan. |
+| `def start_collection()` | Inicia la recolección continua de métricas. |
+| `def stop_collection()` | Detiene la recolección de métricas. |
+| `def _collection_loop()` | Bucle principal de recolección de métricas. |
+| `def _collect_custom_metrics()` | Recolecta métricas personalizadas del sistema. |
+| `def add_metric(metric_name, value, tags, metadata)` | Añade una métrica al buffer. |
+| `def _flush_buffer()` | Vacía el buffer de métricas a la base de datos. |
+| `def get_metrics(metric_name, start_time, end_time, limit, tags)` | Obtiene métricas de la base de datos. |
+| `def get_metric_statistics(metric_name, start_time, end_time)` | Obtiene estadísticas de una métrica específica. |
+| `def get_metric_names()` | Obtiene todos los nombres de métricas disponibles. |
+| `def cleanup_old_metrics()` | Limpia métricas antiguas según la configuración de retención. |
+| `def backup_metrics()` | Realiza una copia de seguridad de la base de datos de métricas. |
+| `def export_metrics(filepath, metric_name, start_time, end_time)` | Exporta métricas a un archivo JSON. |
+| `def get_collector_status()` | Obtiene el estado actual del recolector de métricas. |
+| `def _get_total_metrics_count()` | Obtiene el total de métricas en la base de datos. |
+| `def _get_last_cleanup_time()` | Obtiene la última fecha de limpieza. |
+| `def clear_all_metrics()` | Elimina todas las métricas de la base de datos. |
+| `def __enter__()` | Context manager entry. |
+| `def __exit__(exc_type, exc_val, exc_tb)` | Context manager exit. |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def get_metrics_collector()`  (L575) | Obtiene la instancia global del recolector de métricas. |
+| `def start_metrics_collection()`  (L583) | Inicia la recolección de métricas globales. |
+| `def stop_metrics_collection()`  (L589) | Detiene la recolección de métricas globales. |
+
+<a name="src-utils-monitoring_dashboard-py"></a>
+### `src/utils/monitoring_dashboard.py` [417 líneas] — Sistema de dashboard de monitoreo para JARVIS.
+
+**Descripción:** Sistema de dashboard de monitoreo para JARVIS.
+
+**Importaciones:** 10.
+
+`class DashboardConfig`  (línea 23) — Configuración del dashboard de monitoreo.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` | Convierte la configuración a un diccionario. |
+
+`class DashboardData`  (línea 67) — Datos del dashboard en un punto en el tiempo.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` | Convierte los datos del dashboard a un diccionario. |
+
+`class MonitoringDashboard`  (línea 87) — Dashboard unificado de monitoreo para JARVIS.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(config, performance_monitor, health_checker, metrics_collector)` | Inicializa el dashboard de monitoreo. |
+| `def start_dashboard()` | Inicia el dashboard de monitoreo. |
+| `def stop_dashboard()` | Detiene el dashboard de monitoreo. |
+| `def _dashboard_loop()` | Bucle principal de actualización del dashboard. |
+| `def _update_dashboard_data()` | Actualiza los datos del dashboard. |
+| `def _get_current_performance_metrics()` | Obtiene las métricas de rendimiento actuales. |
+| `def _get_current_health_status()` | Obtiene el estado de salud actual. |
+| `def _get_recent_alerts()` | Obtiene alertas recientes. |
+| `def _generate_system_summary(current_metrics, health_status, recent_alerts)` | Genera un resumen del estado del sistema. |
+| `def get_dashboard_data()` | Obtiene los datos actuales del dashboard. |
+| `def get_dashboard_history(limit)` | Obtiene el historial del dashboard. |
+| `def add_update_callback(callback)` | Agrega un callback para recibir actualizaciones del dashboard. |
+| `def remove_update_callback(callback)` | Remueve un callback de actualizaciones del dashboard. |
+| `def export_dashboard_report(filepath, include_history)` | Exporta un reporte del dashboard a un archivo JSON. |
+| `def get_system_health_score()` | Calcula un puntaje de salud del sistema (0-100). |
+| `def get_critical_metrics()` | Obtiene métricas críticas que requieren atención. |
+| `def get_unhealthy_components()` | Obtiene componentes no saludables. |
+| `def clear_dashboard_history()` | Limpia el historial del dashboard. |
+| `def __enter__()` | Context manager entry. |
+| `def __exit__(exc_type, exc_val, exc_tb)` | Context manager exit. |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def get_monitoring_dashboard()`  (L400) | Obtiene la instancia global del dashboard de monitoreo. |
+| `def start_monitoring_dashboard()`  (L408) | Inicia el dashboard de monitoreo global. |
+| `def stop_monitoring_dashboard()`  (L414) | Detiene el dashboard de monitoreo global. |
+
+<a name="src-utils-optimization_orchestrator-py"></a>
+### `src/utils/optimization_orchestrator.py` [892 líneas] — Optimization Orchestrator v2.7.0
+
+**Descripción:** Optimization Orchestrator v2.7.0
+
+**Importaciones:** 25.
+
+`class OrchestrationMode(Enum)`  (línea 33) — Modos de orquestación
+
+_Sin métodos definidos en el AST._
+
+`class OptimizationPriority(Enum)`  (línea 41) — Prioridades de optimización
+
+_Sin métodos definidos en el AST._
+
+`class OptimizationJob`  (línea 50) — Trabajo de optimización
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class OrchestrationMetrics`  (línea 68) — Métricas de orquestación
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class OptimizationOrchestrator`  (línea 81) — Orquestador de optimización que coordina todos los sistemas de optimización
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(config_path)` |  |
+| `def _load_config(config_path)` | Cargar configuración del orquestador |
+| `def _initialize_resource_monitor()` | Inicializar monitor de recursos |
+| `def _start_orchestration_loop()` | Iniciar bucle de orquestación |
+| `def _orchestration_loop()` | Bucle principal de orquestación |
+| `def _update_system_metrics()` | Actualizar métricas del sistema |
+| `def _calculate_resource_utilization()` | Calcular utilización de recursos |
+| `def _calculate_success_rate()` | Calcular tasa de éxito de optimización |
+| `def _analyze_optimization_needs()` | Analizar necesidades de optimización |
+| `def _estimate_resources(strategy)` | Estimar recursos requeridos para una estrategia |
+| `def _add_optimization_job(job)` | Añadir trabajo de optimización |
+| `def _coordinate_optimization_strategies()` | Coordinar estrategias de optimización |
+| `def _group_compatible_jobs()` | Agrupar trabajos compatibles |
+| `def _are_jobs_compatible(job1, job2)` | Verificar si dos trabajos son compatibles |
+| `def _execute_sequential(jobs)` | Ejecutar trabajos secuencialmente |
+| `def _execute_parallel(jobs)` | Ejecutar trabajos en paralelo |
+| `def _execute_coordinated(jobs)` | Ejecutar trabajos coordinados |
+| `def _execute_optimized(jobs)` | Ejecutar trabajos optimizados |
+| `def _process_optimization_jobs()` | Procesar trabajos de optimización |
+| `def _execute_single_job(job)` | Ejecutar un trabajo de optimización individual |
+| `def _execute_coordinated_job(job, resource_locks)` | Ejecutar trabajo coordinado con control de recursos |
+| `def _execute_strategy(strategy, job)` | Ejecutar una estrategia de optimización |
+| `def _calculate_job_efficiency(job)` | Calcular eficiencia esperada de un trabajo |
+| `def _calculate_job_improvement(initial_metrics, final_metrics)` | Calcular mejora de un trabajo |
+| `def _monitor_job_progress()` | Monitorear progreso de trabajos |
+| `def _adapt_orchestration_mode()` | Adaptar modo de orquestación según condiciones del sistema |
+| `def _optimize_orchestration_mode()` | Optimizar modo de orquestación |
+| `def _calculate_mode_performance(mode)` | Calcular rendimiento de un modo de orquestación |
+| `def get_orchestration_status()` | Obtener estado de orquestación |
+| `def _calculate_average_job_duration()` | Calcular duración promedio de trabajos |
+| `def add_custom_optimization_job(job)` | Añadir trabajo de optimización personalizado |
+| `def get_job_status(job_id)` | Obtener estado de un trabajo específico |
+| `def cancel_job(job_id)` | Cancelar un trabajo |
+| `def export_orchestration_report(filepath)` | Exportar reporte de orquestación |
+| `def stop_orchestration()` | Detener orquestación |
+| `def start_orchestration()` | Iniciar orquestación |
+| `def __del__()` | Destructor |
+
+<a name="src-utils-pattern_analyzer-py"></a>
+### `src/utils/pattern_analyzer.py` [650 líneas] — Analizador avanzado de patrones para Jarvis con machine learning y detección de anomalías.
+
+**Descripción:** Analizador avanzado de patrones para Jarvis con machine learning y detección de anomalías.
+
+**Importaciones:** 16.
+
+`class PatternType(Enum)`  (línea 23) — Tipos de patrones detectables.
+
+_Sin métodos definidos en el AST._
+
+`class PatternSeverity(Enum)`  (línea 36) — Severidad de patrones.
+
+_Sin métodos definidos en el AST._
+
+`class Pattern`  (línea 45) — Estructura de patrón detectado.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` | Convertir a diccionario. |
+
+`class TimeSeriesAnalyzer`  (línea 68) — Analizador de series temporales para detección de patrones.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(window_size)` |  |
+| `def add_data_point(metric_name, value, timestamp)` | Añadir punto de datos a la serie temporal. |
+| `def _train_model()` | Entrenar modelo de detección de anomalías. |
+| `def detect_anomalies(metric_name, window_size)` | Detectar anomalías en una serie temporal. |
+
+`class PatternDetector`  (línea 159) — Detector de patrones con múltiples algoritmos.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__()` |  |
+| `def analyze_logs(logs)` | Analizar logs y detectar patrones. |
+| `def _detect_error_spikes(logs)` | Detectar picos de errores. |
+| `def _detect_performance_degradation(logs)` | Detectar degradación de rendimiento. |
+| `def _detect_anomalies(logs)` | Detectar anomalías usando series temporales. |
+| `def _detect_trends(logs)` | Detectar tendencias en los logs. |
+| `def _detect_cycles(logs)` | Detectar patrones cíclicos. |
+| `def _detect_periodicity(data)` | Detectar periodicidad en datos usando métodos simples. |
+| `def _detect_correlations(logs)` | Detectar correlaciones entre diferentes tipos de logs. |
+| `def _detect_bursts(logs)` | Detectar bursts de actividad. |
+| `def get_patterns_by_type(pattern_type, limit)` | Obtener patrones por tipo. |
+| `def get_active_patterns()` | Obtener patrones activos. |
+| `def acknowledge_pattern(pattern_id)` | Marcar patrón como reconocido. |
+| `def get_pattern_statistics()` | Obtener estadísticas de patrones. |
+
+`class PatternAnalyzer`  (línea 606) — Wrapper para PatternDetector que proporciona la interfaz esperada.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__()` |  |
+| `def get_pattern_analysis()` | Obtener análisis completo de patrones. |
+| `def analyze_logs(logs)` | Analizar logs y detectar patrones. |
+| `def get_patterns_by_type(pattern_type, limit)` | Obtener patrones por tipo. |
+| `def get_active_patterns()` | Obtener patrones activos. |
+| `def acknowledge_pattern(pattern_id)` | Marcar patrón como reconocido. |
+| `def get_pattern_statistics()` | Obtener estadísticas de patrones. |
+
+<a name="src-utils-performance_monitor-py"></a>
+### `src/utils/performance_monitor.py` [856 líneas] — Monitor avanzado de rendimiento para Jarvis con análisis predictivo y alertas inteligentes.
+
+**Descripción:** Monitor avanzado de rendimiento para Jarvis con análisis predictivo y alertas inteligentes.
+
+**Importaciones:** 18.
+
+`class MetricType(Enum)`  (línea 25) — Tipos de métricas de rendimiento.
+
+_Sin métodos definidos en el AST._
+
+`class AlertSeverity(Enum)`  (línea 37) — Severidad de alertas.
+
+_Sin métodos definidos en el AST._
+
+`class PerformanceMetric`  (línea 46) — Métrica de rendimiento.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` | Convertir a diccionario. |
+
+`class PerformanceAlert`  (línea 66) — Alerta de rendimiento.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` | Convertir a diccionario. |
+
+`class PerformanceCollector`  (línea 87) — Colector de métricas de rendimiento.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(collection_interval, max_history)` |  |
+| `def start_collection()` | Iniciar recolección de métricas. |
+| `def stop_collection()` | Detener recolección de métricas. |
+| `def _collection_loop()` | Bucle de recolección de métricas. |
+| `def _collect_system_metrics()` | Recolectar métricas del sistema. |
+| `def _collect_process_metrics()` | Recolectar métricas de procesos. |
+| `def _collect_network_metrics()` | Recolectar métricas de red. |
+| `def _collect_disk_metrics()` | Recolectar métricas de disco. |
+| `def _add_metric(name, value, unit, timestamp, tags)` | Añadir métrica al colector. |
+| `def _get_metric_type(name)` | Determinar el tipo de métrica por nombre. |
+| `def get_metric_history(name, hours)` | Obtener historial de una métrica. |
+| `def get_latest_metrics()` | Obtener las métricas más recientes. |
+| `def get_metric_statistics(name, hours)` | Obtener estadísticas de una métrica. |
+
+`class PerformanceAnalyzer`  (línea 313) — Analizador de rendimiento con detección de anomalías.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(window_size)` |  |
+| `def train_anomaly_detector(metric_name, history)` | Entrenar detector de anomalías para una métrica. |
+| `def detect_anomalies(metric_name, current_value)` | Detectar anomalías en una métrica. |
+| `def analyze_trends(metric_name, history)` | Analizar tendencias en una métrica. |
+
+`class PerformanceMonitor`  (línea 408) — Monitor de rendimiento principal.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(db_path)` |  |
+| `def _create_database()` | Crear base de datos para monitor de rendimiento. |
+| `def _load_default_alert_rules()` | Cargar reglas de alerta por defecto. |
+| `def start_monitoring()` | Iniciar monitoreo de rendimiento. |
+| `def stop_monitoring()` | Detener monitoreo de rendimiento. |
+| `def _monitoring_loop()` | Bucle principal de monitoreo. |
+| `def _alert_processing_loop()` | Bucle de procesamiento de alertas. |
+| `def _evaluate_alert_condition(rule, value)` | Evaluar si se cumple una condición de alerta. |
+| `def _create_alert(rule, metric)` | Crear alerta basada en una regla. |
+| `def _process_alert(alert)` | Procesar alerta. |
+| `def _generate_corrective_actions(alert)` | Generar acciones correctivas basadas en la alerta. |
+| `def _train_anomaly_detectors()` | Entrenar detectores de anomalías. |
+| `def _save_alert(alert)` | Guardar alerta en base de datos. |
+| `def _save_alert_rule(rule)` | Guardar regla de alerta en base de datos. |
+| `def add_alert_rule(rule)` | Añadir regla de alerta. |
+| `def remove_alert_rule(rule_id)` | Eliminar regla de alerta. |
+| `def get_alerts(severity, acknowledged, limit)` | Obtener alertas. |
+| `def acknowledge_alert(alert_id)` | Marcar alerta como reconocida. |
+| `def resolve_alert(alert_id)` | Marcar alerta como resuelta. |
+| `def get_performance_summary()` | Obtener resumen del rendimiento. |
+| `def export_performance_data(start_time, end_time, format)` | Exportar datos de rendimiento. |
+
+`class AlertRule`  (línea 838) — Regla de alerta.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __post_init__()` |  |
+
+<a name="src-utils-performance_optimizer-py"></a>
+### `src/utils/performance_optimizer.py` [1099 líneas] — Performance Optimizer v2.7.0
+
+**Descripción:** Performance Optimizer v2.7.0
+
+**Importaciones:** 25.
+
+`class OptimizationStrategy(Enum)`  (línea 33) — Estrategias de optimización disponibles
+
+_Sin métodos definidos en el AST._
+
+`class OptimizationLevel(Enum)`  (línea 46) — Niveles de optimización
+
+_Sin métodos definidos en el AST._
+
+`class OptimizationMetrics`  (línea 54) — Métricas de optimización
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class OptimizationAction`  (línea 69) — Acción de optimización
+
+**Decoradores:** `@dataclass`, `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class PerformanceOptimizer`  (línea 88) — Optimizador de rendimiento con machine learning y optimización predictiva
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(config_path)` |  |
+| `def _load_config(config_path)` | Cargar configuración del optimizador |
+| `def _initialize_models()` | Inicializar modelos de machine learning para optimización |
+| `def _load_trained_models()` | Cargar modelos pre-entrenados |
+| `def _save_trained_models()` | Guardar modelos entrenados |
+| `def _start_optimization_loop()` | Iniciar bucle de optimización asíncrono |
+| `def _optimization_loop()` | Bucle principal de optimización |
+| `def _analyze_system_performance()` | Analizar rendimiento del sistema |
+| `def _calculate_efficiency_score(metrics)` | Calcular puntuación de eficiencia del sistema |
+| `def _analyze_performance_trends()` | Analizar tendencias de rendimiento |
+| `def _identify_optimization_opportunities()` | Identificar oportunidades de optimización |
+| `def _predict_optimization_opportunities()` | Predecir oportunidades de optimización usando ML |
+| `def _prepare_features_for_prediction()` | Preparar características para predicción ML |
+| `def _create_cpu_optimization_action()` | Crear acción de optimización de CPU |
+| `def _create_memory_optimization_action()` | Crear acción de optimización de memoria |
+| `def _create_disk_optimization_action()` | Crear acción de optimización de disco |
+| `def _create_response_time_optimization_action()` | Crear acción de optimización de tiempo de respuesta |
+| `def _create_error_rate_optimization_action()` | Crear acción de optimización de tasa de errores |
+| `def _create_ml_optimization_action(metric, prediction, confidence)` | Crear acción de optimización basada en ML |
+| `def _execute_optimization_actions()` | Ejecutar acciones de optimización |
+| `def _execute_single_action(action)` | Ejecutar una acción de optimización individual |
+| `def _execute_optimization_command(command)` | Ejecutar comando de optimización |
+| `def _calculate_improvement(pre_metrics, post_metrics)` | Calcular mejora porcentual |
+| `def _calculate_actual_improvement(action)` | Calcular mejora real de una acción |
+| `def _update_ml_models(action, improvement)` | Actualizar modelos ML con resultados de optimización |
+| `def get_optimization_status()` | Obtener estado actual de optimización |
+| `def get_optimization_history(limit)` | Obtener historial de optimización |
+| `def get_current_actions()` | Obtener acciones en curso |
+| `def add_custom_optimization_action(action)` | Añadir acción de optimización personalizada |
+| `def stop_optimization()` | Detener optimización |
+| `def start_optimization()` | Iniciar optimización |
+| `def optimize_system(strategy, level)` | Optimizar sistema manualmente |
+| `def get_optimization_recommendations()` | Obtener recomendaciones de optimización |
+| `def export_optimization_report(filepath)` | Exportar reporte de optimización |
+| `def optimize_resources(optimization_request)` | Optimizar recursos basado en solicitud contextual. |
+| `def __del__()` | Destructor |
+
+<a name="src-utils-recovery_strategies-py"></a>
+### `src/utils/recovery_strategies.py` [514 líneas] — Recovery Strategies for JARVIS System
+
+**Descripción:** Recovery Strategies for JARVIS System
+
+**Importaciones:** 13.
+
+`class RecoveryType(Enum)`  (línea 20) — Types of recovery operations
+
+_Sin métodos definidos en el AST._
+
+`class RecoveryStatus(Enum)`  (línea 26) — Recovery operation status
+
+_Sin métodos definidos en el AST._
+
+`class RecoveryAction`  (línea 34) — Base recovery action
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(name, description, recovery_type)` |  |
+| `def execute()` | Execute the recovery action |
+| `def _do_execute()` | Override this method in subclasses |
+| `def cancel()` | Cancel the recovery action |
+| `def get_duration()` | Get execution duration in seconds |
+
+`class DatabaseRecoveryAction(RecoveryAction)`  (línea 80) — Database recovery action
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(db_path, backup_path)` |  |
+| `def _do_execute()` | Execute database recovery |
+| `def _repair_database()` | Attempt to repair corrupted database |
+
+`class FilesystemRecoveryAction(RecoveryAction)`  (línea 119) — Filesystem recovery action
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(file_path, backup_path)` |  |
+| `def _do_execute()` | Execute filesystem recovery |
+
+`class ProcessRecoveryAction(RecoveryAction)`  (línea 142) — Process recovery action
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(process_name, command)` |  |
+| `def _do_execute()` | Execute process recovery |
+
+`class MemoryRecoveryAction(RecoveryAction)`  (línea 165) — Memory recovery action
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(process_id)` |  |
+| `def _do_execute()` | Execute memory recovery |
+
+`class NetworkRecoveryAction(RecoveryAction)`  (línea 193) — Network recovery action
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(interface)` |  |
+| `def _do_execute()` | Execute network recovery |
+
+`class RecoveryManager`  (línea 234) — Main recovery management system
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(db_path)` |  |
+| `def _init_database()` | Initialize recovery management database |
+| `def register_recovery_action(action)` | Register a recovery action |
+| `def execute_recovery(action_name, component, error_type, additional_data)` | Execute a recovery action |
+| `def _log_recovery_history(action_name, component, error_type, success, additional_data)` | Log recovery history |
+| `def get_recovery_history(days)` | Get recovery history for specified days |
+| `def get_recovery_statistics(days)` | Get recovery statistics |
+| `def get_active_recoveries()` | Get list of active recoveries |
+| `def cancel_recovery(action_name)` | Cancel an active recovery |
+| `def get_available_actions()` | Get list of available recovery actions |
+| `def cleanup_old_history(days)` | Clean up old recovery history |
+| `def setup_default_actions()` | Setup default recovery actions |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def create_database_recovery_action(db_path, backup_path)`  (L487) | Create a database recovery action |
+| `def create_filesystem_recovery_action(file_path, backup_path)`  (L491) | Create a filesystem recovery action |
+| `def create_process_recovery_action(process_name, command)`  (L495) | Create a process recovery action |
+| `def create_memory_recovery_action(process_id)`  (L499) | Create a memory recovery action |
+| `def get_recovery_manager()`  (L504) | Get a singleton instance of RecoveryManager |
+| `def create_network_recovery_action(interface)`  (L512) | Create a network recovery action |
+
+<a name="src-utils-screen_manager-py"></a>
+### `src/utils/screen_manager.py` [1958 líneas] — Gestor unificado de pantallas y configuración del sistema Jarvis.
+
+**Descripción:** Gestor unificado de pantallas y configuración del sistema Jarvis.
+
+**Importaciones:** 16.
+
+`class ScreenSetupType(Enum)`  (línea 88)
+
+_Sin métodos definidos en el AST._
+
+`class MonitorInfo`  (línea 97) — Información física/lógica de un monitor en el escritorio virtual.
+
+**Decoradores:** `@dataclass`
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def center_x()` |  |
+| `def center_y()` |  |
+| `def center()` |  |
+| `def screen_key()` |  |
+| `def contains_point(x, y)` |  |
+| `def contains_window(window)` |  |
+| `def to_dict()` |  |
+
+`class ScreenManager`  (línea 180) — Gestor centralizado de topología, ventanas y capturas.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__()` |  |
+| `def _make_dpi_aware()` |  |
+| `def _get_monitor_dpi(handle)` |  |
+| `def _load_monitors_from_windows()` |  |
+| `def _load_monitors_from_config()` |  |
+| `def refresh_monitors()` |  |
+| `def _calculate_virtual_bounds()` |  |
+| `def _analyze_setup()` |  |
+| `def get_monitor(monitor_num)` |  |
+| `def get_primary_monitor()` |  |
+| `def get_monitor_by_point(x, y)` |  |
+| `def _get_window_geometry(window)` | Obtiene la geometría real de una ventana Win32. |
+| `def get_monitor_for_window(window)` | Obtiene el monitor físico de una ventana, incluso minimizada. |
+| `def _get_window_handle(window)` |  |
+| `def get_foreground_window()` |  |
+| `def get_foreground_monitor()` |  |
+| `def get_active_monitor()` |  |
+| `def get_alternate_monitor(monitor_num)` |  |
+| `def _get_window_class(hwnd)` |  |
+| `def _get_window_process_id(window)` |  |
+| `def _get_window_process_name(window)` |  |
+| `def _is_chrome_window(window)` | Identifica Chrome por su proceso real, no por Chrome_WidgetWin. |
+| `def _window_has_valid_size(window)` |  |
+| `def _window_is_visible(window)` | Comprueba visibilidad real mediante Win32 cuando es posible. |
+| `def _window_is_minimized(window)` | Comprueba si una ventana está minimizada según Windows. |
+| `def _restore_and_maximize_window(window)` | Restaura y maximiza temporalmente una ventana existente. |
+| `def get_chrome_windows()` | Enumera ventanas reales de Chrome evitando depender del orden que |
+| `def get_chrome_window_on_monitor(monitor_num, prefer_foreground)` |  |
+| `def get_chrome_monitor(prefer_foreground)` | Detecta el monitor real de Chrome. |
+| `def _get_window_area(window)` | Devuelve el área aproximada de una ventana en píxeles. |
+| `def get_calibration_monitor()` |  |
+| `def is_window_minimized(window)` | Indica si una ventana está minimizada según Win32. |
+| `def prepare_window_for_calibration(window)` | Restaura/maximiza cualquier ventana y devuelve su monitor real. |
+| `def move_window_to_monitor(window_title, monitor_num)` |  |
+| `def _find_chrome_executable()` |  |
+| `def _snapshot_chrome_handles()` |  |
+| `def _find_new_chrome_window(previous_handles, monitor, timeout)` |  |
+| `def _activate_window(window)` |  |
+| `def _launch_chrome_for_calibration(monitor)` |  |
+| `def open_chrome_calibration_tab(monitor_num)` |  |
+| `def open_chrome_on_monitor(monitor_num)` |  |
+| `def capture_monitor(monitor_num)` | Captura exactamente el rectángulo físico del monitor. |
+| `def close_chrome()` | Cierra Chrome como acción explícita del usuario. |
+| `def move_window_to_screen(window_title, screen_num)` |  |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def get_screen_manager()`  (L1946) |  |
+| `def get_monitor_info(monitor_num)`  (L1953) |  |
+| `def get_monitor_setup()`  (L1957) |  |
+
+<a name="src-utils-self_improvement_system-py"></a>
+### `src/utils/self_improvement_system.py` [1261 líneas] — Self Improvement System v2.7.0
+
+**Descripción:** Self Improvement System v2.7.0
+
+**Importaciones:** 27.
+
+`class LearningMode(Enum)`  (línea 35) — Modos de aprendizaje del sistema
+
+_Sin métodos definidos en el AST._
+
+`class ImprovementType(Enum)`  (línea 43) — Tipos de mejora
+
+_Sin métodos definidos en el AST._
+
+`class LearningSession`  (línea 55) — Sesión de aprendizaje
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class ImprovementRule`  (línea 71) — Regla de mejora
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class KnowledgeGraph`  (línea 86) — Grafo de conocimiento
+
+**Decoradores:** `@dataclass`
+
+_Sin métodos definidos en el AST._
+
+`class SelfImprovementSystem`  (línea 95) — Sistema de automejora con aprendizaje continuo y optimización adaptativa
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(config_path)` |  |
+| `def _load_config(config_path)` | Cargar configuración del sistema de automejora |
+| `def _initialize_learning_models()` | Inicializar modelos de aprendizaje |
+| `def _load_trained_learning_models()` | Cargar modelos pre-entrenados |
+| `def _save_trained_learning_models()` | Guardar modelos entrenados |
+| `def _initialize_improvement_rules()` | Inicializar reglas de mejora |
+| `def _load_custom_rules()` | Cargar reglas personalizadas |
+| `def _save_custom_rules()` | Guardar reglas personalizadas |
+| `def _start_learning_loop()` | Iniciar bucle de aprendizaje |
+| `def _learning_loop()` | Bucle principal de aprendizaje |
+| `def _perform_passive_learning()` | Realizar aprendizaje pasivo |
+| `def _collect_system_data()` | Recopilar datos del sistema para aprendizaje |
+| `def _as_dict(value)` | Convertir cualquier valor a dict de forma segura. |
+| `def _flatten_performance(status)` | Aplanar el estado del optimizador a métricas planas. |
+| `def _flatten_patterns(analysis)` | Aplanar el análisis de patrones a métricas planas. |
+| `def _flatten_analytics(summary)` | Aplanar el resumen analítico a contadores planos. |
+| `def _summarize_predictions(predictions)` | Convertir una lista de Prediction en métricas agregadas. |
+| `def _calculate_system_load()` | Calcular carga del sistema |
+| `def _extract_learning_features(system_data)` | Extraer características para aprendizaje |
+| `def _update_learning_models(features, system_data)` | Actualizar modelos de aprendizaje |
+| `def _determine_learning_labels(system_data)` | Determinar etiquetas para aprendizaje |
+| `def _identify_improvement_opportunities(system_data)` | Identificar oportunidades de mejora |
+| `def _execute_improvement_rules()` | Ejecutar reglas de mejora |
+| `def _evaluate_rule_condition(rule)` | Evaluar condición de una regla |
+| `def _execute_rule_action(rule)` | Ejecutar acción de una regla |
+| `def _analyze_learning_patterns()` | Analizar patrones de aprendizaje |
+| `def _update_knowledge_graph()` | Actualizar grafo de conocimiento |
+| `def _calculate_node_confidence(properties)` | Calcular confianza de un nodo |
+| `def _save_knowledge_graph()` | Guardar grafo de conocimiento |
+| `def _start_learning_session(mode)` | Iniciar sesión de aprendizaje |
+| `def _end_learning_session(session)` | Finalizar sesión de aprendizaje |
+| `def get_learning_status()` | Obtener estado actual de aprendizaje |
+| `def get_learning_history(limit)` | Obtener historial de aprendizaje |
+| `def add_improvement_rule(rule)` | Añadir regla de mejora personalizada |
+| `def remove_improvement_rule(rule_id)` | Eliminar regla de mejora |
+| `def enable_learning_mode(mode)` | Habilitar modo de aprendizaje |
+| `def disable_learning_mode(mode)` | Deshabilitar modo de aprendizaje |
+| `def perform_active_learning()` | Realizar aprendizaje activo |
+| `def _design_experiments()` | Diseñar experimentos para aprendizaje activo |
+| `def _run_experiment(experiment)` | Ejecutar experimento |
+| `def _process_experiment_result(result)` | Procesar resultado de experimento |
+| `def export_learning_report(filepath)` | Exportar reporte de aprendizaje |
+| `def stop_learning()` | Detener aprendizaje |
+| `def start_learning()` | Iniciar aprendizaje |
+| `def __del__()` | Destructor |
+
+<a name="src-utils-ui_element_model-py"></a>
+### `src/utils/ui_element_model.py` [181 líneas] — Modelo canónico de elemento de interfaz de usuario (UI Element).
+
+**Descripción:** Modelo canónico de elemento de interfaz de usuario (UI Element).
+
+**Importaciones:** 4.
+
+`class UIElementData(BaseModel)`  (línea 45) — Representación canónica de un elemento de interfaz de usuario.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def is_calibrated()` | Indica si el elemento dispone de coordenadas utilizables. |
+| `def _coordinates_calibrated(coordinates)` |  |
+| `def has_valid_geometry()` | Devuelve ``True`` si el elemento expone geometría usable. |
+| `def matches_name(name)` | Comprueba si el elemento corresponde a ``name`` (por nombre o texto). |
+| `def to_dict()` | Devuelve un diccionario serializable con la forma canónica. |
+| `def from_dict(cls, data)` | Construye un elemento canónico filtrando claves desconocidas. |
+| `def from_compact_dict(cls, data)` | Construye desde la respuesta compacta del modelo de visión. |
+| `def normalize_name(name)` | Normaliza un nombre a clave canónica (uso interno/planificador). |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def _is_number(value)`  (L30) | Devuelve ``True`` solo para valores numéricos reales (no bool). |
+| `def _as_int_list(value, expected_len)`  (L35) | Normaliza ``value`` a una lista de enteros con longitud exacta. |
+
+## 📂 Archivos de configuración y datos
+
+Resumen de artefactos persistentes (consumidos por `utils/config.py` y `memory/storage.py`):
+
+| Ruta | Rol |
+|---|---|
+| `config/config.json` | Configuración maestra: `project`, `llm`, `memory`, `execution`, `keyboard`, `visual`, `prediction`, `logging`. Accedida vía `get_memory_config()`/`get_timeout_config()`/`get_keyboard_config()`/`get_visual_config()`/`get_predictive_config()`. |
+| `config/command_aliases.json` | Aliases estáticos `intención → comando` (FASE 16). |
+| `data/knowledge/{entities,applications,capabilities}.json` | Conocimiento de dominio estático (FASE 5), cargado por `DomainMemory`. |
+| `data/{entities,applications,capabilities,knowledge_graph,contextual_knowledge_base}.json` | Versiones de datos usadas por `MemoryManager`/`EntityResolver`. |
+| `data/conversational_memory.json` | Histórico de chat con metadatos de planificación. |
+| `data/prediction_memory.json` | `PredictionResult`s y estadísticas de uso (FASE 15/18). |
+| `data/jarvis_memory.json` | Memoria general de largo plazo. |
+| `data/jarvis_learned_aliases.json` | Aliases aprendidos en runtime. |
+| `data/macros_coords.json` | Coordenadas UI calibradas (FASE 13), leídas por `CoordinateManager`. |
+| `data/goal_adaptation_*.json` | Feedback/resultados de adaptación de objetivos. |
+| `data/improvement_rules.json` | Reglas de mejora inferidas. |
+| `data/domain_knowledge_persistence.json` | Conocimiento de dominio persistido (aplicado por `conversation.py`). |
+| `data/memory/*` | Nueva memoria de dominio: `world_state`, `plans`, `executions`, `entities`, `relationships`, `user_preferences`, `learning_stats`, `predictions`, `domain_knowledge`, `conversational_memory`. |
+| `data/memoria/*_analysis.json` | Snapshots de autorreferencia por submódulo (consumidos por el arquitecto). |
+| `data/meta_learning_exports/*.json` | Puntos de entrenamiento de meta-aprendizaje (timestampados, FASE 18). |
+| `data/temp/*` | Scratch y harness de tests de un solo objetivo. |
+| `data/{integrity_report,data_integrative_report,cleaning_report}.txt` | Reportes de higiene de datos. |
+
+| Enum `MemoryType` | Variantes: `CONVERSATIONAL`, `ENTITIES`, `RELATIONSHIPS`, `PREDICTIONS`, `EXECUTIONS`, `PLANS`, `WORLD_STATE`, `USER_PREFERENCES`, `LEARNING_STATS`, `APPLICATIONS`, `CAPABILITIES`, `DOMAIN_KNOWLEDGE`, `META_LEARNING`, `CONTEXTUAL_KNOWLEDGE_BASE`. |
+
+## 🧪 Cobertura de inspección
+
+Este documento se genera a partir del AST real (signatures + docstrings) de los 94 archivos fuente, complementado con inspección de implementación en los módulos centrales. Cuando un `docstring` del código es escaso, la descripción proviene del módulo que lo consume y no inventa comportamiento.
+
+---
+*Generado desde `data/temp/_ast_dump.txt` (extracción AST) — no contiene inferencias de comportamiento no verificado.*

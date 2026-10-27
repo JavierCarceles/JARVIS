@@ -537,7 +537,7 @@ class TestRoundTripRegisterLoad:
 # ---------------------------------------------------------------------------
 
 class TestLoadFullApplicationSet:
-    """Carga las 4 aplicaciones reales de entities.json con MemoryManager real
+    """Carga las 32 aplicaciones reales de entities.json con MemoryManager real
     en sandbox (tmp_path). Verifica que el conjunto se materializa con
     defaults para ui_elements/states (legacy format)."""
 
@@ -559,13 +559,21 @@ class TestLoadFullApplicationSet:
     def test_loads_four_applications(self):
         manager = self._make_manager_with_real_mm()
         manager._load_custom_applications()
-        assert len(manager.applications) == 4
+        assert len(manager.applications) == 32
 
     def test_application_ids_match_real_source(self):
         manager = self._make_manager_with_real_mm()
         manager._load_custom_applications()
         assert set(manager.applications.keys()) == {
             "youtube", "spotify", "github", "twitch",
+            "brave", "discord", "steam", "epic games launcher",
+            "ubisoft connect", "riot client", "obs studio",
+            "docker desktop", "visual studio code", "pycharm",
+            "intellij idea", "ollama", "plex",
+            "teamspeak 3 client", "tlauncher", "overwolf", "outplayed",
+            "microsoft teams", "outlook", "microsoft onedrive",
+            "windows terminal", "notepad", "calculator", "paint",
+            "explorer", "edge", "battle.net", "chrome",
         }
 
     def test_legacy_apps_get_default_states(self):
