@@ -357,7 +357,7 @@
   - `ApplicationManager._normalize_name`: Normaliza nombres habituales de aplicaciones a clave interna
   - `ApplicationManager._initialize_applications`: Inicializa conocimiento de aplicaciones base (Chrome, Spotify)
   - `ApplicationManager.register_application`: Registra aplicacion en memoria y gestor
-  - `ApplicationManager.get_application`: Obtiene aplicacion por nombre o alias
+  - `ApplicationManager.get_application`: Obtiene aplicacion por nombre o alias; primero resuelve mediante alias estaticos (_normalize_name), luego busca coincidencias en aliases dinamicos almacenados en metadata['aliases'] de aplicaciones registradas (provenientes de Entity.aliases al materializar desde entities.json)
   - `ApplicationManager.get_applications_by_type`: Obtiene aplicaciones por tipo
   - `ApplicationManager.get_applications_by_capability`: Obtiene aplicaciones con capacidad determinada
   - `ApplicationManager._load_custom_applications`: Carga aplicaciones personalizadas persistidas en memoria

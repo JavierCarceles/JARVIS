@@ -131,5 +131,527 @@
     "created_at": "2024-09-27T00:00:00.000000",
     "updated_at": "2024-09-27T00:00:00.000000",
     "metadata": null
+  },
+  {
+    "id": "google_chrome",
+    "type": "application",
+    "name": "Google Chrome",
+    "properties": {
+      "executable": "chrome.exe",
+      "category": "browser"
+    },
+    "aliases": [
+      "chrome",
+      "google chrome",
+      "navegador chrome"
+    ],
+    "tags": [],
+    "confidence": 1.0,
+    "created_at": "2026-10-27T00:00:00.000000",
+    "updated_at": "2026-10-27T00:00:00.000000",
+    "metadata": null
+  },
+  {
+    "id": "brave",
+    "type": "application",
+    "name": "Brave",
+    "properties": {
+      "executable": "brave.exe",
+      "category": "browser"
+    },
+    "aliases": [
+      "brave browser",
+      "navegador brave"
+    ],
+    "tags": [],
+    "confidence": 1.0,
+    "created_at": "2026-10-27T00:00:00.000000",
+    "updated_at": "2026-10-27T00:00:00.000000",
+    "metadata": null
+  },
+  {
+    "id": "microsoft_edge",
+    "type": "application",
+    "name": "Microsoft Edge",
+    "properties": {
+      "executable": "msedge.exe",
+      "category": "browser"
+    },
+    "aliases": [
+      "edge",
+      "microsoft edge",
+      "navegador edge"
+    ],
+    "tags": [],
+    "confidence": 1.0,
+    "created_at": "2026-10-27T00:00:00.000000",
+    "updated_at": "2026-10-27T00:00:00.000000",
+    "metadata": null
+  },
+  {
+    "id": "discord",
+    "type": "application",
+    "name": "Discord",
+    "properties": {
+      "executable": "Discord.exe",
+      "category": "communication"
+    },
+    "aliases": [
+      "discord app",
+      "hablar por discord"
+    ],
+    "tags": [],
+    "confidence": 1.0,
+    "created_at": "2026-10-27T00:00:00.000000",
+    "updated_at": "2026-10-27T00:00:00.000000",
+    "metadata": null
+  },
+  {
+    "id": "steam",
+    "type": "application",
+    "name": "Steam",
+    "properties": {
+      "executable": "steam.exe",
+      "category": "game_launcher"
+    },
+    "aliases": [
+      "steam launcher",
+      "juegos de steam"
+    ],
+    "tags": [],
+    "confidence": 1.0,
+    "created_at": "2026-10-27T00:00:00.000000",
+    "updated_at": "2026-10-27T00:00:00.000000",
+    "metadata": null
+  },
+  {
+    "id": "battle_net",
+    "type": "application",
+    "name": "Battle.net",
+    "properties": {
+      "executable": "Battle.net.exe",
+      "category": "game_launcher"
+    },
+    "aliases": [
+      "battlenet",
+      "battle net",
+      "blizzard launcher"
+    ],
+    "tags": [],
+    "confidence": 1.0,
+    "created_at": "2026-10-27T00:00:00.000000",
+    "updated_at": "2026-10-27T00:00:00.000000",
+    "metadata": null
+  },
+  {
+    "id": "epic_games_launcher",
+    "type": "application",
+    "name": "Epic Games Launcher",
+    "properties": {
+      "executable": "EpicGamesLauncher.exe",
+      "category": "game_launcher"
+    },
+    "aliases": [
+      "epic games",
+      "epic launcher"
+    ],
+    "tags": [],
+    "confidence": 1.0,
+    "created_at": "2026-10-27T00:00:00.000000",
+    "updated_at": "2026-10-27T00:00:00.000000",
+    "metadata": null
+  },
+  {
+    "id": "ubisoft_connect",
+    "type": "application",
+    "name": "Ubisoft Connect",
+    "properties": {
+      "executable": "UbisoftConnect.exe",
+      "category": "game_launcher"
+    },
+    "aliases": [
+      "ubisoft",
+      "ubisoft launcher"
+    ],
+    "tags": [],
+    "confidence": 1.0,
+    "created_at": "2026-10-27T00:00:00.000000",
+    "updated_at": "2026-10-27T00:00:00.000000",
+    "metadata": null
+  },
+  {
+    "id": "riot_client",
+    "type": "application",
+    "name": "Riot Client",
+    "properties": {
+      "executable": "RiotClientServices.exe",
+      "category": "game_launcher"
+    },
+    "aliases": [
+      "riot",
+      "riot games",
+      "cliente de riot"
+    ],
+    "tags": [],
+    "confidence": 1.0,
+    "created_at": "2026-10-27T00:00:00.000000",
+    "updated_at": "2026-10-27T00:00:00.000000",
+    "metadata": null
+  },
+  {
+    "id": "obs_studio",
+    "type": "application",
+    "name": "OBS Studio",
+    "properties": {
+      "executable": "obs64.exe",
+      "category": "streaming"
+    },
+    "aliases": [
+      "obs",
+      "open broadcaster software",
+      "grabar pantalla",
+      "emitir en directo"
+    ],
+    "tags": [],
+    "confidence": 1.0,
+    "created_at": "2026-10-27T00:00:00.000000",
+    "updated_at": "2026-10-27T00:00:00.000000",
+    "metadata": null
+  },
+  {
+    "id": "docker_desktop",
+    "type": "application",
+    "name": "Docker Desktop",
+    "properties": {
+      "executable": "Docker Desktop.exe",
+      "category": "development"
+    },
+    "aliases": [
+      "docker",
+      "docker desktop",
+      "contenedores"
+    ],
+    "tags": [],
+    "confidence": 1.0,
+    "created_at": "2026-10-27T00:00:00.000000",
+    "updated_at": "2026-10-27T00:00:00.000000",
+    "metadata": null
+  },
+  {
+    "id": "visual_studio_code",
+    "type": "application",
+    "name": "Visual Studio Code",
+    "properties": {
+      "executable": "Code.exe",
+      "category": "development"
+    },
+    "aliases": [
+      "vscode",
+      "vs code",
+      "visual studio code",
+      "code editor"
+    ],
+    "tags": [],
+    "confidence": 1.0,
+    "created_at": "2026-10-27T00:00:00.000000",
+    "updated_at": "2026-10-27T00:00:00.000000",
+    "metadata": null
+  },
+  {
+    "id": "pycharm",
+    "type": "application",
+    "name": "PyCharm",
+    "properties": {
+      "executable": "pycharm64.exe",
+      "category": "development"
+    },
+    "aliases": [
+      "py charm",
+      "pycharm ide"
+    ],
+    "tags": [],
+    "confidence": 1.0,
+    "created_at": "2026-10-27T00:00:00.000000",
+    "updated_at": "2026-10-27T00:00:00.000000",
+    "metadata": null
+  },
+  {
+    "id": "intellij_idea",
+    "type": "application",
+    "name": "IntelliJ IDEA",
+    "properties": {
+      "executable": "idea64.exe",
+      "category": "development"
+    },
+    "aliases": [
+      "intellij",
+      "intellij idea",
+      "idea"
+    ],
+    "tags": [],
+    "confidence": 1.0,
+    "created_at": "2026-10-27T00:00:00.000000",
+    "updated_at": "2026-10-27T00:00:00.000000",
+    "metadata": null
+  },
+  {
+    "id": "ollama",
+    "type": "application",
+    "name": "Ollama",
+    "properties": {
+      "executable": "ollama.exe",
+      "category": "local_ai"
+    },
+    "aliases": [
+      "ollama",
+      "modelos locales",
+      "ia local"
+    ],
+    "tags": [],
+    "confidence": 1.0,
+    "created_at": "2026-10-27T00:00:00.000000",
+    "updated_at": "2026-10-27T00:00:00.000000",
+    "metadata": null
+  },
+  {
+    "id": "plex",
+    "type": "application",
+    "name": "Plex",
+    "properties": {
+      "executable": "Plex.exe",
+      "category": "media"
+    },
+    "aliases": [
+      "plex media",
+      "mi plex"
+    ],
+    "tags": [],
+    "confidence": 1.0,
+    "created_at": "2026-10-27T00:00:00.000000",
+    "updated_at": "2026-10-27T00:00:00.000000",
+    "metadata": null
+  },
+  {
+    "id": "teamspeak",
+    "type": "application",
+    "name": "TeamSpeak 3 Client",
+    "properties": {
+      "executable": "ts3client_win64.exe",
+      "category": "communication"
+    },
+    "aliases": [
+      "teamspeak",
+      "team speak",
+      "ts3"
+    ],
+    "tags": [],
+    "confidence": 1.0,
+    "created_at": "2026-10-27T00:00:00.000000",
+    "updated_at": "2026-10-27T00:00:00.000000",
+    "metadata": null
+  },
+  {
+    "id": "tlauncher",
+    "type": "application",
+    "name": "TLauncher",
+    "properties": {
+      "executable": "TLauncher.exe",
+      "category": "game_launcher"
+    },
+    "aliases": [
+      "tl launcher",
+      "minecraft tlauncher"
+    ],
+    "tags": [],
+    "confidence": 1.0,
+    "created_at": "2026-10-27T00:00:00.000000",
+    "updated_at": "2026-10-27T00:00:00.000000",
+    "metadata": null
+  },
+  {
+    "id": "overwolf",
+    "type": "application",
+    "name": "Overwolf",
+    "properties": {
+      "executable": "Overwolf.exe",
+      "category": "gaming"
+    },
+    "aliases": [
+      "overwolf"
+    ],
+    "tags": [],
+    "confidence": 1.0,
+    "created_at": "2026-10-27T00:00:00.000000",
+    "updated_at": "2026-10-27T00:00:00.000000",
+    "metadata": null
+  },
+  {
+    "id": "outplayed",
+    "type": "application",
+    "name": "Outplayed",
+    "properties": {
+      "executable": "Outplayed.exe",
+      "category": "gaming"
+    },
+    "aliases": [
+      "outplayed",
+      "grabar partidas"
+    ],
+    "tags": [],
+    "confidence": 1.0,
+    "created_at": "2026-10-27T00:00:00.000000",
+    "updated_at": "2026-10-27T00:00:00.000000",
+    "metadata": null
+  },
+  {
+    "id": "microsoft_teams",
+    "type": "application",
+    "name": "Microsoft Teams",
+    "properties": {
+      "executable": "ms-teams.exe",
+      "category": "communication"
+    },
+    "aliases": [
+      "teams",
+      "microsoft teams",
+      "teams de microsoft"
+    ],
+    "tags": [],
+    "confidence": 1.0,
+    "created_at": "2026-10-27T00:00:00.000000",
+    "updated_at": "2026-10-27T00:00:00.000000",
+    "metadata": null
+  },
+  {
+    "id": "outlook",
+    "type": "application",
+    "name": "Outlook",
+    "properties": {
+      "executable": "olk.exe",
+      "category": "productivity"
+    },
+    "aliases": [
+      "microsoft outlook",
+      "correo",
+      "email"
+    ],
+    "tags": [],
+    "confidence": 1.0,
+    "created_at": "2026-10-27T00:00:00.000000",
+    "updated_at": "2026-10-27T00:00:00.000000",
+    "metadata": null
+  },
+  {
+    "id": "onedrive",
+    "type": "application",
+    "name": "Microsoft OneDrive",
+    "properties": {
+      "executable": "OneDrive.exe",
+      "category": "productivity"
+    },
+    "aliases": [
+      "onedrive",
+      "drive de microsoft"
+    ],
+    "tags": [],
+    "confidence": 1.0,
+    "created_at": "2026-10-27T00:00:00.000000",
+    "updated_at": "2026-10-27T00:00:00.000000",
+    "metadata": null
+  },
+  {
+    "id": "windows_terminal",
+    "type": "application",
+    "name": "Windows Terminal",
+    "properties": {
+      "executable": "wt.exe",
+      "category": "system"
+    },
+    "aliases": [
+      "terminal",
+      "windows terminal",
+      "terminal de windows"
+    ],
+    "tags": [],
+    "confidence": 1.0,
+    "created_at": "2026-10-27T00:00:00.000000",
+    "updated_at": "2026-10-27T00:00:00.000000",
+    "metadata": null
+  },
+  {
+    "id": "notepad",
+    "type": "application",
+    "name": "Bloc de notas",
+    "properties": {
+      "executable": "notepad.exe",
+      "category": "productivity"
+    },
+    "aliases": [
+      "bloc de notas",
+      "notepad",
+      "editor de texto"
+    ],
+    "tags": [],
+    "confidence": 1.0,
+    "created_at": "2026-10-27T00:00:00.000000",
+    "updated_at": "2026-10-27T00:00:00.000000",
+    "metadata": null
+  },
+  {
+    "id": "calculator",
+    "type": "application",
+    "name": "Calculadora",
+    "properties": {
+      "executable": "calc.exe",
+      "category": "system"
+    },
+    "aliases": [
+      "calculadora",
+      "calculator"
+    ],
+    "tags": [],
+    "confidence": 1.0,
+    "created_at": "2026-10-27T00:00:00.000000",
+    "updated_at": "2026-10-27T00:00:00.000000",
+    "metadata": null
+  },
+  {
+    "id": "paint",
+    "type": "application",
+    "name": "Paint",
+    "properties": {
+      "executable": "mspaint.exe",
+      "category": "productivity"
+    },
+    "aliases": [
+      "paint",
+      "microsoft paint",
+      "dibujar"
+    ],
+    "tags": [],
+    "confidence": 1.0,
+    "created_at": "2026-10-27T00:00:00.000000",
+    "updated_at": "2026-10-27T00:00:00.000000",
+    "metadata": null
+  },
+  {
+    "id": "file_explorer",
+    "type": "application",
+    "name": "Explorador de archivos",
+    "properties": {
+      "executable": "explorer.exe",
+      "category": "system"
+    },
+    "aliases": [
+      "explorador",
+      "explorador de archivos",
+      "file explorer",
+      "carpetas"
+    ],
+    "tags": [],
+    "confidence": 1.0,
+    "created_at": "2026-10-27T00:00:00.000000",
+    "updated_at": "2026-10-27T00:00:00.000000",
+    "metadata": null
   }
 ]

@@ -427,9 +427,36 @@ class ApplicationManager:
             return False
 
     def get_application(self, app_name: str) -> Optional[ApplicationKnowledge]:
-        """Obtiene una aplicación por nombre o alias."""
+        """Obtiene una aplicación por nombre o alias.
+
+        Resuelve primero mediante ``_normalize_name`` (alias estáticos
+        hardcodeados) y, si no encuentra nada, busca en los aliases
+        dinámicos almacenados en ``metadata['aliases']`` de las
+        aplicaciones ya registradas (provenientes de ``Entity.aliases``
+        al materializar apps desde entities.json).
+        """
         normalized = self._normalize_name(app_name)
-        return self.applications.get(normalized)
+        app = self.applications.get(normalized)
+        if app is not None:
+            return app
+        return self._resolve_alias(normalized)
+
+    def _resolve_alias(self, normalized_name: str) -> Optional[ApplicationKnowledge]:
+        """Resuelve un alias dinámico contra las aplicaciones ya registradas.
+
+        Busca ``normalized_name`` en ``metadata['aliases']`` de cada
+        aplicación registrada. Los aliases provienen de ``Entity.aliases``
+        al materializar apps desde entities.json (ver
+        ``_reconstruct_metadata``).
+        """
+        for existing_app in self.applications.values():
+            if existing_app.metadata and isinstance(existing_app.metadata, dict):
+                aliases = existing_app.metadata.get("aliases")
+                if aliases:
+                    alias_list = [str(a).lower() for a in aliases]
+                    if normalized_name in alias_list:
+                        return existing_app
+        return None
 
     def get_applications_by_type(self, app_type: str) -> List[ApplicationKnowledge]:
         """Obtiene aplicaciones por tipo."""
