@@ -762,6 +762,54 @@ class ApplicationKnowledgeIntegrator:
             for item in self._as_list(self._get_value(app, "capabilities", []))
         )
 
+    def is_application_available(self, app_name: str) -> bool:
+        """Comprueba disponibilidad en tiempo de ejecución de una aplicación.
+
+        Distingue **disponible** (ejecutable instalado / app con URL) de
+        **simplemente declarada**. Delega en ``ApplicationKnowledge.is_available``
+        cuando el gestor expone el modelo, o en
+        ``ApplicationManager.is_application_available`` como alternativa.
+        """
+        app = self._get_application(app_name)
+        if app is None:
+            return False
+
+        checker = self._get_value(app, "is_available")
+        if callable(checker):
+            try:
+                return bool(checker())
+            except Exception as exc:
+                logger.warning(
+                    "[APP-INTEGRATION] Error comprobando disponibilidad %s: %s",
+                    app_name,
+                    exc,
+                )
+                return False
+
+        manager = self.application_manager
+        manager_checker = self._get_value(manager, "is_application_available")
+        if callable(manager_checker):
+            try:
+                return bool(manager_checker(app_name))
+            except Exception as exc:
+                logger.warning(
+                    "[APP-INTEGRATION] Error comprobando disponibilidad %s: %s",
+                    app_name,
+                    exc,
+                )
+        return False
+
+    def is_capability_available(self, app_name: str, capability: Any) -> bool:
+        """Distingue una capacidad **disponible** de una sola **declarada**.
+
+        Una capacidad está disponible cuando está declarada en el modelo
+        (``is_application_capable``) **y** la aplicación es disponible en
+        tiempo de ejecución (``is_application_available``).
+        """
+        if not self.is_application_capable(app_name, capability):
+            return False
+        return self.is_application_available(app_name)
+
     def register_application_knowledge(self, app_config: Dict[str, Any]) -> bool:
         """Registra conocimiento mediante la API pública de applications_core."""
         if not isinstance(app_config, dict):

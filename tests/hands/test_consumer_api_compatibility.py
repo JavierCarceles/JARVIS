@@ -128,12 +128,16 @@ class TestBrainApplicationKnowledgeConsumer:
             assert isinstance(info["available"], bool)
 
     def test_chrome_present_and_open_capable(self):
-        """Chrome esta en el catalogo y es capaz de OPEN (api usada por Brain)."""
+        """Chrome esta en el catalogo, declara capability OPEN y expone disponibilidad."""
         result = self.brain._get_application_knowledge()
         assert "chrome" in result["applications"]
         chrome_info = result["applications"]["chrome"]
-        assert chrome_info["available"] is True
+        # 3.3.2.2: 'declared' (declarada en el modelo) es el chequeo determinista.
+        assert chrome_info["declared"] is True
         assert "open_chrome" in chrome_info["capabilities"]
+        # 'available' indica disponibilidad en runtime (no determinista: depende
+        # de si el ejecutable esta en PATH).
+        assert isinstance(chrome_info["available"], bool)
 
     def test_spotify_present(self):
         """Spotify esta en el catalogo."""

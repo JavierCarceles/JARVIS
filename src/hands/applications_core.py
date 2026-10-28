@@ -186,8 +186,37 @@ class ApplicationKnowledge:
         )
 
     def is_capable(self, capability: ApplicationCapability) -> bool:
-        """Comprueba si la aplicación posee una capacidad específica."""
+        """Comprueba si la aplicación posee una capacidad específica.
+
+        Esta es una comprobación **declarativa**: verifica únicamente que la
+        capacidad está registrada en el modelo de conocimiento, sin garantizar
+        que la aplicación esté disponible en tiempo de ejecución. Para esa
+        distinción, usar :meth:`is_capability_available`.
+        """
         return any(capability_def.capability == capability for capability_def in self.capabilities)
+
+    def is_available(self) -> bool:
+        """Comprueba si la aplicación está disponible en tiempo de ejecución.
+
+        Reúne la lógica de :func:`_check_application_available` como método de
+        modelo: una aplicación está disponible si su ejecutable está en el
+        PATH o en una ruta de archivo válida, o si no tiene ejecutable pero sí
+        URL. No distingue mayúsculas/minúsculas del ejecutable ni resuelve
+        aliases; la normalización de nombres recae sobre el gestor.
+        """
+        return _check_application_available(self)
+
+    def is_capability_available(
+        self, capability: ApplicationCapability
+    ) -> bool:
+        """Distingue una capacidad **disponible** de una sola **declarada**.
+
+        Una capacidad está disponible cuando está declarada en el modelo
+        (:meth:`is_capable`) **y** la aplicación es disponible en tiempo de
+        ejecución (:meth:`is_available`). Devuelve ``False`` siempre que la
+        aplicación no pueda comprobarse o la capacidad no esté declarada.
+        """
+        return self.is_capable(capability) and self.is_available()
 
     def get_calibrated_elements(self) -> List[UIElement]:
         """Obtiene los elementos UI calibrados."""
@@ -746,6 +775,52 @@ class ApplicationManager:
             for element in app.ui_elements
         }
 
+    def is_application_available(self, app_name: str) -> bool:
+        """Comprueba disponibilidad en tiempo de ejecución de una aplicación.
+
+        Distingue **disponible** (el ejecutable está instalado o la app tiene
+        URL) de **simplemente declarada** (existe en el modelo pero su
+        ejecutable no está disponible). Delega en ``ApplicationKnowledge.is_available``.
+        """
+        app = self.get_application(app_name)
+        if not app:
+            return False
+        try:
+            return bool(app.is_available())
+        except Exception as exc:
+            logger._print_log(
+                "info",
+                f"Error comprobando disponibilidad de {app_name}: {exc} "
+                "[file:applications_core.py, method:is_application_available]",
+                "applications_core.py", "is_application_available", 778,
+            )
+            return False
+
+    def is_capability_available(
+        self, app_name: str, capability: ApplicationCapability
+    ) -> bool:
+        """Distingue una capacidad **disponible** de una sola **declarada**.
+
+        Una capacidad está disponible si está declarada en el modelo
+        (``ApplicationKnowledge.is_capable``) y la aplicación es disponible
+        en tiempo de ejecución (``ApplicationKnowledge.is_available``).
+        """
+        app = self.get_application(app_name)
+        if not app:
+            return False
+        try:
+            return bool(app.is_capability_available(capability))
+        except (TypeError, ValueError):
+            return False
+        except Exception as exc:
+            logger._print_log(
+                "info",
+                f"Error comprobando capacidad disponible de {app_name}: {exc} "
+                "[file:applications_core.py, method:is_capability_available]",
+                "applications_core.py", "is_capability_available", 778,
+            )
+            return False
+
 
 # Instancia global del gestor de aplicaciones.
 _app_manager: Optional[ApplicationManager] = None
@@ -1300,6 +1375,8 @@ def get_application_knowledge(app_name: str) -> Dict[str, Any]:
         "calibration_policy": list(app.calibration_policy),
         "preflight_requirements": list(app.preflight_requirements),
         "default_state": app.default_state.value,
+        "available": bool(app.is_available()),
+        "declared_capabilities": [cap.capability.value for cap in app.capabilities],
         "metadata": dict(app.metadata),
     }
 
@@ -1354,4 +1431,35 @@ def register_custom_application(app_config: Dict[str, Any]) -> bool:
         return get_application_manager().register_application(app)
     except Exception as exc:
         logger._print_log("INFO", "Procesando solicitud", "applications_core.py", "register_custom_application", 1054)
+        return False
+
+
+def is_application_available(app_name: str) -> bool:
+    """Comprueba disponibilidad en tiempo de ejecución de una aplicación.
+
+    Distingue **disponible** (ejecutable instalado / app con URL) de
+    **simplemente declarada** (registrada en el modelo).
+    """
+    try:
+        return bool(get_application_manager().is_application_available(app_name))
+    except Exception:
+        return False
+
+
+def is_capability_available(app_name: str, capability: Any) -> bool:
+    """Distingue una capacidad **disponible** de una sola **declarada**.
+
+    Una capacidad está disponible cuando está declarada en el modelo y la
+    aplicación es disponible en tiempo de ejecución.
+    """
+    try:
+        enum_capability = capability
+        if isinstance(enum_capability, str):
+            enum_capability = ApplicationCapability(enum_capability.strip().lower())
+        return bool(
+            get_application_manager().is_capability_available(app_name, enum_capability)
+        )
+    except (TypeError, ValueError):
+        return False
+    except Exception:
         return False

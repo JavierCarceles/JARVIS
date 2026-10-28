@@ -445,17 +445,23 @@ class TestKnowledgeOutputOverlapsContract:
     cual cae (icon)."""
 
     def test_knowledge_output_keys_subset_of_contract(self):
-        """Todas las claves devueltas estan en el contrato (subset)."""
+        """Todas las claves devueltas estan en el contrato o son campos calculados
+        introducidos por 3.3.2.2 (available, declared_capabilities)."""
         result = get_application_knowledge("chrome")
         assert isinstance(result, dict)
-        assert set(result.keys()) <= set(CONTRACT_FIELDS)
+        # 3.3.2.2: get_application_knowledge añade dos campos calculados que no
+        # son dataclass fields (no están en CONTRACT_FIELDS): 'available' (runtime
+        # availability) y 'declared_capabilities' (lista de capabilities declaradas).
+        EXTRA_COMPUTED_KEYS = {"available", "declared_capabilities"}
+        assert set(result.keys()) <= set(CONTRACT_FIELDS) | EXTRA_COMPUTED_KEYS
 
     def test_knowledge_output_drops_icon_field(self):
         """`icon` esta en el contrato pero get_application_knowledge NO lo expone.
 
         Esto es una duplicacion parcial/incompleta: 12 de 13 campos del contrato
         se reexponen, pero `icon` se pierde en la serializacion (Chrome no lo
-        popula -> None)."""
+        popula -> None). Ademas (3.3.2.2) se añaden 2 campos calculados:
+        'available' y 'declared_capabilities'."""
         manager = get_application_manager()
         app = manager.get_application("Chrome")
         assert app is not None
@@ -466,9 +472,10 @@ class TestKnowledgeOutputOverlapsContract:
         # get_application_knowledge no expone icon
         result = get_application_knowledge("chrome")
         assert "icon" not in result
-        assert set(result.keys()) == set(CONTRACT_FIELDS) - {"icon"}
+        EXTRA_COMPUTED_KEYS = {"available", "declared_capabilities"}
+        assert set(result.keys()) == (set(CONTRACT_FIELDS) - {"icon"}) | EXTRA_COMPUTED_KEYS
 
     def test_knowledge_output_keys_count(self):
-        """get_application_knowledge expone 12 claves (13 - icon)."""
+        """get_application_knowledge expone 14 claves (13 - icon + 2 calculados)."""
         result = get_application_knowledge("chrome")
-        assert len(result) == 12
+        assert len(result) == 14

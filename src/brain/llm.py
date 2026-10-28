@@ -246,7 +246,13 @@ class Brain:
                 capabilities = app_integrator.get_application_capabilities(app_name)
                 applications[app_name] = {
                     "capabilities": capabilities,
-                    "available": app_integrator.is_application_capable(app_name, ApplicationCapability.OPEN),
+                    "declared": app_integrator.is_application_capable(
+                        app_name, ApplicationCapability.OPEN
+                    ),
+                    "available": app_integrator.is_application_available(app_name),
+                    "capability_available": app_integrator.is_capability_available(
+                        app_name, ApplicationCapability.OPEN
+                    ),
                 }
             return {
                 "applications": applications,

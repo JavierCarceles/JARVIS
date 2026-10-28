@@ -206,13 +206,26 @@ class TestBrainConsumesRealCatalog:
         assert result["total_applications"] == len(manager.applications)
         assert result["total_applications"] >= 2  # al menos Chrome + Spotify
 
-    def test_chrome_entry_has_capabilities_and_available(self):
-        """La entrada chrome tiene capabilities (dict) y available=True."""
+    def test_chrome_entry_has_capabilities_and_availability_keys(self):
+        """La entrada chrome tiene capabilities (dict), declared=True (declarada
+        en el modelo) y claves de disponibilidad (available, capability_available).
+
+        Nota: bajo el contrato 3.3.2.2, 'available' indica disponibilidad en tiempo
+        de ejecución (ejecutable en PATH o URL), no simplemente si la capability
+        está declarada. 'declared' refleja la capability declarada en el modelo
+        (determinista: Chrome declara OPEN → True).
+        """
         result = self.brain._get_application_knowledge()
         chrome = result["applications"]["chrome"]
         assert isinstance(chrome["capabilities"], dict)
         assert "open_chrome" in chrome["capabilities"]
-        assert chrome["available"] is True
+        assert chrome["declared"] is True
+        assert isinstance(chrome["available"], bool)
+        assert isinstance(chrome["capability_available"], bool)
+        # capability_available == declared (True) AND available (runtime)
+        assert chrome["capability_available"] == (
+            chrome["declared"] and chrome["available"]
+        )
 
     def test_reconstructed_app_entry(self):
         """YouTube (reconstruido, sin capabilities) aparece con capabilities={}."""
@@ -220,8 +233,12 @@ class TestBrainConsumesRealCatalog:
         assert "youtube" in result["applications"]
         yt = result["applications"]["youtube"]
         assert yt["capabilities"] == {}
-        # Sin capabilities OPEN declaradas, available es False.
-        assert yt["available"] is False
+        # YouTube no declara capability OPEN → declared es determinista False.
+        assert yt["declared"] is False
+        # Sin capability declarada, capability_available es determinista False
+        # (aunque la app pueda ser runtime-available por URL o ejecutable).
+        assert yt["capability_available"] is False
+        assert isinstance(yt["available"], bool)  # runtime availability (no determinista)
 
     def test_supported_capabilities_is_list_of_strings(self):
         """supported_capabilities es una lista de strings."""
@@ -231,13 +248,17 @@ class TestBrainConsumesRealCatalog:
         assert all(isinstance(c, str) for c in caps)
 
     def test_all_entries_have_required_keys(self):
-        """Todas las entradas tienen 'capabilities' (dict) y 'available' (bool)."""
+        """Todas las entradas tienen capabilities, declared, available y capability_available."""
         result = self.brain._get_application_knowledge()
         for info in result["applications"].values():
             assert "capabilities" in info
+            assert "declared" in info
             assert "available" in info
+            assert "capability_available" in info
             assert isinstance(info["capabilities"], dict)
+            assert isinstance(info["declared"], bool)
             assert isinstance(info["available"], bool)
+            assert isinstance(info["capability_available"], bool)
 
 
 # ---------------------------------------------------------------------------
