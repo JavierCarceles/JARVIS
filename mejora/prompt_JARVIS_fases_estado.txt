@@ -690,9 +690,9 @@ FASE 3 ? APPLICATION KNOWLEDGE
 3.3.1 ? Lectura
 3.3.1.1 Localizar la representacion real de capacidades.
 3.3.1.2 Verificar relacion aplicacion -> capability.
-3.3.1.3 Verificar relacion capability -> accion cuando exista.
+3.3.1.3 Verificar relacion capability -> accion cuando exista. [IMPLEMENTADA]
 3.3.2 ? Contrato
-3.3.2.1 Definir una consulta de capacidades sin duplicar APIs existentes.
+3.3.2.1 Definir una consulta de capacidades sin duplicar APIs existentes. [IMPLEMENTADA]
 3.3.2.2 Distinguir capability disponible de capability simplemente declarada.
 3.3.2.3 Verificar capacidades ausentes.
 3.3.3 ? Planificacion
@@ -5170,3 +5170,112 @@ VERIFICACION: SINTAXIS: OK (py_compile de applications_core.py, action_registry.
 DISCREPANCIAS: (D-CAP-MODEL-GAP) Ver CAMBIOS/HALLAZGOS. (D-STATUS-INIT) El bloque "ESTADO PERSISTENTE ACTUAL" en prompt_mejoraActual.txt que acompana este chat indicaba CURRENT_WORK_STATUS: PENDIENTE para 3.3.1.1, pero el archivo en disco indica CURRENT_WORK_STATUS: EN PROCESO (transicion previa). Se contrasta con el archivo real (unica fuente de autoridad) y se continua la hoja EN PROCESO segun regla 5.4. Ninguna contradiccion afecta al codigo de 3.3.1.1. (D-CIERRE-STATUS) Contradiccion documentada en registros 3.2.3.4/3.2.4.2 sobre dejar PENDIENTE vs EN PROCESO para la hoja siguiente — se aplica PENDIENTE para 3.3.1.2 por regla 5.4e (mas especifica y razonada).
 PENDIENTES: NINGUNO (para 3.3.1.1 — inspeccion completada). La siguiente hoja del roadmap es 3.3.1.2.
 ESTADO FINAL: 3.3.1.1 - IMPLEMENTADA
+
+===
+
+REGISTRO DE UNIDAD: 3.3.1.2
+FECHA: 2026-10-28
+OBJETIVO: Verificar la relacion aplicacion -> capability en el codigo y datos reales: confirmar como una aplicacion (ApplicationKnowledge) asocia y expone sus capacidades (List[ApplicationCapabilityDef] con enum ApplicationCapability), que las APIs de consulta (is_capable, get_capability, get_application_capabilities, get_applications_by_capability, get_application_knowledge) resuelven la relacion, que la persistencia round-trip (string -> enum) funciona, y documentar el limite por el cual las apps reconstruidas desde data/memory/entities.json carecen de capabilities.
+TIPO DE TRABAJO: INSPECCION | VERIFICACION
+CAMBIOS / HALLAZGOS:
+- Verificacion empirica read-only contra el singleton real ApplicationManager (get_application_manager(), cargado desde data/memory/entities.json, 32 apps). EVIDENCIA REAL:
+  * TOTAL_APPS=32; APPS_WITH_CAPS=[chrome, spotify] — UNICAMENTE las hardcodeadas en _initialize_applications(); 30 apps reconstruidas sin capabilities.
+  * Chrome.capabilities=[open, navigate, search]; Spotify.capabilities=[open, navigate]; YouTube.capabilities=[] (reconstruida).
+  * is_capable(ApplicationCapability.OPEN): chrome=True, youtube=False. is_capable("open") (string)=False — contrato tipado por enum en is_capable; get_capability acepta string por valor/nombre.
+  * get_applications_by_capability("open") -> [Chrome, Spotify]; get_application_capabilities("chrome") -> dict keys {open_chrome, navigate_to_url, search_in_google} con "capability"=="open"; get_application_capabilities("yt") -> {}.
+  * data/memory/entities.json: 0 de 32 entidades application tienen clave "capabilities"; formato real properties={category, executable, url} (legacy). Por tanto _reconstruct_capabilities(properties.get("capabilities",[])) devuelve [] para las 30 apps reconstruidas.
+- Relacion aplicacion -> capability CANONICA (types fuertes): ApplicationKnowledge.capabilities: Optional[List[ApplicationCapabilityDef]] (default []) con ApplicationCapabilityDef.capability: ApplicationCapability (Enum, 23 miembros) — src/hands/applications_core.py:117,120,145,168,188,466,471,706,1307.
+- Persistencia round-trip verificada: register_application serializa capabilities como [cap.capability.value] (strings) en Entity.properties["capabilities"] (applications_core.py:413); _reconstruct_capabilities reconstruye ApplicationCapabilityDef desde strings (invalidos omitidos). Test existente test_round_trip_preserves_capabilities_as_strings PASSED.
+- APIs de consulta verificadas: manager.is_capable(enum), manager.get_capability(str por valor/nombre), manager.get_applications_by_capability(enum)->List[ApplicationKnowledge], manager.get_application_capabilities(name)->Dict[str,Any], get_application_knowledge(name)->dict con "capabilities", modulo get_applications_by_capability(str)->List[str] (aplicaciones_core.py:1307).
+- GAP (D-CAP-MODEL-GAP, documentado en 3.3.1.1): data/knowledge/capabilities.json y data/knowledge/applications.json son dicts/strings crudos consumidos por DomainMemory (src/memory/conversation.py:172,182) y NO se convierten al Enum ApplicationCapability; data/memory/entities.json no persiste capabilities. La relacion aplicacion -> capability en el modelo Enum solo se satisface para apps hardcodeadas (Chrome, Spotify). No es un bug de codigo: comportamiento determinista y probado; es una brecha de cobertura de datos, pendiente de fases posteriores (3.3.2/3.3.3). NO se modifica codigo de produccion.
+- NO se modifico codigo de produccion ni tests.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: NA; DOCUMENTACION: `mejora/prompt_JARVIS_fases_estado.txt` (registro 3.3.1.2); `mejora/prompt_mejoraActual.txt` (punteros)
+TESTS Y RESULTADOS: UNITARIOS: 74/74 PASSED (tests especificos relacion aplicacion->capability: test_applications_core.py::TestApplicationKnowledgeIsCapable, TestApplicationKnowledgeGetCapability, TestApplicationManagerQueries, TestApplicationManagerQueriesExtended, TestApplicationManagerInit; test_application_load.py::TestRoundTripRegisterLoad; test_application_contract_no_duplication.py; test_application_data_format.py::TestRegisterApplicationVsRealFormatDiscrepancy); INTEGRACION: 37/37 PASSED (test_application_consumers_real_model.py contra modelo real incluye la relacion aplicacion->capability para Chrome/Spotify/YouTube); NO REGRESION: 2076/2076 PASSED (tests/hands/ completo; baseline 2076/2076 confirmado en 3.3.1.1).
+VERIFICACION: SINTAXIS: OK (py_compile implicito via import de tests; 2076 tests importan/ejecutan applications_core.py sin error); MAIN.PY: OK (no modificado; py_compile exit 0 confirmado en 3.3.1.1); COMPORTAMIENTO / INTEGRACION REAL: verificado read-only contra singleton real get_application_manager() — Chrome/Spotify con capabilities tipadas, 30 apps reconstruidas con capabilities=[], get_applications_by_capability('open')=[Chrome,Spotify], is_capable enum-typed (string devuelve False), entities.json 0/32 entidades con clave "capabilities".
+DISCREPANCIAS: (D-CAP-MODEL-GAP) Ver CAMBIOS/HALLAZGOS — gap documentado en 3.3.1.1 entre el modelo Enum canónico (solo Chrome/Spotify) y data/knowledge/*.json + entities.json (sin capabilities). No contradice codigo: comportamiento coherente con los tests. (D-CIERRE-STATUS) Heredado de 3.2.3.4/3.2.4.2/3.3.1.1: al cerrar, segun regla 5.4e (mas especifica) se deja la hoja siguiente (3.3.1.3) PENDIENTE en prompt_mejoraActual.txt; el bloque CONTINUIDAD del propio prompt_mejoraActual.txt indica EN PROCESO. Se aplica PENDIENTE (regla 5). Ninguna contradiccion afecta al codigo de 3.3.1.2.
+PENDIENTES: NINGUNO para 3.3.1.2 (verificacion completada). La siguiente hoja del roadmap es 3.3.1.3.
+ESTADO FINAL: 3.3.1.2 - IMPLEMENTADA
+
+===
+
+REGISTRO DE UNIDAD: 3.3.1.3
+FECHA: 2026-10-28
+OBJETIVO: Verificar la relacion capability -> accion: confirmar que Executor._action_provides_capability(action_info, capability) resuelve si una ActionInfo cubre un capability requerido, identificando si existe una relacion capability -> accion en el codigo real, y corregir el bug donde el metodo consultaba el atributo inexistente `capabilities` (plural) en lugar del atributo canónico `capability` (singular) definido en ActionInfo.
+TIPO DE TRABAJO: VERIFICACION | CORRECCION DE BUG
+CAMBIOS / HALLAZGOS:
+- HALLAZGO (BUG): _action_provides_capability (src/hands/executor.py:597) consulta `getattr(action_info, "capabilities", [])` y luego `getattr(item, "value")` sobre cada item, asumiendo que `capabilities` es una lista de Enum. Sin embargo ActionInfo define `capability: Optional[str] = None` (singular, string, no Enum) en src/hands/action_registry.py:487. El atributo `capabilities` (plural) NO existe en ActionInfo. Con MagicMock los tests pasaban porque el mock permitia cualquier atributo, pero con ActionInfo real la verificacion por capability declarado NUNCA funcionaba (getattr devolvia [], la lista vacia).
+- FIX PRODUCCION: cambiado `getattr(action_info, "capabilities", [])` por `getattr(action_info, "capability", None)`, comparando el string declarado directamente (case-insensitive). La logica de name/action_type/category se mantiene. Verificado contra ActionInfo real con capability="open_application" y capability="keyboard.basic".
+- FIX TESTS: el helper _make_ai en TestActionProvidesCapability usaba `ai.capabilities = capabilities or []` (mock falseamiento). Corregido a `ai.capability = capability` (string) alineado con el contrato real de ActionInfo. Renombrado test_capabilities_declared_match -> test_capability_declared_match. Anadido test_capability_declared_no_match (negative case). Actualizado factory mock_action_info_factory de capabilities(plural)->capability(singular) para alinearse al API canónico. Anadidos test_real_action_info_capability_checked y test_real_action_info_keyboard_capability_checked que construyen ActionInfo real (no mock) y verifican que el capability declarado se chequea correctamente.
+- RELACION CAPABILITY -> ACCION: el metodo _action_provides_capability es llamado en executor.py:552 dentro de _find_alternative_nodes, que busca acciones alternativas cuyo capability coincida. Con el fix, esta relacion funciona correctamente contra ActionInfo reales (antes estaba rota: nunca coincidia por capability declarado).
+ARCHIVOS MODIFICADOS:
+- src/hands/executor.py: método _action_provides_capability (lineas ~597-610) — corregido atributo `capabilities`(inexistente) -> `capability`(canónico string).
+- tests/hands/test_executor.py: TestActionProvidesCapability._make_ai, test_capabilities_declared_match -> test_capability_declared_match, test_capability_declared_no_match (nuevo), test_action_type_enum_value_match (renombrado desde test_capabilities_enum_value_match para coherencia), test_real_action_info_capability_checked (nuevo), test_real_action_info_keyboard_capability_checked (nuevo); fixture mock_action_info_factory corregido.
+TESTS Y RESULTADOS:
+- UNITARIOS: 279/279 PASSED (tests/hands/test_executor.py completo, incluye 12 tests de TestActionProvidesCapability con 2 nuevos tests contra ActionInfo real).
+- INTEGRACION: 117/117 PASSED (tests/brain/ + test_contextual_pattern_recognizer_legacy.py).
+- NO REGRESION: 2079/2079 PASSED (tests/hands/ completo; baseline confirmado).
+VERIFICACION:
+- SINTAXIS: OK (py_compile src/hands/executor.py -> exit 0; py_compile tests/hands/test_executor.py -> exit 0).
+- MAIN.PY: NA (no modificado).
+- COMPORTAMIENTO / INTEGRACION REAL: los 2 nuevos tests construyen ActionInfo real con capability="open_application" y capability="keyboard.basic", verificando que _action_provides_capability retorna True para el capability declarado y False para capability distinto y para typo. Confirmado con el script de verificacion ejecutado antes del fix (fallaba) y despues (pasa).
+DISCREPANCIAS: (D-CAP-MODEL-GAP) Heredado de 3.3.1.1/3.3.1.2: el gap entre el modelo Enum ApplicationCapability (solo Chrome/Spotify) y data/knowledge/*.json + data/memory/entities.json persiste. NO afecta al fix de 3.3.1.3. (D-CIERRE-STATUS) Heredado de 3.2.3.4/3.2.4.2/3.3.1.1/3.3.1.2: al cerrar, segun regla 5.4e (mas especifica) se deja la hoja siguiente (3.3.2.1) PENDIENTE; el bloque CONTINUIDAD de prompt_mejoraActual.txt indica EN PROCESO. Se aplica PENDIENTE (regla 5).
+PENDIENTES: NINGUNO para 3.3.1.3 (completada). La siguiente hoja del roadmap es 3.3.2.1.
+ESTADO FINAL: 3.3.1.3 - IMPLEMENTADA
+===
+
+REGISTRO DE UNIDAD: 3.3.2.1
+FECHA: 2026-10-28
+OBJETIVO: "Definir una consulta de capacidades sin duplicar APIs existentes."
+La hoja 3.3.2 (Contrato) requiere identificar la consulta canónica de capacidades sobre la que se pacta el
+contrato, de modo que ApplicationKnowledgeIntegrator y Planner DEBE delegar a la capa modelo
+(src/hands/applications_core.py) sin reimplementar su lógica.
+CAMBIOS / HALLAZGOS:
+- CANONICIDAD DE LA QUERY: la capa modelo src/hands/applications_core.py ya expone la única query canónica
+  de capabilities:
+   * ApplicationManager.get_application_capabilities(app_name) -> Dict[str, Any] (consulta por app; claves = names de cap-defs, valores con 'capability'/'description'/'preconditions'/'effects'/'required_ui_elements'/'cost')
+   * ApplicationKnowledge.get_capability(name) -> Optional[ApplicationCapabilityDef] (acepta name o value del Enum; case-insensitive)
+   * ApplicationKnowledge.is_capable(capability) -> bool (exige Enum ApplicationCapability)
+   * ApplicationManager.get_applications_by_capability(capability: ApplicationCapability) -> List[ApplicationKnowledge] (consulta inversa)
+   * Funciones módulo de compat: get_application_knowledge(app_name) (serializa a Dict) y get_applications_by_capability(name) (acepta string -> List[str]); ambas delegan a get_application_manager().
+- DELEGACIÓN SIN DUPLICACIÓN: ApplicationKnowledgeIntegrator (src/hands/planner/application_integration.py) expone
+  get_application_capabilities / is_application_capable / get_applications_by_capability que delegan a ApplicationManager /
+  ApplicationKnowledge.is_capable. Planner (src/hands/planner/planner.py) expone get_application_capabilities /
+  get_applications_by_capability que delegan al integrador. Se verifica con spies (wraps) que cada llamada llega a la capa
+  modelo y que los resultados son idénticos a través de las capas.
+- HALLAZGO (documentado, D-CAP-MODEL-GAP, heredado de 3.3.1.1): data/knowledge/*.json y data/memory/entities.json
+  persisten capabilities como dicts/strings crudos consumidos por DomainMemory (src/memory/conversation.py:172,182) y NO
+  se convierten al Enum ApplicationCapability; las apps reconstruidas desde entities.json carecen de 'capabilities'.
+  Las capabilities declaradas en el modelo Enum solo satisfacen apps hardcodeadas (Chrome, Spotify). No es bug de código:
+  comportamiento determinista y probado; es una brecha de cobertura de datos pendiente de fases posteriores (3.3.2/3.3.3).
+  NO se modifica código de producción. Este registro lo documenta por evidencia.
+- GAP DE VERIFICACIÓN: get_applications_by_capability (consulta inversa) sólo devuelve apps con capabilities declaradas
+  en memoria (Chrome, Spotify para OPEN); apps sin capabilities (p.ej. YouTube) aparecen vacías. El contrato canónico
+  mantiene este comportamiento (no hay fuentes secundarias).
+ARCHIVOS MODIFICADOS:
+- tests/hands/test_capability_query_contract.py (NUEVO; 33 tests). Verifica el contrato canónico (1), la no duplicación por delegación (2),
+  la consistencia entre capas (3) y el comportamiento contra el modelo real (4). Importa get_application_manager
+  (añadido al import de applications_core) para los tests de modelo real.
+- src/hands/applications_core.py: NO MODIFICADO (solo lectura).
+- src/hands/planner/application_integration.py: NO MODIFICADO (solo lectura).
+- src/hands/planner/planner.py: NO MODIFICADO (solo lectura).
+TESTS Y RESULTADOS:
+- UNITARIOS (nueva suite): 33/33 PASSED (tests/hands/test_capability_query_contract.py).
+   * TestCanonicalCapabilityQueryContract: 20 tests (consulta canónica: get_application_capabilities, get_capability, is_capable, get_applications_by_capability, funciones módulo, alias, case-insensitive, no_match).
+   * TestNoDuplicationIntegratorDelegatesToModel: 3 tests (spies confirman delegación a la capa modelo).
+   * TestQueryConsistencyAcrossLayers: 5 tests (manager/integrador/planner devuelven el mismo resultado estructural; planner delega al integrador).
+   * TestCanonicalQueryWithRealModel: 5 tests (Chrome OPEN=True, Spotify incluido en OPEN, YouTube sin capabilities -> is_capable False, capability desconocida -> [], definiciones reales con estructura completa).
+- INTEGRACION: 117/117 PASSED (tests/brain/ + test_contextual_pattern_recognizer_legacy.py).
+- NO REGRESION: 2112/2112 PASSED (tests/hands/ completo; baseline 2079 confirmado + 33 nueva suite).
+VERIFICACION:
+- SINTAXIS: OK (py_compile tests/hands/test_capability_query_contract.py -> exit 0).
+- MAIN.PY: NA (no modificado).
+- COMPORTAMIENTO CONTRA MODELO REAL: los tests de TestCanonicalQueryWithRealModel construyen el gestor real vía
+  get_application_manager() (singleton) y verifican Chrome.is_capable(OPEN)=True, Spotify en OPEN, YouTube.capabilities==[],
+  get_applications_by_capability(CLOSE)==[], y estructura completa de open_chrome (capability='open', cost=10.0,
+  preconditions incluye 'chrome_closed', effects incluye 'chrome_open'). Confirmado.
+DISCREPANCIAS: (D-CAP-MODEL-GAP) Heredado de 3.3.1.1/3.3.1.2/3.3.1.3: gap entre modelo Enum y data persistidos persiste.
+NO afecta al contrato definido en 3.3.2.1 (la capa modelo es canónica y las capas superiores delegan correctamente).
+Se documenta por evidencia; no se reconcilia por intuición (regla 5.4).
+PENDIENTES: NINGUNO para 3.3.2.1 (completada). La siguiente hoja del roadmap es 3.3.2.2.
+ESTADO FINAL: 3.3.2.1 - IMPLEMENTADA
+

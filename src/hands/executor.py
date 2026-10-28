@@ -595,7 +595,7 @@ class Executor:
         return capability_mapping.get(action_name, action_name)
 
     def _action_provides_capability(self, action_info: ActionInfo, capability: str) -> bool:
-        """Comprueba compatibilidad por nombre, tipo, categoría o capacidades declaradas."""
+        """Comprueba compatibilidad por nombre, tipo, categoría o capacidad declarada."""
         capability = str(capability or "").strip().lower()
         if not capability:
             return False
@@ -603,9 +603,13 @@ class Executor:
         action_type = getattr(action_info, "action_type", None)
         action_type = str(getattr(action_type, "value", action_type) or "").lower()
         category = str(getattr(action_info, "category", "") or "").lower()
-        capabilities = getattr(action_info, "capabilities", []) or []
-        capabilities = {str(getattr(item, "value", item)).lower() for item in capabilities}
-        return capability in name or capability == action_type or capability in category or capability in capabilities
+        declared_capability = str(getattr(action_info, "capability", None) or "").strip().lower()
+        return (
+            capability in name
+            or capability == action_type
+            or capability in category
+            or capability == declared_capability
+        )
 
     def _should_replan(self, plan: List[Dict[str, Any]], failed_node_index: int) -> bool:
 

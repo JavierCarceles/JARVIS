@@ -71,12 +71,12 @@ def executor(patched_logger):
 def mock_action_info_factory():
     """Factory to create ActionInfo-like mock objects."""
     def _make(name="test_action", action_type=ActionType.INTERACTION, category="keyboard",
-              capabilities=None, **extra):
+              capability=None, **extra):
         ai = MagicMock()
         ai.name = name
         ai.action_type = action_type
         ai.category = category
-        ai.capabilities = capabilities or []
+        ai.capability = capability
         for k, v in extra.items():
             setattr(ai, k, v)
         return ai
@@ -911,12 +911,12 @@ class TestExtractCapability:
 
 class TestActionProvidesCapability:
     def _make_ai(self, name="test_action", action_type=ActionType.INTERACTION, category="keyboard",
-                 capabilities=None):
+                 capability=None):
         ai = MagicMock()
         ai.name = name
         ai.action_type = action_type
         ai.category = category
-        ai.capabilities = capabilities or []
+        ai.capability = capability
         return ai
 
     def test_name_match(self, executor):
@@ -939,11 +939,15 @@ class TestActionProvidesCapability:
         ai = self._make_ai()
         assert executor._action_provides_capability(ai, "") is False
 
-    def test_capabilities_declared_match(self, executor):
-        ai = self._make_ai(capabilities=["search"])
+    def test_capability_declared_match(self, executor):
+        ai = self._make_ai(capability="search")
         assert executor._action_provides_capability(ai, "search") is True
 
-    def test_capabilities_enum_value_match(self, executor):
+    def test_capability_declared_no_match(self, executor):
+        ai = self._make_ai(capability="search")
+        assert executor._action_provides_capability(ai, "navigate") is False
+
+    def test_action_type_enum_value_match(self, executor):
         ai = self._make_ai(action_type=ActionType.INTERACTION)
         assert executor._action_provides_capability(ai, "interaction") is True
 
@@ -954,6 +958,41 @@ class TestActionProvidesCapability:
     def test_none_action_info_returns_false(self, executor):
         """None action_info is handled gracefully via getattr defaults."""
         assert executor._action_provides_capability(None, "test") is False
+
+    def test_real_action_info_capability_checked(self, executor):
+        """A real ActionInfo whose declared capability differs from its name
+        must still match via the declared capability field."""
+        ai = ActionInfo(
+            name="my_custom_action",
+            description="custom",
+            action_type=ActionType.APPLICATION,
+            function=None,
+            parameters={},
+            module="test",
+            category="general",
+            tags=[],
+            confidence_threshold=0.8,
+            capability="open_application",
+        )
+        assert executor._action_provides_capability(ai, "open_application") is True
+        assert executor._action_provides_capability(ai, "navigate") is False
+
+    def test_real_action_info_keyboard_capability_checked(self, executor):
+        """A real ActionInfo with a keyboard.* capability string must match."""
+        ai = ActionInfo(
+            name="type_text",
+            description="type",
+            action_type=ActionType.INTERACTION,
+            function=None,
+            parameters={},
+            module="test",
+            category="keyboard",
+            tags=[],
+            confidence_threshold=0.8,
+            capability="keyboard.basic",
+        )
+        assert executor._action_provides_capability(ai, "keyboard.basic") is True
+        assert executor._action_provides_capability(ai, "keyboard.basic_typo") is False
 
 
 # ---------------------------------------------------------------------------
