@@ -682,7 +682,7 @@ FASE 3 ? APPLICATION KNOWLEDGE
     TestErrorLoggingDuringLoad): 10 tests verificando niveles de log correctos,
     inclusion de detalles de excepcion, y ausencia de mensajes genericos.
     10/10 PASSED. Suite completa tests/hands/ (2010 tests) PASSED sin regresiones.
-3.2.3.4 Anadir tests unitarios de carga correcta e incorrecta.
+3.2.3.4 Anadir tests unitarios de carga correcta e incorrecta. [IMPLEMENTADA]
 3.2.4 ? Cierre
 3.2.4.1 Verificar registro real en memoria.
 3.2.4.2 Verificar que los consumidores existentes siguen funcionando.
@@ -4847,3 +4847,21 @@ VERIFICACION: SINTAXIS: OK (py_compile test_application_invalid_json.py -> exit 
 DISCREPANCIAS: (D-ENTITIES-PERSIST-BUG) CONFIRMADA y DOCUMENTADA: save_entity pasa List[dict] a _process_data_for_save(ENTITIES) que solo procesa List[Entity] -> fichero sobreescrito con [] (no persiste entidades). La cache funciona correctamente. Afecta a la persistencia en disco pero no al runtime en memoria. Persistido como pendiente. (D-ENTIDAD-PROPERTIES) CONFIRMADA y DOCUMENTADA: register_application escribe properties {type, executable, url, login_required, capabilities, ui_elements, states} (7 keys) vs entities.json real {url, executable, category} (3 keys). Persistido. (D-KNOWLEDGE-ENTITIES-DUP) CONFIRMADA y DOCUMENTADA: data/knowledge/entities.json es un snapshot obsoleto (7 entidades) vs data/memory/entities.json (35 entidades). No coinciden. Persistido. D5/D6 persisten: data/knowledge/applications.json no leido por ApplicationManager.__init__ (schema distinto).
 PENDIENTES: (1) Corregir D-ENTITIES-PERSIST-BUG en save_entity/JSONStorage.save para que entities.json refleje el estado real en disco (entidades persistidas correctamente). (2) Unificar formato de properties entre register_application y entities.json (legacy usa 'category', register usa 'type'). (3) Sincronizar o deprecar data/knowledge/entities.json que esta obsoleto (7 vs 35 entidades). Siguiente hoja: 3.2.3.2.
 ESTADO FINAL: 3.2.3.1 - IMPLEMENTADA
+
+===
+
+REGISTRO DE UNIDAD: 3.2.3.4
+FECHA: 2026-10-28
+OBJETIVO: Añadir tests unitarios que verifiquen la carga (ApplicationManager._load_custom_applications) correcta e incorrecta, a nivel de gestor (lo materializado en `manager.applications`), complementando 3.2.3.1 (JSON invalido), 3.2.3.2 (entidad invalida) y 3.2.3.3 (registro de errores).
+TIPO DE TRABAJO: TEST | VERIFICACION
+CAMBIOS / HALLAZGOS:
+- NUEVO fichero `tests/hands/test_application_load_correctness.py` (15 tests) con dos clases:
+  TestCargaCorrecta: carga correcta de una entidad `application` válida reconstruyendo todos los campos (name, type, executable, url, login_required, capabilities como enums ApplicationCapabilityDef, ui_elements/UIElement, states/ApplicationState, aliases/entity_id en metadata); preservación de type parametrizado; carga múltiple como apps independientes bajo claves normalizadas; legacy category -> ApplicationKnowledge.type; retorna None (void) sin lanzar.
+  TestCargaIncorrecta: entidad de type distinto ("streamer") omitida (solo `application` se materializa); entidad invalida (falta `name`) omitida per-item manteniéndose la válida vecina; entidad cuyo nombre normaliza a una app ya registrada ("Google Chrome"->"chrome") omitida sin sobreescribir la app registrada (sentinel preservado); entidad con name usable vacío -> _reconstruct_application devuelve None -> omitida; source no lista -> early return None sin lanzar; properties no dict -> degradación graceful (normaliza a {} y carga con defaults) sin afectar a la válida.
+- NO se modificó codigo de producción: la carga ya implementa el contrato per-item definido en 3.2.3.2 y el skip de duplicados en _load_custom_applications. Los tests verifican el comportamiento REAL existente.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: `tests/hands/test_application_load_correctness.py` (NEW); DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: 15/15 PASSED (`test_application_load_correctness.py`); INTEGRACION: NE (no hay tests de integracion para esta hoja); NO REGRESION: 2164/2164 PASSED (tests/hands + tests/brain + tests/ear completo, incl. los 15 nuevos; 0 fallos, 0 regresiones).
+VERIFICACION: SINTAXIS: OK (py_compile test_application_load_correctness.py -> exit 0); MAIN.PY: NA (no modificado); COMPORTAMIENTO / INTEGRACION REAL: verificado con MemoryManager sandbox en tmp_path (no toca data/ de produccion). Carga correcta materializa ApplicationKnowledge con todos los campos; carga incorrecta omite gracefulmente según contrato (3.2.3.1/3.2.3.2).
+DISCREPANCIAS: (D-CLOSURE-STATUS) CONTRADICCION DOCUMENTADA EN EL PROMPT: el bloque "CONTINUIDAD Y CIERRE" de prompt_mejoraActual.txt dice "dejar CURRENT_WORK_STATUS: EN PROCESO" para la siguiente hoja, mientras que la regla 5 ("TRANSICION DE ESTADO Y CONTINUIDAD") establece "dejar CURRENT_WORK_STATUS: PENDIENTE" con razonamiento explicito ("el estado del puntero actual debe ser PENDIENTE") y obliga a marcar EN PROCESO solo al comenzar el siguiente chat. Se aplica PENDIENTE (regla 5, mas especifica y razonada) y se documenta la contradiccion. NINGUNA otra afecta a 3.2.3.4.
+PENDIENTES: NINGUNO (para 3.2.3.4). La siguiente hoja del roadmap es 3.2.4.1.
+ESTADO FINAL: 3.2.3.4 - IMPLEMENTADA
