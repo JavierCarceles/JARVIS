@@ -82,6 +82,7 @@ Resumen de comportamientos verificados:
 
 import dataclasses
 import json
+import logging
 from pathlib import Path
 from unittest.mock import patch
 
@@ -789,3 +790,249 @@ class TestDomainMemoryWithIncompleteData:
             from src.memory.conversation import DomainMemory
             dm = DomainMemory()
         assert dm.applications == {"incomplete_app": {"name": "Incomplete"}}
+
+
+# ---------------------------------------------------------------------------
+# 8. Error logging verification (3.2.3.3)
+# ---------------------------------------------------------------------------
+class TestErrorLoggingDuringLoad:
+    """Verifica que los errores de carga se registran con detalle y sin
+    ocultar la excepcion (unidad 3.2.3.3).
+
+    - Cargas per-item (entity invalida) → WARNING con id de entity y texto
+      de la excepcion.
+    - Errores generales (JSONStorage.load/save, save_entity, _warm_cache) →
+      ERROR con detalle de la excepcion.
+    - No se usan mensajes genericos "Procesando solicitud" en paths de error.
+    """
+
+    @pytest.fixture
+    def storage(self, tmp_path):
+        return JSONStorage(tmp_path)
+
+    @pytest.fixture
+    def mm(self, tmp_path):
+        _write_entities_json(tmp_path, [_make_valid_entity("ok", "Good")])
+        return MemoryManager(tmp_path)
+
+    # --- JSONStorage.load(): JSONDecodeError → WARNING ---
+    def test_load_corrupted_json_logs_warning(self, storage, tmp_path, caplog):
+        """JSON truncado → JSONDecodeError capturado → se registra WARNING
+        con referencia al archivo y la excepcion."""
+        (tmp_path / "entities.json").write_text(
+            '[{"id": "bad", "type":', encoding="utf-8"
+        )
+        caplog.set_level(logging.WARNING)
+        storage.load(MemoryType.ENTITIES)
+
+        warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+        assert len(warnings) >= 1
+        msg = warnings[0].getMessage()
+        assert "entities.json" in msg or "load" in msg.lower()
+        # No generic "Procesando solicitud"
+        assert "Procesando solicitud" not in msg
+
+    # --- get_entity: entity incompleta → WARNING ---
+    def test_get_entity_invalid_logs_warning_with_id_and_exception(self, tmp_path, caplog):
+        """get_entity con entity que falta 'name' → WARNING que incluye el
+        id de la entity y el texto de la excepcion (TypeError)."""
+        incomplete = {
+            "id": "bad_app",
+            "type": "application",
+            "properties": {},
+            "aliases": [], "tags": [], "confidence": 1.0,
+            "created_at": "2024-01-01", "updated_at": "2024-01-01", "metadata": None,
+        }
+        _write_entities_json(tmp_path, [incomplete])
+        mm = MemoryManager(tmp_path)
+        caplog.set_level(logging.WARNING)
+
+        result = mm.get_entity("bad_app")
+        assert result is None
+
+        warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+        assert len(warnings) >= 1
+        msg = warnings[0].getMessage()
+        assert "bad_app" in msg
+        assert "name" in msg.lower() or "required" in msg.lower()
+        assert "get_entity" in msg
+
+    # --- get_entities_by_type: entity incompleta → WARNING ---
+    def test_get_entities_by_type_invalid_logs_warning(self, tmp_path, caplog):
+        """get_entities_by_type con entity incompleta → WARNING per-item
+        con el id y la excepcion; la entity valida se carga igual."""
+        incomplete = {
+            "id": "bad_app",
+            "type": "application",
+            "properties": {},
+            "aliases": [], "tags": [], "confidence": 1.0,
+            "created_at": "2024-01-01", "updated_at": "2024-01-01", "metadata": None,
+        }
+        _write_entities_json(tmp_path, [_make_valid_entity("ok", "Good"), incomplete])
+        mm = MemoryManager(tmp_path)
+        caplog.set_level(logging.WARNING)
+
+        result = mm.get_entities_by_type("application")
+        assert len(result) == 1
+        assert result[0].id == "ok"
+
+        warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+        assert len(warnings) >= 1
+        msg = warnings[0].getMessage()
+        assert "bad_app" in msg
+        assert "get_entities_by_type" in msg
+
+    # --- find_entities: entity incompleta → WARNING ---
+    def test_find_entities_invalid_logs_warning(self, tmp_path, caplog):
+        """find_entities con entity incompleta → WARNING per-item con el id
+        y la excepcion."""
+        incomplete = {
+            "id": "bad_app",
+            "type": "application",
+            "properties": {},
+            "aliases": [], "tags": [], "confidence": 1.0,
+            "created_at": "2024-01-01", "updated_at": "2024-01-01", "metadata": None,
+        }
+        _write_entities_json(tmp_path, [_make_valid_entity("ok", "Good"), incomplete])
+        mm = MemoryManager(tmp_path)
+        caplog.set_level(logging.WARNING)
+
+        result = mm.find_entities("Good")
+        assert len(result) == 1
+        assert result[0].id == "ok"
+
+        warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+        assert len(warnings) >= 1
+        msg = warnings[0].getMessage()
+        assert "bad_app" in msg
+        assert "find_entities" in msg
+
+    # --- find_entities_by_property: entity incompleta → WARNING ---
+    def test_find_entities_by_property_invalid_logs_warning(self, tmp_path, caplog):
+        """find_entities_by_property con entity incompleta → WARNING per-item
+        con el id y la excepcion."""
+        # bad_app is truly invalid (missing 'name') but matches the property
+        # filter so from_dict is actually attempted.
+        incomplete = {
+            "id": "bad_app",
+            "type": "application",
+            # NOTE: missing 'name' → Entity.from_dict raises TypeError
+            "properties": {"executable": "bad.exe"},
+            "aliases": [], "tags": [], "confidence": 1.0,
+            "created_at": "2024-01-01", "updated_at": "2024-01-01", "metadata": None,
+        }
+        _write_entities_json(
+            tmp_path,
+            [_make_valid_entity("ok", "Good"), incomplete],
+        )
+        mm = MemoryManager(tmp_path)
+        caplog.set_level(logging.WARNING)
+
+        result = mm.find_entities_by_property(
+            "executable", "bad.exe",
+        )
+        # bad_app matches the filter but is invalid → omitted (0 results)
+        assert len(result) == 0
+
+        warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+        assert len(warnings) >= 1
+        msg = warnings[0].getMessage()
+        assert "bad_app" in msg
+        assert "find_entities_by_property" in msg
+
+    # --- per-item errors use WARNING, not INFO ---
+    def test_per_item_errors_are_not_info_level(self, tmp_path, caplog):
+        """Los errores per-item deben ser WARNING, nunca INFO."""
+        incomplete = {
+            "id": "bad_app",
+            "type": "application",
+            "properties": {},
+            "aliases": [], "tags": [], "confidence": 1.0,
+            "created_at": "2024-01-01", "updated_at": "2024-01-01", "metadata": None,
+        }
+        _write_entities_json(tmp_path, [_make_valid_entity("ok", "Good"), incomplete])
+        caplog.set_level(logging.DEBUG)
+        mm = MemoryManager(tmp_path)
+        mm.get_entity("bad_app")
+
+        info_records = [r for r in caplog.records if r.levelno == logging.INFO]
+        # No INFO-level records related to the invalid entity
+        relevant_info = [
+            r for r in info_records
+            if "bad_app" in r.getMessage() or "invalida" in r.getMessage().lower()
+        ]
+        assert len(relevant_info) == 0
+
+    # --- no generic "Procesando solicitud" in error paths ---
+    def test_no_generic_processing_request_in_error_paths(self, tmp_path, caplog):
+        """Ningun mensaje de error debe contener el texto generico
+        'Procesando solicitud'."""
+        incomplete = {
+            "id": "bad_app",
+            "type": "application",
+            "properties": {},
+            "aliases": [], "tags": [], "confidence": 1.0,
+            "created_at": "2024-01-01", "updated_at": "2024-01-01", "metadata": None,
+        }
+        _write_entities_json(tmp_path, [incomplete])
+        caplog.set_level(logging.WARNING)
+        mm = MemoryManager(tmp_path)
+        mm.get_entities_by_type("application")
+
+        for record in caplog.records:
+            assert "Procesando solicitud" not in record.getMessage()
+
+    # --- save_entity: exception → ERROR with exception text ---
+    def test_save_entity_exception_logs_error_with_exception(self, tmp_path, caplog):
+        """save_entity con file permission error → ERROR que incluye el
+        tipo de excepcion."""
+        from src.memory.storage import MemoryType
+        mm = MemoryManager(tmp_path)
+        caplog.set_level(logging.ERROR)
+
+        with patch.object(
+            mm.storage, "save",
+            side_effect=OSError("disk full"),
+        ):
+            result = mm.save_entity(Entity(
+                id="test_ent", type="application", name="Test", properties={},
+                created_at="2024-01-01T00:00:00", updated_at="2024-01-01T00:00:00",
+            ))
+            assert result is False
+
+        errors = [r for r in caplog.records if r.levelno == logging.ERROR]
+        assert len(errors) >= 1
+        msg = errors[0].getMessage()
+        assert "disk full" in msg
+        assert "save_entity" in msg
+
+    # --- JSONStorage.save: exception → ERROR ---
+    def test_json_storage_save_exception_logs_error(self, tmp_path, caplog):
+        """JSONStorage.save() con excepcion → ERROR con detalle."""
+        storage = JSONStorage(tmp_path)
+        caplog.set_level(logging.ERROR)
+
+        with patch("builtins.open", side_effect=OSError("permission denied")):
+            result = storage.save([{"id": "x"}], MemoryType.ENTITIES)
+            assert result is False
+
+        errors = [r for r in caplog.records if r.levelno == logging.ERROR]
+        assert len(errors) >= 1
+        msg = errors[0].getMessage()
+        assert "permission denied" in msg
+        assert "save" in msg.lower()
+
+    # --- _warm_cache: exception → ERROR ---
+    def test_warm_cache_exception_logs_error(self, tmp_path, caplog):
+        """_warm_cache con excepcion en load() → ERROR con detalle."""
+        caplog.set_level(logging.ERROR)
+        with patch.object(
+            JSONStorage, "load",
+            side_effect=OSError("io error during warm cache"),
+        ):
+            mm = MemoryManager(tmp_path)  # __init__ calls _warm_cache
+
+        errors = [r for r in caplog.records if r.levelno == logging.ERROR]
+        assert len(errors) >= 1
+        msg = errors[0].getMessage()
+        assert "io error during warm cache" in msg

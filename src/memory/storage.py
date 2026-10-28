@@ -390,11 +390,14 @@ class JSONStorage(MemoryStorage):
                     default=str,
                 )
 
-            logger._print_log("info", "Procesando solicitud", "storage.py", "get_entities_by_type", 393)
             return True
 
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "storage.py", "get_entities_by_type", 393)
+            logger._print_log(
+                "error",
+                f"Error guardando {memory_type.value} en {file_path}: {e}",
+                "storage.py", "save", 396,
+            )
             return False
 
     def _load_existing_data(self, file_path: Path) -> Any:
@@ -540,21 +543,35 @@ class JSONStorage(MemoryStorage):
             file_path = self.get_file_path(memory_type)
 
             if not file_path.exists():
-                logger._print_log("info", "Procesando solicitud", "storage.py", "method", 393)
+                logger._print_log(
+                    "info",
+                    f"Archivo no existe, usando valor por defecto para "
+                    f"{memory_type.value}",
+                    "storage.py", "load", 542,
+                )
                 return self._get_default_value(memory_type)
 
             with open(file_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
 
-            logger._print_log("info", "Procesando solicitud", "storage.py", "method", 393)
             return data
 
         except json.JSONDecodeError as e:
-            logger._print_log("info", "Procesando solicitud", "storage.py", "method", 393)
+            logger._print_log(
+                "warning",
+                f"JSON invalido en {file_path} para {memory_type.value}: "
+                f"{e}. Usando valor por defecto.",
+                "storage.py", "load", 552,
+            )
             return self._get_default_value(memory_type)
 
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "storage.py", "method", 393)
+            logger._print_log(
+                "error",
+                f"Error inesperado cargando {memory_type.value} desde "
+                f"{file_path}: {e}",
+                "storage.py", "load", 556,
+            )
             return self._get_default_value(memory_type)
 
     def _get_default_value(self, memory_type: MemoryType) -> Any:
@@ -617,7 +634,11 @@ class MemoryManager:
             )
 
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "storage.py", "method", 393)
+            logger._print_log(
+                "error",
+                f"Error inicializando caché: {e}",
+                "storage.py", "_warm_cache", 636,
+            )
 
     def _get_from_cache(
         self,
@@ -686,7 +707,11 @@ class MemoryManager:
             return result
 
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "storage.py", "method", 393)
+            logger._print_log(
+                "error",
+                f"Error guardando entidad id={entity.id} en disco: {e}",
+                "storage.py", "save_entity", 709,
+            )
             return False
 
     def get_entity(self, entity_id: str) -> Optional[Entity]:
@@ -715,12 +740,9 @@ class MemoryManager:
                     return Entity.from_dict(entity_data)
                 except Exception as exc:
                     logger._print_log(
-                        "info",
-                        f"Entidad invalida no puede reconstruirse (id={entity_id}): {exc} "
-                        "[file:storage.py, method:get_entity]",
-                        "storage.py",
-                        "get_entity",
-                        402,
+                        "warning",
+                        f"Entidad invalida no puede reconstruirse (id={entity_id}): {exc}",
+                        "storage.py", "get_entity", 741,
                     )
                     return None
 
@@ -736,10 +758,8 @@ class MemoryManager:
 
             if cached_data:
                 entities_data = cached_data
-                logger._print_log("info", "Procesando solicitud", "storage.py", "method", 393)
             else:
                 entities_data = self.storage.load(MemoryType.ENTITIES)
-                logger._print_log("info", "Procesando solicitud", "storage.py", "method", 393)
                 self._update_cache(
                     "entities",
                     entities_data,
@@ -747,7 +767,12 @@ class MemoryManager:
                 )
 
             if not isinstance(entities_data, list):
-                logger._print_log("info", f"Procesando solicitud - {entities_data}", "storage.py", "get_entities_by_type", 393)
+                logger._print_log(
+                    "warning",
+                    f"Datos de entidades no son una lista (tipo={type(entities_data).__name__}), "
+                    f"usando [] para filtro tipo='{entity_type}'",
+                    "storage.py", "get_entities_by_type", 771,
+                )
                 entities_data = []
 
             entities = []
@@ -761,24 +786,20 @@ class MemoryManager:
                         entities.append(Entity.from_dict(entity_data))
                     except Exception as exc:
                         logger._print_log(
-                            "info",
+                            "warning",
                             f"Entidad invalida omitida (id={entity_data.get('id', '?')}) "
-                            f"al cargar tipo '{entity_type}': {exc} "
-                            "[file:storage.py, method:get_entities_by_type]",
-                            "storage.py",
-                            "get_entities_by_type",
-                            402,
+                            f"al cargar tipo '{entity_type}': {exc}",
+                            "storage.py", "get_entities_by_type", 784,
                         )
-
-            logger._print_log("info", "Procesando solicitud entities of type {entity_type}", "storage.py", "method", 393)
 
             return entities
 
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "storage.py", "method", 393)
-            import traceback
-
-            traceback.print_exc()
+            logger._print_log(
+                "error",
+                f"Error en get_entities_by_type(type='{entity_type}'): {e}",
+                "storage.py", "get_entities_by_type", 799,
+            )
             return []
 
     def find_entities(
@@ -814,13 +835,10 @@ class MemoryManager:
                     entity = Entity.from_dict(entity_data)
                 except Exception as exc:
                     logger._print_log(
-                        "info",
+                        "warning",
                         f"Entidad invalida omitida en find_entities "
-                        f"(id={entity_data.get('id', '?')}): {exc} "
-                        "[file:storage.py, method:find_entities]",
-                        "storage.py",
-                        "find_entities",
-                        402,
+                        f"(id={entity_data.get('id', '?')}): {exc}",
+                        "storage.py", "find_entities", 836,
                     )
                     continue
 
@@ -872,13 +890,10 @@ class MemoryManager:
                     entities.append(Entity.from_dict(entity_data))
                 except Exception as exc:
                     logger._print_log(
-                        "info",
+                        "warning",
                         f"Entidad invalida omitida en find_entities_by_property "
-                        f"(id={entity_data.get('id', '?')}): {exc} "
-                        "[file:storage.py, method:find_entities_by_property]",
-                        "storage.py",
-                        "find_entities_by_property",
-                        402,
+                        f"(id={entity_data.get('id', '?')}): {exc}",
+                        "storage.py", "find_entities_by_property", 891,
                     )
 
         return entities
@@ -917,7 +932,7 @@ class MemoryManager:
             )
 
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "storage.py", "method", 393)
+            logger._print_log("error", f"Error en add_conversational_memory: {e}", "storage.py", "add_conversational_memory", 935)
             return False
 
     def get_conversational_memory(
@@ -946,7 +961,7 @@ class MemoryManager:
             return memories
 
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "storage.py", "method", 393)
+            logger._print_log("error", f"Error en get_conversational_memory: {e}", "storage.py", "get_conversational_memory", 964)
             return []
 
     def save_world_state(
@@ -974,7 +989,7 @@ class MemoryManager:
             return result
 
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "storage.py", "method", 393)
+            logger._print_log("error", f"Error en save_world_state: {e}", "storage.py", "save_world_state", 992)
             return False
 
     def get_world_state(self) -> WorldState:
@@ -1000,7 +1015,7 @@ class MemoryManager:
             return world_state
 
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "storage.py", "method", 393)
+            logger._print_log("error", f"Error en get_world_state: {e}", "storage.py", "get_world_state", 1018)
 
             return WorldState(
                 timestamp=time.time(),
@@ -1046,7 +1061,7 @@ class MemoryManager:
             return self.save_world_state(state)
 
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "storage.py", "method", 393)
+            logger._print_log("error", f"Error en update_world_state: {e}", "storage.py", "update_world_state", 1064)
             return False
 
     def save_plan(self, plan: Plan) -> bool:
@@ -1075,7 +1090,7 @@ class MemoryManager:
             )
 
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "storage.py", "method", 393)
+            logger._print_log("error", f"Error en save_plan: {e}", "storage.py", "save_plan", 1093)
             return False
 
     def get_plan(self, plan_id: str) -> Optional[Plan]:
@@ -1093,7 +1108,7 @@ class MemoryManager:
             return None
 
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "storage.py", "method", 393)
+            logger._print_log("error", f"Error en get_plan: {e}", "storage.py", "get_plan", 1111)
             return None
 
     def save_execution_record(
@@ -1115,7 +1130,7 @@ class MemoryManager:
             )
 
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "storage.py", "method", 393)
+            logger._print_log("error", f"Error en save_execution_record: {e}", "storage.py", "save_execution_record", 1133)
             return False
 
     def update_learning_stats(
@@ -1151,7 +1166,7 @@ class MemoryManager:
             )
 
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "storage.py", "method", 393)
+            logger._print_log("error", f"Error en update_learning_stats: {e}", "storage.py", "update_learning_stats", 1169)
             return False
 
     def get_learning_stats(
@@ -1174,7 +1189,7 @@ class MemoryManager:
             return {name: LearningStat(**data) for name, data in stats_data.items()}
 
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "storage.py", "method", 393)
+            logger._print_log("error", f"Error en get_learning_stats: {e}", "storage.py", "get_learning_stats", 1192)
             return {}
 
     def clear_memory(
@@ -1215,7 +1230,7 @@ class MemoryManager:
             return True
 
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "storage.py", "method", 393)
+            logger._print_log("error", f"Error en clear_memory: {e}", "storage.py", "clear_memory", 1233)
             return False
 
     def get_memory_stats(self) -> Dict[str, Any]:
@@ -1237,7 +1252,7 @@ class MemoryManager:
                         stats[memory_type.value] = 1 if data else 0
 
                 except Exception as e:
-                    logger._print_log("info", "Procesando solicitud", "storage.py", "method", 393)
+                    logger._print_log("error", f"Error en get_memory_stats: {e}", "storage.py", "get_memory_stats", 1255)
                     stats[memory_type.value] = 0
 
             with self.cache_lock:
@@ -1249,7 +1264,7 @@ class MemoryManager:
             return stats
 
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "storage.py", "method", 393)
+            logger._print_log("error", f"Error en get_memory_stats: {e}", "storage.py", "get_memory_stats", 1267)
             return {}
 
     def save_user_preference(
@@ -1292,7 +1307,7 @@ class MemoryManager:
             return result
 
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "storage.py", "method", 393)
+            logger._print_log("error", f"Error en save_user_preference: {e}", "storage.py", "save_user_preference", 1310)
             return False
 
     def get_user_preference(
@@ -1329,7 +1344,7 @@ class MemoryManager:
             return None
 
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "storage.py", "method", 393)
+            logger._print_log("error", f"Error en get_user_preference: {e}", "storage.py", "get_user_preference", 1347)
             return None
 
     def get_user_preferences(
@@ -1379,7 +1394,7 @@ class MemoryManager:
             return preferences
 
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "storage.py", "method", 393)
+            logger._print_log("error", f"Error en get_user_preferences: {e}", "storage.py", "get_user_preferences", 1397)
             return []
 
     def update_user_preference(
@@ -1420,7 +1435,7 @@ class MemoryManager:
             return self.save_user_preference(preference)
 
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "storage.py", "method", 393)
+            logger._print_log("error", f"Error en update_user_preference: {e}", "storage.py", "update_user_preference", 1438)
             return False
 
     def learn_user_preference(
@@ -1478,7 +1493,7 @@ class MemoryManager:
             return self.save_user_preference(existing_pref)
 
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "storage.py", "method", 393)
+            logger._print_log("error", f"Error en learn_user_preference: {e}", "storage.py", "learn_user_preference", 1496)
             return False
 
     def save_entity_attribute(
@@ -1511,7 +1526,7 @@ class MemoryManager:
             return result
 
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "storage.py", "method", 393)
+            logger._print_log("error", f"Error en save_entity_attribute: {e}", "storage.py", "save_entity_attribute", 1529)
             return False
 
     def get_entity_attribute(
@@ -1547,7 +1562,7 @@ class MemoryManager:
             return None
 
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "storage.py", "method", 393)
+            logger._print_log("error", f"Error en get_entity_attribute: {e}", "storage.py", "get_entity_attribute", 1565)
             return None
 
     def get_entity_attributes(
@@ -1589,7 +1604,7 @@ class MemoryManager:
             return attributes
 
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "storage.py", "method", 393)
+            logger._print_log("error", f"Error en get_entity_attributes: {e}", "storage.py", "get_entity_attributes", 1607)
             return []
 
     def update_entity_attribute(
@@ -1617,7 +1632,7 @@ class MemoryManager:
             return self.save_entity_attribute(attribute)
 
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "storage.py", "method", 393)
+            logger._print_log("error", f"Error en update_entity_attribute: {e}", "storage.py", "update_entity_attribute", 1635)
             return False
 
     def get_entities_by_attribute(
@@ -1659,7 +1674,7 @@ class MemoryManager:
             return matching_entities
 
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "storage.py", "method", 393)
+            logger._print_log("error", f"Error en get_entities_by_attribute: {e}", "storage.py", "get_entities_by_attribute", 1677)
             return []
 
     def export_memory(
@@ -1681,11 +1696,11 @@ class MemoryManager:
                     indent=2,
                 )
 
-            logger._print_log("info", "Procesando solicitud", "storage.py", "method", 393)
+            logger._print_log("info", f"Operacion completada en export_memory", "storage.py", "export_memory", 1699)
             return True
 
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "storage.py", "method", 393)
+            logger._print_log("error", f"Error en export_memory: {e}", "storage.py", "export_memory", 1703)
             return False
 
 
@@ -1813,7 +1828,7 @@ def resolve_entity_to_url(entity: Entity) -> Optional[str]:
         return None
 
     except Exception as e:
-        logger._print_log("info", "Procesando solicitud", "storage.py", "method", 393)
+        logger._print_log("error", f"Error en resolve_entity_to_url: {e}", "storage.py", "resolve_entity_to_url", 1831)
         return None
 
 
@@ -1869,7 +1884,7 @@ def get_entity_attributes(entity: Entity) -> Dict[str, Any]:
         return attributes
 
     except Exception as e:
-        logger._print_log("info", "Procesando solicitud", "storage.py", "method", 393)
+        logger._print_log("error", f"Error en get_entity_attributes: {e}", "storage.py", "get_entity_attributes", 1887)
         return {}
 
 
@@ -1936,7 +1951,7 @@ def create_goal_from_entity(
         return None
 
     except Exception as e:
-        logger._print_log("info", "Procesando solicitud", "storage.py", "method", 393)
+        logger._print_log("error", f"Error en create_goal_from_entity: {e}", "storage.py", "create_goal_from_entity", 1954)
         return None
 
 
@@ -2018,7 +2033,7 @@ def verify_entity_integrity(
         return verification_result
 
     except Exception as e:
-        logger._print_log("info", "Procesando solicitud", "storage.py", "method", 393)
+        logger._print_log("error", f"Error en verify_entity_integrity: {e}", "storage.py", "verify_entity_integrity", 2036)
 
         return {
             "entity_id": entity.id,

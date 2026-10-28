@@ -641,7 +641,47 @@ FASE 3 ? APPLICATION KNOWLEDGE
     tests/brain/ PASSED sin regresiones.
   - La entidad "bad_app" (falta name) en data/entities.json es omitida
     per-item; las applications validas (chrome, spotify, good) se cargan.
-3.2.3.3 Registrar errores sin ocultarlos.
+3.2.3.3 Registrar errores sin ocultarlos. [IMPLEMENTADA]
+  REGISTRO 3.2.3.3 (cerrada):
+  - Bug critical corregido en src/utils/logger.py (_print_log): el level_map
+    usaba claves en mayusculas ("WARNING", "ERROR") pero los llamadores pasaban
+    niveles en minusculas ("warning", "error"). level_map.get("warning") caia
+    en el default logging.INFO, ocultando la gravedad real de los errores.
+    Se cambio a level_map.get(level.upper(), logging.INFO) en ambas definiciones
+    de _print_log (la segunda, activa, es la que importa).
+  - src/memory/storage.py: todos los handlers de except ahora registran el
+    detalle de la excepcion (str(e)) y usan el nivel correcto:
+    -- JSONStorage.load() JSONDecodeError: WARNING (ya era "warning", ahora
+      funciona gracias al fix de level_map). Mensaje incluye file_path y memory_type.
+    -- JSONStorage.load() Exception general: ERROR. Mensaje incluye file_path y e.
+    -- JSONStorage.save() Exception: ERROR. Mensaje incluye file_path, memory_type y e.
+    -- _warm_cache() Exception: cambiado de "info" a "error". Mensaje incluye e.
+    -- get_entity() per-item TypeError: WARNING (antes "info"). Mensaje incluye
+      entity_id y exc.
+    -- get_entities_by_type() per-item TypeError: WARNING (antes "info"). Mensaje
+      incluye entity id y exc. Broad Exception: ERROR (antes usaba traceback.print_exc()
+      y mensaje generico "Procesando solicitud"). Mensaje incluye e.
+    -- find_entities() per-item TypeError: WARNING (antes "info"). Mensaje incluye
+      entity id y exc.
+    -- find_entities_by_property() per-item TypeError: WARNING (antes "info"). Mensaje
+      incluye entity id y exc.
+    -- save_entity() Exception: cambiado de "info" a "error". Mensaje incluye e.
+    -- export_memory() exito: reemplazado mensaje generico "Procesando solicitud"
+      con "Operacion completada en export_memory" a nivel "info".
+    -- Todos los metodos de MemoryManager con except Exception: ERROR con e incluido
+      (add_conversational_memory, get_conversational_memory, save_world_state,
+      get_world_state, update_world_state, save_plan, get_plan, save_execution_record,
+      update_learning_stats, get_learning_stats, clear_memory, get_memory_stats,
+      save_user_preference, get_user_preference, get_user_preferences,
+      update_user_preference, learn_user_preference, save_entity_attribute,
+      get_entity_attribute, get_entity_attributes, update_entity_attribute,
+      get_entities_by_attribute, resolve_entity_to_url, get_entity_attributes,
+      create_goal_from_entity, verify_entity_integrity).
+  - Ningun mensaje de error contiene el texto generico "Procesando solicitud".
+  - Tests anadidos en tests/hands/test_application_data_incomplete.py (clase
+    TestErrorLoggingDuringLoad): 10 tests verificando niveles de log correctos,
+    inclusion de detalles de excepcion, y ausencia de mensajes genericos.
+    10/10 PASSED. Suite completa tests/hands/ (2010 tests) PASSED sin regresiones.
 3.2.3.4 Anadir tests unitarios de carga correcta e incorrecta.
 3.2.4 ? Cierre
 3.2.4.1 Verificar registro real en memoria.

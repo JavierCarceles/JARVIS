@@ -119,7 +119,7 @@ class StructuredLogger:
             "SUCCESS": logging.INFO,  # SUCCESS se mapea a INFO
         }
         
-        log_level = level_map.get(level, logging.INFO)
+        log_level = level_map.get(level.upper() if isinstance(level, str) else level, logging.INFO)
         self._log(log_level, context_message)
     
     def _print_log(self, level: str, message: str, file_name: str = None, method_name: str = None, method_start_line: str = None) -> None:
@@ -133,7 +133,7 @@ class StructuredLogger:
             "SUCCESS": logging.INFO  # SUCCESS se mapea a INFO
         }
         
-        log_level = level_map.get(level, logging.INFO)
+        log_level = level_map.get(level.upper() if isinstance(level, str) else level, logging.INFO)
         
         # Formatear mensaje con contexto
         if file_name or method_name or method_start_line:
