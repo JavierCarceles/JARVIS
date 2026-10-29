@@ -66,7 +66,13 @@ def _make_min_manager():
 
 
 def _entity_with_ui_states(name="TestApp", app_type="browser"):
-    """Crea una Entity application con ui_elements y states en properties."""
+    """Crea una Entity application con ui_elements y states en properties.
+
+    ui_elements representa **conocimiento declarativo** (name, type,
+    description, required_capability). Las coordenadas concretas ya no son
+    parte del conocimiento de la aplicación: provienen del
+    ``CoordinateManager`` en tiempo de ejecución.
+    """
     props = {
         "type": app_type,
         "executable": "test.exe",
@@ -77,17 +83,13 @@ def _entity_with_ui_states(name="TestApp", app_type="browser"):
             {
                 "name": "search_bar",
                 "type": "input",
-                "coordinates": {"x": 100, "y": 200},
-                "screen": 1,
-                "calibration_data": {"conf": 0.9},
+                "description": "Barra de búsqueda",
                 "required_capability": "search",
             },
             {
                 "name": "play_button",
                 "type": "button",
-                "coordinates": {"x": 300, "y": 400},
-                "screen": 2,
-                "calibration_data": None,
+                "description": "Botón de reproducción",
                 "required_capability": None,
             },
         ],
@@ -134,7 +136,12 @@ def _entity_legacy(name="LegacyApp", app_type="utility"):
 # ---------------------------------------------------------------------------
 
 class TestSerializeUIElement:
-    """Verifica que _serialize_ui_element produce dicts JSON-friendly."""
+    """Verifica que _serialize_ui_element produce dicts JSON-friendly.
+
+    UIElement ahora representa solo conocimiento declarativo (name, type,
+    description, required_capability). Los campos de coordenadas han sido
+    removidos: pertenecen al CoordinateManager en tiempo de ejecución.
+    """
 
     def test_serialize_basic_element(self):
         el = UIElement(name="btn", type="button")
@@ -142,39 +149,56 @@ class TestSerializeUIElement:
         assert d == {
             "name": "btn",
             "type": "button",
-            "coordinates": None,
-            "screen": 0,
-            "calibration_data": None,
+            "description": "",
             "required_capability": None,
         }
+
+    def test_serialize_with_description(self):
+        el = UIElement(name="btn", type="button", description="Botón OK")
+        d = _serialize_ui_element(el)
+        assert d["description"] == "Botón OK"
 
     def test_serialize_with_capability(self):
         el = UIElement(
             name="search", type="input",
-            coordinates={"x": 10, "y": 20},
+            description="Barra de búsqueda",
             required_capability=ApplicationCapability.SEARCH,
         )
         d = _serialize_ui_element(el)
-        assert d["coordinates"] == {"x": 10, "y": 20}
         assert d["required_capability"] == "search"
+        assert d["description"] == "Barra de búsqueda"
 
     def test_serialize_is_json_serializable(self):
         """El dict resultante no contiene objetos enum (solo strings)."""
         el = UIElement(
-            name="btn", type="button", screen=1,
+            name="btn", type="button",
             required_capability=ApplicationCapability.NAVIGATE,
         )
         d = _serialize_ui_element(el)
         json.dumps(d)  # no debe lanzar
         assert d["required_capability"] == "navigate"
 
-    def test_serialize_multiscreen_coordinates(self):
+    def test_serialize_no_coordinate_fields_by_default(self):
+        """_serialize_ui_element solo incluye coordinates cuando están presentes."""
+        el = UIElement(name="btn", type="button")
+        d = _serialize_ui_element(el)
+        assert "coordinates" not in d
+        assert "screen" not in d
+        assert "calibration_data" not in d
+        assert "is_calibrated" not in d
+
+    def test_serialize_with_coordinates(self):
+        """_serialize_ui_element incluye coordinates cuando están presentes."""
         el = UIElement(
             name="btn", type="button",
-            coordinates={"s1": [10, 20], "s2": [30, 40]},
+            coordinates={"x": 10, "y": 20},
+            screen=1,
+            calibration_data={"conf": 0.9},
         )
         d = _serialize_ui_element(el)
-        assert d["coordinates"] == {"s1": [10, 20], "s2": [30, 40]}
+        assert d["coordinates"] == {"x": 10, "y": 20}
+        assert d["screen"] == 1
+        assert d["calibration_data"] == {"conf": 0.9}
 
 
 # ---------------------------------------------------------------------------
@@ -236,14 +260,22 @@ class TestReconstructUIElements:
         result = ApplicationManager._reconstruct_ui_elements(data)
         assert result[0].required_capability is None
 
-    def test_screen_defaults_to_zero(self):
+    def test_description_reconstructed(self):
+        data = [{"name": "btn", "type": "button", "description": "Botón OK"}]
+        result = ApplicationManager._reconstruct_ui_elements(data)
+        assert len(result) == 1
+        assert result[0].description == "Botón OK"
+
+    def test_description_defaults_empty(self):
         data = [{"name": "btn", "type": "button"}]
         result = ApplicationManager._reconstruct_ui_elements(data)
-        assert result[0].screen == 0
+        assert result[0].description == ""
 
     def test_all_fields_preserved(self):
+        """Todos los campos se preservan: conocimiento declarativo y coordenadas."""
         data = [{
             "name": "btn", "type": "button",
+            "description": "Botón de envío",
             "coordinates": {"x": 5, "y": 10},
             "screen": 3,
             "calibration_data": {"c": 1},
@@ -251,6 +283,9 @@ class TestReconstructUIElements:
         }]
         result = ApplicationManager._reconstruct_ui_elements(data)
         el = result[0]
+        assert el.name == "btn"
+        assert el.type == "button"
+        assert el.description == "Botón de envío"
         assert el.coordinates == {"x": 5, "y": 10}
         assert el.screen == 3
         assert el.calibration_data == {"c": 1}
@@ -319,13 +354,12 @@ class TestReconstructApplicationWithUIElementsAndStates:
         assert app is not None
         assert len(app.ui_elements) == 2
         assert app.ui_elements[0].name == "search_bar"
-        assert app.ui_elements[0].coordinates == {"x": 100, "y": 200}
-        assert app.ui_elements[0].screen == 1
-        assert app.ui_elements[0].calibration_data == {"conf": 0.9}
+        assert app.ui_elements[0].type == "input"
+        assert app.ui_elements[0].description == "Barra de búsqueda"
         assert app.ui_elements[0].required_capability == ApplicationCapability.SEARCH
         assert app.ui_elements[1].name == "play_button"
-        assert app.ui_elements[1].coordinates == {"x": 300, "y": 400}
-        assert app.ui_elements[1].screen == 2
+        assert app.ui_elements[1].type == "button"
+        assert app.ui_elements[1].description == "Botón de reproducción"
         assert app.ui_elements[1].required_capability is None
 
     def test_reconstruct_with_states(self):
@@ -460,7 +494,7 @@ class TestRoundTripRegisterLoad:
             ui_elements=[
                 UIElement(
                     name="btn", type="button",
-                    coordinates={"x": 10, "y": 20},
+                    description="Botón de envío",
                     required_capability=ApplicationCapability.CLICK,
                 ),
             ],
@@ -475,7 +509,8 @@ class TestRoundTripRegisterLoad:
         assert loaded is not None
         assert len(loaded.ui_elements) == 1
         assert loaded.ui_elements[0].name == "btn"
-        assert loaded.ui_elements[0].coordinates == {"x": 10, "y": 20}
+        assert loaded.ui_elements[0].type == "button"
+        assert loaded.ui_elements[0].description == "Botón de envío"
         assert loaded.ui_elements[0].required_capability == ApplicationCapability.CLICK
         assert loaded.states == [ApplicationState.OPEN, ApplicationState.ACTIVE]
 

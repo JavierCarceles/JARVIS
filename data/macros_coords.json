@@ -6,10 +6,6 @@
         "description": "Barra de direcciones de Chrome",
         "calibration_strategy": "visual_detection",
         "alternatives": ["chrome.hotkey_ctrl_l"],
-        "screens": {
-          "s1": [3582, 339],
-          "s2": [7447, 335]
-        },
         "confidence": 0.9
       },
       "new_tab_button": {
@@ -17,10 +13,6 @@
         "description": "Botón para nueva pestaña",
         "calibration_strategy": "visual_detection",
         "alternatives": ["chrome.hotkey_ctrl_t"],
-        "screens": {
-          "s1": [389, 28],
-          "s2": [3254, 25]
-        },
         "confidence": 0.85
       },
       "search_button": {
@@ -28,10 +20,6 @@
         "description": "Botón de búsqueda",
         "calibration_strategy": "visual_detection",
         "alternatives": [],
-        "screens": {
-          "s1": [2278, 1016],
-          "s2": [6115, 1014]
-        },
         "confidence": 0.8
       }
     },
@@ -41,10 +29,6 @@
         "description": "Botón de reproducción",
         "calibration_strategy": "visual_detection",
         "alternatives": ["spotify.hotkey_space"],
-        "screens": {
-          "s1": [950, 1025],
-          "s2": [5015, 1020]
-        },
         "confidence": 0.9
       },
       "next_button": {
@@ -52,10 +36,6 @@
         "description": "Botón siguiente",
         "calibration_strategy": "visual_detection",
         "alternatives": ["spotify.hotkey_next"],
-        "screens": {
-          "s1": [1100, 1025],
-          "s2": [5165, 1020]
-        },
         "confidence": 0.85
       }
     },
@@ -65,10 +45,6 @@
         "description": "Botón de login",
         "calibration_strategy": "visual_detection",
         "alternatives": [],
-        "screens": {
-          "s1": [3582, 339],
-          "s2": [7447, 335]
-        },
         "confidence": 0.8
       },
       "captcha": {
@@ -76,11 +52,43 @@
         "description": "Área de captcha",
         "calibration_strategy": "screen_capture",
         "alternatives": [],
-        "screens": {
-          "s1": [1361, 1584, 100, 50],
-          "s2": [5207, 1565, 100, 50]
-        },
         "confidence": 0.7
+      }
+    }
+  },
+  "calibraciones": {
+    "chrome": {
+      "address_bar": {
+        "s1": [3582, 339],
+        "s2": [7447, 335]
+      },
+      "new_tab_button": {
+        "s1": [389, 28],
+        "s2": [3254, 25]
+      },
+      "search_button": {
+        "s1": [2278, 1016],
+        "s2": [6115, 1014]
+      }
+    },
+    "spotify": {
+      "play_button": {
+        "s1": [950, 1025],
+        "s2": [5015, 1020]
+      },
+      "next_button": {
+        "s1": [1100, 1025],
+        "s2": [5165, 1020]
+      }
+    },
+    "riot_api": {
+      "login": {
+        "s1": [3582, 339],
+        "s2": [7447, 335]
+      },
+      "captcha": {
+        "s1": [1361, 1584, 100, 50],
+        "s2": [5207, 1565, 100, 50]
       }
     }
   },

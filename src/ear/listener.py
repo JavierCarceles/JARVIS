@@ -136,8 +136,7 @@ class TranscriptionNode(AudioNode):
         self.model_size = model_size
         self.language = language
         self.model = None
-        # No cargar el modelo para evitar problemas
-        logger._print_log("INFO", "Modo de prueba: Whisper no cargado", "listener.py", "__init__", 137)
+        self._load_model()
         
     def _load_model(self):
         logger._print_log("info", "Procesando solicitud", "listener.py", "method", 110)
@@ -170,15 +169,14 @@ class TranscriptionNode(AudioNode):
         """
         try:
             if self.model is None:
-                # Modo de prueba - devolver texto fijo
-                result = "hola jarvis"
-                logger._print_log("info", "Procesando solicitud", "listener.py", "method", 110)
-                return {
-                    "node": self.name,
-                    "success": True,
-                    "text": result,
-                    "confidence": 0.8
-                }
+                self._load_model()
+                if self.model is None:
+                    return {
+                        "node": self.name,
+                        "success": False,
+                        "error": "Modelo Whisper no disponible",
+                        "text": ""
+                    }
             
             segments, info = self.model.transcribe(
                 audio,
@@ -291,7 +289,13 @@ class RecordingNode(AudioNode):
         
         while True:
             if audio_queue.empty():
-                break
+                # Wait for audio data instead of breaking immediately
+                time.sleep(0.01)
+                recording_time += self.capabilities.block_duration
+                timeout_check = recording_time >= self.capabilities.max_recording_time
+                if timeout_check:
+                    break
+                continue
             
             chunk = audio_queue.get().flatten()
             volume = self._rms(chunk)

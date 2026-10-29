@@ -75,42 +75,30 @@ class ApplicationState(Enum):
 
 @dataclass
 class UIElement:
-    """Elemento UI de una aplicación."""
+    """Elemento UI de una aplicación — conocimiento declarativo con calibración.
+
+    Representa **qué** elementos de interfaz conoce la aplicación y **cuál**
+    capacidad requiere. Mantiene tanto el conocimiento estructurado (nombre,
+    tipo, descripción, capacidad asociada) como la información de calibración
+    necesaria para localizar el elemento en pantalla en tiempo de ejecución
+    (coordinates, screen, is_calibrated).
+    """
 
     name: str
     type: str
+    description: str = ""
+    required_capability: Optional[ApplicationCapability] = None
     coordinates: Optional[Dict[str, Any]] = None
     screen: int = 0
     calibration_data: Optional[Dict[str, Any]] = None
-    required_capability: Optional[ApplicationCapability] = None
 
     def is_calibrated(self) -> bool:
-        """Comprueba si existe información de coordenadas utilizable."""
-        if not isinstance(self.coordinates, dict) or not self.coordinates:
+        """Indica si el elemento tiene coordenadas válidas para hacer clic."""
+        if self.coordinates is None:
             return False
-
-        # Formato clásico {"x": ..., "y": ...}.
-        if "x" in self.coordinates and "y" in self.coordinates:
-            return self._is_coordinate_pair(self.coordinates.get("x"), self.coordinates.get("y"))
-
-        # Formato multipantalla {"s1": [x, y], "s2": [x, y], ...}.
-        return any(
-            self._is_coordinate_pair(value)
-            for key, value in self.coordinates.items()
-            if str(key).lower().startswith("s")
-        )
-
-    @staticmethod
-    def _is_coordinate_pair(value: Any, y_value: Any = None) -> bool:
-        """Valida una pareja de coordenadas sin asumir un formato único."""
-        if y_value is not None:
-            return all(isinstance(item, (int, float)) for item in (value, y_value))
-
-        return (
-            isinstance(value, (list, tuple))
-            and len(value) >= 2
-            and all(isinstance(item, (int, float)) for item in value[:2])
-        )
+        if isinstance(self.coordinates, dict):
+            return "x" in self.coordinates and "y" in self.coordinates
+        return bool(self.coordinates)
 
 
 @dataclass
@@ -219,8 +207,30 @@ class ApplicationKnowledge:
         return self.is_capable(capability) and self.is_available()
 
     def get_calibrated_elements(self) -> List[UIElement]:
-        """Obtiene los elementos UI calibrados."""
-        return [element for element in self.ui_elements if element.is_calibrated()]
+        """Obtiene los elementos UI conocidos que tienen coordenadas calibradas.
+
+        El conocimiento declarativo (``UIElement``) no almacena coordenadas;
+        la calibración se consulta en tiempo de ejecución al
+        ``CoordinateManager``, que gestiona ``data/macros_coords.json``.
+        Si el gestor no está disponible, devuelve una lista vacía.
+        """
+        try:
+            from src.hands.coordinate_manager import get_coordinate_manager
+            coord_manager = get_coordinate_manager()
+        except Exception:
+            return []
+
+        if coord_manager is None:
+            return []
+
+        app_key = self.metadata.get("entity_id", self.name).strip().lower() if self.metadata else self.name
+        result: List[UIElement] = []
+        for element in self.ui_elements:
+            resource_id = f"{app_key}.{element.name.strip().lower()}"
+            resource = coord_manager.get_ui_resource(resource_id)
+            if resource is not None and resource.is_usable:
+                result.append(element)
+        return result
 
 
 def _reconstruct_metadata(entity: Entity) -> Dict[str, Any]:
@@ -241,21 +251,28 @@ def _reconstruct_metadata(entity: Entity) -> Dict[str, Any]:
 def _serialize_ui_element(element: "UIElement") -> Dict[str, Any]:
     """Serializa un :class:`UIElement` a un dict JSON-friendly.
 
-    Convierte el ``required_capability`` (``ApplicationCapability``) a su
-    valor string para que la entidad resultante sea totalmente serializable.
+    Serializa conocimiento declarativo (name, type, description,
+    required_capability) y datos de calibración (coordinates, screen,
+    calibration_data) para poder localizar el elemento en pantalla en tiempo
+    de ejecución.
     """
-    return {
+    result: Dict[str, Any] = {
         "name": element.name,
         "type": element.type,
-        "coordinates": element.coordinates,
-        "screen": element.screen,
-        "calibration_data": element.calibration_data,
+        "description": element.description,
         "required_capability": (
             element.required_capability.value
             if element.required_capability is not None
             else None
         ),
     }
+    if element.coordinates is not None:
+        result["coordinates"] = element.coordinates
+    if element.screen != 0:
+        result["screen"] = element.screen
+    if element.calibration_data is not None:
+        result["calibration_data"] = element.calibration_data
+    return result
 
 
 class ApplicationManager:
@@ -580,10 +597,11 @@ class ApplicationManager:
                 UIElement(
                     name=name,
                     type=elem_type,
+                    description=item.get("description", ""),
+                    required_capability=required_capability,
                     coordinates=item.get("coordinates"),
                     screen=item.get("screen", 0),
                     calibration_data=item.get("calibration_data"),
-                    required_capability=required_capability,
                 )
             )
         return result
@@ -754,7 +772,12 @@ class ApplicationManager:
         }
 
     def get_application_ui_elements(self, app_name: str) -> Dict[str, Any]:
-        """Obtiene los elementos UI conocidos de una aplicación."""
+        """Obtiene los elementos UI conocidos de una aplicación.
+
+        Devuelve el **conocimiento declarativo** de cada elemento (type,
+        description, required_capability). La información de coordenadas
+        concretas se consulta por separado al ``CoordinateManager``.
+        """
         app = self.get_application(app_name)
         if not app:
             return {}
@@ -762,15 +785,12 @@ class ApplicationManager:
         return {
             element.name: {
                 "type": element.type,
-                "coordinates": element.coordinates,
-                "screen": element.screen,
-                "is_calibrated": element.is_calibrated(),
+                "description": element.description,
                 "required_capability": (
                     element.required_capability.value
                     if element.required_capability
                     else None
                 ),
-                "calibration_data": element.calibration_data,
             }
             for element in app.ui_elements
         }
@@ -1415,7 +1435,16 @@ def register_custom_application(app_config: Dict[str, Any]) -> bool:
             required = element_data.get("required_capability")
             if isinstance(required, str):
                 element_data["required_capability"] = ApplicationCapability(required)
-            ui_elements.append(UIElement(**element_data))
+            # UIElement solo conserva conocimiento declarativo (name, type,
+            # description, required_capability). Los campos de coordenadas
+            # concretas (coordinates, screen, calibration_data) son ignorados
+            # aquí: pertenecen al CoordinateManager en tiempo de ejecución.
+            element_kwargs = {
+                key: value
+                for key, value in element_data.items()
+                if key in ("name", "type", "description", "required_capability")
+            }
+            ui_elements.append(UIElement(**element_kwargs))
         data["ui_elements"] = ui_elements
 
         states = []

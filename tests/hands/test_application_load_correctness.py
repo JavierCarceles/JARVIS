@@ -89,6 +89,7 @@ def _full_application_entity(
             {
                 "name": "url_bar",
                 "type": "input",
+                "description": "Barra de URL",
                 "coordinates": {"x": 10, "y": 20},
                 "screen": 1,
                 "calibration_data": {"conf": 0.9},
@@ -97,6 +98,7 @@ def _full_application_entity(
             {
                 "name": "go_button",
                 "type": "button",
+                "description": "Botón ir",
                 "coordinates": {"x": 30, "y": 40},
                 "screen": 1,
                 "calibration_data": None,
@@ -174,11 +176,15 @@ class TestCargaCorrecta:
             ApplicationCapability.NAVIGATE,
             ApplicationCapability.SEARCH,
         ]
-        # ui_elements y states preservados
+        # ui_elements y states preservados (conocimiento + coordenadas)
         assert [e.name for e in app.ui_elements] == ["url_bar", "go_button"]
+        assert app.ui_elements[0].description == "Barra de URL"
         assert app.ui_elements[0].coordinates == {"x": 10, "y": 20}
         assert app.ui_elements[0].screen == 1
+        assert app.ui_elements[0].calibration_data == {"conf": 0.9}
         assert app.ui_elements[0].required_capability == ApplicationCapability.NAVIGATE
+        assert app.ui_elements[1].description == "Botón ir"
+        assert app.ui_elements[1].coordinates == {"x": 30, "y": 40}
         assert app.ui_elements[1].required_capability == ApplicationCapability.CLICK
         assert app.states == [
             ApplicationState.CLOSED,

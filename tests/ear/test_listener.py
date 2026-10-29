@@ -157,9 +157,13 @@ class TestRecordingNode:
         mock_time.sleep = MagicMock()
 
         node = RecordingNode("recording")
+        # Set a very small max recording time so timeout triggers quickly
+        node.capabilities.max_recording_time = 0.03  # One block duration
+        
         audio_queue = MagicMock()
         chunk = np.array([1.0, 2.0, 3.0])
         # First iteration: audio > threshold, then silence threshold reached
+        # Third call to empty() returns True, recording_time reaches max, breaks
         audio_queue.empty = MagicMock(side_effect=[False, False, True])
         audio_queue.get = MagicMock(side_effect=[
             MagicMock(flatten=MagicMock(return_value=chunk)),

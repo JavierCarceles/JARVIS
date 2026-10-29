@@ -48,7 +48,7 @@ autoritativo e invariantes que las unidades anteriores NO cubren:
      `applications` + restauracion): verifica que el catalogo real reconoce una app
      minimal, sin tocar entities.json.
   6. Contrato minimo de UIElement (name, type obligatorios; coordinates/
-     calibration_data/required_capability opcionales; screen default 0).
+     screen/calibration_data/required_capability/description opcionales).
 
 No modifica codigo de produccion.
 """
@@ -404,8 +404,8 @@ class TestMinimalAppSingletonInMemInjection:
 
 class TestUIElementMinimalContract:
     """UIElement es el segundo bloque del contrato minimo: name y type son
-    obligatorios; coordinates/calibration_data/required_capability son opcionales
-    y screen default 0."""
+    obligatorios; description/coordinates/screen/calibration_data/
+    required_capability son opcionales."""
 
     def test_minimal_construction(self):
         """UIElement(name, type) construye instancia con name y type."""
@@ -420,6 +420,7 @@ class TestUIElementMinimalContract:
         assert el.screen == 0
         assert el.calibration_data is None
         assert el.required_capability is None
+        assert el.description == ""
 
     def test_is_calibrated_false_when_no_coordinates(self):
         """is_calibrated() devuelve False con coordinates por defecto (None)."""

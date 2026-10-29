@@ -272,13 +272,14 @@ class TestUIElementOptionalDefaults:
     """Verifica el valor por defecto de CADA campo opcional de UIElement."""
 
     def test_minimal_construction_all_optionals_defaulted(self):
-        """UIElement con solo name+type: los 4 campos opcionales toman su default."""
+        """UIElement con solo name+type: los campos opcionales toman su default."""
         element = UIElement(name="btn", type="button")
 
         assert element.coordinates is None
         assert element.screen == 0
         assert element.calibration_data is None
         assert element.required_capability is None
+        assert element.description == ""
 
     def test_optional_fields_with_explicit_none(self):
         """Pasar explicitamente None produce el mismo default."""
@@ -286,33 +287,37 @@ class TestUIElementOptionalDefaults:
             name="btn", type="button",
             coordinates=None, screen=None,
             calibration_data=None, required_capability=None,
+            description=None,
         )
         # screen con default 0, pero pasar None sobrescribe a None (no hay __post_init__)
         assert element.coordinates is None
         assert element.screen is None
         assert element.calibration_data is None
         assert element.required_capability is None
+        assert element.description is None
 
     def test_optional_fields_with_explicit_values(self):
         """Los campos opcionales aceptan valores reales."""
         element = UIElement(
             name="address_bar", type="input",
+            description="Barra de direcciones",
             coordinates={"x": 100, "y": 200},
             screen=1,
             calibration_data={"method": "visual"},
             required_capability=ApplicationCapability.NAVIGATE,
         )
+        assert element.description == "Barra de direcciones"
         assert element.coordinates == {"x": 100, "y": 200}
         assert element.screen == 1
         assert element.calibration_data == {"method": "visual"}
         assert element.required_capability == ApplicationCapability.NAVIGATE
 
     def test_field_count(self):
-        """UIElement tiene exactamente 6 campos: 2 obligatorios + 4 opcionales."""
+        """UIElement tiene exactamente 7 campos: 2 obligatorios + 5 opcionales."""
         fields = dataclasses.fields(UIElement)
-        assert len(fields) == 6
+        assert len(fields) == 7
         optional = [f for f in fields if f.name not in ("name", "type")]
-        assert len(optional) == 4
+        assert len(optional) == 5
 
     def test_is_calibrated_defaults_false(self):
         """Un UIElement con defaults es NOT calibrated (coordinates is None)."""
@@ -326,6 +331,14 @@ class TestUIElementOptionalDefaults:
             coordinates={"x": 100, "y": 200},
         )
         assert element.is_calibrated() is True
+
+    def test_is_calibrated_false_with_empty_coordinates(self):
+        """Un UIElement con coordinates={} no esta calibrado."""
+        element = UIElement(
+            name="btn", type="button",
+            coordinates={},
+        )
+        assert element.is_calibrated() is False
 
 
 # ---------------------------------------------------------------------------
@@ -467,7 +480,7 @@ class TestRegisterCustomApplicationOptionalData:
             "name": "OptCustomUI",
             "type": "browser",
             "ui_elements": [
-                {"name": "btn_ok", "type": "button", "screen": 1},
+                {"name": "btn_ok", "type": "button", "description": "Botón OK"},
             ],
         }
         result = register_custom_application(config)
@@ -478,7 +491,7 @@ class TestRegisterCustomApplicationOptionalData:
         assert len(app.ui_elements) == 1
         assert app.ui_elements[0].name == "btn_ok"
         assert app.ui_elements[0].type == "button"
-        assert app.ui_elements[0].screen == 1
+        assert app.ui_elements[0].description == "Botón OK"
 
     def test_optional_states_accepted(self):
         """register_custom_application reconstruye ApplicationState desde strings."""

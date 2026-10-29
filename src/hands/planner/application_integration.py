@@ -514,17 +514,50 @@ class ApplicationKnowledgeIntegrator:
 
     @classmethod
     def _is_element_calibrated(cls, element: Any) -> bool:
+        """Comprueba si un elemento UI tiene coordenadas calibradas.
+
+        El conocimiento declarativo (``UIElement`` / dict de knowledge) no
+        almacena coordenadas; la calibración se consulta en tiempo de
+        ejecución al ``CoordinateManager``. Si el elemento es ``None`` se
+        devuelve ``False``.
+        """
         if element is None:
             return False
+
+        # Compatibilidad con dicts legacy que aún pueden exponer una
+        # bandera de calibración directamente.
         calibrated = cls._get_value(element, "is_calibrated")
         try:
             if callable(calibrated):
                 return bool(calibrated())
             if calibrated is not None:
                 return bool(calibrated)
-            return bool(cls._get_value(element, "calibrated", False))
+            legacy_calibrated = cls._get_value(element, "calibrated")
+            if legacy_calibrated is not None:
+                return bool(legacy_calibrated)
         except Exception:
             return False
+
+        # Si el elemento no expone una bandera de calibración, consultar
+        # el CoordinateManager mediante el resource_id canónico
+        # "{app_key}.{element_name}".
+        element_name = cls._get_value(element, "name")
+        if element_name is None:
+            return False
+        try:
+            from src.hands.coordinate_manager import get_coordinate_manager
+            coord_manager = get_coordinate_manager()
+            if coord_manager is None:
+                return False
+            # El resource_id depende del nombre normalizado de la app y del
+            # elemento; se pasa element_name tal cual para que coincida con la
+            # clave usada en _process_ui_knowledge.
+            resource = coord_manager.get_ui_resource(element_name)
+            if resource is not None and resource.is_usable:
+                return True
+        except Exception:
+            return False
+        return False
 
     def _validate_node_references(self, nodes: Sequence[Node]) -> None:
         """Comprueba las relaciones jerárquicas creadas durante la conversión."""

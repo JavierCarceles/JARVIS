@@ -18,6 +18,12 @@ import onnxruntime as rt
 import soundfile as sf
 import winsound
 
+try:
+    import pyttsx3
+    _PYTTSX3_AVAILABLE = True
+except Exception:
+    _PYTTSX3_AVAILABLE = False
+
 from src.utils.config import (
     get_project_root,
     get_timeout_config,
@@ -63,6 +69,10 @@ class Mouth:
 
         self.session = None
 
+        self.pyttsx3_engine = None
+
+        self.tts_engine = "onnx"
+
         self.style_vector: Optional[np.ndarray] = None
 
         self.token_map = None
@@ -82,23 +92,42 @@ class Mouth:
     # ========================================================================
 
     def _initialize_session(self):
-        """Inicializa la sesión ONNX."""
+        """Inicializa la sesión ONNX, con fallback a pyttsx3 si falla."""
 
         try:
             self.session = rt.InferenceSession(str(self.ONNX_MODEL_PATH))
+            self.tts_engine = "onnx"
+            logger._print_log("INFO", "[VOICE] Sesión ONNX inicializada correctamente: " + str(self.ONNX_MODEL_PATH), "speaker.py", "_initialize_session", 88)
 
-            logger._print_log("ERROR", "[VOICE] Error loading voice config: " + str(e), "speaker.py", "_load_onnx_model", 90)
-
-        except FileNotFoundError:
-            logger._print_log("info", "Procesando solicitud", "speaker.py", "method", 93)
+        except FileNotFoundError as e:
+            logger._print_log("ERROR", "[VOICE] No se encontró el modelo ONNX: " + str(self.ONNX_MODEL_PATH) + " (" + str(e) + ")", "speaker.py", "_initialize_session", 92)
+            self.session = None
+            self._init_pyttsx3_fallback()
 
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "speaker.py", "method", 93)
+            logger._print_log("ERROR", "[VOICE] Error inicializando sesión ONNX: " + str(e), "speaker.py", "_initialize_session", 96)
+            self.session = None
+            self._init_pyttsx3_fallback()
+
+    def _init_pyttsx3_fallback(self):
+        """Inicializa pyttsx3 como motor TTS de respaldo cuando ONNX no está disponible."""
+        if not _PYTTSX3_AVAILABLE:
+            logger._print_log("ERROR", "[VOICE] pyttsx3 no está instalado. No hay motor TTS disponible.", "speaker.py", "_init_pyttsx3_fallback", 100)
+            self.tts_engine = None
+            return
+        try:
+            self.pyttsx3_engine = pyttsx3.init()
+            self.tts_engine = "pyttsx3"
+            logger._print_log("INFO", "[VOICE] Motor pyttsx3 inicializado como respaldo.", "speaker.py", "_init_pyttsx3_fallback", 106)
+        except Exception as e:
+            logger._print_log("ERROR", "[VOICE] No se pudo inicializar pyttsx3: " + str(e), "speaker.py", "_init_pyttsx3_fallback", 110)
+            self.pyttsx3_engine = None
+            self.tts_engine = None
 
     def _load_parameters(self):
         """Carga los parámetros necesarios del motor."""
 
-        if self.session is None:
+        if self.session is None and self.tts_engine != "pyttsx3":
             logger._print_log("error", "[!] ADVERTENCIA: No se pudo iniciar el motor. Revisa las rutas.", "speaker.py", "method", 102)
             return
 
@@ -534,13 +563,17 @@ class Mouth:
         Si voice_id es None se utiliza la voz actualmente seleccionada.
         """
 
-        if self.session is None:
+        if self.tts_engine is None:
             logger.ERROR(r"[ERROR] Motor no cargado. Imposible hablar.  [file:speaker.py, method:speak, line:573]")
             return None
 
         if not text or not text.strip():
             logger.DEBUG(r"[DEBUG] Texto vacío, no generando audio.  [file:speaker.py, method:speak, line:542]")
             return None
+
+        # Si ONNX no está disponible, usar pyttsx3
+        if self.tts_engine == "pyttsx3" and self.pyttsx3_engine is not None:
+            return self._speak_pyttsx3(text, voice_id)
 
         selected_voice = str(voice_id).strip() if voice_id else self.current_voice_id
 
@@ -651,6 +684,32 @@ class Mouth:
 
         except Exception as e:
             logger._print_log("error", f"[VOICE] Error en _synthesize_onnx: {e}", "speaker.py", "method", 653)
+            return None
+
+    def _speak_pyttsx3(
+        self,
+        text: str,
+        voice_id: Optional[str] = None,
+    ) -> Optional[str]:
+        """
+        Sintetiza y reproduce texto usando pyttsx3 (fallback de Windows SAPI).
+        """
+        try:
+            selected_voice = str(voice_id).strip() if voice_id else self.current_voice_id
+
+            if selected_voice:
+                voices = self.pyttsx3_engine.getProperty("voices")
+                for v in voices:
+                    if selected_voice.lower() in v.id.lower() or selected_voice.lower() in v.name.lower():
+                        self.pyttsx3_engine.setProperty("voice", v.id)
+                        break
+
+            self.pyttsx3_engine.say(text)
+            self.pyttsx3_engine.runAndWait()
+            return text
+
+        except Exception as e:
+            logger._print_log("error", f"[VOICE] Error en _speak_pyttsx3: {e}", "speaker.py", "method", 700)
             return None
 
     def speak_async(

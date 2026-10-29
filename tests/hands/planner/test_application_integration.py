@@ -577,7 +577,7 @@ class TestCreateUIElementNode:
         app = get_application_manager().get_application("chrome")
         cap_def = app.capabilities[1]
         node = integrator._create_ui_element_node(app, "address_bar", cap_def)
-        # address_bar has no coordinates -> not calibrated
+        # address_bar has no coordinates in knowledge model -> not calibrated
         assert node.metadata["calibrated"] is False
         # no calibration precondition/effect
         assert "_calibrated" not in " ".join(str(p) for p in node.preconditions)

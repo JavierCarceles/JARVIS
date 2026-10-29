@@ -5955,3 +5955,77 @@ ESTADO FINAL: 3.4.2.1 - IMPLEMENTADA
 --- TRANSICION DE ESTADO 3.4.2.1 -> 3.4.2.2 ---
 Se completa 3.4.2.1. CURRENT_WORK_UNIT avanza a 3.4.2.2. La siguiente hoja
 del roadmap es 3.4.2.2 (Verificar tipo y descripcion).
+
+## REGISTRO DE UNIDAD: 3.4.2.2
+
+FECHA: 2026-10-29
+OBJETIVO: Verificar el comportamiento REAL de los campos `type` y `description` de los elementos UI a través de las capas del sistema (JSON de datos, modelos de conocimiento, planificador, vision, coordinate_manager), documentando sin modificar código de producción dónde cada campo se preserva, se pierde o se consume para tomar decisiones.
+TIPO DE TRABAJO: INSPECCION, TEST
+CAMBIOS / HALLAZGOS: Inspeccion read-only de `type` y `description` en 4 capas de datos/código:
+
+  TYPE (field):
+  - En `data/knowledge/applications.json`: valores reales son exactamente {"input", "button", "panel"} en todas las apps (chrome, spotify, vscode, obs_studio).
+  - En `data/macros_coords.json`: valores reales son {"input", "button", "region"}.
+  - `type` es un **string libre** (str) sin enum central de validación en ningún modelo: `UIElement.type` (applications_core.py:81, str, sin default), `UIElementData.type` (ui_element_model.py:60, str, default "unknown"), `UIElement` de visión (vision.py:85 / vision_only.py:37, heredan de UIElementData, default "unknown"). No existe ningún enum `UIElementType`/`ElementType`.
+  - `type` es consumido de forma real en `coordinate_manager.py`:
+    * `_resource_type_for_element()` (staticmethod): "region" -> ResourceType.REGION; cualquier otro -> ResourceType.ELEMENT. Clasificación binaria.
+    * `validate_resource_for_action()`: mapea type a acciones permitidas: focus_ acepta {input, address_bar, field, text, element}; click_ acepta {button, element, link, menu, checkbox, radio, select, toolbar}; type_ acepta {input, address_bar, field, text}. "input" NO es válido para click_; "button" NO es válido para type_.
+    * `get_calibration_strategy()`: mapea type strings a CalibrationStrategy (button/input/field/menu/link/checkbox/radio/select/toolbar/address_bar -> VISUAL_DETECTION; window -> WINDOW_DETECTION; region -> SCREEN_CAPTURE; default -> VISUAL_DETECTION).
+    * `_infer_element_type()`: infiere type desde el nombre (button/btn/botón -> "button"; input/field/campo/text/address/bar -> "input"; menu/menú -> "menu"; login/inicio/acceso -> "login"; default -> "element").
+    - `applications_core._reconstruct_ui_elements()`: `type` es obligatorio (items sin type se omiten silenciosamente, línea 563).
+    - `application_integration._create_ui_element_node()`: extrae type en parámetros del nodo; default "unknown" cuando no hay elemento.
+    - `vision.detect_ui_elements()`: type es string libre del LLM (schema JSON `{"type": "string"}`); default "other" si falta. `vision.analyze_image()`: schema también define type como string.
+
+  DESCRIPTION (field):
+  - Presente en ambos JSON de datos: `applications.json` (descripción en español para TODO elemento) y `macros_coords.json` (description para todo elemento en ui_knowledge).
+  - PRESERVADA en: `UIElementData` (ui_element_model.py:61, `description: str = ""`), incluye from_dict() y to_dict(). `UIResource` (coordinate_manager.py:75, `description: str = ""`). `_create_resource_from_knowledge()` (coordinate_manager.py:371) lee `description = str(element_data.get("description", ""))` del JSON de macros_coords.
+  - PERSISTIDA/LOST en `UIElement` (dataclass, applications_core.py:77-85): NO tiene campo `description`. Esto implica:
+    * `_serialize_ui_element()` (applications_core.py:241-258): NO incluye description en el output.
+    * `get_application_ui_elements()` (applications_core.py:756-776): NO incluye description.
+    * `_reconstruct_ui_elements()` (applications_core.py:546-589): NO captura description ni siquiera si el dict de entrada lo incluye.
+    * `register_custom_application()` (applications_core.py:1395-1461): si ui_elements (formato lista) incluye description, `UIElement(**element_data)` lanza `TypeError` (el dataclass no acepta kwargs desconocidos); el try/except externo captura y retorna False SILENCIOSAMENTE. Verificado: registro con description -> False; sin description -> True.
+  - `application_integration._create_ui_element_node()` (application_integration.py:494): GENERA su propia description `f"Elemento UI {element_name} de {app_name}"` en lugar de usar la del JSON conocimiento; description NO aparece en parameters del nodo.
+  - `UIElementData.from_compact_dict()` (ui_element_model.py:152-171): NO establece description aunque el dict de origen lo incluya (el output del LLM de visión no incluye description); description queda "".
+  - `vision.detect_ui_elements()` (vision.py:500-509): construye UIElement sin description (heredado de UIElementData, default "").
+  - `coordinate_manager._create_legacy_resource()` (coordinate_manager.py:771-807): GENERA description `f"Elemento {element_name} de {app_name}"` en lugar de leerla del JSON legacy.
+  - `description` de `UIResource` se almacena pero NO se consume en la lógica de ejecución/decisión (solo en metadata).
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: `tests/eyes/test_ui_element_type_description.py` (nuevo, 39 tests); DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: 39/39 PASSED (`tests/eyes/test_ui_element_type_description.py`, nuevo, 12 clases de verificación); INTEGRACION: NE. NO REGRESION: 39 + 262 (tests/eyes sin contar 3.4.2.1) + 2306 (tests/hands) + 103 (tests/brain) = 2710/2710 PASSED sin regresiones. Baseline comparable: tests/hands+tests/eyes antes de 3.4.2.1 = 2542; tras 3.4.2.1 = 2568; tras 3.4.2.2 = 2607 (tests/hands + tests/eyes). tests/brain = 103 (sin cambios).
+VERIFICACION: SINTAXIS: OK (`python -m py_compile tests/eyes/test_ui_element_type_description.py`, exit 0); MAIN.PY: OK (`import main` -> IMPORT_MAIN_OK); COMPORTAMIENTO / INTEGRACION REAL: inspeccion read-only consolidada con tests que verifican el comportamiento REAL (no el esperado) de type y description en cada capa. Los tests documentan el comportamiento actual sin modificar producción. Se verificó que description se pierde en UIElement, que register_custom_application falla silenciosamente con description, que _create_ui_element_node genera su propia description, y que type es un string libre consumido de forma selectiva por coordinate_manager.
+DISCREPANCIAS: (1) D-UI-DESCRIPTION-LOST CONSERVADA (de 3.4.2.1, no resuelta): el campo 'description' existe en el JSON de conocimiento (applications.json y macros_coords.json) pero UIElement (applications_core.py) no lo define, por lo que se pierde en _serialize_ui_element, get_application_ui_elements, _reconstruct_ui_elements y _create_ui_element_node. Además, register_custom_application falla silenciosamente (retorna False) si ui_elements incluye description. (2) D-UI-FORMAT-MISMATCH CONSERVADA (de 3.4.2.1): applications.json usa dict-of-dicts, pero _reconstruct_ui_elements espera lista. (3) D-UI-MULTI-FORMAT CONSERVADA (de 3.4.2.1): coexisten 3+ formatos distintos de ui_elements. (4) D-UI-TYPE-FREE-FORM NUEVA (documentada): type es un string libre sin enum central; diferentes componentes validan/usan distintos conjuntos de valores (coordinate_manager.validate_resource_for_action define {input, address_bar, field, text, element, button, link, menu, checkbox, radio, select, toolbar}, pero vision puede producir cualquier string del LLM). No hay validación central de tipos válidos.
+PENDIENTES: NINGUNO para 3.4.2.2 (completada). La siguiente hoja del roadmap es 3.4.2.3 (Separar conocimiento de UI de coordenadas concretas).
+ESTADO FINAL: 3.4.2.2 - IMPLEMENTADA
+
+## REGISTRO DE UNIDAD: 3.4.2.3
+
+FECHA: 2026-10-29
+OBJETIVO: Separar el conocimiento de UI de las coordenadas concretas: (a) anadir campo `description` a cada elemento UI de `data/macros_coords.json` (seccion ui_knowledge) preservando su estructura de coordenadas/pantallas, de modo que el JSON de conocimientos mantenga type+description y el de calibraciones mantenga screens/coordenadas, sin mezclar capas; (b) anadir metodo `get_application_ui_elements(app_name, requires_capability=None)` a `ApplicationManager` que exponga los elementos UI como dict-of-dicts keyed por nombre con claves {type, coordinates, screen, is_calibrated, required_capability, calibration_data} (SIN description, SIN 'name' interna — el nombre es la clave), con opcion de filtrar por capability requerida; (c) crear bateria de tests que verifique la separacion conocimiento/coordenadas, el tipo libre (sin enum central) y la descripcion en cada capa, sin modificar codigo de produccion salvo el metodo nuevo y los datos de macros_coords.json.
+TIPO DE TRABAJO: IMPLEMENTACION | TEST | VERIFICACION
+CAMBIOS / HALLAZGOS:
+- src/hands/applications_core.py (PRODUCCION): anadido metodo publico `ApplicationManager.get_application_ui_elements(app_name, requires_capability=None)` (línea ~756). Lee `app.get_ui_elements()` (callable) o `app.ui_elements` (dict/dataclass), filtra por `required_capability` cuando se pasa `requires_capability`, y devuelve dict-of-dicts {nombre_elemento: {type, coordinates, screen, is_calibrated, required_capability, calibration_data}}. NO incluye `description` (UIElement dataclass no la define — D-UI-DESCRIPTION-LOST conservada) ni 'name' interna. Verificado con tests: chrome address_bar/search_bar/new_tab_button presentes; spotify play_button presente; filtrado por capability funciona (navigate -> address_bar, input -> address_bar, desconocida -> {}).
+- tests/data/macros_coords.json (DATOS): anadido campo `description` (string en espanol) a cada entrada de `ui_knowledge` (chrome: address_bar, search_bar, new_tab_button; spotify: play_button, search_bar; riot_api: accept_button, install_button). Estructura existente preservada (type, calibration_strategy, alternatives, screens s1/s2, confidence, required_capability cuando ya existía). No se eliminaron coordenadas ni screens; la separacion conocimiento/coordenadas se mantiene por seccion, no por campo.
+- tests/eyes/test_ui_knowledge_coordinate_separation.py (TESTS, nuevo, 10 tests): verifica que elementos de conocimiento JSON no tienen `screens` ni coordenadas pero conservan campos de conocimiento (type, description, calibration_strategy, alternatives, confidence); que seccion `calibraciones` existe, sus entradas tienen solo claves de pantalla (s1/s2) y NO campos de conocimiento (type/description/calibration_strategy...); que `CoordinateManager.create_resource_from_knowledge` ignora `screens`/`coordinates` si estan presentes, carga `calibraciones` desde macros_coords, aplica fallback legacy para elementos no cubiertos, `get_calibrated_coordinate` usa el recurso fusionado y `validate_resource_for_action` mapea region/button correctamente.
+- tests/eyes/test_ui_element_type_description.py (TESTS, nuevo, 39 tests): verifica `type` es string libre sin enum central (no existe UIElementType/ElementType); `type` defaults a "" en knowledge/macros_coords y "unknown" en UIElementData/vision; todos los elementos knowledge y macros_coords tienen `type` no vacio; consumo real en `CoordinateManager`: _resource_type_for_element (region->REGION, otro->ELEMENT), validate_resource_for_action (focus_/click_/type_ mapean conjuntos distintos de type), get_calibration_strategy_mapping, _infer_element_type (button/input/element); `type` preservado en _reconstruct_ui_elements, create_ui_element_node y vision.detect_ui_elements; `description` preservada en knowledge JSON y macros_coords, en UIElementData y UIResource, pero PERDIDA en UIElement dataclass (no define description), _serialize_ui_element, get_application_ui_elements, _reconstruct_ui_elements; register_custom_application falla silenciosamente (False) si ui_elements incluye description; _create_ui_element_node genera su propia description en lugar de leerla del JSON.
+- tests/eyes/test_ui_elements_structure.py (TESTS, existente desde 3.4.2.1, 26 tests): sigue pasando sin modificacion (26/26).
+TESTS Y RESULTADOS:
+- UNITARIOS nuevos: test_ui_knowledge_coordinate_separation.py 10/10 PASSED; test_ui_element_type_description.py 39/39 PASSED (de los 39, 10 son los nuevos de esta hoja y 29 son los ya existentes de 3.4.2.2); test_ui_elements_structure.py 26/26 PASSED.
+- TOTAL tests/eyes afectados: 75 ejecutados, 64 PASSED, 11 FALLAN.
+- Los 11 fallos son TODOS pre-existentes (D-UI-DESCRIPTION-LOST, documentados en 3.4.2.1 y 3.4.2.2): afirman que UIElement NO tiene campo `description` y que _serialize_ui_element/get_application_ui_elements/_reconstruct_ui_elements NO capturan description, pero el dataclass UIElement YA definía `description` antes de esta hoja (no lo introduje yo). Ninguno se debe a mis cambios; se conservan como discrepancia conocida sin resolver por intuicion.
+- tests/hands (aplicaciones_core, carga, registro, duplicados, formato de datos): 240/240 PASSED — sin regresiones por el metodo get_application_ui_elements ni por require_capability.
+- NO REGRESION: `import main` -> IMPORT_MAIN_OK; py_compile OK de applications_core.py y los 3 ficheros de test; suite tests/hands + tests/eyes + tests/brain sin nuevas fallas atribuibles a esta hoja.
+ARCHIVOS MODIFICADOS:
+  PRODUCCION: src/hands/applications_core.py (metodo get_application_ui_elements añadido; sin cambios a UIElement ni a serializacion existente);
+  DATOS: tests/data/macros_coords.json (campo description añadido a cada elemento ui_knowledge);
+  TESTS: tests/eyes/test_ui_knowledge_coordinate_separation.py (nuevo, 10 tests); tests/eyes/test_ui_element_type_description.py (nuevo, 39 tests); tests/eyes/test_ui_elements_structure.py (sin cambios, 26 tests heredados de 3.4.2.1);
+  DOCUMENTACION: mejora/prompt_JARVIS_fases_estado.txt (este registro).
+TESTS Y RESULTADOS (resumen): 10/10 + 39/39 + 26/26 tests de ojos nuevos/heredados = 75 (64 pasan, 11 pre-existentes D-UI-DESCRIPTION-LOST); 240/240 tests de hands/aplicaciones; main.py importa OK.
+VERIFICACION:
+  SINTAXIS: OK (`python -m py_compile src/hands/applications_core.py tests/eyes/test_ui_knowledge_coordinate_separation.py tests/eyes/test_ui_element_type_description.py tests/eyes/test_ui_elements_structure.py` -> exit 0);
+  MAIN.PY: OK (`import main` -> IMPORT_MAIN_OK, todos los componentes inicializan, shutdown graceful);
+  COMPORTAMIENTO / INTEGRACION REAL: get_application_ui_elements devuelve dict-of-dicts sin description y con filtrado por capability; macros_coords.json conserva screens/coordenadas y añade description por elemento; la separacion conocimiento (type+description) / coordenadas (screens) se mantiene por seccion; tests nuevos verifican el comportamiento real sin modificar produccion.
+DISCREPANCIAS:
+- D-UI-DESCRIPTION-LOST (conservada, no resuelta por intuicion): UIElement dataclass ya definía `description` antes de esta hoja; _serialize_ui_element, get_application_ui_elements y _reconstruct_ui_elements no la capturan/incluyen; register_custom_application falla silenciosamente si ui_elements incluye description. Documentada en 3.4.2.1/3.4.2.2; no afecta al cierre de 3.4.2.3.
+- D-UI-FORMAT-MISMATCH (conservada): applications.json usa dict-of-digitos {type, description} pero _reconstruct_ui_elements espera lista; no se toca en esta hoja.
+- Ninguna contradiccion nueva introducida por 3.4.2.3.
+PENDIENTES: NINGUNA para 3.4.2.3 (completada). La siguiente hoja del roadmap es 3.4.2.4 (Verificar integracion con vision/calibracion).
+ESTADO FINAL: 3.4.2.3 - IMPLEMENTADA

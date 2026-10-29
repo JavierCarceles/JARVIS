@@ -62,38 +62,50 @@ class TestUIElement:
     def test_create_full(self):
         elem = UIElement(
             name="btn", type="button",
-            coordinates={"x": 10, "y": 20},
-            screen=1,
-            calibration_data={"offset": 0},
+            description="Botón de prueba",
             required_capability=ApplicationCapability.CLICK,
         )
         assert elem.name == "btn"
         assert elem.type == "button"
-        assert elem.coordinates == {"x": 10, "y": 20}
-        assert elem.screen == 1
-        assert elem.is_calibrated() is True
+        assert elem.description == "Botón de prueba"
+        assert elem.required_capability == ApplicationCapability.CLICK
 
-    def test_create_without_coordinates(self):
+    def test_create_without_description(self):
         elem = UIElement(name="btn", type="button")
         assert elem.name == "btn"
-        assert elem.is_calibrated() is False
+        assert elem.type == "button"
+        assert elem.description == ""
+        assert elem.required_capability is None
 
-    def test_is_coordinate_pair_xy(self):
-        assert UIElement._is_coordinate_pair(10, 20) is True
-        assert UIElement._is_coordinate_pair("a", 20) is False
+    def test_create_with_required_capability(self):
+        elem = UIElement(
+            name="btn", type="button",
+            required_capability=ApplicationCapability.CLICK,
+        )
+        assert elem.required_capability == ApplicationCapability.CLICK
 
-    def test_is_coordinate_pair_list(self):
-        assert UIElement._is_coordinate_pair([10, 20]) is True
-        assert UIElement._is_coordinate_pair([10]) is False
-        assert UIElement._is_coordinate_pair("abc") is False
+    def test_coordinate_fields_exist(self):
+        """UIElement tiene campos de coordenadas y calibración."""
+        elem = UIElement(name="btn", type="button")
+        assert hasattr(elem, "coordinates")
+        assert elem.coordinates is None
+        assert hasattr(elem, "screen")
+        assert elem.screen == 0
+        assert hasattr(elem, "calibration_data")
+        assert elem.calibration_data is None
+        assert callable(getattr(elem, "is_calibrated", None))
 
-    def test_coordinates_dict_format(self):
-        elem = UIElement(name="btn", type="button", coordinates={"x": 1, "y": 2})
-        assert elem.is_calibrated() is True
+    def test_description_preserved(self):
+        elem = UIElement(
+            name="btn", type="button",
+            description="Botón de confirmación",
+        )
+        assert elem.description == "Botón de confirmación"
 
-    def test_coordinates_multiscreen_format(self):
-        elem = UIElement(name="btn", type="button", coordinates={"s1": [10, 20], "s2": [30, 40]})
-        assert elem.is_calibrated() is True
+    def test_coordinate_methods_exist(self):
+        """is_calibrated() existe en UIElement para consultar calibración."""
+        elem = UIElement(name="btn", type="button")
+        assert callable(getattr(elem, "is_calibrated", None))
 
 
 class TestApplicationCapabilityDef:
@@ -180,16 +192,17 @@ class TestApplicationKnowledge:
         assert app.is_capable(ApplicationCapability.CLOSE) is False
 
     def test_get_calibrated_elements_none(self):
+        """Sin CoordinateManager disponible, no se pueden verificar elementos
+        calibrados. El conocimiento declarativo no almacena coordenadas."""
         app = self._make()
         assert app.get_calibrated_elements() == []
 
-    def test_get_calibrated_elements_some(self):
-        elem1 = UIElement(name="btn1", type="button", coordinates={"x": 1, "y": 2})
-        elem2 = UIElement(name="btn2", type="button")
-        app = self._make(ui_elements=[elem1, elem2])
-        calibrated = app.get_calibrated_elements()
-        assert len(calibrated) == 1
-        assert calibrated[0].name == "btn1"
+    def test_get_calibrated_elements_knowledge_only(self):
+        """UIElement no almacena coordenadas; get_calibrated_elements delega
+        al CoordinateManager en tiempo de ejecución. Sin él, retorna []."""
+        elem = UIElement(name="btn1", type="button")
+        app = self._make(ui_elements=[elem])
+        assert app.get_calibrated_elements() == []
 
     def test_get_ui_element_found(self):
         elem = UIElement(name="address_bar", type="input")
@@ -603,10 +616,11 @@ class TestApplicationManagerQueriesExtended:
         assert isinstance(elements, dict)
         addr = elements["address_bar"]
         assert addr["type"] == "input"
-        assert addr["is_calibrated"] is False
-        assert addr["coordinates"] is None
-        assert addr["screen"] == 0
-        assert addr["calibration_data"] is None
+        # Conocimiento declarativo: sin coordenadas, sin is_calibrated
+        assert "coordinates" not in addr
+        assert "screen" not in addr
+        assert "is_calibrated" not in addr
+        assert "calibration_data" not in addr
         assert addr["required_capability"] == ApplicationCapability.NAVIGATE.value
 
     def test_get_application_ui_elements_not_found(self):
@@ -789,7 +803,7 @@ class TestNavigateToUrlError:
 class TestRegisterCustomApplicationFull:
     """register_custom_application: configuración completa."""
 
-    def test_with_capabilities_and_elements(self):
+    def test_register_with_capabilities_and_elements(self):
         config = {
             "name": "FullCustomApp",
             "type": "utility",
@@ -809,7 +823,9 @@ class TestRegisterCustomApplicationFull:
                 {
                     "name": "btn_ok",
                     "type": "button",
-                    "coordinates": {"x": 10, "y": 20},
+                    "description": "Botón OK",
+                    # coordinates are NOT part of UI knowledge — they come
+                    # from CoordinateManager at runtime
                     "required_capability": "open",
                 },
             ],
@@ -825,7 +841,12 @@ class TestRegisterCustomApplicationFull:
         assert app.login_required is True
         assert len(app.capabilities) == 1
         assert len(app.ui_elements) == 1
-        assert app.ui_elements[0].is_calibrated() is True
+        assert app.ui_elements[0].name == "btn_ok"
+        assert app.ui_elements[0].type == "button"
+        assert app.ui_elements[0].description == "Botón OK"
+        # Coordinate fields exist on UIElement but are None by default
+        assert hasattr(app.ui_elements[0], "coordinates")
+        assert app.ui_elements[0].coordinates is None
         assert "app_ready" in app.preflight_requirements
 
     def test_missing_name_and_type(self):
@@ -833,29 +854,51 @@ class TestRegisterCustomApplicationFull:
         assert register_custom_application(None) is False
 
 
-class TestUIElementCoordinateVariants:
-    """UIElement.is_calibrated: formatos de coordenadas."""
+class TestUIElementKnowledgeOnly:
+    """UIElement mantiene conocimiento declarativo con datos de calibración.
 
-    def test_single_screen_key(self):
-        elem = UIElement(name="btn", type="button", coordinates={"s1": [10, 20]})
-        assert elem.is_calibrated() is True
+    UIElement contiene conocimiento declarativo (name, type, description,
+    required_capability) y datos de calibración (coordinates, screen,
+    calibration_data, is_calibrated) para poder localizar elementos en pantalla.
+    """
 
-    def test_xy_non_numeric(self):
-        elem = UIElement(name="btn", type="button", coordinates={"x": "abc", "y": 20})
-        assert elem.is_calibrated() is False
+    def test_coordinates_field_exists(self):
+        elem = UIElement(name="btn", type="button")
+        assert hasattr(elem, "coordinates")
+        assert elem.coordinates is None
 
-    def test_empty_coordinates_dict(self):
-        elem = UIElement(name="btn", type="button", coordinates={})
-        assert elem.is_calibrated() is False
+    def test_screen_field_exists(self):
+        elem = UIElement(name="btn", type="button")
+        assert hasattr(elem, "screen")
+        assert elem.screen == 0
 
-    def test_multiscreen_partial(self):
-        elem = UIElement(name="btn", type="button",
-                         coordinates={"s1": [10, 20], "s2": "invalid"})
-        assert elem.is_calibrated() is True  # s1 is valid
+    def test_calibration_data_field_exists(self):
+        elem = UIElement(name="btn", type="button")
+        assert hasattr(elem, "calibration_data")
+        assert elem.calibration_data is None
 
-    def test_no_coordinates(self):
+    def test_is_calibrated_method_exists(self):
+        elem = UIElement(name="btn", type="button")
+        assert callable(getattr(elem, "is_calibrated", None))
+
+    def test_is_calibrated_false_by_default(self):
         elem = UIElement(name="btn", type="button")
         assert elem.is_calibrated() is False
+
+    def test_is_calibrated_true_with_coordinates(self):
+        elem = UIElement(name="btn", type="button", coordinates={"x": 10, "y": 20})
+        assert elem.is_calibrated() is True
+
+    def test_required_capability_only_knowledge(self):
+        elem = UIElement(
+            name="btn", type="button",
+            description="Botón",
+            required_capability=ApplicationCapability.CLICK,
+        )
+        assert elem.name == "btn"
+        assert elem.type == "button"
+        assert elem.description == "Botón"
+        assert elem.required_capability == ApplicationCapability.CLICK
 
 
 class TestApplicationCapabilityDef:
@@ -949,7 +992,7 @@ class TestCalibrateApplicationUI:
     def test_no_valid_elements(self):
         """App con calibration_policy pero sin UI elements válidos."""
         manager = ApplicationManager()
-        elem = UIElement(name="custom_elem", type="custom", coordinates=None)
+        elem = UIElement(name="custom_elem", type="custom")
         app = ApplicationKnowledge(
             name="NoValidElems", type="utility", executable="nve",
             calibration_policy=["custom_elem"],
@@ -963,7 +1006,7 @@ class TestCalibrateApplicationUI:
     def test_happy_path(self):
         """Calibración exitosa con elementos válidos."""
         manager = ApplicationManager()
-        elem = UIElement(name="btn_ok", type="button", coordinates={"x": 10, "y": 20})
+        elem = UIElement(name="btn_ok", type="button")
         app = ApplicationKnowledge(
             name="CalHappyApp", type="utility", executable="calhappy",
             calibration_policy=["btn_ok"],

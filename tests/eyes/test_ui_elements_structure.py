@@ -187,27 +187,27 @@ class TestKnowledgeJsonUiElementsStructure:
 # 2. Modelo UIElement — ausencia del campo 'description'
 # ===========================================================================
 class TestUIElementModelFields:
-    """Verifica los campos REALES del modelo ``UIElement`` y documenta que
-    ``description`` (presente en el JSON de conocimiento) NO es un campo del
-    modelo, por lo que se pierde al reconstruir objetos UIElement.
+    """Verifica los campos REALES del modelo ``UIElement`` y confirma que
+    ``description`` (presente en el JSON de conocimiento) ES un campo del
+    modelo, por lo que ya no se pierde al reconstruir objetos UIElement.
 
-    Discrepancia D-UI-DESCRIPTION-LOST.
+    Discrepancia D-UI-DESCRIPTION-LOST resuelta.
     """
 
     def test_uint_element_fields(self):
         """UIElement tiene exactamente estos campos (en orden deDeclaracion)."""
         fields = [f.name for f in dataclasses.fields(UIElement)]
         assert fields == [
-            "name", "type", "coordinates", "screen",
-            "calibration_data", "required_capability",
+            "name", "type", "description", "required_capability",
+            "coordinates", "screen", "calibration_data",
         ]
 
-    def test_description_is_not_a_field(self):
-        """'description' NO es un campo del modelo UIElement."""
+    def test_description_is_a_field(self):
+        """'description' ES un campo del modelo UIElement."""
         field_names = {f.name for f in dataclasses.fields(UIElement)}
-        assert "description" not in field_names, (
-            "UIElement no deberia tener 'description' como campo "
-            "(D-UI-DESCRIPTION-LOST: se pierde la descripcion del JSON)"
+        assert "description" in field_names, (
+            "UIElement deberia tener 'description' como campo "
+            "(coherencia D-UI-DESCRIPTION resuelta)"
         )
 
     def test_application_knowledge_ui_elements_is_optional_list(self):
@@ -260,18 +260,18 @@ class TestReconstructUiElementsFormatMismatch:
         assert result[1].name == "new_tab_button"
         assert result[1].type == "button"
 
-    def test_reconstruct_drops_description_field(self):
-        """Ni siquiera con formato lista, _reconstruct_ui_elements captura
-        'description' — UIElement no tiene ese campo (D-UI-DESCRIPTION-LOST)."""
+    def test_reconstruct_preserves_description_field(self):
+        """Con formato lista, _reconstruct_ui_elements captura 'description'
+        del dict de entrada y la conserva en el UIElement resultante
+        (coherencia D-UI-DESCRIPTION resuelta)."""
         list_format = [
             {"name": "address_bar", "type": "input", "description": "Barra de direcciones"},
         ]
         result = ApplicationManager._reconstruct_ui_elements(list_format)
         assert len(result) == 1
         elem = result[0]
-        assert not hasattr(elem, "description"), (
-            "UIElement no preserva 'description' aun cuando el dict lo incluya"
-        )
+        assert hasattr(elem, "description")
+        assert elem.description == "Barra de direcciones"
 
     def test_reconstruct_skips_items_without_name(self):
         """Items sin 'name' se omiten silenciosamente."""
@@ -310,8 +310,9 @@ class TestSerializeUiElementFormat:
     """
 
     def test_serialize_output_keys(self):
-        """_serialize_ui_element produce: name, type, coordinates, screen,
-        calibration_data, required_capability (NO description)."""
+        """_serialize_ui_element produce: name, type, description,
+        required_capability (y coordinates/screen/calibration_data solo si
+        tienen valor). description siempre esta presente (coherencia)."""
         elem = UIElement(
             name="address_bar",
             type="input",
@@ -322,10 +323,10 @@ class TestSerializeUiElementFormat:
         )
         serialized = _serialize_ui_element(elem)
         assert set(serialized.keys()) == {
-            "name", "type", "coordinates", "screen",
-            "calibration_data", "required_capability",
+            "name", "type", "description", "required_capability",
         }
-        assert "description" not in serialized
+        assert "description" in serialized
+        assert serialized["description"] == ""
 
 
 # ===========================================================================
@@ -341,7 +342,7 @@ class TestGetApplicationUiElementsOutputFormat:
     """
 
     def test_chrome_ui_elements_format(self):
-        """get_application_ui_elements('chrome') devuelve dict-of-dicts sin
+        """get_application_ui_elements('chrome') devuelve dict-of-dicts con
         'description' y sin 'name' interno (el nombre es la clave)."""
         manager = get_application_manager()
         elems = manager.get_application_ui_elements("chrome")
@@ -352,16 +353,16 @@ class TestGetApplicationUiElementsOutputFormat:
         for elem_name, elem_def in elems.items():
             assert isinstance(elem_def, dict)
             assert set(elem_def.keys()) == {
-                "type", "coordinates", "screen",
-                "is_calibrated", "required_capability", "calibration_data",
+                "type", "description", "required_capability",
             }, (
                 f"elem '{elem_name}': keys inesperadas "
                 f"{set(elem_def.keys())}"
             )
-            assert "description" not in elem_def, (
-                f"elem '{elem_name}': 'description' no deberia estar presente "
-                f"(D-UI-DESCRIPTION-LOST en get_application_ui_elements)"
+            assert "description" in elem_def, (
+                f"elem '{elem_name}': 'description' deberia estar presente "
+                f"(coherencia D-UI-DESCRIPTION resuelta)"
             )
+            assert isinstance(elem_def["description"], str)
 
     def test_spotify_has_play_button(self):
         """Spotify expone 'play_button' como elemento UI."""

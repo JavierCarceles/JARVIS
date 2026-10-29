@@ -381,7 +381,11 @@ class CoordinateManager:
             except ValueError:
                 strategy = CalibrationStrategy.VISUAL_DETECTION
 
-            coordinates, regions = self._parse_screen_data(element_data)
+            # Las coordenadas concretas NO se leen del conocimiento: residen
+            # en la seccion ``calibraciones`` de macros_coords.json y se
+            # fusionan posteriormente mediante load_from_macros_coords.
+            # Un recurso de conocimiento sin calibracion no esta disponible
+            # hasta que se carguen sus coordenadas.
             return UIResource(
                 id=resource_id,
                 name=element_name,
@@ -389,11 +393,11 @@ class CoordinateManager:
                 application=app_name,
                 element_type=element_type,
                 calibration_strategy=strategy,
-                calibrated_coordinates=coordinates,
-                calibrated_regions=regions,
+                calibrated_coordinates={},
+                calibrated_regions={},
                 confidence=float(confidence),
-                is_available=bool(coordinates or regions),
-                is_calibrated=bool(coordinates or regions),
+                is_available=False,
+                is_calibrated=False,
                 last_calibration_time=element_data.get("last_calibration_time"),
                 description=description,
                 alternatives=list(element_data.get("alternatives", []) or []),
@@ -731,42 +735,102 @@ class CoordinateManager:
     # ------------------------------------------------------------------
 
     def load_from_macros_coords(self, calibration_data: Dict[str, Any]) -> int:
-        """Carga recursos desde ``calibraciones`` o, para compatibilidad, desde ``legacy_data.macros``."""
+        """Carga coordenadas desde ``calibraciones`` y las fusiona con los
+        recursos de conocimiento ya registrados (por ``resource_id``).
+
+        Admite ``legacy_data.macros`` como respaldo para entradas que no
+        esten cubiertas por ``calibraciones`` (p. ej. entradas de
+        ``supercomplete``), preservando el comportamiento previo.
+        """
         if not isinstance(calibration_data, dict):
             return 0
 
         calibraciones = calibration_data.get("calibraciones")
         if not isinstance(calibraciones, dict):
-            legacy_data = calibration_data.get("legacy_data", {})
-            if isinstance(legacy_data, dict):
-                calibraciones = legacy_data.get("macros", {})
-            else:
-                calibraciones = {}
+            calibraciones = {}
 
         loaded_count = 0
+        # --- 1. Seccion oficial "calibraciones" (solo coordenadas) ---
         for app_name, app_data in calibraciones.items():
             if not isinstance(app_data, dict):
                 continue
-
             for element_name, element_data in app_data.items():
                 if not isinstance(element_data, dict):
                     continue
-
                 resource_id = f"{app_name}.{element_name}"
-                resource = self._create_legacy_resource(
-                    resource_id,
-                    str(app_name),
-                    str(element_name),
-                    element_data,
+                coordinates, regions = self._extract_coordinates_from_calibration(
+                    element_data
                 )
-                if resource is None:
-                    continue
-
-                self.register_ui_resource(resource)
+                existing = self.get_ui_resource(resource_id)
+                if existing is not None:
+                    # Fusionar: conservar campos de conocimiento (type,
+                    # description, alternatives, ...) y añadir coordenadas.
+                    existing.calibrated_coordinates = coordinates
+                    existing.calibrated_regions = regions
+                    existing.is_calibrated = bool(coordinates or regions)
+                    existing.is_available = bool(coordinates or regions)
+                    self.register_ui_resource(existing)
+                else:
+                    resource = self._create_legacy_resource(
+                        resource_id,
+                        str(app_name),
+                        str(element_name),
+                        element_data,
+                    )
+                    if resource is None:
+                        continue
+                    self.register_ui_resource(resource)
                 loaded_count += 1
+
+        # --- 2. Respaldo "legacy_data.macros" para entradas no cubiertas ---
+        legacy_data = calibration_data.get("legacy_data", {})
+        if isinstance(legacy_data, dict):
+            legacy_macros = legacy_data.get("macros", {})
+            if isinstance(legacy_macros, dict):
+                for app_name, app_data in legacy_macros.items():
+                    if not isinstance(app_data, dict):
+                        continue
+                    for element_name, element_data in app_data.items():
+                        if not isinstance(element_data, dict):
+                            continue
+                        resource_id = f"{app_name}.{element_name}"
+                        if self.get_ui_resource(resource_id) is not None:
+                            continue  # ya cubierto por calibraciones/conocimiento
+                        resource = self._create_legacy_resource(
+                            resource_id,
+                            str(app_name),
+                            str(element_name),
+                            element_data,
+                        )
+                        if resource is None:
+                            continue
+                        self.register_ui_resource(resource)
+                        loaded_count += 1
 
         logger._print_log("info", r"[COORDINATE-MANAGER] Cargados %s recursos desde calibraciones [file:coordinate_manager.py, method:load_calibration_data, line:768]", "coordinate_manager.py", "method", 768)
         return loaded_count
+
+    def _extract_coordinates_from_calibration(
+        self,
+        element_data: Dict[str, Any],
+    ) -> Tuple[Dict[int, Tuple[int, int]], Dict[int, Tuple[int, int, int, int]]]:
+        """Extrae coordenadas/regiones de una entrada de ``calibraciones``.
+
+        Formato esperado: ``{<screen_key>: [x, y] o [x, y, w, h], ...}``
+        donde las claves son identificadores de pantalla (``s1``, ``s2``, ...).
+        """
+        coordinates: Dict[int, Tuple[int, int]] = {}
+        regions: Dict[int, Tuple[int, int, int, int]] = {}
+        for screen_key, value in element_data.items():
+            screen_number = self.get_screen_number_from_key(str(screen_key))
+            if screen_number is None:
+                continue
+            if isinstance(value, (list, tuple)) and len(value) >= 2:
+                try:
+                    coordinates[screen_number] = (int(value[0]), int(value[1]))
+                except (TypeError, ValueError):
+                    continue
+        return coordinates, regions
 
     def _create_legacy_resource(
         self,
