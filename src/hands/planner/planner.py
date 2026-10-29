@@ -2211,6 +2211,110 @@ class Planner:
                 seen.add(identifier)
         return identifiers
 
+    def trace_application_capability_to_action(
+        self,
+        app_name: str,
+        capability: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Trazabilidad aplicacion -> capability -> accion.
+
+        Documenta, para cada capability expuesta por ``app_name``, los nodos de
+        acción que la proporcionan y si la acción efectiva está registrada en
+        el ``ActionRegistry``.
+
+        Es la unión de las verificaciones ya existentes, sin duplicar lógica:
+
+        * ``get_application_capabilities_as_list`` (3.3.3.1) expone los
+          identificadores canónicos de capability de la aplicación.
+        * ``_node_provides_capability`` resuelve el matching capability -> nodo.
+        * ``_resolve_node_action_name`` y ``action_exists`` (3.3.3.2) verifican
+          que la acción efectiva del nodo está registrada.
+
+        A diferencia de ``_find_nodes_for_capability``, esta trazabilidad NO
+        aplica el filtro de estado (``can_execute``): documenta qué capacidades
+        y acciones *existen*, no cuáles son ejecutables en un estado concreto.
+        Los nodos se restringen a la aplicación solicitada (normalización
+        insensible a mayúsculas/minúsculas) para evitar fugas entre aplicaciones
+        (p.ej. ``spotify_open`` al trazar la capability ``open`` de Chrome).
+
+        Args:
+            app_name: Nombre de la aplicación a trazar.
+            capability: Si se pasa, traza solo esa capability en lugar de todas
+                las expuestas por la aplicación.
+
+        Returns:
+            Dict con ``application``, ``available`` (True si la aplicación
+            expone capabilities) y ``capabilities``: lista ordenada de entries,
+            cada una con ``capability``, ``providing_nodes``
+            (cada nodo: ``node_id``, ``action_name``, ``action_exists``,
+            ``action_category``, ``category_action_exists``, ``source``),
+            ``implemented_actions`` (acciones registradas que la cuben) y
+            ``covered`` (``True`` si alguna acción registrada implementa la
+            capability).
+        """
+        result: Dict[str, Any] = {
+            "application": app_name,
+            "available": False,
+            "capabilities": [],
+        }
+        available_nodes = self._get_available_nodes()
+        capabilities = (
+            [capability] if capability else self.get_application_capabilities_as_list(app_name)
+        )
+        result["available"] = bool(capabilities)
+        if not capabilities:
+            return result
+
+        app_key = self._normalize_identifier(app_name)
+        for cap in capabilities:
+            entry: Dict[str, Any] = {
+                "capability": cap,
+                "providing_nodes": [],
+                "implemented_actions": set(),
+                "covered": False,
+                "covering_action": None,
+            }
+            for node in available_nodes.values():
+                if self._node_type_value(node) not in {"action", "task"}:
+                    continue
+                node_app = self._normalize_identifier(
+                    getattr(node, "application", None) or ""
+                )
+                if node_app != app_key:
+                    continue
+                if not self._node_provides_capability(node, cap):
+                    continue
+                action_name = self._resolve_node_action_name(
+                    {
+                        "id": str(getattr(node, "id", "")),
+                        "action": str(getattr(node, "id", "")),
+                        "metadata": getattr(node, "metadata", {}) or {},
+                    }
+                )
+                action_category = getattr(node, "action_category", None)
+                node_action_exists = bool(action_name) and self.action_exists(action_name)
+                category_exists = bool(action_category) and self.action_exists(action_category)
+                if node_action_exists:
+                    entry["implemented_actions"].add(action_name)
+                if category_exists:
+                    entry["implemented_actions"].add(action_category)
+                entry["providing_nodes"].append(
+                    {
+                        "node_id": str(getattr(node, "id", "")),
+                        "action_name": action_name,
+                        "action_exists": node_action_exists,
+                        "action_category": action_category,
+                        "category_action_exists": category_exists,
+                        "source": (getattr(node, "metadata", {}) or {}).get("source"),
+                    }
+                )
+            if entry["implemented_actions"]:
+                entry["covering_action"] = sorted(entry["implemented_actions"])[0]
+            entry["covered"] = bool(entry["implemented_actions"])
+            entry["implemented_actions"] = sorted(entry["implemented_actions"])
+            result["capabilities"].append(entry)
+        return result
+
     def find_application_for_goal(self, goal: Goal) -> Optional[str]:
         goal_type = str(getattr(goal, "type", "")).lower()
         type_mapping = {

@@ -698,7 +698,7 @@ FASE 3 ? APPLICATION KNOWLEDGE
 3.3.3 ? Planificacion
 3.3.3.1 Exponer capacidades en formato consumible por planificacion. [IMPLEMENTADA]
 3.3.3.2 Verificar que Planner no recibe acciones inexistentes.
-3.3.3.3 Verificar trazabilidad aplicacion -> capability -> accion.
+3.3.3.3 Verificar trazabilidad aplicacion -> capability -> accion. [IMPLEMENTADA]
 3.3.4 ? Tests
 3.3.4.1 Caso de aplicacion con varias capacidades.
 3.3.4.2 Caso de aplicacion sin capacidades.
@@ -5531,4 +5531,61 @@ DISCREPANCIAS: NINGUNA nueva. Heredado de 3.3.3.1: (D-CAP-MODEL-GAP) 30/32 apps 
   la verificacion opera sobre acciones del ActionRegistry, no sobre capabilities.
 PENDIENTES: NINGUNO para 3.3.3.2 (completada). La siguiente hoja del roadmap es 3.3.3.3.
 ESTADO FINAL: 3.3.3.2 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.3.3.3
+FECHA: 2026-10-29
+OBJETIVO: Verificar trazabilidad aplicacion -> capability -> accion.
+Documentar, para cada capability expuesta por una aplicacion, los nodos de accion
+que la proporcionan y si la accion efectiva esta registrada en el ActionRegistry,
+dejando constancia de los huecos reales (capabilities declaradas sin accion
+registrada que las respalde).
+TIPO DE TRABAJO: INSPECCION; IMPLEMENTACION; TEST; VERIFICACION; DOCUMENTACION
+CAMBIOS / HALLAZGOS:
+- Nuevo metodo Planner.trace_application_capability_to_action(app_name, capability=None):
+  cadena aplicacion -> capability -> accion reutilizando (sin duplicar logica):
+  * get_application_capabilities_as_list (3.3.3.1) para los identificadores de capability.
+  * _node_provides_capability para el matching capability -> nodo.
+  * _resolve_node_action_name + action_exists (3.3.3.2) para verificar la accion registrada.
+- A diferencia de _find_nodes_for_capability, la trazabilidad NO aplica el filtro
+  de estado (can_execute): documenta que capacidades/acciones existen, no que son
+  ejecutables en un estado concreto. Los nodos se restringen a la aplicacion
+  solicitada (normalizacion insensible a mayusculas) para evitar fugas entre apps
+  (p. ej. spotify_open no aparece al trazar 'open' de Chrome).
+- Estructura devuelta: {application, available, capabilities:[{capability,
+  providing_nodes:[{node_id,action_name,action_exists,action_category,
+  category_action_exists,source}], implemented_actions, covered, covering_action}]};
+  implemented_actions como lista ordenada para serializacion JSON (sin objetos Node,
+  sin sets).
+- Hecho real verificable (modelo real): Chrome expone ['open','navigate','search'];
+  'open' esta cubierta por la accion registrada 'open_application' (nodo chrome.open,
+  action_category 'open_application' registrada); 'navigate' y 'search' no estan
+  respaldadas por ninguna accion registrada (hueco documentado, no un fallback).
+ARCHIVOS MODIFICADOS:
+  PRODUCCION: `src/hands/planner/planner.py` (metodo trace_application_capability_to_action, tras get_application_capabilities_as_list);
+  TESTS: `tests/hands/planner/test_planner_capability_action_traceability.py` (NUEVA, 23 tests, 6 clases);
+  DOCUMENTACION: `README.md` (tabla Planner: fila trace_application_capability_to_action anadida tras get_application_capabilities_as_list).
+TESTS Y RESULTADOS:
+  UNITARIOS: 23/23 PASSED (test_planner_capability_action_traceability.py).
+    * TestTraceStructure: 6.
+    * TestTraceChromeCapabilities: 7.
+    * TestTraceSingleCapability: 3.
+    * TestTraceNonexistentApplication: 2.
+    * TestTraceReusesActionRegistry: 3.
+    * TestTraceIdempotentAndPure: 2.
+  INTEGRACION: NE (verificacion read-only contra ActionRegistry global real; sin interaccion con Executor).
+  NO REGRESION: 2389/2389 PASSED (tests/hands + tests/brain). (Baseline 3.3.3.2: 2366; +23 de 3.3.3.3 = 2389. 0 fallos, 0 errores.)
+VERIFICACION:
+  SINTAXIS: py_compile de src/hands/planner/planner.py -> exit 0 (OK).
+  MAIN.PY: `import main` -> OK (IMPORT_MAIN_OK).
+  COMPORTAMIENTO / INTEGRACION REAL: verificado read-only contra el ActionRegistry global
+  real y el conocimiento de aplicaciones real (Chrome: open/navigate/search). La trazabilidad
+  reutiliza action_exists, no muta el modelo de nodos y es idempotente. entities.json inalterado.
+DISCREPANCIAS: Heredado de 3.3.3.1/3.3.3.2 (D-CAP-MODEL-GAP): 30/32 apps carecen de capabilities
+  declaradas en el modelo Enum (solo Chrome/Spotify). Ademas, para Chrome las capabilities
+  'navigate' y 'search' no estan respaldadas por ninguna accion registrada (action_category
+  'application_capability'/'search' no registradas); solo 'open' se respalda con 'open_application'.
+  Esto es un hecho de datos/modelo documentado por la trazabilidad, no una contradiccion nueva;
+  no se ha alterado el comportamiento de planificacion para resolverlo.
+PENDIENTES: NINGUNO para 3.3.3.3 (completada). La siguiente hoja del roadmap es 3.3.4.1.
+ESTADO FINAL: 3.3.3.3 - IMPLEMENTADA
 

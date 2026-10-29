@@ -2674,6 +2674,7 @@ Métodos:
 | `def get_applications_by_capability(capability_name)` |  |
 | `def get_application_capabilities(app_name)` |  |
 | `def get_application_capabilities_as_list(app_name)` | Expone capacidades como lista de identificadores canónicos consumibles por el planificador; reutiliza `get_application_capabilities` y devuelve `[]` si la app está ausente o no declara capacidades. |
+| `def trace_application_capability_to_action(app_name, capability)` | Trazabilidad aplicacion -> capability -> accion: para cada capability expuesta por la app documenta los nodos que la proporcionan y verifica (via `action_exists`) si la accion efectiva esta registrada; reutiliza `get_application_capabilities_as_list`, `_node_provides_capability`, `_resolve_node_action_name` y `action_exists`. No filtra por estado (`can_execute`) y restringe nodos a la app solicitada. |
 | `def find_application_for_goal(goal)` |  |
 | `def build_application_aware_plan(goal, current_state)` |  |
 | `def _get_action_registry()` | Obtiene el ActionRegistry disponible a través del executor o directamente; devuelve ``None`` si no está disponible (modo paso seguro). |
