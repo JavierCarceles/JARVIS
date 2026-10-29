@@ -2673,6 +2673,7 @@ Métodos:
 | `def load_application_knowledge()` |  |
 | `def get_applications_by_capability(capability_name)` |  |
 | `def get_application_capabilities(app_name)` |  |
+| `def get_application_capabilities_as_list(app_name)` | Expone capacidades como lista de identificadores canónicos consumibles por el planificador; reutiliza `get_application_capabilities` y devuelve `[]` si la app está ausente o no declara capacidades. |
 | `def find_application_for_goal(goal)` |  |
 | `def build_application_aware_plan(goal, current_state)` |  |
 | `def is_application_available(app_name)` |  |

@@ -696,7 +696,7 @@ FASE 3 ? APPLICATION KNOWLEDGE
 3.3.2.2 Distinguir capability disponible de capability simplemente declarada. [IMPLEMENTADA]
 3.3.2.3 Verificar capacidades ausentes. [VERIFICADA]
 3.3.3 ? Planificacion
-3.3.3.1 Exponer capacidades en formato consumible por planificacion.
+3.3.3.1 Exponer capacidades en formato consumible por planificacion. [IMPLEMENTADA]
 3.3.3.2 Verificar que Planner no recibe acciones inexistentes.
 3.3.3.3 Verificar trazabilidad aplicacion -> capability -> accion.
 3.3.4 ? Tests
@@ -5417,4 +5417,57 @@ tests (vía register_custom_application módulo → singleton real); no persiste
 entities.json.
 PENDIENTES: NINGUNO para 3.3.2.3 (completada). La siguiente hoja del roadmap es 3.3.3.1.
 ESTADO FINAL: 3.3.2.3 - VERIFICADA
+
+REGISTRO DE UNIDAD: 3.3.3.1
+FECHA: 2026-10-29
+OBJETIVO: "Exponer capacidades en formato consumible por planificacion."
+Extiende el contrato establecido en 3.3.1.1/3.3.2.1/3.3.2.2/3.3.2.3: el
+planificador debe exponer las capacidades de una aplicación en un formato
+LISTA consumible por la fase de planificación (identificadores canónicos),
+reutilizando el contrato canonico get_application_capabilities y manejando el
+ausente —app desconocida, integrador no disponible o app conocida sin capacidades
+declaradas— como [] (nota persistente de 3.3.2.3: "3.3.3+ expone capabilities
+al planificador manejando el ausente como []"). La exposición previa en
+build_application_aware_plan usaba list(get_application_capabilities(...).keys())
+—nombres específicos de la app (open_chrome)—, que no son consumibles por el
+planificador.
+CAMBIOS / HALLAZGOS:
+- NUEVO Planner.get_application_capabilities_as_list(app_name) -> List[str]:
+  proyecta get_application_capabilities (dict) a una lista de identificadores
+  canónicos (descriptor["capability"] normalizado con _slug), [] para ausente.
+  Delega al contrato canonico (no duplica logica); evita claves/nombres
+  específicos de la app.
+- build_application_aware_plan: metadata["application_capabilities"] ahora usa
+  get_application_capabilities_as_list(target_app) (lista consumible) en lugar
+  del list(.keys()) no consumible; en la rama de app ausente (target_app None)
+  ahora se expone [] (antes no se establecía la clave).
+- Modelo real verificado read-only: chrome -> ["open","navigate","search"];
+  spotify -> ["open","navigate"]; youtube/github -> []; app inexistente -> [].
+ARCHIVOS MODIFICADOS:
+PRODUCCION: `src/hands/planner/planner.py`;
+TESTS: `tests/hands/planner/test_capabilities_consumible_format.py` (NUEVA, 12 tests, 2 clases);
+DOCUMENTACION: `README.md` (tabla Planner: get_application_capabilities_as_list).
+TESTS Y RESULTADOS:
+UNITARIOS: 12/12 PASSED (tests/hands/planner/test_capabilities_consumible_format.py).
+  * TestCapabilitiesConsumibleFormat: 9.
+  * TestPlanExposesConsumibleCapabilities: 3.
+NO REGRESION: 2299/2299 PASSED (tests/hands + tests/brain). (Baseline 3.3.2.3: 2287;
++12 de 3.3.3.1 = 2299. 0 fallos, 0 errores.)
+VERIFICACION:
+SINTAXIS: py_compile de src/hands/planner/planner.py -> exit 0.
+MAIN.PY: `import main` -> OK (IMPORT_MAIN_OK).
+COMPORTAMIENTO / INTEGRACION REAL: verificado read-only contra singleton real
+get_application_knowledge_integrator()/ApplicationManager (chrome declara
+open/navigate/search; spotify open/navigate; youtube/github ausentes -> [];
+inexistente -> []). build_application_aware_plan('open_application', chrome)
+expone application_used='Chrome' y application_capabilities=['open','navigate','search'];
+goal sin app resoluble expone application_used=None y application_capabilities=[]
+(ausente como []). entities.json inalterado.
+DISCREPANCIAS: (D-CAP-MODEL-GAP) Heredado de 3.3.1.1..3.3.2.3: 30/32 apps carecen de
+capabilities declaradas en el modelo Enum (solo Chrome/Spotify); la exposición
+consumible [] para ausentes está implementada, pero la cobertura de datos del
+Enum para apps reconstruidas persiste como brecha de datos (pendiente fases
+posteriores). NINGUNA contradiccion nueva introducida.
+PENDIENTES: NINGUNO para 3.3.3.1 (completada). La siguiente hoja del roadmap es 3.3.3.2.
+ESTADO FINAL: 3.3.3.1 - IMPLEMENTADA
 

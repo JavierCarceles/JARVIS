@@ -2157,6 +2157,36 @@ class Planner:
             )
             return {}
 
+    def get_application_capabilities_as_list(self, app_name: str) -> List[str]:
+        """Expone las capacidades de una aplicación en formato consumible por el
+        planificador: una lista de identificadores canónicos de capacidad.
+
+        Reutiliza el contrato canónico :meth:`get_application_capabilities` (no
+        duplica lógica) y transforma ese dict —cuyas claves son nombres
+        específicos de la aplicación— a una lista de los identificadores
+        canónicos de capacidad (``descriptor["capability"]``) que el planificador
+        consume en la fase de planificación. Normaliza con :func:`_slug` para
+        coincidir con el vocabulario canónico usado en
+        :meth:`_node_provides_capability`.
+
+        Maneja el ausente —integrador no disponible, aplicación desconocida o
+        aplicación conocida sin capacidades declaradas— devolviendo ``[]`` en
+        lugar de lanzar ni devolver estructuras parciales.
+        """
+        capabilities = self.get_application_capabilities(app_name)
+        if not isinstance(capabilities, dict) or not capabilities:
+            return []
+        identifiers: List[str] = []
+        seen: set = set()
+        for descriptor in capabilities.values():
+            if not isinstance(descriptor, dict):
+                continue
+            identifier = _slug(descriptor.get("capability"))
+            if identifier and identifier not in seen:
+                identifiers.append(identifier)
+                seen.add(identifier)
+        return identifiers
+
     def find_application_for_goal(self, goal: Goal) -> Optional[str]:
         goal_type = str(getattr(goal, "type", "")).lower()
         type_mapping = {
@@ -2209,6 +2239,7 @@ class Planner:
                 30.0,
             )
             result.metadata["application_used"] = None
+            result.metadata["application_capabilities"] = []
             return result
         normalized_app = _normalize_text(target_app)
         nodes = {
@@ -2222,8 +2253,8 @@ class Planner:
             goal, self._normalize_state(current_state), nodes, 30.0
         )
         result.metadata["application_used"] = target_app
-        result.metadata["application_capabilities"] = list(
-            self.get_application_capabilities(target_app).keys()
+        result.metadata["application_capabilities"] = (
+            self.get_application_capabilities_as_list(target_app)
         )
         return result
 
