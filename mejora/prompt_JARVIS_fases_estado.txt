@@ -6029,3 +6029,31 @@ DISCREPANCIAS:
 - Ninguna contradiccion nueva introducida por 3.4.2.3.
 PENDIENTES: NINGUNA para 3.4.2.3 (completada). La siguiente hoja del roadmap es 3.4.2.4 (Verificar integracion con vision/calibracion).
 ESTADO FINAL: 3.4.2.3 - IMPLEMENTADA
+
+## REGISTRO DE UNIDAD: 3.4.2.4
+
+FECHA: 2026-10-29
+OBJETIVO: Verificar la integracion real entre el conocimiento de UI (applications.json, macros_coords.json ui_knowledge), la capa de vision (Vision.analyze_image, nodos de vision) y la capa de calibracion (CoordinateManager recursos UI, validacion de acciones por type, coordenadas calibradas). Crear bateria de tests de integracion que corra sobre modelos y datos reales sin modificar codigo de produccion, cubriendo: UVC usa Vision.analyze_image; Vision expone nodo vision.analyze_for_calibration (tipo calibration_analysis, precondicion calibration_target_known, efecto calibration_candidates_found, execute_function analyze_image, costo 3.5); CoordinateManager carga ui_knowledge desde macros_coords como recursos UI con type/description correctos; elementos UI de aplicaciones (chrome address_bar/new_tab_button/search_bar) tienen recurso calibrado coincidente en type; validate_resource_for_action mapea region/button correctamente para acciones de chrome.
+TIPO DE TRABAJO: TEST | VERIFICACION (sobre modelos y datos reales, sin modificacion de produccion)
+CAMBIOS / HALLAZGOS:
+- tests/eyes/test_vision_calibration_integration.py (TESTS, nuevo, 19 tests en 7 clases): TestUvcUsesVision (UVC tiene instancia Vision; calibrate() invoca vision.analyze_image con captura y prompt, patcheando Path y get_monitor_info sin archivos reales); TestVisionOutputUvcCompatible (schema de analyze_image tiene campos requeridos: image_path, app_name, elements list, prompt, model, confidence; normalizar un elemento usa los campos reales de vision); TestUvcCalibrationPolicy (CalibrationPolicy permite chrome y spotify, bloquea valorant; permite elemento button, bloquea baja confianza y tipo background); TestCoordinateManagerKnowledgeToCalibration (carga ui_knowledge de macros_coords como UIResource con type/description; fusiona calibraciones con conocimiento; get_calibrated_coordinate para chrome address_bar devuelve coordenadas reales de pantalla s1); TestUiElementsToCalibrationToAction (elementos UI de chrome que tambien estan en ui_knowledge de macros_coords tienen recurso en CoordinateManager con mismo type; validate_resource_for_action para chrome address_bar tipo input permite focus_/type_ y no click_; chrome new_tab_button tipo button permite click_ y no type_); TestVisionCalibrationNode (Vision expone _vision_nodes tras _create_vision_nodes(); nodo vision.analyze_for_calibration existe, tipo calibration_analysis, execute_function analyze_image, costo 3.5, precondicion calibration_target_known, efecto calibration_candidates_found); TestVisionVerifyElementWithExpectedCoords (verificar_elemento_visibilidad acepta coordenadas esperadas y compara con calibracion real de CoordinateManager).
+- Ningun archivo de produccion modificado (0 cambios en src/). Los tests ejercitan el codigo real existente: UniversalVisualCalibrator.calibrate, Vision.get_vision_nodes / get_vision_node, Vision.analyze_image, CoordinateManager (carga, fusion, recursos, validacion), ApplicationManager.get_application_ui_elements, CalibrationPolicy, application_integration._create_ui_element_node.
+TESTS Y RESULTADOS:
+- UNITARIOS nuevos: tests/eyes/test_vision_calibration_integration.py 19/19 PASSED (7 clases de verificacion).
+- NO REGRESION: 527/527 PASSED (tests/eyes completo + tests/hands: applications_core, application_consumers_real_model, application_minimal_contract). Baseline antes de 3.4.2.4 = 508 (tests/hands subset) + 19 nuevos = 527. 0 fallos, 0 errores.
+- INTEGRACION REAL: se verifico comportamiento real (no simulado) de: calibrate() invoca vision.analyze_image; Vision._vision_nodes se inicializa via _create_vision_nodes(); nodo calibration_analysis usa analyze_image; CoordinateManager fusiona conocimiento+calibraciones y expone recursos con type correcto; validate_resource_for_action distingue focus_/click_/type_ por type (input vs button).
+ARCHIVOS MODIFICADOS:
+  PRODUCCION: NA (cero cambios en src/).
+  DATOS: NA (cero cambios en JSON de datos).
+  TESTS: tests/eyes/test_vision_calibration_integration.py (nuevo, 19 tests).
+  DOCUMENTACION: mejora/prompt_JARVIS_fases_estado.txt (este registro).
+VERIFICACION:
+  SINTAXIS: OK (py_compile del nuevo test, exit 0).
+  MAIN.PY: OK (import main -> IMPORT_MAIN_OK; todos los componentes inicializan, shutdown graceful).
+  COMPORTAMIENTO / INTEGRACION REAL: tests ejecutados sobre el codigo real existente sin mocks de logica de negocio (solo se mockean Path/get_monitor_info en un test para evitar lecturas de disco, manteniendo la llamada real a vision.analyze_image).
+DISCREPANCIAS: Ninguna contradiccion nueva introducida por 3.4.2.4. Las discrepancias preexistentes D-UI-DESCRIPTION-LOST, D-UI-FORMAT-MISMATCH y D-UI-MULTI-FORMAT (documentadas en 3.4.2.1/3.4.2.2/3.4.2.3) no afectan al cierre de 3.4.2.4 porque esta hoja es pura verificacion de integracion sobre modelos reales.
+PENDIENTES: NINGUNA para 3.4.2.4 (completada). La siguiente hoja del roadmap es 3.4.3.1 (Comparar estado declarado con estado observable).
+ESTADO FINAL: 3.4.2.4 - IMPLEMENTADA
+
+--- TRANSICION DE ESTADO 3.4.2.4 -> 3.4.3.1 ---
+Se completa 3.4.2.4. CURRENT_WORK_UNIT avanza a 3.4.3.1. La siguiente hoja del roadmap es 3.4.3.1 (Comparar estado declarado con estado observable). Los registros canonicos de 3.4.2.1-3.4.2.4 permanecen vigentes.

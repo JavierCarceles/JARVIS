@@ -4198,5 +4198,6245 @@
     "timestamp": 1793316443.6652544,
     "execution_result": null,
     "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Jajajajajajajaja",
+    "timestamp": 1793315600.469189,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793315600.4691908,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Jajajajajaja",
+    "timestamp": 1793315600.5739875,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793315600.5739894,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793315621.292662,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793315621.2926638,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal y dale a like!",
+    "timestamp": 1793315628.5604868,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793315628.5604885,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal y dale a like!",
+    "timestamp": 1793315632.7183735,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793315632.7183769,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal y dale a like!",
+    "timestamp": 1793315648.9810257,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793315648.9810278,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793315649.1193244,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793315649.119328,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793315750.1631446,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793315750.1631472,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Bienvenido.",
+    "timestamp": 1793316384.6200192,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316384.6200216,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Bienvenido.",
+    "timestamp": 1793316385.4382825,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316385.4382854,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Queda un poco el día.",
+    "timestamp": 1793316439.3284938,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316439.3284955,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Queda un poco el día.",
+    "timestamp": 1793316443.6652527,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316443.6652544,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316487.0762918,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316487.0762954,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Jajajajajaja",
+    "timestamp": 1793315600.5739875,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793315600.5739894,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793315621.292662,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793315621.2926638,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal y dale a like!",
+    "timestamp": 1793315628.5604868,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793315628.5604885,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal y dale a like!",
+    "timestamp": 1793315632.7183735,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793315632.7183769,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal y dale a like!",
+    "timestamp": 1793315648.9810257,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793315648.9810278,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793315649.1193244,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793315649.119328,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793315750.1631446,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793315750.1631472,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Bienvenido.",
+    "timestamp": 1793316384.6200192,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316384.6200216,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Bienvenido.",
+    "timestamp": 1793316385.4382825,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316385.4382854,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Queda un poco el día.",
+    "timestamp": 1793316439.3284938,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316439.3284955,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Queda un poco el día.",
+    "timestamp": 1793316443.6652527,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316443.6652544,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316487.0762918,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316487.0762954,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316487.4261591,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316487.4261634,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793315621.292662,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793315621.2926638,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal y dale a like!",
+    "timestamp": 1793315628.5604868,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793315628.5604885,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal y dale a like!",
+    "timestamp": 1793315632.7183735,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793315632.7183769,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal y dale a like!",
+    "timestamp": 1793315648.9810257,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793315648.9810278,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793315649.1193244,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793315649.119328,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793315750.1631446,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793315750.1631472,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Bienvenido.",
+    "timestamp": 1793316384.6200192,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316384.6200216,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Bienvenido.",
+    "timestamp": 1793316385.4382825,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316385.4382854,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Queda un poco el día.",
+    "timestamp": 1793316439.3284938,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316439.3284955,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Queda un poco el día.",
+    "timestamp": 1793316443.6652527,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316443.6652544,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316487.0762918,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316487.0762954,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316487.4261591,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316487.4261634,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316498.5860057,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316498.5860078,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal y dale a like!",
+    "timestamp": 1793315628.5604868,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793315628.5604885,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal y dale a like!",
+    "timestamp": 1793315632.7183735,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793315632.7183769,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal y dale a like!",
+    "timestamp": 1793315648.9810257,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793315648.9810278,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793315649.1193244,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793315649.119328,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793315750.1631446,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793315750.1631472,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Bienvenido.",
+    "timestamp": 1793316384.6200192,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316384.6200216,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Bienvenido.",
+    "timestamp": 1793316385.4382825,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316385.4382854,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Queda un poco el día.",
+    "timestamp": 1793316439.3284938,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316439.3284955,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Queda un poco el día.",
+    "timestamp": 1793316443.6652527,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316443.6652544,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316487.0762918,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316487.0762954,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316487.4261591,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316487.4261634,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316498.5860057,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316498.5860078,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316515.3014266,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316515.301429,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal y dale a like!",
+    "timestamp": 1793315632.7183735,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793315632.7183769,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal y dale a like!",
+    "timestamp": 1793315648.9810257,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793315648.9810278,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793315649.1193244,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793315649.119328,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793315750.1631446,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793315750.1631472,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Bienvenido.",
+    "timestamp": 1793316384.6200192,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316384.6200216,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Bienvenido.",
+    "timestamp": 1793316385.4382825,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316385.4382854,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Queda un poco el día.",
+    "timestamp": 1793316439.3284938,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316439.3284955,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Queda un poco el día.",
+    "timestamp": 1793316443.6652527,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316443.6652544,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316487.0762918,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316487.0762954,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316487.4261591,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316487.4261634,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316498.5860057,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316498.5860078,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316515.3014266,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316515.301429,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Ría, Ría, Ría, Ría, Ría, ¿verdad?",
+    "timestamp": 1793316523.9187212,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316523.9187233,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal y dale a like!",
+    "timestamp": 1793315648.9810257,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793315648.9810278,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793315649.1193244,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793315649.119328,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793315750.1631446,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793315750.1631472,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Bienvenido.",
+    "timestamp": 1793316384.6200192,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316384.6200216,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Bienvenido.",
+    "timestamp": 1793316385.4382825,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316385.4382854,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Queda un poco el día.",
+    "timestamp": 1793316439.3284938,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316439.3284955,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Queda un poco el día.",
+    "timestamp": 1793316443.6652527,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316443.6652544,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316487.0762918,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316487.0762954,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316487.4261591,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316487.4261634,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316498.5860057,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316498.5860078,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316515.3014266,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316515.301429,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Ría, Ría, Ría, Ría, Ría, ¿verdad?",
+    "timestamp": 1793316523.9187212,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316523.9187233,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Ojito! ¡Ojito!",
+    "timestamp": 1793316780.1720397,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316780.1720421,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793315649.1193244,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793315649.119328,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793315750.1631446,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793315750.1631472,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Bienvenido.",
+    "timestamp": 1793316384.6200192,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316384.6200216,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Bienvenido.",
+    "timestamp": 1793316385.4382825,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316385.4382854,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Queda un poco el día.",
+    "timestamp": 1793316439.3284938,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316439.3284955,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Queda un poco el día.",
+    "timestamp": 1793316443.6652527,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316443.6652544,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316487.0762918,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316487.0762954,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316487.4261591,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316487.4261634,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316498.5860057,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316498.5860078,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316515.3014266,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316515.301429,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Ría, Ría, Ría, Ría, Ría, ¿verdad?",
+    "timestamp": 1793316523.9187212,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316523.9187233,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Ojito! ¡Ojito!",
+    "timestamp": 1793316780.1720397,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316780.1720421,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Ojito! ¡Ojito!",
+    "timestamp": 1793316780.5060961,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316780.5060983,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793315750.1631446,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793315750.1631472,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Bienvenido.",
+    "timestamp": 1793316384.6200192,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316384.6200216,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Bienvenido.",
+    "timestamp": 1793316385.4382825,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316385.4382854,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Queda un poco el día.",
+    "timestamp": 1793316439.3284938,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316439.3284955,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Queda un poco el día.",
+    "timestamp": 1793316443.6652527,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316443.6652544,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316487.0762918,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316487.0762954,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316487.4261591,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316487.4261634,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316498.5860057,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316498.5860078,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316515.3014266,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316515.301429,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Ría, Ría, Ría, Ría, Ría, ¿verdad?",
+    "timestamp": 1793316523.9187212,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316523.9187233,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Ojito! ¡Ojito!",
+    "timestamp": 1793316780.1720397,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316780.1720421,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Ojito! ¡Ojito!",
+    "timestamp": 1793316780.5060961,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316780.5060983,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal y dale a like!",
+    "timestamp": 1793316795.4811263,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316795.48113,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Bienvenido.",
+    "timestamp": 1793316384.6200192,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316384.6200216,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Bienvenido.",
+    "timestamp": 1793316385.4382825,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316385.4382854,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Queda un poco el día.",
+    "timestamp": 1793316439.3284938,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316439.3284955,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Queda un poco el día.",
+    "timestamp": 1793316443.6652527,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316443.6652544,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316487.0762918,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316487.0762954,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316487.4261591,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316487.4261634,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316498.5860057,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316498.5860078,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316515.3014266,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316515.301429,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Ría, Ría, Ría, Ría, Ría, ¿verdad?",
+    "timestamp": 1793316523.9187212,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316523.9187233,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Ojito! ¡Ojito!",
+    "timestamp": 1793316780.1720397,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316780.1720421,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Ojito! ¡Ojito!",
+    "timestamp": 1793316780.5060961,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316780.5060983,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal y dale a like!",
+    "timestamp": 1793316795.4811263,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316795.48113,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316801.0756876,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316801.07569,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Bienvenido.",
+    "timestamp": 1793316385.4382825,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316385.4382854,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Queda un poco el día.",
+    "timestamp": 1793316439.3284938,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316439.3284955,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Queda un poco el día.",
+    "timestamp": 1793316443.6652527,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316443.6652544,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316487.0762918,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316487.0762954,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316487.4261591,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316487.4261634,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316498.5860057,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316498.5860078,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316515.3014266,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316515.301429,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Ría, Ría, Ría, Ría, Ría, ¿verdad?",
+    "timestamp": 1793316523.9187212,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316523.9187233,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Ojito! ¡Ojito!",
+    "timestamp": 1793316780.1720397,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316780.1720421,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Ojito! ¡Ojito!",
+    "timestamp": 1793316780.5060961,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316780.5060983,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal y dale a like!",
+    "timestamp": 1793316795.4811263,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316795.48113,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316801.0756876,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316801.07569,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¿Cuándo viviamos parecido?",
+    "timestamp": 1793316868.0698342,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316868.0698364,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Queda un poco el día.",
+    "timestamp": 1793316439.3284938,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316439.3284955,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Queda un poco el día.",
+    "timestamp": 1793316443.6652527,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316443.6652544,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316487.0762918,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316487.0762954,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316487.4261591,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316487.4261634,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316498.5860057,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316498.5860078,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316515.3014266,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316515.301429,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Ría, Ría, Ría, Ría, Ría, ¿verdad?",
+    "timestamp": 1793316523.9187212,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316523.9187233,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Ojito! ¡Ojito!",
+    "timestamp": 1793316780.1720397,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316780.1720421,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Ojito! ¡Ojito!",
+    "timestamp": 1793316780.5060961,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316780.5060983,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal y dale a like!",
+    "timestamp": 1793316795.4811263,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316795.48113,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316801.0756876,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316801.07569,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¿Cuándo viviamos parecido?",
+    "timestamp": 1793316868.0698342,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316868.0698364,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¿Sabes cuándo viviamos?",
+    "timestamp": 1793316874.8528929,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316874.8528957,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Queda un poco el día.",
+    "timestamp": 1793316443.6652527,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316443.6652544,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316487.0762918,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316487.0762954,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316487.4261591,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316487.4261634,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316498.5860057,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316498.5860078,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316515.3014266,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316515.301429,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Ría, Ría, Ría, Ría, Ría, ¿verdad?",
+    "timestamp": 1793316523.9187212,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316523.9187233,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Ojito! ¡Ojito!",
+    "timestamp": 1793316780.1720397,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316780.1720421,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Ojito! ¡Ojito!",
+    "timestamp": 1793316780.5060961,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316780.5060983,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal y dale a like!",
+    "timestamp": 1793316795.4811263,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316795.48113,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316801.0756876,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316801.07569,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¿Cuándo viviamos parecido?",
+    "timestamp": 1793316868.0698342,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316868.0698364,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¿Sabes cuándo viviamos?",
+    "timestamp": 1793316874.8528929,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316874.8528957,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "LoL, Spotify, comando, asistente, tecnología.",
+    "timestamp": 1793316880.7031438,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316880.703147,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316487.0762918,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316487.0762954,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316487.4261591,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316487.4261634,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316498.5860057,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316498.5860078,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316515.3014266,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316515.301429,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Ría, Ría, Ría, Ría, Ría, ¿verdad?",
+    "timestamp": 1793316523.9187212,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316523.9187233,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Ojito! ¡Ojito!",
+    "timestamp": 1793316780.1720397,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316780.1720421,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Ojito! ¡Ojito!",
+    "timestamp": 1793316780.5060961,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316780.5060983,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal y dale a like!",
+    "timestamp": 1793316795.4811263,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316795.48113,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316801.0756876,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316801.07569,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¿Cuándo viviamos parecido?",
+    "timestamp": 1793316868.0698342,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316868.0698364,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¿Sabes cuándo viviamos?",
+    "timestamp": 1793316874.8528929,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316874.8528957,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "LoL, Spotify, comando, asistente, tecnología.",
+    "timestamp": 1793316880.7031438,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316880.703147,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Atrás de la búsqueda.",
+    "timestamp": 1793316909.5614064,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316909.5614085,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316487.0762918,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316487.0762954,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316487.4261591,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316487.4261634,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316498.5860057,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316498.5860078,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316515.3014266,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316515.301429,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Ría, Ría, Ría, Ría, Ría, ¿verdad?",
+    "timestamp": 1793316523.9187212,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316523.9187233,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Ojito! ¡Ojito!",
+    "timestamp": 1793316780.1720397,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316780.1720421,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Ojito! ¡Ojito!",
+    "timestamp": 1793316780.5060961,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316780.5060983,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal y dale a like!",
+    "timestamp": 1793316795.4811263,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316795.48113,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316801.0756876,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316801.07569,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¿Cuándo viviamos parecido?",
+    "timestamp": 1793316868.0698342,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316868.0698364,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¿Sabes cuándo viviamos?",
+    "timestamp": 1793316874.8528929,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316874.8528957,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "LoL, Spotify, comando, asistente, tecnología.",
+    "timestamp": 1793316880.7031438,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316880.703147,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Atrás de la búsqueda.",
+    "timestamp": 1793316909.6096683,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316909.6096706,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316487.4261591,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316487.4261634,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316498.5860057,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316498.5860078,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316515.3014266,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316515.301429,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Ría, Ría, Ría, Ría, Ría, ¿verdad?",
+    "timestamp": 1793316523.9187212,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316523.9187233,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Ojito! ¡Ojito!",
+    "timestamp": 1793316780.1720397,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316780.1720421,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Ojito! ¡Ojito!",
+    "timestamp": 1793316780.5060961,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316780.5060983,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal y dale a like!",
+    "timestamp": 1793316795.4811263,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316795.48113,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316801.0756876,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316801.07569,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¿Cuándo viviamos parecido?",
+    "timestamp": 1793316868.0698342,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316868.0698364,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¿Sabes cuándo viviamos?",
+    "timestamp": 1793316874.8528929,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316874.8528957,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "LoL, Spotify, comando, asistente, tecnología.",
+    "timestamp": 1793316880.7031438,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316880.703147,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Atrás de la búsqueda.",
+    "timestamp": 1793316909.6096683,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316909.6096706,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Bye bye.",
+    "timestamp": 1793316980.7427082,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316980.7427104,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316498.5860057,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316498.5860078,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316515.3014266,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316515.301429,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Ría, Ría, Ría, Ría, Ría, ¿verdad?",
+    "timestamp": 1793316523.9187212,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316523.9187233,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Ojito! ¡Ojito!",
+    "timestamp": 1793316780.1720397,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316780.1720421,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Ojito! ¡Ojito!",
+    "timestamp": 1793316780.5060961,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316780.5060983,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal y dale a like!",
+    "timestamp": 1793316795.4811263,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316795.48113,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316801.0756876,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316801.07569,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¿Cuándo viviamos parecido?",
+    "timestamp": 1793316868.0698342,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316868.0698364,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¿Sabes cuándo viviamos?",
+    "timestamp": 1793316874.8528929,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316874.8528957,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "LoL, Spotify, comando, asistente, tecnología.",
+    "timestamp": 1793316880.7031438,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316880.703147,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Atrás de la búsqueda.",
+    "timestamp": 1793316909.6096683,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316909.6096706,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Bye bye.",
+    "timestamp": 1793316980.7427082,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316980.7427104,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Bye bye.",
+    "timestamp": 1793316986.1080072,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316986.1080117,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316515.3014266,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316515.301429,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Ría, Ría, Ría, Ría, Ría, ¿verdad?",
+    "timestamp": 1793316523.9187212,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316523.9187233,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Ojito! ¡Ojito!",
+    "timestamp": 1793316780.1720397,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316780.1720421,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Ojito! ¡Ojito!",
+    "timestamp": 1793316780.5060961,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316780.5060983,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal y dale a like!",
+    "timestamp": 1793316795.4811263,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316795.48113,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316801.0756876,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316801.07569,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¿Cuándo viviamos parecido?",
+    "timestamp": 1793316868.0698342,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316868.0698364,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¿Sabes cuándo viviamos?",
+    "timestamp": 1793316874.8528929,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316874.8528957,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "LoL, Spotify, comando, asistente, tecnología.",
+    "timestamp": 1793316880.7031438,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316880.703147,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Atrás de la búsqueda.",
+    "timestamp": 1793316909.6096683,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316909.6096706,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Bye bye.",
+    "timestamp": 1793316980.7427082,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316980.7427104,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Bye bye.",
+    "timestamp": 1793316986.1080072,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316986.1080117,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Viene bueno con el...",
+    "timestamp": 1793317012.14615,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793317012.1461525,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Ría, Ría, Ría, Ría, Ría, ¿verdad?",
+    "timestamp": 1793316523.9187212,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316523.9187233,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Ojito! ¡Ojito!",
+    "timestamp": 1793316780.1720397,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316780.1720421,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Ojito! ¡Ojito!",
+    "timestamp": 1793316780.5060961,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316780.5060983,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal y dale a like!",
+    "timestamp": 1793316795.4811263,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316795.48113,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316801.0756876,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316801.07569,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¿Cuándo viviamos parecido?",
+    "timestamp": 1793316868.0698342,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316868.0698364,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¿Sabes cuándo viviamos?",
+    "timestamp": 1793316874.8528929,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316874.8528957,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "LoL, Spotify, comando, asistente, tecnología.",
+    "timestamp": 1793316880.7031438,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316880.703147,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Atrás de la búsqueda.",
+    "timestamp": 1793316909.6096683,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316909.6096706,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Bye bye.",
+    "timestamp": 1793316980.7427082,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316980.7427104,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Bye bye.",
+    "timestamp": 1793316986.1080072,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316986.1080117,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Viene bueno con el...",
+    "timestamp": 1793317012.14615,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793317012.1461525,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Viene bueno con el...",
+    "timestamp": 1793317012.445472,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793317012.4454744,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Ojito! ¡Ojito!",
+    "timestamp": 1793316780.1720397,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316780.1720421,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Ojito! ¡Ojito!",
+    "timestamp": 1793316780.5060961,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316780.5060983,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal y dale a like!",
+    "timestamp": 1793316795.4811263,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316795.48113,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316801.0756876,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316801.07569,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¿Cuándo viviamos parecido?",
+    "timestamp": 1793316868.0698342,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316868.0698364,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¿Sabes cuándo viviamos?",
+    "timestamp": 1793316874.8528929,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316874.8528957,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "LoL, Spotify, comando, asistente, tecnología.",
+    "timestamp": 1793316880.7031438,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316880.703147,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Atrás de la búsqueda.",
+    "timestamp": 1793316909.6096683,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316909.6096706,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Bye bye.",
+    "timestamp": 1793316980.7427082,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316980.7427104,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Bye bye.",
+    "timestamp": 1793316986.1080072,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316986.1080117,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Viene bueno con el...",
+    "timestamp": 1793317012.14615,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793317012.1461525,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Viene bueno con el...",
+    "timestamp": 1793317012.445472,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793317012.4454744,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "En cualquier deporte.",
+    "timestamp": 1793317157.3281488,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793317157.3281515,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Ojito! ¡Ojito!",
+    "timestamp": 1793316780.5060961,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316780.5060983,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal y dale a like!",
+    "timestamp": 1793316795.4811263,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316795.48113,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316801.0756876,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316801.07569,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¿Cuándo viviamos parecido?",
+    "timestamp": 1793316868.0698342,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316868.0698364,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¿Sabes cuándo viviamos?",
+    "timestamp": 1793316874.8528929,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316874.8528957,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "LoL, Spotify, comando, asistente, tecnología.",
+    "timestamp": 1793316880.7031438,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316880.703147,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Atrás de la búsqueda.",
+    "timestamp": 1793316909.6096683,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316909.6096706,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Bye bye.",
+    "timestamp": 1793316980.7427082,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316980.7427104,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Bye bye.",
+    "timestamp": 1793316986.1080072,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316986.1080117,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Viene bueno con el...",
+    "timestamp": 1793317012.14615,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793317012.1461525,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Viene bueno con el...",
+    "timestamp": 1793317012.445472,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793317012.4454744,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "En cualquier deporte.",
+    "timestamp": 1793317157.3281488,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793317157.3281515,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Cualquier deporte.",
+    "timestamp": 1793317174.7144897,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793317174.7144918,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal y dale a like!",
+    "timestamp": 1793316795.4811263,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316795.48113,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316801.0756876,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316801.07569,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¿Cuándo viviamos parecido?",
+    "timestamp": 1793316868.0698342,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316868.0698364,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¿Sabes cuándo viviamos?",
+    "timestamp": 1793316874.8528929,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316874.8528957,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "LoL, Spotify, comando, asistente, tecnología.",
+    "timestamp": 1793316880.7031438,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316880.703147,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Atrás de la búsqueda.",
+    "timestamp": 1793316909.6096683,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316909.6096706,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Bye bye.",
+    "timestamp": 1793316980.7427082,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316980.7427104,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Bye bye.",
+    "timestamp": 1793316986.1080072,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316986.1080117,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Viene bueno con el...",
+    "timestamp": 1793317012.14615,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793317012.1461525,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Viene bueno con el...",
+    "timestamp": 1793317012.445472,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793317012.4454744,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "En cualquier deporte.",
+    "timestamp": 1793317157.3281488,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793317157.3281515,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Cualquier deporte.",
+    "timestamp": 1793317174.7144897,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793317174.7144918,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793317243.8079138,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793317243.8079178,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793316801.0756876,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316801.07569,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¿Cuándo viviamos parecido?",
+    "timestamp": 1793316868.0698342,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316868.0698364,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¿Sabes cuándo viviamos?",
+    "timestamp": 1793316874.8528929,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316874.8528957,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "LoL, Spotify, comando, asistente, tecnología.",
+    "timestamp": 1793316880.7031438,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316880.703147,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Atrás de la búsqueda.",
+    "timestamp": 1793316909.6096683,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316909.6096706,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Bye bye.",
+    "timestamp": 1793316980.7427082,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316980.7427104,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Bye bye.",
+    "timestamp": 1793316986.1080072,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316986.1080117,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Viene bueno con el...",
+    "timestamp": 1793317012.14615,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793317012.1461525,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Viene bueno con el...",
+    "timestamp": 1793317012.445472,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793317012.4454744,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "En cualquier deporte.",
+    "timestamp": 1793317157.3281488,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793317157.3281515,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Cualquier deporte.",
+    "timestamp": 1793317174.7144897,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793317174.7144918,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793317243.8079138,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793317243.8079178,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Jarvis, ¿qué tal?",
+    "timestamp": 1793317256.0310183,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793317256.0310216,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¿Cuándo viviamos parecido?",
+    "timestamp": 1793316868.0698342,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316868.0698364,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¿Sabes cuándo viviamos?",
+    "timestamp": 1793316874.8528929,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316874.8528957,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "LoL, Spotify, comando, asistente, tecnología.",
+    "timestamp": 1793316880.7031438,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316880.703147,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Atrás de la búsqueda.",
+    "timestamp": 1793316909.6096683,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316909.6096706,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Bye bye.",
+    "timestamp": 1793316980.7427082,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316980.7427104,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Bye bye.",
+    "timestamp": 1793316986.1080072,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316986.1080117,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Viene bueno con el...",
+    "timestamp": 1793317012.14615,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793317012.1461525,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Viene bueno con el...",
+    "timestamp": 1793317012.445472,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793317012.4454744,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "En cualquier deporte.",
+    "timestamp": 1793317157.3281488,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793317157.3281515,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Cualquier deporte.",
+    "timestamp": 1793317174.7144897,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793317174.7144918,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793317243.8079138,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793317243.8079178,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Jarvis, ¿qué tal?",
+    "timestamp": 1793317256.0310183,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793317256.0310216,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Cripe que está perdido...",
+    "timestamp": 1793317292.8481715,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793317292.8481739,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¿Sabes cuándo viviamos?",
+    "timestamp": 1793316874.8528929,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316874.8528957,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "LoL, Spotify, comando, asistente, tecnología.",
+    "timestamp": 1793316880.7031438,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316880.703147,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Atrás de la búsqueda.",
+    "timestamp": 1793316909.6096683,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316909.6096706,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Bye bye.",
+    "timestamp": 1793316980.7427082,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316980.7427104,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Bye bye.",
+    "timestamp": 1793316986.1080072,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793316986.1080117,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Viene bueno con el...",
+    "timestamp": 1793317012.14615,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793317012.1461525,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Viene bueno con el...",
+    "timestamp": 1793317012.445472,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793317012.4454744,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "En cualquier deporte.",
+    "timestamp": 1793317157.3281488,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793317157.3281515,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Cualquier deporte.",
+    "timestamp": 1793317174.7144897,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793317174.7144918,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "¡Suscríbete al canal!",
+    "timestamp": 1793317243.8079138,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793317243.8079178,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Jarvis, ¿qué tal?",
+    "timestamp": 1793317256.0310183,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793317256.0310216,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Cripe que está perdido...",
+    "timestamp": 1793317292.8481715,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793317292.8481739,
+    "execution_result": null,
+    "system_state": {}
+  },
+  {
+    "role": "user",
+    "content": "Jarvis, señor, abrir, YouTube, Google, LoL, Spotify, comando, asistente, tecnología.",
+    "timestamp": 1793317325.685463,
+    "intention_parsed": false,
+    "goal_id": null,
+    "goal_type": null,
+    "goal_target": null,
+    "plan_generated": false,
+    "plan_steps": null,
+    "system_state": {},
+    "active_goals": []
+  },
+  {
+    "role": "assistant",
+    "content": "No entendí tu solicitud. ¿Podrías repetirla de otra manera?",
+    "timestamp": 1793317325.6854677,
+    "execution_result": null,
+    "system_state": {}
   }
 ]

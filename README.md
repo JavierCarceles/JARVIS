@@ -813,9 +813,9 @@ Funciones a nivel módulo:
 | `def get_application_preflight()`  (L888) |  |
 
 <a name="src-hands-applications_core-py"></a>
-### `src/hands/applications_core.py` [1357 líneas] — Sistema de conocimiento de aplicaciones para planificación jerárquica.
+### `src/hands/applications_core.py` [1522 líneas] — Sistema de conocimiento de aplicaciones para planificación jerárquica.
 
-**Descripción:** Sistema de conocimiento de aplicaciones para planificación jerárquica.
+**Descripción:** Sistema de conocimiento de aplicaciones para planificación jerárquica. Incluye el campo `description` en el modelo `UIElement` y lo propaga en serialización, reconstrucción, consulta de elementos y registro de aplicaciones personalizadas.
 
 **Importaciones:** 16.
 
@@ -830,6 +830,8 @@ _Sin métodos definidos en el AST._
 `class UIElement`  (línea 77) — Elemento UI de una aplicación.
 
 **Decoradores:** `@dataclass`
+
+**Campos:** `name`, `type`, `description` (str, vacío por defecto), `required_capability`, `coordinates`, `screen`, `calibration_data`.
 
 Métodos:
 
@@ -877,19 +879,19 @@ Métodos:
 | `def get_applications_by_type(app_type)` | Obtiene aplicaciones por tipo. |
 | `def get_applications_by_capability(capability)` | Obtiene aplicaciones con una capacidad determinada. |
 | `def _reconstruct_capabilities(capability_strings)` | Convierte una lista de strings de capacidad en ApplicationCapabilityDef. |
-| `def _reconstruct_ui_elements(elements_data)` | Reconstruye la lista de :class:`UIElement` desde ``properties``. |
+| `def _reconstruct_ui_elements(elements_data)` | Reconstruye la lista de :class:`UIElement` desde ``properties``, capturando el campo ``description`` cuando está presente. |
 | `def _reconstruct_states(states_data)` | Reconstruye la lista de :class:`ApplicationState` desde ``properties``. |
 | `def _reconstruct_application(entity)` | Reconstruye un objeto ApplicationKnowledge desde una Entity. |
 | `def _load_custom_applications()` | Carga aplicaciones personalizadas persistidas en memoria. |
 | `def get_application_capabilities(app_name)` | Obtiene capacidades de una aplicación en formato de planificación. |
-| `def get_application_ui_elements(app_name)` | Obtiene los elementos UI conocidos de una aplicación. |
+| `def get_application_ui_elements(app_name)` | Obtiene los elementos UI conocidos de una aplicación, incluyendo el campo ``description`` de cada uno. |
 
 Funciones a nivel módulo:
 
 | Firma | Docstring |
 |---|---|
 | `def _reconstruct_metadata(entity)`  (L197) | Construye el dict de metadata para una ApplicationKnowledge reconstruida. |
-| `def _serialize_ui_element(element)`  (L212) | Serializa un :class:`UIElement` a un dict JSON-friendly. |
+| `def _serialize_ui_element(element)`  (L212) | Serializa un :class:`UIElement` a un dict JSON-friendly, incluyendo siempre el campo ``description``. |
 | `def get_application_manager()`  (L754) | Obtiene la instancia global del gestor de aplicaciones. |
 | `def open_application(app_name)`  (L785) | Abre una aplicación conocida y valida su disponibilidad. |
 | `def close_application(app_name)`  (L831) | Cierra una aplicación por proceso sin tocar otras aplicaciones. |
@@ -908,7 +910,7 @@ Funciones a nivel módulo:
 | `def abrir_gmail()`  (L1273) |  |
 | `def get_application_knowledge(app_name)`  (L1284) | Obtiene conocimiento estructurado de una aplicación. |
 | `def get_applications_by_capability(capability_name)`  (L1307) | Obtiene aplicaciones que tienen una capacidad específica. |
-| `def register_custom_application(app_config)`  (L1318) | Registra una aplicación personalizada. |
+| `def register_custom_application(app_config)`  (L1318) | Registra una aplicación personalizada, aceptando ``description`` en cada elemento de ``ui_elements``. |
 
 <a name="src-hands-calibration_manager-py"></a>
 ### `src/hands/calibration_manager.py` [2343 líneas] — Gestor universal de calibración de aplicaciones para JARVIS.
