@@ -706,7 +706,7 @@ FASE 3 ? APPLICATION KNOWLEDGE
 3.3.4.4 Verificar no regresion. [IMPLEMENTADA]
 3.4 ? ESTADOS Y UI
 3.4.1 ? Estados
-3.4.1.1 Enumerar estados realmente soportados por el codigo/datos.
+3.4.1.1 Enumerar estados realmente soportados por el codigo/datos. [IMPLEMENTADA]
 3.4.1.2 Separar open, active, maximized, focused cuando correspondan.
 3.4.1.3 Verificar que un estado desconocido no se convierta en un estado valido por defecto.
 3.4.2 ? UI elements
@@ -5835,4 +5835,67 @@ documentada en 3.3.4.1 (regla 5.4e vs prompt_mejoraActual.txt linea 27) no afect
 PENDIENTES: NINGUNO para 3.3.4.4 (completada). La siguiente hoja del roadmap es
 3.4.1.1 (Enumerar estados realmente soportados por el codigo/datos).
 ESTADO FINAL: 3.3.4.4 - IMPLEMENTADA
+
+--- TRANSICION DE ESTADO 3.3.4.4 -> 3.4.1.1 ---
+Se completa 3.3.4.4. CURRENT_WORK_UNIT avanza a 3.4.1.1. Los registros canon
+de 3.3.4.4 y 3.3.4.1-3.3.4.3 permanecen vigentes. La siguiente hoja del
+roadmap es 3.4.1.2 (Separar open, active, maximized, focused cuando
+correspondan).
+
+## REGISTRO DE UNIDAD: 3.4.1.1
+
+OBJETIVO: Enumerar estados realmente soportados por el codigo/datos.
+Capa inspeccionada: estados de aplicacion/window reconocidos en codigo y
+datos, sin modificar codigo de produccion; se crea una suite de tests
+read-only (inspeccion) que documenta el conjunto real de estados en cada
+capa y las discrepancias entre ellos.
+
+CAMBIOS / HALLAZGOS: Inspeccion estatica del codigo fuente y datos; creacion
+de una suite de tests de inspeccion. No se modifico codigo de produccion.
+Representaciones de estados localizadas en 5 capas distintas:
+(A) src/eyes/screen.py — ApplicationState Enum (percepcion): 5 miembros
+    CLOSED, OPEN, ACTIVE, MINIMIZED, MAXIMIZED. Usado por Vision/Screen.
+(B) src/hands/applications_core.py — ApplicationState Enum (conocimiento):
+    8 miembros CLOSED, OPEN, ACTIVE, INACTIVE, LOADING, READY, ERROR,
+    BACKGROUND. Usado por ApplicationKnowledge.states.
+(C) data/knowledge/applications.json — flags booleanos por app
+    (open, active, maximized, focused, playing, streaming, recording).
+(D) data/knowledge/capabilities.json — required_state y effects como
+    atomos de estado planificables.
+(E) src/hands/planner/graph.py GraphBuilder — build_navigation_graph y
+    build_application_graph producen claves de hechos de estado:
+    chrome_closed/open/active, address_bar_focused/clicked, url_typed,
+    destination_loaded, search_performed, text_typed, app_closed/open/
+    active/inactive, element_focused.
+
+DISCREPANCIAS DOCUMENTADAS (conservadas, no resueltas por intuicion):
+- D-STATE-TWO-ENUMS: dos ApplicationState Enum con el mismo nombre pero
+  miembros distintos (solo 3 se superponen: closed, open, active). Cada
+  capa usa su propio enum; no hay import-crossing en produccion.
+- D-STATE-DATA-ONLY: los datos declaran estados (focused, playing,
+  streaming, recording) que no aparecen en ninguno de los dos Enum.
+- D-STATE-GRAPH-DATA-GAP: claves del grafo que NO aparecen en
+  capabilities.json: element_focused, destination_loaded, search_performed,
+  text_typed, address_bar_clicked, app_closed/open/active/inactive,
+  chrome_closed. El grafo solo superpone 4 claves literales con data:
+  address_bar_focused, chrome_active, chrome_open, url_typed. El resto
+  usa su propio vocabulario plano parcial con estados intermedios no
+  modelados en los datos canonicos.
+- D-EFFECTS-NO-APP-FLAGS: los atomos 'effects' de capabilities.json NO
+  incluyen los flags de apertura/activacion por app (chrome_open,
+  chrome_active, spotify_open, ...). Esos flags aparecen SOLO en
+  required_state (precondiciones), no como efectos.
+
+TESTS Y RESULTADOS: UNITARIOS: 34/34 PASSED (test_application_state_enumeration.py,
+nuevo) ; INTEGRACION: NE (inspeccion read-only) ; NO REGRESION:
+210/210 PASSED en tests/eyes/ (incluye la nueva suite); 0 fallos, 0 errores.
+
+VERIFICACION: SINTAXIS: OK (`python -m py_compile` de archivos inspeccionados
+implicitos); MAIN.PY: NE (no se modifico); COMPORTAMIENTO:
+inspeccion read-only, 34 tests nuevos PASSED, 210 tests eyes PASSED.
+
+PENDIENTES: NINGUNO para 3.4.1.1 (completada). La siguiente hoja del
+roadmap es 3.4.1.2 (Separar open, active, maximized, focused cuando
+correspondan).
+ESTADO FINAL: 3.4.1.1 - IMPLEMENTADA
 
