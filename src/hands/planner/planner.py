@@ -1025,6 +1025,14 @@ class Planner:
             fallback.warnings.insert(0, "La ruta no contiene acciones planificables")
             fallback.metadata.setdefault("algorithm_fallback", "deterministic")
             return fallback
+        # 3.3.3.2: verificar acciones inexistentes del plan A* (sin filtrar)
+        verification = self.validate_plan_actions(plan)
+        astar_warnings: List[str] = []
+        if verification["nonexistent_actions"]:
+            astar_warnings.append(
+                "Acciones inexistentes en el plan (A*): "
+                + ", ".join(verification["nonexistent_actions"])
+            )
         return PlanningResult(
             status=PlannerStatus.COMPLETED,
             plan=plan,
@@ -1034,6 +1042,7 @@ class Planner:
             alternatives=self._normalize_alternative_plans(
                 alternatives, available_nodes
             ),
+            warnings=astar_warnings,
             metadata={
                 **metadata,
                 "algorithm": "A*",
@@ -1041,6 +1050,7 @@ class Planner:
                 "total_cost": total_cost,
                 "start_node": start_id,
                 "goal_node": goal_id,
+                "action_verification": verification,
             },
         )
 
@@ -1064,6 +1074,7 @@ class Planner:
                 metadata={
                     "message": "Objetivo ya alcanzado",
                     "algorithm": "deterministic",
+                    "action_verification": self.validate_plan_actions([]),
                 },
             )
         required_capabilities = self._safe_required_capabilities(goal)
@@ -1081,12 +1092,24 @@ class Planner:
                     "capabilities_requested": required_capabilities,
                 },
             )
+        # 3.3.3.2: verificar que las acciones del plan existen en el
+        # ActionRegistry.  Se reportan como advertencias pero no se eliminan
+        # (compatibilidad con nodos legacy/UI que el executor resuelve por otros
+        # medios).  La trazabilidad capability -> acción llegará en 3.3.3.3.
+        verification = self.validate_plan_actions(plan)
+        warnings: List[str] = []
+        if verification["nonexistent_actions"]:
+            warnings.append(
+                "Acciones inexistentes en el plan: "
+                + ", ".join(verification["nonexistent_actions"])
+            )
         return PlanningResult(
             status=PlannerStatus.COMPLETED,
             plan=plan,
             goal=goal,
             current_state=dict(current_state),
             quality=self._evaluate_plan_quality(plan, current_state, goal),
+            warnings=warnings,
             metadata={
                 "algorithm": "deterministic",
                 "plan_length": len(plan),
@@ -1094,6 +1117,7 @@ class Planner:
                     _finite_nonnegative(node.get("cost", 1.0), 1.0) for node in plan
                 ),
                 "capabilities_used": required_capabilities,
+                "action_verification": verification,
             },
         )
 
@@ -2257,6 +2281,167 @@ class Planner:
             self.get_application_capabilities_as_list(target_app)
         )
         return result
+
+    # ==================================================================
+    # VERIFICACIÓN DE ACCIONES EXISTENTES (3.3.3.2)
+    # ==================================================================
+
+    def _get_action_registry(self) -> Optional[Any]:
+        """Obtiene el ActionRegistry disponible a través del executor o directamente.
+
+        Reutiliza el registro del executor cuando existe; en caso contrario
+        intenta resolverlo mediante la función de acceso global.  Si en ningún
+        caso está disponible, devuelve ``None`` para que los llamadores
+        preserven el plan sin filtrar (modo paso seguro).
+        """
+        registry = (
+            getattr(self.executor, "action_registry", None)
+            if self.executor
+            else None
+        )
+        if registry is not None:
+            return registry
+        try:
+            from src.hands.action_registry import get_action_registry
+
+            return get_action_registry()
+        except Exception as exc:  # pragma: no cover - zona defensiva
+            logger.debug("[PLANNER] ActionRegistry no disponible: %s", exc)
+            return None
+
+    def action_exists(self, action_name: str) -> bool:
+        """Verifica si *action_name* está registrada en el ActionRegistry."""
+        if not isinstance(action_name, str) or not action_name.strip():
+            return False
+        registry = self._get_action_registry()
+        if registry is None:
+            return False
+        try:
+            return registry.get_action(action_name) is not None
+        except Exception as exc:
+            logger.debug("[PLANNER] Error verificando acción %s: %s", action_name, exc)
+            return False
+
+    @staticmethod
+    def _resolve_node_action_name(node: Dict[str, Any]) -> Optional[str]:
+        """Determina el nombre de acción efectivo de un paso de plan.
+
+        Replica la lógica de resolución de ``Executor._execute_node_action``:
+
+        * Si el nodo dispone de ``execute_callback``, no necesita estar en el
+          ActionRegistry → devuelve ``None``.
+        * En caso contrario, resuelve el nombre mediante
+          ``metadata["action_name"]`` / ``metadata["action"]`` (cuando el
+          ``action`` del nodo coincide con su ``id``) o, por defecto, el
+          ``id`` del nodo.
+        """
+        if not isinstance(node, dict):
+            return None
+        metadata = node.get("metadata", {})
+        if not isinstance(metadata, dict):
+            metadata = {}
+
+        callback = node.get("execute_callback") or metadata.get("execute_callback")
+        if callable(callback):
+            return None
+
+        action_name = node.get("action")
+        node_id = node.get("id")
+        explicit_action = metadata.get("action_name") or metadata.get("action")
+        if explicit_action and (
+            not action_name or str(action_name) == str(node_id)
+        ):
+            action_name = explicit_action
+        action_name = action_name or node_id
+        return str(action_name) if action_name else None
+
+    def validate_plan_actions(
+        self, plan: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Verifica que las acciones de *plan* existen en el ActionRegistry.
+
+        Un paso se considera **válido** cuando:
+
+        * Tiene ``execute_callback`` (ejecutable sin registro), ó
+        * Su nombre de acción efectivo está registrado en el ActionRegistry.
+
+        Devuelve un diccionario con la información de verificación.
+        """
+        steps = plan if isinstance(plan, list) else []
+        total_steps = len(steps)
+        registry = self._get_action_registry()
+        existing: List[str] = []
+        nonexistent: List[str] = []
+        steps_with_callback = 0
+
+        for step in steps:
+            if not isinstance(step, dict):
+                continue
+            action_name = self._resolve_node_action_name(step)
+            if action_name is None:
+                steps_with_callback += 1
+                continue
+            if registry is None:
+                # Sin ActionRegistry no se puede verificar: no se marca como
+                # inexistente (modo paso seguro).
+                existing.append(action_name)
+                continue
+            if self.action_exists(action_name):
+                existing.append(action_name)
+            else:
+                nonexistent.append(action_name)
+
+        return {
+            "total_steps": total_steps,
+            "valid_steps": len(existing) + steps_with_callback,
+            "nonexistent_actions": nonexistent,
+            "existing_actions": existing,
+            "steps_with_callback": steps_with_callback,
+            "valid": len(nonexistent) == 0,
+            "registry_available": registry is not None,
+        }
+
+    def filter_existing_actions(
+        self, plan: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """Filtra los pasos de *plan* cuyas acciones no existen en el ActionRegistry.
+
+        Conserva los pasos que tienen ``execute_callback`` o cuyo nombre de
+        acción efectivo está registrado.  El plan original no se modifica.
+        """
+        filtered, _ = self._filter_plan_actions(plan)
+        return filtered
+
+    def _filter_plan_actions(
+        self, plan: List[Dict[str, Any]]
+    ) -> Tuple[List[Dict[str, Any]], List[str]]:
+        """Filtra pasos con acciones inexistentes del plan.
+
+        Retorna una tupla ``(plan_filtrado, acciones_eliminadas)``.  Cuando el
+        ActionRegistry no está disponible, el plan se conserva sin cambios.
+        """
+        registry = self._get_action_registry()
+        if registry is None:
+            return plan, []
+
+        filtered: List[Dict[str, Any]] = []
+        removed: List[str] = []
+        for step in plan or []:
+            if not isinstance(step, dict):
+                continue
+            action_name = self._resolve_node_action_name(step)
+            if action_name is None:
+                filtered.append(step)
+                continue
+            if self.action_exists(action_name):
+                filtered.append(step)
+            else:
+                removed.append(action_name)
+                logger.warning(
+                    "[PLANNER] Acción inexistente filtrada del plan: %s",
+                    action_name,
+                )
+        return filtered, removed
 
     def is_application_available(self, app_name: str) -> bool:
         try:

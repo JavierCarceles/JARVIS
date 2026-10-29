@@ -5471,3 +5471,64 @@ posteriores). NINGUNA contradiccion nueva introducida.
 PENDIENTES: NINGUNO para 3.3.3.1 (completada). La siguiente hoja del roadmap es 3.3.3.2.
 ESTADO FINAL: 3.3.3.1 - IMPLEMENTADA
 
+REGISTRO DE UNIDAD: 3.3.3.2
+FECHA: 2026-10-29
+OBJETIVO: Verificar que Planner no recibe acciones inexistentes.
+El planificador debe disponer de un mecanismo que verifique (no elimine) que las
+acciones de un plan producido por planificacion existen en el ActionRegistry,
+reportandolas como advertencias y en la metadata de PlanningResult, sin romper
+planes con nodos legacy/UI que el Executor resuelve por otros medios.
+TIPO DE TRABAJO: INSPECCION; IMPLEMENTACION; TEST; VERIFICACION; DOCUMENTACION
+CAMBIOS / HALLAZGOS:
+- Metodos ya implementados en src/hands/planner/planner.py (seccion VERIFICACION
+  DE ACCIONES EXISTENTES 3.3.3.2):
+  * _get_action_registry(): resuelve el ActionRegistry del executor o via
+    get_action_registry(); devuelve None si no disponible (modo paso seguro).
+  * action_exists(action_name): bool indicando si la accion esta registrada.
+  * _resolve_node_action_name(node) (estatico): resuelve el nombre de accion
+    efectivo replicando Executor._execute_node_action (execute_callback,
+    metadata['action_name']/['action'], action, id).
+  * validate_plan_actions(plan): dict de verificacion con total_steps,
+    valid_steps, nonexistent_actions, existing_actions, steps_with_callback,
+    valid, registry_available.
+  * filter_existing_actions(plan) / _filter_plan_actions(plan): filtran pasos
+    con acciones inexistentes conservando execute_callback; plan original no mutado.
+- Integracion en _create_plan: validate_plan_actions se llama sobre el plan
+  resultante; el reporte se almacena en metadata["action_verification"] y las
+  acciones inexistentes aparecen en warnings. La misma logica se aplica en
+  _create_plan_astar (linea ~1029).
+- CORRECCION: la rama temprana de retorno de _create_plan (goal ya alcanzado,
+  plan=[]) no incluia action_verification en metadata, provocando KeyError en
+  test_plan_result_valid_when_no_actions. Se anadio
+  "action_verification": self.validate_plan_actions([]) al dict de metadata de
+  ese retorno anticipado.
+ARCHIVOS MODIFICADOS:
+  PRODUCCION: `src/hands/planner/planner.py`;
+  TESTS: `tests/hands/planner/test_planner_action_verification.py` (NUEVA, 67 tests, 6 clases);
+  DOCUMENTACION: `README.md` (tabla Planner: 6 metodos de verificacion anadidos).
+TESTS Y RESULTADOS:
+  UNITARIOS: 67/67 PASSED (test_planner_action_verification.py).
+    * TestActionExists: 13 (parametrizados sobre REGISTERED_ACTIONS + NONEXISTENT_ACTIONS + edge cases).
+    * TestResolveNodeActionName: 9.
+    * TestValidatePlanActions: 11.
+    * TestFilterExistingActions: 6.
+    * TestCreatePlanVerification: 3 (verifica action_verification en metadata de _create_plan).
+    * TestBuildApplicationAwarePlanVerification: 1 (verifica action_verification en metadata de build_application_aware_plan).
+    * TestNoActionRegistry: 3.
+  INTEGRACION: NE (verificacion read-only contra ActionRegistry global real; sin interaccion con Executor).
+  NO REGRESION: 2366/2366 PASSED (tests/hands + tests/brain). (Baseline 3.3.3.1: 2299; +67 de 3.3.3.2 = 2366. 0 fallos, 0 errores.)
+VERIFICACION:
+  SINTAXIS: py_compile de src/hands/planner/planner.py -> exit 0 (True).
+  MAIN.PY: `import main` -> OK (IMPORT_MAIN_OK).
+  COMPORTAMIENTO / INTEGRACION REAL: verificado read-only contra ActionRegistry global
+  real (10 registros base, 30 operaciones, 3 modulos Chrome registrados).
+  validate_plan_actions contra planes con acciones registradas vs inexistentes produce
+  reportes correctos. _create_plan con goal ya alcanzado incluye action_verification
+  con total_steps=0, valid=True. BuildApplicationAwarePlan propaga action_verification
+  en metadata. entities.json inalterado.
+DISCREPANCIAS: NINGUNA nueva. Heredado de 3.3.3.1: (D-CAP-MODEL-GAP) 30/32 apps carecen
+  de capabilities declaradas en el modelo Enum (solo Chrome/Spotify). No afecta 3.3.3.2:
+  la verificacion opera sobre acciones del ActionRegistry, no sobre capabilities.
+PENDIENTES: NINGUNO para 3.3.3.2 (completada). La siguiente hoja del roadmap es 3.3.3.3.
+ESTADO FINAL: 3.3.3.2 - IMPLEMENTADA
+

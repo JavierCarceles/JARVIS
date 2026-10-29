@@ -2676,6 +2676,12 @@ Métodos:
 | `def get_application_capabilities_as_list(app_name)` | Expone capacidades como lista de identificadores canónicos consumibles por el planificador; reutiliza `get_application_capabilities` y devuelve `[]` si la app está ausente o no declara capacidades. |
 | `def find_application_for_goal(goal)` |  |
 | `def build_application_aware_plan(goal, current_state)` |  |
+| `def _get_action_registry()` | Obtiene el ActionRegistry disponible a través del executor o directamente; devuelve ``None`` si no está disponible (modo paso seguro). |
+| `def action_exists(action_name)` | Verifica si *action_name* está registrada en el ActionRegistry. |
+| `def _resolve_node_action_name(node)` (estático) | Determina el nombre de acción efectivo de un paso de plan, replicando la resolución del Executor. |
+| `def validate_plan_actions(plan)` | Verifica que las acciones de *plan* existen en el ActionRegistry; devuelve un reporte estructurado con ``nonexistent_actions``, ``existing_actions``, ``valid``, etc. |
+| `def filter_existing_actions(plan)` | Filtra los pasos de *plan* cuyas acciones no existen en el ActionRegistry, conservando pasos con ``execute_callback``. |
+| `def _filter_plan_actions(plan)` | Filtra pasos con acciones inexistentes; retorna ``(plan_filtrado, acciones_eliminadas)``. |
 | `def is_application_available(app_name)` |  |
 | `def get_application_ui_requirements(app_name, capability)` |  |
 | `def get_planning_stats()` |  |
