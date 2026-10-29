@@ -700,8 +700,8 @@ FASE 3 ? APPLICATION KNOWLEDGE
 3.3.3.2 Verificar que Planner no recibe acciones inexistentes.
 3.3.3.3 Verificar trazabilidad aplicacion -> capability -> accion. [IMPLEMENTADA]
 3.3.4 ? Tests
-3.3.4.1 Caso de aplicacion con varias capacidades.
-3.3.4.2 Caso de aplicacion sin capacidades.
+3.3.4.1 Caso de aplicacion con varias capacidades. [IMPLEMENTADA]
+3.3.4.2 Caso de aplicacion sin capacidades. [IMPLEMENTADA]
 3.3.4.3 Caso de capability desconocida.
 3.3.4.4 Verificar no regresion.
 3.4 ? ESTADOS Y UI
@@ -5588,4 +5588,202 @@ DISCREPANCIAS: Heredado de 3.3.3.1/3.3.3.2 (D-CAP-MODEL-GAP): 30/32 apps carecen
   no se ha alterado el comportamiento de planificacion para resolverlo.
 PENDIENTES: NINGUNO para 3.3.3.3 (completada). La siguiente hoja del roadmap es 3.3.4.1.
 ESTADO FINAL: 3.3.3.3 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.3.4.1
+FECHA: 2026-10-29
+OBJETIVO: Verificar el caso de aplicacion con varias capacidades en el camino de
+planificacion: `_find_nodes_for_capability` (que aplica el filtro de estado
+`can_execute`, a diferencia de la trazabilidad de 3.3.3.3) resuelve CADA una de
+las capabilities de una aplicacion multi-capacidad (Chrome: open/navigate/search)
+a su/s nodo/s ejecutable, en un estado que las habilita, y respeta el estado
+(excluyendo proveedores no ejecutables como chrome_open). Se ejerza contra el
+modelo REAL y el ActionRegistry global, read-only.
+TIPO DE TRABAJO: TEST | VERIFICACION
+CAMBIOS / HALLAZGOS:
+- NUEVO fichero `tests/hands/planner/test_planner_find_nodes_for_capability.py`
+  (4 tests, 1 clase `TestFindNodesForCapabilityMultipleCapabilities`):
+  * test_app_with_several_exposes_more_than_one_capability: premisa — Chrome expone
+    >1 capability canonica (open/navigate/search).
+  * test_each_capability_resolves_to_distinct_executable_nodes: en estado ejecutable,
+    open->chrome.open, navigate->chrome_navigate, search->{search_google, chrome_search}.
+  * test_empty_state_excludes_all_providers_via_can_execute: con estado vacio, ninguna
+    capability resuelve nodos (puerta can_execute) — contraste con 3.3.3.3.
+  * test_open_excludes_non_executable_provider_found_by_trace: open resuelve solo
+    chrome.open; chrome_open (proveedor documentado por trazabilidad) excluido por no
+    ejecutable.
+- NO se modifico codigo de produccion. Se reutiliza `_find_nodes_for_capability`,
+  `_node_provides_capability`, `get_application_capabilities_as_list` y `_get_available_nodes`
+  del Planner real; el estado ejecutable se deriva de las precondiciones declarativas reales
+  de los nodos de Chrome. Ningun mock fuerza la decision probada.
+ARCHIVOS MODIFICADOS:
+  PRODUCCION: NA;
+  TESTS: `tests/hands/planner/test_planner_find_nodes_for_capability.py` (NUEVA);
+  DOCUMENTACION: NA.
+TESTS Y RESULTADOS:
+  UNITARIOS: 4/4 PASSED (test_planner_find_nodes_for_capability.py).
+  INTEGRACION: NE (verificacion read-only contra ActionRegistry global real; sin interaccion
+    con Executor).
+  NO REGRESION: 2393/2393 PASSED (tests/hands + tests/brain). (Baseline 3.3.3.3: 2389;
+    +4 de 3.3.4.1 = 2393. 0 fallos, 0 errores.)
+VERIFICACION:
+  SINTAXIS: py_compile de test_planner_find_nodes_for_capability.py -> exit 0 (OK).
+  MAIN.PY: `import main` -> OK (IMPORT_MAIN_OK). Nota: `import main` regenera el
+    artefacto runtime `data/knowledge_graph.json` (no datos fuente). `data/memory/entities.json`
+    integro (verificado: apps Chrome/Spotify presentes, capabilities intactas; 2393 tests PASSED).
+  COMPORTAMIENTO / INTEGRACION REAL: verificado read-only contra el modelo real de capabilities
+    de Chrome (open/navigate/search) y los nodos chrome.open, chrome_open, chrome_navigate,
+    chrome_search, search_google; `_find_nodes_for_capability` aplica can_execute: con estado
+    ejecutable resuelve cada capability a su nodo; con estado vacio devuelve []; chrome_open
+    (proveedor de trazabilidad) excluido al no ser ejecutable. entities.json inalterado.
+DISCREPANCIAS: CONTRACCION DE INSTRUCCIONES sobre el estado de la hoja siguiente al
+cierre. `prompt_mejoraActual.txt` CIERRE (linea 27) dice "dejar CURRENT_WORK_STATUS: EN PROCESO",
+pero `prompt_JARVIS_reglas.txt` 5.44(e) / 5.45 / 5.47 dicen "dejar PENDIENTE", el ORDEN DE
+INICIO (`prompt_mejoraActual.txt` paso 5) implica estado de reposo PENDIENTE ("Si es PENDIENTE,
+cambiarlo a EN PROCESO"), y el PRECEDENTE operativo confirma PENDIENTE: al iniciar este chat
+CURRENT_WORK_STATUS estaba PENDIENTE sobre 3.3.4.1 (dejado asi por la hoja anterior 3.3.3.3).
+Se sigue el estado de reposo PENDIENTE (reglas.txt + precedente + regla de inicio), dejando
+3.3.4.2 como PENDIENTE; se documenta la contradiccion con la instruccion EN PROCESO. Ademas,
+marca roadmap 3.3.3.2 carece de [IMPLEMENTADA] aunque su registro canonico existe e indica
+IMPLEMENTADA (preexistente; no afecta a 3.3.4.1).
+PENDIENTES: NINGUNO para 3.3.4.1 (completada). La siguiente hoja del roadmap es 3.3.4.2
+(Caso de aplicacion sin capacidades).
+ESTADO FINAL: 3.3.4.1 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.3.4.2
+FECHA: 2026-10-29
+OBJETIVO: Verificar el caso de aplicacion conocida SIN capabilities en el camino de
+planificacion: `get_application_capabilities_as_list` expone `[]`;
+`trace_application_capability_to_action` devuelve `available: False` con capabilities
+vacia; `convert_application_to_nodes` produce unico nodo APPLICATION (no action/task);
+`_find_nodes_for_capability` devuelve `[]` para toda capability canónica en estado
+ejecutable y vacio; `_node_provides_capability` devuelve False para el nodo APPLICATION.
+TIPO DE TRABAJO: TEST | VERIFICACION
+CAMBIOS / HALLAZGOS:
+- NUEVA clase `TestFindNodesForCapabilityNoCapabilities` anadida a
+  `tests/hands/planner/test_planner_find_nodes_for_capability.py` (8 tests):
+  * test_known_app_without_capabilities_exposes_empty_list: YouTube (app conocida,
+    sin capabilities) → `get_application_capabilities_as_list("youtube") == []`;
+    `get_application("youtube")` devuelve no-None con `capabilities == []`.
+  * test_known_app_without_capabilities_trace_returns_available_false:
+    `trace_application_capability_to_action("youtube")` → `available: False`,
+    `capabilities: []`.
+  * test_known_app_without_capabilities_differs_from_unknown_app: YouTube vs
+    app desconocida → miso structura pero `application` difiere (YouTube vs
+    nonexistent_app_xyz); ambas `available: False`.
+  * test_convert_app_without_capabilities_creates_only_application_node:
+    `convert_application_to_nodes("youtube")` → 1 nodo de tipo NodeType.APPLICATION,
+    `application == "YouTube"`; sin action/task nodes.
+  * test_find_nodes_returns_empty_for_all_capabilities: `_find_nodes_for_capability`
+    devuelve `[]` para open/navigate/search con CHROME_EXECUTABLE_STATE sobre los
+    nodos de YouTube (único nodo APPLICATION excluido por puerta de tipo action/task).
+  * test_find_nodes_returns_empty_with_empty_state: mismo resultado con estado {}.
+  * test_find_nodes_returns_empty_on_empty_node_set: `_find_nodes_for_capability`
+    devuelve `[]` con dict de nodos vacio (edge case).
+  * test_node_provides_capability_false_for_application_node:
+    `_node_provides_capability(node, cap)` False para todas las capabilities sobre
+    el nodo APPLICATION de YouTube.
+- NO se modifico codigo de produccion. Se reutiliza `_find_nodes_for_capability`,
+  `_node_provides_capability`, `get_application_capabilities_as_list`,
+  `trace_application_capability_to_action`, `convert_application_to_nodes` y
+  `_get_available_nodes` del modelo real (Planner singleton + ApplicationManager
+  real cargado desde entities.json). YouTube es app conocida (get_application !=
+  None) con `capabilities == []`.
+- Se anadio import de `Node, NodeType` y `Dict` al fichero de tests; se anadiron
+  constantes `NO_CAP_APP`, `NO_CAP_APP_NAME`, `CANONICAL_CAPABILITIES` y helper
+  `_no_cap_app_nodes`.
+ARCHIVOS MODIFICADOS:
+  PRODUCCION: NA;
+  TESTS: `tests/hands/planner/test_planner_find_nodes_for_capability.py` (MODIFICADA —
+  clase `TestFindNodesForCapabilityNoCapabilities` anadida; importaciones ampliadas);
+  DOCUMENTACION: NA.
+TESTS Y RESULTADOS:
+  UNITARIOS: 8/8 PASSED (TestFindNodesForCapabilityNoCapabilities). En el fichero:
+  12/12 PASSED (4 de 3.3.4.1 + 8 de 3.3.4.2).
+  INTEGRACION: NE (verificacion read-only contra ActionRegistry global real y
+  ApplicationManager singleton; sin interaccion con Executor).
+  NO REGRESION: 2401/2401 PASSED (tests/hands + tests/brain). Baseline 3.3.4.1: 2393;
+  +8 de 3.3.4.2 = 2401. 0 fallos, 0 errores.
+VERIFICACION:
+  SINTAXIS: py_compile de test_planner_find_nodes_for_capability.py → exit 0 (OK);
+  py_compile del módulo planner.py → OK (sin cambios).
+  MAIN.PY: `import main` → OK (IMPORT_MAIN_OK). Regenera runtime
+  `data/knowledge_graph.json` (no datos fuente); entities.json inalterado (apps
+  Chrome/Spotify/Twitch/etc. intactas; 2401 tests PASSED).
+  COMPORTAMIENTO / INTEGRACION REAL: verificado read-only contra el modelo real.
+  YouTube (app conocida, capabilities=[]) → trazabilidad `available: False`;
+  `_find_nodes_for_capability` devuelve `[]` para open/navigate/search en estado
+  ejecutable y vacío; `convert_application_to_nodes("youtube")` → 1 nodo
+  NodeType.APPLICATION sin action/task nodes. entities.json inalterado.
+DISCREPANCIAS: NINGUNA (la contradiccion de contratos sobre estado PENDIENTE/EN
+PROCESO se documenta en el registro de 3.3.4.1; no afecta a 3.3.4.2).
+PENDIENTES: NINGUNO para 3.3.4.2 (completada). La siguiente hoja del roadmap es
+3.3.4.3 (Caso de capability desconocida).
+ESTADO FINAL: 3.3.4.2 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.3.4.3
+FECHA: 2026-10-29
+OBJETIVO: Verificar el caso de capability desconocida en el camino de planificación:
+una capability que no es canónica (open/navigate/search), no está en el mapa de
+aliases de _node_provides_capability, ni es declarada por ninguna aplicación ni
+nodo, se resuelve de forma determinista a ausencia de proveedores (sin falsear
+disponibilidad) contra la app más capaz del modelo (Chrome). Read-only.
+TIPO DE TRABAJO: TEST | VERIFICACION
+CAMBIOS / HALLAZGOS:
+- NUEVA clase TestFindNodesForCapabilityUnknownCapability añadida a
+  tests/hands/planner/test_planner_find_nodes_for_capability.py (8 tests):
+  * test_unknown_capability_resolves_no_nodes_on_capable_app: _find_nodes_for_capability
+    con capability desconocida contra nodos Chrome ejecutables devuelve [] (contraste con
+    3.3.4.1 donde capabilities canónicas resuelven nodos).
+  * test_unknown_capability_resolves_no_nodes_with_empty_state: mismo resultado con {}.
+  * test_unknown_capability_resolves_no_nodes_on_all_nodes: [] contra TODOS los nodos del
+    modelo en estado ejecutable.
+  * test_node_provides_capability_false_for_unknown_against_all_chrome_nodes: False para
+    toda capability desconocida contra todos los nodos action/task de Chrome; contraste:
+    chrome.open provee 'open' (True) pero no la desconocida (False).
+  * test_unknown_capability_not_in_exposed_capabilities: get_application_capabilities_as_list
+    no incluye capabilities desconocidas.
+  * test_trace_unknown_capability_returns_no_providers: trace con capability explícita
+    devuelve providing_nodes=[], covered=False, covering_action=None,
+    implemented_actions=[]; available=True (semántica: "se solicitó trazar", no
+    "está cubierta").
+  * test_trace_without_capability_never_exposes_unknown: trace sin capability solo expone
+    capabilities canónicas declaradas.
+  * test_unknown_capability_contrast_with_known_returns_empty: 'open' resuelve nodos,
+    'teleportar' devuelve [].
+- NO se modificó código de producción. Se reutiliza _find_nodes_for_capability,
+  _node_provides_capability, get_application_capabilities_as_list y
+  trace_application_capability_to_action del modelo real (Planner singleton +
+  ApplicationManager real cargado desde entities.json + ActionRegistry global). Chrome es
+  la app más capaz (open/navigate/search); 'teleportar' es capability desconocida
+  verificada read-only (ningún nodo la provee).
+- Se añadió la constante UNKNOWN_CAPABILITY = "teleportar" al fichero de tests.
+ARCHIVOS MODIFICADOS:
+  PRODUCCION: NA;
+  TESTS: `tests/hands/planner/test_planner_find_nodes_for_capability.py` (MODIFICADA —
+  clase TestFindNodesForCapabilityUnknownCapability añadida; constante UNKNOWN_CAPABILITY
+  añadida; importaciones ya existentes cubren Dict/Node/NodeType);
+  DOCUMENTACION: NA.
+TESTS Y RESULTADOS:
+  UNITARIOS: 8/8 PASSED (TestFindNodesForCapabilityUnknownCapability). En el fichero:
+  20/20 PASSED (4 de 3.3.4.1 + 8 de 3.3.4.2 + 8 de 3.3.4.3).
+  INTEGRACION: NE (verificación read-only contra ActionRegistry global real y
+  ApplicationManager singleton; sin interacción con Executor).
+  NO REGRESION: 2409/2409 PASSED (tests/hands + tests/brain). Baseline 3.3.4.2: 2401;
+  +8 de 3.3.4.3 = 2409. 0 fallos, 0 errores.
+VERIFICACION:
+  SINTAXIS: py_compile de test_planner_find_nodes_for_capability.py → exit 0 (OK).
+  MAIN.PY: `import main` → OK (IMPORT_MAIN_OK). Regenera runtime
+  data/knowledge_graph.json (no datos fuente); entities.json inalterado (15245 B /
+  35 entidades / 32 apps, sin apps de test persistidas).
+  COMPORTAMIENTO / INTEGRACION REAL: verificado read-only contra el modelo real.
+  'teleportar' (capability desconocida) → []; _find_nodes_for_capability devuelve [] contra
+  nodos Chrome ejecutables y contra todos los nodos; _node_provides_capability False para
+  toda capability desconocida; trace explícita available=True, covered=False,
+  providing_nodes=[]; trace sin capability expone solo ['open','navigate','search'].
+  entities.json inalterado.
+DISCREPANCIAS: NINGUNA. La contradicción de contratos sobre estado PENDIENTE/EN PROCESO
+se documenta en el registro de 3.3.4.1; no afecta a 3.3.4.3.
+PENDIENTES: NINGUNO para 3.3.4.3 (completada). La siguiente hoja del roadmap es
+3.3.4.4 (Verificar no regresion).
+ESTADO FINAL: 3.3.4.3 - IMPLEMENTADA
 
