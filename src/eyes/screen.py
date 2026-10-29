@@ -411,9 +411,26 @@ class ScreenAnalyzer:
                     continue
 
                 state_value = str(raw.get("state", "closed") or "closed").lower()
+
+                # Un estado desconocido NO se convierte en un estado valido por
+                # defecto. Anteriormente state_map.get(...) caia en
+                # ApplicationState.OPEN, lo cual podia llevar a creencias falsas
+                # sobre una aplicacion abierta. Usamos CLOSED como fallback seguro
+                # y registramos el estado desconocido.
+                if state_value in state_map:
+                    resolved_state = state_map[state_value]
+                else:
+                    resolved_state = ApplicationState.CLOSED
+                    logger._print_log(
+                        "info",
+                        f"Estado desconocido omitido en screen.py: '{state_value}' "
+                        "[file:screen.py, method:_convert_visual_world_state]",
+                        "screen.py", "_convert_visual_world_state", 416,
+                    )
+
                 applications[str(key)] = ApplicationInfo(
                     name=str(raw.get("name", key)),
-                    state=state_map.get(state_value, ApplicationState.OPEN),
+                    state=resolved_state,
                     window_title=raw.get("window_title"),
                     window_class=raw.get("window_class"),
                     monitor=max(1, int(raw.get("monitor", 1) or 1)),

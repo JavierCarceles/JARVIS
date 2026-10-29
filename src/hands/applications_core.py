@@ -1420,12 +1420,39 @@ def register_custom_application(app_config: Dict[str, Any]) -> bool:
 
         states = []
         for state in data.get("states", []) or []:
-            states.append(ApplicationState(state) if isinstance(state, str) else state)
+            if isinstance(state, str):
+                try:
+                    states.append(ApplicationState(state))
+                except ValueError:
+                    # Un estado desconocido NO se convierte en un estado valido
+                    # por defecto. Se omite y se registra para evitar creencias
+                    # falsas. No se fuerza ningun estado por defecto en este bucle.
+                    logger._print_log(
+                        "info",
+                        f"Estado desconocido omitido en register_custom_application: '{state}' "
+                        "[file:applications_core.py, method:register_custom_application]",
+                        "applications_core.py", "register_custom_application", 1422,
+                    )
+            else:
+                states.append(state)
         data["states"] = states
 
         default_state = data.get("default_state", ApplicationState.CLOSED)
         if isinstance(default_state, str):
-            data["default_state"] = ApplicationState(default_state)
+            try:
+                data["default_state"] = ApplicationState(default_state)
+            except ValueError:
+                # Un estado desconocido para default_state NO se convierte en
+                # un estado valido por defecto. Se elimina la clave del dict para
+                # que ApplicationKnowledge use su valor por defecto (CLOSED),
+                # y se registra el estado desconocido.
+                logger._print_log(
+                    "info",
+                    f"default_state desconocido omitido en register_custom_application: '{default_state}' "
+                    "[file:applications_core.py, method:register_custom_application]",
+                    "applications_core.py", "register_custom_application", 1426,
+                )
+                data.pop("default_state", None)
 
         app = ApplicationKnowledge(**data)
         return get_application_manager().register_application(app)

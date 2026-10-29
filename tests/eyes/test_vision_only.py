@@ -245,7 +245,10 @@ class TestVisionOnlyDetectApplicationState:
         assert result.state == ApplicationState.CLOSED
 
     @patch("src.eyes.vision_only.ollama")
-    def test_invalid_state_defaults_open(self, mock_ollama):
+    def test_unknown_state_does_not_become_valid(self, mock_ollama):
+        """3.4.1.3: un estado desconocido NO se convierte en un estado valido
+        por defecto. Anteriormente caia en ApplicationState.OPEN; ahora debe
+        usar CLOSED como fallback seguro."""
         mock_ollama.chat.return_value = {
             "message": {"content": json.dumps({"detected": True, "state": "unknown"})}
         }
@@ -254,7 +257,7 @@ class TestVisionOnlyDetectApplicationState:
         vision.screen_capture.capture_monitor = MagicMock(return_value="/fake/img.png")
         from src.eyes.screen import ApplicationState
         result = vision.detect_application_state("app")
-        assert result.state == ApplicationState.OPEN
+        assert result.state == ApplicationState.CLOSED
 
     @patch("src.eyes.vision_only.ollama")
     def test_exception_returns_closed(self, mock_ollama):

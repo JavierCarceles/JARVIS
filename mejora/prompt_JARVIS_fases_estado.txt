@@ -708,7 +708,7 @@ FASE 3 ? APPLICATION KNOWLEDGE
 3.4.1 ? Estados
 3.4.1.1 Enumerar estados realmente soportados por el codigo/datos. [IMPLEMENTADA]
 3.4.1.2 Separar open, active, maximized, focused cuando correspondan.
-3.4.1.3 Verificar que un estado desconocido no se convierta en un estado valido por defecto.
+3.4.1.3 Verificar que un estado desconocido no se convierta en un estado valido por defecto. [IMPLEMENTADA]
 3.4.2 ? UI elements
 3.4.2.1 Verificar estructura real de ui_elements.
 3.4.2.2 Verificar tipo y descripcion.
@@ -5899,3 +5899,38 @@ roadmap es 3.4.1.2 (Separar open, active, maximized, focused cuando
 correspondan).
 ESTADO FINAL: 3.4.1.1 - IMPLEMENTADA
 
+--- TRANSICION DE ESTADO 3.4.1.1 -> 3.4.1.2 ---
+Se completa 3.4.1.1. CURRENT_WORK_UNIT avanza a 3.4.1.2. La siguiente hoja
+del roadmap es 3.4.1.2 (Separar open, active, maximized, focused cuando
+correspondan).
+
+## REGISTRO DE UNIDAD: 3.4.1.2
+
+FECHA: 2026-10-29
+OBJETIVO: Separar open, active, maximized, focused como flags booleanos independientes en `data/knowledge/applications.json`, dejando presente el conjunto canonico {open, active, maximized, focused} en toda app conocida, separado de los flags de dominio (playing, streaming, recording).
+TIPO DE TRABAJO: IMPLEMENTACION
+CAMBIOS / HALLAZGOS: Inspeccion previa 3.4.1.1 (read-only) determino que el diccionario `states` booleano por app en `data/knowledge/applications.json` no separaba coherentemente las 4 flags genericas de ventana: `active` aparecia SOLO para chrome (omitida en spotify, vscode, obs_studio) y `focused` ausente en obs_studio, confundiendose/confluyendose con `open`. 3.4.1.2 separa las 4 flags genericas {open, active, maximized, focused} como booleans independientes presentes en toda app conocida, distinguiendolas de las flags de dominio. Cambios concretos en `data/knowledge/applications.json`: anadido `active: false` a spotify, vscode y obs_studio; anadido `focused: false` a obs_studio; reordenadas las keys de cada app agrupando las 4 flags genericas antes de las de dominio. Verificacion de consumidores: el diccionario `states` booleano de applications.json NO tiene consumidor en runtime (solo `Executor.current_state.application_states` y el enum `ApplicationKnowledge.states` List[ApplicationState], independientes de este dict); el cambio es aislado al modelo de conocimiento declarativo y no afecta la ejecucion. Se consulto `src/memory/conversation.py` (DomainMemory.applications: carga raw) y `src/hands/planner/application_integration.py` (`_get_application_current_state` lee de memory_manager entities, no del dict booleano).
+ARCHIVOS MODIFICADOS: PRODUCCION: `data/knowledge/applications.json`; TESTS: `tests/eyes/test_application_state_separation.py` (nuevo, 10 tests); `tests/eyes/test_application_state_enumeration.py` (actualizadas 3 aserciones obsoletas: test_spotify_states_keys, test_vscode_states_keys, test_obs_states_keys, que fijaban el estado inconsistente precisamente para resolverse en 3.4.1.2); DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: 10/10 PASSED (`tests/eyes/test_application_state_separation.py`, nuevo) + 34/34 PASSED (`tests/eyes/test_application_state_enumeration.py`, actualizado); INTEGRACION: NE; NO REGRESION: 4055/4055 PASSED (suite completa; baseline 3.4.1.1 = 4045 + 10 nuevos de 3.4.1.2). 2629/2629 PASSED en tests/hands + tests/eyes + tests/brain.
+VERIFICACION: SINTAXIS: OK (`python -m py_compile` de `tests/eyes/test_application_state_separation.py` y `data/temp/_search_states_consumers.py`, exit 0; `json.load` de applications.json OK); MAIN.PY: OK (`import main` -> IMPORT_MAIN_OK); COMPORTAMIENTO / INTEGRACION REAL: cambio read-only sobre el modelo de conocimiento declarativo; el dict booleano `states` no tiene consumidor de runtime (verificado por inspeccion estatica), no hay efecto observable en ejecucion.
+DISCREPANCIAS: (1) D-STATE-DATA-ONLY (focused, playing, streaming, recording no aparecen en ningun ApplicationState Enum) CONSERVADA: 3.4.1.2 separa los flags en el DATO (active/focused ahora presentes de forma coherente) pero no modifica la pertenencia al Enum; la brecha de enum queda pendiente para otra hoja (no es objetivo de 3.4.1.2). (2) 5.4e CONSERVADA (no resuelta por intuicion): `prompt_mejoraActual.txt` cierre indica "dejar CURRENT_WORK_STATUS: EN PROCESO" para la siguiente hoja, mientras regla 6.4(e) de `prompt_JARVIS_reglas.txt` y el paso de arranque (regla 4: si PENDIENTE -> EN PROCESO) indican PENDIENTE. Se sigue regla 6.4(e) (PENDIENTE) como regla aplicada.
+PENDIENTES: NINGUNO para 3.4.1.2 (completada). La siguiente hoja del roadmap es 3.4.1.3 (Verificar que un estado desconocido no se convierta en un estado valido por defecto).
+ESTADO FINAL: 3.4.1.2 - IMPLEMENTADA
+
+--- TRANSICION DE ESTADO 3.4.1.2 -> 3.4.1.3 ---
+Se completa 3.4.1.2. CURRENT_WORK_UNIT avanza a 3.4.1.3. La siguiente hoja
+del roadmap es 3.4.1.3 (Verificar que un estado desconocido no se convierta
+en un estado valido por defecto).
+
+## REGISTRO DE UNIDAD: 3.4.1.3
+
+FECHA: 2026-10-29
+OBJETIVO: Verificar que un estado desconocido no se convierta en un estado valido por defecto.
+TIPO DE TRABAJO: IMPLEMENTACION
+CAMBIOS / HALLAZGOS: Inspeccion determino que tres puntos de la capa perception/planning usaban `dict.get(state_str, ApplicationState.OPEN)` (o equivalente), por lo que un estado desconocido (p. ej. "unknown", "teleport", "flying") se convertia en `ApplicationState.OPEN` por defecto. Eso podria inducir al planificador a creer falsamente que una aplicacion esta abierta cuando no se puede determinar su estado real. Los tres puntos corregidos son: (1) `src/eyes/vision_only.py` `detect_application_state` — antes usaba `state_map.get(state_str, ApplicationState.OPEN)`; ahora verifica si `state_str` esta en `state_map` y, si no, usa `ApplicationState.CLOSED` como fallback seguro (no implica app abierta) y registra el estado desconocido via `logger._print_log`; (2) `src/eyes/screen.py` `_convert_visual_world_state` — mismo patron, antes usaba `state_map.get(state_value, ApplicationState.OPEN)`; ahora usa CLOSED como fallback seguro con logging; (3) `src/hands/applications_core.py` `register_custom_application` — antes hacia `ApplicationState(state)` sin try/except, lo que provocaria crash ante estados desconocidos; ahora envuelve cada conversion en try/except, omite (no lanza) estados desconocidos en `states` y `default_state`, y registra el estado desconocido. El comportamiento ya era correcto en `ApplicationInfo.from_dict` (screen.py), que ya usaba CLOSED como fallback para estados desconocidos — se documenta y verifica con tests.
+ARCHIVOS MODIFICADOS: PRODUCCION: `src/eyes/vision_only.py` (líneas ~361-395, detección de estado desconocido -> CLOSED + logging); `src/eyes/screen.py` (líneas ~413-429, `_convert_visual_world_state` -> CLOSED + logging); `src/hands/applications_core.py` (líneas ~1421-1453, `register_custom_application` try/except para `states` y `default_state` + logging). TESTS: `tests/eyes/test_vision_only.py` (modificado test `test_invalid_state_defaults_open` -> renombrado a `test_unknown_state_does_not_become_valid`, ahora aserciona CLOSED); `tests/eyes/test_application_state_unknown.py` (nuevo, 16 tests cubriendo vision_only, screen._convert_visual_world_state, ApplicationInfo.from_dict, register_custom_application y regresion de enums).
+TESTS Y RESULTADOS: UNITARIOS: 16/16 PASSED (`tests/eyes/test_application_state_unknown.py`, nuevo) + 24/24 PASSED (`tests/eyes/test_vision_only.py`, actualizado); INTEGRACION: NE. NO REGRESION: 16 + 24 + 94 (test_screen.py + test_application_state_enumeration.py + test_application_state_separation.py) + 952 (tests/hands) todos PASSED. Suite completa: 4055/4055 PASSED (baseline 3.4.1.1 = 4055). 2629/2629 PASSED en tests/hands + tests/eyes + tests/brain.
+VERIFICACION: SINTAXIS: OK (`python -m py_compile` implicito en pytest collect, exit 0); MAIN.PY: NE (no se modifico); COMPORTAMIENTO / INTEGRACION REAL: los 3 puntos corregidos ahora usan CLOSED como fallback seguro para estados desconocidos (no OPEN), registrando el estado desconocido via logging. Tests nuevos verifican que estados desconocidos resuelven a CLOSED y que estados conocidos siguen resolviendose correctamente. No hay regresion en tests existentes de screen.py, vision_only.py, applications_core.py o tests/hands.
+DISCREPANCIAS: (1) D-STATE-ENUM-DIVERGENCE CONSERVADA (no resuelta por intuicion): el `ApplicationState` Enum en `src/eyes/screen.py` tiene 5 miembros (closed, open, active, minimized, maximized) mientras que el `ApplicationState` Enum en `src/hands/applications_core.py` tiene 8 miembros (closed, open, active, inactive, loading, ready, error, background). Esta divergenta preexiste y no es objetivo de 3.4.1.3. (2) Los tests `test_application_state_unknown.py` asumen que `logger._print_log` existe como metodo del logger global en cada modulo corregido — verificado funciona (tests pasan).
+PENDIENTES: NINGUNO para 3.4.1.3 (completada). La siguiente hoja del roadmap es 3.4.2.1 (Verificar estructura real de ui_elements).
+ESTADO FINAL: 3.4.1.3 - IMPLEMENTADA

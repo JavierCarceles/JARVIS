@@ -370,9 +370,25 @@ Responde en JSON:
                     "closed": ApplicationState.CLOSED
                 }
 
+                if state_str in state_map:
+                    resolved_state = state_map[state_str]
+                else:
+                    # Un estado desconocido NO se convierte en un estado valido
+                    # por defecto (anteriormente caia en ApplicationState.OPEN,
+                    # lo cual podia llevar a creencias falsas sobre una app abierta).
+                    # Se registra el estado desconocido y se usa CLOSED como fallback
+                    # seguro: no implica que la aplicacion este abierta/activo.
+                    resolved_state = ApplicationState.CLOSED
+                    logger._print_log(
+                        "info",
+                        f"Estado desconocido omitido en vision_only: '{state_str}' "
+                        "[file:vision_only.py, method:detect_application_state]",
+                        "vision_only.py", "detect_application_state", 370,
+                    )
+
                 return ApplicationInfo(
                     name=app_name,
-                    state=state_map.get(state_str, ApplicationState.OPEN),
+                    state=resolved_state,
                     window_title=data.get("window_title"),
                     monitor=data.get("monitor", 1),
                     visible_elements=data.get("visible_elements", [])

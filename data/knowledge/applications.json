@@ -60,9 +60,10 @@
         ],
         "states": {
             "open": false,
-            "playing": false,
+            "active": false,
             "maximized": false,
-            "focused": false
+            "focused": false,
+            "playing": false
         },
         "ui_elements": {
             "search_bar": {
@@ -100,6 +101,7 @@
         ],
         "states": {
             "open": false,
+            "active": false,
             "maximized": false,
             "focused": false
         },
@@ -135,9 +137,11 @@
         ],
         "states": {
             "open": false,
+            "active": false,
+            "maximized": false,
+            "focused": false,
             "streaming": false,
-            "recording": false,
-            "maximized": false
+            "recording": false
         },
         "ui_elements": {
             "controls": {

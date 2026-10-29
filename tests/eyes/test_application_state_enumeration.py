@@ -175,19 +175,22 @@ class TestDataApplicationStates:
         assert keys == {"open", "active", "maximized", "focused"}
 
     def test_spotify_states_keys(self):
+        # 3.4.1.2: `active` se separa como flag independiente (era omitido, confundido con `open`).
         data = json.loads(APPS_JSON_PATH.read_text(encoding="utf-8"))
         keys = set(data["spotify"]["states"].keys())
-        assert keys == {"open", "playing", "maximized", "focused"}
+        assert keys == {"open", "active", "playing", "maximized", "focused"}
 
     def test_vscode_states_keys(self):
+        # 3.4.1.2: `active` se separa como flag independiente.
         data = json.loads(APPS_JSON_PATH.read_text(encoding="utf-8"))
         keys = set(data["vscode"]["states"].keys())
-        assert keys == {"open", "maximized", "focused"}
+        assert keys == {"open", "active", "maximized", "focused"}
 
     def test_obs_states_keys(self):
+        # 3.4.1.2: `active` y `focused` se separan como flags independientes.
         data = json.loads(APPS_JSON_PATH.read_text(encoding="utf-8"))
         keys = set(data["obs_studio"]["states"].keys())
-        assert keys == {"open", "streaming", "recording", "maximized"}
+        assert keys == {"open", "active", "streaming", "recording", "maximized", "focused"}
 
     def test_data_union_of_states(self):
         """La uni\u00F3n de todas las claves 'states' del data."""
