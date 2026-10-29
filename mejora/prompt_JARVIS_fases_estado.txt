@@ -694,7 +694,7 @@ FASE 3 ? APPLICATION KNOWLEDGE
 3.3.2 ? Contrato
 3.3.2.1 Definir una consulta de capacidades sin duplicar APIs existentes. [IMPLEMENTADA]
 3.3.2.2 Distinguir capability disponible de capability simplemente declarada. [IMPLEMENTADA]
-3.3.2.3 Verificar capacidades ausentes.
+3.3.2.3 Verificar capacidades ausentes. [VERIFICADA]
 3.3.3 ? Planificacion
 3.3.3.1 Exponer capacidades en formato consumible por planificacion.
 3.3.3.2 Verificar que Planner no recibe acciones inexistentes.
@@ -5345,4 +5345,76 @@ VERIFICACION:
 DISCREPANCIAS: (D-CONTRADICT-3322) Contradicción entre TestKnowledgeOutputOverlapsContract (exige exactamente 12 keys = dataclass fields - icon) y TestGetApplicationKnowledgeIncludesAvailability (exige "available" y "declared_capabilities"). Resuelta: la hoja 3.3.2.2 introduce estos campos y los tests de no-duplicación se actualizaron (no se eliminan los campos). Heredado de 3.3.1.1/3.3.1.2: gap modelo Enum vs data persistidos persiste (las apps reconstruidas desde entities.json carecen de capabilities declaradas).
 PENDIENTES: NINGUNO para 3.3.2.2 (completada). La siguiente hoja del roadmap es 3.3.2.3.
 ESTADO FINAL: 3.3.2.2 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.3.2.3
+FECHA: 2026-10-29
+OBJETIVO: "Verificar capacidades ausentes."
+Extiende el contrato de 3.3.2.2: una capacidad puede estar (a) ausente del modelo
+Enum canónico (nombre definido en data/knowledge/*.json pero no representado en
+ApplicationCapability) —gap D-CAP-MODEL-GAP—, o (b) ausente para una app
+conoccida (app en el catálogo pero con capabilities=[]). 3.3.2.3 verifica que el
+contrato canónico resuelve ambos casos de forma determinista y los distingue de
+una app desconocida. Unidad de verificación (TESTS): no modifica código de
+producción (como 3.3.2.1).
+CAMBIOS / HALLAZGOS:
+- Sin cambios de producción. 3.3.2.3 es una hoja de verificación sobre el
+  contrato establecido en 3.3.2.1/3.3.2.2; caracteriza el comportamiento existente.
+- D-CAP-MODEL-GAP confirmado (evidencia): data/knowledge/applications.json declara
+  capacidades ausentes del Enum canónico. Chrome declara ausentes {back, forward,
+  zoom_in, zoom_out, zoom_reset}; Spotify declara ausentes {play, pause,
+  like_song, create_playlist}. ApplicationCapability("back"/"zoom_in"/"play"/
+  "open_file"/"change_scene") → ValueError (no se falsea ni mapea a otro miembro).
+- _reconstruct_capabilities(["back","forward","zoom_in"]) → [] (omite silenciosamente
+  strings ausentes del Enum; no los mapea a miembros erróneos).
+- Modelo (ApplicationKnowledge): is_capable / is_capability_available / get_capability
+  devuelven False/None para capacidades ausentes (sin excepción).
+- Singleton real get_application_manager(): 30 de 32 apps carecen de capabilities
+  (solo chrome/spotify las declaran); YouTube/GitHub/Twitch son apps reconstruidas
+  con capabilities=[] (ausentes) pero conocidas (get_application != None; alias "yt"
+  resuelve).
+- Contrato de distinción: get_application_knowledge("YouTube") devuelve metadata con
+  declared_capabilities=[] y capabilities={}, DISTINTA de una app desconocida
+  (get_application_knowledge("nonexistent") == {}).
+- (D-ISO-3323) Aislamiento: test_application_optional_data.py registra apps custom
+  (OptCustomFull/FullCustomApp/OptCustomCaps/…) en el singleton EN MEMORIA vía
+  register_custom_application (función módulo → singleton real). Esto invalida
+  aserciones de conjunto EXACTO sobre el singleton real. No afecta entities.json
+  (verificado inmutable: 15245 B / 35 entidades / 32 apps). Resuelta en 3.3.2.3
+  usando fixtures controlados (_make_minimal_manager) para invariantes exactas y
+  aserciones robustas (presencia/ausencia) para el singleton real.
+ARCHIVOS MODIFICADOS:
+- tests/hands/test_capability_absent_verification.py: NUEVA suite (35 tests, 7 clases).
+TESTS Y RESULTADOS:
+- NUEVA SUITE: 35/35 PASSED (tests/hands/test_capability_absent_verification.py).
+  * TestEnumCapabilityAbsence: 7 (gap Enum vs data; _reconstruct_capabilities; datos chrome/spotify).
+  * TestModelAbsentCapabilities: 4 (app sin capabilities → no capable; parcial; get_capability=None).
+  * TestReconstructedAppAbsentCapabilities: 6 (singleton real: YouTube/GitHub/Twitch caps=[]; chrome/spotify declaran; YouTube no en query OPEN).
+  * TestKnownAppAbsentVsUnknownApp: 3 (app conocida con absent ≠ app desconocida).
+  * TestInverseQueryExcludesAbsent: 4 (controlado: solo apps que declaran aparecen; CLOSE/absentes → []).
+  * TestModuleLevelAbsentCapability: 5 (strings ausentes del Enum → []; app desconocida; sin excepción).
+  * TestIntegratorAbsentCapability: 6 (controlado: capable=False/{} para absent; + singleton real YouTube).
+- NO REGRESO: 2287/2287 PASSED (tests/hands/ + tests/brain/). (Baseline 3.3.2.2: 2252;
+  +35 de 3.3.2.3 = 2287. 0 fallos, 0 errores.)
+VERIFICACION:
+- SINTAXIS: py_compile de main.py, applications_core.py, application_integration.py,
+  llm.py y tests/hands/test_capability_absent_verification.py → exit 0.
+- MAIN.PY: `import main` → OK (IMPORT_MAIN_OK). Nota: importar main.py regenera
+  data/knowledge_graph.json (comportamiento PREEXISTENTE de main.py; no es cambio
+  de 3.3.2.3).
+- DATOS: data/memory/entities.json inalterado (15245 B / 35 entidades / 32 apps, sin
+  apps de test persistidas); data/knowledge/applications.json inalterado.
+- COMPORTAMIENTO / INTEGRACION REAL: verificado read-only contra el singleton real
+  get_application_manager() y get_application_knowledge_integrator() (YouTube/GitHub/
+  Twitch carecen de capabilities; Chrome/Spotify las declaran; apps conocidas con
+  capabilities ausentes ≠ apps desconocidas; query inversa excluye apps ausentes).
+DISCREPANCIAS: (D-CAP-MODEL-GAP) Heredado de 3.3.1.1/3.3.1.2/3.3.1.3/3.3.2.1/3.3.2.2:
+el gap entre el modelo Enum ApplicationCapability (solo chrome/spotify declaran
+capacity) y data/knowledge/*.json + data/memory/entities.json persiste: 30/32 apps
+carecen de capabilities declaradas. No se reconcilia (regla 5.4); cobertura de datos
+pendiente (3.3.3+ expone capabilities al planificador manejando el ausente como []).
+(D-ISO-3323) Ver HALLAZGOS: el singleton en memoria se enriquece con apps custom de
+tests (vía register_custom_application módulo → singleton real); no persiste a
+entities.json.
+PENDIENTES: NINGUNO para 3.3.2.3 (completada). La siguiente hoja del roadmap es 3.3.3.1.
+ESTADO FINAL: 3.3.2.3 - VERIFICADA
 
