@@ -19,7 +19,7 @@
 - [`src/eyes/__init__.py` (5 líneas)](#src-eyes-_init_-py)
 - [`src/eyes/screen.py` (997 líneas)](#src-eyes-screen-py)
 - [`src/eyes/screen_capture.py` (368 líneas)](#src-eyes-screen_capture-py)
-- [`src/eyes/vision.py` (924 líneas)](#src-eyes-vision-py)
+- [`src/eyes/vision.py` (935 líneas)](#src-eyes-vision-py)
 - [`src/eyes/vision_only.py` (417 líneas)](#src-eyes-vision_only-py)
 - [`src/hands/__init__.py` (30 líneas)](#src-hands-_init_-py)
 - [`src/hands/action_registry.py` (1272 líneas)](#src-hands-action_registry-py)
@@ -572,7 +572,7 @@ Funciones a nivel módulo:
 | `def get_screen_capture()`  (L361) | Obtiene la instancia global del sistema de captura. |
 
 <a name="src-eyes-vision-py"></a>
-### `src/eyes/vision.py` [924 líneas] — Visión por computadora (Qwen3-VL/Ollama)
+### `src/eyes/vision.py` [935 líneas] — Visión por computadora (Qwen3-VL/Ollama)
 
 **Descripción:** Sistema de visión basado en modelo VL vía Ollama. Analiza pantallas, detecta elementos UI, verifica visibilidad y resultados de acciones, detecta estado de aplicaciones y genera nodos de visión para el planificador.
 

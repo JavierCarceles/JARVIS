@@ -6979,5 +6979,207 @@
     "confidence": 1.0,
     "execution_time": 0.0,
     "success": null
+  },
+  {
+    "id": "conv_1793320601.410494",
+    "message": "Navegar a example.com",
+    "response": "Objetivo completado: Navegar a example.com",
+    "timestamp": "2026-10-30T01:36:41.410502",
+    "context": {
+      "goal_id": "test_valid_goal",
+      "goal_type": "navigate",
+      "target": "https://example.com",
+      "execution_details": {
+        "message": "Jerarquía procesada",
+        "new_state": {
+          "completed_tasks": [
+            "t1",
+            "test_valid_goal_navigate_to_target"
+          ],
+          "browser_available": true
+        }
+      },
+      "error_message": null,
+      "timestamp": 1793320601.4104896
+    },
+    "intent": "navigate",
+    "entities": [],
+    "confidence": 1.0,
+    "execution_time": 0.00015160000111791305,
+    "success": true
+  },
+  {
+    "id": "conv_1793320601.43363",
+    "message": "Navegar a example.com",
+    "response": "Objetivo completado: Navegar a example.com",
+    "timestamp": "2026-10-30T01:36:41.433640",
+    "context": {
+      "goal_id": "test_navigate_goal",
+      "goal_type": "navigate",
+      "target": "https://example.com",
+      "execution_details": {
+        "message": "Jerarquía procesada",
+        "new_state": {
+          "completed_tasks": [
+            "t1",
+            "test_navigate_goal_navigate_to_target"
+          ],
+          "browser_available": true
+        }
+      },
+      "error_message": null,
+      "timestamp": 1793320601.4335716
+    },
+    "intent": "navigate",
+    "entities": [],
+    "confidence": 1.0,
+    "execution_time": 0.00012870000136899762,
+    "success": true
+  },
+  {
+    "id": "conv_1793320603.263666",
+    "message": "abre chrome",
+    "response": "Objetivo creado: Abrir aplicación Google Chrome",
+    "timestamp": "2026-10-30T01:36:43.263670",
+    "context": {
+      "goal_id": "open_application_google_chrome_1793320603",
+      "parameters": {},
+      "confidence": 1.0,
+      "resolution_method": "exact_match"
+    },
+    "intent": "open_application",
+    "entities": [
+      "google_chrome"
+    ],
+    "confidence": 1.0,
+    "execution_time": 0.0,
+    "success": null
+  },
+  {
+    "id": "conv_1793320604.36926",
+    "message": "navega a example.com",
+    "response": "Objetivo creado: test",
+    "timestamp": "2026-10-30T01:36:44.369267",
+    "context": null,
+    "intent": "navigate",
+    "entities": [],
+    "confidence": 1.0,
+    "execution_time": 0.0,
+    "success": null
+  },
+  {
+    "id": "conv_1793320604.398951",
+    "message": "navega a example.com",
+    "response": "Objetivo creado: test",
+    "timestamp": "2026-10-30T01:36:44.398958",
+    "context": null,
+    "intent": "navigate",
+    "entities": [
+      "https://example.com"
+    ],
+    "confidence": 1.0,
+    "execution_time": 0.0,
+    "success": null
+  },
+  {
+    "id": "conv_1793320653.234693",
+    "message": "Navegar a example.com",
+    "response": "Objetivo completado: Navegar a example.com",
+    "timestamp": "2026-10-30T01:37:33.234703",
+    "context": {
+      "goal_id": "test_valid_goal",
+      "goal_type": "navigate",
+      "target": "https://example.com",
+      "execution_details": {
+        "message": "Jerarquía procesada",
+        "new_state": {
+          "completed_tasks": [
+            "t1",
+            "test_valid_goal_navigate_to_target"
+          ],
+          "browser_available": true
+        }
+      },
+      "error_message": null,
+      "timestamp": 1793320653.2346883
+    },
+    "intent": "navigate",
+    "entities": [],
+    "confidence": 1.0,
+    "execution_time": 0.00016239999968092889,
+    "success": true
+  },
+  {
+    "id": "conv_1793320653.260911",
+    "message": "Navegar a example.com",
+    "response": "Objetivo completado: Navegar a example.com",
+    "timestamp": "2026-10-30T01:37:33.260919",
+    "context": {
+      "goal_id": "test_navigate_goal",
+      "goal_type": "navigate",
+      "target": "https://example.com",
+      "execution_details": {
+        "message": "Jerarquía procesada",
+        "new_state": {
+          "completed_tasks": [
+            "t1",
+            "test_navigate_goal_navigate_to_target"
+          ],
+          "browser_available": true
+        }
+      },
+      "error_message": null,
+      "timestamp": 1793320653.2609067
+    },
+    "intent": "navigate",
+    "entities": [],
+    "confidence": 1.0,
+    "execution_time": 0.00014279999959398992,
+    "success": true
+  },
+  {
+    "id": "conv_1793320655.060889",
+    "message": "abre chrome",
+    "response": "Objetivo creado: Abrir aplicación Google Chrome",
+    "timestamp": "2026-10-30T01:37:35.060894",
+    "context": {
+      "goal_id": "open_application_google_chrome_1793320655",
+      "parameters": {},
+      "confidence": 1.0,
+      "resolution_method": "exact_match"
+    },
+    "intent": "open_application",
+    "entities": [
+      "google_chrome"
+    ],
+    "confidence": 1.0,
+    "execution_time": 0.0,
+    "success": null
+  },
+  {
+    "id": "conv_1793320656.179776",
+    "message": "navega a example.com",
+    "response": "Objetivo creado: test",
+    "timestamp": "2026-10-30T01:37:36.179783",
+    "context": null,
+    "intent": "navigate",
+    "entities": [],
+    "confidence": 1.0,
+    "execution_time": 0.0,
+    "success": null
+  },
+  {
+    "id": "conv_1793320656.206842",
+    "message": "navega a example.com",
+    "response": "Objetivo creado: test",
+    "timestamp": "2026-10-30T01:37:36.206850",
+    "context": null,
+    "intent": "navigate",
+    "entities": [
+      "https://example.com"
+    ],
+    "confidence": 1.0,
+    "execution_time": 0.0,
+    "success": null
   }
 ]

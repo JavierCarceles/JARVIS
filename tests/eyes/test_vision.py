@@ -559,12 +559,35 @@ class TestVisionDetectApplicationState:
 
     @patch("src.eyes.vision.ollama")
     def test_app_invalid_state_string(self, mock_ollama):
+        """Un state desconocido NO se afirma como OPEN; se usa CLOSED como fallback seguro."""
         mock_ollama.chat.return_value = {
             "message": {"content": json_dumps({"detected": True, "state": "weird_state"})}
         }
         from src.eyes.screen import ApplicationState
         result = self.vision.detect_application_state("app")
-        assert result.state == ApplicationState.OPEN  # default
+        assert result.state == ApplicationState.CLOSED
+
+    @patch("src.eyes.vision.ollama")
+    def test_app_detected_missing_state_field(self, mock_ollama):
+        """Si la visión detecta la app (detected=True) pero no incluye el campo
+        'state', no se afirma OPEN por defecto. Se asume CLOSED para evitar
+        creencias falsas — hoja 3.4.3.2 'No afirmar un estado solo por configuración'."""
+        mock_ollama.chat.return_value = {
+            "message": {"content": json_dumps({"detected": True, "confidence": 0.9})}
+        }
+        from src.eyes.screen import ApplicationState
+        result = self.vision.detect_application_state("app")
+        assert result.state == ApplicationState.CLOSED
+
+    @patch("src.eyes.vision.ollama")
+    def test_app_detected_null_state_field(self, mock_ollama):
+        """Si la visión detecta la app pero 'state' es null/None, no se afirma OPEN."""
+        mock_ollama.chat.return_value = {
+            "message": {"content": json_dumps({"detected": True, "state": None})}
+        }
+        from src.eyes.screen import ApplicationState
+        result = self.vision.detect_application_state("app")
+        assert result.state == ApplicationState.CLOSED
 
     @patch("src.eyes.vision.ollama")
     def test_app_exception_returns_closed(self, mock_ollama):

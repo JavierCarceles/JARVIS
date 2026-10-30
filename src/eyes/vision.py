@@ -750,7 +750,14 @@ Responde ÚNICAMENTE JSON:
     # ====================================================================
 
     def detect_application_state(self, app_name: str) -> ApplicationInfo:
-        """Busca una aplicación en todas las pantallas disponibles."""
+        """Busca una aplicación en todas las pantallas disponibles.
+
+        No afirma un estado solo por configuración: si la visión no proporciona
+        un ``state`` válido (ausente, nulo o desconocido), el fallback es
+        :attr:`ApplicationState.CLOSED`, nunca ``OPEN``. Esto evita creencias
+        falsas sobre una aplicación abierta cuando no hay evidencia visual
+        concluyente.
+        """
         logger._print_log("info", "Procesando solicitud", "vision.py", "method", 111)
         target = str(app_name or "").strip()
         if not target:
@@ -797,10 +804,14 @@ Responde ÚNICAMENTE JSON:
                     continue
 
                 confidence = self._clamp_float(data.get("confidence", 0.0))
-                state_str = str(data.get("state", "open") or "open").lower()
+                # No afirmar un estado solo por configuración: si la visión no
+                # proporciona un state válido, no se asume OPEN. Se usa CLOSED
+                # como fallback seguro, consistente con analyze_screen_for_world_state
+                # y ScreenAnalyzer._fallback_detect_application_state.
+                state_str = str(data.get("state", "closed") or "closed").lower()
                 info = ApplicationInfo(
                     name=target,
-                    state=state_map.get(state_str, ApplicationState.OPEN),
+                    state=state_map.get(state_str, ApplicationState.CLOSED),
                     window_title=data.get("window_title"),
                     monitor=monitor_number,
                     visible_elements=list(data.get("visible_elements", []) or []),

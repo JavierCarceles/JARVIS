@@ -256,6 +256,94 @@ def compare_declared_and_observable_state(
     }
 
 
+def reconcile_observable_with_declared_state(
+    declared: Dict[str, Any],
+    observable_state: ApplicationState,
+) -> Dict[str, Any]:
+    """Resuelve una discrepancia entre el estado declarado y el observable.
+
+    El **estado declarado** es el modelo de creencias del sistema: proviene de
+    ``applications.json`` (``states`` dict) o del estado en tiempo de ejecución
+    de :class:`Executor` (``current_state.application_states[app]``). Contiene
+    al menos las 4 flags canónicas booleanas.
+
+    El **estado observable** es lo que la capa de visión detecta visualmente en
+    ese momento (``Vision.detect_application_state`` /
+    :meth:`ScreenAnalyzer.analyze_application_state``).
+
+    **Comportamiento ante discrepancia** (hoja 3.4.3.3):
+
+    La visión tiene prioridad sobre la configuración estática cuando detecta una
+    aplicación realmente presente. Por tanto:
+
+    - Si ``match`` es ``True``, el estado declarado no necesita cambios.
+    - Si ``match`` es ``False``, **las 4 flags canónicas del estado declarado se
+      actualizan** para reflejar el estado observable real (las flags de dominio
+      como ``playing``/``streaming``/``recording`` se conservan intactas, ya que
+      no son comparables con ``ApplicationState``).
+    - El estado declarado original recibido como argumento **no se muta**; el
+      retorno incluye una copia reconciliada.
+
+    Esto permite al :class:`Executor` actualizar su estado en tiempo real
+    (``current_state.application_states[app]``) con la realidad observada y, de
+    esa actualización, derivar una posible **replanificación**. La configuración
+    estática de ``applications.json`` no se escribe ni modifica.
+
+    Args:
+        declared: Diccionario de flags declaradas para la aplicación. Normalmente
+            ``applications[app]["states"]`` o ``current_state.application_states[app]``.
+        observable_state: Estado observable detectado por visión
+            (instancia de :class:`ApplicationState`).
+
+    Returns:
+        Diccionario con las claves:
+
+        - ``match`` (``bool``): ``True`` si no había discrepancias.
+        - ``observable_state`` (``ApplicationState``): el estado observable
+          recibido.
+        - ``observable_flags`` (``Dict[str, bool]``): flags canónicas derivadas
+          del estado observable.
+        - ``declared_flags`` (``Dict[str, bool]``): las 4 flags canónicas
+          leídas del estado declarado antes de la reconciliación.
+        - ``reconciled_flags`` (``Dict[str, Any]``): el estado declarado con las
+          4 flags canónicas actualizadas a reflejar el observable; las flags de
+          dominio y claves previamente ausentes se conservan.
+        - ``discrepancies`` (``Dict[str, Dict[str, bool]]``): para cada flag
+          discrepante, ``{flag: {"declared": bool, "observable": bool}}``.
+        - ``reconciled`` (``bool``): ``True`` si se aplicó una reconciliación
+          (es decir, ``match`` era ``False``); ``False`` si el estado declarado
+          ya coincidía con el observable.
+    """
+    comparison = compare_declared_and_observable_state(declared, observable_state)
+
+    observable_flags = comparison["observable_flags"]
+    declared_flags = comparison["declared_flags"]
+    discrepancies = comparison["discrepancies"]
+    match = comparison["match"]
+
+    # Se construye una copia del estado declarado para no mutar el original.
+    reconciled_flags: Dict[str, Any] = dict(declared)
+
+    if not match:
+        # Prioridad a la visión: actualizar las 4 flags canónicas para reflejar
+        # el estado observable real. Las flags de dominio se conservan.
+        for flag in CANONICAL_WINDOW_FLAGS:
+            reconciled_flags[flag] = observable_flags[flag]
+        reconciled = True
+    else:
+        reconciled = False
+
+    return {
+        "match": match,
+        "observable_state": observable_state,
+        "observable_flags": observable_flags,
+        "declared_flags": declared_flags,
+        "reconciled_flags": reconciled_flags,
+        "discrepancies": discrepancies,
+        "reconciled": reconciled,
+    }
+
+
 @dataclass
 class WorldState:
     """Estado del mundo usado por las APIs legacy de este módulo."""
