@@ -27,6 +27,7 @@ from src.eyes.screen import (
     APPLICATION_STATE_TO_WINDOW_FLAGS,
     observable_state_to_flags,
     compare_declared_and_observable_state,
+    reconcile_observable_with_declared_state,
 )
 
 
@@ -286,3 +287,160 @@ class TestCompareWithApplicationsJsonModel:
         result = compare_declared_and_observable_state(states, ApplicationState.CLOSED)
         assert result["match"] is True
         assert result["discrepancies"] == {}
+
+
+class TestReconcileObservableWithDeclared:
+    """``reconcile_observable_with_declared_state`` resuelve discrepancias priorizando la visión."""
+
+    # --- Sin discrepancia: no hay reconciliación ---
+
+    def test_match_true_returns_reconciled_false(self):
+        """Si match es True, reconciled=False y las flags no cambian."""
+        declared = {"open": True, "active": False, "maximized": False, "focused": False}
+        result = reconcile_observable_with_declared_state(declared, ApplicationState.OPEN)
+        assert result["match"] is True
+        assert result["reconciled"] is False
+        assert result["reconciled_flags"] == declared
+        assert result["discrepancies"] == {}
+
+    def test_match_true_preserves_domain_flags(self):
+        """Flags de dominio se conservan cuando no hay discrepancia."""
+        declared = {
+            "open": True, "active": False, "maximized": False, "focused": False,
+            "playing": True, "streaming": False,
+        }
+        result = reconcile_observable_with_declared_state(declared, ApplicationState.OPEN)
+        assert result["match"] is True
+        assert result["reconciled_flags"]["playing"] is True
+        assert result["reconciled_flags"]["streaming"] is False
+
+    def test_original_declared_not_mutated_on_match(self):
+        """El diccionario declarado original no se muta aunque match sea True."""
+        declared = {"open": True, "active": False, "maximized": False, "focused": False}
+        original = dict(declared)
+        reconcile_observable_with_declared_state(declared, ApplicationState.OPEN)
+        assert declared == original
+
+    # --- Con discrepancia: reconciliación aplica flags observables ---
+
+    def test_reconciled_true_when_discrepancy(self):
+        """Si hay discrepancia, reconciled=True."""
+        declared = {"open": False, "active": False, "maximized": False, "focused": False}
+        result = reconcile_observable_with_declared_state(declared, ApplicationState.OPEN)
+        assert result["match"] is False
+        assert result["reconciled"] is True
+
+    def test_reconciled_flags_update_canonical_to_observable(self):
+        """Las 4 flags canónicas se actualizan al estado observable."""
+        declared = {"open": False, "active": False, "maximized": False, "focused": False}
+        result = reconcile_observable_with_declared_state(declared, ApplicationState.ACTIVE)
+        # ACTIVE -> open=True, active=True, maximized=False, focused=True
+        assert result["reconciled_flags"]["open"] is True
+        assert result["reconciled_flags"]["active"] is True
+        assert result["reconciled_flags"]["maximized"] is False
+        assert result["reconciled_flags"]["focused"] is True
+
+    def test_reconciled_preserves_domain_flags(self):
+        """Flags de dominio se conservan intactas durante la reconciliación."""
+        declared = {
+            "open": False, "active": False, "maximized": False, "focused": False,
+            "playing": True, "streaming": True, "recording": False,
+        }
+        result = reconcile_observable_with_declared_state(declared, ApplicationState.ACTIVE)
+        assert result["reconciled_flags"]["playing"] is True
+        assert result["reconciled_flags"]["streaming"] is True
+        assert result["reconciled_flags"]["recording"] is False
+
+    def test_reconciled_preserves_other_keys(self):
+        """Claves no canónicas no estándar se conservan."""
+        declared = {
+            "open": False, "active": False, "maximized": False, "focused": False,
+            "custom_field": "value", "another": 123,
+        }
+        result = reconcile_observable_with_declared_state(declared, ApplicationState.OPEN)
+        assert result["reconciled_flags"]["custom_field"] == "value"
+        assert result["reconciled_flags"]["another"] == 123
+
+    def test_original_declared_not_mutated_on_reconcile(self):
+        """El diccionario declarado original no se muta durante reconciliación."""
+        declared = {"open": False, "active": False, "maximized": False, "focused": False}
+        original = dict(declared)
+        reconcile_observable_with_declared_state(declared, ApplicationState.MAXIMIZED)
+        assert declared == original
+
+    def test_reconciled_flags_is_new_dict(self):
+        """reconciled_flags es un dict nuevo, no referencia al original."""
+        declared = {"open": False, "active": False, "maximized": False, "focused": False}
+        result = reconcile_observable_with_declared_state(declared, ApplicationState.OPEN)
+        assert result["reconciled_flags"] is not declared
+        result["reconciled_flags"]["open"] = False
+        assert declared["open"] is False  # original intacto
+
+    # --- Discrepancias reportadas ---
+
+    def test_discrepancies_included_in_result(self):
+        """El resultado incluye el detalle de discrepancias flag a flag."""
+        declared = {"open": False, "active": False, "maximized": False, "focused": False}
+        result = reconcile_observable_with_declared_state(declared, ApplicationState.ACTIVE)
+        # ACTIVE requiere open=True, active=True, focused=True
+        assert "open" in result["discrepancies"]
+        assert result["discrepancies"]["open"] == {"declared": False, "observable": True}
+        assert "active" in result["discrepancies"]
+        assert result["discrepancies"]["active"] == {"declared": False, "observable": True}
+        assert "focused" in result["discrepancies"]
+        assert result["discrepancies"]["focused"] == {"declared": False, "observable": True}
+        assert "maximized" not in result["discrepancies"]
+
+    def test_all_five_keys_in_result(self):
+        """El resultado siempre contiene las 7 claves requeridas."""
+        declared = {"open": False, "active": False, "maximized": False, "focused": False}
+        result = reconcile_observable_with_declared_state(declared, ApplicationState.OPEN)
+        expected_keys = {
+            "match", "observable_state", "observable_flags",
+            "declared_flags", "reconciled_flags", "discrepancies", "reconciled"
+        }
+        assert set(result.keys()) == expected_keys
+
+    def test_observable_state_preserved(self):
+        """El estado observable original se incluye en el resultado."""
+        declared = {"open": False, "active": False, "maximized": False, "focused": False}
+        result = reconcile_observable_with_declared_state(declared, ApplicationState.MAXIMIZED)
+        assert result["observable_state"] == ApplicationState.MAXIMIZED
+
+    def test_declared_flags_reflects_pre_reconcile_state(self):
+        """declared_flags muestra el estado ANTES de la reconciliación."""
+        declared = {"open": False, "active": True, "maximized": False, "focused": False}
+        result = reconcile_observable_with_declared_state(declared, ApplicationState.MAXIMIZED)
+        # declared_flags es lo que había antes: active=True, resto False
+        assert result["declared_flags"]["open"] is False
+        assert result["declared_flags"]["active"] is True
+        assert result["declared_flags"]["maximized"] is False
+        assert result["declared_flags"]["focused"] is False
+        # reconciled_flags refleja MAXIMIZED
+        assert result["reconciled_flags"]["open"] is True
+        assert result["reconciled_flags"]["active"] is True
+        assert result["reconciled_flags"]["maximized"] is True
+        assert result["reconciled_flags"]["focused"] is True
+
+    # --- Edge cases ---
+
+    def test_empty_declared_dict_reconciles_to_observable(self):
+        """Diccionario vacío se reconcilia completamente al observable."""
+        result = reconcile_observable_with_declared_state({}, ApplicationState.CLOSED)
+        assert result["match"] is True
+        assert result["reconciled"] is False
+        assert result["reconciled_flags"] == {
+            "open": False, "active": False, "maximized": False, "focused": False
+        }
+
+    def test_missing_canonical_flags_assumed_false_then_reconciled(self):
+        """Flags canónicas faltantes se asumen False y luego se actualizan si observables difieren."""
+        declared = {"open": True}  # solo open, resto faltan -> False
+        result = reconcile_observable_with_declared_state(declared, ApplicationState.ACTIVE)
+        # declared_flags: open=True, active=False, maximized=False, focused=False
+        assert result["declared_flags"]["open"] is True
+        assert result["declared_flags"]["active"] is False
+        # reconciled_flags: ACTIVE
+        assert result["reconciled_flags"]["open"] is True
+        assert result["reconciled_flags"]["active"] is True
+        assert result["reconciled_flags"]["focused"] is True

@@ -331,6 +331,11 @@ def reconcile_observable_with_declared_state(
             reconciled_flags[flag] = observable_flags[flag]
         reconciled = True
     else:
+        # Aunque no haya discrepancia, asegurar que las 4 flags canónicas estén
+        # presentes en el resultado reconciliado (usando los valores observables,
+        # que coinciden con los declarados en este caso).
+        for flag in CANONICAL_WINDOW_FLAGS:
+            reconciled_flags[flag] = observable_flags[flag]
         reconciled = False
 
     return {
@@ -1244,4 +1249,5 @@ __all__ = [
     "APPLICATION_STATE_TO_WINDOW_FLAGS",
     "observable_state_to_flags",
     "compare_declared_and_observable_state",
+    "reconcile_observable_with_declared_state",
 ]

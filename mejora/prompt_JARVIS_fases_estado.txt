@@ -6119,3 +6119,30 @@ VERIFICACION:
 DISCREPANCIAS: NINGUNA
 PENDIENTES: NINGUNO para 3.4.3.2 (completada). La siguiente hoja del roadmap es 3.4.3.3 (Definir comportamiento ante discrepancia).
 ESTADO FINAL: 3.4.3.2 - IMPLEMENTADA
+
+## REGISTRO DE UNIDAD: 3.4.3.3
+
+FECHA: 2026-10-30
+OBJETIVO: Definir comportamiento ante discrepancia entre estado declarado (flags de applications.json / Executor.current_state) y estado observable (ApplicationState de Vision). La visión tiene prioridad: cuando hay discrepancia, las 4 flags canónicas (open, active, maximized, focused) del estado declarado se actualizan para reflejar el observable real; las flags de dominio (playing/streaming/recording) se conservan. La configuración estática (applications.json) no se modifica.
+TIPO DE TRABAJO: IMPLEMENTACION | TEST | VERIFICACION | DOCUMENTACION
+CAMBIOS / HALLAZGOS:
+- src/eyes/screen.py: anadida exportacion de `reconcile_observable_with_declared_state` en __all__ (linea ~1234). La funcion ya existia (implementada en 3.4.3.1) pero no estaba exportada ni probada. Ajuste en la logica: cuando match=True, asegurar que reconciled_flags siempre contenga las 4 flags canónicas con valores del observable (que coinciden con los declarados).
+- tests/eyes/test_state_comparison.py: anadida clase TestReconcileObservableWithDeclared con 15 tests (test_match_true_returns_reconciled_false, test_match_true_preserves_domain_flags, test_original_declared_not_mutated_on_match, test_reconciled_true_when_discrepancy, test_reconciled_flags_update_canonical_to_observable, test_reconciled_preserves_domain_flags, test_reconciled_preserves_other_keys, test_original_declared_not_mutated_on_reconcile, test_reconciled_flags_is_new_dict, test_discrepancies_included_in_result, test_all_five_keys_in_result, test_observable_state_preserved, test_declared_flags_reflects_pre_reconcile_state, test_empty_declared_dict_reconciles_to_observable, test_missing_canonical_flags_assumed_false_then_reconciled).
+ARCHIVOS MODIFICADOS:
+  PRODUCCION: `src/eyes/screen.py` (export en __all__; reconciled_flags siempre incluye 4 flags canonicas);
+  TESTS: `tests/eyes/test_state_comparison.py` (15 tests nuevos en TestReconcileObservableWithDeclared);
+  DOCUMENTACION: `mejora/prompt_JARVIS_fases_estado.txt` (este registro).
+TESTS Y RESULTADOS:
+  UNITARIOS: 65/65 PASSED (tests/eyes/test_state_comparison.py, 50 previos + 15 nuevos).
+  INTEGRACION: NE (funcion opera sobre datos estructurales; integrable con Executor.current_state.application_states).
+  NO REGRESION: 2812/2812 PASSED (tests/eyes 397 + tests/hands 2312 + tests/brain 103). Baseline antes de 3.4.3.3: 2797 (382 eyes + 2312 hands + 103 brain). +15 nuevos tests = 2812. 0 fallos, 0 errores. 3 warnings preexistentes en test_application_state_enumeration.py (PytestRemovedIn10Warning, no relacionados).
+VERIFICACION:
+  SINTAXIS: OK (`python -m py_compile src/eyes/screen.py tests/eyes/test_state_comparison.py` -> exit 0).
+  MAIN.PY: OK (`import main` -> IMPORT_MAIN_OK; todos los componentes inicializan, shutdown graceful).
+  COMPORTAMIENTO / INTEGRACION REAL: reconcile_observable_with_declared_state devuelve reconciled=True y actualiza flags canónicas cuando hay discrepancia; reconciled=False y preserva flags de dominio cuando match; declared original nunca mutado; funcion exportada y utilizable por Executor/Planner para actualizar estado en tiempo real y disparar replanificacion.
+DISCREPANCIAS: NINGUNA
+PENDIENTES: NINGUNA para 3.4.3.3 (completada). La siguiente hoja del roadmap es 3.4.4.1 (Tests de estados).
+ESTADO FINAL: 3.4.3.3 - IMPLEMENTADA
+
+--- TRANSICION DE ESTADO 3.4.3.3 -> 3.4.4.1 ---
+Se completa 3.4.3.3. CURRENT_WORK_UNIT avanza a 3.4.4.1 (Tests de estados). La hoja siguiente en el roadmap es 3.4.4.1. CURRENT_WORK_STATUS queda en PENDIENTE (siguiendo reglas 44-45).
