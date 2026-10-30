@@ -8,6 +8,8 @@ Este módulo proporciona:
 - Detección de aplicaciones activas.
 - Verificación básica de elementos UI calibrados.
 - Integración con memoria de dominio.
+- Comparación de estado declarado (flags booleanas) con estado observable
+  (ApplicationState de visión) para detección de discrepancias.
 
 La geometría de monitores y ventanas pertenece a ScreenManager. Este módulo
 no contiene offsets fijos, resoluciones prefijadas ni lógica específica de
@@ -113,6 +115,145 @@ class ApplicationInfo:
             size=(int(size_tuple[0]), int(size_tuple[1])),
             visible_elements=list(payload.get("visible_elements", []) or []),
         )
+
+
+# ============================================================================
+# COMPARACIÓN DE ESTADO DECLARADO vs. ESTADO OBSERVABLE
+# ============================================================================
+
+# Flags genéricas de estado de ventana, separadas e independientes del dominio
+# de la aplicación. Representan el estado de la ventana con booleans y son el
+# conjunto común a toda aplicación conocida en applications.json.
+CANONICAL_WINDOW_FLAGS: Tuple[str, ...] = ("open", "active", "maximized", "focused")
+
+# Conversión determinista de un estado observable (ApplicationState, producido
+# por la capa Vision) a las flags genéricas de estado de ventana {open, active,
+# maximized, focused}.
+#
+# La derivación obedece al contrato del Executor._update_world_state:
+#   - app_open   -> open=True
+#   - app_closed -> open=False
+#   - app_active -> active=True
+#   - app_minimized -> active=False (open permanece True, el proceso sigue activo)
+# MINIMIZED y OPEN comparten las mismas flags genéricas: el proceso corre y la
+# ventana no es ni activa ni maximizada ni enfocada. La distinción visual entre
+# ambas (ventana restaurada vs. minimizada) no afecta a las 4 flags canónicas.
+APPLICATION_STATE_TO_WINDOW_FLAGS: Dict[ApplicationState, Dict[str, bool]] = {
+    ApplicationState.CLOSED: {"open": False, "active": False, "maximized": False, "focused": False},
+    ApplicationState.OPEN: {"open": True, "active": False, "maximized": False, "focused": False},
+    ApplicationState.MINIMIZED: {"open": True, "active": False, "maximized": False, "focused": False},
+    ApplicationState.ACTIVE: {"open": True, "active": True, "maximized": False, "focused": True},
+    ApplicationState.MAXIMIZED: {"open": True, "active": True, "maximized": True, "focused": True},
+}
+
+
+def observable_state_to_flags(state: ApplicationState) -> Dict[str, bool]:
+    """Convierte un :class:`ApplicationState` observable a las flags genéricas
+    booleanas de estado de ventana ``{open, active, maximized, focused}``.
+
+    El estado observable proviene de la capa de visión (``Vision.detect_application_state``
+    / :meth:`ScreenAnalyzer.analyze_application_state`) y representa una única
+    clasificación visual. Esta función la descompone en las 4 flags canónicas
+    que el modelo declarado (``applications.json`` / ``Executor.current_state``)
+    utiliza para razonar sobre el mundo.
+
+    **Contrato:**
+
+    - Cada :class:`ApplicationState` mapea a exactamente una combinación
+      determinista de las 4 flags canónicas.
+    - ``CLOSED`` → todas ``False`` (la aplicación no está visible).
+    - ``MINIMIZED`` → ``open=True`` pero el resto ``False`` (el proceso corre
+      y la ventana existe, aunque está minimizada). Difiere visualmente de
+      ``OPEN`` pero comparte las mismas flags canónicas.
+    - ``ACTIVE`` → ``open=True``, ``active=True``, ``focused=True`` (ventana de
+      primer plano con foco de teclado).
+    - ``MAXIMIZED`` → ``open=True``, ``active=True``, ``maximized=True``,
+      ``focused=True`` (ventana maximizada en primer plano).
+
+    Args:
+        state: Estado observable de la aplicación (enum ``ApplicationState``).
+
+    Returns:
+        Diccionario inmutable con las 4 flags canónicas como booleans. Siempre
+        contiene exactamente las claves ``open``, ``active``, ``maximized`` y
+        ``focused``.
+
+    Nota:
+        Las flags de dominio (``playing``, ``streaming``, ``recording``) no se
+        derivan de ``ApplicationState``; requieren detección visual específica
+        y no se incluyen en el resultado.
+    """
+    return dict(APPLICATION_STATE_TO_WINDOW_FLAGS[state])
+
+
+def compare_declared_and_observable_state(
+    declared: Dict[str, Any],
+    observable_state: ApplicationState,
+) -> Dict[str, Any]:
+    """Compara el estado declarado (flags booleanas) con el estado observable
+    (``ApplicationState``) para detectar discrepancias.
+
+    El **estado declarado** es el modelo de creencias del sistema: proviene de
+    ``applications.json`` (``states`` dict) o del estado en tiempo de ejecución
+    de :class:`Executor` (``current_state.application_states[app]``). Contiene
+    al menos las 4 flags canónicas booleanas
+    (``open``, ``active``, ``maximized``, ``focused``) y, opcionalmente, flags
+    de dominio (``playing``, ``streaming``, ``recording``).
+
+    El **estado observable** es lo que la capa de visión detecta visualmente en
+    ese momento. Se convierte a flags canónicas mediante
+    :func:`observable_state_to_flags`.
+
+    **Contrato:**
+
+    - Solo se comparan las 4 flags canónicas (``open``, ``active``,
+      ``maximized``, ``focused``). Las flags de dominio no son comparables con
+      ``ApplicationState`` y se ignoran en esta comparación.
+    - Si una flag canónica falta en el estado declarado, se asume ``False``
+      (comportamiento consistente con el valor por defecto en
+      ``applications.json``).
+    - Cada flag se compara como booleano; valores no booleanos se convierten con
+      ``bool()``.
+    - Se reportan **todas** las discrepancias encontradas, no solo la primera.
+
+    Args:
+        declared: Diccionario de flags declaradas para la aplicación. Normalmente
+            ``applications[app]["states"]`` o ``current_state.application_states[app]``.
+        observable_state: Estado observable detectado por visión.
+
+    Returns:
+        Diccionario con las claves:
+
+        - ``match`` (``bool``): ``True`` si no hay discrepancias en ninguna
+          flag canónica.
+        - ``observable_state`` (``ApplicationState``): el estado observable
+          recibido.
+        - ``observable_flags`` (``Dict[str, bool]``): flags canónicas derivadas
+          del estado observable.
+        - ``declared_flags`` (``Dict[str, bool]``): las 4 flags canónicas
+          leídas del estado declarado (faltantes → ``False``).
+        - ``discrepancies`` (``Dict[str, Dict[str, bool]]``): para cada flag
+          discrepante, ``{flag: {"declared": bool, "observable": bool}}``.
+          Vacío cuando ``match`` es ``True``.
+    """
+    observable_flags = observable_state_to_flags(observable_state)
+    declared_flags: Dict[str, bool] = {}
+    discrepancies: Dict[str, Dict[str, bool]] = {}
+
+    for flag in CANONICAL_WINDOW_FLAGS:
+        declared_value = bool(declared.get(flag, False))
+        observable_value = observable_flags[flag]
+        declared_flags[flag] = declared_value
+        if declared_value != observable_value:
+            discrepancies[flag] = {"declared": declared_value, "observable": observable_value}
+
+    return {
+        "match": len(discrepancies) == 0,
+        "observable_state": observable_state,
+        "observable_flags": observable_flags,
+        "declared_flags": declared_flags,
+        "discrepancies": discrepancies,
+    }
 
 
 @dataclass
@@ -1011,4 +1152,8 @@ __all__ = [
     "capture_screen",
     "capture_captcha_area",
     "get_screen_capture",
+    "CANONICAL_WINDOW_FLAGS",
+    "APPLICATION_STATE_TO_WINDOW_FLAGS",
+    "observable_state_to_flags",
+    "compare_declared_and_observable_state",
 ]

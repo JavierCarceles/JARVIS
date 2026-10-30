@@ -6057,3 +6057,38 @@ ESTADO FINAL: 3.4.2.4 - IMPLEMENTADA
 
 --- TRANSICION DE ESTADO 3.4.2.4 -> 3.4.3.1 ---
 Se completa 3.4.2.4. CURRENT_WORK_UNIT avanza a 3.4.3.1. La siguiente hoja del roadmap es 3.4.3.1 (Comparar estado declarado con estado observable). Los registros canonicos de 3.4.2.1-3.4.2.4 permanecen vigentes.
+
+## REGISTRO DE UNIDAD: 3.4.3.1
+
+FECHA: 2026-10-30
+OBJETIVO: Comparar estado declarado (flags booleanas de applications.json / Executor.current_state.application_states) con estado observable (ApplicationState enum de Vision.detect_application_state).
+TIPO DE TRABAJO: IMPLEMENTACION | TEST | VERIFICACION | DOCUMENTACION
+CAMBIOS / HALLAZGOS:
+- src/eyes/screen.py: anadidas 4 funciones/constantes (linea ~118):
+  * CANONICAL_WINDOW_FLAGS = ("open", "active", "maximized", "focused") — el conjunto canonico de 4 flags genericas.
+  * APPLICATION_STATE_TO_WINDOW_FLAGS — mapeo determinista ApplicationState -> {open, active, maximized, focused}: CLOSED -> todas False; OPEN/MINIMIZED -> open=True resto False; ACTIVE -> open=True, active=True, focused=True; MAXIMIZED -> todas True. La derivacion obedece al contrato de Executor._update_world_state (app_open->open=True, app_closed->open=False, app_active->active=True, app_minimized->active=False manteniendo open=True).
+  * observable_state_to_flags(state): convierte ApplicationState observable a las 4 flags canonicas. Retorna copia (no referencia compartida).
+  * compare_declared_and_observable_state(declared, observable_state): compara solo las 4 flags canonicas (ignora flags de dominio playing/streaming/recording). Flag faltante se asume False. Valores no booleanos se coercen con bool(). Retorna {match, observable_state, observable_flags, declared_flags, discrepancies}.
+- tests/eyes/test_state_comparison.py: 50 tests en 4 clases (TestCanonicalWindowFlagsConstant=3, TestObservableStateToFlags=24, TestCompareDeclaredAndObservable=21, TestCompareWithApplicationsJsonModel=8 con parametrize sobre 4 apps x 2 tests).
+- README.md: documentadas CANONICAL_WINDOW_FLAGS, APPLICATION_STATE_TO_WINDOW_FLAGS, observable_state_to_flags, compare_declared_and_observable_state en la seccion src/eyes/screen.py; line count actualizado a 1157.
+- Module docstring de screen.py actualizado para mencionar la comparacion de estado.
+- No se modifico logica existente de screen.py, vision.py, executor.py, application_integration.py ni applications.json.
+ARCHIVOS MODIFICADOS:
+  PRODUCCION: `src/eyes/screen.py` (anadidas constantes CANONICAL_WINDOW_FLAGS + APPLICATION_STATE_TO_WINDOW_FLAGS, funciones observable_state_to_flags + compare_declared_and_observable_state, __all__ actualizado, docstring del modulo actualizado);
+  TESTS: `tests/eyes/test_state_comparison.py` (nuevo, 50 tests);
+  DOCUMENTACION: `README.md` (seccion src/eyes/screen.py actualizada).
+TESTS Y RESULTADOS:
+  UNITARIOS: 50/50 PASSED (`tests/eyes/test_state_comparison.py`, nuevo).
+  INTEGRACION: NE (la funcion compare_declared_and_observable_state opera sobre datos estructurales; no requiere integracion con Vision/Executor en este nivel — las flags declaradas provienen de applications.json verificadas read-only).
+  NO REGRESION: 2795/2795 PASSED (tests/eyes 380 + tests/hands 2312 + tests/brain 103). Baseline antes de 3.4.3.1: 2745 (380-50 en eyes + 2312 hands + 103 brain). 0 fallos, 0 errores. 3 warnings preexistentes en test_application_state_enumeration.py (PytestRemovedIn10Warning, no relacionados).
+VERIFICACION:
+  SINTAXIS: OK (`python -m py_compile src/eyes/screen.py tests/eyes/test_state_comparison.py` -> exit 0).
+  MAIN.PY: OK (`import main` -> IMPORT_MAIN_OK; todos los componentes inicializan, shutdown graceful).
+  COMPORTAMIENTO / INTEGRACION REAL: observable_state_to_flags mapea correctamente los 5 ApplicationState a las 4 flags; compare_declared_and_observable_state detecta discrepancias flag-a-flag, ignora flags de dominio, asume False para flags faltantes, coercea valores no booleanos; verificado contra el modelo real de applications.json (chrome, spotify, vscode, obs_studio inicializan todas flags a False -> match con CLOSED).
+DISCREPANCIAS:
+- CONTRADICCION CONTRATO ESTADO TRANSICION: el texto principal de prompt_mejoraActual.txt dice "dejar CURRENT_WORK_STATUS: EN PROCESO" al cerrar una hoja y mover el puntero a la siguiente, pero las reglas 44-45 de prompt_JARVIS_reglas.txt dicen explicitamente "dejar CURRENT_WORK_STATUS: PENDIENTE" y "no marcar la siguiente EN PROCESO antes de empezar un chat dedicado a ella". Siguiendo las reglas mas especificas (44-45), se establece CURRENT_WORK_STATUS: PENDIENTE para 3.4.3.2. Evidencia: rules 44(e) y 45 de prompt_JARVIS_reglas.txt.
+PENDIENTES: NINGUNO para 3.4.3.1 (completada). La siguiente hoja del roadmap es 3.4.3.2 (No afirmar un estado solo por configuracion).
+ESTADO FINAL: 3.4.3.1 - IMPLEMENTADA
+
+--- TRANSICION DE ESTADO 3.4.3.1 -> 3.4.3.2 ---
+Se completa 3.4.3.1. CURRENT_WORK_UNIT avanza a 3.4.3.2 (No afirmar un estado solo por configuracion). La hoja siguiente en el roadmap es 3.4.3.2. CURRENT_WORK_STATUS queda en PENDIENTE (siguiendo reglas 44-45).

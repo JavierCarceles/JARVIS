@@ -451,7 +451,7 @@ Métodos:
 _Archivo de marcador de posición / inicialización de paquete._
 
 <a name="src-eyes-screen-py"></a>
-### `src/eyes/screen.py` [997 líneas] — Captura de pantalla y análisis para JARVIS con arquitectura de planificación.
+### `src/eyes/screen.py` [1157 líneas] — Captura de pantalla y análisis para JARVIS con arquitectura de planificación.
 
 **Descripción:** Captura de pantalla y análisis para JARVIS con arquitectura de planificación.
 
@@ -472,6 +472,16 @@ Métodos:
 | `def __post_init__()` |  |
 | `def to_dict()` |  |
 | `def from_dict(cls, data)` |  |
+
+Constantes y funciones a nivel módulo para la comparación de estado declarado
+con estado observable:
+
+| Firma | Finalidad |
+|---|---|
+| `CANONICAL_WINDOW_FLAGS` (`Tuple[str, ...]`) | Las 4 flags genéricas de estado de ventana: `("open", "active", "maximized", "focused")`. Conjunto común a toda aplicación conocida en `applications.json`. |
+| `APPLICATION_STATE_TO_WINDOW_FLAGS` (`Dict[ApplicationState, Dict[str, bool]]`) | Mapeo determinista de cada `ApplicationState` observable a las 4 flags canónicas booleanas. |
+| `def observable_state_to_flags(state)` | Convierte un `ApplicationState` observado por visión (`Vision.detect_application_state` / `ScreenAnalyzer.analyze_application_state`) a las 4 flags canónicas `{open, active, maximized, focused}`. `CLOSED` → todas `False`; `OPEN`/`MINIMIZED` → `open=True` resto `False`; `ACTIVE` → `open=True, active=True, focused=True`; `MAXIMIZED` → todas `True`. |
+| `def compare_declared_and_observable_state(declared, observable_state)` | Compara el diccionario de flags declaradas (de `applications.json` `states` o `Executor.current_state.application_states[app]`) con un `ApplicationState` observable. Solo compara las 4 flags canónicas (ignora flags de dominio como `playing`/`streaming`/`recording`). Flag faltante en `declared` se asume `False`. Valores no booleanos se convierten con `bool()`. Retorna `{match, observable_state, observable_flags, declared_flags, discrepancies}`. |
 
 `class WorldState`  (línea 119) — Estado del mundo usado por las APIs legacy de este módulo.
 
