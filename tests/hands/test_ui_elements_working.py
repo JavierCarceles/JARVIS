@@ -21,12 +21,12 @@ class TestUIElementWorking:
         # Usar los parámetros correctos de UIElement
         element = UIElement(
             type="button",
-            label="Enviar",
+            name="Enviar",
             coordinates={"x": 100, "y": 200, "width": 80, "height": 30}
         )
         
         assert element.type == "button"
-        assert element.label == "Enviar"
+        assert element.name == "Enviar"
         assert element.coordinates["x"] == 100
         assert element.coordinates["y"] == 200
         
@@ -35,19 +35,19 @@ class TestUIElementWorking:
         # Crear diferentes tipos de elementos UI con parámetros correctos
         button = UIElement(
             type="button",
-            label="Aceptar",
+            name="Aceptar",
             coordinates={"x": 100, "y": 100, "width": 80, "height": 30}
         )
         
         input_field = UIElement(
             type="input_field",
-            label="Buscar",
+            name="Buscar",
             coordinates={"x": 200, "y": 100, "width": 200, "height": 25}
         )
         
         checkbox = UIElement(
             type="checkbox",
-            label="Recordar",
+            name="Recordar",
             coordinates={"x": 300, "y": 100, "width": 15, "height": 15}
         )
         
@@ -59,7 +59,7 @@ class TestUIElementWorking:
         """Test de estructura de coordenadas de elementos UI"""
         element = UIElement(
             type="button",
-            label="Test",
+            name="Test",
             coordinates={"x": 150, "y": 200, "width": 100, "height": 40}
         )
         
@@ -154,7 +154,7 @@ class TestUIElementWorking:
             for ui_element in ui_elements:
                 assert isinstance(ui_element, UIElement)
                 assert hasattr(ui_element, 'type')
-                assert hasattr(ui_element, 'label')  # Corregido: es 'label', no 'text'
+                assert hasattr(ui_element, 'name')  # Es 'name', no 'label' ni 'text'
                 assert hasattr(ui_element, 'coordinates')
                 
             app_count += 1
@@ -194,7 +194,7 @@ class TestUIElementIntegrationWorking:
         # Elemento de botón
         button = UIElement(
             type="button",
-            label="Enviar",
+            name="Enviar",
             coordinates={"x": 100, "y": 200, "width": 80, "height": 30}
         )
         elements.append(button)
@@ -202,7 +202,7 @@ class TestUIElementIntegrationWorking:
         # Elemento de campo de texto
         input_field = UIElement(
             type="input_field",
-            label="Buscar...",
+            name="Buscar...",
             coordinates={"x": 200, "y": 200, "width": 200, "height": 25}
         )
         elements.append(input_field)
@@ -210,7 +210,7 @@ class TestUIElementIntegrationWorking:
         # Elemento de checkbox
         checkbox = UIElement(
             type="checkbox",
-            label="Recordar contraseña",
+            name="Recordar contraseña",
             coordinates={"x": 300, "y": 200, "width": 15, "height": 15}
         )
         elements.append(checkbox)
@@ -220,7 +220,7 @@ class TestUIElementIntegrationWorking:
         for element in elements:
             assert isinstance(element, UIElement)
             assert hasattr(element, 'type')
-            assert hasattr(element, 'label')  # Corregido: es 'label', no 'text'
+            assert hasattr(element, 'name')  # Es 'name', no 'label' ni 'text'
             assert hasattr(element, 'coordinates')
             
     def test_ui_element_validation_workflow_correct(self):
@@ -245,7 +245,7 @@ class TestUIElementIntegrationWorking:
             for ui_element in app_knowledge.ui_elements:
                 assert isinstance(ui_element, UIElement)
                 assert isinstance(ui_element.type, str)
-                assert hasattr(ui_element, 'label')  # Corregido: es 'label', no 'text'
+                assert hasattr(ui_element, 'name')  # Es 'name', no 'label' ni 'text'
                 assert isinstance(ui_element.coordinates, dict)
 
 
@@ -268,11 +268,11 @@ class TestUIElementAdvanced:
         for element_type, label in element_types:
             element = UIElement(
                 type=element_type,
-                label=label,
+                name=label,
                 coordinates={"x": 100, "y": 100, "width": 50, "height": 30}
             )
             assert element.type == element_type
-            assert element.label == label
+            assert element.name == label
             
     def test_ui_element_coordinates_variations(self):
         """Test de variaciones de coordenadas de elementos UI"""
@@ -286,7 +286,7 @@ class TestUIElementAdvanced:
         for coords in test_coords:
             element = UIElement(
                 type="button",
-                label="Test",
+                name="Test",
                 coordinates=coords
             )
             
@@ -313,7 +313,7 @@ class TestUIElementAdvanced:
                 for ui_element in ui_elements:
                     assert isinstance(ui_element, UIElement)
                     assert isinstance(ui_element.type, str)
-                    assert isinstance(ui_element.label, str)
+                    assert isinstance(ui_element.name, str)
                     assert isinstance(ui_element.coordinates, dict)
                     assert len(ui_element.coordinates) >= 2  # Mínimo x,y
                     

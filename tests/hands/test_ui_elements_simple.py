@@ -33,13 +33,13 @@ class TestUIElementDetection:
         # Crear un elemento UI de prueba
         test_element = UIElement(
             type="button",
-            text="Aceptar",
+            name="Aceptar",
             coordinates={"x": 100, "y": 200, "width": 80, "height": 30}
         )
         
         # Verificar que el elemento tiene las propiedades esperadas
         assert test_element.type == "button"
-        assert test_element.text == "Aceptar"
+        assert test_element.name == "Aceptar"
         assert "x" in test_element.coordinates
         assert "y" in test_element.coordinates
         
@@ -141,12 +141,12 @@ class TestUIElementValidation:
         """Test de creación de elementos UI"""
         element = UIElement(
             type="input_field",
-            text="Buscar...",
+            name="Buscar...",
             coordinates={"x": 100, "y": 100, "width": 200, "height": 30}
         )
         
         assert element.type == "input_field"
-        assert element.text == "Buscar..."
+        assert element.name == "Buscar..."
         assert element.coordinates["width"] == 200
         
     def test_application_manager_capabilities(self):

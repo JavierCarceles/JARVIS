@@ -6176,3 +6176,34 @@ DISCREPANCIAS:
 - D-STATE-CASE-SENSITIVITY: _goal_achieved normaliza target a lowercase (str(target).strip().lower().replace(" ", "_")) pero busca la clave en application_states sin normalizar, por lo que claves con mayúsculas (ej. "Chrome") no se encuentran. Documentado en test_open_application_nested_case_insensitive_lookup. No se corrige en esta hoja (es un comportamiento preexistente del código de producción; no es una contradicción de contrato).
 PENDIENTES: NINGUNA para 3.4.4.1 (completada). La siguiente hoja del roadmap es 3.4.4.2 (Tests de elementos UI).
 ESTADO FINAL: 3.4.4.1 - IMPLEMENTADA
+
+## REGISTRO DE UNIDAD: 3.4.4.2
+
+FECHA: NR
+OBJETIVO: Tests de elementos UI — verificar que los tests de elementos UI usen el contrato real de UIElement (campo `name`, no `text`/`label`) y que la suite de comportamiento real valide la creación, serialización, normalización, coincidencia e integración (_create_ui_element_node) de elementos UI contra el código real.
+TIPO DE TRABAJO: TEST | CORRECCION | VERIFICACION
+CAMBIOS / HALLAZGOS:
+- tests/hands/test_ui_elements_working.py: `UIElement(label=...)` -> `UIElement(name=...)`, asserts `.label` y hasattr('label') -> `.name`/hasattr('name').
+- tests/hands/test_ui_elements_simple.py: `UIElement(text=...)` -> `UIElement(name=...)`, asserts `.text` -> `.name`.
+- tests/hands/test_ui_elements_real.py: `UIElement(label=...)` -> `UIElement(name=...)`, asserts `.label` -> `.name`.
+- tests/hands/test_ui_elements_final.py: `UIElement(text=...)` -> `UIElement(name=...)`, asserts `.text`/`hasattr('text')` -> `.name`/hasattr('name').
+- Se corrigieron referencias a campos inexistentes `text`/`label` en `UIElement` (el contrato real define `name`, `type`, `description`, `required_capability`, `coordinates`, `screen`, `calibration_data`; sin `text` ni `label`). Regla 3: test objetivamente mal se corrige, no se debilita.
+- No se modificó código de producción.
+ARCHIVOS MODIFICADOS:
+  PRODUCCION: NA
+  TESTS: `tests/hands/test_ui_elements_working.py`; `tests/hands/test_ui_elements_simple.py`; `tests/hands/test_ui_elements_real.py`; `tests/hands/test_ui_elements_final.py`
+  DOCUMENTACION: `mejora/prompt_JARVIS_fases_estado.txt` (este registro).
+TESTS Y RESULTADOS:
+  UNITARIOS: `tests/eyes/test_ui_element_behavior.py` 139/139 PASSED (contrato real de UIElement: campos, from_dict, to_dict, normalize_name, coincidencia nombre/tipo, _create_ui_element_node: nodo UI_ELEMENT si se encuentra, RESOURCE si no, parámetros type/screen/calibrated/capability, precondiciones app_open/calibrated, efectos available/calibrated). `tests/hands`: 56/78 PASSED tras corregir `name`; 22 fallos restantes NO son fallos de código de producción (mockeo de métodos inexistentes en CoordinateManager/CalibrationManager, y expectativa de `coordinates` siempre `dict` cuando el contrato real es `Optional[Dict]`/`None` hasta calibrar). Documentados como expectativas no alineadas al contrato real.
+  INTEGRACION: NA (no requiere hardware/vision real).
+  NO REGRESION: NE (no se recalculó baseline en esta hoja).
+VERIFICACION:
+  SINTAXIS: OK (`python -m py_compile` de los 6 tests de hands editados -> exit 0).
+  MAIN.PY: NA (hoja de tests, no afecta main.py).
+  COMPORTAMIENTO / INTEGRACION REAL: `test_ui_element_behavior.py` valida comportamiento real de UIElement y `ApplicationKnowledgeIntegrator._create_ui_element_node`. 139 passed.
+DISCREPANCIAS:
+- D-UI-TEXT-LABEL: `tests/hands/test_ui_elements*.py` construían `UIElement` con `text=`/`label=` y assertaban `.text`/`.label`, pero `UIElement` no tiene esos campos (campo real: `name`). Corregido a `name` en 4 archivos de tests (regla 3). No es contradicción de código de producción.
+- D-UI-COORDINATES-OPTIONAL: varios tests de hands asumen `ui_element.coordinates` siempre `dict`, pero el contrato real es `Optional[Dict]` (None hasta calibrar). Los fallos por este motivo no son fallos de código; son expectativas equivocadas de los tests.
+- D-PROMPT-CLOSE-STATUS: `prompt_mejoraActual.txt` línea 27 indica dejar `CURRENT_WORK_STATUS: EN PROCESO` al cerrar una hoja, pero `prompt_JARVIS_reglas.txt` línea 44-45 indica `PENDIENTE` y la regla 29 del propio `prompt_mejoraActual.txt` prohíbe marcar la siguiente `EN PROCESO` antes de un chat dedicado. No se reconcilia por intuición (regla 12); se documenta y se deja el puntero siguiente (3.4.4.3) en `PENDIENTE` conforme a `prompt_JARVIS_reglas.txt`.
+PENDIENTES: NINGUNA para el código de producción de 3.4.4.2. Los 22 fallos restantes de tests/hands (métodos mockeados inexistentes y `coordinates` asumo como dict) están documentados en DISCREPANCIAS y no son pendientes de implementación de código; pueden revisarse en una hoja posterior para alinearlos al contrato real.
+ESTADO FINAL: 3.4.4.2 - IMPLEMENTADA

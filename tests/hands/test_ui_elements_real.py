@@ -20,12 +20,12 @@ class TestUIElementReal:
         # Usar la estructura real de UIElement
         element = UIElement(
             type="button",
-            label="Aceptar",
+            name="Aceptar",
             coordinates={"x": 100, "y": 200, "width": 80, "height": 30}
         )
         
         assert element.type == "button"
-        assert element.label == "Aceptar"
+        assert element.name == "Aceptar"
         assert element.coordinates["x"] == 100
         assert element.coordinates["y"] == 200
         
@@ -131,19 +131,19 @@ class TestUIElementReal:
         # Crear diferentes tipos de elementos UI
         button = UIElement(
             type="button",
-            label="Enviar",
+            name="Enviar",
             coordinates={"x": 100, "y": 100, "width": 80, "height": 30}
         )
         
         input_field = UIElement(
             type="input_field",
-            label="Buscar",
+            name="Buscar",
             coordinates={"x": 200, "y": 100, "width": 200, "height": 25}
         )
         
         checkbox = UIElement(
             type="checkbox",
-            label="Recordar",
+            name="Recordar",
             coordinates={"x": 300, "y": 100, "width": 15, "height": 15}
         )
         

@@ -21,12 +21,12 @@ class TestUIElementFinal:
         # Usar los parámetros correctos de UIElement
         element = UIElement(
             type="button",
-            text="Enviar",
+            name="Enviar",
             coordinates={"x": 100, "y": 200, "width": 80, "height": 30}
         )
         
         assert element.type == "button"
-        assert element.text == "Enviar"
+        assert element.name == "Enviar"
         assert element.coordinates["x"] == 100
         assert element.coordinates["y"] == 200
         
@@ -76,19 +76,19 @@ class TestUIElementFinal:
         # Crear diferentes tipos de elementos UI con parámetros correctos
         button = UIElement(
             type="button",
-            text="Aceptar",
+            name="Aceptar",
             coordinates={"x": 100, "y": 100, "width": 80, "height": 30}
         )
         
         input_field = UIElement(
             type="input_field", 
-            text="Buscar",
+            name="Buscar",
             coordinates={"x": 200, "y": 100, "width": 200, "height": 25}
         )
         
         checkbox = UIElement(
             type="checkbox",
-            text="Recordar",
+            name="Recordar",
             coordinates={"x": 300, "y": 100, "width": 15, "height": 15}
         )
         
@@ -121,7 +121,7 @@ class TestUIElementFinal:
         """Test de estructura de coordenadas de elementos UI"""
         element = UIElement(
             type="button",
-            text="Test",
+            name="Test",
             coordinates={"x": 150, "y": 200, "width": 100, "height": 40}
         )
         
@@ -155,7 +155,7 @@ class TestUIElementFinal:
             for ui_element in ui_elements:
                 assert isinstance(ui_element, UIElement)
                 assert hasattr(ui_element, 'type')
-                assert hasattr(ui_element, 'text')
+                assert hasattr(ui_element, 'name')
                 assert hasattr(ui_element, 'coordinates')
                 
             app_count += 1
@@ -195,7 +195,7 @@ class TestUIElementIntegration:
         # Elemento de botón
         button = UIElement(
             type="button",
-            text="Enviar",
+            name="Enviar",
             coordinates={"x": 100, "y": 200, "width": 80, "height": 30}
         )
         elements.append(button)
@@ -203,7 +203,7 @@ class TestUIElementIntegration:
         # Elemento de campo de texto
         input_field = UIElement(
             type="input_field",
-            text="Buscar...",
+            name="Buscar...",
             coordinates={"x": 200, "y": 200, "width": 200, "height": 25}
         )
         elements.append(input_field)
@@ -211,7 +211,7 @@ class TestUIElementIntegration:
         # Elemento de checkbox
         checkbox = UIElement(
             type="checkbox",
-            text="Recordar contraseña",
+            name="Recordar contraseña",
             coordinates={"x": 300, "y": 200, "width": 15, "height": 15}
         )
         elements.append(checkbox)
@@ -221,7 +221,7 @@ class TestUIElementIntegration:
         for element in elements:
             assert isinstance(element, UIElement)
             assert hasattr(element, 'type')
-            assert hasattr(element, 'text')
+            assert hasattr(element, 'name')
             assert hasattr(element, 'coordinates')
             
     def test_ui_element_validation_workflow(self):
@@ -246,7 +246,7 @@ class TestUIElementIntegration:
             for ui_element in app_knowledge.ui_elements:
                 assert isinstance(ui_element, UIElement)
                 assert isinstance(ui_element.type, str)
-                assert isinstance(ui_element.text, str)
+                assert isinstance(ui_element.name, str)
                 assert isinstance(ui_element.coordinates, dict)
 
 
