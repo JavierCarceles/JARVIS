@@ -6207,3 +6207,15 @@ DISCREPANCIAS:
 - D-PROMPT-CLOSE-STATUS: `prompt_mejoraActual.txt` línea 27 indica dejar `CURRENT_WORK_STATUS: EN PROCESO` al cerrar una hoja, pero `prompt_JARVIS_reglas.txt` línea 44-45 indica `PENDIENTE` y la regla 29 del propio `prompt_mejoraActual.txt` prohíbe marcar la siguiente `EN PROCESO` antes de un chat dedicado. No se reconcilia por intuición (regla 12); se documenta y se deja el puntero siguiente (3.4.4.3) en `PENDIENTE` conforme a `prompt_JARVIS_reglas.txt`.
 PENDIENTES: NINGUNA para el código de producción de 3.4.4.2. Los 22 fallos restantes de tests/hands (métodos mockeados inexistentes y `coordinates` asumo como dict) están documentados en DISCREPANCIAS y no son pendientes de implementación de código; pueden revisarse en una hoja posterior para alinearlos al contrato real.
 ESTADO FINAL: 3.4.4.2 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.4.4.3
+FECHA: NR
+OBJETIVO: Tests de discrepancia entre conocimiento y estado real
+TIPO DE TRABAJO: TEST
+CAMBIOS / HALLAZGOS: 65 tests passed covering compare_declared_and_observable_state and reconcile_observable_with_declared_state functions; full discrepancy detection and reconciliation implementation
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: `tests\eyes\test_state_comparison.py`; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: PASSED: 65; INTEGRACION: NE/NA; NO REGRESION: NE
+VERIFICACION: SINTAXIS: OK; MAIN.PY: NA; COMPORTAMIENTO / INTEGRACION REAL: discrepancy detection and reconciliation working as evidenced by test suite
+DISCREPANCIAS: NINGUNA
+PENDIENTES: NINGUNO
+ESTADO FINAL: 3.4.4.3 - IMPLEMENTADA
