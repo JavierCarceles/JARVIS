@@ -6231,3 +6231,15 @@ VERIFICACION: SINTAXIS: OK; MAIN.PY: NA; COMPORTAMIENTO / INTEGRACION REAL: NV (
 DISCREPANCIAS: NINGUNA
 PENDIENTES: NINGUNO
 ESTADO FINAL: 3.5.1 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.5.2
+FECHA: 2026-11-03
+OBJETIVO: Verificar disponibilidad de la aplicación, ventanas y estado reutilizable sin destruir estado del usuario
+TIPO DE TRABAJO: TEST
+CAMBIOS / HALLAZGOS: Tests pasados para las tres subtareas 3.5.2.1-3.5.2.3: test_application_preflight_availability.py (3 passed), test_window_verification.py (3 passed), test_restore_window_state.py (3 passed). No se modificó código de producción.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: `tests\test_application_preflight_availability.py`; `tests\test_window_verification.py`; `tests\test_restore_window_state.py`; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: PASSED: 9; INTEGRACION: NE/NA; NO REGRESION: NE
+VERIFICACION: SINTAXIS: OK; MAIN.PY: NA; COMPORTAMIENTO / INTEGRACION REAL: evidencia de tests
+DISCREPANCIAS: NINGUNA
+PENDIENTES: NINGUNO
+ESTADO FINAL: 3.5.2 - IMPLEMENTADA
