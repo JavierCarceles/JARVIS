@@ -606,6 +606,7 @@ class EnhancedCalibrator:
             "click_element": ["target_button", "target_link"],
             "type_text": ["text_input", "address_bar"],
             "navigate_stream": ["stream_button", "watch_button"],
+            "calibrate_application": ["app_window", "app_icon", "address_bar"],
         }
         target = str(getattr(goal, "target", "") or "").strip().casefold()
         goal_type = str(getattr(goal, "type", "") or "").strip().casefold()
