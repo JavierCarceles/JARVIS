@@ -6267,3 +6267,16 @@ VERIFICACION: SINTAXIS: OK; MAIN.PY: NA; COMPORTAMIENTO / INTEGRACION REAL: cali
 DISCREPANCIAS: NINGUNA
 PENDIENTES: NINGUNO
 ESTADO FINAL: 3.5.4 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.6.1.1
+FECHA: NR
+OBJETIVO: Verificar que la consulta de una aplicacion por nombre/alias devuelve el conocimiento real o ausencia de coincidencia sin crear datos.
+TIPO DE TRABAJO: VERIFICACION
+CAMBIOS / HALLAZGOS: get_application y get_application_knowledge consultan ApplicationManager sin mutar el catalogo; get_application resuelve alias estaticos y dinamicos y devuelve None para nombres no registrados; get_application_knowledge devuelve {} para aplicacion inexistente y estructura declarativa para existente.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: NA; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: NE; INTEGRACION: NE; NO REGRESION: tests/hands/test_application_read.py y tests/hands/test_application_consumers_real_model.py: 65 passed
+VERIFICACION: SINTAXIS: NE; MAIN.PY: NE; COMPORTAMIENTO / INTEGRACION REAL: consulta manual de chrome/Chrome/edge/spotify/calculator/notepad devuelve aplicacion correcta; firefox y nombre inexistente devuelven None
+DISCREPANCIAS: NINGUNA
+PENDIENTES: NINGUNO
+ESTADO FINAL: 3.6.1.1 - IMPLEMENTADA
+
