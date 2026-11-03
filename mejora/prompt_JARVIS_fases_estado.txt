@@ -6255,3 +6255,15 @@ VERIFICACION: SINTAXIS: OK; MAIN.PY: NA; COMPORTAMIENTO / INTEGRACION REAL: cali
 DISCREPANCIAS: NINGUNA
 PENDIENTES: NINGUNO
 ESTADO FINAL: 3.5.3 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.5.4
+FECHA: 2026-11-03
+OBJETIVO: Tests de requisitos de calibración: aplicación sin requisito, con requisito, requisito pendiente y no regresión.
+TIPO DE TRABAJO: TEST
+CAMBIOS / HALLAZGOS: Añadido tests/hands/test_calibration_requirements.py con 12 tests; verificado calibrador.get_calibration_requirements_for_goal y exposición en Planner; elemento calibrado deja de ser requisito.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: tests/hands/test_calibration_requirements.py; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: 12/12 PASSED; INTEGRACION: NE; NO REGRESION: no ejecutado en este cierre salvo los tests nuevos
+VERIFICACION: SINTAXIS: OK; MAIN.PY: NA; COMPORTAMIENTO / INTEGRACION REAL: calibrador y Planner exponen requisitos correctamente (verificado)
+DISCREPANCIAS: NINGUNA
+PENDIENTES: NINGUNO
+ESTADO FINAL: 3.5.4 - IMPLEMENTADA
