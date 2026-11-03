@@ -900,7 +900,7 @@ def open_application(app_name: str) -> str:
         logger._print_log("info", "Procesando solicitud", "applications_core.py", "method", 371)
         return f"Aplicación {app.name} abierta exitosamente"
     except Exception as exc:
-        logger._print_log("info", f"Error abriendo aplicación: {str(exc, "applications_core.py", "method", 506)} [file:applications_core.py, method:open_application, line:509]")
+        logger._print_log("info", f"Error abriendo aplicación: {exc} [file:applications_core.py, method:open_application, line:903]")
         raise
 
 

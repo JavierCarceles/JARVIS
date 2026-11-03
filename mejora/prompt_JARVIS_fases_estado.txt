@@ -6258,9 +6258,9 @@ ESTADO FINAL: 3.5.3 - IMPLEMENTADA
 
 REGISTRO DE UNIDAD: 3.5.4
 FECHA: 2026-11-03
-OBJETIVO: Tests de requisitos de calibración: aplicación sin requisito, con requisito, requisito pendiente y no regresión.
+OBJETIVO: Tests de requisitos de calibraciï¿½n: aplicaciï¿½n sin requisito, con requisito, requisito pendiente y no regresiï¿½n.
 TIPO DE TRABAJO: TEST
-CAMBIOS / HALLAZGOS: Añadido tests/hands/test_calibration_requirements.py con 12 tests; verificado calibrador.get_calibration_requirements_for_goal y exposición en Planner; elemento calibrado deja de ser requisito.
+CAMBIOS / HALLAZGOS: Aï¿½adido tests/hands/test_calibration_requirements.py con 12 tests; verificado calibrador.get_calibration_requirements_for_goal y exposiciï¿½n en Planner; elemento calibrado deja de ser requisito.
 ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: tests/hands/test_calibration_requirements.py; DOCUMENTACION: NA
 TESTS Y RESULTADOS: UNITARIOS: 12/12 PASSED; INTEGRACION: NE; NO REGRESION: no ejecutado en este cierre salvo los tests nuevos
 VERIFICACION: SINTAXIS: OK; MAIN.PY: NA; COMPORTAMIENTO / INTEGRACION REAL: calibrador y Planner exponen requisitos correctamente (verificado)
@@ -6280,3 +6280,28 @@ DISCREPANCIAS: NINGUNA
 PENDIENTES: NINGUNO
 ESTADO FINAL: 3.6.1.1 - IMPLEMENTADA
 
+
+REGISTRO DE UNIDAD: 3.6.1.2
+FECHA: NR
+OBJETIVO: Verificar comprobacion de disponibilidad.
+TIPO DE TRABAJO: VERIFICACION
+CAMBIOS / HALLAZGOS: _check_application_available devuelve True si existe URL y no ejecutable; para rutas absolutas o con separador usa os.path.isfile; para nombre simple usa shutil.which; devuelve False ante OSError. ApplicationManager.is_application_available y las funciones module-level delegan en el modelo y devuelven False para aplicacion inexistente o excepcion. is_capability_available combina capacidad declarada y disponibilidad. Verificado manualmente: Chrome/Edge/Firefox/Spotify False (chrome.exe no resoluble por PATH), Calculator/Notepad True, app inexistente False; gestor y funcion coinciden.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: NA; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: 194 passed (test_applications_core.py, test_capability_availability_distinction.py, test_capability_absent_verification.py); INTEGRACION: NE; NO REGRESION: NE
+VERIFICACION: SINTAXIS: NE; MAIN.PY: NE; COMPORTAMIENTO / INTEGRACION REAL: disponibilidad real consultada sin mutar catalogo; resultados coherentes con PATH/ejecutable.
+DISCREPANCIAS: NINGUNA
+PENDIENTES: NINGUNO
+ESTADO FINAL: 3.6.1.2 - IMPLEMENTADA
+
+
+REGISTRO DE UNIDAD: 3.6.1.3
+FECHA: NR
+OBJETIVO: Verificar apertura a traves de la API real existente.
+TIPO DE TRABAJO: CORRECCION | VERIFICACION
+CAMBIOS / HALLAZGOS: open_application consulta ApplicationManager real y lanza ejecutable/URL o levanta ValueError/RuntimeError segun corresponda; corregido manejador de errores que usaba str(exc, ...) invalido y enmascaraba RuntimeError; verificado manualmente ValueError para app inexistente y RuntimeError para app sin ejecutable ni URL.
+ARCHIVOS MODIFICADOS: PRODUCCION: src/hands/applications_core.py; TESTS: tests/hands/test_consumer_api_compatibility.py; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: 193 passed (test_applications_core.py, test_application_consumers_real_model.py, test_consumer_api_compatibility.py); INTEGRACION: NE; NO REGRESION: NE
+VERIFICACION: SINTAXIS: OK; MAIN.PY: NE; COMPORTAMIENTO / INTEGRACION REAL: ValueError y RuntimeError propagados correctamente (verificado)
+DISCREPANCIAS: Discrepancia previa documentada en test (TypeError enmascarando RuntimeError) resuelta.
+PENDIENTES: NINGUNO
+ESTADO FINAL: 3.6.1.3 - IMPLEMENTADA

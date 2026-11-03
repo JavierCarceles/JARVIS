@@ -344,18 +344,16 @@ class TestInternalFunctionsConsumerCompatibility:
     def test_open_application_minimal_app_no_executable_no_url(self):
         """open_application accede app.executable y app.url; con ambos None levanta RuntimeError.
 
-        NOTA: el except block en applications_core.py:506 tiene un bug de produccion:
-        str(exc, "applications_core.py", "method", 506) usa str() con 4 argumentos lo cual
-        es invalido en Python, causando TypeError que enmascara el RuntimeError original.
-        Este test documenta el comportamiento actual (TypeError) como discrepancia de produccion.
-        La compatibilidad del API modelo no se ve afectada: open_application accede correctamente
-        a app.executable y app.url; el bug esta unicamente en el manejador de errores."""
+        NOTA: tras la correccion del manejador de errores en applications_core.py,
+        open_application propaga correctamente el RuntimeError original cuando la app
+        no tiene ejecutable ni URL configurados. La compatibilidad del API modelo no
+        se ve afectada: open_application accede correctamente a app.executable y app.url."""
         manager = _make_minimal_manager(name="MinApp", app_type="utility")
         with patch(
             "src.hands.applications_core.get_application_manager",
             return_value=manager,
         ):
-            with pytest.raises(TypeError):
+            with pytest.raises(RuntimeError, match="no tiene ejecutable ni URL"):
                 open_application("minapp")
 
 
