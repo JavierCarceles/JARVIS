@@ -6243,3 +6243,15 @@ VERIFICACION: SINTAXIS: OK; MAIN.PY: NA; COMPORTAMIENTO / INTEGRACION REAL: evid
 DISCREPANCIAS: NINGUNA
 PENDIENTES: NINGUNO
 ESTADO FINAL: 3.5.2 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.5.3
+FECHA: NR
+OBJETIVO: Integrar el requisito de calibracion con el planificador, permitiendo seleccionar calibrate y reutilizando el sistema existente
+TIPO DE TRABAJO: IMPLEMENTACION
+CAMBIOS / HALLAZGOS: Planner ahora carga EnhancedCalibrator (get_enhanced_calibrator) y expone get_calibration_requirements/get_calibration_requirements_for_goal/calibration_requirements_for_goal; plan() registra calibration_requirements en metadata; check_ui_readiness incorpora requisitos del calibrador
+ARCHIVOS MODIFICADOS: PRODUCCION: `src/hands/planner/planner.py`; TESTS: NA; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: importacion y metodo verificados manualmente; INTEGRACION: NE; NO REGRESION: 1151 passed / 1 failed (fallo preexistente en tests/brain/test_llm.py::TestBrainPublicAPI::test_2_8_13_5_16_get_planner_ready_data, no relacionado)
+VERIFICACION: SINTAXIS: OK; MAIN.PY: NA; COMPORTAMIENTO / INTEGRACION REAL: calibrador cargado y metodo devuelve lista (verificado)
+DISCREPANCIAS: NINGUNA
+PENDIENTES: NINGUNO
+ESTADO FINAL: 3.5.3 - IMPLEMENTADA

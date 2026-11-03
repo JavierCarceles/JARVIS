@@ -140,6 +140,18 @@ class Planner:
             )
             self.application_integrator = None
         self.htn_manager: Optional[Any] = None
+        try:
+            from src.hands.calibrator import get_enhanced_calibrator
+
+            self.calibrator = get_enhanced_calibrator()
+        except Exception as exc:
+            logger.warning("[PLANNER] Calibrador no disponible: %s", exc)
+            self.calibrator = None
+        self.calibration_manager = (
+            getattr(self.calibrator, "calibration_manager", None)
+            if self.calibrator is not None
+            else None
+        )
         logger.info("[PLANNER] Planificador inicializado")
 
     # ==================================================================
@@ -881,6 +893,9 @@ class Planner:
                         result.metadata["ui_resolved"] = True
                 result.metadata["ui_readiness"] = self.check_ui_readiness(
                     goal, state, nodes
+                )
+                result.metadata["calibration_requirements"] = self.get_calibration_requirements(
+                    goal
                 )
                 if find_alternatives and self.state_graph is not None and result.plan:
                     result.alternatives = self._find_alternative_plans_astar(
@@ -1754,6 +1769,37 @@ class Planner:
             resolved.append(unresolved)
         return resolved
 
+    def get_calibration_requirements(self, goal: Any = None) -> List[str]:
+        '''Expone los requisitos de calibración de un goal al planificador.'''
+        calibrator = self.calibrator
+        if calibrator is None:
+            try:
+                from src.hands.calibrator import get_enhanced_calibrator
+
+                calibrator = get_enhanced_calibrator()
+                self.calibrator = calibrator
+                self.calibration_manager = getattr(calibrator, "calibration_manager", None)
+            except Exception:
+                calibrator = None
+        if calibrator is None:
+            return []
+        method = getattr(calibrator, "get_calibration_requirements_for_goal", None)
+        if not callable(method):
+            return []
+        try:
+            result = method(goal)
+        except Exception:
+            return []
+        if isinstance(result, (list, tuple)):
+            return [str(item) for item in result]
+        return []
+
+    def get_calibration_requirements_for_goal(self, goal: Any = None) -> List[str]:
+        return self.get_calibration_requirements(goal)
+
+    def calibration_requirements_for_goal(self, goal: Any = None) -> List[str]:
+        return self.get_calibration_requirements(goal)
+
     def check_ui_readiness(
         self,
         goal: Goal,
@@ -1810,6 +1856,12 @@ class Planner:
                     readiness["ui_ready"] = False
                     if resource_id not in readiness["missing_resources"]:
                         readiness["missing_resources"].append(resource_id)
+        for requirement in self.get_calibration_requirements(goal):
+            if requirement not in readiness["calibration_needed"]:
+                readiness["calibration_needed"].append(requirement)
+            recommendation = f"Calibrar: {requirement}"
+            if recommendation not in readiness["recommendations"]:
+                readiness["recommendations"].append(recommendation)
         return readiness
 
     # ==================================================================
