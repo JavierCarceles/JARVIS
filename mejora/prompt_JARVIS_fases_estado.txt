@@ -6305,3 +6305,16 @@ VERIFICACION: SINTAXIS: OK; MAIN.PY: NE; COMPORTAMIENTO / INTEGRACION REAL: Valu
 DISCREPANCIAS: Discrepancia previa documentada en test (TypeError enmascarando RuntimeError) resuelta.
 PENDIENTES: NINGUNO
 ESTADO FINAL: 3.6.1.3 - IMPLEMENTADA
+
+
+REGISTRO DE UNIDAD: 3.6.2.1
+FECHA: NR
+OBJETIVO: Verificar identificacion de ventana/proceso correcto al cerrar una aplicacion.
+TIPO DE TRABAJO: CORRECCION | VERIFICACION
+CAMBIOS / HALLAZGOS: close_application resuelve la aplicacion mediante ApplicationManager y deriva el nombre de proceso del ejecutable declarado (basename), evitando asumir que el nombre comercial coincide con el proceso; mantiene fallback al nombre indicado si no hay app registrada o no declara ejecutable; corregido logger invalido str(exc, ...) que enmascaraba excepciones.
+ARCHIVOS MODIFICADOS: PRODUCCION: src/hands/applications_core.py; TESTS: NA; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: 122 passed (test_applications_core.py); 71 passed (test_consumer_api_compatibility.py, test_application_consumers_real_model.py); INTEGRACION: NE; NO REGRESION: NE
+VERIFICACION: SINTAXIS: OK; MAIN.PY: NE; COMPORTAMIENTO / INTEGRACION REAL: close_application("chrome") deriva chrome.exe y devuelve mensaje de cierre; close_application("notepad.exe") mantiene notepad.exe
+DISCREPANCIAS: NINGUNA
+PENDIENTES: NINGUNO
+ESTADO FINAL: 3.6.2.1 - IMPLEMENTADA

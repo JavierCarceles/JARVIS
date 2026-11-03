@@ -929,25 +929,41 @@ def close_application(app_name: str) -> str:
     if not target:
         raise ValueError("El nombre de la aplicación no puede estar vacío")
 
-    executable_name = target if target.lower().endswith(".exe") else f"{target}.exe"
+    # Identificar el proceso correcto a partir del conocimiento real de la
+    # aplicación (ejecutable declarado), sin asumir que el nombre comercial
+    # coincide con el nombre del proceso. Si no hay aplicación registrada o
+    # no declara ejecutable, se conserva el comportamiento previo basado en
+    # el nombre indicado.
+    process_name = target
+    try:
+        app = get_application_manager().get_application(target)
+    except Exception:
+        app = None
+    if app is not None and getattr(app, "executable", None):
+        process_name = str(app.executable).strip()
+    process_name = os.path.basename(process_name.replace("\\", "/"))
+    if not process_name:
+        process_name = target
+    if not process_name.lower().endswith(".exe"):
+        process_name = f"{process_name}.exe"
 
     try:
         if platform.system() == "Windows":
             subprocess.run(
-                ["taskkill", "/f", "/im", executable_name],
+                ["taskkill", "/f", "/im", process_name],
                 check=False,
                 capture_output=True,
                 text=True,
             )
         elif platform.system() == "Darwin":
-            subprocess.run(["pkill", "-f", target.lower()], check=False)
+            subprocess.run(["pkill", "-f", process_name.lower()], check=False)
         else:
-            subprocess.run(["pkill", "-f", target.lower()], check=False)
+            subprocess.run(["pkill", "-f", process_name.lower()], check=False)
 
         logger._print_log("info", "Procesando solicitud", "applications_core.py", "method", 371)
         return f"Aplicación {target} cerrada exitosamente"
     except Exception as exc:
-        logger._print_log("info", f"Error cerrando aplicación: {str(exc, "applications_core.py", "method", 553)} [file:applications_core.py, method:close_application, line:556]")
+        logger._print_log("info", f"Error cerrando aplicación: {str(exc)} [file:applications_core.py, method:close_application, line:556]")
         raise
 
 
