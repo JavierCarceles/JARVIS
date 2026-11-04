@@ -752,6 +752,8 @@ FASE 3 ? APPLICATION KNOWLEDGE
 3.6.3 ? Lanzamiento
 3.6.3.1 Verificar parametros de lanzamiento existentes.
 3.6.3.2 Verificar resultado de lanzamiento.
+    3.6.3.2.1 Verificar soporte de argumentos. [HIJA de 3.6.3.2]
+    3.6.3.2.2 Verificar ejecucion con argumentos. [HIJA de 3.6.3.2]
 3.6.3.3 Registrar fallos reales.
 3.6.4 ? Aplicacion/monitor
 3.6.4.1 Verificar monitor objetivo.
@@ -6344,3 +6346,29 @@ VERIFICACION: SINTAXIS: OK; MAIN.PY: NE; COMPORTAMIENTO / INTEGRACION REAL: clos
 DISCREPANCIAS: NINGUNA
 PENDIENTES: NINGUNO
 ESTADO FINAL: 3.6.2.3 - IMPLEMENTADA
+
+
+REGISTRO DE UNIDAD: 3.6.3.1
+FECHA: NR
+OBJETIVO: Verificar parametros de lanzamiento existentes en el codigo de apertura de aplicaciones (FASE 3.6.3 Lanzamiento).
+TIPO DE TRABAJO: VERIFICACION | INSPECCION
+CAMBIOS / HALLAZGOS: (1) calibration_manager.launch_application (línea 1256) SOPORTE parametros de lanzamiento: lee application.get("arguments", "") (línea 1261) y los extiende al comando via shlex.split(arguments, posix=False) tanto al lanzar por ejecutable directo (líneas 1294-1298) como por metadata de aplicacion descubierta (líneas 1307-1309). (2) calibration_manager._get_application_metadata (línea 531) devuelve items con campos path, arguments, source; deduplica por (path, arguments, source). (3) calibration_manager._load_application_installation_metadata (~línea 495) ejecuta PowerShell que consulta el registro de Windows y crea registros con Arguments='' hardcodeado (línea 501); lee item.get("Arguments", "") (línea 523). Actualmente todos los argumentos vienen vacios porque el script de PowerShell hardcodea Arguments=''. (4) calibration_manager.discover_applications (línea 544): la funcion interna add_application acepta parametro arguments (línea 557) y lo incluye en el registro si no esta vacio (líneas 574-575). (5) applications_core.open_application (línea 880, accion registrada en ActionRegistry) NO soporta parametros de lanzamiento: recibe solo app_name y ejecuta subprocess.Popen([app.executable]) sin argumentos (línea 893). (6) data/knowledge/applications.json: ninguna aplicacion tiene campo arguments (solo name, executable, capabilities, states, ui_elements, login_required, calibration_needed). (7) data/memory/applications.json: esta vacio {}. (8) ApplicationKnowledge dataclass (línea 125) no tiene campo arguments dedicado; solo metadata: Optional[Dict[str, Any]] generico no usado para argumentos de lanzamiento.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: NA; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: 124 passed (test_applications_core.py); INTEGRACION: NE; NO REGRESION: NE
+VERIFICACION: SINTAXIS: OK (calibration_manager.py y applications_core.py compilan sin errores); MAIN.PY: NE; COMPORTAMIENTO / INTEGRACION REAL: launch_application aplica arguments cuando existen; open_application (accion registrada) ignora arguments; no hay datos de aplicacion con arguments poblados en JSON.
+DISCREPANCIAS: Cobertura desigual entre puntos de entrada: launch_application en calibration_manager soporta arguments, pero la accion open_application registrada en ActionRegistry no los recibe ni los pasa al ejecutable. No es un error (son puntos de entrada distintos), es una limitacion documentada.
+PENDIENTES: NINGUNO (unidad de verificacion; no se requiere implementacion).
+ESTADO FINAL: 3.6.3.1 - IMPLEMENTADA
+
+
+REGISTRO DE UNIDAD: 3.6.3.2.1
+FECHA: NR
+OBJETIVO: Verificar soporte de argumentos en launch_application (FASE 3.6.3 Lanzamiento).
+TIPO DE TRABAJO: VERIFICACION | TESTS UNITARIOS
+CAMBIOS / HALLAZGOS: (1) Se creo tests/hands/test_calibration_manager.py (previo vacio) con 6 tests unitarios que verifican que calibration_manager.launch_application lee application.get("arguments", "") y las pasa a subprocess.Popen via shlex.split(arguments, posix=False). (2) Se verifico que launch_application con arguments="--verbose --port 8080" llama a Popen con comando [".../testapp.exe", "--verbose", "--port", "8080"]. (3) Se verifico que launch_application sin arguments llama a Popen con comando ["/fake/path/testapp.exe"]. (4) Se verifico que launch_application con arguments="" llama a Popen con comando ["/fake/path/testapp.exe"]. (5) Se verifico que launch_application con arguments con espacios y comillas usa shlex.split(posix=False) para separar correctamente. (6) Se verifico que ejecutar launch_application con argumentos retorna (hwnds, True). (7) La accion open_application (ActionRegistry, linea 880) NO soporta argumentos: ejecuta subprocess.Popen([app.executable]) sin argumentos (linea 893) — limite documentado desde 3.6.3.1.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: tests/hands/test_calibration_manager.py (nuevo, 6 tests); DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: 6 passed (tests/hands/test_calibration_manager.py: TestLaunchApplicationArguments x4, TestLaunchApplicationEjecucionConArgumentos x2); INTEGRACION: NE; NO REGRESION: NE
+VERIFICACION: SINTAXIS: OK (test_calibration_manager.py compila sin errores); MAIN.PY: NE; COMPORTAMIENTO / INTEGRACION REAL: launch_application aplica arguments cuando existen (evidencia: tests pasan con mock de subprocess.Popen verificando cmd lista); open_application (accion registrada) ignora arguments (limite documentado, no se modifica en esta unidad).
+DISCREPANCIAS: Cobertura desigual entre puntos de entrada: launch_application en calibration_manager soporta arguments (verificado con tests), pero la accion open_application registrada en ActionRegistry no los recibe ni los pasa al ejecutable. No es un error (son puntos de entrada distintos), es una limitacion documentada heredada de 3.6.3.1.
+PENDIENTES: 3.6.3.2.2 Verificar ejecucion con argumentos (hoja pendiente de 3.6.3.2).
+ESTADO FINAL: 3.6.3.2.1 - IMPLEMENTADA
