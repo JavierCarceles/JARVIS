@@ -904,6 +904,38 @@ def open_application(app_name: str) -> str:
         raise
 
 
+def _is_process_running(process_name: str) -> bool:
+    """Comprueba si un proceso con el nombre dado sigue en ejecucion.
+
+    Usa ``tasklist`` en Windows y ``pgrep`` en sistemas Unix para verificar
+    la presencia del proceso por nombre de imagen/ejecutable. Devuelve ``False``
+    ante cualquier error de consulta, para no bloquear el cierre por problemas
+    de introspeccion del sistema.
+    """
+    name = os.path.basename(str(process_name or "").replace("\\", "/")).strip()
+    if not name:
+        return False
+    try:
+        if platform.system() == "Windows":
+            result = subprocess.run(
+                ["tasklist", "/FI", f"IMAGENAME eq {name}"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            output = result.stdout or ""
+            return name.lower() in output.lower()
+        unix_name = name[:-4] if name.lower().endswith(".exe") else name
+        result = subprocess.run(
+            ["pgrep", "-x", unix_name],
+            capture_output=True,
+            check=False,
+        )
+        return result.returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
 @register_action(
     name="close_application",
     description="Cierra una aplicación genérica",
@@ -956,12 +988,24 @@ def close_application(app_name: str) -> str:
                 text=True,
             )
         elif platform.system() == "Darwin":
-            subprocess.run(["pkill", "-f", process_name.lower()], check=False)
+            unix_process_name = process_name
+            if unix_process_name.lower().endswith(".exe"):
+                unix_process_name = unix_process_name[:-4]
+            subprocess.run(["pkill", "-x", unix_process_name.lower()], check=False)
         else:
-            subprocess.run(["pkill", "-f", process_name.lower()], check=False)
+            unix_process_name = process_name
+            if unix_process_name.lower().endswith(".exe"):
+                unix_process_name = unix_process_name[:-4]
+            subprocess.run(["pkill", "-x", unix_process_name.lower()], check=False)
 
+        # Verificacion de estado posterior: confirmar que el proceso ya no esta
+        # en ejecucion tras enviarle la senal de cierre. Si el proceso persiste,
+        # se informa que no se pudo confirmar el cierre en lugar de asumirlo.
+        cerrado = not _is_process_running(process_name)
         logger._print_log("info", "Procesando solicitud", "applications_core.py", "method", 371)
-        return f"Aplicación {target} cerrada exitosamente"
+        if cerrado:
+            return f"Aplicación {target} cerrada exitosamente"
+        return f"Aplicación {target} no pudo confirmarse cerrada"
     except Exception as exc:
         logger._print_log("info", f"Error cerrando aplicación: {str(exc)} [file:applications_core.py, method:close_application, line:556]")
         raise

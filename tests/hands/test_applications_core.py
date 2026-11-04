@@ -768,6 +768,44 @@ class TestCloseApplication:
             result = close_application("notepad.exe")
             assert "cerrada" in result
 
+    def test_close_verifica_estado_posterior_proceso_terminado(self):
+        """close_application confirma cierre solo si tasklist ya no muestra el proceso."""
+        def side_effect(cmd, *args, **kwargs):
+            mock = MagicMock()
+            if isinstance(cmd, list) and cmd and cmd[0] == "taskkill":
+                mock.returncode = 0
+                mock.stdout = ""
+                return mock
+            # tasklist: el proceso ya no aparece -> cerrado
+            if isinstance(cmd, list) and cmd and cmd[0] == "tasklist":
+                mock.stdout = "INFO: No se encontraron tareas en ejecución que coincidan con el criterio.\n"
+                return mock
+            return mock
+        with patch("src.hands.applications_core.subprocess.run", side_effect=side_effect):
+            result = close_application("chrome")
+            assert "cerrada exitosamente" in result
+
+    def test_close_verifica_estado_posterior_proceso_todavia_ejecutandose(self):
+        """close_application informa que no se pudo confirmar si tasklist sigue mostrando el proceso."""
+        def side_effect(cmd, *args, **kwargs):
+            mock = MagicMock()
+            if isinstance(cmd, list) and cmd and cmd[0] == "taskkill":
+                mock.returncode = 0
+                mock.stdout = ""
+                return mock
+            # tasklist: el proceso sigue apareciendo -> no cerrado
+            if isinstance(cmd, list) and cmd and cmd[0] == "tasklist":
+                mock.stdout = (
+                    "Nombre de la imagen             PID Sesión        ...\n"
+                    "========================= ======== =============== ...\n"
+                    "chrome.exe                     1234 1                   ...\n"
+                )
+                return mock
+            return mock
+        with patch("src.hands.applications_core.subprocess.run", side_effect=side_effect):
+            result = close_application("chrome")
+            assert "no pudo confirmarse cerrada" in result
+
 
 class TestWaitForApplicationStateExtended:
     """wait_for_application_state: casos adicionales."""

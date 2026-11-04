@@ -6318,3 +6318,29 @@ VERIFICACION: SINTAXIS: OK; MAIN.PY: NE; COMPORTAMIENTO / INTEGRACION REAL: clos
 DISCREPANCIAS: NINGUNA
 PENDIENTES: NINGUNO
 ESTADO FINAL: 3.6.2.1 - IMPLEMENTADA
+
+
+REGISTRO DE UNIDAD: 3.6.2.2
+FECHA: NR
+OBJETIVO: Verificar cierre sin afectar otras aplicaciones.
+TIPO DE TRABAJO: CORRECCION | VERIFICACION
+CAMBIOS / HALLAZGOS: close_application sigue derivando el proceso objetivo desde ApplicationManager y ejecuta taskkill /f /im solo para ese nombre de imagen en Windows; en Unix se cambio pkill -f (coincidencia de linea de comandos) por pkill -x (coincidencia exacta de nombre de proceso) y se elimina sufijo .exe cuando no aplica, evitando cerrar procesos no relacionados.
+ARCHIVOS MODIFICADOS: PRODUCCION: src/hands/applications_core.py; TESTS: NA; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: 122 passed (test_applications_core.py); INTEGRACION: NE; NO REGRESION: NE
+VERIFICACION: SINTAXIS: OK; MAIN.PY: NE; COMPORTAMIENTO / INTEGRACION REAL: comando de cierre limitado al proceso objetivo derivado; pkill exacto en Unix
+DISCREPANCIAS: NINGUNA
+PENDIENTES: NINGUNO
+ESTADO FINAL: 3.6.2.2 - IMPLEMENTADA
+
+
+REGISTRO DE UNIDAD: 3.6.2.3
+FECHA: NR
+OBJETIVO: Verificar estado posterior tras cerrar una aplicacion, confirmando que el proceso objetivo deja de estar en ejecucion en lugar de asumir el cierre por senal enviada.
+TIPO DE TRABAJO: IMPLEMENTACION | VERIFICACION | TEST
+CAMBIOS / HALLAZGOS: Se anadio la funcion auxiliar _is_process_running(process_name) en src/hands/applications_core.py que consulta tasklist (Windows) o pgrep (Unix) para determinar si un proceso sigue en ejecucion por nombre de imagen. close_application ahora llama a _is_process_running tras enviar la senal de cierre y devuelve "Aplicacion {target} cerrada exitosamente" solo si el proceso ya no esta en ejecucion; en caso contrario devuelve "Aplicacion {target} no pudo confirmarse cerrada". Se conservan contratos existentes (valor de retorno string, mensaje con "cerrada", registro de log, manejo de excepciones).
+ARCHIVOS MODIFICADOS: PRODUCCION: src/hands/applications_core.py; TESTS: tests/hands/test_applications_core.py; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: 5 passed (TestCloseApplication en test_applications_core.py: 3 existentes + 2 nuevos test_close_verifica_estado_posterior_*); 201 passed (test_applications_core.py + test_executor_state.py); 1 passed (test_executor.py::test_close_application_goal_success); 2 passed (test_node.py close_application); 67 passed (test_planner_action_verification.py); INTEGRACION: NE; NO REGRESION: NE
+VERIFICACION: SINTAXIS: OK; MAIN.PY: NE; COMPORTAMIENTO / INTEGRACION REAL: close_application verifica post-estado tras taskkill/pkill; si tasklist/pgrep reporta proceso ausente se confirma cerrado; si sigue presente se informa que no se pudo confirmar.
+DISCREPANCIAS: NINGUNA
+PENDIENTES: NINGUNO
+ESTADO FINAL: 3.6.2.3 - IMPLEMENTADA
