@@ -6372,3 +6372,16 @@ VERIFICACION: SINTAXIS: OK (test_calibration_manager.py compila sin errores); MA
 DISCREPANCIAS: Cobertura desigual entre puntos de entrada: launch_application en calibration_manager soporta arguments (verificado con tests), pero la accion open_application registrada en ActionRegistry no los recibe ni los pasa al ejecutable. No es un error (son puntos de entrada distintos), es una limitacion documentada heredada de 3.6.3.1.
 PENDIENTES: 3.6.3.2.2 Verificar ejecucion con argumentos (hoja pendiente de 3.6.3.2).
 ESTADO FINAL: 3.6.3.2.1 - IMPLEMENTADA
+
+
+REGISTRO DE UNIDAD: 3.6.3.2.2
+FECHA: NR
+OBJETIVO: Verificar ejecucion con argumentos en launch_application (FASE 3.6.3 Lanzamiento).
+TIPO DE TRABAJO: VERIFICACION | TEST
+CAMBIOS / HALLAZGOS: (1) Al leer src/hands/calibration_manager.py :: launch_application (linea 1256) el soporte de arguments ya existia: `application.get("arguments", "")` (linea 1261) + `shlex.split(arguments, posix=False)` en rama de ejecutable directo (lineas 1294-1298) y en rama de metadatos (lineas 1307-1309); no se modifico produccion. (2) Se amplió tests/hands/test_calibration_manager.py :: TestLaunchApplicationEjecucionConArgumentos de 2 a 15 tests (19 en total en el fichero): Popen recibe lista con argumentos y stdout/stderr=DEVNULL y contexto de lanzamiento nuevo (_last_launch_was_owned=True, root_pid, owned_hwnds); sin ventana detectada o sin HWND => (before, False); OSError y PermissionError en Popen capturados => (set(), False); proceso elevado => False y _close_all_owned_windows solo sobre ventanas propias; rama de metadatos con arguments llega a Popen y sin ruta valida => False sin Popen; rama app_id usa `explorer.exe shell:AppsFolder\<app_id>` e ignora arguments por diseño; ventana existente reutilizable => True sin Popen (arguments no se aplican) con _last_launch_was_owned=False; app vacia/sin nombre, sin ejecutable ni metadatos, o ignorada/juego => (set(), False) sin Popen. (3) Matiz documentado en tests: en rama app_id y en reutilizacion de ventana los arguments no se adjuntan/aplican por diseño, no por defecto.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: tests/hands/test_calibration_manager.py; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: 19 passed (tests/hands/test_calibration_manager.py: TestLaunchApplicationArguments x4, TestLaunchApplicationEjecucionConArgumentos x15); INTEGRACION: NE; NO REGRESION: NE
+VERIFICACION: SINTAXIS: OK (compileall de src/hands/calibration_manager.py y tests/hands/test_calibration_manager.py sin errores); MAIN.PY: NE; COMPORTAMIENTO / INTEGRACION REAL: launch_application aplica arguments cuando existen (evidencia: tests con mock de subprocess.Popen verificando cmd lista, DEVNULL y contexto); open_application (accion registrada) sigue ignorando arguments (limite heredado de 3.6.3.1/3.6.3.2.1, no se modifica en esta unidad).
+DISCREPANCIAS: Cobertura desigual entre puntos de entrada: launch_application en calibration_manager soporta arguments (verificado con tests), pero la accion open_application registrada en ActionRegistry no los recibe ni los pasa al ejecutable. No es un error (son puntos de entrada distintos), es una limitacion documentada heredada de 3.6.3.1.
+PENDIENTES: 3.6.3.3 Registrar fallos reales (siguiente hoja pendiente de 3.6.3 Lanzamiento).
+ESTADO FINAL: 3.6.3.2.2 - IMPLEMENTADA
