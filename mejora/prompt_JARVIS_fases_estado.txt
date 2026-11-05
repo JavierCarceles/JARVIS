@@ -6515,3 +6515,26 @@ VERIFICACION: SINTAXIS: OK; MAIN.PY: NE; COMPORTAMIENTO / INTEGRACION REAL: veri
 DISCREPANCIAS: Las 15 fallas del barrido amplio son pre-existentes y exclusivas de test_ui_elements*.py (deteccion/calibrado de elementos UI, capabilities vacias, coordenadas None), sin relacion con apertura/cierre/lanzamiento/movimiento de aplicaciones. No son regresiones de 3.6.5.
 PENDIENTES: NINGUNO
 ESTADO FINAL: 3.6.5.5 - IMPLEMENTADA
+
+===
+REGISTRO DE UNIDAD: 3.7.1.1
+FECHA: NR
+OBJETIVO: Verificar consumidores de ApplicationsCore: identificar todos los consumidores reales del modulo src/hands/applications_core.py y confirmar que usan la API existente sin romperse, sin modificar codigo de produccion.
+TIPO DE TRABAJO: VERIFICACION | CONSUMIDORES DE API | CARACTERIZACION
+CAMBIOS / HALLAZGOS:
+- Consumidores reales identificados (codigo de produccion, no tests):
+  1. src/brain/llm.py:21 — from src.hands.applications_core import ApplicationCapability (Brain._get_application_knowledge expone aplicaciones al LLM).
+  2. src/hands/__init__.py:6 — from .applications_core import get_application_manager, get_applications_by_capability, register_custom_application (API publica del paquete hands).
+  3. src/hands/executor.py:46 — from src.hands import applications_core as applications (Executor._evaluate_condition lee catalogo declarativo via get_application_manager().applications).
+  4. src/hands/planner/planner.py:2208/2210/2623 — from src.hands.applications_core import ApplicationCapability (Planner carga conocimiento de aplicaciones).
+  5. src/hands/planner/application_integration.py:39/72-84 — importacion diferida de applications_core (ApplicationKnowledgeIntegrator registra conocimiento via API publica).
+  6. src/eyes/vision_only.py:41 — referencia canonica/documentacion entre eyes.vision y hands.applications_core.
+- Funciones internas de applications_core que consumen el modelo ApplicationKnowledge: _check_application_available (app.executable/app.url), _check_application_login, open_application (app.name/executable/url/preflight_requirements), get_calibrated_elements, is_available/is_capable/is_capability_available.
+- Verificacion ejecutada: tests/hands/test_consumer_api_compatibility.py (34 tests en 6 clases: Brain, HTNManager, Planner, Executor, funciones internas, contrato minimo) -> 34/34 PASSED. Importacion de todos los consumidores reales (applications_core, hands, executor, application_integration, planner, brain.llm) -> OK (sin errores de import).
+- No se modifico codigo de produccion. No se modifico el modelo ApplicationKnowledge ni ApplicationManager.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: NA (test_consumer_api_compatibility.py ya existente); DOCUMENTACION: este registro en prompt_JARVIS_fases_estado.txt.
+TESTS Y RESULTADOS: 34/34 PASSED (test_consumer_api_compatibility.py). Importacion de consumidores: ALL_OK. Sin regresiones de consumidores identificados.
+VERIFICACION: SINTAXIS: OK (py_compile src/hands/applications_core.py exit 0; imports de consumidores OK). MAIN.PY: NE. COMPORTAMIENTO / INTEGRACION REAL: todos los 6 consumidores activos usan la API existente (get_application_manager, ApplicationCapability, ApplicationKnowledge, ApplicationManager, open_application, _check_application_available) sin romperse.
+DISCREPANCIAS: NINGUNA nueva. (D11) pendiente documentada en 3.1.3.2: bug de produccion en open_application() error handler (str(exc, ...) con 4 argumentos) en applications_core.py:506, ajeno a la verificacion de consumidores y pendiente de arreglo en fase posterior.
+PENDIENTES: NINGUNO para 3.7.1.1. Siguiente hoja pendiente real en orden del roadmap: 3.7.1.2 (Verificar consumidores del conocimiento de aplicaciones.)
+ESTADO FINAL: 3.7.1.1 - COMPLETADA
