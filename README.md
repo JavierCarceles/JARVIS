@@ -921,7 +921,9 @@ Funciones a nivel módulo:
 | `def get_application_knowledge(app_name)`  (L1284) | Obtiene conocimiento estructurado de una aplicación. |
 | `def get_applications_by_capability(capability_name)`  (L1307) | Obtiene aplicaciones que tienen una capacidad específica. |
 | `def register_custom_application(app_config)`  (L1318) | Registra una aplicación personalizada, aceptando ``description`` en cada elemento de ``ui_elements``. |
-| `def verify_target_monitor(monitor_num)` | Verifica que un monitor objetivo exista antes de operar sobre el. Retorna dict con claves verified, monitor y error. |
+| `def verify_target_monitor(monitor_num)` | Verifica que un monitor objetivo exista antes de operar sobre él. Retorna dict con claves verified, monitor y error. |
+| `def move_application_to_monitor(app_name, monitor_num)` | Mueve una aplicación al monitor objetivo de forma segura: verifica monitor, identifica la ventana correcta, delega el movimiento seguro al `CalibrationManager` y verifica el monitor final. Retorna dict con moved, verified, monitor, window_identified y error. |
+| `def maximize_or_restore_application(app_name, maximize)` | Maximiza o restaura la ventana de una aplicación verificando el estado real: identifica la ventana, captura el estado actual (maximizada/restaurada), ejecuta la operación solicitada y verifica el estado final. Retorna dict con maximized, restored, verified, window_identified, already_in_target_state y error. |
 
 <a name="src-hands-calibration_manager-py"></a>
 ### `src/hands/calibration_manager.py` [2343 líneas] — Gestor universal de calibración de aplicaciones para JARVIS.

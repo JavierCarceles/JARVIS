@@ -15,15 +15,19 @@ concreta para que el planificador pueda trabajar con capacidades genéricas.
 from __future__ import annotations
 
 from src.utils.logger import get_logger
+import ctypes
 import os
 import platform
 import shutil
 import subprocess
 import time
 import webbrowser
+from ctypes import wintypes
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Optional
+
+from src.hands.calibration_manager import SW_RESTORE, SW_MAXIMIZE, USER32
 
 from src.hands.action_registry import ActionType, get_action_registry, register_action
 from src.hands.calibration_manager import get_calibration_manager
@@ -1653,4 +1657,437 @@ def verify_target_monitor(monitor_num: int) -> Dict[str, Any]:
         "verified": True,
         "monitor": monitor.to_dict(),
         "error": None,
+    }
+
+
+@register_action(
+    name="move_application_to_monitor",
+    description="Mueve una aplicacion al monitor objetivo de forma segura",
+    action_type=ActionType.APPLICATION,
+    category="aplicacion",
+    tags=["aplicacion", "monitor", "movimiento", "seguro", "reusable"],
+    parameters={
+        "app_name": {
+            "type": "str",
+            "required": True,
+            "description": "Nombre de la aplicacion cuya ventana debe moverse",
+        },
+        "monitor_num": {
+            "type": "int",
+            "required": True,
+            "description": "Numero de monitor destino (a partir de 1)",
+        },
+    },
+    preconditions=[],
+    effects=["application_moved_to_monitor"],
+    cost=8.0,
+    capability="move_application_to_monitor",
+    planner_enabled=True,
+)
+def move_application_to_monitor(app_name: str, monitor_num: int) -> Dict[str, Any]:
+    """
+    Mueve una aplicacion al monitor objetivo verificando el movimiento seguro.
+
+    Flujo seguro:
+    1. Valida entradas y verifica que el monitor destino exista.
+    2. Identifica la ventana correcta de la aplicacion (sin mover ventanas a ciegas).
+    3. Mueve la ventana usando las comprobaciones de seguridad del gestor de
+       calibracion (ventana GUI valida, no elevada, posicion verificada).
+    4. Verifica que la ventana quedo en el monitor destino.
+
+    Args:
+        app_name: Nombre de la aplicacion cuya ventana debe moverse.
+        monitor_num: Numero de monitor destino (a partir de 1).
+
+    Returns:
+        Dict con claves: moved (bool), verified (bool), monitor (dict o None),
+        window_identified (bool), error (str o None).
+
+    Raises:
+        ValueError: Si app_name esta vacio o monitor_num no es valido.
+    """
+    target = str(app_name or "").strip()
+    if not target:
+        raise ValueError("El nombre de la aplicacion no puede estar vacio")
+
+    monitor_check = verify_target_monitor(monitor_num)
+    if not monitor_check.get("verified"):
+        return {
+            "moved": False,
+            "verified": False,
+            "monitor": monitor_check.get("monitor"),
+            "window_identified": False,
+            "error": monitor_check.get("error") or f"Monitor {monitor_num} no verificado",
+        }
+
+    try:
+        monitor_num = int(monitor_num)
+    except (TypeError, ValueError):
+        return {
+            "moved": False,
+            "verified": False,
+            "monitor": monitor_check.get("monitor"),
+            "window_identified": False,
+            "error": f"Numero de monitor invalido: {monitor_num!r}",
+        }
+
+    try:
+        calibration_manager = get_calibration_manager()
+    except Exception as exc:
+        return {
+            "moved": False,
+            "verified": False,
+            "monitor": monitor_check.get("monitor"),
+            "window_identified": False,
+            "error": f"Error obteniendo CalibrationManager: {exc}",
+        }
+
+    find_window = getattr(calibration_manager, "_find_existing_application_window", None)
+    if not callable(find_window):
+        return {
+            "moved": False,
+            "verified": False,
+            "monitor": monitor_check.get("monitor"),
+            "window_identified": False,
+            "error": "CalibrationManager no permite identificar ventanas de aplicacion",
+        }
+
+    try:
+        window = find_window(target)
+    except Exception as exc:
+        return {
+            "moved": False,
+            "verified": False,
+            "monitor": monitor_check.get("monitor"),
+            "window_identified": False,
+            "error": f"Error identificando ventana de {target}: {exc}",
+        }
+
+    if window is None:
+        return {
+            "moved": False,
+            "verified": False,
+            "monitor": monitor_check.get("monitor"),
+            "window_identified": False,
+            "error": f"No se encontro ventana identificable para {target}",
+        }
+
+    move_window = getattr(calibration_manager, "move_window_to_monitor", None)
+    if not callable(move_window):
+        return {
+            "moved": False,
+            "verified": False,
+            "monitor": monitor_check.get("monitor"),
+            "window_identified": True,
+            "error": "CalibrationManager no expone movimiento seguro de ventanas",
+        }
+
+    try:
+        moved = bool(move_window(window, monitor_num, target))
+    except Exception as exc:
+        return {
+            "moved": False,
+            "verified": False,
+            "monitor": monitor_check.get("monitor"),
+            "window_identified": True,
+            "error": f"Error moviendo {target} al monitor {monitor_num}: {exc}",
+        }
+
+    verified = False
+    if moved:
+        try:
+            screen_manager = get_screen_manager()
+            get_window_monitor = getattr(screen_manager, "get_monitor_for_window", None)
+            if callable(get_window_monitor):
+                actual_monitor = get_window_monitor(window)
+                if actual_monitor is not None:
+                    actual_id = getattr(actual_monitor, "monitor_id", None)
+                    verified = int(actual_id) == int(monitor_num) if actual_id is not None else False
+                else:
+                    verified = False
+            else:
+                verified = True
+        except Exception:
+            verified = False
+
+    return {
+        "moved": moved,
+        "verified": bool(moved and verified),
+        "monitor": monitor_check.get("monitor"),
+        "window_identified": True,
+        "error": None if moved else f"No se pudo mover {target} al monitor {monitor_num}",
+    }
+
+
+@register_action(
+    name="maximize_or_restore_application",
+    description="Maximiza o restaura la ventana de una aplicacion cuando corresponda",
+    action_type=ActionType.APPLICATION,
+    category="aplicacion",
+    tags=["aplicacion", "ventana", "maximizar", "restaurar", "reusable"],
+    parameters={
+        "app_name": {
+            "type": "str",
+            "required": True,
+            "description": "Nombre de la aplicacion cuya ventana se maximizara o restaurara",
+        },
+        "maximize": {
+            "type": "bool",
+            "required": False,
+            "default": True,
+            "description": "Si True, maximiza la ventana; si False, la restaura a tamano normal",
+        },
+    },
+    preconditions=[],
+    effects=["application_window_maximized", "application_window_restored"],
+    cost=5.0,
+    capability="maximize_or_restore_application",
+    planner_enabled=True,
+)
+def maximize_or_restore_application(app_name: str, maximize: bool = True) -> Dict[str, Any]:
+    """
+    Maximiza o restaura la ventana de una aplicacion verificando el estado real.
+
+    Flujo seguro:
+    1. Valida que el nombre de la aplicacion no este vacio.
+    2. Identifica la ventana de la aplicacion sin mover ventanas a ciegas.
+    3. Captura el estado actual de la ventana (maximizada/restaurada/minimizada).
+    4. Si se solicita maximizar y la ventana no esta maximizada, la maximiza.
+    5. Si se solicita restaurar y la ventana esta maximizada, la restaura.
+    6. Verifica el estado final tras la operacion.
+
+    Args:
+        app_name: Nombre de la aplicacion cuya ventana se gestionara.
+        maximize: Si True se maximiza; si False se restaura a tamano normal.
+
+    Returns:
+        Dict con claves: maximized (bool), restored (bool), verified (bool),
+        window_identified (bool), already_in_target_state (bool), error (str o None).
+
+    Raises:
+        ValueError: Si app_name esta vacio.
+    """
+    target = str(app_name or "").strip()
+    if not target:
+        raise ValueError("El nombre de la aplicacion no puede estar vacio")
+
+    try:
+        calibration_manager = get_calibration_manager()
+    except Exception as exc:
+        return {
+            "maximized": False,
+            "restored": False,
+            "verified": False,
+            "window_identified": False,
+            "already_in_target_state": False,
+            "error": f"Error obteniendo CalibrationManager: {exc}",
+        }
+
+    find_window = getattr(calibration_manager, "_find_existing_application_window", None)
+    if not callable(find_window):
+        return {
+            "maximized": False,
+            "restored": False,
+            "verified": False,
+            "window_identified": False,
+            "already_in_target_state": False,
+            "error": "CalibrationManager no permite identificar ventanas de aplicacion",
+        }
+
+    try:
+        window = find_window(target)
+    except Exception as exc:
+        return {
+            "maximized": False,
+            "restored": False,
+            "verified": False,
+            "window_identified": False,
+            "already_in_target_state": False,
+            "error": f"Error identificando ventana de {target}: {exc}",
+        }
+
+    if window is None:
+        return {
+            "maximized": False,
+            "restored": False,
+            "verified": False,
+            "window_identified": False,
+            "already_in_target_state": False,
+            "error": f"No se encontro ventana identificable para {target}",
+        }
+
+    get_hwnd = getattr(calibration_manager, "_get_window_handle", None)
+    if not callable(get_hwnd):
+        return {
+            "maximized": False,
+            "restored": False,
+            "verified": False,
+            "window_identified": True,
+            "already_in_target_state": False,
+            "error": "CalibrationManager no permite obtener el identificador de ventana",
+        }
+
+    try:
+        hwnd = get_hwnd(window)
+    except Exception as exc:
+        return {
+            "maximized": False,
+            "restored": False,
+            "verified": False,
+            "window_identified": True,
+            "already_in_target_state": False,
+            "error": f"Error obteniendo HWND de {target}: {exc}",
+        }
+
+    if not hwnd:
+        return {
+            "maximized": False,
+            "restored": False,
+            "verified": False,
+            "window_identified": True,
+            "already_in_target_state": False,
+            "error": f"No se pudo obtener el HWND de la ventana de {target}",
+        }
+
+    capture_state = getattr(calibration_manager, "_capture_window_state", None)
+    if not callable(capture_state):
+        return {
+            "maximized": False,
+            "restored": False,
+            "verified": False,
+            "window_identified": True,
+            "already_in_target_state": False,
+            "error": "CalibrationManager no permite capturar el estado de la ventana",
+        }
+
+    try:
+        snapshot = capture_state(hwnd)
+    except Exception as exc:
+        return {
+            "maximized": False,
+            "restored": False,
+            "verified": False,
+            "window_identified": True,
+            "already_in_target_state": False,
+            "error": f"Error capturando estado de ventana de {target}: {exc}",
+        }
+
+    if snapshot is None:
+        return {
+            "maximized": False,
+            "restored": False,
+            "verified": False,
+            "window_identified": True,
+            "already_in_target_state": False,
+            "error": f"No se pudo capturar el estado de la ventana de {target}",
+        }
+
+    # SW_SHOWMAXIMIZED = 3 (ventana maximizada); cualquier otro valor (1=normal) no lo esta
+    is_maximized = int(snapshot.show_cmd) == 3
+    want_maximized = bool(maximize)
+
+    already_in_target_state = (is_maximized == want_maximized)
+    if already_in_target_state:
+        return {
+            "maximized": is_maximized,
+            "restored": not is_maximized,
+            "verified": True,
+            "window_identified": True,
+            "already_in_target_state": True,
+            "error": None,
+        }
+
+    # Ejecutar la operacion solicitada
+    if want_maximized:
+        maximize_window = getattr(calibration_manager, "_maximize_window", None)
+        if not callable(maximize_window):
+            return {
+                "maximized": False,
+                "restored": False,
+                "verified": False,
+                "window_identified": True,
+                "already_in_target_state": False,
+                "error": "CalibrationManager no permite maximizar ventanas",
+            }
+        try:
+            success = bool(maximize_window(hwnd))
+        except Exception as exc:
+            return {
+                "maximized": False,
+                "restored": False,
+                "verified": False,
+                "window_identified": True,
+                "already_in_target_state": False,
+                "error": f"Error maximizando {target}: {exc}",
+            }
+        if not success:
+            return {
+                "maximized": False,
+                "restored": False,
+                "verified": False,
+                "window_identified": True,
+                "already_in_target_state": False,
+                "error": f"No se pudo maximizar la ventana de {target}",
+            }
+    else:
+        # Restaurar: usar SW_RESTORE para volver al tamano normal desde maximizada
+        try:
+            success = bool(
+                USER32.ShowWindow(wintypes.HWND(hwnd), int(SW_RESTORE))
+            )
+        except Exception as exc:
+            return {
+                "maximized": False,
+                "restored": False,
+                "verified": False,
+                "window_identified": True,
+                "already_in_target_state": False,
+                "error": f"Error restaurando {target}: {exc}",
+            }
+        if not success:
+            return {
+                "maximized": False,
+                "restored": False,
+                "verified": False,
+                "window_identified": True,
+                "already_in_target_state": False,
+                "error": f"No se pudo restaurar la ventana de {target}",
+            }
+
+    # Pequeña pausa para que el SO aplique el cambio de estado
+    time.sleep(0.5)
+
+    # Verificar estado final
+    try:
+        final_snapshot = capture_state(hwnd)
+    except Exception as exc:
+        return {
+            "maximized": want_maximized,
+            "restored": not want_maximized,
+            "verified": False,
+            "window_identified": True,
+            "already_in_target_state": False,
+            "error": f"Operacion ejecutada pero no se pudo verificar estado final: {exc}",
+        }
+
+    if final_snapshot is None:
+        return {
+            "maximized": want_maximized,
+            "restored": not want_maximized,
+            "verified": False,
+            "window_identified": True,
+            "already_in_target_state": False,
+            "error": "Operacion ejecutada pero no se pudo capturar el estado final",
+        }
+
+    final_is_maximized = int(final_snapshot.show_cmd) == 3
+    verified = (final_is_maximized == want_maximized)
+
+    return {
+        "maximized": bool(want_maximized and final_is_maximized),
+        "restored": bool(not want_maximized and not final_is_maximized),
+        "verified": verified,
+        "window_identified": True,
+        "already_in_target_state": False,
+        "error": None if verified else f"El estado final no coincide con el solicitado para {target}",
     }

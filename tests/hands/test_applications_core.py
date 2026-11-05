@@ -21,6 +21,7 @@ from src.hands.applications_core import (
     get_available_commands,
     get_application_knowledge,
     get_applications_by_capability,
+    move_application_to_monitor,
     navigate_to_url,
     open_application,
     register_custom_application,
@@ -29,6 +30,7 @@ from src.hands.applications_core import (
     _check_application_available,
     _check_application_login,
     verify_target_monitor,
+    maximize_or_restore_application,
 )
 
 
@@ -1204,4 +1206,249 @@ class TestVerifyTargetMonitor:
         registry = get_action_registry()
         actions = registry.list_actions()
         assert "verify_target_monitor" in actions
+
+
+class TestMoveApplicationToMonitor:
+    """move_application_to_monitor: movimiento seguro con verificacion."""
+
+    def _make_monitor(self, monitor_id: int, left: int = 0, top: int = 0,
+                      width: int = 1920, height: int = 1080,
+                      is_primary: bool = True) -> MagicMock:
+        monitor = MagicMock()
+        monitor.monitor_id = monitor_id
+        monitor.handle = monitor_id
+        monitor.left = left
+        monitor.top = top
+        monitor.right = left + width
+        monitor.bottom = top + height
+        monitor.width = width
+        monitor.height = height
+        monitor.is_primary = is_primary
+        monitor.scale_factor = 1.0
+        monitor.index = monitor_id - 1
+        monitor.name = f"Monitor {monitor_id}"
+        monitor.dpi = 96
+        monitor.device_name = f"\\\\.\\DISPLAY{monitor_id}"
+        monitor.scaled_width = width
+        monitor.scaled_height = height
+        monitor.coordinate_system = "native_pixels"
+        monitor.to_dict.return_value = {
+            "id": monitor_id,
+            "handle": monitor_id,
+            "left": left,
+            "top": top,
+            "right": left + width,
+            "bottom": top + height,
+            "width": width,
+            "height": height,
+            "center_x": left + width // 2,
+            "center_y": top + height // 2,
+            "is_primary": is_primary,
+            "scale_factor": 1.0,
+            "index": monitor_id - 1,
+            "monitor_id": monitor_id,
+            "name": f"Monitor {monitor_id}",
+            "dpi": 96,
+            "device_name": f"\\\\.\\DISPLAY{monitor_id}",
+            "scaled_width": width,
+            "scaled_height": height,
+            "coordinate_system": "native_pixels",
+        }
+        return monitor
+
+    def _make_screen_manager(self, target_monitor):
+        mock_sm = MagicMock()
+        mock_sm.get_monitor.return_value = target_monitor
+        mock_sm.refresh_monitors = MagicMock(return_value=True)
+        mock_sm.get_monitor_for_window.return_value = target_monitor
+        return mock_sm
+
+    def test_safe_move_success_and_verified(self):
+        target = self._make_monitor(2, left=1920)
+        window = MagicMock(name="window")
+        mock_sm = self._make_screen_manager(target)
+        mock_cm = MagicMock()
+        mock_cm._find_existing_application_window.return_value = window
+        mock_cm.move_window_to_monitor.return_value = True
+        with patch("src.hands.applications_core.get_screen_manager", return_value=mock_sm), \
+             patch("src.hands.applications_core.get_calibration_manager", return_value=mock_cm):
+            result = move_application_to_monitor("Chrome", 2)
+        assert result["moved"] is True
+        assert result["verified"] is True
+        assert result["window_identified"] is True
+        assert result["error"] is None
+        assert result["monitor"]["monitor_id"] == 2
+        mock_cm._find_existing_application_window.assert_called_once_with("Chrome")
+        mock_cm.move_window_to_monitor.assert_called_once_with(window, 2, "Chrome")
+        mock_sm.get_monitor_for_window.assert_called()
+
+    def test_invalid_monitor_fails_without_moving(self):
+        mock_cm = MagicMock()
+        mock_sm = MagicMock()
+        mock_sm.get_monitor.return_value = None
+        mock_sm.refresh_monitors = MagicMock(return_value=True)
+        with patch("src.hands.applications_core.get_screen_manager", return_value=mock_sm), \
+             patch("src.hands.applications_core.get_calibration_manager", return_value=mock_cm):
+            result = move_application_to_monitor("Chrome", 99)
+        assert result["moved"] is False
+        assert result["verified"] is False
+        assert result["window_identified"] is False
+        assert result["error"]
+        mock_cm._find_existing_application_window.assert_not_called()
+        mock_cm.move_window_to_monitor.assert_not_called()
+
+    def test_window_not_identified_fails_safely(self):
+        target = self._make_monitor(1)
+        mock_sm = self._make_screen_manager(target)
+        mock_cm = MagicMock()
+        mock_cm._find_existing_application_window.return_value = None
+        with patch("src.hands.applications_core.get_screen_manager", return_value=mock_sm), \
+             patch("src.hands.applications_core.get_calibration_manager", return_value=mock_cm):
+            result = move_application_to_monitor("Chrome", 1)
+        assert result["moved"] is False
+        assert result["verified"] is False
+        assert result["window_identified"] is False
+        assert "ventana" in (result["error"] or "").lower()
+        mock_cm.move_window_to_monitor.assert_not_called()
+
+    def test_move_failure_is_reported(self):
+        target = self._make_monitor(1)
+        window = MagicMock(name="window")
+        mock_sm = self._make_screen_manager(target)
+        mock_cm = MagicMock()
+        mock_cm._find_existing_application_window.return_value = window
+        mock_cm.move_window_to_monitor.return_value = False
+        with patch("src.hands.applications_core.get_screen_manager", return_value=mock_sm), \
+             patch("src.hands.applications_core.get_calibration_manager", return_value=mock_cm):
+            result = move_application_to_monitor("Chrome", 1)
+        assert result["moved"] is False
+        assert result["verified"] is False
+        assert result["window_identified"] is True
+        assert result["error"]
+
+    def test_post_move_verification_detects_wrong_monitor(self):
+        target = self._make_monitor(2, left=1920)
+        wrong_monitor = self._make_monitor(1, left=0)
+        window = MagicMock(name="window")
+        mock_sm = self._make_screen_manager(target)
+        mock_sm.get_monitor_for_window.return_value = wrong_monitor
+        mock_cm = MagicMock()
+        mock_cm._find_existing_application_window.return_value = window
+        mock_cm.move_window_to_monitor.return_value = True
+        with patch("src.hands.applications_core.get_screen_manager", return_value=mock_sm), \
+             patch("src.hands.applications_core.get_calibration_manager", return_value=mock_cm):
+            result = move_application_to_monitor("Chrome", 2)
+        assert result["moved"] is True
+        assert result["verified"] is False
+        assert result["window_identified"] is True
+
+    def test_empty_app_name_raises(self):
+        with pytest.raises(ValueError, match="vacio|vacío"):
+            move_application_to_monitor("", 1)
+
+    def test_move_application_to_monitor_is_registered_action(self):
+        from src.hands.applications_core import get_action_registry
+        registry = get_action_registry()
+        actions = registry.list_actions()
+        assert "move_application_to_monitor" in actions
+
+
+class TestMaximizeOrRestoreApplication:
+    """maximize_or_restore_application: maximizacion/restauracion con verificacion."""
+
+    def _make_snapshot(self, show_cmd: int = 1) -> MagicMock:
+        snapshot = MagicMock()
+        snapshot.show_cmd = show_cmd
+        return snapshot
+
+    def _make_screen_manager(self):
+        mock_sm = MagicMock()
+        mock_sm.refresh_monitors = MagicMock(return_value=True)
+        return mock_sm
+
+    def _make_calibration_manager(self, window, snapshots, hwnd=12345):
+        mock_cm = MagicMock()
+        mock_cm._find_existing_application_window.return_value = window
+        mock_cm._get_window_handle.return_value = hwnd
+        mock_cm._capture_window_state.side_effect = snapshots
+        mock_cm._maximize_window.return_value = True
+        return mock_cm
+
+    def test_maximize_not_maximized_success_and_verified(self):
+        window = MagicMock(name="window")
+        before = self._make_snapshot(show_cmd=1)  # no maximizada
+        after = self._make_snapshot(show_cmd=3)  # tras maximizar
+        mock_cm = self._make_calibration_manager(window, [before, after])
+        mock_sm = self._make_screen_manager()
+        with patch("src.hands.applications_core.get_screen_manager", return_value=mock_sm), \
+             patch("src.hands.applications_core.get_calibration_manager", return_value=mock_cm):
+            result = maximize_or_restore_application("Chrome", maximize=True)
+        assert result["window_identified"] is True
+        assert result["already_in_target_state"] is False
+        mock_cm._maximize_window.assert_called_once()
+        assert result["maximized"] is True
+        assert result["restored"] is False
+        assert result["verified"] is True
+
+    def test_restore_when_maximized_success_and_verified(self):
+        window = MagicMock(name="window")
+        before = self._make_snapshot(show_cmd=3)  # maximizada
+        after = self._make_snapshot(show_cmd=1)  # tras restaurar
+        mock_cm = self._make_calibration_manager(window, [before, after])
+        mock_sm = self._make_screen_manager()
+        with patch("src.hands.applications_core.get_screen_manager", return_value=mock_sm), \
+             patch("src.hands.applications_core.get_calibration_manager", return_value=mock_cm), \
+             patch("src.hands.applications_core.USER32.ShowWindow", return_value=True):
+            result = maximize_or_restore_application("Chrome", maximize=False)
+        assert result["window_identified"] is True
+        assert result["already_in_target_state"] is False
+        assert result["restored"] is True
+        assert result["maximized"] is False
+        assert result["verified"] is True
+
+    def test_already_maximized_no_change(self):
+        window = MagicMock(name="window")
+        snapshot = self._make_snapshot(show_cmd=3)  # ya maximizada
+        mock_cm = self._make_calibration_manager(window, [snapshot])
+        mock_sm = self._make_screen_manager()
+        with patch("src.hands.applications_core.get_screen_manager", return_value=mock_sm), \
+             patch("src.hands.applications_core.get_calibration_manager", return_value=mock_cm):
+            result = maximize_or_restore_application("Chrome", maximize=True)
+        assert result["already_in_target_state"] is True
+        assert result["verified"] is True
+        assert result["error"] is None
+        mock_cm._maximize_window.assert_not_called()
+
+    def test_already_restored_no_change(self):
+        window = MagicMock(name="window")
+        snapshot = self._make_snapshot(show_cmd=1)  # ya restaurada
+        mock_cm = self._make_calibration_manager(window, [snapshot])
+        mock_sm = self._make_screen_manager()
+        with patch("src.hands.applications_core.get_screen_manager", return_value=mock_sm), \
+             patch("src.hands.applications_core.get_calibration_manager", return_value=mock_cm):
+            result = maximize_or_restore_application("Chrome", maximize=False)
+        assert result["already_in_target_state"] is True
+        assert result["verified"] is True
+        assert result["error"] is None
+        mock_cm._maximize_window.assert_not_called()
+
+    def test_empty_app_name_raises(self):
+        with pytest.raises(ValueError, match="vacio|vacío"):
+            maximize_or_restore_application("", maximize=True)
+
+    def test_window_not_identified_fails_safely(self):
+        mock_cm = MagicMock()
+        mock_cm._find_existing_application_window.return_value = None
+        mock_sm = self._make_screen_manager()
+        with patch("src.hands.applications_core.get_screen_manager", return_value=mock_sm), \
+             patch("src.hands.applications_core.get_calibration_manager", return_value=mock_cm):
+            result = maximize_or_restore_application("Chrome", maximize=True)
+        assert result["window_identified"] is False
+        assert result["error"]
+
+    def test_maximize_or_restore_application_is_registered_action(self):
+        from src.hands.applications_core import get_action_registry
+        registry = get_action_registry()
+        actions = registry.list_actions()
+        assert "maximize_or_restore_application" in actions
 

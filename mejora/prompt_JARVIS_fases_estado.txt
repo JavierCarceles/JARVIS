@@ -629,59 +629,7 @@ FASE 3 ? APPLICATION KNOWLEDGE
 3.2.3 ? Errores
 3.2.3.1 Definir resultado ante JSON invalido.
 3.2.3.2 Definir resultado ante aplicacion invalida. [IMPLEMENTADA]
-  REGISTRO 3.2.3.2 (cerrada):
-  - Implementacion: se envolvio Entity.from_dict() en try/except per-item
-    en get_entities_by_type(), get_entity() y find_entities() en
-    src/memory/storage.py. Una entity incompleta (falta id/type/name/
-    properties) se omite individualmente con registro de error; las entities
-    validas del mismo tipo/query se conservan.
-  - get_entity(): devuelve None en lugar de propagar TypeError.
-  - Tests actualizados en tests/hands/test_application_data_incomplete.py:
-    48 tests, todos PASSED. Tambien 2000 tests en tests/hands/ y 103 en
-    tests/brain/ PASSED sin regresiones.
-  - La entidad "bad_app" (falta name) en data/entities.json es omitida
-    per-item; las applications validas (chrome, spotify, good) se cargan.
 3.2.3.3 Registrar errores sin ocultarlos. [IMPLEMENTADA]
-  REGISTRO 3.2.3.3 (cerrada):
-  - Bug critical corregido en src/utils/logger.py (_print_log): el level_map
-    usaba claves en mayusculas ("WARNING", "ERROR") pero los llamadores pasaban
-    niveles en minusculas ("warning", "error"). level_map.get("warning") caia
-    en el default logging.INFO, ocultando la gravedad real de los errores.
-    Se cambio a level_map.get(level.upper(), logging.INFO) en ambas definiciones
-    de _print_log (la segunda, activa, es la que importa).
-  - src/memory/storage.py: todos los handlers de except ahora registran el
-    detalle de la excepcion (str(e)) y usan el nivel correcto:
-    -- JSONStorage.load() JSONDecodeError: WARNING (ya era "warning", ahora
-      funciona gracias al fix de level_map). Mensaje incluye file_path y memory_type.
-    -- JSONStorage.load() Exception general: ERROR. Mensaje incluye file_path y e.
-    -- JSONStorage.save() Exception: ERROR. Mensaje incluye file_path, memory_type y e.
-    -- _warm_cache() Exception: cambiado de "info" a "error". Mensaje incluye e.
-    -- get_entity() per-item TypeError: WARNING (antes "info"). Mensaje incluye
-      entity_id y exc.
-    -- get_entities_by_type() per-item TypeError: WARNING (antes "info"). Mensaje
-      incluye entity id y exc. Broad Exception: ERROR (antes usaba traceback.print_exc()
-      y mensaje generico "Procesando solicitud"). Mensaje incluye e.
-    -- find_entities() per-item TypeError: WARNING (antes "info"). Mensaje incluye
-      entity id y exc.
-    -- find_entities_by_property() per-item TypeError: WARNING (antes "info"). Mensaje
-      incluye entity id y exc.
-    -- save_entity() Exception: cambiado de "info" a "error". Mensaje incluye e.
-    -- export_memory() exito: reemplazado mensaje generico "Procesando solicitud"
-      con "Operacion completada en export_memory" a nivel "info".
-    -- Todos los metodos de MemoryManager con except Exception: ERROR con e incluido
-      (add_conversational_memory, get_conversational_memory, save_world_state,
-      get_world_state, update_world_state, save_plan, get_plan, save_execution_record,
-      update_learning_stats, get_learning_stats, clear_memory, get_memory_stats,
-      save_user_preference, get_user_preference, get_user_preferences,
-      update_user_preference, learn_user_preference, save_entity_attribute,
-      get_entity_attribute, get_entity_attributes, update_entity_attribute,
-      get_entities_by_attribute, resolve_entity_to_url, get_entity_attributes,
-      create_goal_from_entity, verify_entity_integrity).
-  - Ningun mensaje de error contiene el texto generico "Procesando solicitud".
-  - Tests anadidos en tests/hands/test_application_data_incomplete.py (clase
-    TestErrorLoggingDuringLoad): 10 tests verificando niveles de log correctos,
-    inclusion de detalles de excepcion, y ausencia de mensajes genericos.
-    10/10 PASSED. Suite completa tests/hands/ (2010 tests) PASSED sin regresiones.
 3.2.3.4 Anadir tests unitarios de carga correcta e incorrecta. [IMPLEMENTADA]
 3.2.4 ? Cierre
 3.2.4.1 Verificar registro real en memoria. [IMPLEMENTADA]
@@ -757,18 +705,6 @@ FASE 3 ? APPLICATION KNOWLEDGE
 3.6.3.3 Registrar fallos reales.
 3.6.4 ? Aplicacion/monitor
 3.6.4.1 Verificar monitor objetivo.
-REGISTRO DE UNIDAD: 3.6.4.1
-FECHA: NR
-OBJETIVO: Verificar que un monitor objetivo exista y sea valido antes de cualquier operacion de aplicacion que lo utilice, exponiendo una funcion pública verify_target_monitor(monitor_num) en applications_core.py registrada como accion, sin mover ni alterar ventanas.
-TIPO DE TRABAJO: IMPLEMENTACION | TEST | VERIFICACION
-CAMBIOS / HALLAZGOS: Agregada importacion de get_screen_manager en src/hands/applications_core.py. Agregada funcion verify_target_monitor(monitor_num) con decorador @register_action (name="verify_target_monitor", action_type=APPLICATION, categoria="aplicacion", efectos=["monitor_verified"], planner_enabled=True). La funcion refresca monitores via ScreenManager, valida el numero de monitor con get_monitor(), retorna dict {verified, monitor, error} y lanza ValueError para numeros invalidos (<1 o no entero).
-ARCHIVOS MODIFICADOS: PRODUCCION: `src/hands/applications_core.py`; TESTS: `tests/hands/test_applications_core.py`; DOCUMENTACION: `README.md` (tabla de funciones de applications_core.py).
-TESTS Y RESULTADOS: UNITARIOS: PASSED/129/129 (incluyendo 5 tests nuevos de TestVerifyTargetMonitor: valido, invalido, inexistente, excepcion, registro de accion); INTEGRACION: NA; NO REGRESION: suite completa test_applications_core.py PASSED sin regresiones.
-VERIFICACION: SINTAXIS: OK; MAIN.PY: NE; COMPORTAMIENTO / INTEGRACION REAL: verificado mediante tests unitarios con mock de get_screen_manager.
-DISCREPANCIAS: NINGUNA
-PENDIENTES: NINGUNO
-ESTADO FINAL: 3.6.4.1 - IMPLEMENTADA
-
 3.6.4.2 Verificar movimiento seguro.
 3.6.4.3 Verificar maximizacion/restauracion cuando corresponda.
 3.6.5 ? Tests
@@ -2668,17 +2604,6 @@ Nunca resetear version ni depender del chat anterior.
 
 ### NOTA GENERAL: REGLA FINAL
 La IA debe pensar y resolver; el prompt solo fija limites y continuidad. No sustituir razonamiento por listas. No inventar trabajo para tener algo que hacer. No afirmar que algo funciona porque este escrito en README o en un prompt: verificarlo cuando sea relevante.
-
-### FRAGMENTO HISTORICO SIN FORMATO CANONICO (2.8.8.9.11.1)
-REGISTRO 2.8.8.9.11.1:
-- RESULTADO: implementado (inspeccion pura, sin cambios de codigo).
-- HALLAZGO: NO existe mecanismo dedicado de olvido/expiration en el motor. Existe `remove_adaptation_rule(rule_id)` (eliminacion manual por id, persistida) y truncamiento por limite de tamano: `adaptation_history` (1000), feedback records (1000), learning results (500), snapshots (1000 config max_context_snapshots), patrones/entries (50), summary (100), knowledge transfers (200), etc. No hay expiracion por edad ni eviction automatica basada en utilidad/valor. No se inventa mecanismo nuevo; esta hoja solo localiza.
-- ARCHIVOS: solo lectura de src/utils/contextual_adaptation_engine.py.
-- TESTS: no aplican (sin cambios de codigo).
-- SIGUIENTE: 2.8.8.9.11.2 - definir politica de olvido (sin codigo, solo decision).
-"""
-filePath: c:\Users\FO TARDA\Documents\VSC_JC\JARVIS\data\temp\reg.txt
-ESTADO FINAL: 2.8.11.2.2 - IMPLEMENTADA
 
 --- INICIO DE LOS REGISTROS CANONICOS DE UNIDAD ---
 ## REGISTROS DETALLADOS DE UNIDAD — HISTORIAL CANONICO
@@ -6410,3 +6335,115 @@ VERIFICACION: SINTAXIS: OK (src/hands/executor.py y tests/hands/test_executor.py
 DISCREPANCIAS: Ninguna nueva. Se mantiene documentada la discrepancia heredada de 3.6.3.1 (launch_application soporta arguments; la accion open_application registrada no los recibe ni los pasa al ejecutable).
 PENDIENTES: 3.6.4.1 Verificar monitor objetivo (siguiente hoja pendiente de 3.6.4 Aplicacion/monitor).
 ESTADO FINAL: 3.6.3.3 - IMPLEMENTADA
+
+## FRAGMENTO HISTORICO NO CANONICO — ARCHIVO
+Se conserva el fragmento original de 2.8.8.9.11.1 sin convertirlo en registro canonico ni inferir un cierre adicional.
+### FRAGMENTO HISTORICO SIN FORMATO CANONICO (2.8.8.9.11.1)
+REGISTRO 2.8.8.9.11.1:
+- RESULTADO: implementado (inspeccion pura, sin cambios de codigo).
+- HALLAZGO: NO existe mecanismo dedicado de olvido/expiration en el motor. Existe `remove_adaptation_rule(rule_id)` (eliminacion manual por id, persistida) y truncamiento por limite de tamano: `adaptation_history` (1000), feedback records (1000), learning results (500), snapshots (1000 config max_context_snapshots), patrones/entries (50), summary (100), knowledge transfers (200), etc. No hay expiracion por edad ni eviction automatica basada en utilidad/valor. No se inventa mecanismo nuevo; esta hoja solo localiza.
+- ARCHIVOS: solo lectura de src/utils/contextual_adaptation_engine.py.
+- TESTS: no aplican (sin cambios de codigo).
+- SIGUIENTE: 2.8.8.9.11.2 - definir politica de olvido (sin codigo, solo decision).
+"""
+filePath: c:\Users\FO TARDA\Documents\VSC_JC\JARVIS\data\temp\reg.txt
+ESTADO FINAL: 2.8.11.2.2 - IMPLEMENTADA
+
+
+
+## REGISTROS REUBICADOS DESDE EL INTERIOR DEL ROADMAP
+Estos registros estaban insertados entre unidades de la enumeracion. Se trasladan aqui sin alterar sus hallazgos, resultados ni estados. Las unidades del roadmap conservan unicamente sus entradas breves y marcadores.
+
+  REGISTRO 3.2.3.2 (cerrada):
+  - Implementacion: se envolvio Entity.from_dict() en try/except per-item
+    en get_entities_by_type(), get_entity() y find_entities() en
+    src/memory/storage.py. Una entity incompleta (falta id/type/name/
+    properties) se omite individualmente con registro de error; las entities
+    validas del mismo tipo/query se conservan.
+  - get_entity(): devuelve None en lugar de propagar TypeError.
+  - Tests actualizados en tests/hands/test_application_data_incomplete.py:
+    48 tests, todos PASSED. Tambien 2000 tests en tests/hands/ y 103 en
+    tests/brain/ PASSED sin regresiones.
+  - La entidad "bad_app" (falta name) en data/entities.json es omitida
+    per-item; las applications validas (chrome, spotify, good) se cargan.
+
+
+  REGISTRO 3.2.3.3 (cerrada):
+  - Bug critical corregido en src/utils/logger.py (_print_log): el level_map
+    usaba claves en mayusculas ("WARNING", "ERROR") pero los llamadores pasaban
+    niveles en minusculas ("warning", "error"). level_map.get("warning") caia
+    en el default logging.INFO, ocultando la gravedad real de los errores.
+    Se cambio a level_map.get(level.upper(), logging.INFO) en ambas definiciones
+    de _print_log (la segunda, activa, es la que importa).
+  - src/memory/storage.py: todos los handlers de except ahora registran el
+    detalle de la excepcion (str(e)) y usan el nivel correcto:
+    -- JSONStorage.load() JSONDecodeError: WARNING (ya era "warning", ahora
+      funciona gracias al fix de level_map). Mensaje incluye file_path y memory_type.
+    -- JSONStorage.load() Exception general: ERROR. Mensaje incluye file_path y e.
+    -- JSONStorage.save() Exception: ERROR. Mensaje incluye file_path, memory_type y e.
+    -- _warm_cache() Exception: cambiado de "info" a "error". Mensaje incluye e.
+    -- get_entity() per-item TypeError: WARNING (antes "info"). Mensaje incluye
+      entity_id y exc.
+    -- get_entities_by_type() per-item TypeError: WARNING (antes "info"). Mensaje
+      incluye entity id y exc. Broad Exception: ERROR (antes usaba traceback.print_exc()
+      y mensaje generico "Procesando solicitud"). Mensaje incluye e.
+    -- find_entities() per-item TypeError: WARNING (antes "info"). Mensaje incluye
+      entity id y exc.
+    -- find_entities_by_property() per-item TypeError: WARNING (antes "info"). Mensaje
+      incluye entity id y exc.
+    -- save_entity() Exception: cambiado de "info" a "error". Mensaje incluye e.
+    -- export_memory() exito: reemplazado mensaje generico "Procesando solicitud"
+      con "Operacion completada en export_memory" a nivel "info".
+    -- Todos los metodos de MemoryManager con except Exception: ERROR con e incluido
+      (add_conversational_memory, get_conversational_memory, save_world_state,
+      get_world_state, update_world_state, save_plan, get_plan, save_execution_record,
+      update_learning_stats, get_learning_stats, clear_memory, get_memory_stats,
+      save_user_preference, get_user_preference, get_user_preferences,
+      update_user_preference, learn_user_preference, save_entity_attribute,
+      get_entity_attribute, get_entity_attributes, update_entity_attribute,
+      get_entities_by_attribute, resolve_entity_to_url, get_entity_attributes,
+      create_goal_from_entity, verify_entity_integrity).
+  - Ningun mensaje de error contiene el texto generico "Procesando solicitud".
+  - Tests anadidos en tests/hands/test_application_data_incomplete.py (clase
+    TestErrorLoggingDuringLoad): 10 tests verificando niveles de log correctos,
+    inclusion de detalles de excepcion, y ausencia de mensajes genericos.
+    10/10 PASSED. Suite completa tests/hands/ (2010 tests) PASSED sin regresiones.
+
+
+REGISTRO DE UNIDAD: 3.6.4.1
+FECHA: NR
+OBJETIVO: Verificar que un monitor objetivo exista y sea valido antes de cualquier operacion de aplicacion que lo utilice, exponiendo una funcion pública verify_target_monitor(monitor_num) en applications_core.py registrada como accion, sin mover ni alterar ventanas.
+TIPO DE TRABAJO: IMPLEMENTACION | TEST | VERIFICACION
+CAMBIOS / HALLAZGOS: Agregada importacion de get_screen_manager en src/hands/applications_core.py. Agregada funcion verify_target_monitor(monitor_num) con decorador @register_action (name="verify_target_monitor", action_type=APPLICATION, categoria="aplicacion", efectos=["monitor_verified"], planner_enabled=True). La funcion refresca monitores via ScreenManager, valida el numero de monitor con get_monitor(), retorna dict {verified, monitor, error} y lanza ValueError para numeros invalidos (<1 o no entero).
+ARCHIVOS MODIFICADOS: PRODUCCION: `src/hands/applications_core.py`; TESTS: `tests/hands/test_applications_core.py`; DOCUMENTACION: `README.md` (tabla de funciones de applications_core.py).
+TESTS Y RESULTADOS: UNITARIOS: PASSED/129/129 (incluyendo 5 tests nuevos de TestVerifyTargetMonitor: valido, invalido, inexistente, excepcion, registro de accion); INTEGRACION: NA; NO REGRESION: suite completa test_applications_core.py PASSED sin regresiones.
+VERIFICACION: SINTAXIS: OK; MAIN.PY: NE; COMPORTAMIENTO / INTEGRACION REAL: verificado mediante tests unitarios con mock de get_screen_manager.
+DISCREPANCIAS: NINGUNA
+PENDIENTES: NINGUNO
+ESTADO FINAL: 3.6.4.1 - IMPLEMENTADA
+
+
+REGISTRO DE UNIDAD: 3.6.4.2
+FECHA: NR
+OBJETIVO: Verificar el movimiento seguro de una aplicacion a un monitor objetivo, identificando la ventana correcta, delegando el movimiento con comprobaciones de seguridad y verificando el monitor final sin mover ventanas a ciegas.
+TIPO DE TRABAJO: IMPLEMENTACION | TEST | VERIFICACION
+CAMBIOS / HALLAZGOS: Agregada la accion `move_application_to_monitor(app_name, monitor_num)` en `src/hands/applications_core.py` (registrada en ActionRegistry, categoria aplicacion, efectos `application_moved_to_monitor`, planner_enabled). El flujo valida monitor via `verify_target_monitor`, identifica la ventana con `CalibrationManager._find_existing_application_window`, ejecuta movimiento seguro con `CalibrationManager.move_window_to_monitor` (identidad GUI, no elevada, posicion/monitor verificados internamente) y verifica el monitor final con `ScreenManager.get_monitor_for_window`. Retorna `{moved, verified, monitor, window_identified, error}` y falla seguro ante monitor invalido, ventana no identificada, errores de dependencias o verificacion fallida.
+ARCHIVOS MODIFICADOS: PRODUCCION: `src/hands/applications_core.py`; TESTS: `tests/hands/test_applications_core.py`; DOCUMENTACION: `README.md` (tabla de funciones de `applications_core.py`).
+TESTS Y RESULTADOS: UNITARIOS: PASSED/136/136 en `tests/hands/test_applications_core.py` (incluye 7 tests nuevos de `TestMoveApplicationToMonitor`: exito verificado; monitor invalido sin movimiento; ventana no identificada; fallo de movimiento; verificacion post-movimiento detecta monitor incorrecto; nombre vacio; registro de accion). INTEGRACION: NE/NA. NO REGRESION: suite completa de `test_applications_core.py` PASSED sin regresiones.
+VERIFICACION: SINTAXIS: OK (`py_compile src/hands/applications_core.py`); MAIN.PY: NE; COMPORTAMIENTO / INTEGRACION REAL: verificado mediante tests unitarios con mocks de `get_screen_manager`/`get_calibration_manager` y verificacion de llamadas (no se invoca movimiento ante monitor invalido o ventana no identificada). NV movimiento real de ventanas del SO en este entorno.
+DISCREPANCIAS: NINGUNA
+PENDIENTES: NINGUNO
+ESTADO FINAL: 3.6.4.2 - IMPLEMENTADA
+
+
+REGISTRO DE UNIDAD: 3.6.4.3
+FECHA: NR
+OBJETIVO: Verificar maximizacion/restauracion de la ventana de una aplicacion cuando corresponda, exponiendo una función pública maximize_or_restore_application(app_name, maximize) en applications_core.py registrada como accion, sin mover ventanas a ciegas y verificando el estado real antes y despues.
+TIPO DE TRABAJO: IMPLEMENTACION | TEST | VERIFICACION
+CAMBIOS / HALLAZGOS: Agregada funcion `maximize_or_restore_application(app_name, maximize=True)` en `src/hands/applications_core.py` (registrada en ActionRegistry, categoria aplicacion, efectos `application_window_maximized` / `application_window_restored`, planner_enabled=True). El flujo: valida que app_name no este vacio (ValueError), identifica la ventana con `CalibrationManager._find_existing_application_window`, obtiene el HWND con `CalibrationManager._get_window_handle`, captura el estado actual con `CalibrationManager._capture_window_state` (show_cmd==3 = maximizada). Si ya está en el estado solicitado, retorna sin cambios (already_in_target_state=True). Si se solicita maximizar y no esta maximizada, llama a `CalibrationManager._maximize_window(hwnd)`. Si se solicita restaurar y esta maximizada, llama a `USER32.ShowWindow(hwnd, SW_RESTORE)`. Tras una pausa de 0.5s, captura el estado final y verifica que coincida con lo solicitado. Retorna {maximized, restored, verified, window_identified, already_in_target_state, error} y falla seguro ante errores de dependencias, ventana no identificada, o verificacion fallida.
+ARCHIVOS MODIFICADOS: PRODUCCION: `src/hands/applications_core.py` (imports ctypes, wintypes, SW_RESTORE/SW_MAXIMIZE/USER32 desde calibration_manager; nueva funcion registrada); TESTS: `tests/hands/test_applications_core.py` (clase TestMaximizeOrRestoreApplication: 7 tests); DOCUMENTACION: `README.md` (entrada en tabla de funciones de applications_core.py).
+TESTS Y RESULTADOS: UNITARIOS: PASSED/143/143 en `tests/hands/test_applications_core.py` (incluyendo 7 tests nuevos de TestMaximizeOrRestoreApplication: maximizar desde no-maximizada con verificacion; restaurar desde maximizada con verificacion; ya maximizada sin cambios; ya restaurada sin cambios; nombre vacio lanza ValueError; ventana no identificada falla seguro; registro de accion). INTEGRACION: NE/NA. NO REGRESION: suite completa de `test_applications_core.py` PASSED sin regresiones (143/143).
+VERIFICACION: SINTAXIS: OK (`py_compile src/hands/applications_core.py`); MAIN.PY: NE; COMPORTAMIENTO / INTEGRACION REAL: verificado mediante tests unitarios con mocks de `get_screen_manager`/`get_calibration_manager` y verificacion de llamadas (no se invoca maximizacion/restauracion si ya esta en el estado objetivo; no se mueven ventanas a ciegas). NV movimiento real de ventanas del SO en este entorno.
+DISCREPANCIAS: NINGUNA
+PENDIENTES: NINGUNO
+ESTADO FINAL: 3.6.4.3 - IMPLEMENTADA
