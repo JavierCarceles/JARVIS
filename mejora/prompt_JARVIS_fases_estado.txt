@@ -6497,3 +6497,21 @@ VERIFICACION: SINTAXIS: OK (`py_compile src/hands/applications_core.py` y `py_co
 DISCREPANCIAS: NINGUNA
 PENDIENTES: NINGUNO
 ESTADO FINAL: 3.6.5.4 - IMPLEMENTADA
+
+
+REGISTRO DE UNIDAD: 3.6.5.5
+FECHA: NR
+OBJETIVO: Verificar ausencia de regresion en la ejecucion de aplicaciones (abertura, cierre, lanzamiento, movimiento entre monitores) tras las unidades 3.6.5.1 a 3.6.5.4, ejecutando todas las suites de tests pertinentes en conjunto.
+TIPO DE TRABAJO: VERIFICACION | NO REGRESION | TEST
+CAMBIOS / HALLAZGOS: No se modifico codigo de produccion. Se ejecutaron las suites de tests de ejecucion de aplicaciones en conjunto:
+  - tests/hands/test_applications_core.py: 146/146 PASSED (TestOpenApplication x4, TestCloseApplication x8, TestVerifyTargetMonitor x5, TestMoveApplicationToMonitor x7, TestMaximizeOrRestoreApplication x7, etc.)
+  - tests/hands/test_calibration_manager.py: 19/19 PASSED (TestLaunchApplicationArguments x4, TestLaunchApplicationEjecucionConArgumentos x15)
+  - tests/hands/test_executor.py + tests/action_registry: 340/340 PASSED (ejecucion HTN, registro de acciones)
+  Barrido amplio tests/hands/ + tests/brain/: 2613 PASSED, 15 FAILED (todas en test_ui_elements*.py: coordinates=None, capabilities=[], atributos de mock ausentes; pre-existentes, ajenas a ejecucion de aplicaciones, no se modifico codigo).
+No hay fallos en tests de apertura, cierre, lanzamiento ni movimiento entre monitores.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: NA; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: PASSED/505/505 (aplicaciones_core 146 + calibration_manager 19 + executor/action_registry 340); INTEGRACION: NA; NO REGRESION: 0 fallos en suites de ejecucion de aplicaciones. Barrido amplio: 2613 PASSED / 15 FAILED (todas pre-existentes en test_ui_elements*.py, ajenas a 3.6.5).
+VERIFICACION: SINTAXIS: OK; MAIN.PY: NE; COMPORTAMIENTO / INTEGRACION REAL: verificado mediante tests unitarios con mocks reales. NV ejecucion real de aplicaciones del SO en este entorno.
+DISCREPANCIAS: Las 15 fallas del barrido amplio son pre-existentes y exclusivas de test_ui_elements*.py (deteccion/calibrado de elementos UI, capabilities vacias, coordenadas None), sin relacion con apertura/cierre/lanzamiento/movimiento de aplicaciones. No son regresiones de 3.6.5.
+PENDIENTES: NINGUNO
+ESTADO FINAL: 3.6.5.5 - IMPLEMENTADA
