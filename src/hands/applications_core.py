@@ -28,6 +28,7 @@ from typing import Any, Dict, List, Optional
 from src.hands.action_registry import ActionType, get_action_registry, register_action
 from src.hands.calibration_manager import get_calibration_manager
 from src.memory.storage import Entity, get_memory_manager
+from src.utils.screen_manager import get_screen_manager
 
 logger = get_logger(__name__)
 
@@ -1579,3 +1580,77 @@ def is_capability_available(app_name: str, capability: Any) -> bool:
         return False
     except Exception:
         return False
+
+
+@register_action(
+    name="verify_target_monitor",
+    description="Verifica que un monitor objetivo exista antes de operar sobre el",
+    action_type=ActionType.APPLICATION,
+    category="aplicacion",
+    tags=["aplicacion", "monitor", "verificacion", "reusable"],
+    parameters={
+        "monitor_num": {
+            "type": "int",
+            "required": True,
+            "description": "Numero de monitor a verificar (a partir de 1)",
+        }
+    },
+    preconditions=[],
+    effects=["monitor_verified"],
+    cost=2.0,
+    capability="verify_target_monitor",
+    planner_enabled=True,
+)
+def verify_target_monitor(monitor_num: int) -> Dict[str, Any]:
+    """
+    Verifica que un monitor objetivo exista y sea valido antes de cualquier
+    operacion de aplicacion que lo utilice.
+
+    Refresca la topologia de monitores desde Windows (o fallback de config)
+    y valida que el numero de monitor solicitado corresponda a un monitor
+    real detectado. No mueve ni altera ninguna ventana.
+
+    Args:
+        monitor_num: Numero de monitor a verificar (a partir de 1).
+
+    Returns:
+        Dict con claves: verified (bool), monitor (dict o None),
+        error (str o None).
+
+    Raises:
+        ValueError: Si monitor_num no es un entero positivo.
+    """
+    try:
+        monitor_num = int(monitor_num)
+    except (TypeError, ValueError):
+        raise ValueError(f"Numero de monitor invalido: {monitor_num!r}")
+
+    if monitor_num < 1:
+        raise ValueError(f"Numero de monitor invalido: {monitor_num} (debe ser >= 1)")
+
+    try:
+        screen_manager = get_screen_manager()
+        refresh = getattr(screen_manager, "refresh_monitors", None)
+        if callable(refresh):
+            refresh()
+
+        monitor = screen_manager.get_monitor(monitor_num)
+    except Exception as exc:
+        return {
+            "verified": False,
+            "monitor": None,
+            "error": f"Error verificando monitor {monitor_num}: {exc}",
+        }
+
+    if monitor is None:
+        return {
+            "verified": False,
+            "monitor": None,
+            "error": f"Monitor {monitor_num} no encontrado",
+        }
+
+    return {
+        "verified": True,
+        "monitor": monitor.to_dict(),
+        "error": None,
+    }

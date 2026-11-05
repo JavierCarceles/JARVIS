@@ -28,6 +28,7 @@ from src.hands.applications_core import (
     get_application_manager,
     _check_application_available,
     _check_application_login,
+    verify_target_monitor,
 )
 
 
@@ -1104,4 +1105,103 @@ class TestCallCalibrateAllApplications:
         manager.calibrate_all_applications = mock_method
         result = _call_calibrate_all_applications(manager, force=True)
         assert result == {"called": True}
+
+
+class TestVerifyTargetMonitor:
+    """verify_target_monitor: validacion de monitor objetivo antes de operar."""
+
+    def _make_monitor(self, monitor_id: int, left: int = 0, top: int = 0,
+                      width: int = 1920, height: int = 1080,
+                      is_primary: bool = True) -> MagicMock:
+        monitor = MagicMock()
+        monitor.monitor_id = monitor_id
+        monitor.handle = monitor_id
+        monitor.left = left
+        monitor.top = top
+        monitor.right = left + width
+        monitor.bottom = top + height
+        monitor.width = width
+        monitor.height = height
+        monitor.is_primary = is_primary
+        monitor.scale_factor = 1.0
+        monitor.index = monitor_id - 1
+        monitor.name = f"Monitor {monitor_id}"
+        monitor.dpi = 96
+        monitor.device_name = f"\\\\.\\DISPLAY{monitor_id}"
+        monitor.scaled_width = width
+        monitor.scaled_height = height
+        monitor.coordinate_system = "native_pixels"
+        monitor.to_dict.return_value = {
+            "id": monitor_id,
+            "handle": monitor_id,
+            "left": left,
+            "top": top,
+            "right": left + width,
+            "bottom": top + height,
+            "width": width,
+            "height": height,
+            "center_x": left + width // 2,
+            "center_y": top + height // 2,
+            "is_primary": is_primary,
+            "scale_factor": 1.0,
+            "index": monitor_id - 1,
+            "monitor_id": monitor_id,
+            "name": f"Monitor {monitor_id}",
+            "dpi": 96,
+            "device_name": f"\\\\.\\DISPLAY{monitor_id}",
+            "scaled_width": width,
+            "scaled_height": height,
+            "coordinate_system": "native_pixels",
+        }
+        return monitor
+
+    def test_valid_monitor_verified_true(self):
+        mock_monitor = self._make_monitor(1)
+        mock_sm = MagicMock()
+        mock_sm.get_monitor.return_value = mock_monitor
+        refresh = MagicMock(return_value=True)
+        mock_sm.refresh_monitors = refresh
+        with patch("src.hands.applications_core.get_screen_manager", return_value=mock_sm):
+            result = verify_target_monitor(1)
+        assert result["verified"] is True
+        assert result["monitor"] is not None
+        assert result["error"] is None
+        assert result["monitor"]["monitor_id"] == 1
+        mock_sm.refresh_monitors.assert_called_once()
+        mock_sm.get_monitor.assert_called_once_with(1)
+
+    def test_invalid_monitor_number_raises_value_error(self):
+        with pytest.raises(ValueError, match="invalido"):
+            verify_target_monitor("abc")
+        with pytest.raises(ValueError, match="invalido"):
+            verify_target_monitor(None)
+        with pytest.raises(ValueError, match="invalido"):
+            verify_target_monitor(0)
+        with pytest.raises(ValueError, match="invalido"):
+            verify_target_monitor(-3)
+
+    def test_nonexistent_monitor_returns_verified_false(self):
+        mock_sm = MagicMock()
+        mock_sm.get_monitor.return_value = None
+        refresh = MagicMock(return_value=True)
+        mock_sm.refresh_monitors = refresh
+        with patch("src.hands.applications_core.get_screen_manager", return_value=mock_sm):
+            result = verify_target_monitor(99)
+        assert result["verified"] is False
+        assert result["monitor"] is None
+        assert "no encontrado" in result["error"]
+
+    def test_screen_manager_exception_returns_verified_false(self):
+        with patch("src.hands.applications_core.get_screen_manager",
+                   side_effect=RuntimeError("No se pudo iniciar ScreenManager")):
+            result = verify_target_monitor(1)
+        assert result["verified"] is False
+        assert result["monitor"] is None
+        assert result["error"] is not None
+
+    def test_verify_target_monitor_is_registered_action(self):
+        from src.hands.applications_core import get_action_registry
+        registry = get_action_registry()
+        actions = registry.list_actions()
+        assert "verify_target_monitor" in actions
 

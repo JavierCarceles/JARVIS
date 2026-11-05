@@ -757,6 +757,18 @@ FASE 3 ? APPLICATION KNOWLEDGE
 3.6.3.3 Registrar fallos reales.
 3.6.4 ? Aplicacion/monitor
 3.6.4.1 Verificar monitor objetivo.
+REGISTRO DE UNIDAD: 3.6.4.1
+FECHA: NR
+OBJETIVO: Verificar que un monitor objetivo exista y sea valido antes de cualquier operacion de aplicacion que lo utilice, exponiendo una funcion pública verify_target_monitor(monitor_num) en applications_core.py registrada como accion, sin mover ni alterar ventanas.
+TIPO DE TRABAJO: IMPLEMENTACION | TEST | VERIFICACION
+CAMBIOS / HALLAZGOS: Agregada importacion de get_screen_manager en src/hands/applications_core.py. Agregada funcion verify_target_monitor(monitor_num) con decorador @register_action (name="verify_target_monitor", action_type=APPLICATION, categoria="aplicacion", efectos=["monitor_verified"], planner_enabled=True). La funcion refresca monitores via ScreenManager, valida el numero de monitor con get_monitor(), retorna dict {verified, monitor, error} y lanza ValueError para numeros invalidos (<1 o no entero).
+ARCHIVOS MODIFICADOS: PRODUCCION: `src/hands/applications_core.py`; TESTS: `tests/hands/test_applications_core.py`; DOCUMENTACION: `README.md` (tabla de funciones de applications_core.py).
+TESTS Y RESULTADOS: UNITARIOS: PASSED/129/129 (incluyendo 5 tests nuevos de TestVerifyTargetMonitor: valido, invalido, inexistente, excepcion, registro de accion); INTEGRACION: NA; NO REGRESION: suite completa test_applications_core.py PASSED sin regresiones.
+VERIFICACION: SINTAXIS: OK; MAIN.PY: NE; COMPORTAMIENTO / INTEGRACION REAL: verificado mediante tests unitarios con mock de get_screen_manager.
+DISCREPANCIAS: NINGUNA
+PENDIENTES: NINGUNO
+ESTADO FINAL: 3.6.4.1 - IMPLEMENTADA
+
 3.6.4.2 Verificar movimiento seguro.
 3.6.4.3 Verificar maximizacion/restauracion cuando corresponda.
 3.6.5 ? Tests
