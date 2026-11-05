@@ -6447,3 +6447,16 @@ VERIFICACION: SINTAXIS: OK (`py_compile src/hands/applications_core.py`); MAIN.P
 DISCREPANCIAS: NINGUNA
 PENDIENTES: NINGUNO
 ESTADO FINAL: 3.6.4.3 - IMPLEMENTADA
+
+
+REGISTRO DE UNIDAD: 3.6.5.1
+FECHA: NR
+OBJETIVO: Verificar que la apertura de aplicaciones funcione correctamente mediante la acción `open_application` registrada en ActionRegistry, abriendo por ejecutable o URL, con manejo seguro de errores para aplicación no encontrada (ValueError) y no disponible (RuntimeError).
+TIPO DE TRABAJO: TEST | VERIFICACION
+CAMBIOS / HALLAZGOS: El código `open_application(app_name: str) -> str` ya existía en `src/hands/applications_core.py` registrado como acción (name="open_application", action_type=APPLICATION, categoria="aplicacion", preconditions=["application_exists"], effects=["application_open"], cost=10.0, capability="open_application", planner_enabled=True). Los tests `TestOpenApplication` ya existían (4 tests) en `tests/hands/test_applications_core.py` y todos PASSED.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: NA; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: PASSED/143/143 en `tests/hands/test_applications_core.py` (incluyendo 4 tests de TestOpenApplication: test_open_via_executable, test_open_via_url, test_open_not_found, test_open_not_available); INTEGRACION: NA; NO REGRESION: suite completa de `test_applications_core.py` PASSED sin regresiones (143/143).
+VERIFICACION: SINTAXIS: OK (`py_compile src/hands/applications_core.py` y `py_compile main.py`); MAIN.PY: OK; COMPORTAMIENTO / INTEGRACION REAL: verificado mediante tests unitarios con mocks de get_application_manager, subprocess.Popen, webbrowser.open y _check_application_available.
+DISCREPANCIAS: NINGUNA
+PENDIENTES: NINGUNO
+ESTADO FINAL: 3.6.5.1 - IMPLEMENTADA
