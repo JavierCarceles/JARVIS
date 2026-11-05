@@ -635,6 +635,30 @@ class CoordinateManager:
         return self.get_calibration_strategy(application, element_type) is not None
 
     # ------------------------------------------------------------------
+    # CALIBRACIÓN: GET / SAVE
+    # ------------------------------------------------------------------
+
+    def get_calibration(self, element_name: str) -> Optional[Dict[str, Any]]:
+        """Devuelve los datos de calibración de un elemento UI por nombre.
+
+        Delegado a la función de nivel módulo para que los parches sobre
+        ``src.hands.coordinate_manager.get_calibration`` surtan efecto sobre
+        las llamadas de instancia.
+        """
+        return get_calibration(element_name)
+
+    def save_calibration(
+        self, element_name: str, coordinates: Dict[str, Any]
+    ) -> bool:
+        """Guarda o actualiza los datos de calibración de un elemento UI.
+
+        Delegado a la función de nivel módulo para que los parches sobre
+        ``src.hands.coordinate_manager.save_calibration`` surtan efecto sobre
+        las llamadas de instancia.
+        """
+        return save_calibration(element_name, coordinates)
+
+    # ------------------------------------------------------------------
     # PLANIFICADOR / EJECUCIÓN
     # ------------------------------------------------------------------
 
@@ -1164,6 +1188,76 @@ def get_coordinate_manager() -> CoordinateManager:
     return _coordinate_manager
 
 
+def get_calibration(element_name: str) -> Optional[Dict[str, Any]]:
+    """Devuelve los datos de calibración de un elemento UI por nombre (nivel módulo)."""
+    mgr = get_coordinate_manager()
+    for resource in mgr.ui_resources.values():
+        if str(resource.name or "").strip().lower() == str(element_name or "").strip().lower():
+            coords = resource.get_best_coordinates()
+            if coords is not None:
+                x, y = coords
+                return {
+                    "x": x,
+                    "y": y,
+                    "application": resource.application,
+                    "element": resource.name,
+                }
+            regions = resource.calibrated_regions
+            if regions:
+                screen = next(iter(regions))
+                region = regions[screen]
+                return {
+                    "x": region[0],
+                    "y": region[1],
+                    "width": region[2] - region[0],
+                    "height": region[3] - region[1],
+                    "application": resource.application,
+                    "element": resource.name,
+                }
+    return None
+
+
+def save_calibration(element_name: str, coordinates: Dict[str, Any]) -> bool:
+    """Guarda o actualiza los datos de calibración de un elemento UI (nivel módulo)."""
+    try:
+        mgr = get_coordinate_manager()
+        app_name = str(coordinates.get("application", "unknown")).strip()
+        resource_id = f"{app_name}.{str(element_name).strip()}"
+        existing = mgr.get_ui_resource(resource_id)
+        x = int(coordinates.get("x", 0))
+        y = int(coordinates.get("y", 0))
+        if existing is not None:
+            existing.calibrated_coordinates = {1: (x, y)}
+            existing.is_calibrated = True
+            existing.is_available = True
+            mgr.register_ui_resource(existing)
+        else:
+            resource = UIResource(
+                id=resource_id,
+                name=str(element_name).strip(),
+                resource_type=ResourceType.ELEMENT,
+                application=app_name,
+                element_type="element",
+                calibration_strategy=CalibrationStrategy.VISUAL_DETECTION,
+                calibrated_coordinates={1: (x, y)},
+                calibrated_regions={},
+                confidence=1.0,
+                is_available=True,
+                is_calibrated=True,
+            )
+            mgr.register_ui_resource(resource)
+        return True
+    except (TypeError, ValueError) as exc:
+        logger._print_log(
+            "error",
+            r"[COORDINATE-MANAGER] Error guardando calibración %s: %s [file:coordinate_manager.py, method:save_calibration]",
+            "coordinate_manager.py",
+            "method",
+            0,
+        )
+        return False
+
+
 __all__ = [
     "ResourceType",
     "CalibrationStrategy",
@@ -1174,4 +1268,6 @@ __all__ = [
     "ElementInfo",
     "CoordinateManager",
     "get_coordinate_manager",
+    "get_calibration",
+    "save_calibration",
 ]

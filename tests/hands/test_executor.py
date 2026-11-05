@@ -1374,6 +1374,76 @@ class TestUpdateWorldStateAfterFailure:
 
 
 # ---------------------------------------------------------------------------
+# _update_world_state_after_failure: persistencia de fallos reales
+# ---------------------------------------------------------------------------
+
+class TestUpdateWorldStateAfterFailurePersistence:
+    """Verifica que los fallos reales se persisten en el estado del mundo
+    (memoria) para que la replanificacion y verificacion puedan consumirlos."""
+
+    def test_failure_persists_per_application(self, executor):
+        """Un fallo con aplicacion se persiste bajo la clave app_<clave>."""
+        mock_mm = MagicMock()
+        executor.memory_manager = mock_mm
+        node = _make_node("n1", "open_chrome", application="Chrome")
+        result = ExecutionResult(
+            status=ExecutionStatus.FAILED,
+            error="No se pudo iniciar",
+            node_id="n1",
+            execution_time=2.5,
+        )
+        executor._update_world_state_after_failure(node, result)
+        # Flag en memoria
+        assert executor.current_state.application_states["Chrome"]["last_action_failed"] is True
+        # Persistencia por aplicacion
+        mock_mm.update_world_state.assert_any_call(
+            "app_chrome",
+            {
+                "last_action_failed": True,
+                "last_error": "No se pudo iniciar",
+                "last_failure_timestamp": executor.current_state.timestamp,
+                "last_failed_node": "n1",
+            },
+        )
+
+    def test_failure_persists_global_record(self, executor):
+        """Un fallo se agrega al registro global last_failures."""
+        mock_mm = MagicMock()
+        executor.memory_manager = mock_mm
+        node = _make_node("n1", "open_chrome", application="Chrome")
+        result = ExecutionResult(status=ExecutionStatus.FAILED, error="fail", node_id="n1")
+        executor._update_world_state_after_failure(node, result)
+        global_calls = [
+            call for call in mock_mm.update_world_state.call_args_list
+            if call[0][0] == "last_failures"
+        ]
+        assert len(global_calls) == 1
+        failures = global_calls[0][0][1]
+        assert isinstance(failures, list)
+        assert len(failures) == 1
+        assert failures[0]["error"] == "fail"
+        assert failures[0]["application"] == "Chrome"
+
+    def test_failure_without_application_persists_global_record_only(self, executor):
+        """Un fallo sin aplicacion no persiste por app_ pero sí persiste globalmente."""
+        mock_mm = MagicMock()
+        executor.memory_manager = mock_mm
+        node = _make_node("n1", "test", application=None)
+        result = ExecutionResult(status=ExecutionStatus.FAILED, error="fail", node_id="n1")
+        executor._update_world_state_after_failure(node, result)
+        app_calls = [
+            call for call in mock_mm.update_world_state.call_args_list
+            if str(call[0][0]).startswith("app_")
+        ]
+        assert len(app_calls) == 0
+        global_calls = [
+            call for call in mock_mm.update_world_state.call_args_list
+            if call[0][0] == "last_failures"
+        ]
+        assert len(global_calls) == 1
+
+
+# ---------------------------------------------------------------------------
 # _goal_achieved
 # ---------------------------------------------------------------------------
 

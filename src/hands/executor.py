@@ -726,25 +726,53 @@ class Executor:
         }
 
     def _update_world_state_after_failure(self, node: Dict[str, Any], result: ExecutionResult) -> None:
-        """Registra el fallo y su timestamp sin alterar estados de éxito."""
+        """Registra el fallo y su timestamp, persistiendolo en el estado del mundo.
+
+        El fallo real se guarda tanto por aplicacion (para que la replanificacion
+        y verificacion puedan consultar si una aplicacion fallo) como en un
+        registro global de fallos recientes. No altera los estados de exito.
+        """
         application = str(node.get("application") or "").strip()
         if application:
             self.current_state.application_states.setdefault(application, {})["last_action_failed"] = True
         self.current_state.timestamp = time.time()
-        failure_data = {
-            "failure_info": {
-                "node_id": result.node_id or node.get("id"),
-                "error": result.error,
-                "timestamp": self.current_state.timestamp,
-                "execution_time": result.execution_time,
-                "status": result.status.value,
-            },
-            "world_state": self._get_state_for_planning(),
+        ts = self.current_state.timestamp
+        failure_entry = {
+            "node_id": result.node_id or node.get("id"),
+            "action": node.get("action") or node.get("id"),
+            "application": application or None,
+            "error": result.error,
+            "timestamp": ts,
+            "execution_time": result.execution_time,
+            "status": result.status.value,
         }
+        # Persistir el fallo real por aplicacion (alimenta replanificacion/verificacion).
+        if application:
+            app_key = application.strip().lower().replace(" ", "_")
+            try:
+                self.memory_manager.update_world_state(
+                    f"app_{app_key}",
+                    {
+                        "last_action_failed": True,
+                        "last_error": result.error,
+                        "last_failure_timestamp": ts,
+                        "last_failed_node": failure_entry["node_id"],
+                    },
+                )
+            except Exception:
+                logger.exception("[EXECUTOR] No se pudo persistir el fallo de la aplicacion %s", application)
+        # Persistir registro global de fallos recientes (historia acotada a 50).
         try:
-            self.memory_manager.update_world_state(failure_data)
+            world_state = self.memory_manager.get_world_state()
+            system_info = getattr(world_state, "system_info", None)
+            if not isinstance(system_info, dict):
+                system_info = {}
+            failures = list(system_info.get("last_failures", []) or [])
+            failures.append(failure_entry)
+            failures = failures[-50:]
+            self.memory_manager.update_world_state("last_failures", failures)
         except Exception:
-            logger.exception("[EXECUTOR] No se pudo persistir el fallo del nodo %s", node.get("id"))
+            logger.exception("[EXECUTOR] No se pudo persistir el registro global de fallos")
 
     def _goal_achieved(self, goal: Dict[str, Any], current_state: Dict[str, Any]) -> bool:
         """Comprueba objetivos conocidos usando tanto estado plano como estado anidado."""

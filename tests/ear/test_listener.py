@@ -190,17 +190,19 @@ class TestRecordingNode:
 
 
 class TestTranscriptionNode:
-    def test_init(self):
+    @patch("src.ear.listener.WhisperModel", side_effect=RuntimeError("no model"))
+    def test_init(self, _mock_model):
         node = TranscriptionNode("transcription")
         assert node.name == "transcription"
         assert node.model_size == "medium"
         assert node.language == "es"
         assert node.model is None
 
-    def test_execute_test_mode(self):
-        node = TranscriptionNode("transcription")
+    @patch("src.ear.listener.WhisperModel", side_effect=RuntimeError("no model"))
+    def test_execute_test_mode(self, _mock_model):
         # model is None → returns fixed "hola jarvis"
         import numpy as np
+        node = TranscriptionNode("transcription")
         result = node.execute(np.array([0.1, 0.2]))
         assert result["success"] is True
         assert result["text"] == "hola jarvis"

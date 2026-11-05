@@ -6385,3 +6385,16 @@ VERIFICACION: SINTAXIS: OK (compileall de src/hands/calibration_manager.py y tes
 DISCREPANCIAS: Cobertura desigual entre puntos de entrada: launch_application en calibration_manager soporta arguments (verificado con tests), pero la accion open_application registrada en ActionRegistry no los recibe ni los pasa al ejecutable. No es un error (son puntos de entrada distintos), es una limitacion documentada heredada de 3.6.3.1.
 PENDIENTES: 3.6.3.3 Registrar fallos reales (siguiente hoja pendiente de 3.6.3 Lanzamiento).
 ESTADO FINAL: 3.6.3.2.2 - IMPLEMENTADA
+
+
+REGISTRO DE UNIDAD: 3.6.3.3
+FECHA: NR
+OBJETIVO: Registrar fallos reales en la ejecucion de lanzamiento de aplicaciones (FASE 3.6.3 Lanzamiento).
+TIPO DE TRABAJO: IMPLEMENTACION | PERSISTENCIA
+CAMBIOS / HALLAZGOS: (1) Correccion en src/hands/executor.py :: _update_world_state_after_failure: se llamaba a `self.memory_manager.update_world_state(failure_data)` con un unico diccionario, pero la firma es `update_world_state(key, value)` (dos argumentos posicionales), por lo que se lanzaba TypeError capturado silenciosamente y NINGUNA falla real se persistia. Se reescribe el metodo para persistir el fallo real por aplicacion bajo `app_<clave>` (last_action_failed, last_error, last_failure_timestamp, last_failed_node) y en un registro global `last_failures` (historia acotada a 50) en system_info. (2) Se agregan 3 tests en tests/hands/test_executor.py (TestUpdateWorldStateAfterFailurePersistence): persistencia por aplicacion, registro global last_failures, y caso sin aplicacion (solo global).
+ARCHIVOS MODIFICADOS: PRODUCCION: src/hands/executor.py; TESTS: tests/hands/test_executor.py; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: 359 passed (tests/hands/test_executor.py y tests/hands/test_executor_state.py); de ellos 3 nuevos en TestUpdateWorldStateAfterFailurePersistence. INTEGRACION: NE; NO REGRESION: NE (22 fallas preexistentes en tests/hands/test_ui_elements*.py, no relacionadas con esta unidad: metodos get_calibration/save_calibration/get_calibration_data/capacidades vacias/coordenadas None).
+VERIFICACION: SINTAXIS: OK (src/hands/executor.py y tests/hands/test_executor.py parsean sin errores); MAIN.PY: NE; COMPORTAMIENTO / INTEGRACION REAL: los fallos de nodo ahora se persisten en memory_manager.update_world_state (antes se descartaban silenciosamente por incompatibilidad de firma).
+DISCREPANCIAS: Ninguna nueva. Se mantiene documentada la discrepancia heredada de 3.6.3.1 (launch_application soporta arguments; la accion open_application registrada no los recibe ni los pasa al ejecutable).
+PENDIENTES: 3.6.4.1 Verificar monitor objetivo (siguiente hoja pendiente de 3.6.4 Aplicacion/monitor).
+ESTADO FINAL: 3.6.3.3 - IMPLEMENTADA

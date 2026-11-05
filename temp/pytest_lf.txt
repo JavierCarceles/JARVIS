@@ -1,0 +1,497 @@
+﻿.FFFFFFFFFFFFFFFFF                                                       [100%]
+================================== FAILURES ===================================
+_______________________ TestTranscriptionNode.test_init _______________________
+
+self = <test_listener.TestTranscriptionNode object at 0x00000103840EA850>
+
+    def test_init(self):
+        node = TranscriptionNode("transcription")
+        assert node.name == "transcription"
+        assert node.model_size == "medium"
+        assert node.language == "es"
+>       assert node.model is None
+E       assert <faster_whisper.transcribe.WhisperModel object at 0x0000010388221FD0> is None
+E        +  where <faster_whisper.transcribe.WhisperModel object at 0x0000010388221FD0> = <src.ear.listener.TranscriptionNode object at 0x000001039204D160>.model
+
+C:\Informatica\PROYectos\BACKEND\IA_python\IA\JARVIS\tests\ear\test_listener.py:198: AssertionError
+________________ TestTranscriptionNode.test_execute_test_mode _________________
+
+self = <test_listener.TestTranscriptionNode object at 0x00000103840EA990>
+
+    def test_execute_test_mode(self):
+        node = TranscriptionNode("transcription")
+        # model is None \u2192 returns fixed "hola jarvis"
+        import numpy as np
+        result = node.execute(np.array([0.1, 0.2]))
+        assert result["success"] is True
+>       assert result["text"] == "hola jarvis"
+E       AssertionError: assert '' == 'hola jarvis'
+E         
+E         - hola jarvis
+
+C:\Informatica\PROYectos\BACKEND\IA_python\IA\JARVIS\tests\ear\test_listener.py:206: AssertionError
+______ TestUIElementDetection.test_ui_element_detection_with_calibration ______
+
+self = <test_ui_elements.TestUIElementDetection object at 0x00000103848DE710>
+
+    def test_ui_element_detection_with_calibration(self):
+        """Test de detecci¾n con calibraci¾n existente"""
+        # Cargar datos de calibraci¾n simulados
+        calibration_data = {
+            "chrome_accept_button": {"x": 150, "y": 250, "width": 100, "height": 40},
+            "chrome_menu_button": {"x": 50, "y": 50, "width": 30, "height": 30}
+        }
+    
+>       with patch.object(self.calibration_manager, 'get_calibration_data') as mock_calib:
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\test_ui_elements.py:62: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <unittest.mock._patch object at 0x0000010388854750>
+
+    def get_original(self):
+        target = self.getter()
+        name = self.attribute
+    
+        original = DEFAULT
+        local = False
+    
+        try:
+            original = target.__dict__[name]
+        except (AttributeError, KeyError):
+            original = getattr(target, name, DEFAULT)
+        else:
+            local = True
+    
+        if name in _builtins and isinstance(target, ModuleType):
+            self.create = True
+    
+        if not self.create and original is DEFAULT:
+>           raise AttributeError(
+                "%s does not have the attribute %r" % (target, name)
+            )
+E           AttributeError: <src.hands.calibration_manager.CalibrationManager object at 0x0000010388848D70> does not have the attribute 'get_calibration_data'
+
+C:\Python314\Lib\unittest\mock.py:1480: AttributeError
+__________ TestUIElementCalibration.test_ui_element_calibration_save __________
+
+self = <test_ui_elements.TestUIElementCalibration object at 0x00000103848DE850>
+
+    def test_ui_element_calibration_save(self):
+        """Test de calibraci¾n y guardado de elementos UI"""
+        mock_element = {
+            "type": "button",
+            "text": "Enviar",
+            "coordinates": {"x": 250, "y": 350, "width": 80, "height": 35},
+            "confidence": 0.94
+        }
+    
+        calibration_name = "send_button"
+    
+>       with patch.object(self.calibrator, 'calibrate_element') as mock_calib:
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\test_ui_elements.py:160: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Python314\Lib\unittest\mock.py:1510: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <unittest.mock._patch object at 0x0000010388855710>
+
+    def get_original(self):
+        target = self.getter()
+        name = self.attribute
+    
+        original = DEFAULT
+        local = False
+    
+        try:
+            original = target.__dict__[name]
+        except (AttributeError, KeyError):
+            original = getattr(target, name, DEFAULT)
+        else:
+            local = True
+    
+        if name in _builtins and isinstance(target, ModuleType):
+            self.create = True
+    
+        if not self.create and original is DEFAULT:
+>           raise AttributeError(
+                "%s does not have the attribute %r" % (target, name)
+            )
+E           AttributeError: <src.hands.universal_visual_calibrator.UniversalVisualCalibrator object at 0x00000103888D0050> does not have the attribute 'calibrate_element'
+
+C:\Python314\Lib\unittest\mock.py:1480: AttributeError
+_________ TestUIElementCalibration.test_ui_element_calibration_update _________
+
+self = <test_ui_elements.TestUIElementCalibration object at 0x00000103849016E0>
+
+    def test_ui_element_calibration_update(self):
+        """Test de actualizaci¾n de calibraci¾n existente"""
+        calibration_name = "ok_button"
+        old_coords = {"x": 200, "y": 300, "width": 70, "height": 30}
+        new_coords = {"x": 210, "y": 305, "width": 75, "height": 32}
+    
+        with patch.object(self.coordinate_manager, 'get_calibration') as mock_load:
+            mock_load.return_value = old_coords
+    
+            with patch.object(self.coordinate_manager, 'save_calibration') as mock_save:
+                # Simular actualizaci¾n de coordenadas
+                self.coordinate_manager.save_calibration(calibration_name, new_coords)
+    
+                mock_save.assert_called_once_with(calibration_name, new_coords)
+    
+                # Verificar que la calibraci¾n se actualiz¾
+                updated_coords = self.coordinate_manager.get_calibration(calibration_name)
+>               assert updated_coords == new_coords
+E               AssertionError: assert {'x': 200, 'y... 'height': 30} == {'x': 210, 'y... 'height': 32}
+E                 
+E                 Differing items:
+E                 {'y': 300} != {'y': 305}
+E                 {'height': 30} != {'height': 32}
+E                 {'width': 70} != {'width': 75}
+E                 {'x': 200} != {'x': 210}
+E                 Use -v to get more diff
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\test_ui_elements.py:206: AssertionError
+_______________ TestUIElementInteraction.test_ui_element_click ________________
+
+self = <test_ui_elements.TestUIElementInteraction object at 0x00000103848DEAD0>
+
+    def test_ui_element_click(self):
+        """Test de clic en elemento UI"""
+        element_name = "submit_button"
+        expected_coords = {"x": 300, "y": 400, "width": 100, "height": 40}
+    
+        with patch.object(self.coordinate_manager, 'get_calibration') as mock_get:
+            mock_get.return_value = expected_coords
+    
+            with patch('src.hands.mouse.click_element') as mock_click:
+                click_element(button="left")
+    
+>               mock_click.assert_called_once_with(button="left")
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\test_ui_elements.py:228: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <MagicMock name='click_element' id='1114686926064'>, args = ()
+kwargs = {'button': 'left'}
+
+    def assert_called_once_with(self, /, *args, **kwargs):
+        """assert that the mock was called exactly once and that that call was
+        with the specified arguments."""
+        if not self.call_count == 1:
+            msg = ("Expected '%s' to be called once. Called %s times.%s"
+                   % (self._mock_name or 'mock',
+                      self.call_count,
+                      self._calls_repr()))
+>           raise AssertionError(msg)
+E           AssertionError: Expected 'click_element' to be called once. Called 0 times.
+
+C:\Python314\Lib\unittest\mock.py:997: AssertionError
+____________ TestUIElementInteraction.test_ui_element_double_click ____________
+
+self = <test_ui_elements.TestUIElementInteraction object at 0x00000103848DEC10>
+
+    def test_ui_element_double_click(self):
+        """Test de doble clic en elemento UI"""
+        element_name = "file_item"
+        expected_coords = {"x": 150, "y": 250, "width": 200, "height": 30}
+    
+        with patch.object(self.coordinate_manager, 'get_calibration') as mock_get:
+            mock_get.return_value = expected_coords
+    
+            with patch('src.hands.mouse.click_element') as mock_click:
+                # Simular doble clic mediante dos clics rßpidos
+                click_element(button="left", wait_after=0.01)
+                click_element(button="left", wait_after=0.01)
+    
+>               assert mock_click.call_count == 2
+E               AssertionError: assert 0 == 2
+E                +  where 0 = <MagicMock name='click_element' id='1114686926736'>.call_count
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\test_ui_elements.py:243: AssertionError
+____________ TestUIElementInteraction.test_ui_element_right_click _____________
+
+self = <test_ui_elements.TestUIElementInteraction object at 0x0000010384901810>
+
+    def test_ui_element_right_click(self):
+        """Test de clic derecho en elemento UI"""
+        element_name = "context_menu_item"
+        expected_coords = {"x": 400, "y": 300, "width": 150, "height": 25}
+    
+        with patch.object(self.coordinate_manager, 'get_calibration') as mock_get:
+            mock_get.return_value = expected_coords
+    
+            with patch('src.hands.mouse.click_element') as mock_click:
+                click_element(button="right")
+    
+>               mock_click.assert_called_once_with(button="right")
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\test_ui_elements.py:256: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <MagicMock name='click_element' id='1114846318944'>, args = ()
+kwargs = {'button': 'right'}
+
+    def assert_called_once_with(self, /, *args, **kwargs):
+        """assert that the mock was called exactly once and that that call was
+        with the specified arguments."""
+        if not self.call_count == 1:
+            msg = ("Expected '%s' to be called once. Called %s times.%s"
+                   % (self._mock_name or 'mock',
+                      self.call_count,
+                      self._calls_repr()))
+>           raise AssertionError(msg)
+E           AssertionError: Expected 'click_element' to be called once. Called 0 times.
+
+C:\Python314\Lib\unittest\mock.py:997: AssertionError
+_____________ TestUIElementInteraction.test_ui_element_text_input _____________
+
+self = <test_ui_elements.TestUIElementInteraction object at 0x0000010384901940>
+
+    def test_ui_element_text_input(self):
+        """Test de entrada de texto en elemento UI"""
+        element_name = "search_field"
+        expected_coords = {"x": 200, "y": 100, "width": 300, "height": 30}
+        test_text = "Buscar prueba"
+    
+        with patch.object(self.coordinate_manager, 'get_calibration') as mock_get:
+            mock_get.return_value = expected_coords
+    
+            with patch('src.hands.keyboard.type_text') as mock_type:
+                type_text(test_text)
+    
+>               mock_type.assert_called_once_with(text=test_text)
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\test_ui_elements.py:270: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <MagicMock name='type_text' id='1114680467408'>, args = ()
+kwargs = {'text': 'Buscar prueba'}
+
+    def assert_called_once_with(self, /, *args, **kwargs):
+        """assert that the mock was called exactly once and that that call was
+        with the specified arguments."""
+        if not self.call_count == 1:
+            msg = ("Expected '%s' to be called once. Called %s times.%s"
+                   % (self._mock_name or 'mock',
+                      self.call_count,
+                      self._calls_repr()))
+>           raise AssertionError(msg)
+E           AssertionError: Expected 'type_text' to be called once. Called 0 times.
+
+C:\Python314\Lib\unittest\mock.py:997: AssertionError
+________ TestUIElementIntegration.test_ui_element_validation_workflow _________
+
+self = <test_ui_elements_final.TestUIElementIntegration object at 0x0000010384901E00>
+
+    def test_ui_element_validation_workflow(self):
+        """Test de flujo de validaci¾n de elementos UI"""
+        app_manager = ApplicationManager()
+    
+        # Obtener algunas aplicaciones para validar
+        app_names = list(app_manager.applications.keys())[:3]
+    
+        for app_name in app_names:
+            app_knowledge = app_manager.applications[app_name]
+    
+            # Validar estructura de la aplicaci¾n
+            assert isinstance(app_knowledge, ApplicationKnowledge)
+            assert isinstance(app_knowledge.name, str)
+            assert isinstance(app_knowledge.type, str)
+            assert isinstance(app_knowledge.capabilities, list)
+            assert isinstance(app_knowledge.ui_elements, list)
+            assert isinstance(app_knowledge.states, list)
+    
+            # Validar UI elements
+            for ui_element in app_knowledge.ui_elements:
+                assert isinstance(ui_element, UIElement)
+                assert isinstance(ui_element.type, str)
+                assert isinstance(ui_element.name, str)
+>               assert isinstance(ui_element.coordinates, dict)
+E               AssertionError: assert False
+E                +  where False = isinstance(None, dict)
+E                +    where None = UIElement(name='address_bar', type='input', description='', required_capability=<ApplicationCapability.NAVIGATE: 'navigate'>, coordinates=None, screen=0, calibration_data=None).coordinates
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\test_ui_elements_final.py:250: AssertionError
+_______ TestUIElementMinimal.test_ui_element_coordinates_from_existing ________
+
+self = <test_ui_elements_minimal.TestUIElementMinimal object at 0x0000010384926050>
+
+    def test_ui_element_coordinates_from_existing(self):
+        """Test de coordenadas de UI elements desde aplicaciones existentes"""
+        app_manager = ApplicationManager()
+    
+        coord_count = 0
+        for app_name, app_knowledge in app_manager.applications.items():
+            for ui_element in app_knowledge.ui_elements:
+                if ui_element.coordinates is not None:
+                    coord_count += 1
+                    coords = ui_element.coordinates
+                    assert isinstance(coords, dict)
+                    # Verificar que tiene las coordenadas bßsicas
+                    assert 'x' in coords or 'y' in coords or len(coords) > 0
+    
+        # Verificamos que encontramos algunas coordenadas
+>       assert coord_count > 0
+E       assert 0 > 0
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\test_ui_elements_minimal.py:137: AssertionError
+___________ TestUIElementReal.test_application_knowledge_structure ____________
+
+self = <test_ui_elements_real.TestUIElementReal object at 0x00000103849023F0>
+
+    def test_application_knowledge_structure(self):
+        """Test de estructura de conocimiento de aplicaciones"""
+        app_manager = ApplicationManager()
+    
+        # Verificar el conocimiento de cada aplicaci¾n
+        for app_name, app_knowledge in app_manager.applications.items():
+            assert isinstance(app_knowledge, ApplicationKnowledge)
+            assert hasattr(app_knowledge, 'name')
+            assert hasattr(app_knowledge, 'type')
+            assert hasattr(app_knowledge, 'capabilities')
+>           assert len(app_knowledge.capabilities) > 0
+E           AssertionError: assert 0 > 0
+E            +  where 0 = len([])
+E            +    where [] = ApplicationKnowledge(name='YouTube', type='video_platform', executable='chrome.exe', url='https://www.youtube.com', ic...nts=[], default_state=<ApplicationState.CLOSED: 'closed'>, metadata={'entity_id': 'youtube', 'aliases': ['yt', 'you']}).capabilities
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\test_ui_elements_real.py:54: AssertionError
+__________ TestUIElementReal.test_calibration_manager_initialization __________
+
+self = <test_ui_elements_real.TestUIElementReal object at 0x0000010384927150>
+
+    def test_calibration_manager_initialization(self):
+        """Test de inicializaci¾n real del gestor de calibraci¾n"""
+        calib_manager = CalibrationManager()
+    
+        assert calib_manager is not None
+        # Verificar que tiene los mÚtodos esperados
+>       assert hasattr(calib_manager, 'get_calibration_manager')
+E       AssertionError: assert False
+E        +  where False = hasattr(<src.hands.calibration_manager.CalibrationManager object at 0x000001038876A210>, 'get_calibration_manager')
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\test_ui_elements_real.py:127: AssertionError
+__________ TestUIElementReal.test_application_capabilities_existence __________
+
+self = <test_ui_elements_real.TestUIElementReal object at 0x00000103847476B0>
+
+    def test_application_capabilities_existence(self):
+        """Test de existencia de capacidades en aplicaciones"""
+        app_manager = ApplicationManager()
+    
+        # Verificar que algunas aplicaciones tienen capacidades esperadas
+        for app_name, app_knowledge in app_manager.applications.items():
+            capabilities = app_knowledge.capabilities
+>           assert len(capabilities) > 0
+E           assert 0 > 0
+E            +  where 0 = len([])
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\test_ui_elements_real.py:161: AssertionError
+________ TestUIElementIntegration.test_application_knowledge_structure ________
+
+self = <test_ui_elements_simple.TestUIElementIntegration object at 0x0000010384950690>
+
+    def test_application_knowledge_structure(self):
+        """Test de estructura de conocimiento de aplicaciones"""
+        # Verificar que las aplicaciones tienen conocimiento estructurado
+        for app_name, app_knowledge in self.app_manager.applications.items():
+            assert hasattr(app_knowledge, 'name')
+            assert hasattr(app_knowledge, 'type')
+            assert hasattr(app_knowledge, 'capabilities')
+>           assert len(app_knowledge.capabilities) > 0
+E           AssertionError: assert 0 > 0
+E            +  where 0 = len([])
+E            +    where [] = ApplicationKnowledge(name='YouTube', type='video_platform', executable='chrome.exe', url='https://www.youtube.com', ic...nts=[], default_state=<ApplicationState.CLOSED: 'closed'>, metadata={'entity_id': 'youtube', 'aliases': ['yt', 'you']}).capabilities
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\test_ui_elements_simple.py:180: AssertionError
+_ TestUIElementIntegrationWorking.test_ui_element_validation_workflow_correct _
+
+self = <test_ui_elements_working.TestUIElementIntegrationWorking object at 0x0000010384902C40>
+
+    def test_ui_element_validation_workflow_correct(self):
+        """Test de flujo de validaci¾n de elementos UI"""
+        app_manager = ApplicationManager()
+    
+        # Obtener algunas aplicaciones para validar
+        app_names = list(app_manager.applications.keys())[:3]
+    
+        for app_name in app_names:
+            app_knowledge = app_manager.applications[app_name]
+    
+            # Validar estructura de la aplicaci¾n
+            assert isinstance(app_knowledge, ApplicationKnowledge)
+            assert isinstance(app_knowledge.name, str)
+            assert isinstance(app_knowledge.type, str)
+            assert isinstance(app_knowledge.capabilities, list)
+            assert isinstance(app_knowledge.ui_elements, list)
+            assert isinstance(app_knowledge.states, list)
+    
+            # Validar UI elements con atributos correctos
+            for ui_element in app_knowledge.ui_elements:
+                assert isinstance(ui_element, UIElement)
+                assert isinstance(ui_element.type, str)
+                assert hasattr(ui_element, 'name')  # Es 'name', no 'label' ni 'text'
+>               assert isinstance(ui_element.coordinates, dict)
+E               AssertionError: assert False
+E                +  where False = isinstance(None, dict)
+E                +    where None = UIElement(name='address_bar', type='input', description='', required_capability=<ApplicationCapability.NAVIGATE: 'navigate'>, coordinates=None, screen=0, calibration_data=None).coordinates
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\test_ui_elements_working.py:249: AssertionError
+_______ TestUIElementAdvanced.test_application_ui_elements_integration ________
+
+self = <test_ui_elements_working.TestUIElementAdvanced object at 0x0000010384902D70>
+
+    def test_application_ui_elements_integration(self):
+        """Test de integraci¾n de UI elements con aplicaciones"""
+        app_manager = ApplicationManager()
+    
+        # Contar total de UI elements en todas las aplicaciones
+        total_ui_elements = 0
+        app_with_ui_elements = 0
+    
+        for app_name, app_knowledge in app_manager.applications.items():
+            ui_elements = app_knowledge.ui_elements
+            total_ui_elements += len(ui_elements)
+    
+            if len(ui_elements) > 0:
+                app_with_ui_elements += 1
+    
+                # Validar cada UI element
+                for ui_element in ui_elements:
+                    assert isinstance(ui_element, UIElement)
+                    assert isinstance(ui_element.type, str)
+                    assert isinstance(ui_element.name, str)
+>                   assert isinstance(ui_element.coordinates, dict)
+E                   AssertionError: assert False
+E                    +  where False = isinstance(None, dict)
+E                    +    where None = UIElement(name='address_bar', type='input', description='', required_capability=<ApplicationCapability.NAVIGATE: 'navigate'>, coordinates=None, screen=0, calibration_data=None).coordinates
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\test_ui_elements_working.py:317: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/ear/test_listener.py::TestTranscriptionNode::test_init - assert ...
+FAILED tests/ear/test_listener.py::TestTranscriptionNode::test_execute_test_mode
+FAILED tests/hands/test_ui_elements.py::TestUIElementDetection::test_ui_element_detection_with_calibration
+FAILED tests/hands/test_ui_elements.py::TestUIElementCalibration::test_ui_element_calibration_save
+FAILED tests/hands/test_ui_elements.py::TestUIElementCalibration::test_ui_element_calibration_update
+FAILED tests/hands/test_ui_elements.py::TestUIElementInteraction::test_ui_element_click
+FAILED tests/hands/test_ui_elements.py::TestUIElementInteraction::test_ui_element_double_click
+FAILED tests/hands/test_ui_elements.py::TestUIElementInteraction::test_ui_element_right_click
+FAILED tests/hands/test_ui_elements.py::TestUIElementInteraction::test_ui_element_text_input
+FAILED tests/hands/test_ui_elements_final.py::TestUIElementIntegration::test_ui_element_validation_workflow
+FAILED tests/hands/test_ui_elements_minimal.py::TestUIElementMinimal::test_ui_element_coordinates_from_existing
+FAILED tests/hands/test_ui_elements_real.py::TestUIElementReal::test_application_knowledge_structure
+FAILED tests/hands/test_ui_elements_real.py::TestUIElementReal::test_calibration_manager_initialization
+FAILED tests/hands/test_ui_elements_real.py::TestUIElementReal::test_application_capabilities_existence
+FAILED tests/hands/test_ui_elements_simple.py::TestUIElementIntegration::test_application_knowledge_structure
+FAILED tests/hands/test_ui_elements_working.py::TestUIElementIntegrationWorking::test_ui_element_validation_workflow_correct
+FAILED tests/hands/test_ui_elements_working.py::TestUIElementAdvanced::test_application_ui_elements_integration
+17 failed, 1 passed, 4559 deselected in 13.64s
