@@ -6472,3 +6472,16 @@ VERIFICACIÓN: SINTAXIS: OK (`py_compile tests/hands/test_applications_core.py` 
 DISCREPANCIAS: NINGUNA
 PENDIENTES: NINGUNO
 ESTADO FINAL: 3.6.5.2 - IMPLEMENTADA
+
+
+REGISTRO DE UNIDAD: 3.6.5.3
+FECHA: NR
+OBJETIVO: Verificar que el lanzamiento de aplicaciones funcione correctamente, cubriendo tanto `launch_application` de `calibration_manager` (con soporte de argumentos de lanzamiento) como la acción `open_application` registrada en ActionRegistry (sin argumentos), con manejo seguro de fallos reales (aplicación no encontrada / no disponible).
+TIPO DE TRABAJO: VERIFICACION | TEST
+CAMBIOS / HALLAZGOS: Los tests de `launch_application` ya existían en `tests/hands/test_calibration_manager.py` (19 tests: TestLaunchApplicationArguments x4, TestLaunchApplicationEjecucionConArgumentos x15), creados en unidades 3.6.3.2.1 y 3.6.3.2.2; todos PASSED. Los tests de `open_application` ya existían en `tests/hands/test_applications_core.py` (4 tests: TestOpenApplication), verificados en unidad 3.6.5.1; todos PASSED. No se requirió código nuevo ni modificaciones de produccion.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: NA; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: PASSED/19/19 en `tests/hands/test_calibration_manager.py` (launch_application: argumentos, ejecucion con argumentos, casos de error); PASSED/146/146 en `tests/hands/test_applications_core.py` (incluyendo TestOpenApplication x4: test_open_via_executable, test_open_via_url, test_open_not_found, test_open_not_available); INTEGRACION: NA; NO REGRESION: suite completa de `test_applications_core.py` PASSED sin regresiones (146/146).
+VERIFICACION: SINTAXIS: OK (`py_compile tests/hands/test_calibration_manager.py` y `py_compile tests/hands/test_applications_core.py` y `py_compile src/hands/applications_core.py`); MAIN.PY: NE; COMPORTAMIENTO / INTEGRACION REAL: verificado mediante tests unitarios con mocks de `subprocess.Popen` (launch_application verifica lista de comandos con argumentos) y `subprocess.Popen`/`webbrowser.open` (open_application verifica lanzamiento por ejecutable y URL).
+DISCREPANCIAS: NINGUNA nueva. Se mantiene documentada la discrepancia heredada de 3.6.3.1: `launch_application` en `calibration_manager` soporta argumentos de lanzamiento, pero la acción `open_application` registrada en ActionRegistry no los recibe ni los pasa al ejecutable (puntos de entrada distintos, límite documentado, no se modifica en esta unidad).
+PENDIENTES: NINGUNO
+ESTADO FINAL: 3.6.5.3 - IMPLEMENTADA
