@@ -6485,3 +6485,15 @@ VERIFICACION: SINTAXIS: OK (`py_compile tests/hands/test_calibration_manager.py`
 DISCREPANCIAS: NINGUNA nueva. Se mantiene documentada la discrepancia heredada de 3.6.3.1: `launch_application` en `calibration_manager` soporta argumentos de lanzamiento, pero la acción `open_application` registrada en ActionRegistry no los recibe ni los pasa al ejecutable (puntos de entrada distintos, límite documentado, no se modifica en esta unidad).
 PENDIENTES: NINGUNO
 ESTADO FINAL: 3.6.5.3 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.6.5.4
+FECHA: NR
+OBJETIVO: Verificar que el movimiento de aplicaciones entre monitores funcione de forma segura mediante las acciones `verify_target_monitor` y `move_application_to_monitor` registradas en ActionRegistry, incluyendo validación de monitor objetivo, identificación de ventana de la aplicación, movimiento seguro y verificación post-movimiento de que la ventana quedó en el monitor destino.
+TIPO DE TRABAJO: TEST | VERIFICACION
+CAMBIOS / HALLAZGOS: El código ya existía en `src/hands/applications_core.py`: `verify_target_monitor` (línea 1608) y `move_application_to_monitor` (línea 1687), ambas registradas como acciones con `action_type=APPLICATION`, `category="aplicacion"`, `planner_enabled=True`. Los tests `TestVerifyTargetMonitor` (5 tests) y `TestMoveApplicationToMonitor` (7 tests) ya existían en `tests/hands/test_applications_core.py`; todos PASSED (12/12). No se requirió código nuevo ni modificaciones de produccion.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: NA; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: PASSED/12/12 en `tests/hands/test_applications_core.py` (5 tests TestVerifyTargetMonitor: test_valid_monitor_verified_true, test_invalid_monitor_number_raises_value_error, test_nonexistent_monitor_returns_verified_false, test_screen_manager_exception_returns_verified_false, test_verify_target_monitor_is_registered_action; 7 tests TestMoveApplicationToMonitor: test_safe_move_success_and_verified, test_invalid_monitor_fails_without_moving, test_window_not_identified_fails_safely, test_move_failure_is_reported, test_post_move_verification_detects_wrong_monitor, test_empty_app_name_raises, test_move_application_to_monitor_is_registered_action); INTEGRACION: NA; NO REGRESION: suite completa de `test_applications_core.py` PASSED sin regresiones (146/146, baseline de unidad 3.6.5.2).
+VERIFICACION: SINTAXIS: OK (`py_compile src/hands/applications_core.py` y `py_compile main.py`); MAIN.PY: OK; COMPORTAMIENTO / INTEGRACION REAL: verificado mediante tests unitarios con mocks de `get_screen_manager`, `get_calibration_manager`, `ScreenManager.get_monitor`, `ScreenManager.get_monitor_for_window`, `CalibrationManager._find_existing_application_window` y `CalibrationManager.move_window_to_monitor`.
+DISCREPANCIAS: NINGUNA
+PENDIENTES: NINGUNO
+ESTADO FINAL: 3.6.5.4 - IMPLEMENTADA
