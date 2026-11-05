@@ -809,6 +809,70 @@ class TestCloseApplication:
             result = close_application("chrome")
             assert "no pudo confirmarse cerrada" in result
 
+    def test_close_taskkill_usa_nombre_proceso_resuelto_desde_ejecutable(self):
+        """close_application resuelve el nombre del proceso desde el ejecutable
+        registrado y se lo pasa a taskkill (3.6.2.1 identificacion de proceso correcto)."""
+        calls = []
+
+        def side_effect(cmd, *args, **kwargs):
+            calls.append(cmd)
+            mock = MagicMock()
+            if isinstance(cmd, list) and cmd and cmd[0] == "tasklist":
+                mock.stdout = "INFO: No se encontraron tareas en ejecucion que coincidan con el criterio.\n"
+            return mock
+
+        with patch("src.hands.applications_core.subprocess.run", side_effect=side_effect):
+            result = close_application("chrome")
+            taskkill_calls = [c for c in calls if isinstance(c, list) and c and c[0] == "taskkill"]
+            assert len(taskkill_calls) == 1
+            assert "/im" in taskkill_calls[0]
+            im_idx = taskkill_calls[0].index("/im")
+            assert taskkill_calls[0][im_idx + 1] == "chrome.exe"
+            assert "cerrada exitosamente" in result
+
+    def test_close_app_no_registrada_usa_nombre_objetivo_como_proceso(self):
+        """Si la app no esta registrada, close_application usa el nombre indicado
+        como nombre de proceso (comportamiento previo conservado)."""
+        calls = []
+
+        def side_effect(cmd, *args, **kwargs):
+            calls.append(cmd)
+            mock = MagicMock()
+            if isinstance(cmd, list) and cmd and cmd[0] == "tasklist":
+                mock.stdout = "INFO: No se encontraron tareas en ejecucion que coincidan con el criterio.\n"
+            return mock
+
+        with patch("src.hands.applications_core.subprocess.run", side_effect=side_effect):
+            result = close_application("MiAppDesconocida")
+            taskkill_calls = [c for c in calls if isinstance(c, list) and c and c[0] == "taskkill"]
+            assert len(taskkill_calls) == 1
+            assert "/im" in taskkill_calls[0]
+            im_idx = taskkill_calls[0].index("/im")
+            assert taskkill_calls[0][im_idx + 1] == "MiAppDesconocida.exe"
+            assert "cerrada exitosamente" in result
+
+    def test_close_no_usa_comodin_solo_proceso_objetivo(self):
+        """close_application no cierra todas las aplicaciones: taskkill se invoca
+        con /im concreto sobre el proceso objetivo, sin comodin
+        (3.6.2.2 cierre sin afectar otras aplicaciones)."""
+        calls = []
+
+        def side_effect(cmd, *args, **kwargs):
+            calls.append(cmd)
+            mock = MagicMock()
+            if isinstance(cmd, list) and cmd and cmd[0] == "tasklist":
+                mock.stdout = "INFO: No se encontraron tareas en ejecucion que coincidan con el criterio.\n"
+            return mock
+
+        with patch("src.hands.applications_core.subprocess.run", side_effect=side_effect):
+            close_application("chrome")
+            taskkill_calls = [c for c in calls if isinstance(c, list) and c and c[0] == "taskkill"]
+            assert len(taskkill_calls) == 1
+            cmd = taskkill_calls[0]
+            im_idx = cmd.index("/im")
+            assert cmd[im_idx + 1] != "*"
+            assert cmd[im_idx + 1].endswith(".exe")
+
 
 class TestWaitForApplicationStateExtended:
     """wait_for_application_state: casos adicionales."""

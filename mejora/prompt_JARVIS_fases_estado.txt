@@ -6460,3 +6460,15 @@ VERIFICACION: SINTAXIS: OK (`py_compile src/hands/applications_core.py` y `py_co
 DISCREPANCIAS: NINGUNA
 PENDIENTES: NINGUNO
 ESTADO FINAL: 3.6.5.1 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.6.5.2
+FECHA: NR
+OBJETIVO: Verificar que el cierre de aplicaciones funcione correctamente mediante la acción `close_application` registrada en ActionRegistry, resolviendo el nombre del proceso desde el ejecutable conocido (o usando el nombre indicado como fallback), confirmando el estado posterior mediante tasklist y sin afectar otras aplicaciones (sin comodín).
+TIPO DE TRABAJO: TEST | VERIFICACIÓN
+CAMBIOS / HALLAZGOS: El código `close_application(app_name: str) -> str` ya existía en `src/hands/applications_core.py` registrado como acción (name="close_application", action_type=APPLICATION, categoria="aplicacion", preconditions=["application_open"], effects=["application_closed"], cost=5.0, capability="close_application", planner_enabled=True). Existían 5 tests de TestCloseApplication y todos PASSED. Se añadieron 3 tests para cubrir lagunas del roadmap 3.6.2 (identificacion de proceso correcto y cierre sin afectar otras aplicaciones): test_close_taskkill_usa_nombre_proceso_resuelto_desde_ejecutable, test_close_app_no_registrada_usa_nombre_objetivo_como_proceso, test_close_no_usa_comodin_solo_proceso_objetivo. Suite completa PASSED (146/146).
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: tests/hands/test_applications_core.py; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: PASSED/146/146 en `tests/hands/test_applications_core.py` (incluyendo 8 tests de TestCloseApplication: test_close_empty_name, test_close_happy_path, test_close_with_exe_suffix, test_close_verifica_estado_posterior_proceso_terminado, test_close_verifica_estado_posterior_proceso_todavia_ejecutandose, test_close_taskkill_usa_nombre_proceso_resuelto_desde_ejecutable, test_close_app_no_registrada_usa_nombre_objetivo_como_proceso, test_close_no_usa_comodin_solo_proceso_objetivo); INTEGRACION: NA; NO REGRESION: suite completa de `test_applications_core.py` PASSED sin regresiones (146/146).
+VERIFICACIÓN: SINTAXIS: OK (`py_compile tests/hands/test_applications_core.py` y `py_compile src/hands/applications_core.py`); MAIN.PY: NE; COMPORTAMIENTO / INTEGRACIÓN REAL: verificado mediante tests unitarios con mocks de subprocess.run (taskkill/tasklist) y get_application_manager.
+DISCREPANCIAS: NINGUNA
+PENDIENTES: NINGUNO
+ESTADO FINAL: 3.6.5.2 - IMPLEMENTADA
