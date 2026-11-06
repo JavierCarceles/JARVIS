@@ -530,10 +530,13 @@ class ApplicationPreflight:
         if cache_key in self._executable_cache:
             return self._executable_cache[cache_key]
 
-        executable = self._resolve_from_apps_folder(
-            name=name,
-            app_id=app_id,
-        )
+        try:
+            executable = self._resolve_from_apps_folder(
+                name=name,
+                app_id=app_id,
+            )
+        except Exception:
+            executable = None
 
         if executable:
             executable = os.path.abspath(executable)
