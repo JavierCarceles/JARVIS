@@ -30,6 +30,7 @@ from typing import Any, Dict, List, Optional
 from src.hands.calibration_manager import SW_RESTORE, SW_MAXIMIZE, USER32
 
 from src.hands.action_registry import ActionType, get_action_registry, register_action
+from src.hands.application_preflight import ApplicationPreflight, get_application_preflight
 from src.hands.calibration_manager import get_calibration_manager
 from src.memory.storage import Entity, get_memory_manager
 from src.utils.screen_manager import get_screen_manager
@@ -1464,6 +1465,113 @@ def get_application_knowledge(app_name: str) -> Dict[str, Any]:
         "declared_capabilities": [cap.capability.value for cap in app.capabilities],
         "metadata": dict(app.metadata),
     }
+
+
+@dataclass
+class ApplicationClassification:
+    """Resultado de la clasificación de una aplicación en cuatro estados.
+
+    Distingue cuatro ejes independientes y no excluyentes entre sí:
+
+    - ``installed``: el ejecutable está en disco (PATH o ruta absoluta) o la
+      app tiene URL configurada. Es decir, está instalada/localizable.
+    - ``running``: un proceso con el nombre del ejecutable está activo en el
+      sistema (comprobado vía tasklist/psutil).
+    - ``registered``: la app está registrada en ``ApplicationManager``
+      (conocimiento de aplicación, ya sea hardcodeado o cargado de memoria).
+    - ``automatable``: la app pasa el preflight (no bloqueada, confidence
+      disponible) y está disponible en tiempo de ejecución, por lo que JARVIS
+      puede intentar automatizarla.
+    """
+
+    app_name: str
+    installed: bool
+    running: bool
+    registered: bool
+    automatable: bool
+    details: Dict[str, Any]
+
+
+def classify_application(app_name: str) -> ApplicationClassification:
+    """Clasifica una aplicación en los cuatro estados de descubrimiento.
+
+    Para un nombre de aplicación dado, determina si está:
+    1. Instalada (ejecutable en disco o URL),
+    2. En ejecución (proceso activo),
+    3. Registrada en ApplicationManager (conocimiento estructurado),
+    4. Disponible para automatización (preflight aprobado y disponible).
+
+    Los cuatro ejes son independientes: una aplicación puede estar instalada
+    pero no registrada, registrada pero no instalada, en ejecución sin estar
+    registrada, etc.
+
+    No lanza, instala ni modifica ninguna aplicación: es una operación de
+    inspección de lectura sola.
+    """
+    target = str(app_name or "").strip()
+    app_manager = get_application_manager()
+    app = app_manager.get_application(target) if target else None
+
+    # 1. Registrada en ApplicationManager
+    registered = app is not None
+
+    # 2. Instalada (ejecutable en disco o URL, o disponible por preflight)
+    installed = bool(app.is_available()) if app else False
+
+    # 3. En ejecución (proceso activo por nombre de ejecutable de la app
+    # registrada). Para apps no registradas no asumimos ejecución solo por
+    # coincidencia de nombre: sin conocimiento estructurado no podemos
+    # confirmar que el proceso corresponde a la aplicación consultada.
+    running = False
+    if app is not None:
+        exe = getattr(app, "executable", None)
+        if exe:
+            running = _is_process_running(str(exe))
+        if not running and target:
+            running = _is_process_running(target)
+
+    # 4. Disponible para automatización (preflight aprobado y disponible).
+    # Si el preflight falla (excepción), no se puede confirmar:
+    # automatable queda False.
+    automatable = False
+    preflight_result = None
+    if app is not None and installed:
+        try:
+            preflight = get_application_preflight()
+            preflight_result = preflight.check(app)
+            automatable = bool(
+                preflight_result.allowed
+                and preflight_result.confidence != "unknown"
+                and installed
+            )
+        except Exception:
+            preflight_result = None
+            automatable = False
+
+    details: Dict[str, Any] = {
+        "app_name": target,
+        "normalized_name": app_manager._normalize_name(target) if target else "",
+        "registered": registered,
+        "installed": installed,
+        "running": running,
+        "automatable": automatable,
+    }
+    if app is not None:
+        details["executable"] = app.executable
+        details["url"] = app.url
+        details["type"] = app.type
+        details["login_required"] = app.login_required
+    if preflight_result is not None:
+        details["preflight"] = preflight_result.to_dict()
+
+    return ApplicationClassification(
+        app_name=target,
+        installed=installed,
+        running=running,
+        registered=registered,
+        automatable=automatable,
+        details=details,
+    )
 
 
 def get_applications_by_capability(capability_name: str) -> List[str]:
