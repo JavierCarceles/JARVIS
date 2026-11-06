@@ -40,6 +40,7 @@ logger = get_logger(__name__)
 
 RESOLUTION_FUZZY_THRESHOLD = 0.7
 _MAX_RESOLUTION_ALTERNATIVES = 3
+RESOLUTION_AMBIGUITY_GAP = 0.05
 
 
 @dataclass
@@ -54,12 +55,21 @@ class ApplicationResolutionResult:
             ``fuzzy_name``, ``fuzzy_alias`` o ``none``.
         alternatives: Otras aplicaciones candidatas ordenadas por similitud
             (solo se rellena en resolución difusa).
+        is_ambiguous: ``True`` cuando la resolución difusa tiene otra
+            candidata dentro del umbral de proximidad
+            (``RESOLUTION_AMBIGUITY_GAP``) del mejor resultado, por lo que no
+            debe seleccionarse silenciosamente una aplicación posiblemente
+            incorrecta. El llamador debe pedir aclaración al usuario.
+        ambiguity_reason: Descripción legible de la ambigüedad detectada o
+            ``None`` si no hay ambigüedad.
     """
 
     app: Optional[ApplicationKnowledge]
     confidence: float
     method: str
     alternatives: List[ApplicationKnowledge]
+    is_ambiguous: bool = False
+    ambiguity_reason: Optional[str] = None
 
 
 class ApplicationCapability(Enum):
@@ -549,6 +559,13 @@ class ApplicationManager:
         Devuelve la mejor coincidencia con su confianza, el método usado y las
         alternativas ordenadas por similitud. Si no hay coincidencia,
         devuelve ``app=None``, ``confidence=0.0`` y ``method="none"``.
+
+        Cuando la resolución es difusa y existe otra candidata dentro del
+        umbral de proximidad (``RESOLUTION_AMBIGUITY_GAP``) del mejor
+        resultado, el campo ``is_ambiguous`` se establece en ``True`` junto
+        con una ``ambiguity_reason``, para que el llamador no seleccione
+        silenciosamente una aplicación posiblemente incorrecta y pueda pedir
+        aclaración al usuario.
         """
         normalized = self._normalize_name(app_name or "")
 
@@ -589,18 +606,41 @@ class ApplicationManager:
             candidates.append((ratio, candidate))
 
         if best_app is not None and best_ratio >= RESOLUTION_FUZZY_THRESHOLD:
+            sorted_candidates = sorted(
+                candidates, key=lambda item: item[0], reverse=True
+            )
             alternatives = [
                 candidate_app
-                for _, candidate_app in sorted(
-                    candidates, key=lambda item: item[0], reverse=True
-                )
+                for ratio, candidate_app in sorted_candidates
                 if candidate_app is not best_app
             ][:_MAX_RESOLUTION_ALTERNATIVES]
+
+            # Detectar coincidencias ambiguas: si otra candidata está lo
+            # suficientemente cerca del mejor resultado, no se selecciona
+            # silenciosamente una aplicación posiblemente incorrecta. Se marca
+            # la ambigüedad para que el llamador pueda pedir aclaración.
+            is_ambiguous = False
+            ambiguity_reason = None
+            for ratio, candidate_app in sorted_candidates:
+                if candidate_app is best_app:
+                    continue
+                if best_ratio - ratio < RESOLUTION_AMBIGUITY_GAP:
+                    is_ambiguous = True
+                    ambiguity_reason = (
+                        f"Coincidencia ambigua entre '{best_app.name}' y "
+                        f"'{candidate_app.name}' (diferencia de similitud "
+                        f"{best_ratio - ratio:.2f} < umbral "
+                        f"{RESOLUTION_AMBIGUITY_GAP})"
+                    )
+                    break
+
             return ApplicationResolutionResult(
                 app=best_app,
                 confidence=best_ratio,
                 method=best_method,
                 alternatives=alternatives,
+                is_ambiguous=is_ambiguous,
+                ambiguity_reason=ambiguity_reason,
             )
 
         return ApplicationResolutionResult(
@@ -627,7 +667,8 @@ class ApplicationManager:
         Retorna:
             Diccionario con claves: ``app_name``, ``app_name_resolved`` (si hay
             coincidencia), ``confidence``, ``method``, ``evidence_score``,
-            ``has_match``, ``alternatives_count``.
+            ``has_match``, ``alternatives_count``, ``is_ambiguous`` y
+            ``ambiguity_reason`` (ambigüedad de la resolución, si procede).
         """
         result = self.resolve_application(app_name)
 
@@ -640,6 +681,8 @@ class ApplicationManager:
                 "evidence_score": 0.0,
                 "has_match": False,
                 "alternatives_count": 0,
+                "is_ambiguous": False,
+                "ambiguity_reason": None,
             }
 
         confidence = result.confidence
@@ -661,6 +704,8 @@ class ApplicationManager:
             "method": result.method,
             "evidence_score": evidence_score,
             "resolved_name": app_name,
+            "is_ambiguous": result.is_ambiguous,
+            "ambiguity_reason": result.ambiguity_reason,
         }
 
         return {
@@ -671,6 +716,8 @@ class ApplicationManager:
             "evidence_score": evidence_score,
             "has_match": True,
             "alternatives_count": len(result.alternatives),
+            "is_ambiguous": result.is_ambiguous,
+            "ambiguity_reason": result.ambiguity_reason,
         }
 
     def get_stored_resolution_evidence(self, app_name: str) -> Optional[dict]:
