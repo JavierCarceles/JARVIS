@@ -631,6 +631,258 @@ $result | ConvertTo-Json -Compress -Depth 4
         return applications
 
     # ========================================================================
+    # REPORTE DE FUENTES DE DESCUBRIMIENTO (3.8.1.5)
+    # ========================================================================
+
+    def get_discovery_source_report(self) -> Dict[str, Any]:
+        """Registra cobertura, permisos y limitaciones de cada fuente de
+        descubrimiento de aplicaciones.
+
+        Retorna un diccionario con una entrada por fuente, cada una con:
+        source, ok, count, samples, error, coverage, permissions, limitations.
+
+        Es de lectura sola: no lanza, no instala ni modifica ninguna aplicacion.
+        """
+        report: Dict[str, Any] = {}
+
+        # 1) Aplicaciones instaladas (mecanismo real de CalibrationManager)
+        try:
+            apps = self.discover_applications() or []
+            by_source: Dict[str, int] = {}
+            for app in apps:
+                src = str(app.get("source", "desconocido"))
+                by_source[src] = by_source.get(src, 0) + 1
+            samples = [
+                {
+                    "name": app.get("name", ""),
+                    "app_id": app.get("app_id", "") or "",
+                    "path": app.get("path", "") or "",
+                    "source": app.get("source", "") or "",
+                }
+                for app in apps[:12]
+            ]
+            report["aplicaciones_instaladas"] = {
+                "source": "aplicaciones_instaladas",
+                "ok": True,
+                "count": len(apps),
+                "samples": samples,
+                "error": None,
+                "coverage": (
+                    "Get-StartApps (menu Inicio con AppID), accesos directos .lnk del "
+                    "menu Inicio (APPDATA y ProgramData, nivel raiz sin recursion por "
+                    "disco, cumple 3.8.1.4), paquetes AppX (Get-AppxPackage -AllUsers) "
+                    "y registro de desinstaladores (HKCU/HKLM/WOW6432Node Uninstall)."
+                ),
+                "permissions": (
+                    "Ejecucion de PowerShell (ExecutionPolicy Bypass), lectura de "
+                    "sistema de archivos (accesos directos .lnk), lectura de registro "
+                    "de Windows (desinstaladores y paquetes AppX)."
+                ),
+                "limitations": (
+                    "Filtrado por _should_ignore_application; los metadatos de "
+                    "desinstalador/shortcut solo se anaden si el path existe en disco "
+                    "(os.path.isfile); fuentes sin path usable quedan excluidas; no se "
+                    "usa busqueda recursiva por todo el disco como mecanismo por defecto "
+                    "(3.8.1.4)."
+                ),
+                "by_source": by_source,
+            }
+        except Exception as exc:
+            report["aplicaciones_instaladas"] = {
+                "source": "aplicaciones_instaladas",
+                "ok": False,
+                "count": 0,
+                "samples": [],
+                "error": f"{type(exc).__name__}: {exc}",
+                "coverage": "Get-StartApps, .lnk menu Inicio, AppX, registro de desinstaladores",
+                "permissions": "Ejecucion de PowerShell, lectura de sistema de archivos y registro",
+                "limitations": "Fuente no disponible por error de ejecucion",
+            }
+
+        # 2) Rutas registradas en PATH
+        try:
+            raw_path = os.environ.get("PATH", "")
+            dirs = [d for d in raw_path.split(os.pathsep) if d]
+            existing = [d for d in dirs if os.path.isdir(d)]
+            missing = [d for d in dirs if not os.path.isdir(d)]
+            exe_samples: List[str] = []
+            for directory in existing:
+                try:
+                    for entry in os.listdir(directory):
+                        if entry.lower().endswith(".exe") and len(exe_samples) < 40:
+                            exe_samples.append(entry)
+                except (OSError, PermissionError):
+                    continue
+            report["rutas_registradas_path"] = {
+                "source": "rutas_registradas_path",
+                "ok": True,
+                "count": len(dirs),
+                "samples": {
+                    "total_dirs": len(dirs),
+                    "existing_dirs": len(existing),
+                    "missing_dirs": len(missing),
+                    "exe_sample": sorted(set(exe_samples))[:12],
+                },
+                "error": None,
+                "coverage": "Variable de entorno PATH del usuario/proceso actual.",
+                "permissions": "Lectura de variable de entorno PATH y listado de directorios del sistema de archivos.",
+                "limitations": (
+                    "Solo se inspecciona la primera capa de cada carpeta PATH; no se "
+                    "hace busqueda recursiva por el disco (evitado por diseno, 3.8.1.4)."
+                ),
+            }
+        except Exception as exc:
+            report["rutas_registradas_path"] = {
+                "source": "rutas_registradas_path",
+                "ok": False,
+                "count": 0,
+                "samples": {},
+                "error": f"{type(exc).__name__}: {exc}",
+                "coverage": "Variable de entorno PATH",
+                "permissions": "Lectura de variable de entorno",
+                "limitations": "Fuente no disponible por error de ejecucion",
+            }
+
+        # 3) Rutas registradas en App Paths del registro de Windows
+        try:
+            import winreg
+            _APP_PATHS_ROOTS = [
+                (winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\App Paths"),
+                (winreg.HKEY_LOCAL_MACHINE, r"Software\Microsoft\Windows\CurrentVersion\App Paths"),
+            ]
+            entries: List[Dict[str, str]] = []
+            errors: List[str] = []
+            for hive, root in _APP_PATHS_ROOTS:
+                try:
+                    with winreg.OpenKey(hive, root) as key:
+                        index = 0
+                        while True:
+                            try:
+                                exe_name = winreg.EnumKey(key, index)
+                            except OSError:
+                                break
+                            index += 1
+                            try:
+                                with winreg.OpenKey(key, exe_name) as subkey:
+                                    path, _ = winreg.QueryValueEx(subkey, "")
+                                    exe_path, _ = winreg.QueryValueEx(subkey, "Path")
+                            except OSError:
+                                path = ""
+                                exe_path = ""
+                            entries.append(
+                                {
+                                    "hive": "HKCU" if hive == winreg.HKEY_CURRENT_USER else "HKLM",
+                                    "exe": exe_name,
+                                    "path": path,
+                                    "path_env": exe_path,
+                                }
+                            )
+                except OSError as exc:
+                    errors.append(f"{root}: {type(exc).__name__}: {exc}")
+            report["rutas_registradas_app_paths"] = {
+                "source": "rutas_registradas_app_paths",
+                "ok": len(errors) == 0,
+                "count": len(entries),
+                "samples": entries[:12],
+                "error": "; ".join(errors) if errors else None,
+                "coverage": "HKCU y HKLM Software\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\App Paths\\\\*",
+                "permissions": "Lectura de claves de registro HKCU y HKLM (App Paths).",
+                "limitations": (
+                    "Cada entrada es un ejecutable concreto registrado por instalador; no "
+                    "cubre aplicaciones sin registro en App Paths."
+                ),
+            }
+        except Exception as exc:
+            report["rutas_registradas_app_paths"] = {
+                "source": "rutas_registradas_app_paths",
+                "ok": False,
+                "count": 0,
+                "samples": [],
+                "error": f"{type(exc).__name__}: {exc}",
+                "coverage": "Registro de Windows App Paths",
+                "permissions": "Lectura de registro HKCU/HKLM",
+                "limitations": "Fuente no disponible por error de ejecucion",
+            }
+
+        # 4) Procesos activos
+        try:
+            processes: List[Dict[str, Any]] = []
+            try:
+                result = subprocess.run(
+                    ["tasklist", "/FO", "CSV", "/NH"],
+                    capture_output=True, text=True, check=False, timeout=15,
+                )
+                if result.returncode == 0 and result.stdout.strip():
+                    for line in result.stdout.strip().splitlines():
+                        parts = [p.strip('"') for p in line.split('","')]
+                        if len(parts) >= 2:
+                            processes.append({"pid": parts[1], "name": parts[0]})
+                            if len(processes) >= 60:
+                                break
+            except (OSError, subprocess.SubprocessError):
+                pass
+            report["procesos_activos"] = {
+                "source": "procesos_activos",
+                "ok": True,
+                "count": len(processes),
+                "samples": processes[:12],
+                "error": None,
+                "coverage": "tasklist (Windows) sobre procesos visibles al proceso actual.",
+                "permissions": "Enumeracion de procesos del sistema (tasklist).",
+                "limitations": (
+                    "Puede no incluir procesos del sistema sin privilegios elevados; "
+                    "el PID/name proviene de tasklist y puede carecer de detalles de sesion."
+                ),
+            }
+        except Exception as exc:
+            report["procesos_activos"] = {
+                "source": "procesos_activos",
+                "ok": False,
+                "count": 0,
+                "samples": [],
+                "error": f"{type(exc).__name__}: {exc}",
+                "coverage": "Procesos activos del sistema",
+                "permissions": "Enumeracion de procesos",
+                "limitations": "Fuente no disponible por error de ejecucion",
+            }
+
+        # 5) Ventanas activas
+        try:
+            windows = gw.getAllWindows() or []
+            foreground = gw.getActiveWindow()
+            samples = [
+                {"title": w.title, "pid": getattr(w, "_pid", None)}
+                for w in windows[:12]
+            ]
+            report["ventanas_activas"] = {
+                "source": "ventanas_activas",
+                "ok": True,
+                "count": len(windows),
+                "samples": samples,
+                "error": None,
+                "coverage": "pygetwindow.getAllWindows + getActiveWindow (ventana foreground).",
+                "permissions": "Enumeracion de ventanas de escritorio (pygetwindow / Win32 user32).",
+                "limitations": (
+                    "Titulos pueden estar vacios para ventanas sin titulo o inaccesibles; "
+                    "no se lanza ninguna aplicacion; ventana foreground puede ser None."
+                ),
+                "foreground_title": foreground.title if foreground else None,
+            }
+        except Exception as exc:
+            report["ventanas_activas"] = {
+                "source": "ventanas_activas",
+                "ok": False,
+                "count": 0,
+                "samples": [],
+                "error": f"{type(exc).__name__}: {exc}",
+                "coverage": "Ventanas activas del escritorio",
+                "permissions": "Enumeracion de ventanas",
+                "limitations": "Fuente no disponible por error de ejecucion",
+            }
+
+        return report
+
+    # ========================================================================
     # FILTROS
     # ========================================================================
 

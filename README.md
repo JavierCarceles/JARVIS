@@ -989,6 +989,7 @@ Métodos:
 | `def _load_application_installation_metadata()` |  |
 | `def _get_application_metadata(name, app_id)` |  |
 | `def discover_applications()` | Descubre aplicaciones GUI sin limitarse a una lista de apps conocidas. |
+| `def get_discovery_source_report()` | Registra cobertura, permisos y limitaciones de cada fuente de descubrimiento de aplicaciones (3.8.1.5). |
 | `def _is_vscode_application(name, app_id)` |  |
 | `def _is_game_launcher_application(name, app_id)` |  |
 | `def _is_game_launcher_executable(path)` |  |
