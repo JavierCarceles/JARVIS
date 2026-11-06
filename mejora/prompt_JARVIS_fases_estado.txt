@@ -6659,3 +6659,45 @@ VERIFICACION: SINTAXIS: OK (pytest recolecta y ejecuta sin errores de importaci�
 DISCREPANCIAS: NINGUNA
 PENDIENTES: NINGUNO para 3.7.2.4. Siguiente hoja pendiente real en orden del roadmap: 3.7.3.1 (Ejecutar tests pertinentes), fase 3.7.
 ESTADO FINAL: 3.7.2.4 - IMPLEMENTADA
+
+===
+REGISTRO DE UNIDAD: 3.7.3.1
+FECHA: 2026-11-06
+OBJETIVO: Ejecutar la suite completa de tests existentes (regresión de fase 3.7 VERIFICACION Y COMPATIBILIDAD) sin modificar código de producción, y obtener evidencia real de PASSED/FAILED para decidir en 3.7.3.2 si hay fallos de tests correctos que exijan corrección de código.
+TIPO DE TRABAJO: TEST | VERIFICACION
+CAMBIOS / HALLAZGOS: 4602 PASSED, 15 FAILED, 41 subtests PASSED en 432.01s sobre 4617 tests recolectados (`python -m pytest tests -q --tb=short`). Ningún error de importación ni sintaxis en la recolección. Todas las 15 fallas concentradas en tests/hands/test_ui_elements.py y variantes (test_ui_elements_final.py, test_ui_elements_minimal.py, test_ui_elements_real.py, test_ui_elements_simple.py, test_ui_elements_working.py). No se modificó código de producción.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: NA; DOCUMENTACION: este registro en mejora/prompt_JARVIS_fases_estado.txt.
+TESTS Y RESULTADOS: UNITARIOS: PASSED/4602/4617 en 432.01s; INTEGRACION: NA; NO REGRESION: suite completa ejecutada como regresión de fase 3.7 (baseline de esta hoja: 4602/4617).
+VERIFICACION: SINTAXIS: OK (pytest recolectó y ejecutó sin errores de importación ni sintaxis; py_compile main.py OK); MAIN.PY: OK (sintaxis válida, sin modificaciones); COMPORTAMIENTO / INTEGRACION REAL: 15 fallos reales verificados por ejecución real de pytest, todos en tests de UI elements (mock de atributos inexistentes en producción: `get_calibration_data` en CalibrationManager, `calibrate_element` en UniversalVisualCalibrator; asserts de coordenadas `None` vs dict y capacidades vacías).
+DISCREPANCIAS: Ninguna entre código, roadmap y README. Los 15 fallos requieren análisis en 3.7.3.2 para decidir si son tests defectuosos (patch de atributos que no existen en producción) o errores de producción que exijan corrección de código; no se reconcilia por intuición.
+PENDIENTES: NINGUNO para 3.7.3.1. Siguiente hoja pendiente real en orden del roadmap: 3.7.3.2 (Corregir código ante fallos de tests correctos), fase 3.7; luego 3.7.3.3 (Verificar main.py).
+ESTADO FINAL: 3.7.3.1 - IMPLEMENTADA
+
+
+===
+REGISTRO DE UNIDAD: 3.7.3.2
+FECHA: 2026-11-06
+OBJETIVO: Determinar cuáles de los 15 fallos de la suite de tests de elementos UI son fallos de tests correctos que exijan corrección de código de producción, y corregir dicho código; si no los hay, registrar que no hay cambios de producción.
+TIPO DE TRABAJO: VERIFICACION | INSPECCION
+CAMBIOS / HALLAZGOS: Ejecutada pytest real sobre tests/hands/test_ui_elements.py, test_ui_elements_final.py, test_ui_elements_minimal.py, test_ui_elements_real.py, test_ui_elements_simple.py y test_ui_elements_working.py: 63 PASSED, 15 FAILED (baseline 3.7.3.1 sobre suite completa: 4602 PASSED / 15 FAILED / 4617 en 432.01s). Ninguno de los 15 fallos es un test correcto que fije un contrato real aún no implementado. Clasificación con evidencia de ejecución real:
+ - 8 fallos por tests defectuosos que parchean atributos/métodos inexistentes en producción o mockean de modo que invalidan su propio assert: `get_calibration_data` en CalibrationManager (AttributeError), `calibrate_element` en UniversalVisualCalibrator (AttributeError), `save_calibration` mockeado a nivel de módulo en `src.hands.coordinate_manager` con expectativa de persistencia real posterior (assert `updated_coords == new_coords` falla), `click_element` en `src.hands.mouse` y `type_text` en `src.hands.keyboard` parcheados como atributo de módulo tras importación estática al inicio del test (mock "Called 0 times"), `get_calibration_manager` en CalibrationManager (AssertionError hasattr False).
+ - 7 fallos por tests defectuosos que afirman invariables que el modelo de datos no garantiza: `UIElement.coordinates` es `Optional[Dict[str, Any]] = None` (applications_core.py:96; None es válido) y `ApplicationKnowledge.capabilities` se inicializa a `[]` si falta (applications_core.py:148-149; lista vacía válida). Los asserts `isinstance(ui_element.coordinates, dict)` y `len(app_knowledge.capabilities) > 0` contradicen el contrato real (elemento `address_bar` con coordinates=None; aplicaciones con capabilities vacías).
+CONCLUSION: no hay fallos de tests correctos; no hay código de producción que corregir. Todos los 15 fallos son de tests, no de producción.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: NA; DOCUMENTACION: este registro en mejora/prompt_JARVIS_fases_estado.txt.
+TESTS Y RESULTADOS: UNITARIOS: 63 PASSED / 15 FAILED sobre las 6 suites de UI elements (ejecución real de pytest); NO REGRESION: sin cambios de producción, baseline 3.7.3.1 mantenido (4602/4617 PASSED suite completa).
+VERIFICACION: SINTAXIS: OK (pytest recolectó y ejecutó sin errores de importación ni sintaxis); MAIN.PY: OK (sin modificaciones); COMPORTAMIENTO / INTEGRACION REAL: evidencia real de pytest — AttributeError y AssertionError capturados por test; los 15 fallos reproducidos y clasificados uno a uno.
+DISCREPANCIAS: NINGUNA entre código, roadmap y README. Los 15 fallos son de tests, no de producción.
+PENDIENTES: NINGUNO para 3.7.3.2. Siguiente hoja pendiente real en orden del roadmap: 3.7.3.3 (Verificar main.py), fase 3.7.
+ESTADO FINAL: 3.7.3.2 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.7.3.3
+FECHA: 2026-11-06
+OBJETIVO: Verificar que main.py compila sin errores de sintaxis, se importa sin excepciones, y arranca/detiene correctamente (graceful shutdown) sin requerir cambios de producción.
+TIPO DE TRABAJO: VERIFICACION
+CAMBIOS / HALLAZGOS: py_compile de main.py -> exit 0 (sin errores de sintaxis); import main -> IMPORT_OK (todas las dependencias resueltas, código a nivel de módulo ejecutado sin excepciones); logs evidencian inicio de advanced logging ("Advanced logging system started successfully"), carga de modelos ML, inicialización de PerformanceOptimizer, SelfImprovementSystem, AdaptiveLearningEngine, OptimizationOrchestrator, y persistencia del grafo de conocimiento en data/knowledge_graph.json; al salir del proceso todos los subsistemas se detuvieron limpiamente ("Optimización detenida", "Aprendizaje detenido", "Motor de aprendizaje detenido", "Orquestación detenida", "Sistema de optimización finalizado") -> graceful shutdown verificado. No hubo cambios de código de producción.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: NA; DOCUMENTACION: este registro en mejora/prompt_JARVIS_fases_estado.txt.
+TESTS Y RESULTADOS: UNITARIOS: NE (esta hoja no ejecuta tests unitarios, solo verificación de main.py); INTEGRACION: NE; NO REGRESION: NE (baseline mantenido de 3.7.3.1: 4602/4617 PASSED suite completa; sin cambios de producción desde 3.7.3.2).
+VERIFICACION: SINTAXIS: OK (py_compile main.py -> exit 0); MAIN.PY: OK (import main ejecutado sin excepciones, arranque y parada graceful de todos los subsistemas evidenciados en logs); COMPORTAMIENTO / INTEGRACION REAL: import main ejecuta código a nivel de módulo (jarvis_logger.start, importaciones src.ear/src.brain/src.tools.executor/src.memory/src.utils.*, DPI awareness ctypes) sin fallos; data/knowledge_graph.json persistido al importarse; parada graceful de subsistemas al finalizar el proceso.
+DISCREPANCIAS: NINGUNA entre código, roadmap y README para esta unidad.
+PENDIENTES: NINGUNO
+ESTADO FINAL: 3.7.3.3 - IMPLEMENTADA
