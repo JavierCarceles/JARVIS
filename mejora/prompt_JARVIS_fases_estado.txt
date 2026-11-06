@@ -6561,3 +6561,26 @@ VERIFICACION: SINTAXIS: OK (py_compile de test y de applications_core.py, applic
 DISCREPANCIAS: NINGUNA nueva en consumidores del conocimiento. Heredada de 3.7.1.1: (D11) bug de producción en open_application() error handler (applications_core.py:506, str(exc, ...) con 4 argumentos), ajeno a esta verificacion y pendiente de fase posterior. Contradicción de instrucciones de cierre: prompt_mejoraActual.txt (CONTINUIDAD Y CIERRE) indica dejar CURRENT_WORK_STATUS: EN PROCESO al cerrar; prompt_JARVIS_reglas.txt (sección 5) indica PENDIENTE para la siguiente hoja. Se sigue prompt_JARVIS_reglas.txt (especificación operativa del ciclo); se registra la contradicción sin reconciliar por intuición.
 PENDIENTES: NINGUNO para 3.7.1.2. Siguiente hoja pendiente real en orden del roadmap: 3.7.1.3 (Verificar integracion con Brain), fase 3.7.
 ESTADO FINAL: 3.7.1.2 - IMPLEMENTADA
+===
+REGISTRO DE UNIDAD: 3.7.1.3
+FECHA: 2026-11-06
+OBJETIVO: Verificar integracion con Brain: confirmar que Brain se integra correctamente con ApplicationKnowledge, Goal, Planner, Executor y HTN, sin modificar codigo de produccion.
+TIPO DE TRABAJO: VERIFICACION | INTEGRACION | TEST
+CAMBIOS / HALLAZGOS:
+- Integracion Brain verificada contra componentes reales (src/brain/llm.py y src/brain/htn_integration.py):
+  1. Brain.__init__ inicializa htn_integration (HTNBrainIntegration), action_registry, entity_resolver, memory_manager y preconditions_effects_manager.
+  2. Brain._get_application_knowledge() expone aplicaciones al LLM (capabilities, declared, available, capability_available) mediante ApplicationKnowledgeIntegrator singleton (verificado tambien en 3.7.1.2 contra el modelo real de data/memory/entities.json: 35 entidades, 32 aplicaciones).
+  3. Brain.interpret_intent() interpreta intenciones: detecta acciones directas (_detect_direct_action), resuelve entidades (entity_resolver), crea Goal (_create_goal_from_entity) y hace fallback al LLM (generate_response) + modo legacy.
+  4. Brain.execute_goal() ejecuta objetivos (navigate_stream, navigate, open_application -> legacy_action).
+  5. Brain.process_intent_to_execution() ejecuta objetivos vía HTN (htn_integration.process_goal_through_htn) y legacy.
+  6. Brain.process_with_htn() integra texto -> objetivo HTN.
+  7. Brain.get_planner_ready_data() expone goals, domain_entities, current_state, conversation_history, available_actions, memory_stats para el Planner.
+  8. Brain.create_goal_from_user_input(), register_node(), register_task().
+  9. HTNBrainIntegration: process_goal_through_htn (descompone y ejecuta Goal), create_and_execute_htn_goal, estadísticas, singleton get_htn_integration().
+- No se modificó codigo de produccion. No se crearon tests nuevos (tests de Brain ya existían, fase 2.8.13.5).
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: NA (tests de Brain ya existentes, fase 2.8.13.5); DOCUMENTACION: este registro en mejora/prompt_JARVIS_fases_estado.txt.
+TESTS Y RESULTADOS: UNITARIOS: PASSED/103/103 (tests/brain/test__init__.py 6; test_llm.py 59; test_htn_integration.py 38; ejecutados en 14.42s); INTEGRACION: NA (la integración real se verificó por inspección de contratos y ejecución de tests de Brain contra componentes reales); NO REGRESION: 37/37 PASSED (tests/hands/test_application_consumers_real_model.py, hoja 3.7.1.2); 34/34 PASSED (tests/hands/test_consumer_api_compatibility.py, hoja 3.7.1.1).
+VERIFICACION: SINTAXIS: OK (py_compile de src/brain/llm.py, src/brain/htn_integration.py, src/brain/__init__.py exit 0); MAIN.PY: NE (no modificado, no requerido para esta hoja de verificación; integración verificada vía tests de Brain y contratos); COMPORTAMIENTO / INTEGRACION REAL: verificado contra componentes reales (Brain, HTNBrainIntegration, Goal, ApplicationKnowledgeIntegrator singleton); ejecución real de aplicaciones del SO no verificada en este entorno (NV).
+DISCREPANCIAS: NINGUNA nueva en la integración con Brain. Heredada de 3.7.1.1: (D11) bug de producción en open_application() error handler (applications_core.py:506, str(exc, ...) con 4 argumentos), ajeno a esta verificación y pendiente de fase posterior. Contradicción de instrucciones de cierre (prompt_mejoraActual.txt vs prompt_JARVIS_reglas.txt sección 5) ya documentada en 3.7.1.2; se sigue prompt_JARVIS_reglas.txt.
+PENDIENTES: NINGUNO para 3.7.1.3. Siguiente hoja pendiente real en orden del roadmap: 3.7.2.1 (Application Knowledge -> Goal), fase 3.7.
+ESTADO FINAL: 3.7.1.3 - IMPLEMENTADA
