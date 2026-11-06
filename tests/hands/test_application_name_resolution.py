@@ -8,6 +8,9 @@ normalizada, sobre ApplicationManager sin modificar lógica existente.
 
 import pytest
 
+import src.hands.applications_core as _applications_core
+import src.memory.storage as _storage
+
 from src.hands.applications_core import (
     ApplicationCapability,
     ApplicationCapabilityDef,
@@ -47,6 +50,22 @@ def _registrar_app(manager: ApplicationManager, name: str, aliases=None):
     )
     assert manager.register_application(app) is True
     return app
+
+
+@pytest.fixture(autouse=True)
+def _reset_singletons_compartidos():
+    """Aísla cada test de los singletons globales ``ApplicationManager`` y
+    ``MemoryManager`` para que los registros persistentes de pruebas previas
+    (que se guardan en el gestor compartido) no contaminen esta suite.
+
+    Esta es la contención detectada en la unidad 3.8.2.6: los tests de nombres,
+    alias, errores de escritura, ambiguedad y ausencia de coincidencias deben
+    verificarse juntos como suite, independientemente del orden de ejecución.
+    El fixture reinicia los singletons sin debilitar ninguna aserción.
+    """
+    _applications_core._app_manager = None
+    _storage._memory_manager = None
+    yield
 
 
 class TestApplicationResolutionResult:
