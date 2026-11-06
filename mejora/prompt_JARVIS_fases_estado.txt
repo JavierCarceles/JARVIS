@@ -6701,3 +6701,17 @@ VERIFICACION: SINTAXIS: OK (py_compile main.py -> exit 0); MAIN.PY: OK (import m
 DISCREPANCIAS: NINGUNA entre código, roadmap y README para esta unidad.
 PENDIENTES: NINGUNO
 ESTADO FINAL: 3.7.3.3 - IMPLEMENTADA
+
+
+===
+REGISTRO DE UNIDAD: 3.7.3.4
+FECHA: 2026-11-06
+OBJETIVO: Verificar que todas las hojas de FASE 3 (3.1 a 3.8) tienen registro canonico IMPLEMENTADA para poder cerrar FASE 3, tal como exige 3.7.3.4 ("Cerrar FASE 3 solo con todas las hojas completadas, incluidas todas las hojas de 3.8").
+TIPO DE TRABAJO: VERIFICACION
+CAMBIOS / HALLAZGOS: Se inspeccionaron los registros canonicos existentes en este archivo: 3.1.1.1 a 3.1.3.4; 3.2.1.1 a 3.2.4.2; 3.3.1.1 a 3.3.4.4; 3.4.1.1 a 3.4.4.3; 3.5.1 a 3.5.4; 3.6.1.1 a 3.6.5.5; 3.7.1.1 a 3.7.2.4; 3.7.3.1 a 3.7.3.3 — todos con ESTADO FINAL IMPLEMENTADA (registros en líneas 4387-6703). No existen registros canonicos para ninguna hoja de 3.8 (3.8.1 a 3.8.9). El roadmap define 3.8 como parte de FASE 3 con 9 hojas (3.8.1 INSPECCION Y FUENTES DE DESCUBRIMIENTO, 3.8.2 RESOLUCION DE LA APLICACION OBJETIVO, 3.8.3 DESCUBRIMIENTO DEL EJECUTABLE, 3.8.4 CONOCIMIENTO DINAMICO SIN ALTERAR ENTITIES.JSON, 3.8.5 PREFLIGHT Y APERTURA SEGURA, 3.8.6 CALIBRACION DE APLICACIONES DESCUBIERTAS, 3.8.7 CAPACIDADES DISPONIBLES PARA PLANIFICACION, 3.8.8 ERRORES EVIDENCIA Y RECUPERACION, 3.8.9 INTEGRACION Y CIERRE DE LA RAMA), ninguna con marcador [IMPLEMENTADA] ni registro canonico. Por tanto FASE 3 no puede cerrarse: faltan todas las hojas de 3.8. No se modificó código de producción.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: NA; DOCUMENTACION: este registro en mejora/prompt_JARVIS_fases_estado.txt.
+TESTS Y RESULTADOS: UNITARIOS: NE (unidad de cierre de fase; no ejecuta tests unitarios); INTEGRACION: NA; NO REGRESION: NA.
+VERIFICACION: SINTAXIS: NA; MAIN.PY: NA; COMPORTAMIENTO / INTEGRACION REAL: Evidencia real de inspeccion de registros: hojas 3.1-3.7.3.3 IMPLEMENTADA; ausencia confirmada de registros 3.8.1 a 3.8.9; FASE 3 no cerrada.
+DISCREPANCIAS: El roadmap declara 3.8 como parte de FASE 3 con 9 hojas, pero ninguna hoja de 3.8 tiene registro canonico ni marcador de completado; 3.7.3.4 exige todas las hojas de 3.8 completadas para cerrar FASE 3. Se conserva como pendiente sin reconciliar por intuicion.
+PENDIENTES: Implementar y registrar (registro canonico ESTADO FINAL IMPLEMENTADA) las hojas 3.8.1, 3.8.2, 3.8.3, 3.8.4, 3.8.5, 3.8.6, 3.8.7, 3.8.8, 3.8.9; luego reintentar 3.7.3.4.
+ESTADO FINAL: 3.7.3.4 - PARCIALMENTE IMPLEMENTADA
