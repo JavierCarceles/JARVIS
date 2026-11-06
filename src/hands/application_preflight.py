@@ -143,12 +143,18 @@ class ApplicationPreflight:
     def check(
         self,
         application: Dict[str, Any],
+        ambiguous: bool = False,
     ) -> Dict[str, Any]:
         """
         Analiza una aplicación sin ejecutarla.
 
         La información de login y recursos puede llegar desde el conocimiento
         de la aplicación. Este módulo no inventa ese estado.
+
+        Cuando ``ambiguous`` es True, la resolución de la aplicación resultó
+        ambigua (múltiples candidatos dentro del umbral de proximidad) y la
+        solicitud se rechaza para no seleccionar silenciosamente una aplicación
+        posiblemente incorrecta (unidad 3.8.3.5).
         """
 
         if not isinstance(application, dict):
@@ -177,6 +183,22 @@ class ApplicationPreflight:
                 logged_in=logged_in,
                 resources_available=resources_available,
                 blocked_by="invalid_application",
+            )
+
+        if ambiguous:
+            return self._result(
+                allowed=False,
+                reason=(
+                    "Resolución de aplicación ambigua: múltiples candidatos "
+                    "dentro del umbral de proximidad; no se selecciona "
+                    "silenciosamente una aplicación posiblemente incorrecta"
+                ),
+                confidence="medium",
+                availability="unknown",
+                login_required=login_required,
+                logged_in=logged_in,
+                resources_available=resources_available,
+                blocked_by="ambiguous_resolution",
             )
 
         if self._name_is_blocked(name):
@@ -245,19 +267,57 @@ class ApplicationPreflight:
         )
 
         if not executable_path:
+            # 3.8.3.5: rechazar rutas inexistentes y destinos no verificables.
+            # Una aplicación solo puede abrirse si se resuelve un ejecutable
+            # existente O si tiene un URI de aplicación válido como destino.
+            url = str(application.get("url", "")).strip()
+            if url:
+                url_validation = self.validate_launch_destination(url)
+                if url_validation["valid"]:
+                    return self._result(
+                        allowed=True,
+                        reason=(
+                            "No se pudo resolver el ejecutable; se permite URI de "
+                            "aplicacion como destino de lanzamiento"
+                        ),
+                        executable_path=None,
+                        requires_elevation=False,
+                        confidence="medium",
+                        availability="available",
+                        login_required=login_required,
+                        logged_in=logged_in,
+                        resources_available=resources_available,
+                    )
             return self._result(
-                allowed=True,
+                allowed=False,
                 reason=(
-                    "No se pudo resolver el ejecutable; se mantiene la apertura "
-                    "como permitida y la elevación deberá comprobarse también después de abrir"
+                    "No se pudo resolver el ejecutable y no hay destino de "
+                    "lanzamiento verificable"
                 ),
                 executable_path=None,
                 requires_elevation=False,
-                confidence="low",
+                confidence="high",
                 availability="unknown",
                 login_required=login_required,
                 logged_in=logged_in,
                 resources_available=resources_available,
+                blocked_by="executable_not_resolved",
+            )
+
+        # 3.8.3.5: validar que el destino resuelto sea verificable y admisible.
+        launch_validation = self.validate_launch_destination(executable_path)
+        if not launch_validation["valid"]:
+            return self._result(
+                allowed=False,
+                reason=f"Destino de lanzamiento no verificable: {launch_validation['reason']}",
+                executable_path=executable_path,
+                requires_elevation=False,
+                confidence="high",
+                availability="unknown",
+                login_required=login_required,
+                logged_in=logged_in,
+                resources_available=resources_available,
+                blocked_by="launch_destination_invalid",
             )
 
         manifest_info = self.inspect_executable_manifest(executable_path)
@@ -323,10 +383,11 @@ class ApplicationPreflight:
     def check_application(
         self,
         application: Dict[str, Any],
+        ambiguous: bool = False,
     ) -> PreflightResult:
         """Versión tipada del chequeo principal."""
 
-        data = self.check(application)
+        data = self.check(application, ambiguous=ambiguous)
         return PreflightResult(**data)
 
     def is_safe_to_calibrate(

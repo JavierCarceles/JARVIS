@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """Tests de ApplicationPreflight (src/hands/application_preflight.py)."""
 
+import os
+import tempfile
 from dataclasses import is_dataclass
 from unittest.mock import patch, MagicMock
 
@@ -220,8 +222,66 @@ class TestCheck:
         assert result["blocked_by"] == "resources_unavailable"
 
     def test_check_normal_app_passes_preflight(self):
-        result = self.pf.check({"name": "chrome"})
-        assert result["allowed"] is True
+        with tempfile.NamedTemporaryFile(suffix=".exe", delete=False) as f:
+            path = f.name
+        try:
+            with patch.object(
+                self.pf, "resolve_executable", return_value=path
+            ):
+                result = self.pf.check({"name": "chrome"})
+                assert result["allowed"] is True
+        finally:
+            os.unlink(path)
+
+    def test_check_unresolved_executable_without_url_is_rejected(self):
+        with patch.object(
+            self.pf, "resolve_executable", return_value=None
+        ):
+            result = self.pf.check({"name": "unknown_app"})
+            assert result["allowed"] is False
+            assert result["blocked_by"] == "executable_not_resolved"
+            assert "no hay destino de lanzamiento verificable" in result["reason"]
+
+    def test_check_unresolved_executable_with_valid_uri_is_allowed(self):
+        with patch.object(
+            self.pf, "resolve_executable", return_value=None
+        ):
+            result = self.pf.check({"name": "webapp", "url": "https://example.com"})
+            assert result["allowed"] is True
+            assert "URI de aplicacion" in result["reason"]
+
+    def test_check_unresolved_executable_with_invalid_uri_is_rejected(self):
+        with patch.object(
+            self.pf, "resolve_executable", return_value=None
+        ):
+            result = self.pf.check({"name": "webapp", "url": "custom-app:algo"})
+            assert result["allowed"] is False
+            assert result["blocked_by"] == "executable_not_resolved"
+
+    def test_check_ambiguous_resolution_is_rejected(self):
+        result = self.pf.check(
+            {"name": "app"}, ambiguous=True
+        )
+        assert result["allowed"] is False
+        assert result["blocked_by"] == "ambiguous_resolution"
+        assert "ambigua" in result["reason"]
+
+    def test_check_resolved_executable_that_is_directory_is_rejected(self):
+        with patch.object(
+            self.pf, "resolve_executable", return_value=r"C:\Windows"
+        ):
+            result = self.pf.check({"name": "app"})
+            assert result["allowed"] is False
+            assert result["blocked_by"] == "launch_destination_invalid"
+            assert "directorio" in result["reason"]
+
+    def test_check_resolved_executable_nonexistent_path_is_rejected(self):
+        with patch.object(
+            self.pf, "resolve_executable", return_value=r"C:\No\Existe\app.exe"
+        ):
+            result = self.pf.check({"name": "app"})
+            assert result["allowed"] is False
+            assert result["blocked_by"] == "launch_destination_invalid"
 
     def test_check_returns_dict(self):
         result = self.pf.check({"name": "app"})
@@ -236,9 +296,26 @@ class TestCheckApplication:
         self.pf = ApplicationPreflight()
 
     def test_check_application_returns_preflight_result(self):
-        result = self.pf.check_application({"name": "chrome"})
-        assert isinstance(result, PreflightResult)
-        assert result.allowed is True
+        with tempfile.NamedTemporaryFile(suffix=".exe", delete=False) as f:
+            path = f.name
+        try:
+            with patch.object(
+                self.pf, "resolve_executable", return_value=path
+            ):
+                result = self.pf.check_application({"name": "chrome"})
+                assert isinstance(result, PreflightResult)
+                assert result.allowed is True
+        finally:
+            os.unlink(path)
+
+    def test_check_application_unresolved_executable_is_blocked(self):
+        with patch.object(
+            self.pf, "resolve_executable", return_value=None
+        ):
+            result = self.pf.check_application({"name": "unknown_app"})
+            assert isinstance(result, PreflightResult)
+            assert result.allowed is False
+            assert result.blocked_by == "executable_not_resolved"
 
     def test_check_application_typed_blocked(self):
         result = self.pf.check_application({"name": "Task Scheduler"})
@@ -252,7 +329,15 @@ class TestIsSafeToCalibrate:
         self.pf = ApplicationPreflight()
 
     def test_safe_app(self):
-        assert self.pf.is_safe_to_calibrate({"name": "chrome"}) is True
+        with tempfile.NamedTemporaryFile(suffix=".exe", delete=False) as f:
+            path = f.name
+        try:
+            with patch.object(
+                self.pf, "resolve_executable", return_value=path
+            ):
+                assert self.pf.is_safe_to_calibrate({"name": "chrome"}) is True
+        finally:
+            os.unlink(path)
 
     def test_unsafe_blocked_name(self):
         assert self.pf.is_safe_to_calibrate({"name": "Task Scheduler"}) is False

@@ -1,7 +1,11 @@
 """
 Tests for ApplicationPreflight availability verification (3.5.2.1).
 """
+import os
+import tempfile
 import unittest
+from unittest.mock import patch
+
 from src.hands.application_preflight import ApplicationPreflight, PreflightResult
 
 
@@ -10,22 +14,27 @@ class TestApplicationPreflightAvailability(unittest.TestCase):
         self.preflight = ApplicationPreflight()
 
     def test_available_app(self):
-        """An app with no blocking factors and with manifest should be reported as available."""
-        app = {
-            "name": "Notepad",
-            "app_id": "Microsoft.Notepad",
-            "login_required": False,
-            "logged_in": None,
-            "resources_available": True,
-        }
-        result: PreflightResult = self.preflight.check_application(app)
-        # The current implementation returns "available" only when manifest is found;
-        # if manifest not found it returns "unknown". Here we test the path where
-        # manifest is present (we do not mock manifest, so result will be "unknown").
-        # This test documents the current behaviour.
-        self.assertTrue(result.allowed)
-        # Availability is "unknown" because no manifest is supplied in the test data.
-        self.assertEqual(result.availability, "unknown")
+        """An app with a resolvable executable and no blocking factors is allowed."""
+        with tempfile.NamedTemporaryFile(suffix=".exe", delete=False) as f:
+            path = f.name
+        try:
+            with patch.object(
+                self.preflight, "resolve_executable", return_value=path
+            ):
+                app = {
+                    "name": "Notepad",
+                    "app_id": "Microsoft.Notepad",
+                    "login_required": False,
+                    "logged_in": None,
+                    "resources_available": True,
+                }
+                result: PreflightResult = self.preflight.check_application(app)
+                # Executable resolves and passes launch-destination validation;
+                # no manifest found => allowed with availability "available".
+                self.assertTrue(result.allowed)
+                self.assertEqual(result.availability, "available")
+        finally:
+            os.unlink(path)
 
     def test_blocked_name(self):
         """An app with a blocked name should not be allowed."""
