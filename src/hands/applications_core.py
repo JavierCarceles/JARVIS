@@ -1503,6 +1503,25 @@ def _check_application_available(app: ApplicationKnowledge) -> bool:
         return False
 
 
+def _executable_target_is_localizable(app: Optional[ApplicationKnowledge]) -> bool:
+    """Indica si se puede localizar un ejecutable/local concreto para la app.
+
+    Solo cuenta un destino local ejecutable (ruta absoluta v�lida a un archivo
+    existente, o nombre de ejecutable resuelto en PATH mediante
+    ``shutil.which``). Una URL sola hace que la app sea lan�able
+    (``installed``) pero no proporciona un ejecutable local localizable, as�
+    no se confunde "est� instalada" con "se sabe d�nde est� el ejecutable".
+    """
+    if app is None:
+        return False
+    executable = str(getattr(app, "executable", None) or "").strip()
+    if not executable:
+        return False
+    if os.path.isabs(executable) or any(sep in executable for sep in ("/", "\\")):
+        return os.path.isfile(executable)
+    return shutil.which(executable) is not None
+
+
 def _check_application_login(app: ApplicationKnowledge) -> bool:
     """Comprueba el estado de login cuando exista un backend para ello."""
     # La verificación real pertenece a la integración específica de cada app.
@@ -1699,12 +1718,20 @@ def get_application_knowledge(app_name: str) -> Dict[str, Any]:
 
 @dataclass
 class ApplicationClassification:
-    """Resultado de la clasificación de una aplicación en cuatro estados.
+    """Resultado de la clasificación de una aplicación en estados de descubrimiento.
 
-    Distingue cuatro ejes independientes y no excluyentes entre sí:
+    Distingue ejes independientes y no excluyentes entre sí, de modo que el
+    llamador puede decidir qué hacer en cada caso sin mezclar estados:
 
-    - ``installed``: el ejecutable está en disco (PATH o ruta absoluta) o la
-      app tiene URL configurada. Es decir, está instalada/localizable.
+    - ``unknown``: la aplicación no se conoce (no está registrada en
+      ``ApplicationManager`` ni es resoluble como coincidencia sobre aplicaciones
+      conocidas). Es una aplicación realmente desconocida.
+    - ``installed``: el ejecutable está en disco (PATH o ruta absoluta) o la app
+      tiene URL configurada, por lo que se puede intentar lanzar.
+    - ``localizable``: se pudo determinar una ruta o ejecutable local concreto
+      para la aplicación (ejecutable en PATH, ruta absoluta válida). Una app
+      puede estar instalada (lançable por URL) y sin embargo no tener un
+      ejecutable local localizable.
     - ``running``: un proceso con el nombre del ejecutable está activo en el
       sistema (comprobado vía tasklist/psutil).
     - ``registered``: la app está registrada en ``ApplicationManager``
@@ -1720,6 +1747,8 @@ class ApplicationClassification:
     registered: bool
     automatable: bool
     details: Dict[str, Any]
+    unknown: bool = False
+    localizable: bool = False
 
 
 def classify_application(app_name: str) -> ApplicationClassification:
@@ -1745,8 +1774,16 @@ def classify_application(app_name: str) -> ApplicationClassification:
     # 1. Registrada en ApplicationManager
     registered = app is not None
 
+    # Eje desconocida: la app no es conocida ni resoluble como coincidencia
+    # sobre aplicaciones registradas (reusa el contrato de resoluci�n 3.8.2).
+    resolution = app_manager.resolve_application(target)
+    unknown = resolution.app is None
+
     # 2. Instalada (ejecutable en disco o URL, o disponible por preflight)
     installed = bool(app.is_available()) if app else False
+
+    # Eje localizable: instalada y se determina un ejecutable/local concreto.
+    localizable = installed and (app is not None) and _executable_target_is_localizable(app)
 
     # 3. En ejecución (proceso activo por nombre de ejecutable de la app
     # registrada). Para apps no registradas no asumimos ejecución solo por
@@ -1781,8 +1818,10 @@ def classify_application(app_name: str) -> ApplicationClassification:
     details: Dict[str, Any] = {
         "app_name": target,
         "normalized_name": app_manager._normalize_name(target) if target else "",
+        "unknown": unknown,
         "registered": registered,
         "installed": installed,
+        "localizable": localizable,
         "running": running,
         "automatable": automatable,
     }
@@ -1801,6 +1840,8 @@ def classify_application(app_name: str) -> ApplicationClassification:
         registered=registered,
         automatable=automatable,
         details=details,
+        unknown=unknown,
+        localizable=localizable,
     )
 
 

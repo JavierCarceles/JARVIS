@@ -430,3 +430,102 @@ class TestClassifyDetails:
         assert result.details["type"] == "browser"
         assert result.details["app_name"] == "DetailApp"
         assert "normalized_name" in result.details
+
+
+# ---------------------------------------------------------------------------
+# 9. classify_application: unknown axis (unidad 3.8.2.5)
+# ---------------------------------------------------------------------------
+
+class TestClassifyUnknown:
+    """Eje unknown: la app no se conoce ni es resoluble sobre apps registradas."""
+
+    def test_unknown_true_for_unregistered_app(self):
+        manager = _make_minimal_manager()
+        with _patch_manager(manager):
+            result = classify_application("UnknownAppXyz")
+        assert result.unknown is True
+        assert result.registered is False
+
+    def test_unknown_false_for_registered_app(self):
+        manager = _make_minimal_manager()
+        app = _make_app("KnownApp")  # sin executable ni url: installed=False, no preflight
+        manager.applications["knownapp"] = app
+        with _patch_manager(manager):
+            result = classify_application("KnownApp")
+        assert result.unknown is False
+        assert result.registered is True
+
+    def test_unknown_true_for_empty_name(self):
+        manager = _make_minimal_manager()
+        with _patch_manager(manager):
+            result = classify_application("")
+        assert result.unknown is True
+        assert result.app_name == ""
+
+
+# ---------------------------------------------------------------------------
+# 10. classify_application: localizable axis (unidad 3.8.2.5)
+# ---------------------------------------------------------------------------
+
+def _patch_preflight(allowed=True, confidence="high"):
+    """Mockea get_application_preflight para evitar llamadas reales al sistema."""
+    result = PreflightResult(
+        allowed=allowed,
+        reason="ok",
+        confidence=confidence,
+        availability="available",
+    )
+    return patch(
+        "src.hands.applications_core.get_application_preflight",
+        return_value=MagicMock(check=MagicMock(return_value=result)),
+    )
+
+
+class TestClassifyLocalizable:
+    """Eje localizable: instalada y se determina un ejecutable/local concreto."""
+
+    def test_localizable_true_when_executable_in_path(self):
+        manager = _make_minimal_manager()
+        app = _make_app("PathApp", executable="python")
+        manager.applications["pathapp"] = app
+        with _patch_manager(manager), _patch_preflight():
+            result = classify_application("PathApp")
+        assert result.installed is True
+        assert result.localizable is True
+
+    def test_localizable_false_when_executable_not_found(self):
+        manager = _make_minimal_manager()
+        app = _make_app("GhostApp", executable="nonexistent_ghost_xyz.exe")
+        manager.applications["ghostapp"] = app
+        with _patch_manager(manager):
+            result = classify_application("GhostApp")
+        assert result.installed is False
+        assert result.localizable is False
+
+    def test_localizable_false_for_url_only_app(self):
+        # installed (se puede lanzar por URL) pero sin ejecutable local localizable.
+        manager = _make_minimal_manager()
+        app = _make_app("UrlApp", executable=None, url="https://example.com")
+        manager.applications["urlapp"] = app
+        with _patch_manager(manager), _patch_preflight():
+            result = classify_application("UrlApp")
+        assert result.installed is True
+        assert result.localizable is False
+
+    def test_localizable_true_when_absolute_existing_path(self, tmp_path):
+        executable = tmp_path / "miapp.exe"
+        executable.write_text("dummy")
+        manager = _make_minimal_manager()
+        app = _make_app("LocalApp", executable=str(executable))
+        manager.applications["localapp"] = app
+        with _patch_manager(manager), _patch_preflight():
+            result = classify_application("LocalApp")
+        assert result.installed is True
+        assert result.localizable is True
+
+    def test_localizable_false_for_unknown_app(self):
+        manager = _make_minimal_manager()
+        with _patch_manager(manager):
+            result = classify_application("UnknownAppXyz")
+        assert result.localizable is False
+        assert result.unknown is True
