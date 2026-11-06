@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from src.utils.logger import get_logger
 import ctypes
+import difflib
 import os
 import platform
 import shutil
@@ -36,6 +37,29 @@ from src.memory.storage import Entity, get_memory_manager
 from src.utils.screen_manager import get_screen_manager
 
 logger = get_logger(__name__)
+
+RESOLUTION_FUZZY_THRESHOLD = 0.7
+_MAX_RESOLUTION_ALTERNATIVES = 3
+
+
+@dataclass
+class ApplicationResolutionResult:
+    """Resultado de la resolución de una aplicación por nombre.
+
+    Atributos:
+        app: Aplicación resuelta o ``None`` si no hubo coincidencia.
+        confidence: Confianza de la coincidencia (1.0 exacto/alias, ratio
+            difuso para nombres imperfectos, 0.0 sin coincidencia).
+        method: Método usado: ``exact_normalized``, ``dynamic_alias``,
+            ``fuzzy_name``, ``fuzzy_alias`` o ``none``.
+        alternatives: Otras aplicaciones candidatas ordenadas por similitud
+            (solo se rellena en resolución difusa).
+    """
+
+    app: Optional[ApplicationKnowledge]
+    confidence: float
+    method: str
+    alternatives: List[ApplicationKnowledge]
 
 
 class ApplicationCapability(Enum):
@@ -509,6 +533,79 @@ class ApplicationManager:
                     if normalized_name in alias_list:
                         return existing_app
         return None
+
+    def resolve_application(self, app_name: str) -> ApplicationResolutionResult:
+        """Resuelve una aplicación a partir de un nombre ya normalizado.
+
+        Orden de resolución:
+        1. nombre normalizado exacto (incluye los alias estáticos de
+           ``_normalize_name``);
+        2. alias dinámico (``metadata['aliases']`` de las aplicaciones
+           registradas, vía ``_resolve_alias``);
+        3. nombre imperfecto (errores de escritura, variantes) mediante
+           coincidencia difusa con ``difflib`` sobre el nombre y los aliases
+           de cada aplicación registrada.
+
+        Devuelve la mejor coincidencia con su confianza, el método usado y las
+        alternativas ordenadas por similitud. Si no hay coincidencia,
+        devuelve ``app=None``, ``confidence=0.0`` y ``method="none"``.
+        """
+        normalized = self._normalize_name(app_name or "")
+
+        # 1. Exacto: nombre normalizado (cubre alias estáticos hardcodeados).
+        app = self.applications.get(normalized)
+        if app is not None:
+            return ApplicationResolutionResult(
+                app=app, confidence=1.0, method="exact_normalized", alternatives=[]
+            )
+
+        # 2. Alias dinámico de aplicaciones ya registradas.
+        app = self._resolve_alias(normalized)
+        if app is not None:
+            return ApplicationResolutionResult(
+                app=app, confidence=1.0, method="dynamic_alias", alternatives=[]
+            )
+
+        # 3. Difuso: nombres imperfectos sobre nombre y aliases registrados.
+        best_app: Optional[ApplicationKnowledge] = None
+        best_ratio = 0.0
+        best_method = "none"
+        candidates: list = []
+        for candidate in self.applications.values():
+            ratios: list = []
+            name_ratio = difflib.SequenceMatcher(None, normalized, candidate.name.lower()).ratio()
+            ratios.append(("fuzzy_name", name_ratio))
+            if candidate.metadata and isinstance(candidate.metadata, dict):
+                for alias in candidate.metadata.get("aliases") or []:
+                    alias_ratio = difflib.SequenceMatcher(
+                        None, normalized, str(alias).lower()
+                    ).ratio()
+                    ratios.append(("fuzzy_alias", alias_ratio))
+            method, ratio = max(ratios, key=lambda item: item[1])
+            if ratio > best_ratio:
+                best_ratio = ratio
+                best_app = candidate
+                best_method = method
+            candidates.append((ratio, candidate))
+
+        if best_app is not None and best_ratio >= RESOLUTION_FUZZY_THRESHOLD:
+            alternatives = [
+                candidate_app
+                for _, candidate_app in sorted(
+                    candidates, key=lambda item: item[0], reverse=True
+                )
+                if candidate_app is not best_app
+            ][:_MAX_RESOLUTION_ALTERNATIVES]
+            return ApplicationResolutionResult(
+                app=best_app,
+                confidence=best_ratio,
+                method=best_method,
+                alternatives=alternatives,
+            )
+
+        return ApplicationResolutionResult(
+            app=None, confidence=best_ratio, method="none", alternatives=[]
+        )
 
     def get_applications_by_type(self, app_type: str) -> List[ApplicationKnowledge]:
         """Obtiene aplicaciones por tipo."""

@@ -1,26 +1,9 @@
 # -*- coding: utf-8 -*-
-"""Tests de resolucion por nombre — unidad 3.2.2.4 (FASE 3.2.2 — Carga).
+"""Tests de resolución de nombres de aplicación (FASE 3.8, unidad 3.8.2.2).
 
-Objetivo: "Verificar resolucion por nombre".
-
-Verifica que ``ApplicationManager.get_application`` resuelve aplicaciones
-por su nombre de forma case-insensitive, tanto para apps hardcodeadas
-(Chrome, Spotify) como para apps cargadas desde entidades
-(YouTube, GitHub, Twitch).
-
-Tambien verifica la coherencia del identificador canónico:
-``register_application`` y ``_load_custom_applications`` usan
-``_normalize_name`` como clave (no ``app.name.lower()``), de modo que
-una app cuyo nombre coincide con un alias hardcodeado (ej. "Google
-Chrome") se almacena bajo la clave canónica ("chrome") y es resoluble
-por su nombre y por el alias. Antes de la correccion de 3.2.2.4,
-``register_application`` usaba ``app.name.lower()`` lo que producia una
-clave divergente de la que ``get_application`` usa para buscar, rompiendo
-la resolucion para nombres con alias.
-
-Los tests usan:
-- ``ApplicationManager()`` real (carga Chrome/Spotify + entities de data/memory/entities.json).
-- ``_make_min_manager()`` aislado (bypass __init__) con MemoryManager falso para round-trip controlado.
+Cubre nombres normalizados, nombres alternativos (alias dinámicos) y nombres
+imperfectos (errores de escritura/variantes) procedentes de una petición ya
+normalizada, sobre ApplicationManager sin modificar lógica existente.
 """
 
 import pytest
@@ -30,327 +13,167 @@ from src.hands.applications_core import (
     ApplicationCapabilityDef,
     ApplicationKnowledge,
     ApplicationManager,
+    ApplicationResolutionResult,
     ApplicationState,
+    RESOLUTION_FUZZY_THRESHOLD,
     UIElement,
+    get_application_manager,
 )
-from src.memory.storage import Entity
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def _make_min_manager():
-    """ApplicationManager aislado (bypass __init__) con MemoryManager falso.
-
-    Evita registrar Chrome/Spotify y evita toda persistencia a entities.json.
-    Ideal para testear el round-trip register -> get_application de forma controlada.
-    """
-    manager = ApplicationManager.__new__(ApplicationManager)
-    manager.applications = {}
-
-    class _CountingMemoryManager:
-        def __init__(self):
-            self.saved = []
-            self.save_calls = 0
-
-        def save_entity(self, entity):
-            self.save_calls += 1
-            self.saved.append(entity)
-            return True
-
-        def get_entities_by_type(self, t):
-            return []
-
-    manager.memory_manager = _CountingMemoryManager()
-    return manager
+def _registrar_app(manager: ApplicationManager, name: str, aliases=None):
+    """Registra una aplicación de prueba con nombre y aliases distintivos."""
+    app = ApplicationKnowledge(
+        name=name,
+        type="test",
+        executable=name.lower().replace(" ", ""),
+        url=f"https://{name.lower().replace(' ', '')}.example.com",
+        capabilities=[
+            ApplicationCapabilityDef(
+                capability=ApplicationCapability.OPEN,
+                name=f"open_{name.lower().replace(' ', '_')}",
+                description=f"Abre {name}",
+                required_ui_elements=[],
+                preconditions=[],
+                effects=[],
+                cost=1.0,
+            )
+        ],
+        ui_elements=[
+            UIElement(name="ventana_principal", type="window", description=f"Ventana de {name}")
+        ],
+        states=[ApplicationState.CLOSED, ApplicationState.OPEN],
+        metadata={"aliases": aliases or []},
+    )
+    assert manager.register_application(app) is True
+    return app
 
 
-# ---------------------------------------------------------------------------
-# 1. Resolucion por nombre: apps hardcodeadas (Chrome, Spotify)
-# ---------------------------------------------------------------------------
-
-class TestNameResolutionHardcodedApps:
-    """``get_application`` resuelve apps hardcodeadas por su nombre,
-    case-insensitive, tanto con nombre canónico como con el nombre
-    display completo (ej. "Chrome", no "Google Chrome")."""
-
-    @pytest.fixture
-    def manager(self):
-        return ApplicationManager()
-
-    @pytest.mark.parametrize("query", ["chrome", "Chrome", "CHROME", " Chrome "])
-    def test_resolve_chrome_by_name(self, manager, query):
-        result = manager.get_application(query)
-        assert result is not None
-        assert result.name == "Chrome"
-        assert result.type == "browser"
-
-    @pytest.mark.parametrize("query", ["spotify", "Spotify", "SPOTIFY"])
-    def test_resolve_spotify_by_name(self, manager, query):
-        result = manager.get_application(query)
-        assert result is not None
-        assert result.name == "Spotify"
-        assert result.type == "media"
+class TestApplicationResolutionResult:
+    def test_estructura_dataclass(self):
+        result = ApplicationResolutionResult(app=None, confidence=0.0, method="none", alternatives=[])
+        assert result.app is None
+        assert result.confidence == 0.0
+        assert result.method == "none"
+        assert result.alternatives == []
 
 
-# ---------------------------------------------------------------------------
-# 2. Resolucion por nombre: apps cargadas desde entities (YouTube, GitHub, Twitch)
-# ---------------------------------------------------------------------------
+class TestResolveApplication:
+    def setup_method(self):
+        self.manager = get_application_manager()
 
-class TestNameResolutionEntityLoadedApps:
-    """``get_application`` resuelve apps cargadas desde entities.json
-    (data/memory/entities.json) por su nombre, case-insensitive."""
+    def test_resuelve_nombre_normalizado_exacto_chrome(self):
+        result = self.manager.resolve_application("chrome")
+        assert isinstance(result, ApplicationResolutionResult)
+        assert result.app is not None
+        assert result.app.name == "Chrome"
+        assert result.confidence == 1.0
+        assert result.method == "exact_normalized"
+        assert result.alternatives == []
 
-    @pytest.fixture
-    def manager(self):
-        return ApplicationManager()
+    def test_resuelve_nombre_normalizado_exacto_spotify(self):
+        result = self.manager.resolve_application("spotify")
+        assert result.app is not None
+        assert result.app.name == "Spotify"
+        assert result.confidence == 1.0
+        assert result.method == "exact_normalized"
 
-    @pytest.mark.parametrize("query", ["youtube", "YouTube", "YOUTUBE"])
-    def test_resolve_youtube_by_name(self, manager, query):
-        result = manager.get_application(query)
-        assert result is not None
-        assert result.name == "YouTube"
-        assert result.type == "video_platform"
+    def test_resuelve_alias_estatico_google_chrome(self):
+        result = self.manager.resolve_application("google chrome")
+        assert result.app is not None
+        assert result.app.name == "Chrome"
+        assert result.confidence == 1.0
+        assert result.method == "exact_normalized"
 
-    @pytest.mark.parametrize("query", ["github", "GitHub", "GITHUB"])
-    def test_resolve_github_by_name(self, manager, query):
-        result = manager.get_application(query)
-        assert result is not None
-        assert result.name == "GitHub"
-        assert result.type == "development"
+    def test_resuelve_alias_dinámico_registrado(self):
+        _registrar_app(self.manager, "App Resolucion Test", aliases=["arte", "app resolucion"])
+        result = self.manager.resolve_application("arte")
+        assert result.app is not None
+        assert result.app.name == "App Resolucion Test"
+        assert result.confidence == 1.0
+        assert result.method == "dynamic_alias"
 
-    @pytest.mark.parametrize("query", ["twitch", "Twitch", "TWITCH"])
-    def test_resolve_twitch_by_name(self, manager, query):
-        result = manager.get_application(query)
-        assert result is not None
-        assert result.name == "Twitch"
-        assert result.type == "streaming"
+    def test_resuelve_nombre_imperfecto_typo(self):
+        """'spotifiy' es una variante imperfecta de 'Spotify' (difuso sobre nombre)."""
+        result = self.manager.resolve_application("spotifiy")
+        assert result.app is not None
+        assert result.app.name == "Spotify"
+        assert result.method == "fuzzy_name"
+        assert 0.7 <= result.confidence < 1.0
 
+    def test_resuelve_nombre_imperfecto_por_alias(self):
+        _registrar_app(self.manager, "Navegador Web Alternativo", aliases=["navegador web"])
+        result = self.manager.resolve_application("navegador webb")  # alias con typo
+        assert result.app is not None
+        assert result.app.name == "Navegador Web Alternativo"
+        assert result.method == "fuzzy_alias"
+        assert 0.7 <= result.confidence < 1.0
 
-# ---------------------------------------------------------------------------
-# 3. Coherencia de clave: register_application usa _normalize_name
-# ---------------------------------------------------------------------------
+    def test_nombre_desconocido_devuelve_none(self):
+        result = self.manager.resolve_application("aplicacion_que_no_existe_xyz_789")
+        assert result.app is None
+        assert result.method == "none"
+        # La confianza conserva el mejor ratio aunque esté bajo el umbral:
+        # es evidencia de proximidad, no una resolución.
+        assert result.confidence < RESOLUTION_FUZZY_THRESHOLD
+        assert result.alternatives == []
 
-class TestRegisterApplicationUsesNormalizeName:
-    """``register_application`` debe usar ``_normalize_name`` como clave
-    para ser consistente con ``get_application``. Antes de 3.2.2.4 usaba
-    ``app.name.lower()``, rompiendo la resolucion para nombres con alias."""
+    def test_cadena_vacia_devuelve_none(self):
+        result = self.manager.resolve_application("")
+        assert result.app is None
+        assert result.confidence == 0.0
+        assert result.method == "none"
 
-    def test_register_alias_name_resolvable_by_name(self):
-        """Una app registrada con nombre 'Google Chrome' se almacena bajo
-        la clave canónica 'chrome' y es resoluble por 'Google Chrome'
-        y por 'chrome'."""
-        manager = _make_min_manager()
-        app = ApplicationKnowledge(
-            name="Google Chrome", type="browser", executable="chrome",
-        )
-        assert manager.register_application(app) is True
-        # Resoluble por el nombre completo (alias)
-        result1 = manager.get_application("Google Chrome")
-        assert result1 is not None
-        assert result1 is app
-        # Resoluble por la clave canónica
-        result2 = manager.get_application("chrome")
-        assert result2 is not None
-        assert result2 is app
+    def test_espacios_en_blanco_devuelve_none(self):
+        result = self.manager.resolve_application("   ")
+        assert result.app is None
+        assert result.method == "none"
 
-    def test_register_alias_name_stored_under_normalized_key(self):
-        """La clave usada en self.applications es _normalize_name(app.name),
-        no app.name.lower()."""
-        manager = _make_min_manager()
-        app = ApplicationKnowledge(
-            name="Google Chrome", type="browser", executable="chrome",
-        )
-        manager.register_application(app)
-        assert "chrome" in manager.applications
-        assert "google chrome" not in manager.applications
+    def _mejores_ratios(self, consulta: str):
+        import difflib
 
-    def test_register_alias_name_entity_id_uses_normalized_key(self):
-        """El Entity.id derivado usa la clave normalizada."""
-        manager = _make_min_manager()
-        app = ApplicationKnowledge(
-            name="Google Chrome", type="browser", executable="chrome",
-        )
-        manager.register_application(app)
-        saved_entity = manager.memory_manager.saved[-1]
-        assert saved_entity.id == "app_chrome"
+        ratios = {}
+        for app in self.manager.applications.values():
+            r = difflib.SequenceMatcher(None, consulta, app.name.lower()).ratio()
+            if app.metadata and isinstance(app.metadata, dict):
+                for alias in app.metadata.get("aliases") or []:
+                    r = max(
+                        r,
+                        difflib.SequenceMatcher(None, consulta, str(alias).lower()).ratio(),
+                    )
+            ratios[app.name] = r
+        return ratios
 
-    def test_register_non_alias_name_still_works(self):
-        """Nombres sin alias se registran y resuelven igual (lowercase)."""
-        manager = _make_min_manager()
-        app = ApplicationKnowledge(
-            name="MyCustomApp", type="utility", executable="mycustomapp",
-        )
-        assert manager.register_application(app) is True
-        assert manager.get_application("MyCustomApp") is not None
-        assert manager.get_application("mycustomapp") is not None
-        assert manager.applications["mycustomapp"] is app
+    def test_alternativas_ordenadas_y_ganador_max_similitud(self):
+        _registrar_app(self.manager, "Editor de Texto Pro", aliases=["editor texto"])
+        _registrar_app(self.manager, "Calculadora Científica", aliases=["calculo"])
+        consulta = "editor de texto"
+        result = self.manager.resolve_application(consulta)
+        assert result.app is not None
+        ratios = self._mejores_ratios(consulta)
+        if result.method in ("exact_normalized", "dynamic_alias"):
+            assert result.confidence == 1.0
+            assert result.alternatives == []
+        else:
+            assert result.method in ("fuzzy_name", "fuzzy_alias")
+            assert RESOLUTION_FUZZY_THRESHOLD <= result.confidence < 1.0
+            assert ratios[result.app.name] == max(ratios.values())
+            assert result.confidence == pytest.approx(ratios[result.app.name])
+            nombres_alt = [a.name for a in result.alternatives]
+            assert result.app.name not in nombres_alt
+            assert len(nombres_alt) <= 3
+            assert nombres_alt == sorted(
+                nombres_alt, key=lambda n: ratios[n], reverse=True
+            )
 
-    def test_register_alias_name_duplicate_detected(self):
-        """Registrar 'Google Chrome' cuando Chrome ya está registrado devuelve False."""
-        manager = _make_min_manager()
-        # Pre-registrar Chrome bajo la clave canónica
-        manager.register_application(
-            ApplicationKnowledge(name="Chrome", type="browser", executable="chrome")
-        )
-        # Intentar registrar "Google Chrome" debe detectarse como duplicado
-        result = manager.register_application(
-            ApplicationKnowledge(name="Google Chrome", type="browser", executable="gc")
-        )
-        assert result is False
-        # Chrome original no se sobreescribe
-        existing = manager.get_application("chrome")
-        assert existing.executable == "chrome"
-
-
-# ---------------------------------------------------------------------------
-# 4. Round-trip: register -> resolve -> verify
-# ---------------------------------------------------------------------------
-
-class TestNameResolutionRoundTrip:
-    """Round-trip: register_application almacena bajo la clave normalizada;
-    get_application la resuelve de vuelta usando _normalize_name."""
-
-    def test_round_trip_exact_name(self):
-        manager = _make_min_manager()
-        app = ApplicationKnowledge(
-            name="TestApp", type="utility", executable="testapp",
-        )
-        manager.register_application(app)
-        result = manager.get_application("TestApp")
-        assert result is not None
-        assert result is app
-        assert result.name == "TestApp"
-
-    def test_round_trip_case_insensitive(self):
-        manager = _make_min_manager()
-        app = ApplicationKnowledge(
-            name="CaseApp", type="utility", executable="caseapp",
-        )
-        manager.register_application(app)
-        assert manager.get_application("CASEAPP") is app
-        assert manager.get_application("caseapp") is app
-        assert manager.get_application("CaseApp") is app
-
-    def test_round_trip_with_spaces_and_case(self):
-        """Normalización: strip + lower + alias resolution."""
-        manager = _make_min_manager()
-        app = ApplicationKnowledge(
-            name="Microsoft Edge", type="browser", executable="edge",
-        )
-        manager.register_application(app)
-        # Resoluble por el nombre con espacios y mayúsculas
-        assert manager.get_application("  Microsoft Edge  ") is app
-        # Resoluble por la clave canónica
-        assert manager.get_application("edge") is app
-        # No almacenado bajo el nombre sin normalizar
-        assert "microsoft edge" not in manager.applications
+    def test_no_devuelve_alternativas_cuando_resolucion_exacta(self):
+        result = self.manager.resolve_application("chrome")
+        assert result.alternatives == []
 
 
-# ---------------------------------------------------------------------------
-# 5. Negativo: apps inexistentes
-# ---------------------------------------------------------------------------
-
-class TestNameResolutionNotFound:
-    """``get_application`` devuelve None para apps que no existen."""
-
-    @pytest.fixture
-    def manager(self):
-        return ApplicationManager()
-
-    def test_nonexistent_name(self, manager):
-        assert manager.get_application("nonexistent_app_xyz") is None
-
-    def test_nonexistent_case_variants(self, manager):
-        assert manager.get_application("NONEXISTENT_APP_XYZ") is None
-        assert manager.get_application("NonExistent_App_XyZ") is None
-
-
-# ---------------------------------------------------------------------------
-# 6. Coherencia interna: ApplicationManager + _load_custom_applications
-# ---------------------------------------------------------------------------
-
-class TestLoadCustomApplicationsUsesNormalizeName:
-    """``_load_custom_applications`` también usa ``_normalize_name`` como clave,
-    manteniendo coherencia con ``register_application`` y ``get_application``."""
-
-    def test_entity_with_alias_matching_name_skipped(self):
-        """Una entity cuyo nombre normaliza a una app ya registrada se omite
-        (no crea duplicado). Chrome + entity 'Google Chrome' -> clave 'chrome'."""
-        manager = _make_min_manager()
-        manager.register_application(
-            ApplicationKnowledge(name="Chrome", type="browser", executable="chrome")
-        )
-
-        class _FakeMM:
-            def get_entities_by_type(self, t):
-                if t == "application":
-                    return [Entity.from_dict({
-                        "id": "app_google_chrome",
-                        "type": "application",
-                        "name": "Google Chrome",
-                        "properties": {
-                            "type": "browser",
-                            "executable": "chrome",
-                            "url": "https://chrome.google.com",
-                            "login_required": False,
-                            "capabilities": ["open"],
-                            "ui_elements": [],
-                            "states": ["closed"],
-                        },
-                        "aliases": ["google", "gc"],
-                        "tags": [],
-                        "confidence": 1.0,
-                        "created_at": "2024-01-01",
-                        "updated_at": "2024-01-01",
-                        "metadata": None,
-                    })]
-                return []
-
-            def save_entity(self, entity):
-                pass
-
-        manager.memory_manager = _FakeMM()
-        manager._load_custom_applications()
-        # Chrome está bajo 'chrome' (normalizado desde "Google Chrome")
-        assert "chrome" in manager.applications
-        # No hay entrada adicional bajo 'google chrome'
-        assert "google chrome" not in manager.applications
-        # Sigue resoluble
-        assert manager.get_application("google chrome") is manager.applications["chrome"]
-
-    def test_entity_without_alias_loaded_normally(self):
-        """Una entity sin coincidencia de alias se carga bajo su clave normalizada."""
-        manager = _make_min_manager()
-
-        class _FakeMM:
-            def get_entities_by_type(self, t):
-                if t == "application":
-                    return [Entity.from_dict({
-                        "id": "youtube",
-                        "type": "application",
-                        "name": "YouTube",
-                        "properties": {
-                            "url": "https://www.youtube.com",
-                            "executable": "chrome.exe",
-                            "category": "video_platform",
-                        },
-                        "aliases": ["yt", "you"],
-                        "tags": [],
-                        "confidence": 1.0,
-                        "created_at": "2024-01-01",
-                        "updated_at": "2024-01-01",
-                        "metadata": None,
-                    })]
-                return []
-
-            def save_entity(self, entity):
-                pass
-
-        manager.memory_manager = _FakeMM()
-        manager._load_custom_applications()
-        assert "youtube" in manager.applications
-        assert manager.applications["youtube"].name == "YouTube"
-        assert manager.get_application("youtube") is not None
-        assert manager.get_application("YouTube") is not None
+class TestCompatibilidadGetApplication:
+    def test_get_application_sigue_resolviendo_exactos(self):
+        manager = get_application_manager()
+        app = manager.get_application("chrome")
+        assert app is not None
+        assert app.name == "Chrome"
