@@ -6623,3 +6623,22 @@ VERIFICACION: SINTAXIS: OK (pytest recolecta y ejecuta sin errores de importaci�
 DISCREPANCIAS: NINGUNA (hereda D1 y D2 de 3.7.2.1 referentes a nomenclatura Goal vs ApplicationCapability, que no afectan a la conexión Planner ya que trace_application_capability_to_action y get_application_capabilities_as_list resuelven por identificadores canónicos).
 PENDIENTES: NINGUNO para 3.7.2.2. Siguiente hoja pendiente real en orden del roadmap: 3.7.2.3 (Application Knowledge -> Executor), fase 3.7.
 ESTADO FINAL: 3.7.2.2 - IMPLEMENTADA
+
+===
+REGISTRO DE UNIDAD: 3.7.2.3
+FECHA: NR
+OBJETIVO: Verificar la conexión Application Knowledge → Executor: confirmar que el conocimiento estructurado de aplicaciones (ApplicationKnowledgeIntegrator, applications_core, ApplicationManager, ApplicationKnowledge) es consumido correctamente por el Executor (evaluación de condiciones de aplicación vía _evaluate_condition con fallback al catálogo real, estados de aplicación en ExecutionState.application_states, nodos de plan con campos application/ui_element, get_plannable_actions, can_execute, execute_plan, execute_goal), sin modificar código de producción.
+TIPO DE TRABAJO: VERIFICACION | TEST | INTEGRACION
+CAMBIOS / HALLAZGOS:
+- Verificación ejecutada contra suites existentes: tests/hands/test_application_consumers_real_model.py (36 tests, 36/36 PASSED); tests/hands/test_executor.py (suite completa PASSED); tests/hands/test_applications_core.py (suite completa PASSED). Total: 465 passed in 8.30s.
+- Hallazgo 1: TestExecutorConsumesRealCatalog verifica que Executor._evaluate_condition("application_available") y _evaluate_condition("browser_available") usan el catálogo real de ApplicationManager como fallback cuando el estado runtime está vacío (línea 958 de executor.py: get_application_manager()).
+- Hallazgo 2: El estado de ejecución ExecutionState.application_states persiste estados por aplicación (open, active, etc.) y se actualiza tras confirmar el éxito de cada nodo (_update_world_state).
+- Hallazgo 3: Los nodos de plan pueden incluir campos application y ui_element; _normalize_plan_node los preserva y execute_plan los consume.
+- Hallazgo 4: get_plannable_actions() expone ActionInfo del ActionRegistry para planificación; can_execute() valida precondiciones antes de ejecutar.
+- No se modificó código de producción.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: NA (suite existente); DOCUMENTACION: este registro en mejora/prompt_JARVIS_fases_estado.txt.
+TESTS Y RESULTADOS: UNITARIOS: PASSED/36/36 (test_application_consumers_real_model.py); PASSED (suite completa test_executor.py); PASSED (suite completa test_applications_core.py); TOTAL: PASSED/465/465 en 8.30s; INTEGRACION: NA; NO REGRESION: NA.
+VERIFICACION: SINTAXIS: OK (pytest recolecta y ejecuta sin errores de importación ni sintaxis); MAIN.PY: NE (no modificado); COMPORTAMIENTO / INTEGRACION REAL: verificado mediante ejecución real de pytest sobre suites existentes (465/465 PASSED).
+DISCREPANCIAS: NINGUNA
+PENDIENTES: NINGUNO para 3.7.2.3. Siguiente hoja pendiente real en orden del roadmap: 3.7.2.4 (Application Knowledge -> calibracion cuando corresponda), fase 3.7.
+ESTADO FINAL: 3.7.2.3 - IMPLEMENTADA

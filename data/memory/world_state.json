@@ -1,6 +1,13 @@
 {
-  "timestamp": 1793958666.6389897,
-  "applications": {},
+  "timestamp": 1793959747.8599114,
+  "applications": {
+    "chrome": {
+      "last_action_failed": true,
+      "last_error": "fail",
+      "last_failure_timestamp": 1793959747.8492274,
+      "last_failed_node": "n1"
+    }
+  },
   "ui_elements": {},
   "system_info": {
     "last_intention": {
@@ -8,7 +15,63 @@
       "goal_type": "navigate",
       "target": "https://example.com",
       "timestamp": 1793958666.6387358
-    }
+    },
+    "last_failures": [
+      {
+        "node_id": "n1",
+        "action": "orig_action",
+        "application": null,
+        "error": "Acción no encontrada: orig_action",
+        "timestamp": 1793959747.8162842,
+        "execution_time": 6.579999990208307e-05,
+        "status": "failed"
+      },
+      {
+        "node_id": "alt1",
+        "action": "alt_action",
+        "application": null,
+        "error": "Acción no encontrada: alt_action",
+        "timestamp": 1793959747.817049,
+        "execution_time": 2.480000011928496e-05,
+        "status": "failed"
+      },
+      {
+        "node_id": "n1",
+        "action": "nonexistent_xyz",
+        "application": null,
+        "error": "Acción no encontrada: nonexistent_xyz",
+        "timestamp": 1793959747.8282452,
+        "execution_time": 6.729999995513936e-05,
+        "status": "failed"
+      },
+      {
+        "node_id": "n1",
+        "action": "nonexistent_xyz",
+        "application": null,
+        "error": "Acción no encontrada: nonexistent_xyz",
+        "timestamp": 1793959747.8345072,
+        "execution_time": 0.00010370000018156134,
+        "status": "failed"
+      },
+      {
+        "node_id": "n1",
+        "action": "test",
+        "application": "Chrome",
+        "error": "fail",
+        "timestamp": 1793959747.8492274,
+        "execution_time": 0.0,
+        "status": "failed"
+      },
+      {
+        "node_id": "n1",
+        "action": "test",
+        "application": null,
+        "error": "fail",
+        "timestamp": 1793959747.8599021,
+        "execution_time": 0.0,
+        "status": "failed"
+      }
+    ]
   },
   "constraints": [],
   "last_actions": [],
