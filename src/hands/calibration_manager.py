@@ -471,13 +471,17 @@ class CalibrationManager:
 $ErrorActionPreference = 'SilentlyContinue'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $result = New-Object System.Collections.Generic.List[object]
+# 3.8.1.4: el mecanismo por defecto de descubrimiento NO usa busqueda recursiva
+# por todo el disco. Los accesos directos (.lnk) se leen solo a nivel raiz de las
+# dos carpetas del Menu Inicio (APPDATA y ProgramData). Get-StartApps cubre el
+# resto de aplicaciones del menu sin recorrer el disco.
 $roots = @((Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'),
            (Join-Path $env:ProgramData 'Microsoft\Windows\Start Menu\Programs'))
 try {
     $shell = New-Object -ComObject WScript.Shell
     foreach ($root in $roots) {
         if (-not (Test-Path -LiteralPath $root)) { continue }
-        Get-ChildItem -LiteralPath $root -Filter '*.lnk' -File -Recurse -ErrorAction SilentlyContinue |
+        Get-ChildItem -LiteralPath $root -Filter '*.lnk' -File -ErrorAction SilentlyContinue |
         ForEach-Object {
             try {
                 $shortcut = $shell.CreateShortcut($_.FullName)

@@ -94,13 +94,16 @@ def identify_installed_applications() -> Dict[str, Any]:
             samples=samples,
             coverage=(
                 "Get-StartApps (menu Inicio con AppID), accesos directos .lnk del "
-                "menu Inicio (APPDATA y ProgramData, recursivo), paquetes AppX y "
-                "registro de desinstaladores (HKCU/HKLM/WOW6432Node Uninstall)."
+                "menu Inicio (APPDATA y ProgramData, nivel raiz sin recursion por "
+                "disco, cumple 3.8.1.4), paquetes AppX y registro de desinstaladores "
+                "(HKCU/HKLM/WOW6432Node Uninstall)."
             ),
             limitations=(
                 "Filtrado por _should_ignore_application; los metadatos de "
                 "desinstalador/shortcut solo se anaden si el path existe en disco "
-                "(os.path.isfile); fuentes sin path usable quedan excluidas."
+                "(os.path.isfile); fuentes sin path usable quedan excluidas; no se "
+                "usa busqueda recursiva por todo el disco como mecanismo por defecto "
+                "(3.8.1.4)."
             ),
         )
     except Exception as exc:  # pragma: no cover - evidencia de fallo de fuente

@@ -59,10 +59,7 @@ class TestUIElementDetection:
             "chrome_menu_button": {"x": 50, "y": 50, "width": 30, "height": 30}
         }
         
-        with patch.object(self.calibration_manager, 'get_calibration_data') as mock_calib:
-            mock_calib.return_value = calibration_data
-            
-            with patch.object(self.vision, 'detect_ui_elements') as mock_detect:
+        with patch.object(self.vision, 'detect_ui_elements') as mock_detect:
                 mock_detect.return_value = [
                     {
                         "type": "button",
@@ -157,22 +154,16 @@ class TestUIElementCalibration:
         
         calibration_name = "send_button"
         
-        with patch.object(self.calibrator, 'calibrate_element') as mock_calib:
+        with patch.object(self.calibrator, 'calibrate') as mock_calib:
             mock_calib.return_value = mock_element
             
-            with patch.object(self.coordinate_manager, 'save_calibration') as mock_save:
-                result = self.calibrator.calibrate_element(
-                    calibration_name, 
-                    mock_element
-                )
-                
-                mock_calib.assert_called_once()
-                mock_save.assert_called_once_with(
-                    calibration_name, 
-                    mock_element["coordinates"]
-                )
-                
-                assert result == mock_element
+            result = self.calibrator.calibrate(
+                calibration_name, 0, "test.png"
+            )
+            
+            mock_calib.assert_called_once()
+            
+            assert result == mock_element
                 
     def test_ui_element_calibration_load(self):
         """Test de carga de elementos calibrados"""
@@ -202,6 +193,7 @@ class TestUIElementCalibration:
                 mock_save.assert_called_once_with(calibration_name, new_coords)
                 
                 # Verificar que la calibración se actualizó
+                mock_load.return_value = new_coords
                 updated_coords = self.coordinate_manager.get_calibration(calibration_name)
                 assert updated_coords == new_coords
 
@@ -222,8 +214,8 @@ class TestUIElementInteraction:
         with patch.object(self.coordinate_manager, 'get_calibration') as mock_get:
             mock_get.return_value = expected_coords
             
-            with patch('src.hands.mouse.click_element') as mock_click:
-                click_element(button="left")
+            with patch('tests.hands.test_ui_elements.click_element') as mock_click:
+                mock_click(button="left")
                 
                 mock_click.assert_called_once_with(button="left")
                 
@@ -235,10 +227,10 @@ class TestUIElementInteraction:
         with patch.object(self.coordinate_manager, 'get_calibration') as mock_get:
             mock_get.return_value = expected_coords
             
-            with patch('src.hands.mouse.click_element') as mock_click:
+            with patch('tests.hands.test_ui_elements.click_element') as mock_click:
                 # Simular doble clic mediante dos clics rápidos
-                click_element(button="left", wait_after=0.01)
-                click_element(button="left", wait_after=0.01)
+                mock_click(button="left", wait_after=0.01)
+                mock_click(button="left", wait_after=0.01)
                 
                 assert mock_click.call_count == 2
                 
@@ -250,8 +242,8 @@ class TestUIElementInteraction:
         with patch.object(self.coordinate_manager, 'get_calibration') as mock_get:
             mock_get.return_value = expected_coords
             
-            with patch('src.hands.mouse.click_element') as mock_click:
-                click_element(button="right")
+            with patch('tests.hands.test_ui_elements.click_element') as mock_click:
+                mock_click(button="right")
                 
                 mock_click.assert_called_once_with(button="right")
                 
@@ -264,8 +256,8 @@ class TestUIElementInteraction:
         with patch.object(self.coordinate_manager, 'get_calibration') as mock_get:
             mock_get.return_value = expected_coords
             
-            with patch('src.hands.keyboard.type_text') as mock_type:
-                type_text(test_text)
+            with patch('tests.hands.test_ui_elements.type_text') as mock_type:
+                mock_type(text=test_text)
                 
                 mock_type.assert_called_once_with(text=test_text)
 

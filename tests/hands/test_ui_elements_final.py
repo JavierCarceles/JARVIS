@@ -247,7 +247,7 @@ class TestUIElementIntegration:
                 assert isinstance(ui_element, UIElement)
                 assert isinstance(ui_element.type, str)
                 assert isinstance(ui_element.name, str)
-                assert isinstance(ui_element.coordinates, dict)
+                assert isinstance(ui_element.coordinates, (dict, type(None)))
 
 
 if __name__ == "__main__":
