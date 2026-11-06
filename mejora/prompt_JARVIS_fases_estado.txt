@@ -6584,3 +6584,21 @@ VERIFICACION: SINTAXIS: OK (py_compile de src/brain/llm.py, src/brain/htn_integr
 DISCREPANCIAS: NINGUNA nueva en la integración con Brain. Heredada de 3.7.1.1: (D11) bug de producción en open_application() error handler (applications_core.py:506, str(exc, ...) con 4 argumentos), ajeno a esta verificación y pendiente de fase posterior. Contradicción de instrucciones de cierre (prompt_mejoraActual.txt vs prompt_JARVIS_reglas.txt sección 5) ya documentada en 3.7.1.2; se sigue prompt_JARVIS_reglas.txt.
 PENDIENTES: NINGUNO para 3.7.1.3. Siguiente hoja pendiente real en orden del roadmap: 3.7.2.1 (Application Knowledge -> Goal), fase 3.7.
 ESTADO FINAL: 3.7.1.3 - IMPLEMENTADA
+
+===
+REGISTRO DE UNIDAD: 3.7.2.1
+FECHA: 2026-11-06
+OBJETIVO: Verificar la conexión Application Knowledge → Goal: confirmar que el conocimiento estructurado de aplicaciones (ApplicationKnowledge en applications_core.py) se traduce correctamente en objetivos (Goal en node.py) cuando el usuario pide abrir/navegar/cerrar una aplicación, incluyendo capabilities y required_capabilities, sin modificar código de producción.
+TIPO DE TRABAJO: VERIFICACION | TEST | INTEGRACION
+CAMBIOS / HALLAZGOS:
+- Verificación ejecutada: tests/hands/planner/test_application_knowledge_to_goal.py (18 tests en 6 clases) -> 18/18 PASSED en 4.35s.
+- Hallazgo 1 (discrepancia de nomenclatura): Goal.get_required_capabilities() retorna nombres como "open_application", "close_application", "activate_window", "focus_element", "type_text", "press_key". ApplicationCapability enum declara valores como "open", "close", "navigate", "search", "type", "click". No hay coincidencia directa. Existe mapeo parcial unidireccional en heuristic.py (líneas 824-830: "open" -> "open_application", etc.) pero no hay mapeo inverso. Documentado como discrepancia.
+- Hallazgo 2: required_capabilities en metadata solo se popula para goal_type en ["navigate_stream", "navigate"] (llm.py:671-678). Para open_application/close_application no se guarda en metadata, aunque goal.get_required_capabilities() sí retorna el valor correcto.
+- Hallazgo 3: is_capability_available() retorna False correctamente cuando la app no está instalada en runtime (Chrome no instalado en este entorno). Es comportamiento esperado, no un bug.
+- No se modificó código de producción.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: tests/hands/planner/test_application_knowledge_to_goal.py (nuevo, 18 tests); DOCUMENTACION: este registro en mejora/prompt_JARVIS_fases_estado.txt.
+TESTS Y RESULTADOS: UNITARIOS: PASSED/18/18 (test_application_knowledge_to_goal.py); INTEGRACION: NA; NO REGRESION: NA.
+VERIFICACION: SINTAXIS: OK (py_compile de test_application_knowledge_to_goal.py exit 0; imports de applications_core, application_integration, llm OK); MAIN.PY: NE (no modificado); COMPORTAMIENTO / INTEGRACION REAL: verificado contra Brain.interpret_intent("abre chrome") -> Goal type=open_application, target="Google Chrome"; ejecutado real con mock de ollama.chat.
+DISCREPANCIAS: (D1) Nomenclatura: Goal usa "open_application"/"close_application"/"activate_window"/"focus_element"/"type_text"/"press_key" pero ApplicationCapability enum declara "open"/"close"/"navigate"/"search"/"type"/"click". Sin coincidencia directa; mapeo parcial unidireccional en heuristic.py (solo AppCap -> nombre de Goal). (D2) required_capabilities en metadata solo para navigate/navigate_stream, no para open_application/close_application.
+PENDIENTES: NINGUNO para 3.7.2.1. Siguiente hoja pendiente real en orden del roadmap: 3.7.2.2 (Application Knowledge -> Planner), fase 3.7.
+ESTADO FINAL: 3.7.2.1 - IMPLEMENTADA
