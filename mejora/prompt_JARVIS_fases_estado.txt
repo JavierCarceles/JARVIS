@@ -6602,3 +6602,24 @@ VERIFICACION: SINTAXIS: OK (py_compile de test_application_knowledge_to_goal.py 
 DISCREPANCIAS: (D1) Nomenclatura: Goal usa "open_application"/"close_application"/"activate_window"/"focus_element"/"type_text"/"press_key" pero ApplicationCapability enum declara "open"/"close"/"navigate"/"search"/"type"/"click". Sin coincidencia directa; mapeo parcial unidireccional en heuristic.py (solo AppCap -> nombre de Goal). (D2) required_capabilities en metadata solo para navigate/navigate_stream, no para open_application/close_application.
 PENDIENTES: NINGUNO para 3.7.2.1. Siguiente hoja pendiente real en orden del roadmap: 3.7.2.2 (Application Knowledge -> Planner), fase 3.7.
 ESTADO FINAL: 3.7.2.1 - IMPLEMENTADA
+
+===
+REGISTRO DE UNIDAD: 3.7.2.2
+FECHA: NR
+OBJETIVO: Verificar la conexión Application Knowledge → Planner: confirmar que el conocimiento estructurado de aplicaciones (ApplicationKnowledgeIntegrator, applications_core) se traduce correctamente en nodos y datos consumibles por el Planner (Planner.available_nodes, load_application_knowledge, get_application_capabilities, get_application_capabilities_as_list, trace_application_capability_to_action, build_application_aware_plan, validate_plan_actions, get_application_ui_requirements, find_application_for_goal), sin modificar código de producción.
+TIPO DE TRABAJO: VERIFICACION | TEST | INTEGRACION
+CAMBIOS / HALLAZGOS:
+- Verificación ejecutada contra suites existentes: tests/hands/planner/test_application_integration.py (118 tests, 118/118 PASSED en 4.04s); tests/hands/planner/test_capabilities_consumible_format.py (12 tests, 12/12 PASSED); tests/hands/planner/test_planner_action_verification.py (~50 tests, todos PASSED); tests/hands/planner/test_planner_capability_action_traceability.py (~40 tests, todos PASSED); tests/hands/planner/test_planner_find_nodes_for_capability.py (~40 tests, todos PASSED); tests/hands/test_application_consumers_real_model.py (36 tests, 36/36 PASSED en 5.90s).
+- Hallazgo 1: ApplicationKnowledgeIntegrator.convert_application_to_nodes(app_name) convierte una aplicación y sus capacidades en Nodes canónicos (APPLICATION, capacidad, elementos UI) con jerarquía padre/hijos declarativa y metadatos "application_knowledge"; los Nodes se cargan en Planner.available_nodes vía load_application_knowledge().
+- Hallazgo 2: get_application_capabilities_as_list(app_name) expone identificadores canónicos de capacidad consumibles por el planificador; devuelve [] para apps sin capacidades o desconocidas.
+- Hallazgo 3: trace_application_capability_to_action(app_name, capability) documenta nodos proveedores y si la acción efectiva está registrada en ActionRegistry; restringe nodos a la app solicitada y no filtra por can_execute.
+- Hallazgo 4: build_application_aware_plan(goal, current_state) expone action_verification en metadata y usa find_application_for_goal para seleccionar la app objetivo.
+- Hallazgo 5: validate_plan_actions(plan) y filter_existing_actions(plan) verifican que las acciones del plan existen en el ActionRegistry.
+- Hallazgo 6: get_application_ui_requirements(app_name, capability) devuelve los elementos UI requeridos para una capacidad (ej. chrome/navigate -> ['address_bar']).
+- No se modificó código de producción.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: NA (suite existente); DOCUMENTACION: este registro en mejora/prompt_JARVIS_fases_estado.txt.
+TESTS Y RESULTADOS: UNITARIOS: PASSED/118/118 (test_application_integration.py); PASSED/12/12 (test_capabilities_consumible_format.py); PASSED/159/159 (suite combinada capabilities + action_verification + traceability + find_nodes + real_model); INTEGRACION: NA; NO REGRESION: NA.
+VERIFICACION: SINTAXIS: OK (pytest recolecta y ejecuta sin errores de importación ni sintaxis); MAIN.PY: NE (no modificado); COMPORTAMIENTO / INTEGRACION REAL: verificado mediante ejecución real de pytest sobre suites existentes (test_application_integration.py 118/118 PASSED; suite combinada 159/159 PASSED).
+DISCREPANCIAS: NINGUNA (hereda D1 y D2 de 3.7.2.1 referentes a nomenclatura Goal vs ApplicationCapability, que no afectan a la conexión Planner ya que trace_application_capability_to_action y get_application_capabilities_as_list resuelven por identificadores canónicos).
+PENDIENTES: NINGUNO para 3.7.2.2. Siguiente hoja pendiente real en orden del roadmap: 3.7.2.3 (Application Knowledge -> Executor), fase 3.7.
+ESTADO FINAL: 3.7.2.2 - IMPLEMENTADA
