@@ -512,6 +512,97 @@ class ApplicationManager:
             logger._print_log("info", f"Error procesando solicitud: {str(exc)} [file:applications_core.py, method:register_application, line:374]")
             return False
 
+    def register_discovered_application(
+        self,
+        name: str,
+        type: str = "application",
+        executable: Optional[str] = None,
+        url: Optional[str] = None,
+        observed_facts: Optional[Dict[str, Any]] = None,
+        inferred_data: Optional[Dict[str, Any]] = None,
+        capabilities: Optional[List[ApplicationCapabilityDef]] = None,
+        ui_elements: Optional[List[UIElement]] = None,
+        states: Optional[List[ApplicationState]] = None,
+        login_required: bool = False,
+        calibration_policy: Optional[List[str]] = None,
+        preflight_requirements: Optional[List[str]] = None,
+        default_state: ApplicationState = ApplicationState.CLOSED,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> ApplicationKnowledge:
+        """Registra temporalmente una aplicacion descubierta en memoria sin
+        persistir en entities.json.
+
+        La aplicacion representa un descubrimiento en tiempo de ejecucion que
+        no existe en el catalogo conocido. Se almacena solo en el diccionario
+        en memoria ``self.applications`` y NO se guarda mediante
+        ``memory_manager.save_entity``, por lo que no altera el esquema, las
+        siete entidades originales ni el contenido de
+        ``data/memory/entities.json``.
+
+        Separacion conceptual de la informacion:
+        - ``observed_facts``: datos reales del descubrimiento (ruta del
+          ejecutable, ventana detectada, proceso activo, etc.).
+        - ``inferred_data``: deducciones no verificadas (tipo por extension,
+          suposicion de capacidad, etc.).
+        - ``capabilities``: capacidades declaradas sin evidencia de
+          ejecutabilidad real en runtime.
+
+        Args:
+            name: Nombre de la aplicacion descubierta.
+            app_type: Tipo de aplicacion (default "application").
+            executable: Ruta al ejecutable, si se observo.
+            url: URL de la aplicacion, si se conocio.
+            observed_facts: Hechos observados durante el descubrimiento.
+            inferred_data: Datos inferidos / no verificados.
+            capabilities: Capacidades declaradas (no verificadas en runtime).
+            ui_elements: Elementos UI conocidos (sin calibracion).
+            states: Estados conocidos de la aplicacion.
+            login_required: Si se requiere login.
+            calibration_policy: Politicas de calibracion.
+            preflight_requirements: Requisitos de preflight.
+            default_state: Estado por defecto.
+            metadata: Metadatos adicionales (se fusionan con discovered/temporary).
+
+        Returns:
+            El objeto ApplicationKnowledge creado y registrado en memoria.
+        """
+        discovered_metadata: Dict[str, Any] = {
+            "discovered": True,
+            "temporary": True,
+            "source": "discovery",
+        }
+        if observed_facts:
+            discovered_metadata["observed_facts"] = observed_facts
+        if inferred_data:
+            discovered_metadata["inferred_data"] = inferred_data
+        if metadata:
+            discovered_metadata.update(metadata)
+
+        app = ApplicationKnowledge(
+            name=name,
+            type=type,
+            executable=executable,
+            url=url,
+            capabilities=capabilities,
+            ui_elements=ui_elements,
+            states=states,
+            login_required=login_required,
+            calibration_policy=calibration_policy,
+            preflight_requirements=preflight_requirements,
+            default_state=default_state,
+            metadata=discovered_metadata,
+        )
+
+        key = self._normalize_name(app.name)
+        self.applications[key] = app
+        logger._print_log(
+            "info",
+            f"Aplicacion descubierta registrada temporalmente en memoria: '{key}' "
+            "[file:applications_core.py, method:register_discovered_application]",
+            "applications_core.py", "register_discovered_application",
+        )
+        return app
+
     def get_application(self, app_name: str) -> Optional[ApplicationKnowledge]:
         """Obtiene una aplicación por nombre o alias.
 

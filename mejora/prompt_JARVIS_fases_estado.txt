@@ -6957,3 +6957,15 @@ VERIFICACION: SINTAXIS: OK (py_compile src/hands/application_preflight.py, tests
 DISCREPANCIAS: Se conserva la discrepancia histórica documentada entre prompt_mejoraActual.txt (CONTINUIDAD Y CIERRE indica dejar EN PROCESO al cerrar hoja) y prompt_JARVIS_reglas.txt (sección 5 TRANSICIÓN DE ESTADO exige dejar PENDIENTE al apuntar a la siguiente hoja); se sigue PENDIENTE, como registros 3.8.3.1 a 3.8.3.5. NINGUNA discrepancia nueva entre código, roadmap y README para esta unidad.
 PENDIENTES: Siguiente hoja pendiente real en orden del roadmap: 3.8.4.1 (Definir como representar temporalmente una aplicacion descubierta que no exista en el catalogo conocido).
 ESTADO FINAL: 3.8.3.6 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.8.4.1
+FECHA: NR
+OBJETIVO: Definir como representar temporalmente una aplicación descubierta que no exista en el catálogo conocido, sin alterar data/memory/entities.json ni sus siete entidades originales. Padre: 3.8.4; abuelo: 3.8 (FASE 3).
+TIPO DE TRABAJO: IMPLEMENTACION | TEST
+CAMBIOS / HALLAZGOS: Se añadio el metodo ApplicationManager.register_discovered_application() en src/hands/applications_core.py. Crea un ApplicationKnowledge (name+type obligatorios, resto opcional) y lo almacena solo en el dict en memoria self.applications, sin llamar a memory_manager.save_entity(), por lo que no modifica entities.json. El metadata marca discovered=True, temporary=True, source="discovery" y separa observed_facts, inferred_data y capabilities no verificadas. La clave del dict usa _normalize_name (case-insensitive), consistente con get_application/register_application.
+ARCHIVOS MODIFICADOS: PRODUCCION: src/hands/applications_core.py (metodo register_discovered_application despues de register_application); TESTS: tests/hands/test_application_discovered_temporary.py (nuevo); DOCUMENTACION: este registro en mejora/prompt_JARVIS_fases_estado.txt.
+TESTS Y RESULTADOS: UNITARIOS: 11 PASSED / 11 TOTAL en tests/hands/test_application_discovered_temporary.py; INTEGRACION: NA; NO REGRESION: 59 PASSED / 59 TOTAL en tests de resolucion, evidencia, ambiguedad, descubrimiento y datos obligatorios (sin regresión introducida).
+VERIFICACION: SINTAXIS: OK (py_compile src/hands/applications_core.py, tests/hands/test_application_discovered_temporary.py y main.py -> exit 0); MAIN.PY: OK (py_compile main.py -> exit 0; sin cambios en main.py); COMPORTAMIENTO / INTEGRACION REAL: 11 tests unitarios PASSED con pytest verificando registro solo en memoria, recuperacion via get_application, clave case-insensitive, separacion observed_facts/inferred_data/capacidades, metadata discovered/temporary, no llamada a save_entity y no conflicto con apps registradas.
+DISCREPANCIAS: NINGUNA. Se respeta 3.8.4.4 (no alterar entities.json, esquema ni siete entidades originales). Se reutilizan contratos reales: ApplicationKnowledge, ApplicationManager.applications, _normalize_name, get_application.
+PENDIENTES: Siguiente hoja pendiente real en orden del roadmap: 3.8.4.2 (Reutilizar ApplicationKnowledge/ApplicationManager y los mecanismos de persistencia existentes solo si su contrato es adecuado).
+ESTADO FINAL: 3.8.4.1 - IMPLEMENTADA
