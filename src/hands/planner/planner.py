@@ -2606,7 +2606,7 @@ class Planner:
             except ImportError:
                 from src.hands.application_preflight import ApplicationPreflight
             result = ApplicationPreflight().check(
-                {"name": app_name, "executable": f"{app_name.lower()}.exe"}
+                {"name": app_name, "app_id": ""}
             )
             return bool(isinstance(result, dict) and result.get("allowed", False))
         except Exception as exc:

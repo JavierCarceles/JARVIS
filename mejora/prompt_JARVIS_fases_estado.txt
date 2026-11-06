@@ -6890,3 +6890,17 @@ VERIFICACION: SINTAXIS: OK (py_compile src/hands/application_preflight.py, tests
 DISCREPANCIAS: Se conserva la discrepancia histórica documentada entre prompt_mejoraActual.txt (CONTINUIDAD Y CIERRE indica dejar EN PROCESO al cerrar hoja) y prompt_JARVIS_reglas.txt (sección 5 TRANSICIÓN DE ESTADO exige dejar PENDIENTE al apuntar a la siguiente hoja); se sigue la regla de transición (PENDIENTE), como en registros previos 3.8.2.2 a 3.8.2.6.
 PENDIENTES: Siguiente hoja pendiente real en orden del roadmap: 3.8.3.2 (Resolver rutas a partir de fuentes verificables sin asumir que el nombre del proceso coincide con el nombre comercial).
 ESTADO FINAL: 3.8.3.1 - IMPLEMENTADA
+
+
+===
+REGISTRO DE UNIDAD: 3.8.3.2
+FECHA: NR
+OBJETIVO: Resolver rutas de aplicaciones descubiertas a partir de fuentes verificables (ApplicationPreflight.resolve_executable, que consulta shell:AppsFolder y devuelve el Target real) sin asumir que el nombre del proceso coincide con el nombre comercial, es decir, no construir ejecutables a partir del nombre comercial (f"{app_name.lower()}.exe").
+TIPO DE TRABAJO: CORRECCION | TEST | VERIFICACION
+CAMBIOS / HALLAZGOS: src/hands/planner/planner.py (Planner.is_application_available): se elimina la suposicion de que el nombre del proceso coincide con el nombre comercial; se deja de construir "executable": f"{app_name.lower()}.exe" y se pasa {"name": app_name, "app_id": ""} para que resolve_executable resuelva la ruta real desde shell:AppsFolder (fuente verificable). No se duplica logica ni se crea API ficticia; resolve_executable (3.8.3.1) ya resuelve rutas reales desde shell:AppsFolder. Se añaden 2 tests que verifican que para nombres comerciales con espacios ("Google Chrome", "Microsoft Edge") no se construye un ejecutable falso ("google chrome.exe", "microsoft edge.exe").
+ARCHIVOS MODIFICADOS: PRODUCCION: src/hands/planner/planner.py; TESTS: tests/hands/planner/test_is_application_available_no_process_name_assumption.py; DOCUMENTACION: este registro en mejora/prompt_JARVIS_fases_estado.txt.
+TESTS Y RESULTADOS: UNITARIOS: 2 PASSED / 2 TOTAL (test_is_application_available_no_process_name_assumption.py); NO REGRESION: 237 PASSED (tests/hands/test_capability_availability_distinction.py, tests/hands/test_capability_absent_verification.py, tests/hands/test_application_preflight_resolve_executable.py, tests/hands/test_application_classification.py, tests/hands/planner/test_application_integration.py y el nuevo, sin fallos); INTEGRACION: NA.
+VERIFICACION: SINTAXIS: OK (py_compile src/hands/planner/planner.py y main.py -> exit 0); MAIN.PY: OK (py_compile main.py -> exit 0; el cambio no afecta el bucle principal ni imports de main.py); COMPORTAMIENTO / INTEGRACION REAL: Planner().is_application_available("Google Chrome") invoca ApplicationPreflight.check con name="Google Chrome" y sin executable="google chrome.exe" (verificado con mock); igual para "Microsoft Edge" y "microsoft edge.exe".
+DISCREPANCIAS: Se conserva la discrepancia historica documentada entre prompt_mejoraActual.txt y prompt_JARVIS_reglas.txt sobre el estado al cerrar hoja (se sigue PENDIENTE al apuntar a la siguiente hoja, como en registros previos 3.8.2.2 a 3.8.3.1). NINGUNA discrepancia nueva entre codigo, roadmap y README para esta unidad.
+PENDIENTES: Siguiente hoja pendiente real en orden del roadmap: 3.8.3.3 (Validar que la ruta o destino resuelto existe y corresponde al tipo de lanzamiento admitido).
+ESTADO FINAL: 3.8.3.2 - IMPLEMENTADA
