@@ -6642,3 +6642,20 @@ VERIFICACION: SINTAXIS: OK (pytest recolecta y ejecuta sin errores de importaci�
 DISCREPANCIAS: NINGUNA
 PENDIENTES: NINGUNO para 3.7.2.3. Siguiente hoja pendiente real en orden del roadmap: 3.7.2.4 (Application Knowledge -> calibracion cuando corresponda), fase 3.7.
 ESTADO FINAL: 3.7.2.3 - IMPLEMENTADA
+
+===
+REGISTRO DE UNIDAD: 3.7.2.4
+FECHA: 2026-11-06
+OBJETIVO: Verificar la conexión Application Knowledge -> calibración: confirmar que el conocimiento estructurado de aplicaciones (ApplicationManager, ApplicationKnowledge, applications_core) consume CalibrationManager para calibrar aplicaciones cuando corresponda (acciones calibrate_application_ui, calibrar_aplicaciones/calibrate_applications registradas con planner_enabled=True), sin modificar código de producción.
+TIPO DE TRABAJO: VERIFICACION | TEST | INTEGRACION
+CAMBIOS / HALLAZGOS:
+- Conexión verificada: calibrate_application_ui (línea 1101 de applications_core.py) obtiene ApplicationKnowledge vía get_application_manager(), usa calibration_policy para seleccionar elementos válidos (button/input/menu/link/checkbox/radio/select/toolbar) e invoca calibration_manager.calibrate_application(app.name, screen).
+- Conexión verificada: calibrar_aplicaciones / calibrate_applications (líneas 1181/1226) invocan calibration_manager.calibrate_all_applications() y construyen un informe estable vía _build_global_calibration_report.
+- CalibrationManager expone calibrate_application (línea 1787) y calibrate_all_applications (línea 2032); aplicaciones_core verifica su existencia con hasattr antes de invocarlas.
+- No se modificó código de producción.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: NA (suite existente); DOCUMENTACION: este registro en mejora/prompt_JARVIS_fases_estado.txt.
+TESTS Y RESULTADOS: UNITARIOS: PASSED/146/146 (tests/hands/test_applications_core.py, incl. calibrate_application_ui y calibrar_aplicaciones) en 5.73s; PASSED/19/19 (tests/eyes/test_vision_calibration_integration.py) en 4.05s; TOTAL: PASSED/165/165; INTEGRACION: NA; NO REGRESION: NA.
+VERIFICACION: SINTAXIS: OK (pytest recolecta y ejecuta sin errores de importación ni sintaxis; py_compile main.py OK); MAIN.PY: OK (sintaxis válida, sin modificaciones); COMPORTAMIENTO / INTEGRACION REAL: verificado mediante ejecución real de pytest sobre suites existentes (165/165 PASSED).
+DISCREPANCIAS: NINGUNA
+PENDIENTES: NINGUNO para 3.7.2.4. Siguiente hoja pendiente real en orden del roadmap: 3.7.3.1 (Ejecutar tests pertinentes), fase 3.7.
+ESTADO FINAL: 3.7.2.4 - IMPLEMENTADA
