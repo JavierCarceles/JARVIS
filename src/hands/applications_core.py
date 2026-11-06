@@ -607,6 +607,92 @@ class ApplicationManager:
             app=None, confidence=best_ratio, method="none", alternatives=[]
         )
 
+    def calculate_resolution_evidence(self, app_name: str) -> dict:
+        """Calcula y conserva la evidencia/confianza de una resolución de aplicación.
+
+        Utiliza :meth:`resolve_application` para obtener el resultado y
+        calcula una puntuación de evidencia basada en la confianza, el método
+        usado y la presencia de alternativas. La evidencia se conserva en el
+        ``metadata`` de la aplicación resuelta (mecanismo existente).
+
+        La puntuación de evidencia pondera el ``confidence`` por el método
+        (exacto/alias = 1.0, difuso = 0.8) y aplica una penalización leve por
+        cada alternativa candidata (máximo 0.2), de modo que una resolución
+        exacta sin alternativas puntúa 1.0 y una resolución difusa ambigua
+        puntúa menor.
+
+        Argumentos:
+            app_name: Nombre de la aplicación a resolver (ya normalizado o no).
+
+        Retorna:
+            Diccionario con claves: ``app_name``, ``app_name_resolved`` (si hay
+            coincidencia), ``confidence``, ``method``, ``evidence_score``,
+            ``has_match``, ``alternatives_count``.
+        """
+        result = self.resolve_application(app_name)
+
+        if result.app is None:
+            return {
+                "app_name": app_name,
+                "app_name_resolved": None,
+                "confidence": result.confidence,
+                "method": result.method,
+                "evidence_score": 0.0,
+                "has_match": False,
+                "alternatives_count": 0,
+            }
+
+        confidence = result.confidence
+        method_weight = {
+            "exact_normalized": 1.0,
+            "dynamic_alias": 1.0,
+            "fuzzy_name": 0.8,
+            "fuzzy_alias": 0.8,
+            "none": 0.0,
+        }.get(result.method, 0.5)
+
+        alternatives_penalty = min(len(result.alternatives) * 0.05, 0.2)
+        evidence_score = max(0.0, min(1.0, confidence * method_weight - alternatives_penalty))
+
+        if result.app.metadata is None:
+            result.app.metadata = {}
+        result.app.metadata["resolution_evidence"] = {
+            "confidence": confidence,
+            "method": result.method,
+            "evidence_score": evidence_score,
+            "resolved_name": app_name,
+        }
+
+        return {
+            "app_name": app_name,
+            "app_name_resolved": result.app.name,
+            "confidence": confidence,
+            "method": result.method,
+            "evidence_score": evidence_score,
+            "has_match": True,
+            "alternatives_count": len(result.alternatives),
+        }
+
+    def get_stored_resolution_evidence(self, app_name: str) -> Optional[dict]:
+        """Recupera la evidencia de resolución guardada para una aplicación.
+
+        Busca la aplicación por nombre normalizado (clave de
+        ``self.applications``) y devuelve el contenido de
+        ``metadata["resolution_evidence"]`` si existe.
+
+        Argumentos:
+            app_name: Nombre de la aplicación (se normaliza internamente).
+
+        Retorna:
+            Diccionario con la evidencia guardada o ``None`` si no hay nada
+            registrado para esa aplicación.
+        """
+        normalized = self._normalize_name(app_name or "")
+        app = self.applications.get(normalized)
+        if app is None or not app.metadata:
+            return None
+        return app.metadata.get("resolution_evidence")
+
     def get_applications_by_type(self, app_type: str) -> List[ApplicationKnowledge]:
         """Obtiene aplicaciones por tipo."""
         target = str(app_type).strip().lower()

@@ -887,6 +887,8 @@ Métodos:
 | `def get_application(app_name)` | Obtiene una aplicación por nombre o alias. |
 | `def _resolve_alias(normalized_name)` | Resuelve un alias dinámico contra las aplicaciones ya registradas. |
 | `def resolve_application(app_name)` | Resuelve una aplicación por nombre normalizado, alias dinámico o nombre imperfecto (coincidencia difusa con `difflib`), devolviendo la aplicación, confianza, método y alternativas. |
+| `def calculate_resolution_evidence(app_name)` | Calcula y conserva la evidencia/confianza de una resolución de aplicación: usa `resolve_application`, calcula una puntuación de evidencia basada en confianza, método y alternativas, y la conserva en el `metadata` de la aplicación resuelta. |
+| `def get_stored_resolution_evidence(app_name)` | Recupera la evidencia de resolución guardada en el `metadata` de una aplicación, buscándola por nombre normalizado. |
 | `def get_applications_by_type(app_type)` | Obtiene aplicaciones por tipo. |
 | `def get_applications_by_capability(capability)` | Obtiene aplicaciones con una capacidad determinada. |
 | `def _reconstruct_capabilities(capability_strings)` | Convierte una lista de strings de capacidad en ApplicationCapabilityDef. |
