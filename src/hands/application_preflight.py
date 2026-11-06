@@ -669,6 +669,149 @@ foreach ($item in $items) {
             return False
 
     # ======================================================================
+    # VALIDACIÓN DE DESTINO DE LANZAMIENTO (3.8.3.3)
+    # ======================================================================
+
+    LAUNCH_TYPE_EXECUTABLE = "ejecutable"
+    LAUNCH_TYPE_SHORTCUT = "acceso_directo"
+    LAUNCH_TYPE_URI = "uri_aplicacion"
+
+    # Esquemas de URI de aplicación reconocidos como destino de lanzamiento
+    # admitido. No requieren archivo en disco. Los tipos "paquete" y
+    # "lanzador" (roadmap 3.8.3.4) se dejan para cuando el código soporte su
+    # distinción real; aquí no se inventan mecanismos de lanzamiento.
+    _URI_SCHEMES = (
+        "ms-settings",
+        "microsoft-edge",
+        "ms-store",
+        "ms-windows-store",
+        "mailto",
+        "http",
+        "https",
+    )
+
+    @staticmethod
+    def _is_windows_path(destination: str) -> bool:
+        """True si destination parece una ruta de archivo de Windows (unidad o UNC)."""
+        if not destination or not isinstance(destination, str):
+            return False
+        d = destination.strip()
+        if d.startswith("\\\\"):
+            return True
+        return len(d) >= 2 and d[0].isalpha() and d[1] == ":"
+
+    @staticmethod
+    def _uri_scheme(destination: str) -> Optional[str]:
+        """Devuelve el esquema de URI si destination tiene uno válido y no es ruta de Windows."""
+        if not destination or not isinstance(destination, str):
+            return None
+        if ApplicationPreflight._is_windows_path(destination):
+            return None
+        match = re.match(r"^([A-Za-z][A-Za-z0-9+.-]*):", destination.strip())
+        return match.group(1).lower() if match else None
+
+    def validate_launch_destination(
+        self,
+        destination: str,
+    ) -> Dict[str, Any]:
+        """
+        Valida que un destino de lanzamiento exista y corresponda a un tipo
+        de lanzamiento admitido.
+
+        No lanza la aplicación ni abre nada; solo valida estáticamente el
+        destino resuelto (por ejemplo, el devuelto por resolve_executable).
+
+        Retorna un dict con:
+          - valid: bool, si el destino es admisible para lanzamiento.
+          - launch_type: Optional[str], tipo clasificado o None.
+          - destination: str, destino normalizado/absoluto cuando aplica.
+          - reason: str, motivo legible del resultado.
+        """
+        if not destination or not isinstance(destination, str):
+            return {
+                "valid": False,
+                "launch_type": None,
+                "destination": destination,
+                "reason": "Destino vacío o no es una cadena",
+            }
+
+        destination = destination.strip()
+        if not destination:
+            return {
+                "valid": False,
+                "launch_type": None,
+                "destination": "",
+                "reason": "Destino vacío tras normalizar",
+            }
+
+        # 1) URI de aplicación: esquema URI válido (no requiere archivo en disco).
+        scheme = self._uri_scheme(destination)
+        if scheme:
+            if scheme in self._URI_SCHEMES:
+                return {
+                    "valid": True,
+                    "launch_type": self.LAUNCH_TYPE_URI,
+                    "destination": destination,
+                    "reason": f"URI de aplicación admitida (esquema {scheme})",
+                }
+            return {
+                "valid": False,
+                "launch_type": None,
+                "destination": destination,
+                "reason": f"Esquema de URI no admitido como lanzamiento: {scheme}",
+            }
+
+        # 2) Ruta de archivo: normalizar a absoluta y comprobar existencia.
+        try:
+            resolved = os.path.abspath(destination)
+        except Exception:
+            return {
+                "valid": False,
+                "launch_type": None,
+                "destination": destination,
+                "reason": "No se pudo normalizar la ruta del destino",
+            }
+
+        if not os.path.exists(resolved):
+            return {
+                "valid": False,
+                "launch_type": None,
+                "destination": resolved,
+                "reason": "El destino no existe",
+            }
+
+        if os.path.isdir(resolved):
+            return {
+                "valid": False,
+                "launch_type": None,
+                "destination": resolved,
+                "reason": "El destino es un directorio, no un lanzamiento",
+            }
+
+        if resolved.casefold().endswith(".lnk"):
+            return {
+                "valid": True,
+                "launch_type": self.LAUNCH_TYPE_SHORTCUT,
+                "destination": resolved,
+                "reason": "Acceso directo existente admitido",
+            }
+
+        if self._is_executable(resolved):
+            return {
+                "valid": True,
+                "launch_type": self.LAUNCH_TYPE_EXECUTABLE,
+                "destination": resolved,
+                "reason": "Ejecutable existente admitido",
+            }
+
+        return {
+            "valid": False,
+            "launch_type": None,
+            "destination": resolved,
+            "reason": "Tipo de archivo no admitido como lanzamiento",
+        }
+
+    # ======================================================================
     # MANIFEST
     # ======================================================================
 
