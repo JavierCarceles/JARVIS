@@ -7044,3 +7044,15 @@ VERIFICACION: SINTAXIS: OK (py_compile src/hands/applications_core.py, tests/han
 DISCREPANCIAS: NINGUNA. Se respeta 3.8.4.4 (no alterar entities.json, esquema ni entidades originales). Se reutilizan contratos reales de 3.8.4.1 y 3.8.4.2.
 PENDIENTES: Siguiente hoja pendiente real en orden del roadmap: 3.8.4.4.1 (Localizar por inspeccion los ficheros entities.json que existen realmente).
 ESTADO FINAL: 3.8.4.3 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.8.4.4.1
+FECHA: NR
+OBJETIVO: Localizar por inspeccion los ficheros entities.json que existen realmente (data/entities.json, data/knowledge/entities.json, data/memory/entities.json u otros) y registrar de cada uno: ruta, numero de entidades, tamano, hash SHA-256 y que componente lo lee o lo escribe (MemoryManager, DomainMemory, EntityResolver). Solo lectura. Padre: 3.8.4.4; abuelo: 3.8 (FASE 3).
+TIPO DE TRABAJO: INSPECCION
+CAMBIOS / HALLAZGOS: Se localizaron dos ficheros entities.json reales y no existe data/entities.json en la raiz. (1) data/knowledge/entities.json: 7 entidades, 3231 bytes, SHA-256 60635AA8F64FAAD75C2C9635E483769874A60E0A98FD1244F696AC2B62A0DAB7. Componente: DomainMemory (src/memory/conversation.py, load_domain_knowledge(), linea 149) lo LEE; no se detecto escritura en DomainMemory. (2) data/memory/entities.json: 35 entidades, 15245 bytes, SHA-256 553B02A8C6B5EEC3C2F9A0B5D315B1066D48F45874B91AF970105BE3C353E1CC. Componente: MemoryManager (src/memory/storage.py, JSONStorage con MemoryType.ENTITIES -> entities.json, base_path data/memory; save_entity lineas 674-707 y _warm_cache lineas 612-620 lo LEE y ESCRIBE); EntityResolver (src/memory/entity_resolver.py linea 688, memory_manager.save_entity) lo ESCRIBE vía MemoryManager. No se modifico ningun fichero (operacion solo lectura).
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: NA; DOCUMENTACION: NA (este registro en mejora/prompt_JARVIS_fases_estado.txt).
+TESTS Y RESULTADOS: UNITARIOS: NE; INTEGRACION: NA; NO REGRESION: NA.
+VERIFICACION: SINTAXIS: NA; MAIN.PY: NA; COMPORTAMIENTO / INTEGRACION REAL: NV (inspeccion de ficheros de datos y de codigo fuente; sin ejecucion de tests ni de main.py).
+DISCREPANCIAS: El registro historico 3.8.1.1 declaraba no haber encontrado ningun entities.json, mientras los registros 3.2.3.1 y 3.3.4.4 citan 7 entidades en data/knowledge/entities.json y 35 en data/memory/entities.json. Evidencia comprobada: existen ambos ficheros con exactamente 7 y 35 entidades respectivamente. Discrepancia conservada sin resolver por intuicion (regla 1.13 y 5.5). Linea base unica fijada para 3.8.4.4.2 y 3.8.9.7: data/knowledge/entities.json = 7 entidades / 3231 bytes / SHA-256 60635AA8F64FAAD75C2C9635E483769874A60E0A98FD1244F696AC2B62A0DAB7; data/memory/entities.json = 35 entidades / 15245 bytes / SHA-256 553B02A8C6B5EEC3C2F9A0B5D315B1066D48F45874B91AF970105BE3C353E1CC.
+PENDIENTES: 3.8.4.4.2 (Determinar a que fichero se refieren las siete entidades originales: los registros 3.2.3.1 y 3.3.4.4 citan 7 entidades en data/knowledge/entities.json y 35 en data/memory/entities.json; fijar la linea base unica que usaran 3.8.4.7 y 3.8.9.7).
+ESTADO FINAL: 3.8.4.4.1 - IMPLEMENTADA
