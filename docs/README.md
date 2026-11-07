@@ -813,6 +813,7 @@ Métodos:
 | `def _extract_embedded_manifest(executable_path)` | Extrae RT_MANIFEST del PE sin ejecutar el binario. |
 | `def _result(allowed, reason, executable_path, requires_elevation, confidence, availability, login_required, logged_in, resources_available, blocked_by)` |  |
 | `def clear_cache()` | Limpia resultados de resolución y manifest. |
+| `def verify_app_id_in_apps_folder(app_id)` | Verifica que un app_id exista realmente en shell:AppsFolder. |
 | `def _normalized_values(values)` |  |
 | `def _normalize(value)` |  |
 
