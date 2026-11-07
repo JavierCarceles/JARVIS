@@ -288,6 +288,26 @@ class ApplicationPreflight:
                         logged_in=logged_in,
                         resources_available=resources_available,
                     )
+            # 3.8.5.1.2: admitir lanzamiento por paquete cuando el app_id
+            # procede del descubrimiento y se verifica contra shell:AppsFolder.
+            if app_id and self.verify_app_id_in_apps_folder(app_id):
+                return self._result(
+                    allowed=True,
+                    reason=(
+                        "No se pudo resolver el ejecutable; se admite "
+                        "lanzamiento por paquete (AppX/UWP) verificado en "
+                        "shell:AppsFolder"
+                    ),
+                    executable_path=None,
+                    requires_elevation=False,
+                    confidence="high",
+                    availability="available",
+                    login_required=login_required,
+                    logged_in=logged_in,
+                    resources_available=resources_available,
+                    blocked_by=None,
+                )
+
             return self._result(
                 allowed=False,
                 reason=(
@@ -710,6 +730,77 @@ foreach ($item in $items) {
         except Exception:
             return None
 
+    def verify_app_id_in_apps_folder(self, app_id: str) -> bool:
+        """
+        Verifica que un app_id exista realmente en shell:AppsFolder.
+
+        No construye comandos de lanzamiento ni aplica heurísticas sobre
+        cadenas arbitrarias: solo confirma la existencia del app_id en el
+        catálogo de aplicaciones instaladas del sistema (origen de
+        descubrimiento). Retorna False ante cualquier error de entorno.
+        """
+
+        if not app_id or not isinstance(app_id, str):
+            return False
+
+        script = r"""
+$ErrorActionPreference = "SilentlyContinue"
+
+$shell = New-Object -ComObject Shell.Application
+$folder = $shell.Namespace("shell:AppsFolder")
+
+if ($null -eq $folder) {
+    exit 1
+}
+
+$items = $folder.Items()
+$found = $false
+
+foreach ($item in $items) {
+    $aumid = [string]$item.ExtendedProperty("System.AppUserModel.ID")
+    $itemPath = [string]$item.Path
+
+    if ($aumid -and ($aumid -ieq $env:JARVIS_APP_ID)) {
+        $found = $true
+        break
+    }
+
+    if ($itemPath -and ($itemPath -ieq $env:JARVIS_APP_ID)) {
+        $found = $true
+        break
+    }
+}
+
+if ($found) { exit 0 } else { exit 1 }
+"""
+
+        env = os.environ.copy()
+        env["JARVIS_APP_ID"] = str(app_id)
+
+        try:
+            process = subprocess.run(
+                [
+                    "powershell",
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-Command",
+                    script,
+                ],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=self.POWERSHELL_TIMEOUT,
+                env=env,
+            )
+            return process.returncode == 0
+        except (subprocess.TimeoutExpired, OSError):
+            return False
+        except Exception:
+            return False
+
     @staticmethod
     def _resolve_from_target_string(target: str) -> Optional[str]:
         if not target:
@@ -736,11 +827,13 @@ foreach ($item in $items) {
     LAUNCH_TYPE_EXECUTABLE = "ejecutable"
     LAUNCH_TYPE_SHORTCUT = "acceso_directo"
     LAUNCH_TYPE_URI = "uri_aplicacion"
+    LAUNCH_TYPE_PACKAGE = "paquete"
 
     # Esquemas de URI de aplicación reconocidos como destino de lanzamiento
-    # admitido. No requieren archivo en disco. Los tipos "paquete" y
-    # "lanzador" (roadmap 3.8.3.4) se dejan para cuando el código soporte su
-    # distinción real; aquí no se inventan mecanismos de lanzamiento.
+    # admitido. No requieren archivo en disco. El tipo "paquete" se admite
+    # cuando el app_id procede del descubrimiento y se verifica contra
+    # shell:AppsFolder (unidad 3.8.5.1.2); no se inventan mecanismos de
+    # lanzamiento sobre cadenas arbitrarias.
     _URI_SCHEMES = (
         "ms-settings",
         "microsoft-edge",

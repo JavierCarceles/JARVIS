@@ -2,6 +2,7 @@
 """Tests de ApplicationPreflight (src/hands/application_preflight.py)."""
 
 import os
+import subprocess
 import tempfile
 from dataclasses import is_dataclass
 from unittest.mock import patch, MagicMock
@@ -258,6 +259,41 @@ class TestCheck:
             assert result["allowed"] is False
             assert result["blocked_by"] == "executable_not_resolved"
 
+    def test_check_unresolved_executable_with_valid_app_id_is_allowed_for_package(self):
+        with patch.object(
+            self.pf, "resolve_executable", return_value=None
+        ), patch.object(
+            self.pf, "verify_app_id_in_apps_folder", return_value=True
+        ):
+            result = self.pf.check(
+                {"name": "Calculadora", "app_id": "Microsoft.WindowsCalculator_8wekyb3d8bbwe"}
+            )
+            assert result["allowed"] is True
+            assert result["blocked_by"] is None
+            assert "paquete" in result["reason"].lower()
+            assert result["availability"] == "available"
+            assert result["confidence"] == "high"
+
+    def test_check_unresolved_executable_with_invalid_app_id_is_rejected(self):
+        with patch.object(
+            self.pf, "resolve_executable", return_value=None
+        ), patch.object(
+            self.pf, "verify_app_id_in_apps_folder", return_value=False
+        ):
+            result = self.pf.check(
+                {"name": "app", "app_id": "No.Exists.App.Id"}
+            )
+            assert result["allowed"] is False
+            assert result["blocked_by"] == "executable_not_resolved"
+
+    def test_check_unresolved_executable_without_app_id_is_rejected(self):
+        with patch.object(
+            self.pf, "resolve_executable", return_value=None
+        ):
+            result = self.pf.check({"name": "unknown_app"})
+            assert result["allowed"] is False
+            assert result["blocked_by"] == "executable_not_resolved"
+
     def test_check_ambiguous_resolution_is_rejected(self):
         result = self.pf.check(
             {"name": "app"}, ambiguous=True
@@ -438,3 +474,52 @@ class TestInspectExecutableManifest:
     def test_parse_manifest_xml_empty(self):
         result = self.pf._parse_manifest_xml(None)
         assert result == {}
+
+
+class TestVerifyAppIdInAppsFolder:
+    def setup_method(self, _method=None):
+        self.pf = ApplicationPreflight()
+
+    def test_empty_app_id_returns_false_without_subprocess(self):
+        with patch("src.hands.application_preflight.subprocess.run") as mock_run:
+            assert self.pf.verify_app_id_in_apps_folder("") is False
+            assert self.pf.verify_app_id_in_apps_folder(None) is False
+            mock_run.assert_not_called()
+
+    def test_returncode_zero_returns_true(self):
+        with patch(
+            "src.hands.application_preflight.subprocess.run"
+        ) as mock_run:
+            mock_run.return_value.returncode = 0
+            assert self.pf.verify_app_id_in_apps_folder("Microsoft.WindowsCalculator_8wekyb3d8bbwe") is True
+            mock_run.assert_called_once()
+
+    def test_returncode_one_returns_false(self):
+        with patch(
+            "src.hands.application_preflight.subprocess.run"
+        ) as mock_run:
+            mock_run.return_value.returncode = 1
+            assert self.pf.verify_app_id_in_apps_folder("No.Exists.App.Id") is False
+
+    def test_timeout_returns_false(self):
+        with patch(
+            "src.hands.application_preflight.subprocess.run"
+        ) as mock_run:
+            mock_run.side_effect = subprocess.TimeoutExpired("powershell", 10)
+            assert self.pf.verify_app_id_in_apps_folder("Any.App.Id") is False
+
+    def test_oserror_returns_false(self):
+        with patch(
+            "src.hands.application_preflight.subprocess.run"
+        ) as mock_run:
+            mock_run.side_effect = OSError("boom")
+            assert self.pf.verify_app_id_in_apps_folder("Any.App.Id") is False
+
+    def test_passes_jarvis_app_id_env(self):
+        with patch(
+            "src.hands.application_preflight.subprocess.run"
+        ) as mock_run:
+            mock_run.return_value.returncode = 0
+            self.pf.verify_app_id_in_apps_folder("Test.App.Id")
+            _, kwargs = mock_run.call_args
+            assert kwargs["env"]["JARVIS_APP_ID"] == "Test.App.Id"
