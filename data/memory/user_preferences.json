@@ -1,1 +1,16 @@
-{}
+{
+  "default_user_entity_confidence_selection_entity_confidence_selection_google_chrome": {
+    "user_id": "default_user",
+    "preference_type": "entity_confidence_selection",
+    "preference_key": "entity_confidence_selection_google_chrome",
+    "preference_value": "google_chrome",
+    "confidence": 1.0,
+    "created_at": "",
+    "updated_at": "2026-11-07T22:54:31.469535",
+    "context": {
+      "interaction_type": "confidence_selection",
+      "success": true
+    },
+    "usage_count": 24
+  }
+}

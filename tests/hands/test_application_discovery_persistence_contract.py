@@ -206,7 +206,8 @@ class TestNoDuplicacionNiEscrituraDeEntitiesJson:
 
     def test_app_descubierta_no_sobrescribe_catalogo_persistido(self):
         """Una app descubierta con nombre de app conocida (p.ej. Chrome)
-        se guarda solo en memoria y no genera entidad de persistencia."""
+        se guarda solo en memoria, no genera entidad de persistencia y NO
+        reemplaza la entrada de catalogo ya registrada."""
         manager = _make_manager()
         chrome = ApplicationKnowledge(name="Chrome", type="browser", executable="chrome")
         manager.register_application(chrome)
@@ -220,4 +221,6 @@ class TestNoDuplicacionNiEscrituraDeEntitiesJson:
         assert len(manager.memory_manager.saved) == entidades_antes, (
             "register_discovered_application no debe persistir en entities.json"
         )
-        assert manager.applications["chrome"].type == "utility"  # memoria: la descubierta reemplaza
+        # La entrada previa se conserva: register_discovered_application no
+        # sobrescribe una app de catalogo con una descubierta homonima.
+        assert manager.applications["chrome"].type == "browser"  # memoria: se conserva la entrada previa

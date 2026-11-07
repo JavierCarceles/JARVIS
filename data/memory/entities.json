@@ -695,8 +695,8 @@
         "loading"
       ]
     },
-    "created_at": "2026-11-07T16:50:49.870144",
-    "updated_at": "2026-11-07T16:50:49.870147",
+    "created_at": "2026-11-07T23:33:55.602360",
+    "updated_at": "2026-11-07T23:33:55.602363",
     "metadata": null,
     "aliases": [],
     "confidence": 1.0,
@@ -735,8 +735,8 @@
         "active"
       ]
     },
-    "created_at": "2026-11-07T16:50:49.878876",
-    "updated_at": "2026-11-07T16:50:49.878878",
+    "created_at": "2026-11-07T23:33:55.604631",
+    "updated_at": "2026-11-07T23:33:55.604632",
     "metadata": null,
     "aliases": [],
     "confidence": 1.0,
@@ -856,6 +856,488 @@
     },
     "created_at": "2026-11-07T03:41:16.259708",
     "updated_at": "2026-11-07T03:41:16.259711",
+    "metadata": null,
+    "aliases": [],
+    "confidence": 1.0,
+    "tags": []
+  },
+  {
+    "id": "app_dupapp",
+    "type": "application",
+    "name": "DupApp",
+    "properties": {
+      "type": "utility",
+      "executable": "dupapp_exe",
+      "url": "https://example.com",
+      "login_required": false,
+      "capabilities": [
+        "navigate",
+        "search"
+      ],
+      "ui_elements": [
+        {
+          "name": "shared_elem",
+          "type": "input",
+          "description": "",
+          "required_capability": null
+        }
+      ],
+      "states": [
+        "closed"
+      ]
+    },
+    "created_at": "2026-11-07T22:40:36.240756",
+    "updated_at": "2026-11-07T22:40:36.240759",
+    "metadata": null,
+    "aliases": [],
+    "confidence": 1.0,
+    "tags": []
+  },
+  {
+    "id": "app_nocaps",
+    "type": "application",
+    "name": "NoCaps",
+    "properties": {
+      "type": "utility",
+      "executable": "nocaps_exe",
+      "url": "https://example.com",
+      "login_required": false,
+      "capabilities": [],
+      "ui_elements": [],
+      "states": [
+        "closed"
+      ]
+    },
+    "created_at": "2026-11-07T22:40:36.360863",
+    "updated_at": "2026-11-07T22:40:36.360866",
+    "metadata": null,
+    "aliases": [],
+    "confidence": 1.0,
+    "tags": []
+  },
+  {
+    "id": "app_registertestapp",
+    "type": "application",
+    "name": "RegisterTestApp",
+    "properties": {
+      "type": "utility",
+      "executable": "regtestapp",
+      "url": null,
+      "login_required": false,
+      "capabilities": [],
+      "ui_elements": [],
+      "states": []
+    },
+    "created_at": "2026-11-07T22:40:37.027621",
+    "updated_at": "2026-11-07T22:40:37.027624",
+    "metadata": null,
+    "aliases": [],
+    "confidence": 1.0,
+    "tags": []
+  },
+  {
+    "id": "app_minimalcustom",
+    "type": "application",
+    "name": "MinimalCustom",
+    "properties": {
+      "type": "utility",
+      "executable": null,
+      "url": null,
+      "login_required": false,
+      "capabilities": [],
+      "ui_elements": [],
+      "states": []
+    },
+    "created_at": "2026-11-07T22:40:54.284661",
+    "updated_at": "2026-11-07T22:40:54.284665",
+    "metadata": null,
+    "aliases": [],
+    "confidence": 1.0,
+    "tags": []
+  },
+  {
+    "id": "app_minimalcustomcheck",
+    "type": "application",
+    "name": "MinimalCustomCheck",
+    "properties": {
+      "type": "browser",
+      "executable": null,
+      "url": null,
+      "login_required": false,
+      "capabilities": [],
+      "ui_elements": [],
+      "states": []
+    },
+    "created_at": "2026-11-07T22:40:54.306102",
+    "updated_at": "2026-11-07T22:40:54.306105",
+    "metadata": null,
+    "aliases": [],
+    "confidence": 1.0,
+    "tags": []
+  },
+  {
+    "id": "app_app resolucion test",
+    "type": "application",
+    "name": "App Resolucion Test",
+    "properties": {
+      "type": "test",
+      "executable": "appresoluciontest",
+      "url": "https://appresoluciontest.example.com",
+      "login_required": false,
+      "capabilities": [
+        "open"
+      ],
+      "ui_elements": [
+        {
+          "name": "ventana_principal",
+          "type": "window",
+          "description": "Ventana de App Resolucion Test",
+          "required_capability": null
+        }
+      ],
+      "states": [
+        "closed",
+        "open"
+      ]
+    },
+    "created_at": "2026-11-07T22:40:54.794861",
+    "updated_at": "2026-11-07T22:40:54.794864",
+    "metadata": null,
+    "aliases": [],
+    "confidence": 1.0,
+    "tags": []
+  },
+  {
+    "id": "app_navegador web alternativo",
+    "type": "application",
+    "name": "Navegador Web Alternativo",
+    "properties": {
+      "type": "test",
+      "executable": "navegadorwebalternativo",
+      "url": "https://navegadorwebalternativo.example.com",
+      "login_required": false,
+      "capabilities": [
+        "open"
+      ],
+      "ui_elements": [
+        {
+          "name": "ventana_principal",
+          "type": "window",
+          "description": "Ventana de Navegador Web Alternativo",
+          "required_capability": null
+        }
+      ],
+      "states": [
+        "closed",
+        "open"
+      ]
+    },
+    "created_at": "2026-11-07T22:40:54.835299",
+    "updated_at": "2026-11-07T22:40:54.835301",
+    "metadata": null,
+    "aliases": [],
+    "confidence": 1.0,
+    "tags": []
+  },
+  {
+    "id": "app_editor de texto pro",
+    "type": "application",
+    "name": "Editor de Texto Pro",
+    "properties": {
+      "type": "test",
+      "executable": "editordetextopro",
+      "url": "https://editordetextopro.example.com",
+      "login_required": false,
+      "capabilities": [
+        "open"
+      ],
+      "ui_elements": [
+        {
+          "name": "ventana_principal",
+          "type": "window",
+          "description": "Ventana de Editor de Texto Pro",
+          "required_capability": null
+        }
+      ],
+      "states": [
+        "closed",
+        "open"
+      ]
+    },
+    "created_at": "2026-11-07T22:40:54.922817",
+    "updated_at": "2026-11-07T22:40:54.922820",
+    "metadata": null,
+    "aliases": [],
+    "confidence": 1.0,
+    "tags": []
+  },
+  {
+    "id": "app_calculadora científica",
+    "type": "application",
+    "name": "Calculadora Científica",
+    "properties": {
+      "type": "test",
+      "executable": "calculadoracientífica",
+      "url": "https://calculadoracientífica.example.com",
+      "login_required": false,
+      "capabilities": [
+        "open"
+      ],
+      "ui_elements": [
+        {
+          "name": "ventana_principal",
+          "type": "window",
+          "description": "Ventana de Calculadora Científica",
+          "required_capability": null
+        }
+      ],
+      "states": [
+        "closed",
+        "open"
+      ]
+    },
+    "created_at": "2026-11-07T22:40:54.932075",
+    "updated_at": "2026-11-07T22:40:54.932078",
+    "metadata": null,
+    "aliases": [],
+    "confidence": 1.0,
+    "tags": []
+  },
+  {
+    "id": "app_optcustommin",
+    "type": "application",
+    "name": "OptCustomMin",
+    "properties": {
+      "type": "utility",
+      "executable": null,
+      "url": null,
+      "login_required": false,
+      "capabilities": [],
+      "ui_elements": [],
+      "states": []
+    },
+    "created_at": "2026-11-07T22:40:55.030071",
+    "updated_at": "2026-11-07T22:40:55.030075",
+    "metadata": null,
+    "aliases": [],
+    "confidence": 1.0,
+    "tags": []
+  },
+  {
+    "id": "app_optcustomfull",
+    "type": "application",
+    "name": "OptCustomFull",
+    "properties": {
+      "type": "browser",
+      "executable": "custom.exe",
+      "url": "https://custom.example.com",
+      "login_required": true,
+      "capabilities": [],
+      "ui_elements": [],
+      "states": []
+    },
+    "created_at": "2026-11-07T22:40:55.057691",
+    "updated_at": "2026-11-07T22:40:55.057694",
+    "metadata": null,
+    "aliases": [],
+    "confidence": 1.0,
+    "tags": []
+  },
+  {
+    "id": "app_optcustomcaps",
+    "type": "application",
+    "name": "OptCustomCaps",
+    "properties": {
+      "type": "browser",
+      "executable": null,
+      "url": null,
+      "login_required": false,
+      "capabilities": [
+        "open"
+      ],
+      "ui_elements": [],
+      "states": []
+    },
+    "created_at": "2026-11-07T22:40:55.101990",
+    "updated_at": "2026-11-07T22:40:55.101993",
+    "metadata": null,
+    "aliases": [],
+    "confidence": 1.0,
+    "tags": []
+  },
+  {
+    "id": "app_optcustomui",
+    "type": "application",
+    "name": "OptCustomUI",
+    "properties": {
+      "type": "browser",
+      "executable": null,
+      "url": null,
+      "login_required": false,
+      "capabilities": [],
+      "ui_elements": [
+        {
+          "name": "btn_ok",
+          "type": "button",
+          "description": "Botón OK",
+          "required_capability": null
+        }
+      ],
+      "states": []
+    },
+    "created_at": "2026-11-07T22:40:55.138484",
+    "updated_at": "2026-11-07T22:40:55.138487",
+    "metadata": null,
+    "aliases": [],
+    "confidence": 1.0,
+    "tags": []
+  },
+  {
+    "id": "app_optcustomstates",
+    "type": "application",
+    "name": "OptCustomStates",
+    "properties": {
+      "type": "browser",
+      "executable": null,
+      "url": null,
+      "login_required": false,
+      "capabilities": [],
+      "ui_elements": [],
+      "states": [
+        "open",
+        "active"
+      ]
+    },
+    "created_at": "2026-11-07T22:40:55.167408",
+    "updated_at": "2026-11-07T22:40:55.167411",
+    "metadata": null,
+    "aliases": [],
+    "confidence": 1.0,
+    "tags": []
+  },
+  {
+    "id": "app_app prueba ambiguedad",
+    "type": "application",
+    "name": "App Prueba Ambiguedad",
+    "properties": {
+      "type": "test",
+      "executable": "apppruebaambiguedad",
+      "url": "https://apppruebaambiguedad.example.com",
+      "login_required": false,
+      "capabilities": [
+        "open"
+      ],
+      "ui_elements": [
+        {
+          "name": "ventana_principal",
+          "type": "window",
+          "description": "Ventana de App Prueba Ambiguedad",
+          "required_capability": null
+        }
+      ],
+      "states": [
+        "closed",
+        "open"
+      ]
+    },
+    "created_at": "2026-11-07T22:40:56.557885",
+    "updated_at": "2026-11-07T22:40:56.557888",
+    "metadata": null,
+    "aliases": [],
+    "confidence": 1.0,
+    "tags": []
+  },
+  {
+    "id": "app_navegador web pro",
+    "type": "application",
+    "name": "Navegador Web Pro",
+    "properties": {
+      "type": "test",
+      "executable": "navegadorwebpro",
+      "url": "https://navegadorwebpro.example.com",
+      "login_required": false,
+      "capabilities": [
+        "open"
+      ],
+      "ui_elements": [
+        {
+          "name": "ventana_principal",
+          "type": "window",
+          "description": "Ventana de Navegador Web Pro",
+          "required_capability": null
+        }
+      ],
+      "states": [
+        "closed",
+        "open"
+      ]
+    },
+    "created_at": "2026-11-07T22:40:56.618133",
+    "updated_at": "2026-11-07T22:40:56.618136",
+    "metadata": null,
+    "aliases": [],
+    "confidence": 1.0,
+    "tags": []
+  },
+  {
+    "id": "app_navegador web lite",
+    "type": "application",
+    "name": "Navegador Web Lite",
+    "properties": {
+      "type": "test",
+      "executable": "navegadorweblite",
+      "url": "https://navegadorweblite.example.com",
+      "login_required": false,
+      "capabilities": [
+        "open"
+      ],
+      "ui_elements": [
+        {
+          "name": "ventana_principal",
+          "type": "window",
+          "description": "Ventana de Navegador Web Lite",
+          "required_capability": null
+        }
+      ],
+      "states": [
+        "closed",
+        "open"
+      ]
+    },
+    "created_at": "2026-11-07T22:40:56.624831",
+    "updated_at": "2026-11-07T22:40:56.624834",
+    "metadata": null,
+    "aliases": [],
+    "confidence": 1.0,
+    "tags": []
+  },
+  {
+    "id": "app_app evidencia test",
+    "type": "application",
+    "name": "App Evidencia Test",
+    "properties": {
+      "type": "test",
+      "executable": "appevidenciatest",
+      "url": "https://appevidenciatest.example.com",
+      "login_required": false,
+      "capabilities": [
+        "open"
+      ],
+      "ui_elements": [
+        {
+          "name": "ventana_principal",
+          "type": "window",
+          "description": "Ventana de App Evidencia Test",
+          "required_capability": null
+        }
+      ],
+      "states": [
+        "closed",
+        "open"
+      ]
+    },
+    "created_at": "2026-11-07T22:40:56.897198",
+    "updated_at": "2026-11-07T22:40:56.897201",
     "metadata": null,
     "aliases": [],
     "confidence": 1.0,

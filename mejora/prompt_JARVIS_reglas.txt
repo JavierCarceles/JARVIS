@@ -52,7 +52,7 @@ Evolucionar de `intencion -> comando -> funcion -> ejecucion` a `intencion -> Go
 6. REGISTROS DE UNIDAD: FORMATO COMPACTO UNICO
 Cada unidad debe tener un unico registro final, con los campos siguientes en este orden. Se permite una linea por campo y compactar listas mediante `;`, sin perder datos:
 REGISTRO DE UNIDAD: <ID>
-FECHA: AAAA-MM-DD o NR
+FECHA: AAAA-MM-DD (obtenerla del sistema actual al cerrar la unidad; nunca usar NR para este campo)
 OBJETIVO: <objetivo verificable>
 TIPO DE TRABAJO: INSPECCION | TEST | IMPLEMENTACION | CORRECCION | VERIFICACION | DOCUMENTACION | INTEGRACION (solo los aplicables)
 CAMBIOS / HALLAZGOS: <hechos comprobados; NR si faltan>
@@ -62,7 +62,7 @@ VERIFICACION: SINTAXIS: <OK/ERROR/NE/NA>; MAIN.PY: <OK/ERROR/NE/NA>; COMPORTAMIE
 DISCREPANCIAS: <contradicciones y resolucion o NINGUNA>
 PENDIENTES: <IDs concretos o NINGUNO>
 ESTADO FINAL: <ID> - <NO IMPLEMENTADA | EN PROCESO | PARCIALMENTE IMPLEMENTADA | IMPLEMENTADA>
-- Abreviaturas solo para valores vacios de registros: `NR` = no registrado; `NE` = no ejecutado/a; `NV` = no verificado; `NA` = no aplica. No usarlas si el valor real puede escribirse.
+- Abreviaturas solo para valores vacios de registros: `NR` = no registrado; `NE` = no ejecutado/a; `NV` = no verificado; `NA` = no aplica. No usarlas si el valor real puede escribirse. `NR` no se usa nunca para el campo FECHA: la fecha siempre se registra en formato AAAA-MM-DD obtenida del sistema actual al cerrar la unidad.
 - Mantener rutas completas entre backticks y grafia exacta de metodos/campos/claves. No inferir datos no comprobados.
 - Anotar cada unidad una sola vez. Si existen varias ejecuciones de tests, registrar cada resultado con su contexto/orden sin duplicar el registro. Mantener discrepancias historicas explicitas y documentar su resolucion posterior, sin borrar el antecedente ni dejar dos cierres para la misma unidad.
 - El estado global se actualiza solo en los cuatro campos persistentes de `prompt_mejoraActual.txt`: `CURRENT_PHASE`, `CURRENT_WORK_UNIT`, `CURRENT_WORK_STATUS`, `LAST_COMPLETED_UNIT`. El detalle va en registros de `prompt_JARVIS_fases_estado.txt`.
@@ -99,4 +99,5 @@ ESTADO FINAL: <ID> - <NO IMPLEMENTADA | EN PROCESO | PARCIALMENTE IMPLEMENTADA |
 - NO USAR `write` para agregar contenido a un archivo existente: `write` sobrescribe TODO el archivo y borra su contenido previo. Usar `write` solo para crear archivos nuevos o reemplazar un archivo completo intencionadamente. Para modificar partes de un archivo existente, usar `edit` con un `oldString` que coincida unívocamente.
 - SÍ USAR: `shell` con comandos individuales de PowerShell; `read` / `get-content` para leer archivos; `edit` para cambios parciales en archivos existentes; `write` solo para archivos nuevos o reemplazo total; `glob`, `grep`, `webfetch`, `websearch`, `question`, `subagent`, `execute`, `mcp` según corresponda.
 - Antes de usar `write` en un archivo existente, leerlo primero con `read` para conocer su contenido y evitar pérdidas de datos.
+- Para obtener la fecha actual en formato AAAA-MM-DD al cerrar una unidad, usar en `shell`: `(Get-Date).ToString("yyyy-MM-dd")` (PowerShell, Windows). Nunca usar `NR` para el campo FECHA de los registros de unidad.
 
