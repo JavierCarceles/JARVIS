@@ -7093,3 +7093,16 @@ VERIFICACION: SINTAXIS: OK (py_compile de main.py -> exit 0); MAIN.PY: OK (py_co
 DISCREPANCIAS: NINGUNA.
 PENDIENTES: NINGUNO.
 ESTADO FINAL: 3.8.4.4.4 - IMPLEMENTADA
+
+
+REGISTRO DE UNIDAD: 3.8.4.5
+FECHA: NR
+OBJETIVO: Verificar que ninguna aplicacion instalada o descubierta se convierte automaticamente en segura o totalmente automatizable: `automatable` queda `False` por defecto en `classify_application()` y solo pasa a `True` si `ApplicationPreflight.check()` aprueba con confianza conocida. Padre: 3.8.4; abuelo: 3.8 (FASE 3).
+TIPO DE TRABAJO: INSPECCION | VERIFICACION
+CAMBIOS / HALLAZGOS: En `src/hands/applications_core.py`, `classify_application()` inicializa `automatable = False` (linea 1956) y solo lo activa si `preflight_result.allowed` es True, `confidence != "unknown"` y la app esta instalada (lineas 1962-1966). `ApplicationPreflight.check()` en `src/hands/application_preflight.py` rechaza por: nombre bloqueado, app_id bloqueado, login requerido sin sesion, recursos no disponibles, ejecutable no resuelto, destino de lanzamiento invalido, nivel de elevacion requerido y uiAccess. No existe codigo que marque automaticamente apps instaladas como automatable. No se modifica codigo de produccion.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: NA; DOCUMENTACION: NA (este registro en mejora/prompt_JARVIS_fases_estado.txt).
+TESTS Y RESULTADOS: UNITARIOS: 30 PASSED / 30 TOTAL en tests/hands/test_application_classification.py (incluye 9 tests del eje automatable: test_automatable_true, test_automatable_false_preflight_blocked, test_automatable_false_confidence_unknown, test_automatable_false_not_installed, test_installed_not_registered_not_running_not_automatable, test_registered_but_not_installed_not_running, test_preflight_exception_does_not_crash, test_empty_name, test_whitespace_name); INTEGRACION: NA; NO REGRESION: 30 PASSED / 30 TOTAL.
+VERIFICACION: SINTAXIS: OK (pytest ejecutado sin errores de importacion); MAIN.PY: NA; COMPORTAMIENTO / INTEGRACION REAL: Verificado mediante ejecucion de pytest: 30 PASSED / 0 FAILED en tests/hands/test_application_classification.py.
+DISCREPANCIAS: NINGUNA.
+PENDIENTES: Siguiente hoja pendiente real en orden del roadmap: 3.8.4.6.1 (Evitar duplicados al registrar conocimiento dinamico en memoria por nombre normalizado y por alias).
+ESTADO FINAL: 3.8.4.5 - IMPLEMENTADA
