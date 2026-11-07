@@ -160,16 +160,96 @@ class TestDiscoveredAppDoesNotOverrideRegistered:
         mm: _FakeMemoryManager = manager.memory_manager  # type: ignore[assignment]
         entidades_antes = len(mm.saved_entities)
         # register_discovered_application con el mismo nombre: no debe llamar
-        # a save_entity (no duplica en entities.json aunque colisione)
+        # a save_entity (no duplica en entities.json aunque colisione) y NO
+        # debe sobrescribir la app de catalogo existente.
         app = manager.register_discovered_application(
             name="Chrome", type="browser",
             observed_facts={"origen": "descubrimiento_en_runtime"},
         )
         assert app.name == "Chrome"
+        # Se conserva la entrada previa: la app devuelta es la de catalogo,
+        # no la descubierta.
+        assert app is chrome
+        assert manager.applications["chrome"] is chrome
         assert len(mm.saved_entities) == entidades_antes, (
             "register_discovered_application no debe persistir en entities.json"
         )
-        assert manager.applications["chrome"] is app
+
+    def test_no_sobrescribe_por_alias_de_app_existente(self):
+        """Nombre normalizado de descubierta colisiona con alias de app registrada."""
+        manager = _make_manager()
+        existing = ApplicationKnowledge(
+            name="MiApp", type="utility", executable="miapp.exe",
+            metadata={"aliases": ["miapp_alias", "mi app"]},
+        )
+        manager.register_application(existing)
+        mm: _FakeMemoryManager = manager.memory_manager
+        entidades_antes = len(mm.saved_entities)
+
+        app = manager.register_discovered_application(
+            name="miapp_alias", type="utility",
+            observed_facts={"origen": "descubrimiento"},
+        )
+        # Se conserva la entrada previa: devuelve la existente.
+        assert app is existing
+        assert manager.get_application("miapp_alias") is existing
+        assert len(mm.saved_entities) == entidades_antes
+
+    def test_no_sobrescribe_por_alias_de_descubierta_que_colisiona_con_nombre(self):
+        """Alias de la descubierta colisiona con nombre normalizado de app registrada."""
+        manager = _make_manager()
+        existing = ApplicationKnowledge(
+            name="OtraApp", type="utility", executable="otraapp.exe",
+        )
+        manager.register_application(existing)
+        mm: _FakeMemoryManager = manager.memory_manager
+        entidades_antes = len(mm.saved_entities)
+
+        app = manager.register_discovered_application(
+            name="NuevaDescubierta", type="utility",
+            metadata={"aliases": ["otraapp"]},
+            observed_facts={"origen": "descubrimiento"},
+        )
+        assert app is existing
+        assert manager.get_application("otraapp") is existing
+        assert len(mm.saved_entities) == entidades_antes
+
+    def test_no_sobrescribe_por_alias_compartido_entre_descubiertas(self):
+        """Dos descubiertas comparten un alias: la primera se conserva."""
+        manager = _make_manager()
+        primera = manager.register_discovered_application(
+            name="AppA", type="utility",
+            metadata={"aliases": ["alias_compartido"]},
+            observed_facts={"origen": "descubrimiento"},
+        )
+        mm: _FakeMemoryManager = manager.memory_manager
+        entidades_antes = len(mm.saved_entities)
+
+        app = manager.register_discovered_application(
+            name="AppB", type="utility",
+            metadata={"aliases": ["alias_compartido"]},
+            observed_facts={"origen": "descubrimiento"},
+        )
+        assert app is primera
+        assert manager.get_application("appb") is None  # AppB no se registro
+        assert manager.get_application("alias_compartido") is primera
+        assert len(mm.saved_entities) == entidades_antes
+
+    def test_registro_nuevo_sin_conflicto_registra_ok(self):
+        """Nombre y alias nuevos sin conflicto: se registra normalmente."""
+        manager = _make_manager()
+        mm: _FakeMemoryManager = manager.memory_manager
+        entidades_antes = len(mm.saved_entities)
+
+        app = manager.register_discovered_application(
+            name="AppUnica", type="utility",
+            metadata={"aliases": ["unica_alias"]},
+            observed_facts={"exe": r"C:\AppUnica\app.exe"},
+        )
+        assert app.name == "AppUnica"
+        assert manager.get_application("AppUnica") is app
+        assert manager.get_application("unica_alias") is app
+        assert len(mm.saved_entities) == entidades_antes
 
     def test_app_descubierta_no_afecta_get_de_app_registrada(self):
         manager = _make_manager()

@@ -631,6 +631,72 @@ class ApplicationManager:
         )
 
         key = self._normalize_name(app.name)
+
+        # 1. Si ya existe una app bajo la clave normalizada, no reemplazar:
+        #    conservar siempre la entrada previa (nunca sobrescribir una app de
+        #    catálogo con una descubierta homónima).
+        if key in self.applications:
+            existing = self.applications[key]
+            logger._print_log(
+                "info",
+                f"Aplicacion descubierta '{key}' ya existe en memoria por "
+                f"nombre normalizado duplicado; se conserva la entrada previa "
+                f"y no se reemplaza. "
+                "[file:applications_core.py, method:register_discovered_application]",
+                "applications_core.py", "register_discovered_application",
+            )
+            return existing
+
+        # 2. Detectar conflictos por alias: el nombre normalizado de la nueva
+        #    app no debe coincidir con un alias de ninguna app existente, ni los
+        #    aliases de la nueva con nombres/aliases de apps existentes.
+        new_aliases = []
+        if app.metadata and isinstance(app.metadata, dict):
+            new_aliases = [str(a).strip().lower() for a in (app.metadata.get("aliases") or [])]
+
+        for existing_app in self.applications.values():
+            existing_key = self._normalize_name(existing_app.name)
+            existing_aliases = []
+            if existing_app.metadata and isinstance(existing_app.metadata, dict):
+                existing_aliases = [str(a).strip().lower() for a in (existing_app.metadata.get("aliases") or [])]
+
+            # 2a. Nombre normalizado de la nueva == alias de una existente.
+            if key in existing_aliases:
+                logger._print_log(
+                    "info",
+                    f"Aplicacion descubierta '{key}' colisiona con un alias de "
+                    f"la aplicacion ya registrada '{existing_key}'; se conserva "
+                    f"la entrada previa y no se reemplaza. "
+                    "[file:applications_core.py, method:register_discovered_application]",
+                    "applications_core.py", "register_discovered_application",
+                )
+                return existing_app
+
+            # 2b. Alias de la nueva == nombre normalizado de una existente.
+            if existing_key in new_aliases:
+                logger._print_log(
+                    "info",
+                    f"Aplicacion descubierta '{key}' declara un alias que "
+                    f"colisiona con el nombre normalizado de '{existing_key}'; "
+                    f"se conserva la entrada previa y no se reemplaza. "
+                    "[file:applications_core.py, method:register_discovered_application]",
+                    "applications_core.py", "register_discovered_application",
+                )
+                return existing_app
+
+            # 2c. Alias de la nueva == alias de una existente.
+            if any(a in existing_aliases for a in new_aliases):
+                logger._print_log(
+                    "info",
+                    f"Aplicacion descubierta '{key}' declara un alias que "
+                    f"colisiona con un alias de '{existing_key}'; se conserva "
+                    f"la entrada previa y no se reemplaza. "
+                    "[file:applications_core.py, method:register_discovered_application]",
+                    "applications_core.py", "register_discovered_application",
+                )
+                return existing_app
+
+        # 3. Sin conflictos: registrar y retornar la nueva app.
         self.applications[key] = app
         logger._print_log(
             "info",
