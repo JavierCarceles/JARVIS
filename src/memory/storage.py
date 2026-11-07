@@ -674,6 +674,39 @@ class MemoryManager:
     def save_entity(self, entity: Entity) -> bool:
         """Guarda una entidad en la memoria de dominio."""
         try:
+            entities_path = self.storage.get_file_path(MemoryType.ENTITIES)
+
+            # Contrato de 3.8.4.6.4: nunca sobrescribir silenciosamente entities.json
+            # perdiendo entidades previas.
+            # - Fichero ausente: se permite crear (no hay datos previos que perder).
+            # - Fichero vacio o lista JSON valida: no hay datos validos que perder,
+            #   se procede con la operacion normal de fusion.
+            # - Fichero corrupto (JSON invalido) o contenido no-lista: se RECHAZA
+            #   la escritura (retorna False) para no destruir lo que pudiera
+            #   recuperarse; el fichero original se deja intacto.
+            if entities_path.exists():
+                try:
+                    raw = entities_path.read_text(encoding="utf-8")
+                    existing_raw = json.loads(raw) if raw.strip() else []
+                except (json.JSONDecodeError, OSError, ValueError):
+                    logger._print_log(
+                        "error",
+                        f"entities.json corrupto o no legible en {entities_path}; "
+                        f"se rechaza save_entity(id={entity.id}) para no sobrescribir "
+                        f"y perder datos",
+                        "storage.py", "save_entity", 674,
+                    )
+                    return False
+                if not isinstance(existing_raw, list):
+                    logger._print_log(
+                        "error",
+                        f"entities.json en {entities_path} no contiene una lista JSON; "
+                        f"se rechaza save_entity(id={entity.id}) para no sobrescribir "
+                        f"y perder datos",
+                        "storage.py", "save_entity", 674,
+                    )
+                    return False
+
             entities = self.storage.load(MemoryType.ENTITIES)
 
             if not isinstance(entities, list):
