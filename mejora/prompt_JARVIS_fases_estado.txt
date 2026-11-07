@@ -7068,3 +7068,16 @@ VERIFICACION: SINTAXIS: NA; MAIN.PY: NA; COMPORTAMIENTO / INTEGRACION REAL: Veri
 DISCREPANCIAS: El registro historico 3.8.1.1 declaraba no haber encontrado ningun entities.json, mientras existen data/knowledge/entities.json y data/memory/entities.json. Discrepancia conservada sin resolver por intuicion (regla 1.13 y 5.5).
 PENDIENTES: NINGUNO.
 ESTADO FINAL: 3.8.4.4.2 - IMPLEMENTADA
+
+
+REGISTRO DE UNIDAD: 3.8.4.4.3
+FECHA: NR
+OBJETIVO: Crear en `tests/` un helper reutilizable que capture y compare el estado exacto (hash y contenido) de un entities.json antes y despues de una operacion, trabajando siempre sobre copias en directorios temporales y sin escribir nunca en los ficheros reales de datos. Padre: 3.8.4.4; abuelo: 3.8 (FASE 3).
+TIPO DE TRABAJO: IMPLEMENTACION | TEST | DOCUMENTACION
+CAMBIOS / HALLAZGOS: Se creo tests/helpers/__init__.py (paquete de helpers vacio), tests/helpers/entities_state.py (helper reutilizable: snapshot_entities_json, copy_to_temp_dir, snapshots_equal, verify_entities_json_unchanged) y tests/helpers/test_entities_state_helper.py (7 tests). El helper captura el estado exacto (contenido bytes + hash SHA-256 + tamano) antes y despues de una operacion sobre una copia temporal en el directorio temporal del sistema; nunca escribe ni modifica el fichero real de datos (source_untouched True). py_compile OK y pytest: 7 PASSED / 7 TOTAL en tests/helpers/test_entities_state_helper.py. data/knowledge/entities.json quedo intacto (SHA-256 60635AA8F64FAAD75C2C9635E483769874A60E0A98FD1244F696AC2B62A0DAB7, 3231 bytes, 7 entidades, igual al baseline de 3.8.4.4.2).
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: tests/helpers/__init__.py (nuevo); tests/helpers/entities_state.py (nuevo); tests/helpers/test_entities_state_helper.py (nuevo); DOCUMENTACION: este registro en mejora/prompt_JARVIS_fases_estado.txt.
+TESTS Y RESULTADOS: UNITARIOS: 7 PASSED / 7 TOTAL en tests/helpers/test_entities_state_helper.py; INTEGRACION: NA; NO REGRESION: py_compile OK en tests/helpers/entities_state.py, tests/helpers/test_entities_state_helper.py, tests/helpers/__init__.py y main.py (sin cambios en main.py ni sus imports).
+VERIFICACION: SINTAXIS: OK (py_compile de los tres ficheros nuevos y main.py -> exit 0); MAIN.PY: OK (py_compile main.py -> exit 0; sin cambios en main.py); COMPORTAMIENTO / INTEGRACION REAL: 7 tests unitarios PASSED con pytest verificando captura de hash/contenido/tamano, copia temporal sin tocar el original, deteccion de cambio y no-cambio, y source_untouched True (fichero real sin alterar).
+DISCREPANCIAS: NINGUNA.
+PENDIENTES: Siguiente hoja pendiente real en orden del roadmap: 3.8.4.4.4 (Verificar con ese helper que register_discovered_application y los consumidores del conocimiento dinamico no modifican ningun entities.json ni su esquema).
+ESTADO FINAL: 3.8.4.4.3 - IMPLEMENTADA
