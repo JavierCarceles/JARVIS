@@ -442,11 +442,28 @@ class JSONStorage(MemoryStorage):
                 existing_data = []
 
             if isinstance(new_data, Entity):
+                items = [new_data.to_dict()]
+            elif isinstance(new_data, dict):
+                items = [new_data]
+            elif isinstance(new_data, list):
+                items = []
+                for item in new_data:
+                    if isinstance(item, Entity):
+                        items.append(item.to_dict())
+                    elif isinstance(item, dict):
+                        items.append(item)
+            else:
+                items = []
+
+            for entity_dict in items:
+                entity_id = entity_dict.get("id") if isinstance(entity_dict, dict) else None
+                if entity_id is None:
+                    continue
                 existing = next(
                     (
                         e
                         for e in existing_data
-                        if isinstance(e, dict) and e.get("id") == new_data.id
+                        if isinstance(e, dict) and e.get("id") == entity_id
                     ),
                     None,
                 )
@@ -454,24 +471,7 @@ class JSONStorage(MemoryStorage):
                 if existing:
                     existing_data.remove(existing)
 
-                existing_data.append(new_data.to_dict())
-
-            elif isinstance(new_data, list):
-                for item in new_data:
-                    if isinstance(item, Entity):
-                        existing = next(
-                            (
-                                e
-                                for e in existing_data
-                                if isinstance(e, dict) and e.get("id") == item.id
-                            ),
-                            None,
-                        )
-
-                        if existing:
-                            existing_data.remove(existing)
-
-                        existing_data.append(item.to_dict())
+                existing_data.append(entity_dict)
 
             return existing_data
 
