@@ -93,3 +93,10 @@ ESTADO FINAL: <ID> - <NO IMPLEMENTADA | EN PROCESO | PARCIALMENTE IMPLEMENTADA |
 - Los marcadores historicos `[COMPLETADO]` / `[IMPLEMENTADA]` y los registros antiguos no sustituyen los cuatro campos persistentes de `prompt_mejoraActual.txt`.
 - Consultar en `prompt_JARVIS_fases_estado.txt` solo el registro por ID, la rama del roadmap y la discrepancia pertinente para la unidad activa. No usar el historial para sustituir el estado persistente.
 
+12. REGLAS DE ENTORNO Y HERRAMIENTAS DEL CHAT
+- El entorno ejecuta comandos `shell` a través de PowerShell en Windows, no Bash/Linux. No usar operadores ni comandos de Unix que no existan en PowerShell.
+- NO USAR en `shell`: `&&` (separador de instrucciones), `head`, `tail`, `wc -l`, ni pipes (`|`) a comandos de Unix. Ejecutar comandos individuales de PowerShell, uno por llamada.
+- NO USAR `write` para agregar contenido a un archivo existente: `write` sobrescribe TODO el archivo y borra su contenido previo. Usar `write` solo para crear archivos nuevos o reemplazar un archivo completo intencionadamente. Para modificar partes de un archivo existente, usar `edit` con un `oldString` que coincida unívocamente.
+- SÍ USAR: `shell` con comandos individuales de PowerShell; `read` / `get-content` para leer archivos; `edit` para cambios parciales en archivos existentes; `write` solo para archivos nuevos o reemplazo total; `glob`, `grep`, `webfetch`, `websearch`, `question`, `subagent`, `execute`, `mcp` según corresponda.
+- Antes de usar `write` en un archivo existente, leerlo primero con `read` para conocer su contenido y evitar pérdidas de datos.
+
