@@ -873,6 +873,9 @@ Métodos:
 | `def get_ui_element(element_name)` | Obtiene un elemento UI por nombre. |
 | `def is_capable(capability)` | Comprueba si la aplicación posee una capacidad específica. |
 | `def get_calibrated_elements()` | Obtiene los elementos UI calibrados. |
+| `def get_observed_facts()` | Devuelve los hechos observados del descubrimiento (ruta del ejecutable, ventana detectada, proceso activo). Dict vacio si no hay metadata. |
+| `def get_inferred_data()` | Devuelve los datos inferidos o no verificados (tipo por extension, suposicion de capacidad). Dict vacio si no hay metadata. |
+| `def get_unverified_capabilities()` | Devuelve las capacidades declaradas pero no verificadas en tiempo de ejecucion (declaradas pero sin disponibilidad en runtime). |
 
 `class ApplicationManager`  (línea 232) — Gestor del conocimiento estructurado de aplicaciones.
 
@@ -898,6 +901,9 @@ Métodos:
 | `def _load_custom_applications()` | Carga aplicaciones personalizadas persistidas en memoria. |
 | `def get_application_capabilities(app_name)` | Obtiene capacidades de una aplicación en formato de planificación. |
 | `def get_application_ui_elements(app_name)` | Obtiene los elementos UI conocidos de una aplicación, incluyendo el campo ``description`` de cada uno. |
+| `def get_application_observed_facts(app_name)` | Devuelve los hechos observados de una aplicación (ruta del ejecutable, ventana detectada, proceso activo). Dict vacio si no existe. |
+| `def get_application_inferred_data(app_name)` | Devuelve los datos inferidos de una aplicación (deducciones no verificadas). Dict vacio si no existe. |
+| `def get_application_unverified_capabilities(app_name)` | Devuelve las capacidades declaradas pero no verificadas de una aplicación en tiempo de ejecución. Lista vacia si no existe o no hay capacidades no verificadas. |
 
 Funciones a nivel módulo:
 

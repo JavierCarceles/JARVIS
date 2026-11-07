@@ -755,20 +755,45 @@ FASE 3 ? APPLICATION KNOWLEDGE
 3.8.4.2 Reutilizar ApplicationKnowledge/ApplicationManager y los mecanismos de persistencia existentes solo si su contrato real lo permite.
 3.8.4.3 Separar hechos observados, datos inferidos y capacidades aun no verificadas.
 3.8.4.4 No cambiar el esquema, las siete entidades originales ni el contenido de data/memory/entities.json como parte de esta funcionalidad.
+    3.8.4.4.1 Localizar por inspeccion los ficheros entities.json que existen realmente (`data/entities.json`, `data/knowledge/entities.json`, `data/memory/entities.json` u otros) y registrar de cada uno: ruta, numero de entidades, tamano, hash SHA-256 y que componente lo lee o lo escribe (MemoryManager, DomainMemory, EntityResolver). Solo lectura. [HIJA de 3.8.4.4]
+    3.8.4.4.2 Determinar con esa evidencia a que fichero se refieren las siete entidades originales: los registros 3.2.3.1 y 3.3.4.4 citan 7 entidades en `data/knowledge/entities.json` y 35 en `data/memory/entities.json`, y el registro 3.8.1.1 declara no haber encontrado ningun entities.json. Registrar la discrepancia sin resolverla por intuicion y fijar la linea base unica (ruta, numero de entidades, hash) que usaran 3.8.4.7 y 3.8.9.7. [HIJA de 3.8.4.4]
+    3.8.4.4.3 Crear en `tests/` un helper reutilizable que capture y compare el estado exacto (hash y contenido) de un entities.json antes y despues de una operacion, trabajando siempre sobre copias en directorios temporales y sin escribir nunca en los ficheros reales de datos. [HIJA de 3.8.4.4]
+    3.8.4.4.4 Verificar con ese helper que `register_discovered_application` y los consumidores del conocimiento dinamico no modifican ningun entities.json ni su esquema, y que las entidades originales fijadas en 3.8.4.4.2 permanecen intactas. [HIJA de 3.8.4.4]
 3.8.4.5 No convertir automaticamente cualquier aplicacion instalada en una aplicacion segura o totalmente automatizable.
 3.8.4.6 Evitar duplicados y preservar el conocimiento previo al registrar conocimiento dinamico.
+    3.8.4.6.1 Evitar duplicados al registrar conocimiento dinamico en memoria (por nombre normalizado y por alias) y no reemplazar una aplicacion de catalogo por una descubierta homonima; conservar siempre la entrada previa. [HIJA de 3.8.4.6]
+    3.8.4.6.2 Reproducir con un test sobre un MemoryManager con directorio temporal el defecto D-ENTITIES-PERSIST-BUG, pendiente desde 3.2.1.3 sin unidad asignada: `MemoryManager.save_entity` pasa una lista de dict a `JSONStorage.save`, `_process_data_for_save` para ENTITIES solo procesa instancias de Entity, entities.json queda en `[]` y la cache solo conserva la ultima entidad (registros 3.2.1.3, 3.2.3.1 y 3.2.4.1). El test debe fallar por el defecto y registrarse como FAILED; no se corrige todavia. [HIJA de 3.8.4.6]
+    3.8.4.6.3 Corregir `src/memory/storage.py` (`save_entity`, `_process_data_for_save`, `JSONStorage.save`) para que persistir una entidad conserve las ya existentes en disco y en cache y escriba un fichero valido, sin cambiar el esquema de Entity ni tocar los ficheros de datos reales; el test de 3.8.4.6.2 debe pasar. [HIJA de 3.8.4.6]
+    3.8.4.6.4 Comprobar con copias temporales que un entities.json ausente, vacio o corrupto no se sobrescribe perdiendo entidades en silencio (el registro 3.2.3.1 documenta que con fichero corrupto `register_application` lo dejaba en `[]`) y dejar definido y probado el comportamiento resultante segun el contrato real: rechazo o recuperacion. [HIJA de 3.8.4.6]
+    3.8.4.6.5 Verificar no regresion de MemoryManager (todos los MemoryType que usan JSONStorage.save), EntityResolver y ApplicationManager (`_load_custom_applications`, `register_application`, `register_custom_application`); si algun test de 3.2.x fijaba el comportamiento defectuoso, actualizarlo solo por cambio legitimo de contrato registrando el motivo (regla 3 de `prompt_JARVIS_reglas.txt`) y sin quitar asserts. [HIJA de 3.8.4.6]
 3.8.4.7 Tests de descubrimiento no persistente, persistencia admitida, duplicados y preservacion exacta de entities.json.
+    3.8.4.7.1 Reconciliar el estado real de los tests de elementos UI: 3.7.3.1 y 3.7.3.2 registran 15 FAILED y 63 PASSED en `tests/hands/test_ui_elements.py` y sus variantes (`_final`, `_minimal`, `_real`, `_simple`, `_working`), clasificados como defectos de test (parcheo de atributos inexistentes como `get_calibration_data`, `calibrate_element` o `get_calibration_manager`; expectativa de `coordinates` como dict cuando el contrato es Optional[Dict]; capabilities no vacias cuando [] es valido), mientras 3.8.4.2 registra 2671 PASSED de 2672 en `tests/hands`. Ejecutar esas suites y registrar el resultado real sin inferirlo. [HIJA de 3.8.4.7]
+    3.8.4.7.2 Si 3.8.4.7.1 confirma fallos: corregir solo los tests objetivamente defectuosos conforme a la regla 3 de `prompt_JARVIS_reglas.txt` (motivo registrado, sin quitar asserts ni ocultar errores y conservando una comprobacion equivalente contra el contrato real); un test correcto que fije un contrato aun no implementado se registra como FAILED. Si no hay fallos, registrar la evidencia y no cambiar nada. [HIJA de 3.8.4.7]
+    3.8.4.7.3 Aislar el estado global compartido entre tests: fixture autouse en `tests/` (conftest) que reinicie los singletons `_app_manager` y `_memory_manager` de `src/hands/applications_core.py` y use directorios temporales, para eliminar la falla por orden de ejecucion preexistente de `tests/hands/test_consumer_api_compatibility.py::TestMinimalContractConsumerCompatibility::test_brain_consumer_with_minimal_app_in_catalog` (registrada en 3.8.2.5 y 3.8.4.2). Sin debilitar aserciones y verificando ambos ordenes de ejecucion. [HIJA de 3.8.4.7]
+    3.8.4.7.4 Tests de descubrimiento no persistente: una aplicacion descubierta vive solo en memoria y nunca invoca `save_entity`. [HIJA de 3.8.4.7]
+    3.8.4.7.5 Tests de persistencia admitida (registro explicito de catalogo) sobre copias temporales, con el defecto ya corregido en 3.8.4.6.3. [HIJA de 3.8.4.7]
+    3.8.4.7.6 Tests de duplicados y de preservacion exacta de entities.json contra la linea base fijada en 3.8.4.4.2. [HIJA de 3.8.4.7]
 3.8.5 ? PREFLIGHT Y APERTURA SEGURA
 3.8.5.1 Pasar toda aplicacion descubierta por ApplicationPreflight y las politicas de seguridad reales.
+    3.8.5.1.1 Verificar con ejecucion real como responde `ApplicationPreflight.check` a una aplicacion empaquetada (AppX/UWP) descubierta con `app_id` y sin ruta .exe: tras 3.8.3.5 `check` rechaza con `blocked_by=executable_not_resolved` cuando `resolve_executable` devuelve None, mientras que 3.8.3.4 registro que el lanzamiento de paquetes si esta soportado en `CalibrationManager.launch_application` (shell:AppsFolder\{app_id}). Registrar si alguna aplicacion empaquetada real queda bloqueada por esa causa. [HIJA de 3.8.5.1]
+    3.8.5.1.2 Si 3.8.5.1.1 lo confirma: admitir el tipo de lanzamiento paquete reutilizando el soporte real de `launch_application`, exigiendo que el `app_id` proceda de la fuente de descubrimiento y se verifique contra shell:AppsFolder, sin construir comandos a partir de la peticion ni aplicar heuristicas sobre cadenas arbitrarias; con tests de paquete valido, `app_id` inexistente y `app_id` que no procede del descubrimiento. Si no lo confirma, registrar la evidencia y no cambiar codigo. [HIJA de 3.8.5.1]
+    3.8.5.1.3 Pasar toda aplicacion descubierta (ejecutable, acceso directo, URI de aplicacion y paquete) por ApplicationPreflight y las politicas de seguridad reales. [HIJA de 3.8.5.1]
 3.8.5.2 Rechazar aplicaciones bloqueadas, elevacion no permitida o destinos de ejecucion no verificables.
 3.8.5.3 Comprobar si la aplicacion ya esta abierta y reutilizarla cuando el contrato lo permita.
 3.8.5.4 Abrir una aplicacion cerrada mediante la API real de ejecucion, sin cerrar ni alterar ventanas ajenas.
+    3.8.5.4.1 Definir en `tests/` un arnes seguro para pruebas con lanzamiento real: solo aplicaciones inocuas ya conocidas por ApplicationManager (por ejemplo notepad o calculator), registro del PID o de la ventana creados por la prueba, cierre exclusivo de lo creado por ella y comprobacion de que los procesos y ventanas previos (incluidos el editor y la sesion del desarrollador) quedan intactos. Donde se aisle la frontera del sistema operativo, no sustituir con mocks la seleccion del proceso o de la ventana ni la autorizacion que se esta probando. [HIJA de 3.8.5.4]
+    3.8.5.4.2 Abrir una aplicacion cerrada mediante la API real de ejecucion, sin cerrar ni alterar ventanas ajenas. [HIJA de 3.8.5.4]
 3.8.5.5 Verificar proceso, ventana y estado posterior a la apertura.
 3.8.5.6 Tests de preflight rechazado, aplicacion abierta/cerrada, fallo de lanzamiento y proteccion de ventanas existentes.
 3.8.6 ? CALIBRACION DE APLICACIONES DESCUBIERTAS
 3.8.6.1 Conectar el descubrimiento con el requisito de calibracion de 3.5 y el CalibrationManager/UniversalVisualCalibrator existentes.
+    3.8.6.1.1 Delimitar el alcance: 3.8.6 reutiliza CalibrationManager, UniversalVisualCalibrator y CoordinateManager tal como existen hoy, con sus mecanismos de identificacion de ventana y monitor; el contrato de la capability calibrate, la calibracion multipantalla completa y la seguridad operativa se definen en FASE 12 y no se anticipan aqui. Registrar como limitaciones conocidas lo que 3.8.6 no cubra. [HIJA de 3.8.6.1]
+    3.8.6.1.2 Conectar el descubrimiento con el requisito de calibracion de 3.5 y el CalibrationManager/UniversalVisualCalibrator existentes. [HIJA de 3.8.6.1]
 3.8.6.2 Calibrar la ventana real de la aplicacion objetivo sin depender de coordenadas o plantillas codificadas para cada programa.
 3.8.6.3 Usar Vision para detectar elementos visibles y relevantes para la tarea concreta.
+    3.8.6.3.1 Representar un elemento detectado por Vision sin perder datos: `UIElement` (`src/hands/applications_core.py`) no define `description` aunque `UIElementData` (`src/utils/ui_element_model.py`) si, y `register_custom_application` falla en silencio si ui_elements incluye description (D-UI-DESCRIPTION-LOST, registros 3.4.2.1 a 3.4.2.3). Reutilizar UIElementData como modelo canonico o anadir el campo, sin crear un tercer formato y sin cambiar los datos persistidos existentes. [HIJA de 3.8.6.3]
+    3.8.6.3.2 Normalizar el tipo del elemento detectado por Vision (cadena libre generada por el LLM, D-UI-TYPE-FREE-FORM) al conjunto que ya valida `coordinate_manager.validate_resource_for_action`; un tipo desconocido se trata segun el contrato real (rechazo o tipo generico) sin inventar tipos nuevos. [HIJA de 3.8.6.3]
+    3.8.6.3.3 Usar Vision para detectar elementos visibles y relevantes para la tarea concreta, conservando descripcion y tipo y registrandolos como hechos observados y no como datos inferidos. [HIJA de 3.8.6.3]
 3.8.6.4 Rechazar o detenerse ante politicas de bloqueo, pantalla inaccesible, deteccion insuficiente o confianza inadecuada.
 3.8.6.5 Verificar que las coordenadas/resultados pertenecen a la ventana y monitor correctos.
 3.8.6.6 Persistir la calibracion solo mediante el mecanismo existente y tras validar el resultado.
@@ -787,6 +812,8 @@ FASE 3 ? APPLICATION KNOWLEDGE
 3.8.8.5 Tests de fallos parciales, timeouts, reintentos y ausencia de doble ejecucion.
 3.8.9 ? INTEGRACION Y CIERRE DE LA RAMA
 3.8.9.1 Integrar con Brain/Goal/Planner/Executor sin introducir rutas paralelas que dupliquen la ejecucion.
+    3.8.9.1.1 Delimitar el alcance: 3.8.9 conecta el descubrimiento con los puntos de integracion que existen hoy (Brain hacia HTNBrainIntegration, ApplicationKnowledgeIntegrator en `src/hands/planner/application_integration.py`, `Planner.is_application_available` y Executor) y los flujos de 3.8.9.2 a 3.8.9.4 se verifican hasta esos puntos; el flujo universal completo de voz normalizada a Goal, Plan, Executor y verificacion se construye en FASE 4 y FASE 15.7 y no se anticipa aqui. Registrar como limitacion conocida lo que quede para esas fases. [HIJA de 3.8.9.1]
+    3.8.9.1.2 Integrar con Brain/Goal/Planner/Executor sin introducir rutas paralelas que dupliquen la ejecucion. [HIJA de 3.8.9.1]
 3.8.9.2 Verificar flujo completo para una aplicacion conocida.
 3.8.9.3 Verificar flujo completo para una aplicacion instalada que inicialmente no este registrada.
 3.8.9.4 Verificar aplicacion no instalada, ejecutable no localizable, aplicacion bloqueada y UI no calibrable.
@@ -927,6 +954,15 @@ FASE 4 ? GOAL + TASK/HTN
 4.5.6.14 Verificar que la normalizacion no ejecuta acciones, no modifica entities.json y no elimina evidencia del texto original.
 4.5.6.15 Registrar metricas minimas de exito/fallo y coste/latencia solo si existe infraestructura compatible.
 4.5.6.16 Cerrar la unidad tras pruebas unitarias, integracion y no regresion de Brain/Ear.
+4.5.7 ? ACLARACION Y CONFIRMACION CON EL USUARIO
+Objetivo: un unico canal reutilizable para pedir aclaracion o confirmacion al usuario y reanudar el Goal con su respuesta. Lo presuponen 3.8.8.4 (que solo propaga el resultado de aclaracion como dato), 4.5.6.9, 15.7.15 y 15.7.16 y no tenia unidad propia. No duplicar el flujo de confirmacion por voz que ya existe en `main.py`.
+4.5.7.1 Inspeccionar como piden hoy aclaracion o confirmacion Brain, `main.py` (sugerencias con score >= 0.8 y respuesta si, claro, ok, vale, dale o hazlo), Ear y Mouth, y que datos se conservan entre turnos; registrar lo que ya puede reutilizarse y no crear un mecanismo nuevo si existe uno adecuado.
+4.5.7.2 Definir la estructura minima de una solicitud de aclaracion (motivo, candidatos reutilizando `alternatives` e `is_ambiguous` de ApplicationResolutionResult, pregunta y accion que se reanuda al responder) sin duplicar campos que ya existan.
+4.5.7.3 Definir la estructura minima de una solicitud de confirmacion para acciones con efectos externos o destructivos, consumiendo la politica de seguridad existente y sin inventar politicas nuevas.
+4.5.7.4 Conservar el Goal o la Task a la espera de respuesta con su caducidad y sin ejecutar nada mientras espera, reutilizando la memoria de conversacion existente; definir que ocurre cuando llega una peticion nueva que cancela o reemplaza a la pendiente.
+4.5.7.5 Interpretar la respuesta del usuario (elegir candidato, si, no, cancelar, silencio, respuesta ambigua o fuera de contexto) reutilizando el vocabulario de confirmacion existente; ante duda no ejecutar y volver a preguntar con un limite de intentos.
+4.5.7.6 Reanudar el Goal con la respuesta validada sin doble ejecucion ni repeticion de pasos ya realizados.
+4.5.7.7 Tests: aclaracion con candidatos, confirmacion aceptada y rechazada, silencio, respuesta ambigua, peticion que reemplaza a la pendiente, caducidad y no ejecucion mientras se espera; separar los tests deterministas de la prueba con voz real cuando exista.
 4.6 ? STATE
 4.6.1 ? Entrada al HTN
 4.6.1.1 Obtener estado actual.
@@ -972,8 +1008,13 @@ FASE 5 ? DOMAIN MEMORY
 5.1.1 Inspeccionar Entity real.
 5.1.2 Verificar tipos de entidad existentes.
 5.1.3 Verificar properties.
+    5.1.3.1 Verificar properties de la entidad real: claves presentes en el entities.json real y claves que escribe `register_application`. Solo inspeccion. [HIJA de 5.1.3]
+    5.1.3.2 Reconciliar el formato de properties de las entidades de aplicacion (D-ENTIDAD-PROPERTIES, registros 3.2.1.2 a 3.2.3.1): `register_application` escribe type, executable, url, login_required, capabilities, ui_elements y states, mientras el entities.json real usa url, executable y category. Definir el formato canonico solo a partir de los consumidores reales (`_reconstruct_application` acepta properties.type o properties.category), conservar la lectura del formato antiguo y no migrar ni reescribir datos reales. [HIJA de 5.1.3]
 5.1.4 Verificar aliases.
 5.1.5 Verificar persistencia en entities.json.
+    5.1.5.1 Inventariar las copias de datos de entidades y aplicaciones (`data/entities.json`, `data/knowledge/entities.json`, `data/memory/entities.json`, `data/knowledge/applications.json`) con su consumidor, esquema y numero de registros (D-KNOWLEDGE-ENTITIES-DUP: 7 frente a 35 entidades; D5/D6: `ApplicationManager.__init__` no lee `data/knowledge/applications.json` por tener otro esquema) y registrar la fuente canonica de cada capa, DomainMemory estatica frente a MemoryManager. Solo lectura. [HIJA de 5.1.5]
+    5.1.5.2 Proponer con la evidencia de 5.1.5.1 la politica minima para esas copias (sincronizar, deprecar o solo documentar la separacion) y aplicar unicamente la opcion que no modifique datos persistentes reales (documentacion y lectura compatible); si la opcion adecuada exigiera tocar datos reales, registrarla como pendiente de decision del usuario y no aplicarla. La FASE 21.7 solo audita y no decide. [HIJA de 5.1.5]
+    5.1.5.3 Verificar persistencia en entities.json: con el defecto de 3.8.4.6.3 ya corregido, comprobar sobre copias temporales que crear, actualizar y recuperar una entidad tras reinicio funciona y que 5.1.9 cubre esos casos. [HIJA de 5.1.5]
 5.1.6 Verificar creacion.
 5.1.7 Verificar actualizacion.
 5.1.8 Verificar eliminacion solo si existe contrato real.
@@ -1049,6 +1090,9 @@ FASE 6 ? ACTION GRAPH
 6.2.7 Tests de construccion.
 6.3 ? PRECONDICIONES / EFECTOS BASICOS
 6.3.1 Leer precondiciones reales.
+    6.3.1.1 Inventariar el vocabulario real de atomos de estado en sus capas: los dos Enum llamados ApplicationState (el de `src/eyes/screen.py` tiene 5 miembros y el de `src/hands/applications_core.py` tiene 8, con solo 3 comunes: D-STATE-TWO-ENUMS, D-STATE-ENUM-DIVERGENCE), los flags de `data/knowledge/applications.json` (open, active, maximized, focused, playing, streaming, recording: D-STATE-DATA-ONLY), required_state y effects de `data/knowledge/capabilities.json`, y las claves que produce GraphBuilder en `src/hands/planner/graph.py` (chrome_open, address_bar_focused, url_typed y otras: D-STATE-GRAPH-DATA-GAP, D-EFFECTS-NO-APP-FLAGS). Solo lectura. [HIJA de 6.3.1]
+    6.3.1.2 Con esa evidencia y sin crear vocabulario nuevo, definir la equivalencia entre los atomos de GraphBuilder y los de capabilities.json, incluida la sensibilidad a mayusculas de `_goal_achieved` (D-STATE-CASE-SENSITIVITY), y registrar los atomos sin equivalente como huecos conocidos. [HIJA de 6.3.1]
+    6.3.1.3 Leer precondiciones reales, comprobando con tests que un atomo desconocido o sin equivalencia no se da por satisfecho. [HIJA de 6.3.1]
 6.3.2 Evaluar precondicion simple.
 6.3.3 Leer efectos reales.
 6.3.4 Aplicar efecto simple.
@@ -1629,6 +1673,8 @@ FASE 13 ? MACROS_COORDS COMO UI KNOWLEDGE
 13.3 ? MIGRACION / COMPATIBILIDAD
 13.3.1 Identificar consumidores actuales.
 13.3.2 Adaptar lectura sin romper APIs.
+    13.3.2.1 Inventariar los formatos de ui_elements que coexisten (diccionario de type y description por nombre en `data/knowledge/applications.json`, List[UIElement] de `src/hands/applications_core.py`, UIElementData de `src/utils/ui_element_model.py` y el formato de `data/macros_coords.json`: D-UI-MULTI-FORMAT, D-UI-FORMAT-MISMATCH) y el consumidor de cada uno. Solo lectura. [HIJA de 13.3.2]
+    13.3.2.2 Adaptar lectura sin romper APIs: definir conversiones de lectura reutilizando UIElementData y hacer que `_reconstruct_ui_elements` registre el rechazo en lugar de devolver [] en silencio ante un formato distinto; sin migrar ni reescribir datos reales. [HIJA de 13.3.2]
 13.3.3 Mantener formato compatible cuando sea necesario.
 13.3.4 Eliminar duplicacion solo cuando este verificada.
 13.3.5 Tests de migracion.
@@ -1781,6 +1827,7 @@ FASE 15 ? HIGH LEVEL GOALS
 15.7.20 Tests negativos: aplicacion ausente, nombre ambiguo, ejecutable no verificable, preflight bloqueado, calibracion fallida, accion inexistente, cancelacion y fallo durante un paso.
 15.7.21 Comprobar que no se repiten aperturas, clics, envios o acciones con efectos externos tras un timeout o replanificacion.
 15.7.22 Verificar integracion real entre transcripcion normalizada, deteccion de aplicacion, preflight, calibracion, Planner, Executor y verificacion del resultado.
+15.7.23 Traducir el resultado final del flujo (exito verificado, exito parcial, detenido con motivo, aclaracion pendiente, confirmacion pendiente) en la respuesta que el bucle de `main.py` entrega a Mouth o al modo texto, reutilizando el canal de 4.5.7; Planner, Executor y Verification no llaman a Mouth directamente y ninguna respuesta declara exito sin verificacion.
 15.8 ? REGRESION / LEGACY
 15.8.1 Comando existente.
 15.8.2 Accion legacy.
@@ -2014,6 +2061,7 @@ FASE 19 ? AUTOMEJORA
 19.14.5 Actualizar pendientes.
 19.14.6 Actualizar NEXT_DOCUMENTED_UNIT.
 19.14.7 Modificar README solo cuando corresponda.
+19.14.8 Sustituir la referencia obsoleta de 19.14.6 (NEXT_DOCUMENTED_UNIT, que ya no existe) por los cuatro campos persistentes vigentes de `prompt_mejoraActual.txt` (CURRENT_PHASE, CURRENT_WORK_UNIT, CURRENT_WORK_STATUS, LAST_COMPLETED_UNIT) y aplicar la transicion vigente de `prompt_JARVIS_reglas.txt` seccion 5: al cerrar una hoja el puntero queda PENDIENTE y solo pasa a EN PROCESO cuando empieza su chat dedicado.
 19.15 ? VERIFICACION
 19.15.1 Verificar archivo objetivo.
 19.15.2 Verificar sintaxis.
@@ -2136,6 +2184,7 @@ FASE 20 ? AUTOMEJORA CONTINUA
 20.11.3 Marcar solo esa hoja como EN PROCESO.
 20.11.4 No saltar fases.
 20.11.5 Tests.
+20.11.6 Reconciliar 20.11.3 con el protocolo vigente: la primera hoja del nuevo ciclo queda PENDIENTE y pasa a EN PROCESO solo al empezar su chat dedicado (`prompt_JARVIS_reglas.txt`, seccion 5); en todo momento solo una hoja puede estar EN PROCESO.
 20.12 ? NUEVO CHAT
 20.12.1 Cerrar operacion anterior.
 20.12.2 Persistir estado.
@@ -6982,3 +7031,16 @@ VERIFICACION: SINTAXIS: OK (py_compile tests/hands/test_application_discovery_pe
 DISCREPANCIAS: NINGUNA. Se respeta 3.8.4.4 (no alterar entities.json, esquema ni entidades originales). Se respeta el diseno de 3.8.4.1 (apps descubiertas solo en memoria, metadata discovered/temporary/source conservada solo en memoria).
 PENDIENTES: Siguiente hoja pendiente real en orden del roadmap: 3.8.4.3 (Separar hechos observados, datos inferidos y capacidades aun no verificadas).
 ESTADO FINAL: 3.8.4.2 - IMPLEMENTADA
+
+
+REGISTRO DE UNIDAD: 3.8.4.3
+FECHA: NR
+OBJETIVO: Separar hechos observados, datos inferidos y capacidades aun no verificadas en el conocimiento dinamico de aplicaciones descubiertas, exponiendolos como API consultable para el Planner/Executor. Padre: 3.8.4; abuelo: 3.8 (FASE 3).
+TIPO DE TRABAJO: IMPLEMENTACION | TEST
+CAMBIOS / HALLAZGOS: Se añadieron métodos de consulta que exponen la separación ya almacenada en register_discovered_application (3.8.4.1): ApplicationKnowledge.get_observed_facts(), get_inferred_data(), get_unverified_capabilities() y ApplicationManager.get_application_observed_facts(), get_application_inferred_data(), get_application_unverified_capabilities(). get_unverified_capabilities() distingue capacidades declaradas (is_capable) de capacidades verificadas en runtime (is_capability_available/is_available). No se modifica entities.json, su esquema, ni las siete entidades originales. No se introduce lógica nueva de persistencia.
+ARCHIVOS MODIFICADOS: PRODUCCION: src/hands/applications_core.py (metodos get_observed_facts, get_inferred_data, get_unverified_capabilities en ApplicationKnowledge; get_application_observed_facts, get_application_inferred_data, get_application_unverified_capabilities en ApplicationManager); TESTS: tests/hands/test_application_discovery_separation.py (nuevo); DOCUMENTACION: este registro en mejora/prompt_JARVIS_fases_estado.txt.
+TESTS Y RESULTADOS: UNITARIOS: 17 PASSED / 17 TOTAL en tests/hands/test_application_discovery_separation.py (además los 17 previos de 3.8.4.1 y 3.8.4.2 siguen pasando, 34 TOTAL); INTEGRACION: NA; NO REGRESION: py_compile OK en src/hands/applications_core.py y main.py (sin cambios en main.py ni sus imports).
+VERIFICACION: SINTAXIS: OK (py_compile src/hands/applications_core.py, tests/hands/test_application_discovery_separation.py y main.py -> exit 0); MAIN.PY: OK (py_compile main.py -> exit 0; sin cambios en main.py); COMPORTAMIENTO / INTEGRACION REAL: 17 tests unitarios PASSED con pytest verificando observed_facts, inferred_data y capacidades no verificadas tanto en ApplicationKnowledge como en ApplicationManager, incluyendo que consultar la separacion no llama a save_entity (entities.json sin alterar).
+DISCREPANCIAS: NINGUNA. Se respeta 3.8.4.4 (no alterar entities.json, esquema ni entidades originales). Se reutilizan contratos reales de 3.8.4.1 y 3.8.4.2.
+PENDIENTES: Siguiente hoja pendiente real en orden del roadmap: 3.8.4.4.1 (Localizar por inspeccion los ficheros entities.json que existen realmente).
+ESTADO FINAL: 3.8.4.3 - IMPLEMENTADA

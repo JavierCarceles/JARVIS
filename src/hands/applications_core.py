@@ -205,6 +205,43 @@ class ApplicationKnowledge:
             None,
         )
 
+    def get_observed_facts(self) -> Dict[str, Any]:
+        """Devuelve los hechos observados durante el descubrimiento.
+
+        Son datos reales obtenidos del sistema (ruta del ejecutable,
+        ventana detectada, proceso activo, etc.). Devuelve dict vacio
+        cuando no hay metadata o no se registraron hechos observados.
+        """
+        if not self.metadata:
+            return {}
+        return dict(self.metadata.get("observed_facts") or {})
+
+    def get_inferred_data(self) -> Dict[str, Any]:
+        """Devuelve los datos inferidos o no verificados.
+
+        Son deducciones no verificadas (tipo por extension, suposicion
+        de capacidad, etc.). Devuelve dict vacio cuando no hay metadata
+        o no se registraron datos inferidos.
+        """
+        if not self.metadata:
+            return {}
+        return dict(self.metadata.get("inferred_data") or {})
+
+    def get_unverified_capabilities(self) -> List["ApplicationCapabilityDef"]:
+        """Devuelve las capacidades declaradas pero no verificadas en tiempo de ejecucion.
+
+        Una capacidad esta verificada cuando esta declarada
+        (``is_capable``) y la aplicacion esta disponible en runtime
+        (``is_available``). Las no verificadas son las declaradas cuya
+        disponibilidad no puede confirmarse. Esto permite al Planner
+        distinguir capacidades reales de suposiciones.
+        """
+        result: List["ApplicationCapabilityDef"] = []
+        for cap in (self.capabilities or []):
+            if self.is_capable(cap.capability) and not self.is_capability_available(cap.capability):
+                result.append(cap)
+        return result
+
     def get_ui_element(self, element_name: str) -> Optional[UIElement]:
         """Obtiene un elemento UI por nombre."""
         target = str(element_name).strip().lower()
@@ -1167,6 +1204,31 @@ class ApplicationManager:
                 "applications_core.py", "is_capability_available", 778,
             )
             return False
+
+    def get_application_observed_facts(self, app_name: str) -> Dict[str, Any]:
+        """Devuelve los hechos observados de una aplicacion, o dict vacio si no existe."""
+        app = self.get_application(app_name)
+        if not app:
+            return {}
+        return app.get_observed_facts()
+
+    def get_application_inferred_data(self, app_name: str) -> Dict[str, Any]:
+        """Devuelve los datos inferidos de una aplicacion, o dict vacio si no existe."""
+        app = self.get_application(app_name)
+        if not app:
+            return {}
+        return app.get_inferred_data()
+
+    def get_application_unverified_capabilities(self, app_name: str) -> List["ApplicationCapabilityDef"]:
+        """Devuelve las capacidades declaradas pero no verificadas de una aplicacion.
+
+        Devuelve lista vacia si la aplicacion no existe o no tiene
+        capacidades no verificadas.
+        """
+        app = self.get_application(app_name)
+        if not app:
+            return []
+        return app.get_unverified_capabilities()
 
 
 # Instancia global del gestor de aplicaciones.
