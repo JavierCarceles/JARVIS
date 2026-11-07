@@ -7081,3 +7081,15 @@ VERIFICACION: SINTAXIS: OK (py_compile de los tres ficheros nuevos y main.py -> 
 DISCREPANCIAS: NINGUNA.
 PENDIENTES: Siguiente hoja pendiente real en orden del roadmap: 3.8.4.4.4 (Verificar con ese helper que register_discovered_application y los consumidores del conocimiento dinamico no modifican ningun entities.json ni su esquema).
 ESTADO FINAL: 3.8.4.4.3 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.8.4.4.4
+FECHA: NR
+OBJETIVO: Verificar con el helper (tests/helpers/entities_state.py, unidad 3.8.4.4.3) que register_discovered_application y los consumidores del conocimiento dinamico (get_application, get_application_capabilities, get_application_ui_elements de ApplicationManager) no modifican ningun entities.json ni su esquema, y que las 7 entidades originales de data/knowledge/entities.json (linea base 3.8.4.4.2) permanecen intactas. Padre: 3.8.4.4; abuelo: 3.8 (FASE 3).
+TIPO DE TRABAJO: VERIFICACION | TEST
+CAMBIOS / HALLAZGOS: Se creo tests/hands/test_entities_json_preservation_discovery.py con 3 tests. Se verifico que data/knowledge/entities.json (linea base: 7 entidades, 3231 bytes, SHA-256 60635aa8f64faad75c2c9635e483769874a60e0a98fd1244f696ac2b62a0dab7) permanece intacto (source_untouched True, changed False) tras llamar register_discovered_application y consumidores. Se verifico que data/memory/entities.json (usado por MemoryManager, 35 entidades) tampoco se modifica. Las 7 entidades originales (nissaxter, shroud, pokimane, youtube, spotify, github, twitch) permanecen intactas.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: tests/hands/test_entities_json_preservation_discovery.py (nuevo); DOCUMENTACION: este registro en mejora/prompt_JARVIS_fases_estado.txt.
+TESTS Y RESULTADOS: UNITARIOS: 3 PASSED / 3 TOTAL en tests/hands/test_entities_json_preservation_discovery.py; INTEGRACION: NA; NO REGRESION: 44 PASSED / 44 TOTAL en tests/helpers/test_entities_state_helper.py, tests/hands/test_application_discovered_temporary.py, tests/hands/test_application_discovery_persistence_contract.py, tests/hands/test_application_discovery_separation.py y tests/hands/test_entities_json_preservation_discovery.py.
+VERIFICACION: SINTAXIS: OK (py_compile de main.py -> exit 0); MAIN.PY: OK (py_compile main.py -> exit 0; sin cambios en main.py); COMPORTAMIENTO / INTEGRACION REAL: 3 tests unitarios PASSED verificando preservacion de entities.json ante registro y consumo de conocimiento dinamico; log de ejecucion confirma register_discovered_application escribe solo en memoria (self.applications) y nunca invoca save_entity.
+DISCREPANCIAS: NINGUNA.
+PENDIENTES: NINGUNO.
+ESTADO FINAL: 3.8.4.4.4 - IMPLEMENTADA
