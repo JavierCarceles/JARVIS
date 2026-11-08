@@ -29,6 +29,7 @@ import pygetwindow as gw
 from src.utils.config import get_calibration_config, get_macros_coords_path
 from src.utils.logger import get_logger
 from src.utils.screen_manager import get_monitor_info, get_screen_manager
+from src.hands.application_preflight import get_application_preflight
 
 logger = get_logger(__name__)
 
@@ -316,7 +317,9 @@ class CalibrationManager:
         self._application_metadata_by_app_id: Dict[str, List[Dict[str, str]]] = {}
         self._application_metadata_all: List[Dict[str, str]] = []
         self._application_metadata_loaded = False
-        self._preflight_checker: Optional[Callable[[Dict[str, str]], Any]] = None
+        self._preflight_checker: Optional[Callable[[Dict[str, str]], Any]] = (
+            get_application_preflight().check
+        )
 
         logger._print_log("info", r"[CALIBRATION-MANAGER] Gestor universal de calibración inicializado [file:calibration_manager.py, method:__init__, line:321]", "calibration_manager.py", "method", 321)
 

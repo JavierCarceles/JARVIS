@@ -40,6 +40,7 @@
 - [`src/hands/firefox/firefox.py` (638 líneas)](#src-hands-firefox-firefox-py)
 - [`src/hands/keyboard.py` (901 líneas)](#src-hands-keyboard-py)
 - [`src/hands/mouse.py` (129 líneas)](#src-hands-mouse-py)
+- [`src/hands/system_inventory.py` (389 líneas)](#src-hands-system_inventory-py)
 - [`src/hands/planner/__init__.py` (235 líneas)](#src-hands-planner-_init_-py)
 - [`src/hands/planner/application_integration.py` (864 líneas)](#src-hands-planner-application_integration-py)
 - [`src/hands/planner/goal_state_mapper.py` (1485 líneas)](#src-hands-planner-goal_state_mapper-py)
@@ -1742,6 +1743,52 @@ Funciones a nivel módulo:
 | `def click_element(button, wait_after)`  (L44) | Realiza un clic con el ratón. |
 | `def scroll_at_position(x, y, clicks, wait_after)`  (L74) | Realiza scroll en una posición específica. |
 | `def register_mouse_capabilities()`  (L110) | Registra las capacidades del ratón en el sistema. |
+
+<a name="src-hands-system_inventory-py"></a>
+### `src/hands/system_inventory.py` [389 líneas] — Contrato, alcance y privacidad del inventario persistente del sistema de archivos.
+
+**Descripción:** Define el contrato del inventario local de elementos del sistema de archivos del equipo donde se ejecuta JARVIS. No implementa escaneo ni persistencia (responsabilidades de unidades posteriores). Solo define la entrada de inventario con metadatos mínimos, el identificador local de equipo, el alcance predeterminado, exclusiones técnicas, controles de privacidad y operaciones de control del inventario.
+
+**Características:**
+
+- Entrada de inventario con metadatos mínimos observados del SO (machine_id, volumen, ruta absoluta/relativa, nombre, extensión, tipo de entrada, tamaño, fechas, atributos)
+- Identificador local de equipo estable (UUID v5 basado en nodo y plataforma; sin MAC, número de serie ni nombre de usuario)
+- Alcance predeterminado: volúmenes locales montados
+- Exclusiones técnicas justificadas (sistemas de archivos virtuales, puntos de montaje recursivos, papelera, archivos de paginación)
+- Separación entre hechos observados del SO e inferencias (no persistir inferencias como hechos)
+- Controles de privacidad: sin lectura de contenido de archivos personales, sin rutas completas en logs
+- Controles de operación del inventario: pausa, reanudación, cancelación, exclusión de ruta, reconstrucción con aislamiento por equipo
+- Matriz de cobertura por sistema operativo, versión, arquitectura, tipo de volumen y tipo de entrada
+
+**Importaciones:** 6.
+
+Clases:
+
+| Clase | Docstring |
+|---|---|
+| `class EntryType(Enum)` | Tipo de entrada del inventario, observado directamente del SO. |
+| `class InventoryScope(Enum)` | Alcance del inventario. |
+| `class InventoryEntry` | Entrada del inventario de un elemento del sistema de archivos. Solo metadatos observados por el sistema operativo. |
+| `class FactType(Enum)` | Clasifica si un dato es un hecho observado o una inferencia. |
+| `class InventoryControl(Enum)` | Controles disponibles para gestión del inventario. |
+| `class InventoryControlResult` | Resultado de una operación de control del inventario. |
+| `class InventoryContract` | Contrato del inventario persistente. Define alcance, metadatos, privacidad y exclusiones de forma centralizada. |
+| `class CoverageMatrixEntry` | Una celda de la matriz de cobertura del inventario. |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def generate_machine_id()` | Genera un identificador local de equipo para JARVIS. |
+| `def is_same_machine(machine_id_a, machine_id_b)` | Comprueba si dos identificadores pertenecen al mismo equipo. |
+| `def is_excluded_path(path, exclusions=None)` | Determina si una ruta debe excluirse del inventario. |
+| `def is_excluded_mount(mount_point, exclusions=None)` | Determina si un punto de montaje/volumen debe excluirse. |
+| `def safe_log_path(path, max_chars=40)` | Devuelve una versión acortada y segura de una ruta para logs. |
+| `def classify_entry(entry_type, extension)` | Clasifica una entrada como hecho observado o inferencia. |
+| `def validate_control(control, machine_id, current_machine_id)` | Valida que una operación de control sea aceptable. |
+| `def default_contract()` | Devuelve el contrato por defecto del inventario. |
+| `def cobertura_soportada(sistema_operativo, version, arquitectura, tipo_volumen, tipo_entrada)` | Consulta la matriz de cobertura para saber si una combinación es soportada. |
+| `def entradas_cobertura_por_sistema(sistema_operativo)` | Devuelve todas las entradas de cobertura para un sistema operativo. |
 
 ## 🗺️ `src/hands/planner/`
 

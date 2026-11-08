@@ -12,7 +12,19 @@ USO
 Localizar la unidad indicada por el archivo principal y consultar su rama, jerarquia, criterios de cierre y registros relacionados. Para la continuidad, prevalecen los cuatro campos de estado de `prompt_mejoraActual.txt`. No corregir discrepancias por intuicion; registrar evidencia cuando una discrepancia afecte a la unidad activa.
 
 DISCREPANCIA HISTORICA CONSERVADA
-`2.8.8.9` aparece marcada `[IMPLEMENTADA]` aunque `2.8.8.9.15.2` se registro `PARCIALMENTE IMPLEMENTADA`. No inferir su cierre o reapertura solo de esos marcadores: consultar evidencia posterior si afecta a la unidad activa.
+`2.8.8.9` aparecia marcada `[IMPLEMENTADA]` mientras un registro anterior de `2.8.8.9.15.2` la describia como parcialmente implementada. Esta discrepancia historica quedo posteriormente actualizada: el registro consolidado `2.8.14.4` documenta la ejecucion completa de `tests/utils/contextual_adaptation_engine/` con 733 PASSED / 0 FAILED y el registro de `2.8.8.9.15.2` termina en `IMPLEMENTADA`. Se conserva la trazabilidad del estado antiguo, pero no se mantiene como discrepancia activa. No usar marcadores aislados para contradecir evidencia posterior.
+
+CRITERIOS TRANSVERSALES DE DEPENDENCIA Y ORDEN LOGICO
+El orden numerico organiza el trabajo y conserva referencias historicas, pero no significa que cada fase sea una dependencia estricta de todas las posteriores. `prompt_mejoraActual.txt` sigue siendo la unica fuente del puntero operativo. Las dependencias siguientes aclaran el orden tecnico sin renumerar unidades ya registradas:
+- FASES 0-2: auditoria documental y contratos fundacionales (Node/State). La extension 2.8 es una rama arquitectonica transversal; no debe interpretarse como sustituto de las capacidades base ni como permiso para duplicarlas.
+- FASE 3: conocimiento de aplicaciones y descubrimiento. FASE 4 puede consumir contratos de entidades/aplicaciones que ya existan; las ampliaciones de persistencia y resolucion de DOMAIN MEMORY corresponden a FASE 5. No adelantar ni duplicar esas ampliaciones dentro de FASE 4.
+- FASES 6-9: grafo, planner determinista, A* y replanning. El replanning depende de una ruta/ejecucion ya disponible; mantener el planner determinista como fallback. Los contratos basicos de precondiciones/efectos que Graph y Planner necesitan deben existir antes de sus consumidores, aunque su formalizacion y cierre transversal se completen en FASE 10.
+- FASES 10-13: FASE 10 consolida el contrato completo de precondiciones/efectos; FASE 11 generaliza el preflight/login reutilizando el preflight de aplicaciones de 3.8; FASE 12 desarrolla la capability de calibracion sobre las APIs reales disponibles; FASE 13 normaliza y migra el conocimiento persistente de `macros_coords.json` manteniendo compatibilidad. Hasta completar FASE 13, FASE 12 no debe asumir que todos los formatos legacy ya estan migrados.
+- FASE 14: es una fase de identificacion, normalizacion y exposicion de acciones primitivas que ya existen en el proyecto; no debe bloquear ni duplicar los contratos de ejecucion usados anteriormente por Graph/Planner/Executor. Su integracion final debe reutilizar los puntos de registro existentes.
+- FASE 15: integra el flujo de alto nivel y depende de los contratos verificados de aplicaciones (3.8), Goal/HTN (4), memoria (5), Graph/Planner/Executor (6-9), precondiciones, preflight, calibracion y acciones (10-14). No declarar un flujo end-to-end universal por haber probado solo una aplicacion o un tipo de lanzamiento.
+- FASE 16 mantiene compatibilidad legacy despues de disponer del flujo nuevo; FASES 17-18 optimizan y aprenden solo de resultados observables y persistidos, sin alterar primero la correccion funcional.
+- FASES 19-20 describen el ciclo operativo de automejora y continuidad. FASE 21 es una auditoria posterior del repositorio/proyecto JARVIS, no un requisito para el inventario del ordenador completo definido en 3.8.5.1.4.
+No mover unidades completadas ni inventar estados para hacer coincidir este orden conceptual. Cuando una unidad posterior necesite una capacidad anterior aun no cerrada, registrar la dependencia concreta y no simular su cumplimiento.
 
 --- INICIO DEL ROADMAP: ENUMERACION DE FASES Y UNIDADES ---
 
@@ -371,7 +383,11 @@ FASE 2 ? ARQUITECTURA (extension documentada actual)
 2.8.7.8.3 Verificar no duplicacion.
 2.8.7.8.4 No regresion.
 2.8.7.8.5 Documentacion.
-**2.8.8.9 ? PERSISTENCIA [IMPLEMENTADA]**
+2.8.8 ? ADAPTIVE GOAL SYSTEM (continuacion historica)
+Nota de integridad: los registros canonicos disponibles incluyen 2.8.8.7 y 2.8.8.8, pero en este archivo no aparece una enumeracion ni un registro de 2.8.8.1 a 2.8.8.6. No inventar esas unidades ni asignarles contenido por inferencia.
+2.8.8.7 ? FEEDBACK DE ADAPTACION DE GOAL [IMPLEMENTADA; REGISTRO HISTORICO SIN RECUENTOS DE TESTS]
+2.8.8.8 ? BUCLE DE APRENDIZAJE CONTINUO PARA ADAPTACION DE GOAL [IMPLEMENTADA; TESTS/NO REGRESION NO REGISTRADOS EN EL CIERRE ORIGINAL]
+2.8.8.9 ? PERSISTENCIA [IMPLEMENTADA]
 2.8.8.9.1 ? IDENTIFICAR PERSISTENCIA DISPONIBLE [COMPLETADO]
 2.8.8.9.1.1 ? LOCALIZAR ALMACENAMIENTO [COMPLETADO]
 2.8.8.9.1.2 ? LOCALIZAR CARGA
@@ -734,6 +750,8 @@ FASE 3 ? APPLICATION KNOWLEDGE
 3.8.1.2 Identificar fuentes reales disponibles en Windows: aplicaciones instaladas, accesos directos, rutas registradas, PATH y procesos/ventanas activos cuando proceda.
 3.8.1.3 Distinguir aplicacion instalada, aplicacion en ejecucion, aplicacion registrada en ApplicationManager y aplicacion disponible para automatizacion.
 3.8.1.4 Evitar busquedas indiscriminadas o recursivas por todo el disco como mecanismo por defecto.
+    3.8.1.4.1 Las fuentes nativas y acotadas de 3.8.1.2 mantienen prioridad para resolver rapidamente aplicaciones instaladas o registradas; el inventario completo de 3.8.5.1.4 es una fuente complementaria, no una busqueda que se repite en cada peticion. [HIJA de 3.8.1.4]
+    3.8.1.4.2 No confundir inventariar un archivo ejecutable con demostrar que es una aplicacion instalada, GUI, compatible o autorizada para abrirse; esa clasificacion y validacion corresponde a 3.8.5.1.4.7 y ApplicationPreflight. [HIJA de 3.8.1.4]
 3.8.1.5 Registrar cobertura, permisos y limitaciones de cada fuente.
 3.8.1.6 Tests con resultados reales de las fuentes, fuentes inaccesibles y resultados vacios.
 3.8.2 ? RESOLUCION DE LA APLICACION OBJETIVO
@@ -774,17 +792,158 @@ FASE 3 ? APPLICATION KNOWLEDGE
     3.8.4.7.5 Tests de persistencia admitida (registro explicito de catalogo) sobre copias temporales, con el defecto ya corregido en 3.8.4.6.3. [HIJA de 3.8.4.7]
     3.8.4.7.6 Tests de duplicados y de preservacion exacta de entities.json contra la linea base fijada en 3.8.4.4.2. [HIJA de 3.8.4.7]
 3.8.5 ? PREFLIGHT Y APERTURA SEGURA
-3.8.5.1 Pasar toda aplicacion descubierta por ApplicationPreflight y las politicas de seguridad reales.
+3.8.5.1 ? PREPARACION DE DESTINOS, PREFLIGHT Y BASE DE DESCUBRIMIENTO LOCAL.
+Nota de alcance: 3.8.5.1.1-3.8.5.1.3 implementan y verifican la puerta real de preflight. La nueva 3.8.5.1.4 incorpora el inventario persistente como fuente complementaria para ampliar la localizacion en el equipo y debe completarse antes de avanzar a las pruebas de apertura real. Esta ubicacion agrupa las dependencias previas a la apertura; no significa que el escaner forme parte del metodo ApplicationPreflight ni que pueda autorizar lanzamientos.
     3.8.5.1.1 Verificar con ejecucion real como responde `ApplicationPreflight.check` a una aplicacion empaquetada (AppX/UWP) descubierta con `app_id` y sin ruta .exe: tras 3.8.3.5 `check` rechaza con `blocked_by=executable_not_resolved` cuando `resolve_executable` devuelve None, mientras que 3.8.3.4 registro que el lanzamiento de paquetes si esta soportado en `CalibrationManager.launch_application` (shell:AppsFolder\{app_id}). Registrar si alguna aplicacion empaquetada real queda bloqueada por esa causa. [HIJA de 3.8.5.1]
     3.8.5.1.2 Si 3.8.5.1.1 lo confirma: admitir el tipo de lanzamiento paquete reutilizando el soporte real de `launch_application`, exigiendo que el `app_id` proceda de la fuente de descubrimiento y se verifique contra shell:AppsFolder, sin construir comandos a partir de la peticion ni aplicar heuristicas sobre cadenas arbitrarias; con tests de paquete valido, `app_id` inexistente y `app_id` que no procede del descubrimiento. Si no lo confirma, registrar la evidencia y no cambiar codigo. [HIJA de 3.8.5.1]
-    3.8.5.1.3 Pasar toda aplicacion descubierta (ejecutable, acceso directo, URI de aplicacion y paquete) por ApplicationPreflight y las politicas de seguridad reales. [HIJA de 3.8.5.1]
+    3.8.5.1.3 Pasar toda aplicacion descubierta (ejecutable, acceso directo, URI de aplicacion y paquete) por ApplicationPreflight y las politicas de seguridad reales. [IMPLEMENTADA] [HIJA de 3.8.5.1]
+3.8.5.1.4 ? INVENTARIO PERSISTENTE UNIVERSAL DEL SISTEMA DE ARCHIVOS Y DESCUBRIMIENTO DE APLICACIONES (DEPENDENCIA PREVIA A 3.8.5.4 Y AL FLUJO END-TO-END DE 3.8.9)
+3.8.5.1.4.1 ? CONTRATO, ALCANCE Y PRIVACIDAD DEL INVENTARIO
+3.8.5.1.4.1.1 Definir el inventario como un indice local de los elementos del sistema de archivos del equipo donde se ejecuta JARVIS, no como una copia del contenido de todos los documentos y binarios. Guardar rutas y metadatos; no duplicar por defecto los bytes de los ficheros. [HIJA de 3.8.5.1.4.1]
+3.8.5.1.4.1.2 Identificar cada equipo con un identificador local generado para JARVIS; no usar MAC, numero de serie, nombre de usuario ni otros identificadores personales/hardware como clave. [HIJA de 3.8.5.1.4.1]
+3.8.5.1.4.1.3 Delimitar que el inventario pertenece al equipo y a la instalacion que lo crea; no reutilizar rutas absolutas de otro equipo como si fueran validas en el actual. [HIJA de 3.8.5.1.4.1]
+3.8.5.1.4.1.4 Incluir archivos y directorios accesibles, incluidos ocultos y del sistema, registrando explicitamente los elementos que no puedan leerse por permisos, bloqueo o restricciones del sistema operativo. [HIJA de 3.8.5.1.4.1]
+3.8.5.1.4.1.5 Definir como alcance predeterminado los volumenes locales montados del equipo; unidades extraibles y ubicaciones de red requieren deteccion y politica explicita, y deben identificarse como tales. [HIJA de 3.8.5.1.4.1]
+3.8.5.1.4.1.6 Definir exclusiones tecnicas justificadas para sistemas de archivos virtuales, puntos de montaje recursivos, ubicaciones efimeras y el propio almacenamiento del inventario; cada exclusion debe quedar documentada y contabilizada, no ocultarse como cobertura completa. [HIJA de 3.8.5.1.4.1]
+3.8.5.1.4.1.7 Definir los metadatos minimos: equipo, volumen, ruta absoluta y relativa, nombre, extension, tipo de entrada, tamano, marcas temporales disponibles, identificador del sistema de archivos cuando exista, atributos, primera/ultima deteccion y estado de disponibilidad. [HIJA de 3.8.5.1.4.1]
+3.8.5.1.4.1.8 Separar hechos observados por el sistema operativo de inferencias (por ejemplo, que un .exe sea una aplicacion GUI); nunca presentar una inferencia como dato confirmado. [HIJA de 3.8.5.1.4.1]
+3.8.5.1.4.1.9 No leer el contenido de archivos personales para construir el inventario ni enviar nombres/rutas completos a logs o al LLM si no son necesarios para la peticion. [HIJA de 3.8.5.1.4.1]
+3.8.5.1.4.1.10 Definir controles para pausar, reanudar, cancelar, excluir una ruta y reconstruir/eliminar el inventario local sin tocar los archivos originales. [HIJA de 3.8.5.1.4.1]
+3.8.5.1.4.1.11 Crear tests de contrato que fijen alcance, campos, privacidad, identidad local y tratamiento de exclusiones. [HIJA de 3.8.5.1.4.1]
+3.8.5.1.4.1.12 Definir una matriz explicita de cobertura por sistema operativo, version, arquitectura, tipo de volumen y tipo de lanzamiento; JARVIS no debe afirmar que puede abrir literalmente cualquier aplicacion en cualquier equipo si algun adaptador, permiso, dependencia o tipo de destino no esta soportado y verificado. [HIJA de 3.8.5.1.4.1]
+3.8.5.1.4.2 ? FORMATO, ALMACENAMIENTO Y VERSIONADO PERSISTENTE
+3.8.5.1.4.2.1 Inspeccionar `src/memory/storage.py`, `JSONStorage`, `MemoryManager` y los formatos reales de `README_DATA.md` antes de elegir el almacenamiento; no reutilizar `MemoryType.ENTITIES` para el inventario. [HIJA de 3.8.5.1.4.2]
+3.8.5.1.4.2.2 Evaluar el volumen previsto y justificar el uso de SQLite (`sqlite3` de la biblioteca estandar) como indice consultable para miles o millones de entradas, evitando un unico JSON gigante que deba releerse y reescribirse completo en cada cambio. [HIJA de 3.8.5.1.4.2]
+3.8.5.1.4.2.3 Si la inspeccion confirma que no existe una alternativa del proyecto con prestaciones equivalentes, crear `data/system_inventory.sqlite3` como almacenamiento canonico del indice y documentar el formato SQLite en `README_DATA.md`. [HIJA de 3.8.5.1.4.2]
+3.8.5.1.4.2.4 Definir tablas y relaciones para equipos, volumenes, ejecuciones de escaneo, entradas del sistema de archivos y candidatos de aplicaciones; separar los candidatos de aplicacion de los registros genericos de archivos. [HIJA de 3.8.5.1.4.2]
+3.8.5.1.4.2.5 Definir claves unicas por equipo/volumen/ruta normalizada e indices de consulta por nombre normalizado, extension, tipo, ruta, volumen y estado; contemplar sistemas sensibles y no sensibles a mayusculas. [HIJA de 3.8.5.1.4.2]
+3.8.5.1.4.2.6 Guardar en cada escaneo su identificador, equipo, volumen, modalidad (completo/incremental), inicio, fin, resultado, numero de entradas, errores, exclusiones y cobertura estimada. [HIJA de 3.8.5.1.4.2]
+3.8.5.1.4.2.7 Ejecutar escrituras por lotes y transacciones atomicas; un escaneo interrumpido no debe dejar media base de datos presentada como inventario completo. [HIJA de 3.8.5.1.4.2]
+3.8.5.1.4.2.8 Versionar el esquema de SQLite y definir migraciones verificables, sin borrar ni reinterpretar silenciosamente inventarios de versiones anteriores. [HIJA de 3.8.5.1.4.2]
+3.8.5.1.4.2.9 Definir bloqueo/concurrencia para impedir que dos escaneos simultaneos corrompan o dupliquen el inventario; comprobar el modo de journaling adecuado y los cierres limpios. [HIJA de 3.8.5.1.4.2]
+3.8.5.1.4.2.10 Si aporta informacion util sin duplicar datos, definir `data/system_inventory_manifest.json` como manifiesto/resumen JSON ligero de version, equipo, volumenes y ultimo escaneo; mantenerlo coherente con SQLite y no almacenar en el JSON el listado entero de archivos. [HIJA de 3.8.5.1.4.2]
+3.8.5.1.4.2.11 Definir backup, deteccion de corrupcion y recuperacion; no sobrescribir una base valida con una base vacia o incompleta tras un error. [HIJA de 3.8.5.1.4.2]
+3.8.5.1.4.2.12 Probar persistencia real en disco creando una nueva instancia del repositorio/manager sobre la misma base temporal y recuperando las mismas entradas tras recarga. [HIJA de 3.8.5.1.4.2]
+3.8.5.1.4.3 ? DESCUBRIMIENTO DE VOLUMENES Y ADAPTADORES POR SISTEMA OPERATIVO
+3.8.5.1.4.3.1 Detectar sistema operativo, arquitectura y version mediante APIs del sistema, sin deducir el SO a partir de nombres de rutas. [HIJA de 3.8.5.1.4.3]
+3.8.5.1.4.3.2 Enumerar en Windows unidades y volumenes locales, letras, puntos de montaje, tipo de unidad y estado de disponibilidad; reutilizar APIs existentes cuando sean adecuadas. [HIJA de 3.8.5.1.4.3]
+3.8.5.1.4.3.3 Definir el adaptador equivalente para Linux usando los puntos de montaje disponibles y diferenciando sistemas locales, virtuales, de red y extraibles. [HIJA de 3.8.5.1.4.3]
+3.8.5.1.4.3.4 Definir el adaptador equivalente para macOS usando volumenes montados y diferenciando volumenes locales, de red, virtuales y extraibles. [HIJA de 3.8.5.1.4.3]
+3.8.5.1.4.3.5 Definir un contrato comun de volumen que no fuerce letras de unidad ni rutas propias de Windows sobre otros sistemas. [HIJA de 3.8.5.1.4.3]
+3.8.5.1.4.3.6 Identificar enlaces simbolicos, junctions, reparse points, bind mounts y otros mecanismos de redireccion del sistema de archivos; decidir explicitamente cuando seguirlos y evitar ciclos. [HIJA de 3.8.5.1.4.3]
+3.8.5.1.4.3.7 Diferenciar volumen desmontado, volumen inaccesible, permiso denegado, sistema de archivos no soportado y volumen vacio. [HIJA de 3.8.5.1.4.3]
+3.8.5.1.4.3.8 No declarar soportado un sistema operativo cuyo adaptador no haya sido implementado y probado; mantener una matriz de soporte por SO y version. [HIJA de 3.8.5.1.4.3]
+3.8.5.1.4.3.9 Ejecutar pruebas de descubrimiento en el SO real disponible y tests de contrato por adaptador para los demas SO soportados. [HIJA de 3.8.5.1.4.3]
+3.8.5.1.4.4 ? ESCANEO COMPLETO, CONTROLADO Y RESILIENTE
+3.8.5.1.4.4.1 Implementar recorrido iterativo y controlado de directorios por volumen; evitar recursion sin limites y no lanzar busquedas indiscriminadas desde cada consulta del usuario. [HIJA de 3.8.5.1.4.4]
+3.8.5.1.4.4.2 Mantener un conjunto de directorios/identificadores visitados para evitar ciclos, duplicados por puntos de montaje y recorridos repetidos de enlaces. [HIJA de 3.8.5.1.4.4]
+3.8.5.1.4.4.3 Capturar metadatos de archivos y directorios sin abrir ni copiar su contenido; no calcular hashes de todos los documentos personales como requisito del inventario. [HIJA de 3.8.5.1.4.4]
+3.8.5.1.4.4.4 No descartar por extension: registrar tambien archivos sin extension, ocultos, del sistema y formatos desconocidos siempre que sean accesibles. [HIJA de 3.8.5.1.4.4]
+3.8.5.1.4.4.5 Gestionar rutas Unicode, rutas largas, caracteres especiales, nombres duplicados en directorios distintos y diferencias de normalizacion entre sistemas. [HIJA de 3.8.5.1.4.4]
+3.8.5.1.4.4.6 Gestionar archivos bloqueados, permisos denegados, errores de E/S, rutas eliminadas durante el recorrido y directorios que cambian mientras se escanean. [HIJA de 3.8.5.1.4.4]
+3.8.5.1.4.4.7 Registrar errores por ruta y volumen con categoria y contador, evitando que una excepcion aislada aborte todo el escaneo. [HIJA de 3.8.5.1.4.4]
+3.8.5.1.4.4.8 Informar progreso, entradas procesadas, volumen actual, errores, exclusiones y cobertura; no mostrar 100% si quedan rutas relevantes sin inspeccionar. [HIJA de 3.8.5.1.4.4]
+3.8.5.1.4.4.9 Si un volumen o subarbol no termina de escanearse, conservar el ultimo inventario valido y marcar la ejecucion como parcial/interrumpida; no marcar sus archivos como eliminados. [HIJA de 3.8.5.1.4.4]
+3.8.5.1.4.4.10 Probar el recorrido sobre arboles temporales controlados con archivos reales de diversos tipos, rutas Unicode, subdirectorios profundos, enlaces, archivos bloqueados y permisos insuficientes. [HIJA de 3.8.5.1.4.4]
+3.8.5.1.4.5 ? ACTUALIZACION INCREMENTAL, CAMBIOS Y CONSISTENCIA
+3.8.5.1.4.5.1 Crear una primera instantanea completa por volumen y conservar la fecha, estado y cobertura de esa linea base. [HIJA de 3.8.5.1.4.5]
+3.8.5.1.4.5.2 Detectar altas, cambios y desapariciones mediante identificadores y metadatos disponibles (tamano, marcas temporales y atributos), sin releer el contenido de todos los archivos. [HIJA de 3.8.5.1.4.5]
+3.8.5.1.4.5.3 Detectar cambios de ruta/nombre y renombrados cuando el sistema de archivos proporcione evidencia suficiente; no fusionar archivos distintos solo por compartir nombre o tamano. [HIJA de 3.8.5.1.4.5]
+3.8.5.1.4.5.4 Marcar como ausente/eliminada una entrada solo despues de completar correctamente el escaneo del ambito que la contiene; un error de permisos no equivale a una eliminacion. [HIJA de 3.8.5.1.4.5]
+3.8.5.1.4.5.5 Permitir reanudar un escaneo interrumpido sin mezclar resultados de generaciones distintas ni degradar la ultima instantanea completa. [HIJA de 3.8.5.1.4.5]
+3.8.5.1.4.5.6 Definir refresco bajo demanda para una ruta/volumen y refresco incremental global; la apertura de una aplicacion debe poder solicitar una revalidacion puntual de su destino. [HIJA de 3.8.5.1.4.5]
+3.8.5.1.4.5.7 Evaluar observadores/notificaciones del sistema de archivos como optimizacion opcional; no depender exclusivamente de ellos porque pueden perder eventos o tener limites. [HIJA de 3.8.5.1.4.5]
+3.8.5.1.4.5.8 Limitar CPU, disco, memoria y concurrencia del escaneo, permitiendo pausar y cancelar sin corromper la base. [HIJA de 3.8.5.1.4.5]
+3.8.5.1.4.5.9 Definir caducidad y deteccion de inventario obsoleto; no confiar en una ruta historica sin comprobar que sigue existiendo justo antes de lanzarla. [HIJA de 3.8.5.1.4.5]
+3.8.5.1.4.5.10 Probar altas, cambios, renombrados, eliminaciones, permisos recuperados, ejecuciones parciales y reanudacion contra directorios temporales reales. [HIJA de 3.8.5.1.4.5]
+3.8.5.1.4.6 ? CONSULTA DEL INVENTARIO Y API DE ACCESO
+3.8.5.1.4.6.1 Exponer una API unica para buscar por nombre exacto/normalizado, ruta, extension, tipo, volumen y criterios de disponibilidad. [HIJA de 3.8.5.1.4.6]
+3.8.5.1.4.6.2 Permitir resultados paginados y ordenados sin cargar toda la base de datos en memoria. [HIJA de 3.8.5.1.4.6]
+3.8.5.1.4.6.3 Devolver procedencia, volumen, fecha de ultima comprobacion, estado y evidencia de cada resultado para que el consumidor pueda decidir si necesita revalidarlo. [HIJA de 3.8.5.1.4.6]
+3.8.5.1.4.6.4 Diferenciar encontrado en inventario, existe ahora, accesible ahora, ejecutable, candidato a aplicacion y autorizado para lanzamiento. [HIJA de 3.8.5.1.4.6]
+3.8.5.1.4.6.5 Revalidar en el sistema operativo la existencia y tipo del destino antes de cualquier operacion de apertura; el inventario nunca es una autorizacion para ejecutar. [HIJA de 3.8.5.1.4.6]
+3.8.5.1.4.6.6 Evitar que una consulta de inventario devuelva rutas de otro host o de volumenes que no estan montados en el equipo actual. [HIJA de 3.8.5.1.4.6]
+3.8.5.1.4.6.7 Limitar los datos enviados a Brain/LLM a los candidatos relevantes para la orden; no introducir el inventario completo ni rutas privadas en el contexto conversacional. [HIJA de 3.8.5.1.4.6]
+3.8.5.1.4.6.8 Probar busquedas, paginacion, orden, rendimiento y revalidacion con una base de datos de volumen significativo generada en entorno temporal. [HIJA de 3.8.5.1.4.6]
+3.8.5.1.4.7 ? IDENTIFICACION DE APLICACIONES A PARTIR DEL INVENTARIO
+3.8.5.1.4.7.1 Clasificar candidatos por tipo de lanzamiento propio de cada SO (ejecutable, bundle, paquete, acceso directo, URI o lanzador) sin asumir que todos los archivos ejecutables son aplicaciones GUI. [HIJA de 3.8.5.1.4.7]
+3.8.5.1.4.7.2 Reutilizar primero las fuentes de descubrimiento ya existentes (menu de aplicaciones, registro, paquetes, accesos directos y PATH) y utilizar el inventario como fuente complementaria para localizar destinos faltantes. [HIJA de 3.8.5.1.4.7]
+3.8.5.1.4.7.3 Diferenciar aplicacion GUI, herramienta CLI, servicio, controlador, biblioteca, instalador, actualizador, desinstalador, componente auxiliar y archivo ejecutable desconocido. [HIJA de 3.8.5.1.4.7]
+3.8.5.1.4.7.4 No clasificar como aplicacion lanzable un archivo solo por su extension; requerir evidencia adicional del sistema, paquete, acceso directo, registro o metadatos verificables. [HIJA de 3.8.5.1.4.7]
+3.8.5.1.4.7.5 Resolver el nombre comercial y los alias sin asumir que coinciden con el nombre del ejecutable; conservar todas las rutas candidatas cuando haya varias instalaciones. [HIJA de 3.8.5.1.4.7]
+3.8.5.1.4.7.6 Registrar fuente, ruta/destino, tipo de lanzamiento, version/producto si existe, ultima comprobacion, evidencia y nivel de confianza. [HIJA de 3.8.5.1.4.7]
+3.8.5.1.4.7.7 Deduplicar por identidad y destino real, no solo por nombre; no fusionar instalaciones distintas ni escoger una ruta arbitrariamente. [HIJA de 3.8.5.1.4.7]
+3.8.5.1.4.7.8 Mantener candidatos descubiertos en el inventario/catalogo dinamico separado; no modificar `data/knowledge/entities.json`, su esquema ni las siete entidades originales. [HIJA de 3.8.5.1.4.7]
+3.8.5.1.4.7.9 No persistir como capacidad confirmada una inferencia sobre lo que puede hacer la aplicacion; mantener el contrato observed_facts/inferred_data/unverified_capabilities de ApplicationKnowledge. [HIJA de 3.8.5.1.4.7]
+3.8.5.1.4.7.10 Pasar todo candidato que se pretenda abrir por ApplicationPreflight y las politicas existentes; rechazar ejecutables desconocidos, destinos ambiguos o rutas manipuladas. [HIJA de 3.8.5.1.4.7]
+3.8.5.1.4.7.11 Probar candidatos reales de aplicaciones conocidas, aplicaciones no registradas, herramientas CLI, instaladores, accesos directos rotos, paquetes y falsos positivos. [HIJA de 3.8.5.1.4.7]
+3.8.5.1.4.8 ? INTEGRACION CON EL DESCUBRIMIENTO Y APERTURA UNIVERSAL DE 3.8
+3.8.5.1.4.8.1 Integrar la consulta al inventario como fuente complementaria de 3.8.1-3.8.3, sin duplicar los mecanismos de descubrimiento que ya funcionan. [HIJA de 3.8.5.1.4.8]
+3.8.5.1.4.8.2 Definir orden de precedencia entre aplicacion ya abierta, catalogo conocido, fuentes nativas instaladas y candidatos del inventario; conservar procedencia y confianza. [HIJA de 3.8.5.1.4.8]
+3.8.5.1.4.8.3 Si existen varias coincidencias plausibles, no elegir silenciosamente: conservar alternativas y solicitar desambiguacion cuando la evidencia no permita decidir. [HIJA de 3.8.5.1.4.8]
+3.8.5.1.4.8.4 Si la ruta de un candidato ha cambiado, desaparecido o ya no es accesible, actualizar su estado y repetir la resolucion mediante fuentes vigentes; no intentar la ruta obsoleta. [HIJA de 3.8.5.1.4.8]
+3.8.5.1.4.8.5 Conectar el resultado con ApplicationManager/ApplicationKnowledge solo mediante sus contratos verificados y sin crear un segundo registro paralelo de aplicaciones. [HIJA de 3.8.5.1.4.8]
+3.8.5.1.4.8.6 Reutilizar ApplicationPreflight, CalibrationManager.launch_application y la verificacion proceso/ventana de 3.8.5; el inventario localiza, pero no ejecuta ni autoriza. [HIJA de 3.8.5.1.4.8]
+3.8.5.1.4.8.7 Mantener aislamiento por equipo y volumen incluso si se copia la base de datos; detectar host distinto y exigir reescaneo/revalidacion antes de usar destinos. [HIJA de 3.8.5.1.4.8]
+3.8.5.1.4.8.8 Verificar integracion con el flujo de aplicaciones ya registradas y descubiertas sin crear rutas paralelas Brain/Planner/Executor. [HIJA de 3.8.5.1.4.8]
+3.8.5.1.4.9 ? OPERACION, PRIVACIDAD Y MANTENIMIENTO
+3.8.5.1.4.9.1 Definir cuando se realiza el primer inventario, como se informa de su alcance y como se muestra el progreso sin bloquear el arranque o la conversacion de JARVIS. [HIJA de 3.8.5.1.4.9]
+3.8.5.1.4.9.2 Definir actualizaciones incrementales bajo demanda y una politica configurable de refresco; no escanear todos los volumenes completos en cada peticion. [HIJA de 3.8.5.1.4.9]
+3.8.5.1.4.9.3 Permitir escaneo por volumen o ruta, exclusion de ubicaciones elegidas por el usuario y reconstruccion controlada del catalogo. [HIJA de 3.8.5.1.4.9]
+3.8.5.1.4.9.4 Proteger la base de datos local con permisos adecuados y evitar exponerla por red o sincronizarla con otros equipos sin una decision explicita. [HIJA de 3.8.5.1.4.9]
+3.8.5.1.4.9.5 Evitar logs con listados completos de nombres/rutas; registrar resumenes, errores agregados y evidencia minima necesaria para diagnostico. [HIJA de 3.8.5.1.4.9]
+3.8.5.1.4.9.6 Definir limpieza/retencion de generaciones antiguas, entradas obsoletas y backups sin borrar informacion valida durante un escaneo parcial. [HIJA de 3.8.5.1.4.9]
+3.8.5.1.4.9.7 Medir tiempo, CPU, memoria, lecturas de disco, crecimiento de SQLite y rendimiento de consultas con volumenes representativos. [HIJA de 3.8.5.1.4.9]
+3.8.5.1.4.9.8 Verificar que JARVIS puede seguir respondiendo y ejecutar acciones mientras un escaneo esta pausado, limitado o ejecutandose en segundo plano controlado. [HIJA de 3.8.5.1.4.9]
+3.8.5.1.4.9.9 Probar permisos de acceso al inventario, exclusion de rutas, cancelacion, reanudacion y recuperacion ante cierre inesperado. [HIJA de 3.8.5.1.4.9]
+3.8.5.1.4.10 ? VERIFICACION REAL, REGRESION Y CIERRE
+3.8.5.1.4.10.1 Crear tests unitarios del contrato y almacenamiento usando bases temporales; no tocar los ficheros reales de datos del proyecto. [HIJA de 3.8.5.1.4.10]
+3.8.5.1.4.10.2 Verificar persistencia real en disco y recuperacion desde una nueva instancia, incluyendo migracion de esquema y base corrupta/ausente. [HIJA de 3.8.5.1.4.10]
+3.8.5.1.4.10.3 Ejecutar un escaneo real sobre el equipo donde corre JARVIS y registrar SO/version, volumenes detectados, entradas encontradas, errores, exclusiones, tiempo, recursos y cobertura; no sustituir este resultado por fixtures o mocks. [HIJA de 3.8.5.1.4.10]
+3.8.5.1.4.10.4 Contrastar una muestra representativa de rutas del inventario con el sistema de archivos real y demostrar que altas, cambios y eliminaciones se reflejan correctamente. [HIJA de 3.8.5.1.4.10]
+3.8.5.1.4.10.5 Verificar en el entorno real que archivos ocultos, rutas Unicode, rutas largas y permisos denegados se registran conforme al contrato, indicando expresamente lo que no pudo inspeccionarse. [HIJA de 3.8.5.1.4.10]
+3.8.5.1.4.10.6 Confirmar que no se copiaron contenidos de documentos/archivos personales, no se modificaron archivos originales y la base de inventario permanece limitada al almacenamiento definido. [HIJA de 3.8.5.1.4.10]
+3.8.5.1.4.10.7 Verificar que `data/knowledge/entities.json` y `data/memory/entities.json` permanecen intactos (contenido/hash/esquema) despues de descubrir, registrar, consultar y refrescar candidatos. [HIJA de 3.8.5.1.4.10]
+3.8.5.1.4.10.8 Desde el inventario real, localizar una aplicacion inocua no registrada previamente, comprobar que el candidato contiene un destino y evidencia suficientes y pasarlo por ApplicationPreflight; registrar el destino autorizado sin lanzarlo. La apertura real se verifica posteriormente en 3.8.5.4.2.6. [HIJA de 3.8.5.1.4.10]
+3.8.5.1.4.10.9 Comprobar que los candidatos identificados cubren los tipos de lanzamiento que el adaptador del SO declara soportar y clasificar cada tipo como disponible, no verificado o no soportado. No ejecutar aun los lanzamientos: la prueba real corresponde a 3.8.5.4.2.6; nunca ejecutar en lote candidatos ni aplicaciones sensibles. [HIJA de 3.8.5.1.4.10]
+3.8.5.1.4.10.10 Verificar la matriz de sistemas operativos y declarar como NO SOPORTADO/NO VERIFICADO cualquier adaptador o tipo de lanzamiento sin pruebas nativas satisfactorias. [HIJA de 3.8.5.1.4.10]
+3.8.5.1.4.10.11 Ejecutar las suites de no regresion de ApplicationPreflight, ApplicationManager, CalibrationManager, MemoryManager, EntityResolver y las integraciones Brain/Planner/Executor afectadas. [HIJA de 3.8.5.1.4.10]
+3.8.5.1.4.10.12 Actualizar `README_DATA.md` con rutas, formato SQLite/JSON, tablas, campos, responsables de lectura/escritura, flujo, versionado y estado real de integridad; actualizar `README.md` solo si cambian modulos de `src/`, describiendo comportamiento implementado y verificado sin referencias a fases. [HIJA de 3.8.5.1.4.10]
+3.8.5.1.4.10.13 Cerrar esta unidad solo cuando el escaneo real, las consultas, la persistencia, la integracion con preflight, la seguridad, la privacidad y la no regresion tengan evidencia registrada. La apertura real de aplicaciones queda reservada para 3.8.5.4 y la integracion posterior de 3.8.9; los casos no probados permanecen explicitamente pendientes. [HIJA de 3.8.5.1.4.10]
+
 3.8.5.2 Rechazar aplicaciones bloqueadas, elevacion no permitida o destinos de ejecucion no verificables.
 3.8.5.3 Comprobar si la aplicacion ya esta abierta y reutilizarla cuando el contrato lo permita.
 3.8.5.4 Abrir una aplicacion cerrada mediante la API real de ejecucion, sin cerrar ni alterar ventanas ajenas.
-    3.8.5.4.1 Definir en `tests/` un arnes seguro para pruebas con lanzamiento real: solo aplicaciones inocuas ya conocidas por ApplicationManager (por ejemplo notepad o calculator), registro del PID o de la ventana creados por la prueba, cierre exclusivo de lo creado por ella y comprobacion de que los procesos y ventanas previos (incluidos el editor y la sesion del desarrollador) quedan intactos. Donde se aisle la frontera del sistema operativo, no sustituir con mocks la seleccion del proceso o de la ventana ni la autorizacion que se esta probando. [HIJA de 3.8.5.4]
+    3.8.5.4.1 Definir en `tests/` un arnes seguro para pruebas con lanzamiento real: solo aplicaciones inocuas ya conocidas por ApplicationManager (por ejemplo Notepad o Calculator), registro del PID o de la ventana creados por la prueba, cierre exclusivo de lo creado por ella y comprobacion de que los procesos y ventanas previos (incluidos el editor y la sesion del desarrollador) quedan intactos. Donde se aisle la frontera del sistema operativo, no sustituir con mocks la seleccion del proceso o de la ventana ni la autorizacion que se esta probando. [HIJA de 3.8.5.4]
+        3.8.5.4.1.1 Crear una linea base real de procesos y ventanas antes de cada prueba (PID, proceso padre cuando se pueda obtener, ruta del ejecutable, identificador de ventana y estado visible), sin asumir que un titulo de ventana identifica por si solo una aplicacion. [HIJA de 3.8.5.4.1]
+        3.8.5.4.1.2 Mantener una allowlist explicita de aplicaciones GUI inocuas y disponibles en el equipo de pruebas; no ejecutar en lote todos los ejecutables encontrados por el inventario. [HIJA de 3.8.5.4.1]
+        3.8.5.4.1.3 Registrar la identidad exacta del proceso/ventana creado por cada prueba y distinguirlo de procesos preexistentes, procesos compartidos y servicios del sistema. [HIJA de 3.8.5.4.1]
+        3.8.5.4.1.4 Permitir limpieza unicamente de ventanas o procesos creados por la propia prueba y cuya propiedad exclusiva se haya demostrado; nunca terminar procesos preexistentes, compartidos o ambiguos. [HIJA de 3.8.5.4.1]
+        3.8.5.4.1.5 Verificar que el arnes restaura el estado de prueba y no altera las ventanas activas, el foco, los monitores ni las aplicaciones previas del usuario. [HIJA de 3.8.5.4.1]
+        3.8.5.4.1.6 Probar el arnes primero con una aplicacion de prueba controlada y despues con una aplicacion GUI inocua real del sistema. [HIJA de 3.8.5.4.1]
     3.8.5.4.2 Abrir una aplicacion cerrada mediante la API real de ejecucion, sin cerrar ni alterar ventanas ajenas. [HIJA de 3.8.5.4]
+        3.8.5.4.2.1 Ejecutar el destino validado por el preflight mediante el mecanismo nativo que corresponda al tipo real (ejecutable, acceso directo, URI, paquete o bundle), sin construir una orden arbitraria desde el texto del usuario. [HIJA de 3.8.5.4.2]
+        3.8.5.4.2.2 Confirmar que el mecanismo de lanzamiento devuelve un resultado interpretable y conservar codigo de salida, PID, identificador de activacion o evidencia equivalente cuando el sistema operativo lo proporcione. [HIJA de 3.8.5.4.2]
+        3.8.5.4.2.3 Diferenciar lanzamiento solicitado, proceso creado, activacion aceptada por el sistema y aplicacion GUI realmente disponible; no declarar exito solo porque la llamada de lanzamiento no lanzo una excepcion. [HIJA de 3.8.5.4.2]
+        3.8.5.4.2.4 Gestionar timeout, rechazo del sistema, ejecutable eliminado entre preflight y apertura, permisos insuficientes y cierre inmediato del proceso, devolviendo un motivo concreto. [HIJA de 3.8.5.4.2]
+        3.8.5.4.2.5 Evitar aperturas duplicadas: si la aplicacion ya esta abierta, reutilizarla solo cuando se identifique inequívocamente y el contrato lo permita. [HIJA de 3.8.5.4.2]
+        3.8.5.4.2.6 Verificar en el entorno real al menos un lanzamiento correcto por cada tipo de destino que el adaptador del sistema operativo declare soportar; los tipos no disponibles se registran como NO VERIFICADOS, no como completados. [HIJA de 3.8.5.4.2]
+        3.8.5.4.2.7 Mantener una matriz de resultados por sistema operativo, version, arquitectura y tipo de destino (ejecutable, acceso directo, URI, paquete, bundle u otros realmente soportados); no extrapolar el exito de Windows a Linux/macOS ni el de un tipo de lanzamiento a los demas. [HIJA de 3.8.5.4.2]
+        3.8.5.4.2.8 Declarar explicitamente NO SOPORTADO o NO VERIFICADO cualquier aplicacion cuyo instalador, runtime, servicio externo, licencia, controlador, arquitectura, sesion o interfaz impida una apertura real reproducible; ofrecer el motivo concreto en lugar de intentar ejecutar a ciegas. [HIJA de 3.8.5.4.2]
 3.8.5.5 Verificar proceso, ventana y estado posterior a la apertura.
+    3.8.5.5.1 Comprobar mediante el sistema operativo que el proceso objetivo existe y sigue vivo despues del lanzamiento; correlacionarlo con la ruta, PID, identificador de paquete o evidencia de activacion. [HIJA de 3.8.5.5]
+    3.8.5.5.2 Para aplicaciones GUI, detectar una ventana perteneciente al proceso/aplicacion objetivo mediante identificadores y propietario; no aceptar una coincidencia basada solo en el titulo. [HIJA de 3.8.5.5]
+    3.8.5.5.3 Esperar la ventana durante un timeout acotado y configurable, distinguiendo inicio lento, aplicacion de fondo, proceso sin interfaz y fallo de apertura. [HIJA de 3.8.5.5]
+    3.8.5.5.4 Verificar que la ventana detectada es visible y corresponde a la aplicacion solicitada, sin forzar foco, maximizar ni moverla salvo que la peticion lo solicite. [HIJA de 3.8.5.5]
+    3.8.5.5.5 Comprobar la estabilidad minima del proceso/ventana durante un intervalo definido para evitar declarar exito a un proceso que se cierra inmediatamente. [HIJA de 3.8.5.5]
+    3.8.5.5.6 Representar por separado los estados ABRIENDO, PROCESO_INICIADO, VENTANA_DETECTADA, ABIERTA_VERIFICADA, ABIERTA_SIN_VENTANA, FALLO y TIMEOUT, solo si el contrato real permite esos estados. [HIJA de 3.8.5.5]
+    3.8.5.5.7 Guardar evidencia tecnica minima del resultado (tipo de destino, fuente, ruta/identificador validado, PID o identificador equivalente, ventana y tiempos), sin registrar contenido privado ni argumentos que puedan contener secretos. [HIJA de 3.8.5.5]
 3.8.5.6 Tests de preflight rechazado, aplicacion abierta/cerrada, fallo de lanzamiento y proteccion de ventanas existentes.
+    3.8.5.6.1 Mantener tests unitarios para decisiones puras y contratos, pero no utilizarlos como prueba suficiente de que una aplicacion real se abre. [HIJA de 3.8.5.6]
+    3.8.5.6.2 Ejecutar pruebas de integracion reales con aplicaciones GUI inocuas de la allowlist del equipo, sin mockear la API de lanzamiento, la enumeracion de procesos ni la identificacion de ventanas que se estan verificando. [HIJA de 3.8.5.6]
+    3.8.5.6.3 Comprobar los casos aplicacion ya abierta, aplicacion cerrada, apertura correcta, proceso que termina, ausencia de ventana, permiso denegado, ruta obsoleta y timeout. [HIJA de 3.8.5.6]
+    3.8.5.6.4 Comparar antes y despues los procesos y ventanas ajenos a la prueba y demostrar que permanecen intactos. [HIJA de 3.8.5.6]
+    3.8.5.6.5 Registrar por separado resultados simulados, pruebas unitarias con mocks, pruebas de integracion del sistema operativo y aperturas GUI verificadas visualmente; nunca mezclar sus conteos. [HIJA de 3.8.5.6]
 3.8.6 ? CALIBRACION DE APLICACIONES DESCUBIERTAS
 3.8.6.1 Conectar el descubrimiento con el requisito de calibracion de 3.5 y el CalibrationManager/UniversalVisualCalibrator existentes.
     3.8.6.1.1 Delimitar el alcance: 3.8.6 reutiliza CalibrationManager, UniversalVisualCalibrator y CoordinateManager tal como existen hoy, con sus mecanismos de identificacion de ventana y monitor; el contrato de la capability calibrate, la calibracion multipantalla completa y la seguridad operativa se definen en FASE 12 y no se anticipan aqui. Registrar como limitaciones conocidas lo que 3.8.6 no cubra. [HIJA de 3.8.6.1]
@@ -1654,6 +1813,7 @@ FASE 12 ? CALIBRATION CAPABILITY
 12.8.5 README.
 12.8.6 Cerrar FASE 12.
 FASE 13 ? MACROS_COORDS COMO UI KNOWLEDGE
+Dependencia con FASE 12: esta fase completa la validacion/migracion del conocimiento persistente de UI que FASE 12 consume. FASE 12 puede reutilizar los formatos existentes y verificar sus APIs, pero no debe asumir que la migracion de todos los formatos coexistentes o la consistencia global ya esta completada hasta cerrar 13.3 y 13.4.
 
 13.1 ? LECTURA / SCHEMA / VALIDACION
 13.1.1 Localizar macros_coords.json real.
@@ -1686,6 +1846,7 @@ FASE 13 ? MACROS_COORDS COMO UI KNOWLEDGE
 13.4.5 main.py.
 13.4.6 README.
 FASE 14 ? ACCIONES PRIMITIVAS REUTILIZABLES
+Alcance y dependencia: esta fase consolida, normaliza y expone acciones primitivas ya presentes en el codigo; no vuelve a implementar desde cero las acciones que Graph/Planner/Executor ya consumen en FASES 6-9. La integracion de 14.8 debe reutilizar ActionRegistry/Executor y demostrar compatibilidad, sin crear un segundo canal de ejecucion.
 
 14.1 ? VENTANAS / APPS
 14.1.1 Identificar accion de abrir.
@@ -2216,6 +2377,7 @@ Objetivo: localizar, justificar y retirar de forma controlada archivos realmente
 21.1.10 Registrar cada conclusion con ruta exacta, evidencia comprobable, riesgo y siguiente accion; no registrar inferencias como hechos.
 
 21.2 ? BASELINE E INVENTARIO FISICO COMPLETO
+Alcance obligatorio: esta unidad inventaria exclusivamente el arbol del proyecto/repositorio JARVIS y sus recursos asociados para la auditoria de limpieza. No es el inventario global del ordenador ni debe duplicar el escaneo de volumenes de 3.8.5.1.4; mantener separados ambos resultados, sus bases de datos y sus finalidades.
 21.2.1 Confirmar la raiz real del proyecto y el directorio de trabajo usado para ejecutar JARVIS.
 21.2.2 Inventariar todos los archivos y directorios de primer nivel, incluidos los ocultos.
 21.2.3 Inventariar recursivamente el contenido del proyecto, respetando limites de exclusion justificados y documentados.
@@ -7277,3 +7439,29 @@ VERIFICACION: SINTAXIS: OK (py_compile de src/hands/application_preflight.py y t
 DISCREPANCIAS: (1) Contradiccion entre instrucciones de cierre: mejora/prompt_mejoraActual.txt (seccion CONTINUIDAD Y CIERRE) indica dejar CURRENT_WORK_STATUS: EN PROCESO al mover al siguiente hoja, mientras mejora/prompt_JARVIS_reglas.txt (seccion 5, puntos 46(e), 47 y 50) indica dejar CURRENT_WORK_STATUS: PENDIENTE para el puntero actual y nunca marcar la siguiente hoja EN PROCESO antes de un chat dedicado. Se conserva sin reconciliar por intuicion; se sigue prompt_JARVIS_reglas.txt (seccion dedicada a transiciones, mas specifica), por tanto el siguiente hoja 3.8.5.1.3 queda PENDIENTE.
 PENDIENTES: Siguiente hoja pendiente real en orden del roadmap: 3.8.5.1.3 (Pasar toda aplicacion descubierta por ApplicationPreflight y las politicas de seguridad reales, hija de 3.8.5.1 PREFLIGHT Y APERTURA SEGURA). Padre 3.8.5.1 no se completa hasta cerrar todas sus hijas (.1, .2, .3); .1 y .2 cerrados.
 ESTADO FINAL: 3.8.5.1.2 - IMPLEMENTADA
+
+
+REGISTRO DE UNIDAD: 3.8.5.1.3
+FECHA: 2026-11-08
+OBJETIVO: Pasar toda aplicación descubierta (ejecutable, acceso directo, URI de aplicación y paquete) por ApplicationPreflight y las políticas de seguridad reales, de modo que calibrate_application valide con el preflight real antes de lanzar cualquier aplicación descubierta resuelta. Padre: 3.8.5.1; abuelo: 3.8.5; FASE 3.8.
+TIPO DE TRABAJO: IMPLEMENTACION | VERIFICACION
+CAMBIOS / HALLAZGOS: (1) Cableado de CalibrationManager._preflight_checker al checador real get_application_preflight().check en src/hands/calibration_manager.py (__init__), de modo que preflight_application ejecute ApplicationPreflight.check (bloqueo de nombres/app_id, estado de login, recursos, resolución de ejecutable, validación de URI, verificación de paquete en shell:AppsFolder, manifest de elevación y uiAccess) antes de cada lanzamiento vía calibrate_application. (2) Verificación funcional: el checador es el método bound de la instancia singleton de ApplicationPreflight; check rechaza app bloqueada por nombre (blocked_by=blocked_name) y app no resoluble (blocked_by=executable_not_resolved); preflight_application devuelve source="application_preflight" para apps resueltas que pasan los filtros internos. (3) launch_application (primitiva de lanzamiento) no se modifica para no romper los tests existentes de paso de argumentos; el preflight se aplica en la puerta de calibrate_application, ruta de producción para abrir aplicaciones descubiertas.
+ARCHIVOS MODIFICADOS: PRODUCCION: src/hands/calibration_manager.py; TESTS: NA; DOCUMENTACION: este registro en mejora/prompt_JARVIS_fases_estado.txt (docs/README.md revisado: no requiere cambios).
+TESTS Y RESULTADOS: UNITARIOS: 19 PASSED / 19 TOTAL en tests/hands/test_calibration_manager.py; 30 PASSED / 30 TOTAL en tests/hands/test_application_classification.py; INTEGRACION: NA; NO REGRESION: suites de calibration_manager y classification pasan sin modificaciones.
+VERIFICACION: SINTAXIS: OK (py_compile de src/hands/calibration_manager.py y main.py -> exit 0); MAIN.PY: OK (sin cambios; py_compile exit 0); COMPORTAMIENTO / INTEGRACION REAL: verificado funcionalmente (script temporal borrado): preflight_application con _resolve_application parcheado a app resuelta devuelve source="application_preflight" y allowed=False para app bloqueada por nombre; checador = get_application_preflight().check bound al singleton.
+DISCREPANCIAS: (1) Contradicción entre instrucciones de cierre: mejora/prompt_mejoraActual.txt (sección CONTINUIDAD Y CIERRE) indica dejar CURRENT_WORK_STATUS: EN PROCESO al mover al siguiente hoja, mientras mejora/prompt_JARVIS_reglas.txt (sección 5, puntos 46(e) y 47) indica dejar CURRENT_WORK_STATUS: PENDIENTE para el puntero actual y nunca marcar la siguiente hoja EN PROCESO antes de un chat dedicado. Se conserva sin reconciliar por intuición; se sigue prompt_JARVIS_reglas.txt (sección dedicada a transiciones, más específica), por tanto el siguiente hoja 3.8.5.2 queda PENDIENTE. Coherente con el registro 3.8.5.1.2 (línea 7414).
+PENDIENTES: Tras la ampliacion posterior del roadmap, la siguiente unidad pendiente es 3.8.5.1.4 (Inventario persistente universal del sistema de archivos y descubrimiento complementario de aplicaciones), situada como dependencia previa a las pruebas de apertura real. La unidad 3.8.5.1.3 permanece IMPLEMENTADA, pero el padre 3.8.5.1 no se considera cerrado hasta completar tambien la nueva .1.4. Despues continua 3.8.5.2 (rechazos de seguridad), seguido de deteccion de aplicaciones abiertas y lanzamiento real.
+ESTADO FINAL: 3.8.5.1.3 - IMPLEMENTADA
+
+
+REGISTRO DE UNIDAD: 3.8.5.1.4.1
+FECHA: 2026-11-08
+OBJETIVO: Definir el contrato, alcance y privacidad del inventario persistente del sistema de archivos del equipo donde ejecuta JARVIS, incluyendo: entrada de inventario con metadatos minimos (machine_id, volumen, ruta absoluta/relativa, nombre, extension, tipo de entrada, tamano, fechas, atributos), identificador local de equipo estable (sin MAC ni serial de numero), alcance predeterminado de volumenes locales montados, exclusiones tecnicas justificadas (sistemas de archivos virtuales, puntos de montaje recursivos, papelera, archivos de paginacion), separacion entre hechos observados del SO e inferencias, controles de privacidad (sin lectura de contenido de archivos personales, sin rutas completas en logs) y operaciones de control del inventario (pausa, reanudacion, cancelacion, exclusion, reconstruccion con aislamiento por equipo). Matriz de cobertura por SO/version/arquitectura/tipo de volumen/tipo de entrada. Padre: 3.8.5.1.4; abuelo: 3.8.5.1; bisabuelo: 3.8 (FASE 3.8). Sub-tareas cubiertas: .1.1 contrato/index local, .1.2 ID de equipo, .1.3 pertenencia al equipo, .1.4 archivos y directorios accesibles, .1.5 alcance local, .1.6 exclusiones tecnicas, .1.7 metadatos minimos, .1.8 hechos vs inferencias, .1.9 privacidad, .1.10 controles de operacion, .1.11 tests de contrato, .1.12 matriz de cobertura.
+TIPO DE TRABAJO: IMPLEMENTACION | TEST
+CAMBIOS / HALLAZGOS: Creado `src/hands/system_inventory.py` con dataclasses `InventoryEntry`, `InventoryContract`, `CoverageMatrixEntry`; enums `EntryType`, `FactType`, `InventoryScope`, `InventoryControl`; funciones `generate_machine_id`, `is_same_machine`, `is_excluded_path`, `is_excluded_mount`, `safe_log_path`, `classify_entry`, `validate_control`, `default_contract`, `cobertura_soportada`, `entradas_cobertura_por_sistema`; constantes de exclusiones predeterminadas y aviso de privacidad. Creado `tests/hands/test_system_inventory.py` con 26 tests de contrato que verifican serializacion/deserializacion, ID de equipo estable, privacidad por defecto, exclusiones tecnicas, hechos vs inferencias, truncamiento seguro de rutas, controles de aislamiento por equipo, contrato por defecto y serializacion para persistencia. Todos los tests pasan (26/26). No se modifico codigo de produccion existente.
+ARCHIVOS MODIFICADOS: PRODUCCION: src/hands/system_inventory.py; TESTS: tests/hands/test_system_inventory.py; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: 26 PASSED / 0 FAILED / 26 TOTAL; INTEGRACION: NA; NO REGRESION: NA (no se modifica codigo existente, solo se adicionan archivos nuevos)
+VERIFICACION: SINTAXIS: OK (import y ejecucion de `src/hands/system_inventory.py` sin errores; py_compile implicito en tests); MAIN.PY: NA (no se modifica main.py); COMPORTAMIENTO / INTEGRACION REAL: 26 tests unitarios ejecutados y pasados, verificando contrato del inventario en isolation con tmp_path (sin tocar datos de produccion)
+DISCREPANCIAS: NINGUNA
+PENDIENTES: NINGUNO (todas las sub-tareas .1.1 a .1.12 cubiertas)
+ESTADO FINAL: 3.8.5.1.4.1 - IMPLEMENTADA

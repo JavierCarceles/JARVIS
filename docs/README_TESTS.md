@@ -87,6 +87,7 @@
 - [`hands\test_executor.py`](#hands/test-executor)
 - [`hands\test_executor_state.py`](#hands/test-executor_state)
 - [`hands\test_restore_window_state.py`](#hands/test-restore_window_state)
+- [`hands\test_system_inventory.py`](#hands/test-system_inventory)
 - [`hands\test_ui_elements.py`](#hands/test-ui_elements)
 - [`hands\test_ui_elements_final.py`](#hands/test-ui_elements_final)
 - [`hands\test_ui_elements_minimal.py`](#hands/test-ui_elements_minimal)
@@ -10673,6 +10674,28 @@ da reconciled=False (coincidencia).
     - Invalid window handle should return False.
 
   Métodos auxiliares (no test): setUp
+
+---
+
+<a name="hands/test-system_inventory"></a>
+### `hands\test_system_inventory.py`
+
+**Descripción:** Tests de contrato del inventario persistente del sistema de archivos (unidad 3.8.5.1.4.1). Verifican serialización/deserialización de `InventoryEntry`, generación de identificador local de equipo estable (sin MAC ni serial), controles de privacidad por defecto (sin lectura de contenido, sin rutas completas en logs), exclusiones técnicas de rutas y puntos de montaje, separación entre hechos observados del SO e inferencias, truncamiento seguro de rutas para logs, controles de operación del inventario con aislamiento por equipo, valores por defecto del contrato y serialización para persistencia en JSON.
+
+**Clases de test:**
+
+| Clase | Descripción |
+|---|---|
+| `TestInventoryEntryRoundTrip` | Serialización/deserialización de `InventoryEntry` sin pérdida de datos. |
+| `TestMachineId` | Identificador de equipo estable y determinista. |
+| `TestPrivacidad` | Controles de privacidad del contrato por defecto y truncamiento seguro de rutas. |
+| `TestExclusiones` | Exclusiones técnicas de rutas y puntos de montaje. |
+| `TestHechosVsInferencias` | Separación entre hechos observados e inferencias. |
+| `TestControlInventario` | Operaciones de control con aislamiento por equipo. |
+| `TestContratoPorDefecto` | Valores por defecto del contrato de inventario. |
+| `TestSerializacionParaPersistencia` | Serialización de entrada como JSON válido para persistencia. |
+
+**Resultados:** 26 tests unitarios, 26 PASSED / 0 FAILED.
 
 ---
 

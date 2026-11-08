@@ -6,11 +6,11 @@
     "preference_value": "google_chrome",
     "confidence": 1.0,
     "created_at": "",
-    "updated_at": "2026-11-07T22:54:31.469535",
+    "updated_at": "2026-11-08T00:57:58.061773",
     "context": {
       "interaction_type": "confidence_selection",
       "success": true
     },
-    "usage_count": 24
+    "usage_count": 27
   }
 }
