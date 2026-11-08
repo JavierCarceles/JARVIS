@@ -1827,6 +1827,9 @@ Funciones a nivel módulo:
 | `def recorrer()` | Generador que recorre iterativamente el volumen emitiendo `InventoryEntry` por cada entrada accesible. |
 | `property progreso` | Devuelve el `ProgresoRecorrido` actual del recorrido. |
 | `property errores` | Devuelve la lista de `ErrorRecorrido` acumulados durante el recorrido. |
+| `property errores_por_categoria` | Devuelve una copia del conteo de errores agrupado por categoría. |
+| `property entradas_validas` | Devuelve una copia de las entradas emitidas hasta el momento (último inventario válido), incluidas las emitidas antes de una interrupción (3.8.5.1.4.4.9). |
+| `property ejecucion_parcial` | Devuelve True si la última ejecución de `recorrer()` fue interrumpida (cancelada o pausada) antes de completar; el volumen o subárbol no terminó de escanearse (3.8.5.1.4.4.9). |
 
 ### `src/hands/system_inventory_storage.py` — Almacenamiento canonico SQLite del indice de inventario persistente del sistema de archivos.
 

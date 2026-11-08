@@ -2309,3 +2309,113 @@ class TestRecorridoVolumenErroresPorCategoria:
         assert recorrido.progreso.completado is True
 
 
+# ---------------------------------------------------------------------------
+# Ultimo inventario valido y ejecucion parcial (3.8.5.1.4.4.9)
+# ---------------------------------------------------------------------------
+
+class TestRecorridoVolumenUltimoInventarioValido:
+    """Cuando un volumen o subarbol no termina de escanearse, se conserva
+    el ultimo inventario valido y se marca la ejecucion como parcial;
+    no se marcan los archivos no escaneados como eliminados."""
+
+    def _crear_arbol_grande(self, tmp_path: Path) -> Path:
+        """Crea un arbol con varios directorios y archivos para permitir
+        interrupciones en medio del recorrido."""
+        raiz = tmp_path / "volumen"
+        for i in range(5):
+            sub = raiz / f"sub{i}"
+            sub.mkdir(parents=True)
+            for j in range(3):
+                (sub / f"archivo_{i}_{j}.txt").write_text(f"contenido {i}-{j}", encoding="utf-8")
+        (raiz / "raiz_file.dat").write_text("contenido raiz", encoding="utf-8")
+        return raiz
+
+    def test_recorrido_completo_todas_entradas_en_inventario_valido(self, tmp_path: Path):
+        """Cuando el recorrido completa, todas las entradas emitidas estan
+        en el ultimo inventario valido y la ejecucion no es parcial."""
+        raiz = self._crear_arbol_grande(tmp_path)
+        contrato = _ContratoPrueba()
+        recorrido = RecorridoVolumen(
+            volumen="V", raiz=str(raiz), contrato=contrato, maquina_id="maquina-test"
+        )
+        entradas = list(recorrido.recorrer())
+        assert recorrido.progreso.completado is True
+        assert recorrido.progreso.interrumpido is False
+        assert recorrido.ejecucion_parcial is False
+        assert len(recorrido.entradas_validas) == len(entradas)
+        nombres_validos = {e.name for e in recorrido.entradas_validas}
+        nombres_emitidos = {e.name for e in entradas}
+        assert nombres_validos == nombres_emitidos
+
+    def test_recorrido_interrumpido_conserva_entradas_previas(self, tmp_path: Path):
+        """Si el recorrido se interrumpe, las entradas emitidas antes de
+        la interrupcion se conservan como ultimo inventario valido."""
+        raiz = self._crear_arbol_grande(tmp_path)
+        contrato = _ContratoPrueba()
+        llamadas = [0]
+        def control() -> ControlRecorrido:
+            llamadas[0] += 1
+            # Cancelar tras procesar algunos directorios (no el primero).
+            return ControlRecorrido.CANCELAR if llamadas[0] > 2 else ControlRecorrido.CONTINUAR
+        recorrido = RecorridoVolumen(
+            volumen="V", raiz=str(raiz), contrato=contrato, maquina_id="maquina-test",
+            callback_control=control,
+        )
+        entradas = list(recorrido.recorrer())
+        assert recorrido.progreso.completado is False
+        assert recorrido.progreso.interrumpido is True
+        assert recorrido.ejecucion_parcial is True
+        # Debe haber al menos una entrada emitida antes de la interrupcion.
+        assert len(entradas) > 0
+        assert len(recorrido.entradas_validas) == len(entradas)
+        nombres_validos = {e.name for e in recorrido.entradas_validas}
+        nombres_emitidos = {e.name for e in entradas}
+        assert nombres_validos == nombres_emitidos
+
+    def test_recorrido_interrumpido_no_marca_archivos_como_eliminados(self, tmp_path: Path):
+        """Una ejecucion parcial no marca los archivos no escaneados como
+        eliminados: no hay logica de borrado ni de comparacion con un
+        inventario previo que elimine entradas."""
+        raiz = self._crear_arbol_grande(tmp_path)
+        contrato = _ContratoPrueba()
+        llamadas = [0]
+        def control() -> ControlRecorrido:
+            llamadas[0] += 1
+            return ControlRecorrido.CANCELAR if llamadas[0] > 1 else ControlRecorrido.CONTINUAR
+        recorrido = RecorridoVolumen(
+            volumen="V", raiz=str(raiz), contrato=contrato, maquina_id="maquina-test",
+            callback_control=control,
+        )
+        entradas = list(recorrido.recorrer())
+        assert recorrido.ejecucion_parcial is True
+        # Todas las entradas emitidas siguen presentes; ninguna fue eliminada.
+        assert len(recorrido.entradas_validas) == len(entradas)
+        # No existe campo ni metodo que marque entradas como eliminadas.
+        for entrada in recorrido.entradas_validas:
+            assert entrada.excluded is False or entrada.exclusion_reason is not None
+
+    def test_entradas_validas_devuelve_copia_no_referencia(self, tmp_path: Path):
+        """La propiedad `entradas_validas` devuelve una copia, no la referencia
+        interna, por lo que modificar la lista devuelta no afecta al recorrido."""
+        raiz = self._crear_arbol_grande(tmp_path)
+        contrato = _ContratoPrueba()
+        recorrido = RecorridoVolumen(
+            volumen="V", raiz=str(raiz), contrato=contrato, maquina_id="maquina-test"
+        )
+        list(recorrido.recorrer())
+        copia = recorrido.entradas_validas
+        copia.clear()
+        # La lista interna no debe haberse modificado.
+        assert len(recorrido.entradas_validas) > 0
+
+    def test_ejecucion_parcial_falso_desde_inicio(self, tmp_path: Path):
+        """Antes de ejecutar `recorrer()`, `ejecucion_parcial` es False."""
+        raiz = tmp_path / "volumen"
+        raiz.mkdir(parents=True)
+        contrato = _ContratoPrueba()
+        recorrido = RecorridoVolumen(
+            volumen="V", raiz=str(raiz), contrato=contrato, maquina_id="maquina-test"
+        )
+        assert recorrido.ejecucion_parcial is False
+
+

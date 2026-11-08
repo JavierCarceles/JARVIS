@@ -1732,6 +1732,7 @@ class RecorridoVolumen:
         self._errores: list[ErrorRecorrido] = []
         self._visitados: set[str] = set()
         self._interrumpido = False
+        self._entradas_emitidas: list[InventoryEntry] = []
 
     @property
     def progreso(self) -> ProgresoRecorrido:
@@ -1747,6 +1748,29 @@ class RecorridoVolumen:
     def errores_por_categoria(self) -> dict[str, int]:
         """Devuelve una copia del conteo de errores agrupado por categoría."""
         return dict(self._progreso.errores_por_categoria)
+
+    @property
+    def entradas_validas(self) -> list[InventoryEntry]:
+        """Devuelve una copia de las entradas emitidas hasta el momento.
+
+        Representa el ultimo inventario valido: las entradas que se
+        emitieron correctamente antes de una interrupcion o antes de
+        completar el recorrido. Si el recorrido se interrumpe, estas
+        entradas se conservan y no se descartan (3.8.5.1.4.4.9).
+        """
+        return list(self._entradas_emitidas)
+
+    @property
+    def ejecucion_parcial(self) -> bool:
+        """Devuelve True si la ultima ejecucion de `recorrer()` fue
+        interrumpida (cancelada o pausada) antes de completar.
+
+        Una ejecucion parcial significa que el volumen o subarbol no
+        termino de escanearse; las entradas ya emitidas constituyen el
+        ultimo inventario valido y no se deben marcar sus archivos
+        como eliminados (3.8.5.1.4.4.9).
+        """
+        return self._progreso.interrumpido
 
     def _clave_directorio(self, path: str) -> str:
         """Identificador canonico de visita para un directorio.
@@ -1921,6 +1945,7 @@ class RecorridoVolumen:
         self._errores = []
         self._visitados = set()
         self._interrumpido = False
+        self._entradas_emitidas = []
 
         # Semilla del conjunto de visitados con la raiz: se visita exactamente
         # una vez y nunca se vuelve a procesar.
@@ -1993,6 +2018,7 @@ class RecorridoVolumen:
                                     ruta_absoluta, self._pila
                                 )
 
+                        self._entradas_emitidas.append(entry)
                         yield entry
 
             except PermissionError as exc:
