@@ -28,13 +28,33 @@ en el proyecto (p. ej. `src/utils/advanced_logger.py`).
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+
+# Detectar si el sistema de archivos es sensible a mayusculas y minusculas.
+# Windows y macOS (por defecto) son insensibles; Linux y la mayoria de Unix son sensibles.
+_FILESYSTEM_CASE_SENSITIVE = os.path.normcase("A") != os.path.normcase("a")
+
+
+def normalize_path(path: str) -> str:
+    """Normaliza una ruta para uso como clave unica, respetando la case-sensitividad del SO.
+
+    En sistemas insensibles a mayusculas (Windows, macOS por defecto) la ruta se
+    normaliza a minusculas para que "C:/App.EXE" y "c:/app.exe" se consideren la
+    misma entrada. En sistemas sensibles (Linux) se conserva tal cual, ya que son
+    archivos distintos.
+    """
+    p = path.replace("\\", "/")
+    if not _FILESYSTEM_CASE_SENSITIVE:
+        p = p.lower()
+    return p
+
 
 DEFAULT_DB_PATH = Path("data") / "system_inventory.sqlite3"
 
@@ -48,7 +68,7 @@ SCAN_RESULT_PARTIAL = "parcial"
 SCAN_RESULT_INTERRUPTED = "interrumpido"
 SCAN_RESULT_ERROR = "error"
 
-_SCHEMA_SQL = f"""
+_SCHEMA_TABLES_SQL = f"""
 CREATE TABLE IF NOT EXISTS schema_version (
     version INTEGER PRIMARY KEY
 );
@@ -90,6 +110,7 @@ CREATE TABLE IF NOT EXISTS file_entries (
     machine_id TEXT NOT NULL,
     volume TEXT NOT NULL,
     absolute_path TEXT NOT NULL,
+    normalized_path TEXT NOT NULL DEFAULT '',
     relative_path TEXT NOT NULL,
     name TEXT NOT NULL,
     extension TEXT NOT NULL DEFAULT '',
@@ -120,7 +141,9 @@ CREATE TABLE IF NOT EXISTS application_candidates (
     FOREIGN KEY (scan_id) REFERENCES scan_runs(scan_id),
     FOREIGN KEY (machine_id) REFERENCES machines(machine_id)
 );
+"""
 
+_SCHEMA_INDEXES_SQL = """
 CREATE INDEX IF NOT EXISTS idx_file_entries_machine_volume
     ON file_entries(machine_id, volume);
 CREATE INDEX IF NOT EXISTS idx_file_entries_name
@@ -133,6 +156,15 @@ CREATE INDEX IF NOT EXISTS idx_file_entries_absolute_path
     ON file_entries(machine_id, absolute_path);
 CREATE INDEX IF NOT EXISTS idx_file_entries_excluded
     ON file_entries(machine_id, excluded);
+
+-- Clave unica por equipo/volumen/ruta normalizada (3.8.5.1.4.2.5).
+-- Impide duplicar la misma entrada de archivo para un equipo y volumen dados.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_file_entries_unique_path
+    ON file_entries(machine_id, volume, normalized_path);
+
+-- Indice de consulta por ruta normalizada (soporta busquedas case-correctas).
+CREATE INDEX IF NOT EXISTS idx_file_entries_normalized_path
+    ON file_entries(machine_id, normalized_path);
 
 CREATE INDEX IF NOT EXISTS idx_app_candidates_machine_volume
     ON application_candidates(machine_id, volume);
@@ -188,16 +220,44 @@ class SystemInventoryStorage:
     # Esquema
     # ------------------------------------------------------------------ #
     def initialize(self) -> int:
-        """Crea las tablas e indices si no existen y devuelve la version del esquema."""
+        """Crea las tablas e indices si no existen y devuelve la version del esquema.
+
+        Maneja la migracion del esquema v1 al v2 (3.8.5.1.4.2.5):
+        1. Crea tablas (IF NOT EXISTS). En bases nuevas, `file_entries` ya trae
+           `normalized_path`. En bases v1 existentes, la tabla ya existe sin ella.
+        2. Detecta version actual (0 si es base nueva).
+        3. Si viene de v1, agrega `normalized_path` a `file_entries` ANTES de crear
+           indices, para que `CREATE UNIQUE INDEX` no falle.
+        4. Crea todos los indices (incluido el unico por ruta normalizada).
+        5. Registra/actualiza la version del esquema sin borrar datos previos.
+        """
         conn = self.connect()
-        conn.executescript(_SCHEMA_SQL)
-        # Registrar/actualizar la version del esquema sin borrar datos previos.
+        # 1. Crear tablas (schema_version incluido).
+        conn.executescript(_SCHEMA_TABLES_SQL)
+
+        # 2. Detectar version actual (0 si la tabla schema_version esta vacia o nueva).
         cur = conn.execute("SELECT version FROM schema_version LIMIT 1")
         row = cur.fetchone()
+        current_version = int(row["version"]) if row else 0
+
+        # 3. Migracion v1 -> v2: agregar columna normalized_path si falta.
+        if current_version < 2:
+            try:
+                conn.execute(
+                    "ALTER TABLE file_entries ADD COLUMN normalized_path TEXT NOT NULL DEFAULT ''"
+                )
+            except sqlite3.OperationalError:
+                # La columna ya existe (base nueva creada con el esquema v2); ignorar.
+                pass
+
+        # 4. Crear indices (ahora `normalized_path` existe en todas las bases).
+        conn.executescript(_SCHEMA_INDEXES_SQL)
+
+        # 5. Registrar/actualizar version sin borrar datos.
         if row is None:
             conn.execute("INSERT INTO schema_version(version) VALUES (?)", (SCHEMA_VERSION,))
         else:
-            if int(row["version"]) != SCHEMA_VERSION:
+            if current_version != SCHEMA_VERSION:
                 conn.execute("UPDATE schema_version SET version = ?", (SCHEMA_VERSION,))
         conn.commit()
         return SCHEMA_VERSION
@@ -267,7 +327,17 @@ class SystemInventoryStorage:
         mode: str,
         started_at: Optional[str] = None,
     ) -> None:
-        """Registra el inicio de una ejecucion de escaneo."""
+        """Registra el inicio de una ejecucion de escaneo.
+
+        Valida que `mode` sea SCAN_MODE_FULL o SCAN_MODE_INCREMENTAL
+        (contrato de unidad 3.8.5.1.4.2.6: modalidad completo/incremental
+        guardada en cada ejecucion de escaneo).
+        """
+        if mode not in (SCAN_MODE_FULL, SCAN_MODE_INCREMENTAL):
+            raise ValueError(
+                f"Modo de escaneo no valido: {mode!r}. "
+                "Use SCAN_MODE_FULL ('completo') o SCAN_MODE_INCREMENTAL ('incremental')."
+            )
         if started_at is None:
             started_at = _now_iso()
         conn = self.connect()
@@ -293,7 +363,22 @@ class SystemInventoryStorage:
         exclusions_count: int = 0,
         coverage_estimate: Optional[str] = None,
     ) -> None:
-        """Finaliza una ejecucion de escaneo con su resultado y metricas."""
+        """Finaliza una ejecucion de escaneo con su resultado y metricas.
+
+        Valida que `result` sea uno de los valores permitidos
+        (contrato de unidad 3.8.5.1.4.2.6: resultado guardado en cada
+        ejecucion de escaneo).
+        """
+        if result not in (
+            SCAN_RESULT_OK,
+            SCAN_RESULT_PARTIAL,
+            SCAN_RESULT_INTERRUPTED,
+            SCAN_RESULT_ERROR,
+        ):
+            raise ValueError(
+                f"Resultado de escaneo no valido: {result!r}. "
+                "Use SCAN_RESULT_OK, SCAN_RESULT_PARTIAL, SCAN_RESULT_INTERRUPTED o SCAN_RESULT_ERROR."
+            )
         if finished_at is None:
             finished_at = _now_iso()
         conn = self.connect()
@@ -347,6 +432,10 @@ class SystemInventoryStorage:
 
         Devuelve el numero de entradas insertadas. Si la transaccion falla, no
         se persiste entrada alguna de este lote.
+
+        Cada entrada se indexa por la clave unica (machine_id, volume,
+        normalized_path); intentar insertar la misma ruta dos veces para un
+        mismo equipo/volumen viola la restriccion de unicidad y revierte el lote.
         """
         if not entries:
             return 0
@@ -357,11 +446,11 @@ class SystemInventoryStorage:
                 """
                 INSERT INTO file_entries(
                     entry_id, scan_id, machine_id, volume, absolute_path,
-                    relative_path, name, extension, entry_type, size_bytes,
-                    modified_at, created_at, accessed_at, attributes,
+                    normalized_path, relative_path, name, extension, entry_type,
+                    size_bytes, modified_at, created_at, accessed_at, attributes,
                     excluded, source, last_checked_at
                 ) VALUES (
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
                 )
                 """,
                 [
@@ -371,6 +460,7 @@ class SystemInventoryStorage:
                         machine_id,
                         volume,
                         e.get("absolute_path"),
+                        normalize_path(e.get("absolute_path", "")),
                         e.get("relative_path"),
                         e.get("name"),
                         e.get("extension", ""),
@@ -506,6 +596,26 @@ class SystemInventoryStorage:
                 (machine_id, volume),
             )
         return int(cur.fetchone()["c"])
+
+    def search_by_state(
+        self,
+        machine_id: str,
+        excluded: bool,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[dict]:
+        """Busca entradas por estado de exclusicion (disponible vs excluida).
+
+        Usa el indice `idx_file_entries_excluded(machine_id, excluded)` para
+        consultas eficientes por estado (3.8.5.1.4.2.5).
+        """
+        conn = self.connect()
+        cur = conn.execute(
+            "SELECT * FROM file_entries WHERE machine_id = ? AND excluded = ? "
+            "ORDER BY absolute_path LIMIT ? OFFSET ?",
+            (machine_id, 1 if excluded else 0, limit, offset),
+        )
+        return [dict(r) for r in cur.fetchall()]
 
     def db_file_exists(self) -> bool:
         """Devuelve True si el fichero de la base de datos existe en disco."""

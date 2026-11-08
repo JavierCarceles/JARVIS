@@ -1824,8 +1824,8 @@ Métodos de `SystemInventoryStorage`:
 | `def schema_version()` | Devuelve la versión del esquema almacenada en disco. |
 | `def record_machine(machine_id, created_at)` | Registra el equipo local si aún no existe (aislamiento por equipo). |
 | `def record_volume(volume_id, machine_id, volume, ...)` | Registra o actualiza un volumen descubierto para un equipo. |
-| `def begin_scan_run(scan_id, machine_id, volume, mode, started_at)` | Registra el inicio de una ejecución de escaneo. |
-| `def end_scan_run(scan_id, finished_at, result, entries_count, errors_count, exclusions_count, coverage_estimate)` | Finaliza una ejecución de escaneo con su resultado y métricas. |
+| `def begin_scan_run(scan_id, machine_id, volume, mode, started_at)` | Registra el inicio de una ejecución de escaneo. Valida que el modo sea completo o incremental. |
+| `def end_scan_run(scan_id, finished_at, result, entries_count, errors_count, exclusions_count, coverage_estimate)` | Finaliza una ejecución de escaneo con su resultado y métricas. Valida que el resultado sea uno de los valores permitidos. |
 | `def get_scan_run(scan_id)` | Devuelve los datos de una ejecución de escaneo o None. |
 | `def get_latest_scan(machine_id, volume)` | Devuelve la última ejecución de escaneo de un equipo (y opcionalmente volumen). |
 | `def insert_file_entries(scan_id, machine_id, volume, entries)` | Inserta una lista de entradas de archivo en una transacción atómica. |
