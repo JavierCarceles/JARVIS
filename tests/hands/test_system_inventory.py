@@ -2087,3 +2087,148 @@ class TestRecorridoVolumenErroresDuranteRecorrido:
         assert recorrido.progreso.completado is True
 
 
+# ---------------------------------------------------------------------------
+# Contador de errores por categoría (3.8.5.1.4.4.7)
+# ---------------------------------------------------------------------------
+
+class TestRecorridoVolumenErroresPorCategoria:
+    """El recorrido registra errores por ruta y volumen con categoría y
+    contador agregado, sin que una excepción aislada aborte el escaneo
+    (3.8.5.1.4.4.7)."""
+
+    class _EntradaFalsa:
+        """DirEntry simulado para forzar fallos de lectura o inspección de metadatos."""
+        def __init__(self, nombre, ruta, stat_ok=True, tipo_ok=True, tipo_entrada="archivo"):
+            self.name = nombre
+            self.path = ruta
+            self._stat_ok = stat_ok
+            self._tipo_ok = tipo_ok
+            self._tipo_entrada = tipo_entrada
+
+        def stat(self, follow_symlinks=False):
+            if not self._stat_ok:
+                raise OSError("error simulado al leer metadatos")
+            return SimpleNamespace(st_size=10, st_mtime=0, st_ctime=0, st_atime=0)
+
+        def is_dir(self, follow_symlinks=False):
+            if not self._tipo_ok:
+                raise OSError("error simulado al inspeccionar entrada")
+            return self._tipo_entrada == "directorio"
+
+        def is_symlink(self):
+            if not self._tipo_ok:
+                raise OSError("error simulado al inspeccionar entrada")
+            return self._tipo_entrada == "enlace"
+
+        def is_file(self, follow_symlinks=False):
+            if not self._tipo_ok:
+                raise OSError("error simulado al inspeccionar entrada")
+            return self._tipo_entrada == "archivo"
+
+    class _ScandirFalso:
+        """Iterador de entradas que cumple el protocolo de gestor de contexto de os.scandir."""
+        def __init__(self, entradas):
+            self._iter = iter(entradas)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def __iter__(self):
+            return self
+
+        def __next__(self):
+            return next(self._iter)
+
+    def _recorrer_con_scandir(self, tmp_path, scandir_falso):
+        raiz = tmp_path / "volumen"
+        raiz.mkdir(parents=True)
+        contrato = _ContratoPrueba()
+        recorrido = RecorridoVolumen(
+            volumen="V", raiz=str(raiz), contrato=contrato, maquina_id="maquina-test"
+        )
+        with patch("src.hands.system_inventory.os.scandir", scandir_falso):
+            entradas = list(recorrido.recorrer())
+        return raiz, recorrido, entradas
+
+    def test_errores_por_categoria_contador_agregado(self, tmp_path: Path):
+        """Varios errores de distintas categorías se cuentan por categoría
+        y el total es consistente."""
+        def scandir(ruta):
+            return self._ScandirFalso([
+                self._EntradaFalsa("ok1.txt", str(tmp_path / "volumen" / "ok1.txt")),
+                self._EntradaFalsa("bloqueado1.txt", str(tmp_path / "volumen" / "bloqueado1.txt"), stat_ok=False),
+                self._EntradaFalsa("bloqueado2.txt", str(tmp_path / "volumen" / "bloqueado2.txt"), stat_ok=False),
+                self._EntradaFalsa("cambiante.txt", str(tmp_path / "volumen" / "cambiante.txt"),
+                                   stat_ok=True, tipo_ok=False),
+                self._EntradaFalsa("ok2.txt", str(tmp_path / "volumen" / "ok2.txt")),
+            ])
+        _, recorrido, entradas = self._recorrer_con_scandir(tmp_path, scandir)
+        nombres = {e.name for e in entradas}
+        assert "ok1.txt" in nombres
+        assert "ok2.txt" in nombres
+        assert "bloqueado1.txt" not in nombres
+        assert "bloqueado2.txt" not in nombres
+        assert "cambiante.txt" not in nombres
+
+        # Contador total y por categoría consistentes.
+        assert recorrido.progreso.errores == 3
+        cats = recorrido.errores_por_categoria
+        assert cats == {"error_estado": 3}
+        assert sum(cats.values()) == recorrido.progreso.errores
+
+    def test_errores_por_categorias_distintas_contadores_separados(self, tmp_path: Path):
+        """Errores de diferentes categorías generan contadores independientes."""
+        def scandir(ruta):
+            return self._ScandirFalso([
+                self._EntradaFalsa("ok.txt", str(tmp_path / "volumen" / "ok.txt")),
+                self._EntradaFalsa("bloqueado.txt", str(tmp_path / "volumen" / "bloqueado.txt"), stat_ok=False),
+                self._EntradaFalsa("cambiante.txt", str(tmp_path / "volumen" / "cambiante.txt"),
+                                   stat_ok=True, tipo_ok=False),
+            ])
+        _, recorrido, entradas = self._recorrer_con_scandir(tmp_path, scandir)
+        assert recorrido.progreso.errores == 2
+        cats = recorrido.errores_por_categoria
+        assert cats == {"error_estado": 2}
+        assert sum(cats.values()) == recorrido.progreso.errores
+
+    def test_errores_por_categoria_es_copia_no_referencia(self, tmp_path: Path):
+        """La propiedad errores_por_categoria devuelve una copia, no la referencia interna."""
+        def scandir(ruta):
+            return self._ScandirFalso([
+                self._EntradaFalsa("ok.txt", str(tmp_path / "volumen" / "ok.txt")),
+                self._EntradaFalsa("bloqueado.txt", str(tmp_path / "volumen" / "bloqueado.txt"), stat_ok=False),
+            ])
+        _, recorrido, entradas = self._recorrer_con_scandir(tmp_path, scandir)
+        cats = recorrido.errores_por_categoria
+        cats["inexistente"] = 999
+        assert "inexistente" not in recorrido.errores_por_categoria
+
+    def test_sin_errores_contador_por_categoria_vacio(self, tmp_path: Path):
+        """Sin errores, el contador por categoría está vacío y el total es cero."""
+        raiz = tmp_path / "volumen"
+        raiz.mkdir(parents=True)
+        (raiz / "archivo.txt").write_text("ok", encoding="utf-8")
+        contrato = _ContratoPrueba()
+        recorrido = RecorridoVolumen(
+            volumen="V", raiz=str(raiz), contrato=contrato, maquina_id="maquina-test"
+        )
+        entradas = list(recorrido.recorrer())
+        assert len(entradas) == 1
+        assert recorrido.progreso.errores == 0
+        assert recorrido.errores_por_categoria == {}
+
+    def test_error_permiso_denegado_contado_por_categoria(self, tmp_path: Path):
+        """Un error de permiso denegado en un directorio se cuenta en su categoría."""
+        def scandir(ruta):
+            raise PermissionError("acceso denegado al directorio")
+        _, recorrido, entradas = self._recorrer_con_scandir(tmp_path, scandir)
+        assert recorrido.progreso.errores == 1
+        cats = recorrido.errores_por_categoria
+        assert cats == {"permiso_denegado": 1}
+        assert recorrido.errores[0].volumen == "V"
+        assert recorrido.progreso.completado is True
+
+

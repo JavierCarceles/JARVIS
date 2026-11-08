@@ -1662,6 +1662,7 @@ class ProgresoRecorrido:
     directorios_procesados: int = 0
     archivos_procesados: int = 0
     errores: int = 0
+    errores_por_categoria: dict[str, int] = field(default_factory=dict)
     exclusiones: int = 0
     entrada_actual: str = ""
     completado: bool = False
@@ -1741,6 +1742,11 @@ class RecorridoVolumen:
         """Devuelve una copia de los errores acumulados durante el recorrido."""
         return list(self._errores)
 
+    @property
+    def errores_por_categoria(self) -> dict[str, int]:
+        """Devuelve una copia del conteo de errores agrupado por categoría."""
+        return dict(self._progreso.errores_por_categoria)
+
     def _clave_directorio(self, path: str) -> str:
         """Identificador canonico de visita para un directorio.
 
@@ -1778,7 +1784,13 @@ class RecorridoVolumen:
         pila.append(ruta)
 
     def _registrar_error(self, ruta: str, categoria: str, mensaje: str) -> None:
-        """Añade un error al registro sin abortar el recorrido."""
+        """Añade un error al registro sin abortar el recorrido.
+
+        Registra el error por ruta y volumen con su categoría, e incrementa
+        el contador total y el contador agregado por categoría, de modo que
+        una excepción aislada no detiene el escaneo pero queda contabilizada
+        (3.8.5.1.4.4.7).
+        """
         self._errores.append(
             ErrorRecorrido(
                 ruta=ruta,
@@ -1788,6 +1800,9 @@ class RecorridoVolumen:
             )
         )
         self._progreso.errores = len(self._errores)
+        self._progreso.errores_por_categoria[categoria] = (
+            self._progreso.errores_por_categoria.get(categoria, 0) + 1
+        )
 
     def _normalizar_visitado(self, path: str) -> str:
         """Devuelve la representación normalizada de `path` para el conjunto de visitados."""

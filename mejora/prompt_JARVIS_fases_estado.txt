@@ -7794,3 +7794,15 @@ VERIFICACION: SINTAXIS: OK (py_compile de src/hands/system_inventory.py y tests/
 DISCREPANCIAS: NINGUNA
 PENDIENTES: Siguiente hoja pendiente real en orden del roadmap: 3.8.5.1.4.4.7 (registrar errores por ruta y volumen con categoria y contador, evitando que una excepcion aislada aborte todo el escaneo). Padre 3.8.5.1.4.4 con hijas .1 a .6 cerradas; .7 a .10 pendientes.
 ESTADO FINAL: 3.8.5.1.4.4.6 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.8.5.1.4.4.7
+FECHA: 2026-11-08
+OBJETIVO: Registrar errores por ruta y volumen con categoría y contador, evitando que una excepción aislada aborte todo el escaneo.
+TIPO DE TRABAJO: IMPLEMENTACION | TEST
+CAMBIOS / HALLAZGOS: Añadido campo `errores_por_categoria: dict[str, int]` a `ProgresoRecorrido` en `src/hands/system_inventory.py`; actualizado `RecorridoVolumen._registrar_error` para incrementar el contador agregado por categoría junto al total; añadida propiedad `RecorridoVolumen.errores_por_categoria` que devuelve una copia del diccionario de conteos por categoría; el contador se resetea automáticamente al iniciar `recorrer()` porque se recrea `ProgresoRecorrido`. Añadidos 5 tests en `tests/hands/test_system_inventory.py` (clase TestRecorridoVolumenErroresPorCategoria): varios errores de distintas categorías se cuentan por categoría y el total es consistente; errores de diferentes categorías generan contadores independientes; la propiedad `errores_por_categoria` devuelve una copia y no la referencia interna; sin errores el contador por categoría está vacío y el total es cero; un error de permiso denegado se cuenta en su categoría con volumen y ruta correctos. Ningún cambio en `main.py`. Revisada `docs/README.md` (descripción de RecorridoVolumen actualizada con contador agregado por categoría).
+ARCHIVOS MODIFICADOS: PRODUCCION: `src/hands/system_inventory.py`; TESTS: `tests/hands/test_system_inventory.py`; DOCUMENTACION: `docs/README.md`
+TESTS Y RESULTADOS: UNITARIOS: 167 PASSED / 8 SKIPPED / 175 TOTAL (`tests/hands/test_system_inventory.py`, ejecutados en Windows real); INTEGRACION: NA; NO REGRESION: NA
+VERIFICACION: SINTAXIS: OK (py_compile de `src/hands/system_inventory.py` y `tests/hands/test_system_inventory.py` sin errores; import del módulo y recolección de pytest OK); MAIN.PY: NA (no se modifica `main.py`); COMPORTAMIENTO / INTEGRACION REAL: Evidencia real de ejecución: 167 tests pasan y 8 se saltan en Windows real. Verificado: errores por categoría contados correctamente, múltiples errores de misma categoría se acumulan, categorías distintas tienen contadores independientes, la propiedad devuelve una copia, sin errores el contador está vacío.
+DISCREPANCIAS: NINGUNA
+PENDIENTES: Siguiente hoja pendiente real en orden del roadmap: 3.8.5.1.4.4.8 (informar progreso, entradas procesadas, volumen actual, errores, exclusiones y cobertura). Padre 3.8.5.1.4.4 con hijas .1 a .7 cerradas; .8 a .10 pendientes.
+ESTADO FINAL: 3.8.5.1.4.4.7 - IMPLEMENTADA
