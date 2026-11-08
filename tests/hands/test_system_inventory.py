@@ -53,9 +53,12 @@ from src.hands.system_inventory import (
     _WIN_ATTR_HIDDEN,
     _WIN_ATTR_READONLY,
     _WIN_ATTR_SYSTEM,
+    _aplicar_prefijo_ruta_larga,
     _atributos_observados,
     _clasificar_tipo_volumen_linux,
     _clasificar_tipo_volumen_macos,
+    _normalizar_para_visitado,
+    _prefix_ruta_larga_windows,
     classify_entry,
     determinar_estado_volumen,
     detectar_bind_mount_linux,
@@ -1868,5 +1871,219 @@ class TestRecorridoVolumenSinDescartarPorExtension:
         assert por_extension["a.txt"] == ".txt"
         assert por_extension["b"] == ""
         assert por_extension[".oculto"] == ""
+
+
+# ---------------------------------------------------------------------------
+# Prefijo de ruta larga Windows (3.8.5.1.4.4.5)
+# ---------------------------------------------------------------------------
+
+class TestPrefijoRutaLargaWindows:
+    """_prefix_ruta_larga_windows y _aplicar_prefijo_ruta_larga gestionan
+    rutas largas en Windows con el prefijo `\\\\?\\` para superar MAX_PATH."""
+
+    def test_ruta_corta_sin_cambios(self):
+        """Una ruta corta ( <= 260 chars) se devuelve sin modificar."""
+        ruta = "C:/Users/Jarvis/documento.txt"
+        assert _prefix_ruta_larga_windows(ruta) == ruta
+
+    def test_ruta_larga_windows_recibe_prefijo(self):
+        """Una ruta absoluta larga en Windows recibe el prefijo `\\\\?\\`."""
+        ruta_larga = "C:" + "\\" + "directorio_muy_largo_" * 20 + "\\archivo.txt"
+        assert len(ruta_larga) > 260
+        resultado = _prefix_ruta_larga_windows(ruta_larga)
+        assert resultado.startswith("\\\\?\\")
+        assert resultado == "\\\\?\\" + ruta_larga
+
+    def test_ruta_unc_larga_recibe_prefijo_unc(self):
+        """Una ruta UNC larga se transforma a `\\\\?\\UNC\\servidor\\...`."""
+        ruta_unc = "\\\\servidor\\compartido\\" + "x" * 300
+        assert len(ruta_unc) > 260
+        resultado = _prefix_ruta_larga_windows(ruta_unc)
+        assert resultado.startswith("\\\\?\\UNC\\")
+
+    def test_aplicar_prefijo_ruta_larga_no_afecta_rutas_cortas(self):
+        """_aplicar_prefijo_ruta_larga es transparente para rutas cortas."""
+        ruta = "C:/archivo.txt"
+        assert _aplicar_prefijo_ruta_larga(ruta) == ruta
+
+
+# ---------------------------------------------------------------------------
+# Normalizacion Unicode NFC (3.8.5.1.4.4.5)
+# ---------------------------------------------------------------------------
+
+class TestNormalizacionUnicode:
+    """Las claves de visitado y ciclos normalizan Unicode a NFC para que
+    rutas canonicamente equivalentes (NFC vs NFD) se traten como iguales."""
+
+    def test_normalizar_para_visitado_nfc_y_nfd_coinciden(self):
+        """Un nombre en forma NFC y NFD producen la misma clave normalizada."""
+        # 'e' + acento combinante (NFD) vs 'e' con acento precompuesto (NFC)
+        nombre_nfc = "caf\u00e9"          # café (NFC: e + ´ precompuesto)
+        nombre_nfd = "cafe\u0301"        # café (NFD: e + acento combinante)
+        clave_nfc = _normalizar_para_visitado(nombre_nfc)
+        clave_nfd = _normalizar_para_visitado(nombre_nfd)
+        assert clave_nfc == clave_nfd, (
+            f"NFC y NFD deben normalizar a la misma clave: {clave_nfc!r} vs {clave_nfd!r}"
+        )
+
+    def test_normalizar_visitado_nfc_y_nfd_coinciden(self, tmp_path):
+        """El metodo de instancia _normalizar_visitado iguala NFC y NFD."""
+        from src.hands.system_inventory import RecorridoVolumen, InventoryContract
+        contrato = InventoryContract(
+            machine_id="m", excluded_paths=[], excluded_mounts=[]
+        )
+        recorrido = RecorridoVolumen(
+            volumen="V", raiz=str(tmp_path), contrato=contrato, maquina_id="m"
+        )
+        nombre_nfc = "caf\u00e9"
+        nombre_nfd = "cafe\u0301"
+        clave_nfc = recorrido._normalizar_visitado(nombre_nfc)
+        clave_nfd = recorrido._normalizar_visitado(nombre_nfd)
+        assert clave_nfc == clave_nfd, (
+            f"NFC y NFD deben normalizar a la misma clave: {clave_nfc!r} vs {clave_nfd!r}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Errores durante el recorrido (3.8.5.1.4.4.6)
+# ---------------------------------------------------------------------------
+
+class TestRecorridoVolumenErroresDuranteRecorrido:
+    """Gestion de errores durante el recorrido: archivos bloqueados, permisos
+    denegados, errores de E/S, rutas eliminadas y directorios que cambian
+    mientras se escanean (3.8.5.1.4.4.6). Ninguna excepcion aislada aborta
+    el recorrido ni deja entradas hermanas sin procesar."""
+
+    class _EntradaFalsa:
+        """DirEntry simulado para forzar fallos de lectura o inspeccion de metadatos."""
+        def __init__(self, nombre, ruta, stat_ok=True, tipo_ok=True, tipo_entrada="archivo"):
+            self.name = nombre
+            self.path = ruta
+            self._stat_ok = stat_ok
+            self._tipo_ok = tipo_ok
+            self._tipo_entrada = tipo_entrada
+
+        def stat(self, follow_symlinks=False):
+            if not self._stat_ok:
+                raise OSError("error simulado al leer metadatos")
+            return SimpleNamespace(st_size=10, st_mtime=0, st_ctime=0, st_atime=0)
+
+        def is_dir(self, follow_symlinks=False):
+            if not self._tipo_ok:
+                raise OSError("error simulado al inspeccionar entrada")
+            return self._tipo_entrada == "directorio"
+
+        def is_symlink(self):
+            if not self._tipo_ok:
+                raise OSError("error simulado al inspeccionar entrada")
+            return self._tipo_entrada == "enlace"
+
+        def is_file(self, follow_symlinks=False):
+            if not self._tipo_ok:
+                raise OSError("error simulado al inspeccionar entrada")
+            return self._tipo_entrada == "archivo"
+
+    class _ScandirFalso:
+        """Iterador de entradas que ademas cumple el protocolo de gestor de
+        contexto requerido por `with os.scandir(...) as iterator:`."""
+
+        def __init__(self, entradas):
+            self._iter = iter(entradas)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def __iter__(self):
+            return self
+
+        def __next__(self):
+            return next(self._iter)
+
+    def _recorrer_con_scandir(self, tmp_path, scandir_falso):
+        raiz = tmp_path / "volumen"
+        raiz.mkdir(parents=True)
+        contrato = _ContratoPrueba()
+        recorrido = RecorridoVolumen(
+            volumen="V", raiz=str(raiz), contrato=contrato, maquina_id="maquina-test"
+        )
+        with patch("src.hands.system_inventory.os.scandir", scandir_falso):
+            entradas = list(recorrido.recorrer())
+        return raiz, recorrido, entradas
+
+    def test_entrada_bloqueada_se_registra_como_error_y_el_recorrido_continua(self, tmp_path: Path):
+        """Un archivo cuyos metadatos no se pueden leer (bloqueado/eliminado)
+        se registra como error_estado y el recorrido emite las demas entradas."""
+        def scandir(ruta):
+            return self._ScandirFalso([
+                self._EntradaFalsa("accesible.txt", str(tmp_path / "volumen" / "accesible.txt")),
+                self._EntradaFalsa("bloqueado.txt", str(tmp_path / "volumen" / "bloqueado.txt"), stat_ok=False),
+            ])
+        _, recorrido, entradas = self._recorrer_con_scandir(tmp_path, scandir)
+        nombres = {e.name for e in entradas}
+        assert "accesible.txt" in nombres
+        assert "bloqueado.txt" not in nombres
+        assert len(recorrido.errores) == 1
+        err = recorrido.errores[0]
+        assert err.categoria == "error_estado"
+        assert err.volumen == "V"
+        assert "bloqueado.txt" in err.ruta
+        assert recorrido.progreso.completado is True
+
+    def test_entrada_que_cambia_durante_el_recorrido_se_registra_y_continua(self, tmp_path: Path):
+        """Una entrada que falla al inspeccionarse (is_dir/is_file) durante el
+        recorrido se registra como error y no detiene las demas."""
+        def scandir(ruta):
+            return self._ScandirFalso([
+                self._EntradaFalsa("ok.txt", str(tmp_path / "volumen" / "ok.txt")),
+                self._EntradaFalsa("cambiante.txt", str(tmp_path / "volumen" / "cambiante.txt"),
+                                   stat_ok=True, tipo_ok=False),
+            ])
+        _, recorrido, entradas = self._recorrer_con_scandir(tmp_path, scandir)
+        nombres = {e.name for e in entradas}
+        assert "ok.txt" in nombres
+        assert "cambiante.txt" not in nombres
+        assert len(recorrido.errores) == 1
+        assert recorrido.errores[0].categoria == "error_estado"
+        assert "cambiante.txt" in recorrido.errores[0].ruta
+        assert recorrido.progreso.completado is True
+
+    def test_scandir_falla_a_media_iteracion_no_aborta_el_recorrido(self, tmp_path: Path):
+        """Si el directorio cambia mientras se escanea (OSError al iterar
+        scandir), se registra error_e_s en el directorio y el recorrido termina
+        sin abortar."""
+        def scandir(ruta):
+            def gen():
+                yield self._EntradaFalsa("primero.txt", str(tmp_path / "volumen" / "primero.txt"))
+                raise OSError("el directorio cambio durante el escaneo")
+            return self._ScandirFalso(gen())
+        _, recorrido, entradas = self._recorrer_con_scandir(tmp_path, scandir)
+        nombres = {e.name for e in entradas}
+        assert "primero.txt" in nombres
+        assert len(recorrido.errores) == 1
+        assert recorrido.errores[0].categoria == "error_e_s"
+        assert recorrido.progreso.completado is True
+
+    def test_error_por_entrada_no_impide_procesar_directorios_hermanos(self, tmp_path: Path):
+        """Un error en una entrada de la raiz no impide entrar a subdirectorios
+        validos apilados durante el mismo recorrido. `scandir` esta parcheado,
+        por tanto no hace falta crear el arbol real."""
+        def scandir(ruta):
+            if Path(ruta).name == "sub":
+                return self._ScandirFalso([self._EntradaFalsa("dentro.txt", str(tmp_path / "volumen" / "sub" / "dentro.txt"))])
+            return self._ScandirFalso([
+                self._EntradaFalsa("malo.txt", str(tmp_path / "volumen" / "malo.txt"), stat_ok=False),
+                self._EntradaFalsa("sub", str(tmp_path / "volumen" / "sub"), tipo_entrada="directorio"),
+            ])
+
+        _, recorrido, entradas = self._recorrer_con_scandir(tmp_path, scandir)
+        nombres = {e.name for e in entradas}
+        assert "dentro.txt" in nombres
+        assert "malo.txt" not in nombres
+        assert len(recorrido.errores) == 1
+        assert recorrido.errores[0].categoria == "error_estado"
+        assert recorrido.progreso.completado is True
 
 

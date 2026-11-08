@@ -25,6 +25,7 @@ import ctypes
 import os
 import platform
 import subprocess
+import unicodedata
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -1419,9 +1420,10 @@ def detectar_tipo_enlace(path: str) -> InfoEnlace:
 def _normalizar_para_visitado(path: str) -> str:
     """Devuelve una representación normalizada y absoluta de `path` apta para
     usarse como clave de deteccion de ciclos, respetando la case-sensitividad
-    del sistema de archivos subyacente."""
+    del sistema de archivos subyacente y la normalización Unicode (NFC)."""
     absoluto = os.path.abspath(path)
-    normalizado = os.path.normpath(absoluto)
+    normalizado = unicodedata.normalize("NFC", absoluto)
+    normalizado = os.path.normpath(normalizado)
     if not _sistema_archivo_case_sensitive():
         normalizado = normalizado.lower()
     return normalizado
@@ -1433,6 +1435,45 @@ def _sistema_archivo_case_sensitive() -> bool:
         return os.path.normcase("A") != os.path.normcase("a")
     except OSError:
         return True
+
+
+def _prefix_ruta_larga_windows(path: str) -> str:
+    """
+    Aplica el prefijo de ruta larga de Windows (`\\\\?\\`) cuando la ruta
+    absoluta supera el limite MAX_PATH (260 caracteres) y el SO es Windows.
+
+    En Windows, las rutas con el prefijo `\\\\?\\` pueden alcanzar hasta
+    ~32.767 caracteres y evitan el limite historico de 260 de la API Win32.
+    Las rutas UNC se transforman a `\\\\?\\UNC\\servidor\\compartido\\...`.
+    En sistemas no-Windows se devuelve la ruta sin cambios.
+
+    Nunca se aplica a rutas relativas: solo rutas absolutas ya resueltas.
+    """
+    if os.name != "nt":
+        return path
+
+    absoluto = os.path.abspath(path)
+    if len(absoluto) <= 260:
+        return path
+
+    # Rutas UNC: \\servidor\compartido\... -> \\?\UNC\servidor\compartido\...
+    if absoluto.startswith("\\\\"):
+        sin_barras = absoluto[2:]
+        return "\\\\?\\UNC\\" + sin_barras
+
+    # Ruta absoluta normal: C:\... -> \\?\C:\...
+    return "\\\\?\\" + absoluto
+
+
+def _aplicar_prefijo_ruta_larga(ruta: str) -> str:
+    """
+    Devuelve `ruta` con prefijo de ruta larga de Windows si corresponde.
+
+    Wrapper sobre `_prefix_ruta_larga_windows` para uso claro en los puntos
+    de llamada del recorrido (os.scandir, os.stat, etc.). En plataformas
+    no-Windows o rutas cortas devuelve la ruta sin cambios.
+    """
+    return _prefix_ruta_larga_windows(ruta)
 
 
 def resolver_sin_ciclos(
@@ -1679,7 +1720,7 @@ class RecorridoVolumen:
         callback_control: Optional[Callable[[], ControlRecorrido]] = None,
     ) -> None:
         self.volumen = volumen
-        self.raiz = os.path.abspath(raiz)
+        self.raiz = _aplicar_prefijo_ruta_larga(os.path.abspath(raiz))
         self.contrato = contrato
         self.maquina_id = maquina_id
         self._seguir_enlaces = seguir_enlaces
@@ -1751,7 +1792,8 @@ class RecorridoVolumen:
     def _normalizar_visitado(self, path: str) -> str:
         """Devuelve la representación normalizada de `path` para el conjunto de visitados."""
         absoluto = os.path.abspath(path)
-        normalizado = os.path.normpath(absoluto)
+        normalizado = unicodedata.normalize("NFC", absoluto)
+        normalizado = os.path.normpath(normalizado)
         if not _sistema_archivo_case_sensitive():
             normalizado = normalizado.lower()
         return normalizado
@@ -1770,39 +1812,37 @@ class RecorridoVolumen:
     def _crear_entrada(self, entrada: os.DirEntry, ruta_absoluta: str) -> Optional[InventoryEntry]:
         """Crea un `InventoryEntry` a partir de una entrada de directorio, sin leer su contenido.
 
-        Solo metadatos observados por el SO. Si no se pueden obtener los metadatos
-        (archivo bloqueado, ruta eliminada durante el recorrido), se registra el error
-        y se retorna None para que el recorrido continúe con la siguiente entrada.
+        Solo metadatos observados por el SO. Si la entrada no se puede leer porque
+        esta bloqueada, fue eliminada o cambio durante el recorrido
+        (stat, is_dir, is_symlink o is_file fallan), se registra el error por ruta
+        con categoria `error_estado` y se retorna None para que el recorrido continúe
+        con la siguiente entrada sin abortar (3.8.5.1.4.4.6).
         """
         try:
             stat = entrada.stat(follow_symlinks=False)
-        except OSError as exc:
-            self._registrar_error(ruta_absoluta, "error_estado", f"No se pudieron obtener los metadatos: {exc}")
-            return None
+            nombre = entrada.name
+            extension = os.path.splitext(nombre)[1]
 
-        nombre = entrada.name
-        extension = os.path.splitext(nombre)[1]
+            # Tipo de entrada observado directamente del SO, sin inferencias.
+            if entrada.is_dir(follow_symlinks=False):
+                tipo_entrada = EntryType.DIRECTORY
+            elif entrada.is_symlink():
+                tipo_entrada = EntryType.SYMLINK
+            elif entrada.is_file(follow_symlinks=False):
+                tipo_entrada = EntryType.FILE
+            else:
+                tipo_entrada = EntryType.OTHER
 
-        # Tipo de entrada observado directamente del SO, sin inferencias.
-        if entrada.is_dir(follow_symlinks=False):
-            tipo_entrada = EntryType.DIRECTORY
-        elif entrada.is_symlink():
-            tipo_entrada = EntryType.SYMLINK
-        elif entrada.is_file(follow_symlinks=False):
-            tipo_entrada = EntryType.FILE
-        else:
-            tipo_entrada = EntryType.OTHER
+            ahora = datetime.now().isoformat()
+            try:
+                relativa = os.path.relpath(ruta_absoluta, self.raiz)
+            except ValueError:
+                relativa = nombre
 
-        ahora = datetime.now().isoformat()
-        try:
-            relativa = os.path.relpath(ruta_absoluta, self.raiz)
-        except ValueError:
-            relativa = nombre
+            excluida = self._debe_excluir(ruta_absoluta)
+            atributos = _atributos_observados(entrada, stat)
 
-        excluida = self._debe_excluir(ruta_absoluta)
-        atributos = _atributos_observados(entrada, stat)
-
-        return InventoryEntry(
+            return InventoryEntry(
             machine_id=self.maquina_id,
             volume=self.volumen,
             absolute_path=ruta_absoluta,
@@ -1820,6 +1860,9 @@ class RecorridoVolumen:
             source="filesystem_scan",
             last_checked_at=ahora,
         )
+        except OSError as exc:
+            self._registrar_error(ruta_absoluta, "error_estado", f"No se pudieron leer los metadatos de la entrada durante el recorrido: {exc}")
+            return None
 
     def recorrer(self) -> Iterator[InventoryEntry]:
         """
@@ -1872,7 +1915,8 @@ class RecorridoVolumen:
             self._progreso.directorios_procesados += 1
 
             try:
-                with os.scandir(directorio_actual) as iterator:
+                ruta_scandir = _aplicar_prefijo_ruta_larga(directorio_actual)
+                with os.scandir(ruta_scandir) as iterator:
                     for entrada in iterator:
                         ruta_absoluta = entrada.path
 
