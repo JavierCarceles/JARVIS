@@ -88,6 +88,7 @@
 - [`hands\test_executor_state.py`](#hands/test-executor_state)
 - [`hands\test_restore_window_state.py`](#hands/test-restore_window_state)
 - [`hands\test_system_inventory.py`](#hands/test-system_inventory)
+- [`hands\test_system_inventory_storage.py`](#hands/test-system_inventory_storage)
 - [`hands\test_ui_elements.py`](#hands/test-ui_elements)
 - [`hands\test_ui_elements_final.py`](#hands/test-ui_elements_final)
 - [`hands\test_ui_elements_minimal.py`](#hands/test-ui_elements_minimal)
@@ -10696,6 +10697,26 @@ da reconciled=False (coincidencia).
 | `TestSerializacionParaPersistencia` | Serialización de entrada como JSON válido para persistencia. |
 
 **Resultados:** 26 tests unitarios, 26 PASSED / 0 FAILED.
+
+---
+
+<a name="hands/test-system_inventory_storage"></a>
+### `hands\test_system_inventory_storage.py`
+
+**Descripción:** Tests de contrato del almacenamiento canonico SQLite del inventario persistente del sistema de archivos (unidad 3.8.5.1.4.2.3). Verifican creación de `data/system_inventory.sqlite3` (en directorio temporal, nunca en producción), inicialización y versionado del esquema (`schema_version`), registro de equipos y volumenes con aislamiento por equipo (`machine_id`), ejecuciones de escaneo (inicio/fin, resultado, métricas), escritura por lotes atómica de entradas de archivo y candidatos de aplicación, tablas separadas para entradas genéricas de archivo y candidatos de aplicación, consultas indexadas paginadas por nombre, extensión y prefijo de ruta, contador de entradas y recuperación de la última ejecución por equipo/volumen.
+
+**Clases de test:**
+
+| Clase | Descripción |
+|---|---|
+| `TestCreacionBaseDeDatos` | Creación del fichero SQLite en la ruta dada, ruta por defecto y versionado del esquema. |
+| `TestMaquinasYVolumenes` | Registro de equipos y volumenes con aislamiento por `machine_id`. |
+| `TestScanRuns` | Inicio y finalización de ejecuciones de escaneo, resultados permitidos y última ejecución. |
+| `TestInsercionAtomica` | Inserción por lotes atómica, lote vacío y ausencia de entradas parciales tras fallo. |
+| `TestConsultasIndexadas` | Búsquedas por nombre, extensión y prefijo de ruta con paginación y aislamiento por equipo. |
+| `TestContexto` | Uso como gestor de contexto, cierre de conexión, WAL y claves foráneas. |
+
+**Resultados:** 24 tests unitarios, 24 PASSED / 0 FAILED.
 
 ---
 

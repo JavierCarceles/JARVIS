@@ -55,6 +55,7 @@ Los ficheros se consumen principalmente a través de:
 | `improvement_rules.json` | JSON (array) | `self_improvement_system.py` (rule_engine_path) | `self_improvement_system.py` | Reglas de mejora/optimización del sistema (CPU, memoria, errores, etc.) |
 | `goal_adaptation_feedback.json` | JSON (objeto) | `contextual_adaptation_engine.py` | `contextual_adaptation_engine.py` | Feedback de adaptación de objetivos (métricas de rendimiento) |
 | `goal_adaptation_learning_results.json` | JSON (objeto) | `contextual_adaptation_engine.py` | `contextual_adaptation_engine.py` | Resultados de aprendizaje de adaptación de objetivos |
+| `system_inventory.sqlite3` | SQLite | `SystemInventoryStorage` (`src/hands/system_inventory_storage.py`) | `SystemInventoryStorage` (crea e inicializa `data/system_inventory.sqlite3`) | Índice canonico persistente del inventario de archivos del sistema (maquinas, volumenes, ejecuciones de escaneo, entradas de archivo y candidatos de aplicacion). |
 
 ---
 
@@ -170,6 +171,21 @@ Los ficheros se consumen principalmente a través de:
 
 
 ---
+
+### 3.12 `system_inventory.sqlite3`
+- **Formato:** SQLite (biblioteca estandar `sqlite3`), gestionado por `src/hands/system_inventory_storage.py` (unidad 3.8.5.1.4.2.3).
+- **Quien lo lee/escribe:** `SystemInventoryStorage` (`src/hands/system_inventory_storage.py`). Es el almacenamiento canonico del indice de inventario persistente del sistema de archivos (unidad 3.8.5.1.4.2). No lo lee ni lo escribe ningun otro componente de `src/` todavia.
+- **Esquema (version 1):**
+  - `schema_version(version)`: version del esquema.
+  - `machines(machine_id PK, created_at)`: equipos que crean el inventario (aislamiento por equipo, sin MAC ni serial de hardware).
+  - `volumes(volume_id PK, machine_id FK, volume, volume_type, state, first_seen_at, last_seen_at)`: volumenes descubiertos por equipo.
+  - `scan_runs(scan_id PK, machine_id FK, volume, mode, started_at, finished_at, result, entries_count, errors_count, exclusions_count, coverage_estimate)`: ejecuciones de escaneo (completo/incremental, resultado y metrica de cobertura).
+  - `file_entries(entry_id PK, scan_id FK, machine_id FK, volume, absolute_path, relative_path, name, extension, entry_type, size_bytes, modified_at, created_at, accessed_at, attributes JSON, excluded, source, last_checked_at)`: entradas genericas de archivos y directorios (solo metadatos observados, nunca contenido de archivos personales).
+  - `application_candidates(candidate_id PK, scan_id FK, machine_id FK, volume, name, absolute_path, launch_type, confidence, source, last_checked_at)`: candidatos de aplicacion, almacenados en tabla propia separada de las entradas genericas de archivo.
+  - Indices de consulta por `(machine_id, volume)`, `lower(name)`, `lower(extension)`, `entry_type`, `absolute_path`, `excluded` y `(machine_id, started_at)`.
+- **Transacciones:** escrituras por lotes en transaccion atomica (`BEGIN`/`COMMIT` con `ROLLBACK` ante fallo); un escaneo interrumpido no deja media base presentada como inventario completo.
+- **Modo de journaling:** WAL, con claves foraneas activadas (`PRAGMA journal_mode=WAL`, `PRAGMA foreign_keys=ON`).
+- **Ruta por defecto:** `data/system_inventory.sqlite3` (creada por el gestor al inicializar; se crea el directorio padre si no existe).
 
 ## 4. Subdirectorio `data/knowledge/`
 
