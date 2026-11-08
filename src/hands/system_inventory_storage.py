@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import sqlite3
 import threading
 from datetime import datetime, timezone
@@ -63,6 +64,21 @@ DEFAULT_DB_PATH = Path("data") / "system_inventory.sqlite3"
 # Se guarda junto a la base de datos SQLite y resume version, equipo, volumenes
 # y ultimo escaneo sin almacenar el listado entero de archivos.
 DEFAULT_MANIFEST_PATH = Path("data") / "system_inventory_manifest.json"
+
+# Sufijo del fichero de copia de seguridad junto a la base de datos.
+DEFAULT_BACKUP_SUFFIX = ".bak"
+
+
+class InventoryCorruptError(Exception):
+    """La base de datos SQLite del inventario esta corrupta o ilegible y no
+    puede usarse como fuente de verdad sin recuperarla desde una copia de
+    seguridad valida."""
+
+
+class InventoryBackupError(Exception):
+    """Fallo al crear una copia de seguridad del inventario o al restaurarla.
+    Nunca se usa para ocultar un fallo: cuando la copia de seguridad no es
+    valida, la base actual queda intacta y no se sobrescribe."""
 
 # Valores admitidos para el modo de escaneo (3.8.5.1.4.2.6).
 SCAN_MODE_FULL = "completo"
@@ -350,6 +366,27 @@ class SystemInventoryStorage:
            requieren que las migraciones ya hayan ejecutado.
         5. Registra/actualiza la version del esquema sin borrar datos previos.
         """
+        # (3.8.5.1.4.2.11) Si la base de datos ya existe en disco, verificar su
+        # integridad antes de tocarla. Una base corrupta no se inicializa sobre
+        # ella: se intenta recuperar desde la copia de seguridad y, si no hay
+        # una valida, se falla en alto sin destruir datos recuperables. Nunca
+        # se sobrescribe una base valida con una vacia o incompleta tras un error.
+        if self.db_path.exists():
+            integridad = self.verify_integrity()
+            if not integridad["ok"]:
+                try:
+                    self.restaurar_desde_backup()
+                except InventoryBackupError:
+                    raise InventoryCorruptError(
+                        "La base de datos del inventario esta corrupta y no se "
+                        "pudo recuperar desde copia de seguridad: "
+                        f"{integridad.get('error')}"
+                    ) from None
+                if not self.verify_integrity()["ok"]:
+                    raise InventoryCorruptError(
+                        "La copia de seguridad restaurada tampoco pasa la "
+                        "verificacion de integridad."
+                    )
         conn = self.connect()
         # 1. Crear tablas (schema_version incluido) con el esquema actual.
         conn.executescript(_SCHEMA_TABLES_SQL)
@@ -445,6 +482,154 @@ class SystemInventoryStorage:
         conn = self.connect()
         journal = conn.execute("PRAGMA journal_mode").fetchone()[0]
         return str(journal)
+
+    # ------------------------------------------------------------------ #
+    # Copia de seguridad, deteccion de corrupcion y recuperacion (3.8.5.1.4.2.11).
+    # ------------------------------------------------------------------ #
+    def backup_path(self, custom: Optional[Path] = None) -> Path:
+        """Devuelve la ruta de la copia de seguridad del inventario.
+
+        Por defecto queda junto a la base de datos SQLite con el sufijo
+        `.bak` (p. ej. `data/system_inventory.sqlite3.bak`). Se acepta una
+        ruta personalizada para entornos de prueba o configurados.
+        """
+        if custom is not None:
+            return Path(custom)
+        return self.db_path.parent / (self.db_path.name + DEFAULT_BACKUP_SUFFIX)
+
+    def create_backup(self, backup_path: Optional[Path] = None) -> Path:
+        """Crea una copia de seguridad del fichero SQLite actual.
+
+        Usa `sqlite3.Connection.backup` para copiar la base en caliente de
+        forma consistente (incluye el modo WAL). Si la base de datos no
+        existe, no hay nada que respaldar y se levanta
+        `InventoryBackupError`. Cualquier fallo se reporta como
+        `InventoryBackupError` sin dejar un fichero de copia parcial
+        presentado como valido.
+        """
+        dest = self.backup_path(backup_path)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        if not self.db_path.exists():
+            raise InventoryBackupError(
+                f"No existe la base de datos para respaldar: {self.db_path}"
+            )
+        conn = self.connect()
+        dest_conn: Optional[sqlite3.Connection] = None
+        try:
+            dest_conn = sqlite3.connect(str(dest))
+            conn.backup(dest_conn)
+            dest_conn.commit()
+        except Exception:
+            if dest_conn is not None:
+                try:
+                    dest_conn.close()
+                except Exception:
+                    pass
+            # No dejar un fichero de copia parcial presentado como valido.
+            try:
+                if dest.exists():
+                    dest.unlink()
+            except OSError:
+                pass
+            raise InventoryBackupError(
+                f"No se pudo crear la copia de seguridad en {dest}"
+            ) from None
+        finally:
+            if dest_conn is not None:
+                try:
+                    dest_conn.close()
+                except Exception:
+                    pass
+        return dest
+
+    def verify_integrity(self) -> dict:
+        """Diagnostica la integridad de la base de datos actual sin repararla.
+
+        Ejecuta `PRAGMA quick_check` y `PRAGMA integrity_check` y devuelve un
+        diccionario con el resultado de cada una, una bandera `ok` (True solo
+        si ambas devuelven "ok") y, en caso de fallo, el motivo en `error`.
+        Si la base de datos no existe o no se puede abrir, devuelve
+        `ok=False` con el motivo sin levantar excepcion, para que el llamante
+        decida si restaurar desde copia de seguridad o inicializar de cero.
+        """
+        resultado: dict[str, object] = {
+            "quick_check": None,
+            "integrity_check": None,
+            "ok": False,
+            "error": None,
+        }
+        if not self.db_path.exists():
+            resultado["error"] = f"La base de datos no existe: {self.db_path}"
+            return resultado
+        try:
+            conn = self.connect()
+        except sqlite3.DatabaseError as exc:
+            resultado["error"] = str(exc)
+            resultado["ok"] = False
+            return resultado
+        try:
+            cur = conn.execute("PRAGMA quick_check")
+            resultado["quick_check"] = str(cur.fetchone()[0])
+            cur = conn.execute("PRAGMA integrity_check")
+            resultado["integrity_check"] = str(cur.fetchone()[0])
+            resultado["ok"] = (
+                resultado["quick_check"] == "ok"
+                and resultado["integrity_check"] == "ok"
+            )
+        except sqlite3.DatabaseError as exc:
+            resultado["error"] = str(exc)
+            resultado["ok"] = False
+        return resultado
+
+    def restaurar_desde_backup(self, backup_path: Optional[Path] = None) -> None:
+        """Restaura la base de datos actual desde una copia de seguridad.
+
+        Antes de tocar la base actual, verifica que la copia de seguridad
+        exista y pase `PRAGMA integrity_check`. Nunca se sobrescribe una base
+        actual valida con una copia vacia, incompleta o corrupta: si la copia
+        de seguridad no pasa la verificacion, se levanta
+        `InventoryBackupError` y la base actual queda intacta. Si no existe
+        copia de seguridad, tambien se levanta `InventoryBackupError`.
+        """
+        src = self.backup_path(backup_path)
+        if not src.exists():
+            raise InventoryBackupError(
+                f"No existe copia de seguridad para restaurar: {src}"
+            )
+        # Verificar que la copia de seguridad sea valida antes de tocar la actual.
+        tmp_conn: Optional[sqlite3.Connection] = None
+        try:
+            tmp_conn = sqlite3.connect(str(src))
+            cur = tmp_conn.execute("PRAGMA integrity_check")
+            status = str(cur.fetchone()[0])
+        except sqlite3.DatabaseError as exc:
+            if tmp_conn is not None:
+                tmp_conn.close()
+            raise InventoryBackupError(
+                f"La copia de seguridad esta corrupta ({exc}); no se restaura sobre la base actual."
+            ) from None
+        finally:
+            if tmp_conn is not None:
+                tmp_conn.close()
+        if status != "ok":
+            raise InventoryBackupError(
+                f"La copia de seguridad no pasa integrity_check ({status}); "
+                f"no se restaura sobre la base actual."
+            )
+        # Cerrar la conexion actual antes de reemplazar el fichero.
+        self.close()
+        try:
+            for suf in ("", "-wal", "-shm"):
+                p = Path(str(self.db_path) + suf)
+                if p.exists():
+                    p.unlink()
+            shutil.copy2(src, self.db_path)
+        except Exception:
+            raise InventoryBackupError(
+                f"No se pudo restaurar desde {src} sobre {self.db_path}"
+            ) from None
+        # Reabrir la base restaurada.
+        self.connect()
 
     # ------------------------------------------------------------------ #
     # Entidades maestras

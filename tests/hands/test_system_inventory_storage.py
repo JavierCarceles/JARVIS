@@ -25,6 +25,7 @@ from pathlib import Path
 import pytest
 
 from src.hands.system_inventory_storage import (
+    DEFAULT_BACKUP_SUFFIX,
     DEFAULT_DB_PATH,
     SCHEMA_VERSION,
     SCAN_MODE_FULL,
@@ -34,6 +35,8 @@ from src.hands.system_inventory_storage import (
     SCAN_RESULT_OK,
     SCAN_RESULT_PARTIAL,
     ConcurrentScanError,
+    InventoryBackupError,
+    InventoryCorruptError,
     SystemInventoryStorage,
     _MIGRACIONES,
 )
@@ -1219,3 +1222,210 @@ class TestConcurrenciaEscaneos:
         """ConcurrentScanError se puede importar desde el modulo."""
         from src.hands.system_inventory_storage import ConcurrentScanError
         assert issubclass(ConcurrentScanError, Exception)
+
+
+# ---------------------------------------------------------------------------
+# Copia de seguridad, deteccion de corrupcion y recuperacion (3.8.5.1.4.2.11).
+# ---------------------------------------------------------------------------
+
+class TestBackupCorrupcionYRecuperacion:
+    """Copia de seguridad, deteccion de corrupcion y recuperacion del inventario.
+
+    La base nunca se sobrescribe con una copia vacia, incompleta o corrupta:
+    restaurar_desde_backup verifica la copia antes de tocar la base actual, e
+    initialize() no crea tablas vacias sobre una base corrupta sin una copia
+    valida desde la que recuperar.
+    """
+
+    def _crear_base_con_datos(self, storage: SystemInventoryStorage) -> None:
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        storage.record_volume("vol-c:", "machine-alfa", "C:", "local", "online")
+        storage.begin_scan_run("scan-1", "machine-alfa", "C:", SCAN_MODE_FULL)
+        storage.insert_file_entries("scan-1", "machine-alfa", "C:", [
+            {
+                "entry_id": "e-1",
+                "absolute_path": "C:/Apps/app.exe",
+                "relative_path": "Apps/app.exe",
+                "name": "app.exe",
+                "extension": ".exe",
+                "entry_type": "file",
+                "size_bytes": 1024,
+                "modified_at": "2024-01-01T10:00:00",
+                "created_at": "2024-01-01T09:00:00",
+                "accessed_at": "2024-01-02T08:00:00",
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-03T00:00:00",
+            }
+        ])
+        storage.end_scan_run("scan-1", result=SCAN_RESULT_OK, entries_count=1)
+
+    def _conteo_en_fichero(self, fichero: Path, tabla: str) -> int:
+        import sqlite3
+
+        conn = sqlite3.connect(str(fichero))
+        try:
+            return int(conn.execute(f"SELECT COUNT(*) FROM {tabla}").fetchone()[0])
+        finally:
+            conn.close()
+
+    def test_create_backup_crea_copia_valida_al_lado_de_la_base(
+        self, storage: SystemInventoryStorage, db_path: Path
+    ):
+        self._crear_base_con_datos(storage)
+        backup = storage.create_backup()
+        assert backup == db_path.parent / (db_path.name + DEFAULT_BACKUP_SUFFIX)
+        assert backup.exists()
+        assert storage.verify_integrity()["ok"] is True
+        # La copia es una base SQLite valida con los mismos datos y version.
+        assert self._conteo_en_fichero(backup, "file_entries") == 1
+        assert self._conteo_en_fichero(backup, "machines") == 1
+        import sqlite3
+
+        conn = sqlite3.connect(str(backup))
+        try:
+            version = conn.execute("SELECT version FROM schema_version").fetchone()[0]
+        finally:
+            conn.close()
+        assert version == SCHEMA_VERSION
+
+    def test_create_backup_sin_base_existente_levanta_InventoryBackupError(
+        self, storage: SystemInventoryStorage
+    ):
+        # storage no inicializado: no hay base que respaldar.
+        assert not storage.db_path.exists()
+        with pytest.raises(InventoryBackupError):
+            storage.create_backup()
+
+    def test_create_backup_no_deja_copia_parcial_al_fallar(
+        self, storage: SystemInventoryStorage, monkeypatch: pytest.MonkeyPatch
+    ):
+        self._crear_base_con_datos(storage)
+        backup = storage.backup_path()
+
+        def fallo_backup(*args, **kwargs):  # noqa: ARG005
+            raise RuntimeError("fallo simulado en la copia de seguridad")
+
+        # sqlite3.Connection es un tipo inmutable (ni en instancia se puede
+        # reasignar su metodo backup), así que se simula toda la conexion: su
+        # metodo backup falla y create_backup debe limpiar la copia parcial.
+        class _ConnSinBackup:
+            def backup(self, destino, *args, **kwargs):  # noqa: ARG005
+                raise RuntimeError("fallo simulado en la copia de seguridad")
+
+        monkeypatch.setattr(
+            SystemInventoryStorage, "connect", lambda self: _ConnSinBackup()
+        )
+        with pytest.raises(InventoryBackupError):
+            storage.create_backup()
+        # No queda una copia parcial presentada como valida.
+        assert not backup.exists()
+
+    def test_verify_integrity_base_sana_devuelve_ok(
+        self, storage: SystemInventoryStorage
+    ):
+        self._crear_base_con_datos(storage)
+        resultado = storage.verify_integrity()
+        assert resultado["ok"] is True
+        assert resultado["quick_check"] == "ok"
+        assert resultado["integrity_check"] == "ok"
+        assert resultado["error"] is None
+
+    def test_verify_integrity_base_no_existente_devuelve_ok_falso(
+        self, storage: SystemInventoryStorage
+    ):
+        assert not storage.db_path.exists()
+        resultado = storage.verify_integrity()
+        assert resultado["ok"] is False
+        assert resultado["error"] is not None
+
+    def test_verify_integrity_base_corrupta_devuelve_ok_falso(
+        self, storage: SystemInventoryStorage, db_path: Path
+    ):
+        self._crear_base_con_datos(storage)
+        storage.close()
+        db_path.write_bytes(b"esto no es una base de datos sqlite valida")
+        resultado = storage.verify_integrity()
+        assert resultado["ok"] is False
+        assert resultado["error"] is not None
+
+    def test_restaurar_desde_backup_recupera_datos_despues_de_corrupcion(
+        self, storage: SystemInventoryStorage, db_path: Path
+    ):
+        self._crear_base_con_datos(storage)
+        backup = storage.create_backup()
+        assert backup.exists()
+        storage.close()
+        db_path.write_bytes(b"contenido corrupto que invalida la base de datos")
+        assert storage.verify_integrity()["ok"] is False
+        storage.restaurar_desde_backup()
+        # La base recuperada es valida y conserva los datos.
+        assert storage.verify_integrity()["ok"] is True
+        assert storage.schema_version() == SCHEMA_VERSION
+        assert storage.get_entry_count("machine-alfa", "C:") == 1
+        run = storage.get_scan_run("scan-1")
+        assert run is not None and run["result"] == SCAN_RESULT_OK
+        storage.close()
+
+    def test_restaurar_desde_backup_sin_copia_levanta_InventoryBackupError(
+        self, storage: SystemInventoryStorage
+    ):
+        self._crear_base_con_datos(storage)
+        assert not storage.backup_path().exists()
+        with pytest.raises(InventoryBackupError):
+            storage.restaurar_desde_backup()
+
+    def test_restaurar_desde_backup_copia_corrupta_no_sobrescribe_base_valida(
+        self, storage: SystemInventoryStorage, db_path: Path
+    ):
+        self._crear_base_con_datos(storage)
+        backup = storage.create_backup()
+        assert storage.verify_integrity()["ok"] is True
+        assert storage.get_entry_count("machine-alfa", "C:") == 1
+        # Corromper SOLO la copia de seguridad, no la base actual.
+        storage.close()
+        backup.write_bytes(b"copia de seguridad corrupta")
+        storage2 = SystemInventoryStorage(db_path)
+        try:
+            with pytest.raises(InventoryBackupError):
+                storage2.restaurar_desde_backup()
+            # La base actual queda intacta y valida.
+            assert storage2.verify_integrity()["ok"] is True
+            assert storage2.get_entry_count("machine-alfa", "C:") == 1
+        finally:
+            storage2.close()
+
+    def test_inicializacion_sobre_base_corrupta_sin_backup_levanta_InventoryCorruptError(
+        self, db_path: Path
+    ):
+        storage = SystemInventoryStorage(db_path)
+        self._crear_base_con_datos(storage)
+        storage.close()
+        assert not storage.backup_path().exists()
+        db_path.write_bytes(b"corrupcion total del fichero de inventario")
+        storage2 = SystemInventoryStorage(db_path)
+        try:
+            with pytest.raises(InventoryCorruptError):
+                storage2.initialize()
+        finally:
+            storage2.close()
+
+    def test_inicializacion_sobre_base_corrupta_con_backup_recupera_automaticamente(
+        self, db_path: Path
+    ):
+        storage = SystemInventoryStorage(db_path)
+        self._crear_base_con_datos(storage)
+        backup = storage.create_backup()
+        storage.close()
+        db_path.write_bytes(b"corrupcion total del fichero de inventario")
+        storage2 = SystemInventoryStorage(db_path)
+        try:
+            assert storage2.initialize() == SCHEMA_VERSION
+            assert storage2.verify_integrity()["ok"] is True
+            assert storage2.get_entry_count("machine-alfa", "C:") == 1
+            run = storage2.get_scan_run("scan-1")
+            assert run is not None and run["result"] == SCAN_RESULT_OK
+        finally:
+            storage2.close()

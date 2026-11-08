@@ -1793,7 +1793,7 @@ Funciones a nivel módulo:
 
 ### `src/hands/system_inventory_storage.py` — Almacenamiento canonico SQLite del indice de inventario persistente del sistema de archivos.
 
-**Descripción:** Implementa el almacenamiento canonico `data/system_inventory.sqlite3` del índice de inventario del sistema de archivos. Provee inicialización y versionado de esquema (`schema_version`), tablas para equipos (`machines`), volúmenes (`volumes`), ejecuciones de escaneo (`scan_runs`), entradas de archivo (`file_entries`) y candidatos de aplicación (`application_candidates`), escritura por lotes en transacción atómica y consultas indexadas paginadas por nombre, extensión, tipo, ruta, volumen y estado. Aísla el inventario por equipo (`machine_id`) y usa WAL con claves foráneas. Incluye control de concurrencia para impedir que dos escaneos simultáneos sobre el mismo equipo y volumen corrompan o dupliquen el inventario, con bloqueo por `(machine_id, volumen)`, transacciones `BEGIN IMMEDIATE` en escrituras y verificación del modo de journaling. No implementa el recorrido de directorios ni la clasificación de aplicaciones.
+**Descripción:** Implementa el almacenamiento canonico `data/system_inventory.sqlite3` del índice de inventario del sistema de archivos. Provee inicialización y versionado de esquema (`schema_version`), tablas para equipos (`machines`), volúmenes (`volumes`), ejecuciones de escaneo (`scan_runs`), entradas de archivo (`file_entries`) y candidatos de aplicación (`application_candidates`), escritura por lotes en transacción atómica y consultas indexadas paginadas por nombre, extensión, tipo, ruta, volumen y estado. Aísla el inventario por equipo (`machine_id`) y usa WAL con claves foráneas. Incluye control de concurrencia para impedir que dos escaneos simultáneos sobre el mismo equipo y volumen corrompan o dupliquen el inventario, con bloqueo por `(machine_id, volumen)`, transacciones `BEGIN IMMEDIATE` en escrituras y verificación del modo de journaling. Provee copia de seguridad del fichero SQLite, detección de corrupción con `PRAGMA quick_check`/`integrity_check` y restauración desde copia sin sobrescribir una base válida con una copia vacía, incompleta o corrupta. No implementa el recorrido de directorios ni la clasificación de aplicaciones.
 
 **Características:**
 
@@ -1806,6 +1806,10 @@ Funciones a nivel módulo:
 - Consultas indexadas paginadas por nombre, extensión y prefijo de ruta absoluta; contador de entradas y recuperación de la última ejecución por equipo/volumen.
 - Aislamiento por equipo: un inventario pertenece al equipo que lo creó (sin MAC, número de serie ni nombre de usuario).
 - Modo de journaling WAL y claves foráneas activadas (`PRAGMA journal_mode=WAL`, `PRAGMA foreign_keys=ON`); `verify_journal_mode()` devuelve el modo activo.
+- Copia de seguridad: `create_backup(backup_path)` copia el fichero SQLite activo (WAL incluido) a la ruta indicada o, por defecto, junto a la base con sufijo `.bak`; nunca deja una copia parcial presentada como válida.
+- Detección de corrupción: `verify_integrity()` ejecuta `PRAGMA quick_check` y `PRAGMA integrity_check` y devuelve `ok` solo si ambas lo son, sin modificar la base.
+- Recuperación: `restaurar_desde_backup(backup_path)` reemplaza la base actual solo si la copia existe y pasa `integrity_check`; nunca sobrescribe una base válida con una copia vacía, incompleta o corrupta.
+- `initialize()` verifica la integridad al abrir una base existente: si está corrupta, intenta restaurar desde la copia de seguridad y, sin copia válida, falla sin crear tablas vacías sobre la base corrupta.
 
 **Importaciones:** 5.
 
@@ -1814,6 +1818,8 @@ Clases:
 | Clase | Docstring |
 |---|---|
 | `class ConcurrentScanError` | Excepción levantada al intentar iniciar un escaneo mientras otro está en curso para el mismo equipo y volumen. |
+| `class InventoryBackupError` | Excepción levantada al crear o restaurar una copia de seguridad del inventario cuando la operación falla o la copia no es válida. |
+| `class InventoryCorruptError` | Excepción levantada cuando la base de datos del inventario está corrupta y no se puede recuperar desde copia de seguridad. |
 | `class SystemInventoryStorage` | Gestor del almacenamiento canonico SQLite del inventario de archivos. |
 
 Métodos de `SystemInventoryStorage`:
@@ -1840,6 +1846,10 @@ Métodos de `SystemInventoryStorage`:
 | `def db_file_exists()` | Devuelve True si el fichero de la base de datos existe en disco. |
 | `def has_active_scan(machine_id, volume)` | Devuelve True si hay un escaneo en curso para el equipo y volumen dados. |
 | `def verify_journal_mode()` | Devuelve el modo de journaling activo (p. ej. "wal") para verificar que sea adecuado a escrituras concurrentes. |
+| `def backup_path(custom)` | Devuelve la ruta de la copia de seguridad del inventario (por defecto junto a la base con sufijo `.bak`; acepta ruta personalizada). |
+| `def create_backup(backup_path)` | Crea una copia de seguridad del fichero SQLite activo (WAL incluido); nunca deja una copia parcial presentada como válida. |
+| `def verify_integrity()` | Diagnostica la integridad con `PRAGMA quick_check` y `PRAGMA integrity_check`; devuelve `ok`, `quick_check`, `integrity_check` y `error` sin modificar la base. |
+| `def restaurar_desde_backup(backup_path)` | Restaura la base actual desde una copia de seguridad solo si esta existe y pasa `integrity_check`; nunca sobrescribe una base válida con una copia vacía, incompleta o corrupta. |
 
 ## 🗺️ `src/hands/planner/`
 

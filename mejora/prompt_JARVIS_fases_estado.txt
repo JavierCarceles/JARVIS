@@ -7589,3 +7589,16 @@ VERIFICACIÓN: SINTAXIS: OK (`py_compile` de `src/hands/system_inventory_storage
 DISCREPANCIAS: NINGUNA
 PENDIENTES: NINGUNO (unidad completa; el padre 3.8.5.1.4.2 no se completa hasta terminar sus hijas restantes 3.8.5.1.4.2.11 y 3.8.5.1.4.2.12, que se abrirán en chats dedicados).
 ESTADO FINAL: 3.8.5.1.4.2.10 - IMPLEMENTADA
+
+
+REGISTRO DE UNIDAD: 3.8.5.1.4.2.11
+FECHA: 2026-11-08
+OBJETIVO: Definir backup, deteccion de corrupcion y recuperacion; no sobrescribir una base valida con una base vacia o incompleta tras un error. (unidad hoja de 3.8.5.1.4.2).
+TIPO DE TRABAJO: IMPLEMENTACION | TEST | DOCUMENTACION
+CAMBIOS / HALLAZGOS: `src/hands/system_inventory_storage.py`: se añaden las excepciones `InventoryCorruptError` y `InventoryBackupError`, la constante `DEFAULT_BACKUP_SUFFIX` (`.bak`) y los métodos `backup_path()`, `create_backup()`, `verify_integrity()` y `restaurar_desde_backup()`. `initialize()` verifica la integridad de la base existente antes de tocarla: si esta corrupta, intenta restaurar desde la copia de seguridad y, sin copia valida, falla sin crear tablas vacias sobre la base corrupta. `create_backup()` copia en caliente con `sqlite3.Connection.backup` (WAL incluido) y elimina cualquier copia parcial si falla. `verify_integrity()` ejecuta `PRAGMA quick_check` y `PRAGMA integrity_check` sin modificar la base. `restaurar_desde_backup()` verifica que la copia pase `integrity_check` antes de reemplazar la base actual, de modo que nunca se sobrescribe una base valida con una copia vacia, incompleta o corrupta.
+ARCHIVOS MODIFICADOS: PRODUCCION: `src/hands/system_inventory_storage.py`; TESTS: `tests/hands/test_system_inventory_storage.py`; DOCUMENTACION: `docs/README.md`, `docs/README_DATA.md`, `docs/README_TESTS.md`.
+TESTS Y RESULTADOS: UNITARIOS: 70 PASSED / 0 FAILED / 70 TOTAL (`tests/hands/test_system_inventory_storage.py`, 59 preexistentes + 11 nuevos de esta unidad); INTEGRACION: NA; NO REGRESION: 26 PASSED / 0 FAILED / 26 TOTAL (`tests/hands/test_system_inventory.py`, sin cambios, ejecutados tras modificacion).
+VERIFICACION: SINTAXIS: OK (`py_compile` de `src/hands/system_inventory_storage.py` y `tests/hands/test_system_inventory_storage.py` sin errores); MAIN.PY: NA (no se modifica `main.py`); COMPORTAMIENTO / INTEGRACION REAL: 70 tests ejecutados y pasados, verificando que `create_backup` crea una copia SQLite valida con los mismos datos y version sin dejar copia parcial ante fallo, que `verify_integrity` reporta `ok=True` en base sana y `ok=False` en base inexistente o corrupta, que `restaurar_desde_backup` recupera los datos tras corromper la base, que rechaza copias corruptas sin tocar la base actual, y que `initialize()` sobre base corrupta recupera automaticamente desde copia valida o levanta `InventoryCorruptError` sin backup.
+DISCREPANCIAS: NINGUNA
+PENDIENTES: NINGUNO (unidad completa; el padre 3.8.5.1.4.2 no se completa hasta terminar su hija restante 3.8.5.1.4.2.12, que se abrira en un chat dedicado).
+ESTADO FINAL: 3.8.5.1.4.2.11 - IMPLEMENTADA

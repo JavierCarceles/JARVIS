@@ -10703,7 +10703,7 @@ da reconciled=False (coincidencia).
 <a name="hands/test-system_inventory_storage"></a>
 ### `hands\test_system_inventory_storage.py`
 
-**Descripción:** Tests de contrato del almacenamiento canonico SQLite del inventario persistente del sistema de archivos (unidad 3.8.5.1.4.2.3). Verifican creación de `data/system_inventory.sqlite3` (en directorio temporal, nunca en producción), inicialización y versionado del esquema (`schema_version`), registro de equipos y volumenes con aislamiento por equipo (`machine_id`), ejecuciones de escaneo (inicio/fin, resultado, métricas), escritura por lotes atómica de entradas de archivo y candidatos de aplicación, tablas separadas para entradas genéricas de archivo y candidatos de aplicación, consultas indexadas paginadas por nombre, extensión y prefijo de ruta, contador de entradas y recuperación de la última ejecución por equipo/volumen.
+**Descripción:** Tests de contrato del almacenamiento canonico SQLite del inventario persistente del sistema de archivos. Verifican creación de `data/system_inventory.sqlite3` (en directorio temporal, nunca en producción), inicialización y versionado del esquema (`schema_version`), registro de equipos y volumenes con aislamiento por equipo (`machine_id`), ejecuciones de escaneo (inicio/fin, resultado, métricas), escritura por lotes atómica de entradas de archivo y candidatos de aplicación, tablas separadas para entradas genéricas de archivo y candidatos de aplicación, consultas indexadas paginadas por nombre, extensión y prefijo de ruta, contador de entradas y recuperación de la última ejecución por equipo/volumen, migraciones verificables de esquema, búsqueda por estado, normalización de rutas, control de concurrencia de escaneos, manifiesto JSON ligero, clave unica por ruta normalizada y copia de seguridad, detección de corrupción y recuperación de la base de datos.
 
 **Clases de test:**
 
@@ -10715,8 +10715,15 @@ da reconciled=False (coincidencia).
 | `TestInsercionAtomica` | Inserción por lotes atómica, lote vacío y ausencia de entradas parciales tras fallo. |
 | `TestConsultasIndexadas` | Búsquedas por nombre, extensión y prefijo de ruta con paginación y aislamiento por equipo. |
 | `TestContexto` | Uso como gestor de contexto, cierre de conexión, WAL y claves foráneas. |
+| `TestClaveUnicaRutaNormalizada` | Clave unica `(machine_id, volumen, ruta normalizada)` y ausencia de duplicados. |
+| `TestNormalizacionRutas` | Normalización de rutas según la distinción mayúsculas/minúsculas del sistema de archivos. |
+| `TestMigracionEsquemaV1AV2` | Migración de esquema v1 a v2 (columna `normalized_path` e índice único). |
+| `TestMigracionesVerificables` | Migraciones versionadas, atómicas, sin pérdida ni reinterpretación de datos; fallo sin cambios parciales. |
+| `TestBusquedaPorEstado` | Consultas de entradas por estado de exclusión. |
+| `TestConcurrenciaEscaneos` | Bloqueo de concurrencia, `ConcurrentScanError`, liberación del bloqueo y modo de journaling WAL. |
+| `TestBackupCorrupcionYRecuperacion` | Copia de seguridad, verificación de integridad (`PRAGMA quick_check` / `integrity_check`) y restauración desde copia sin sobrescribir una base válida con una copia vacía, incompleta o corrupta. |
 
-**Resultados:** 24 tests unitarios, 24 PASSED / 0 FAILED.
+**Resultados:** 70 tests unitarios, 70 PASSED / 0 FAILED.
 
 ---
 
