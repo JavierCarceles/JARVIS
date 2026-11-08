@@ -22,6 +22,7 @@ documentado.
 from __future__ import annotations
 
 import ctypes
+import os
 import platform
 import subprocess
 import uuid
@@ -29,7 +30,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Iterator, Optional
 
 
 class EntryType(Enum):
@@ -597,6 +598,26 @@ class VolumeType(Enum):
     VIRTUAL = "virtual"
 
 
+# ---------------------------------------------------------------------------
+# Estados de volumen (3.8.5.1.4.3.7)
+# ---------------------------------------------------------------------------
+
+class EstadoVolumen(Enum):
+    """Estado de un volumen, diferenciando situaciones de acceso y contenido.
+
+    Permite distinguir un volumen simplemente disponible de uno desmontado,
+    inaccesible, con permiso denegado, con sistema de archivos no soportado
+    o vacio (3.8.5.1.4.3.7).
+    """
+
+    DISPONIBLE = "disponible"
+    DESMONTADO = "desmontado"
+    INACCESIBLE = "inaccesible"
+    PERMISO_DENEGADO = "permiso_denegado"
+    SISTEMA_ARCHIVOS_NO_SOPORTADO = "sistema_archivos_no_soportado"
+    VACIO = "vacio"
+
+
 _VOLUME_TYPE_BY_CODE: dict[int, VolumeType] = {
     0: VolumeType.UNKNOWN,
     1: VolumeType.NO_ROOT_DIR,
@@ -1018,6 +1039,7 @@ class VolumenComun:
     raiz: str                   # ruta de acceso a la raiz del volumen, segun el SO
     tipo: VolumeType            # tipo de volumen observado
     disponible: bool            # True si el volumen esta listo para leer
+    estado: EstadoVolumen = EstadoVolumen.DISPONIBLE  # Estado diferenciado del volumen
     sistema_archivos: str = ""
     etiqueta: str = ""
     letra_unidad: Optional[str] = None  # solo tiene sentido en Windows; None en otros SO
@@ -1038,11 +1060,106 @@ class VolumenComun:
             "raiz": self.raiz,
             "tipo": self.tipo.value,
             "disponible": self.disponible,
+            "estado": self.estado.value,
             "sistema_archivos": self.sistema_archivos,
             "etiqueta": self.etiqueta,
             "letra_unidad": self.letra_unidad,
             "sistema_origen": self.sistema_origen,
         }
+
+
+def _sistema_archivos_no_soportado(fstype: str) -> bool:
+    """Devuelve True si el tipo de sistema de archivos no es soportado para
+    inventario (sistemas virtuales, de red o pseudoficheros del kernel).
+
+    No declara no soportado por inferencia: solo los tipos conocidos como
+    no inventariables (3.8.5.1.4.3.7).
+    """
+    f = (fstype or "").lower()
+    if not f:
+        return False
+    return (
+        f in _LINUX_VIRTUAL_FSTYPES
+        or f in _LINUX_NETWORK_FSTYPES
+        or f in _MACOS_VIRTUAL_FSTYPES
+        or f in _MACOS_NETWORK_FSTYPES
+    )
+
+
+def _clasificar_acceso_raiz(ruta_raiz: str) -> Optional[EstadoVolumen]:
+    """Intenta acceder a la raiz del volumen y clasifica el error, si lo hay.
+
+    Retorna:
+    - `EstadoVolumen.PERMISO_DENEGADO` si el SO deniega el acceso por permisos.
+    - `EstadoVolumen.INACCESIBLE` si hay otro error de E/S al acceder.
+    - `None` si el acceso a la raiz tiene exito.
+
+    Nunca lee el contenido de archivos personales (3.8.5.1.4.1.9).
+    """
+    try:
+        with os.scandir(ruta_raiz) as _:
+            pass
+        return None
+    except PermissionError:
+        return EstadoVolumen.PERMISO_DENEGADO
+    except OSError:
+        return EstadoVolumen.INACCESIBLE
+
+
+def _volumen_esta_vacio(ruta_raiz: str) -> bool:
+    """Detecta si el volumen es accesible pero no tiene entradas.
+
+    Intenta leer la primera entrada del directorio raiz; si no hay ninguna,
+    el volumen se considera vacio (3.8.5.1.4.3.7).
+    """
+    try:
+        with os.scandir(ruta_raiz) as entradas:
+            try:
+                next(entradas)
+                return False
+            except StopIteration:
+                return True
+    except OSError:
+        return False
+
+
+def determinar_estado_volumen(
+    info: VolumeInfo, sistema_origen: Optional[str] = None
+) -> EstadoVolumen:
+    """Determina el estado de un volumen diferenciando:
+
+    - `DESMONTADO`: el volumen no esta disponible (sin medio, no montado,
+      unidad sin raiz).
+    - `PERMISO_DENEGADO`: el volumen existe pero el acceso a la raiz esta
+      denegado por permisos.
+    - `INACCESIBLE`: el volumen no se puede acceder por error de E/S.
+    - `SISTEMA_ARCHIVOS_NO_SOPORTADO`: el tipo de sistema de archivos no
+      es inventariable (virtual, de red, pseudofichero).
+    - `VACIO`: el volumen es accesible pero no tiene entradas.
+    - `DISPONIBLE`: el volumen es accesible y tiene entradas.
+
+    Las comprobaciones se aplican en orden: un volumen no disponible no se
+    puede ni siquiera intentar leer, por lo que DESMONTADO tiene prioridad.
+    Nunca se lee el contenido de archivos personales (3.8.5.1.4.1.9).
+    """
+    # 1. No disponible => desmontado (sin medio, no montado, unidad sin raiz)
+    if not info.disponible:
+        return EstadoVolumen.DESMONTADO
+
+    # 2. Acceso a la raiz: permiso denegado o inaccesible
+    error_acceso = _clasificar_acceso_raiz(info.ruta_raiz)
+    if error_acceso is not None:
+        return error_acceso
+
+    # 3. Sistema de archivos no soportado
+    if _sistema_archivos_no_soportado(info.sistema_archivos):
+        return EstadoVolumen.SISTEMA_ARCHIVOS_NO_SOPORTADO
+
+    # 4. Volumen vacio (accesible pero sin entradas)
+    if _volumen_esta_vacio(info.ruta_raiz):
+        return EstadoVolumen.VACIO
+
+    return EstadoVolumen.DISPONIBLE
 
 
 def volumen_comun_desde_info(
@@ -1063,11 +1180,18 @@ def volumen_comun_desde_info(
     if sistema != "Windows":
         letra = None
     identificador = letra if letra else info.ruta_raiz
+    # Determinar el estado diferenciado del volumen de forma segura;
+    # si no se puede comprobar, se asume DISPONIBLE por defecto.
+    try:
+        estado = determinar_estado_volumen(info, sistema)
+    except Exception:
+        estado = EstadoVolumen.DISPONIBLE
     return VolumenComun(
         identificador=identificador,
         raiz=info.ruta_raiz,
         tipo=info.tipo,
         disponible=info.disponible,
+        estado=estado,
         sistema_archivos=info.sistema_archivos,
         etiqueta=info.etiqueta_volumen,
         letra_unidad=letra if sistema == "Windows" else None,
@@ -1095,3 +1219,615 @@ def enumerar_volumenes_comun(
     else:
         return []
     return [volumen_comun_desde_info(info, sistema) for info in infos]
+
+
+# ---------------------------------------------------------------------------
+# Identificacion de enlaces y redirecciones del sistema de archivos (3.8.5.1.4.3.6)
+# ---------------------------------------------------------------------------
+
+# Atributo de archivo de Windows que indica un reparse point (enlace simbolico,
+# junction, punto de montaje de volumen u otro mecanismo de redireccion).
+FILE_ATTRIBUTE_REPARSE_POINT = 0x00000400
+
+# Etiquetas de reparse point de Windows conocidas (valores del campo
+# ReparseTag del REPARSE_DATA_BUFFER).
+IO_REPARSE_TAG_SYMLINK = 0xA000000C
+IO_REPARSE_TAG_MOUNT_POINT = 0xA0000003  # junction / punto de montaje de volumen
+
+
+class TipoEnlace(Enum):
+    """Tipo de mecanismo de redireccion del sistema de archivos observado."""
+    NINGUNO = "ninguno"
+    SIMBOLICO = "simbolico"
+    JUNCTION = "junction"
+    REPARSE_POINT = "reparse_point"
+    BIND_MOUNT = "bind_mount"
+    OTRO = "otro"
+
+
+@dataclass
+class InfoEnlace:
+    """Resultado de la identificacion de un enlace o redireccion.
+
+    `es_enlace` indica si el mecanismo existe. `tipo` clasifica el mecanismo.
+    `objetivo` es el destino declarado por el enlace (cuando el SO lo expone).
+    `es_ciclico` indica que seguirlo generaria un ciclo dado el conjunto de
+    rutas ya visitadas. `seguir` es la decision explicita de si se debe
+    atravesar el enlace, segun la politica solicitada.
+    """
+
+    es_enlace: bool
+    tipo: TipoEnlace
+    objetivo: Optional[str]
+    es_ciclico: bool
+    seguir: bool
+
+
+def _atributos_archivo_windows(path: str) -> Optional[int]:
+    """Devuelve los atributos de archivo de Windows para `path` o None si no
+    se pueden obtener (arquitectura no Windows o error de acceso)."""
+    if os.name != "nt":
+        return None
+    try:
+        kernel32 = ctypes.windll.kernel32
+        attrs = kernel32.GetFileAttributesW(path)
+        if attrs == 0xFFFFFFFF:
+            return None
+        return int(attrs)
+    except (OSError, AttributeError):
+        return None
+
+
+def _etiqueta_reparse_windows(path: str) -> Optional[int]:
+    """Lee el `ReparseTag` de un reparse point de Windows mediante
+    `DeviceIoControl(FSCTL_GET_REPARSE_POINT)`. Devuelve None si no es un
+    reparse point o no se puede leer."""
+    if os.name != "nt":
+        return None
+    try:
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.CreateFileW(
+            path,
+            0,  # GENERIC_READ no necesario para leer el reparse point
+            0x00000001 | 0x00000002,  # FILE_SHARE_READ | FILE_SHARE_WRITE
+            None,
+            3,  # OPEN_EXISTING
+            0x00200000,  # FILE_FLAG_OPEN_REPARSE_POINT
+            None,
+        )
+        if handle == -1 or handle is None:
+            return None
+        try:
+            buffer = ctypes.create_string_buffer(1024)
+            devuelto = ctypes.c_ulong(0)
+            FSCTL_GET_REPARSE_POINT = 0x900A8
+            ok = kernel32.DeviceIoControl(
+                handle,
+                FSCTL_GET_REPARSE_POINT,
+                None,
+                0,
+                buffer,
+                ctypes.sizeof(buffer),
+                ctypes.byref(devuelto),
+                None,
+            )
+            if not ok:
+                return None
+            # Los primeros 4 bytes del buffer son el ReparseTag (unsigned long).
+            tag = int.from_bytes(buffer.raw[:4], "little", signed=False)
+            return tag
+        finally:
+            kernel32.CloseHandle(handle)
+    except (OSError, AttributeError):
+        return None
+
+
+def detectar_bind_mount_linux(path: str) -> bool:
+    """Detecta un bind mount en Linux/Unix.
+
+    Un bind mount hace que el mismo inode (mismo `st_dev` y `st_ino`) sea
+    accesible desde dos rutas distintas. Se compara la entrada del `path`
+    con la de su directorio padre: si comparten device e inodo, `path` es un
+    bind mount (o hard link de directorio, tratandolo de forma equivalente
+    para efectos de evitacion de ciclos). Retorna False en no-Linux o error.
+    """
+    if os.name == "nt" or os.name == "posix" and sys_platform() == "win32":
+        return False
+    try:
+        stat_path = os.stat(path)
+        padre = os.path.dirname(path)
+        if not padre or padre == path:
+            return False
+        stat_padre = os.stat(padre)
+        return (
+            stat_path.st_dev == stat_padre.st_dev
+            and stat_path.st_ino == stat_padre.st_ino
+        )
+    except OSError:
+        return False
+
+
+def sys_platform() -> str:
+    """Devuelve el identificador de plataforma de `sys.platform` sin importar
+    el modulo sys (evita acoplamiento innecesario en modulos de bajo nivel)."""
+    return platform.system()
+
+
+def detectar_tipo_enlace(path: str) -> InfoEnlace:
+    """Identifica si `path` es un enlace simbolico, junction, reparse point o
+    bind mount, y declara explicitamente si se debe seguir.
+
+    La decision por defecto es conservadora: no se sigue ningún enlace a menos
+    que el llamante lo solicite y el objetivo no genere un ciclo. Un archivo
+    o directorio ordinario (sin redireccion) retorna `es_enlace=False` y
+    `tipo=NINGUNO`.
+
+    No lee el contenido del archivo destino (privacidad, 3.8.5.1.4.1.9).
+    """
+    if not os.path.exists(path) and not os.path.islink(path):
+        return InfoEnlace(
+            es_enlace=False,
+            tipo=TipoEnlace.NINGUNO,
+            objetivo=None,
+            es_ciclico=False,
+            seguir=False,
+        )
+
+    objetivo: Optional[str] = None
+    tipo = TipoEnlace.NINGUNO
+
+    if os.path.islink(path):
+        try:
+            objetivo = os.readlink(path)
+        except OSError:
+            objetivo = None
+        # En Windows os.path.islink() es True tanto para symlinks como para
+        # junctions; se intenta distinguir mediante el ReparseTag.
+        if sys_platform() == "Windows":
+            tag = _etiqueta_reparse_windows(path)
+            if tag == IO_REPARSE_TAG_MOUNT_POINT:
+                tipo = TipoEnlace.JUNCTION
+            elif tag == IO_REPARSE_TAG_SYMLINK:
+                tipo = TipoEnlace.SIMBOLICO
+            else:
+                tipo = TipoEnlace.SIMBOLICO
+        else:
+            tipo = TipoEnlace.SIMBOLICO
+    elif sys_platform() == "Windows":
+        attrs = _atributos_archivo_windows(path)
+        if attrs is not None and (attrs & FILE_ATTRIBUTE_REPARSE_POINT):
+            tag = _etiqueta_reparse_windows(path)
+            if tag == IO_REPARSE_TAG_MOUNT_POINT:
+                tipo = TipoEnlace.JUNCTION
+            elif tag == IO_REPARSE_TAG_SYMLINK:
+                tipo = TipoEnlace.SIMBOLICO
+            else:
+                tipo = TipoEnlace.REPARSE_POINT
+    elif detectar_bind_mount_linux(path):
+        tipo = TipoEnlace.BIND_MOUNT
+
+    es_enlace = tipo != TipoEnlace.NINGUNO
+    return InfoEnlace(
+        es_enlace=es_enlace,
+        tipo=tipo,
+        objetivo=objetivo,
+        es_ciclico=False,  # se calcula en resolver_sin_ciclos con el contexto
+        seguir=False,  # decision por defecto conservadora
+    )
+
+
+def _normalizar_para_visitado(path: str) -> str:
+    """Devuelve una representación normalizada y absoluta de `path` apta para
+    usarse como clave de deteccion de ciclos, respetando la case-sensitividad
+    del sistema de archivos subyacente."""
+    absoluto = os.path.abspath(path)
+    normalizado = os.path.normpath(absoluto)
+    if not _sistema_archivo_case_sensitive():
+        normalizado = normalizado.lower()
+    return normalizado
+
+
+def _sistema_archivo_case_sensitive() -> bool:
+    """Devuelve True si el sistema de archivos actual distingue mayusculas."""
+    try:
+        return os.path.normcase("A") != os.path.normcase("a")
+    except OSError:
+        return True
+
+
+def resolver_sin_ciclos(
+    path: str,
+    visitados: Optional[set[str]] = None,
+    seguir_enlaces: bool = False,
+) -> tuple[str, Optional[InfoEnlace]]:
+    """Resuelve la ruta real de `path` siguiendo enlaces de forma segura.
+
+    Parametros:
+    - `path`: ruta a resolver.
+    - `visitados`: conjunto de rutas normalizadas ya atravesadas. Si se omite,
+      se crea uno nuevo para esta resolucion.
+    - `seguir_enlaces`: si True, se atraviesan enlaces simbolicos/junctions
+      cuando no generen ciclo; si False, se devuelve el enlace sin atravesar.
+
+    Retorna `(ruta_resuelta, info_enlace_o_none)`. `ruta_resuelta` es la ruta
+    canonica despues de atravesar enlaces seguros (o la ruta original si no se
+    atraviesa). Si se detecta un ciclo (la ruta ya estaba en `visitados`),
+    `ruta_resuelta` es la ruta que cierra el ciclo y `info_enlace` tiene
+    `es_ciclico=True`.
+
+    Nunca sigue un enlace dos veces: evita ciclos por enlaces simbolicos,
+    junctions, reparse points y bind mounts (3.8.5.1.4.3.6).
+    """
+    if visitados is None:
+        visitados = set()
+
+    actual = path
+    info_final: Optional[InfoEnlace] = None
+    profundidad = 0
+    limite_profundidad = 64  # cota de seguridad contra bucles imprevistos
+
+    while profundidad < limite_profundidad:
+        clave = _normalizar_para_visitado(actual)
+        if clave in visitados:
+            # Ciclo detectado: esta ruta ya fue atravesada.
+            info_ciclo = detectar_tipo_enlace(actual)
+            return actual, InfoEnlace(
+                es_enlace=info_ciclo.es_enlace,
+                tipo=info_ciclo.tipo,
+                objetivo=info_ciclo.objetivo,
+                es_ciclico=True,
+                seguir=False,
+            )
+        visitados.add(clave)
+
+        info = detectar_tipo_enlace(actual)
+        info_final = info
+        if not info.es_enlace or not seguir_enlaces:
+            return actual, info
+
+        # Es un enlace y se solicita atravesarlo: resolver el objetivo.
+        if info.objetivo:
+            siguiente = os.path.normpath(
+                os.path.join(os.path.dirname(actual), info.objetivo)
+            )
+        else:
+            # No se pudo leer el objetivo: no se atraviesa.
+            return actual, info
+
+        actual = siguiente
+        profundidad += 1
+
+    # Superado el limite de profundidad: tratar como ciclo de seguridad.
+    info_final = detectar_tipo_enlace(actual)
+    return actual, InfoEnlace(
+        es_enlace=info_final.es_enlace,
+        tipo=info_final.tipo,
+        objetivo=info_final.objetivo,
+        es_ciclico=True,
+        seguir=False,
+    )
+
+
+def debe_seguir_enlace(
+    info: InfoEnlace,
+    visitados: set[str],
+    politica: str = "conservadora",
+) -> bool:
+    """Decide explicitamente si se debe seguir un enlace identificado.
+
+    Politicas:
+    - `"nunca"`: nunca se sigue un enlace (predeterminado mas seguro).
+    - `"conservadora"`: se sigue solo si no es ciclico, el objetivo existe,
+      no esta ya visitado y el tipo es reconocido (simbolico o junction).
+    - `"siempre"`: se sigue si no es ciclico y el objetivo existe.
+
+    La decision es puramente local y no lee el contenido del destino.
+    """
+    if politica == "nunca":
+        return False
+    if info.es_ciclico or not info.es_enlace:
+        return False
+    if info.tipo not in (
+        TipoEnlace.SIMBOLICO,
+        TipoEnlace.JUNCTION,
+        TipoEnlace.REPARSE_POINT,
+        TipoEnlace.BIND_MOUNT,
+    ):
+        return False
+    if info.objetivo is None:
+        return False
+    if politica == "siempre":
+        try:
+            return os.path.exists(info.objetivo) or os.path.islink(info.objetivo)
+        except OSError:
+            return False
+    # politica conservadora
+    clave_objetivo = _normalizar_para_visitado(info.objetivo)
+    if clave_objetivo in visitados:
+        return False
+    try:
+        return os.path.exists(info.objetivo) or os.path.islink(info.objetivo)
+    except OSError:
+        return False
+
+
+# ---------------------------------------------------------------------------
+# Recorrido iterativo y controlado de directorios por volumen (3.8.5.1.4.4.1)
+# ---------------------------------------------------------------------------
+
+class ControlRecorrido(Enum):
+    """Decisiones de flujo del recorrido iterativo de un volumen."""
+    CONTINUAR = "continuar"
+    PAUSAR = "pausar"
+    CANCELAR = "cancelar"
+
+
+@dataclass
+class ProgresoRecorrido:
+    """Estado de progreso de un recorrido de volumen.
+
+    Se informa tras procesar cada directorio para que el llamante conozca
+    el avance sin necesidad de consultar el estado interno del recorrido.
+    """
+
+    volumen: str          # identificador del volumen (letra en Windows, punto de montaje en otros SO)
+    raiz: str             # ruta de acceso a la raiz del volumen
+    entradas_procesadas: int = 0
+    directorios_procesados: int = 0
+    archivos_procesados: int = 0
+    errores: int = 0
+    exclusiones: int = 0
+    entrada_actual: str = ""
+    completado: bool = False
+    interrumpido: bool = False
+
+
+@dataclass
+class ErrorRecorrido:
+    """Error ocurrido al procesar una ruta durante el recorrido de un volumen.
+
+    Los errores se registran por ruta y volumen con una categoria, pero nunca
+    abortan el recorrido completo: una excepcion aislada no detiene el escaneo
+    de las demas entradas (3.8.5.1.4.4.6, .4.4.7).
+    """
+
+    ruta: str             # ruta donde ocurrio el error
+    volumen: str          # volumen al que pertenece la ruta
+    categoria: str        # "permiso_denegado", "ruta_eliminada", "error_e_s", "error_estado", etc.
+    mensaje: str          # mensaje descriptivo del error
+
+
+class RecorridoVolumen:
+    """
+    Recorrido iterativo y controlado de directorios por volumen.
+
+    Implementa un recorrido por pila explícita (sin recursión ilimitada)
+    sobre un único volumen del sistema de archivos. Captura metadatos de
+    cada entrada mediante `InventoryEntry` sin leer el contenido de los
+    archivos (privacidad, 3.8.5.1.4.1.9). Maneja errores por ruta
+    (permisos denegados, errores de E/S, rutas eliminadas) sin abortar el
+    recorrido completo. No lanza búsquedas indiscriminadas: es una operación
+    explícita y controlada, no disparada por cada consulta del usuario
+    (3.8.5.1.4.4.1).
+
+    Parametros:
+    - `volumen`: identificador del volumen.
+    - `raiz`: ruta de acceso a la raiz del volumen.
+    - `contrato`: `InventoryContract` que define alcance, exclusiones y privacidad.
+    - `maquina_id`: identificador local del equipo.
+    - `callback_progreso`: función opcional llamada con `ProgresoRecorrido` tras procesar cada directorio.
+    - `callback_control`: función opcional llamada antes de procesar cada directorio; si devuelve
+      `ControlRecorrido.CANCELAR` el recorrido se interrumpe; si devuelve `PAUSAR` se detiene temporalmente.
+    """
+
+    def __init__(
+        self,
+        volumen: str,
+        raiz: str,
+        contrato: InventoryContract,
+        maquina_id: str,
+        callback_progreso: Optional[Callable[[ProgresoRecorrido], None]] = None,
+        callback_control: Optional[Callable[[], ControlRecorrido]] = None,
+    ) -> None:
+        self.volumen = volumen
+        self.raiz = os.path.abspath(raiz)
+        self.contrato = contrato
+        self.maquina_id = maquina_id
+        self.callback_progreso = callback_progreso
+        self.callback_control = callback_control
+        self._progreso = ProgresoRecorrido(volumen=volumen, raiz=self.raiz)
+        self._errores: list[ErrorRecorrido] = []
+        self._visitados: set[str] = set()
+        self._interrumpido = False
+
+    @property
+    def progreso(self) -> ProgresoRecorrido:
+        """Devuelve el progreso actual del recorrido."""
+        return self._progreso
+
+    @property
+    def errores(self) -> list[ErrorRecorrido]:
+        """Devuelve una copia de los errores acumulados durante el recorrido."""
+        return list(self._errores)
+
+    def _registrar_error(self, ruta: str, categoria: str, mensaje: str) -> None:
+        """Añade un error al registro sin abortar el recorrido."""
+        self._errores.append(
+            ErrorRecorrido(
+                ruta=ruta,
+                volumen=self.volumen,
+                categoria=categoria,
+                mensaje=mensaje,
+            )
+        )
+        self._progreso.errores = len(self._errores)
+
+    def _normalizar_visitado(self, path: str) -> str:
+        """Devuelve la representación normalizada de `path` para el conjunto de visitados."""
+        absoluto = os.path.abspath(path)
+        normalizado = os.path.normpath(absoluto)
+        if not _sistema_archivo_case_sensitive():
+            normalizado = normalizado.lower()
+        return normalizado
+
+    def _debe_excluir(self, path: str) -> bool:
+        """Devuelve True si la ruta debe excluirse según el contrato de inventario."""
+        return self.contrato.should_exclude_path(path)
+
+    def _timestamp_seguro(self, valor: float) -> str:
+        """Convierte un timestamp de estadísticas del SO a ISO 8601 de forma segura."""
+        try:
+            return datetime.fromtimestamp(valor).isoformat()
+        except (OSError, ValueError, OverflowError):
+            return ""
+
+    def _crear_entrada(self, entrada: os.DirEntry, ruta_absoluta: str) -> Optional[InventoryEntry]:
+        """Crea un `InventoryEntry` a partir de una entrada de directorio, sin leer su contenido.
+
+        Solo metadatos observados por el SO. Si no se pueden obtener los metadatos
+        (archivo bloqueado, ruta eliminada durante el recorrido), se registra el error
+        y se retorna None para que el recorrido continúe con la siguiente entrada.
+        """
+        try:
+            stat = entrada.stat(follow_symlinks=False)
+        except OSError as exc:
+            self._registrar_error(ruta_absoluta, "error_estado", f"No se pudieron obtener los metadatos: {exc}")
+            return None
+
+        nombre = entrada.name
+        extension = os.path.splitext(nombre)[1]
+
+        # Tipo de entrada observado directamente del SO, sin inferencias.
+        if entrada.is_dir(follow_symlinks=False):
+            tipo_entrada = EntryType.DIRECTORY
+        elif entrada.is_symlink():
+            tipo_entrada = EntryType.SYMLINK
+        elif entrada.is_file(follow_symlinks=False):
+            tipo_entrada = EntryType.FILE
+        else:
+            tipo_entrada = EntryType.OTHER
+
+        ahora = datetime.now().isoformat()
+        try:
+            relativa = os.path.relpath(ruta_absoluta, self.raiz)
+        except ValueError:
+            relativa = nombre
+
+        excluida = self._debe_excluir(ruta_absoluta)
+
+        return InventoryEntry(
+            machine_id=self.maquina_id,
+            volume=self.volumen,
+            absolute_path=ruta_absoluta,
+            relative_path=relativa,
+            name=nombre,
+            extension=extension,
+            entry_type=tipo_entrada,
+            size_bytes=int(stat.st_size) if tipo_entrada == EntryType.FILE else 0,
+            modified_at=self._timestamp_seguro(stat.st_mtime),
+            created_at=self._timestamp_seguro(stat.st_ctime),
+            accessed_at=self._timestamp_seguro(stat.st_atime),
+            attributes=[],
+            excluded=excluida,
+            exclusion_reason="exclusion_tecnica" if excluida else None,
+            source="filesystem_scan",
+            last_checked_at=ahora,
+        )
+
+    def recorrer(self) -> Iterator[InventoryEntry]:
+        """
+        Recorre iterativamente el volumen emitiendo `InventoryEntry` por cada entrada accesible.
+
+        Usa una pila explícita en lugar de recursión, de modo que no hay
+        riesgo de desbordamiento de pila en árboles de directorios profundos
+        (evita recursión sin límites, 3.8.5.1.4.4.1). Los errores por ruta
+        se registran y el recorrido continúa con la siguiente entrada.
+
+        Genera:
+        - `InventoryEntry` para cada archivo, directorio, enlace u otro elemento accesible.
+        """
+        self._progreso = ProgresoRecorrido(volumen=self.volumen, raiz=self.raiz)
+        self._errores = []
+        self._visitados = set()
+        self._interrumpido = False
+
+        pila: list[str] = [self.raiz]
+
+        while pila:
+            # Comprobar control de flujo (pausa/cancelar) antes de cada directorio.
+            if self.callback_control is not None:
+                decision = self.callback_control()
+                if decision == ControlRecorrido.CANCELAR:
+                    self._progreso.interrumpido = True
+                    self._progreso.completado = False
+                    return
+                if decision == ControlRecorrido.PAUSAR:
+                    self._progreso.interrumpido = True
+                    self._progreso.completado = False
+                    return
+
+            directorio_actual = pila.pop()
+            clave_visitado = self._normalizar_visitado(directorio_actual)
+
+            # Evitar volver a procesar el mismo directorio (protege contra ciclos
+            # por enlaces simbólicos, junctions, reparse points y bind mounts).
+            if clave_visitado in self._visitados:
+                continue
+            self._visitados.add(clave_visitado)
+
+            self._progreso.entrada_actual = directorio_actual
+            self._progreso.directorios_procesados += 1
+
+            try:
+                with os.scandir(directorio_actual) as iterator:
+                    for entrada in iterator:
+                        ruta_absoluta = entrada.path
+
+                        # Respetar exclusiones del contrato de inventario.
+                        if self._debe_excluir(ruta_absoluta):
+                            self._progreso.exclusiones += 1
+                            continue
+
+                        entry = self._crear_entrada(entrada, ruta_absoluta)
+                        if entry is None:
+                            continue
+
+                        if entry.excluded:
+                            self._progreso.exclusiones += 1
+                            continue
+
+                        self._progreso.entradas_procesadas += 1
+
+                        if entry.entry_type == EntryType.FILE:
+                            self._progreso.archivos_procesados += 1
+                        elif entry.entry_type == EntryType.DIRECTORY:
+                            # Añadir directorio a la pila para procesarlo después
+                            # (iterativo, sin recursión).
+                            try:
+                                real_path = os.path.realpath(ruta_absoluta)
+                            except OSError:
+                                real_path = ruta_absoluta
+                            clave_dir = self._normalizar_visitado(real_path)
+                            if clave_dir not in self._visitados:
+                                pila.append(ruta_absoluta)
+
+                        yield entry
+
+            except PermissionError as exc:
+                self._registrar_error(directorio_actual, "permiso_denegado", str(exc))
+                continue
+            except FileNotFoundError as exc:
+                self._registrar_error(directorio_actual, "ruta_eliminada", str(exc))
+                continue
+            except OSError as exc:
+                self._registrar_error(directorio_actual, "error_e_s", str(exc))
+                continue
+
+            # Notificar progreso tras procesar cada directorio.
+            if self.callback_progreso is not None:
+                self.callback_progreso(self._progreso)
+
+        self._progreso.completado = True
+        self._progreso.interrumpido = False
+        if self.callback_progreso is not None:
+            self.callback_progreso(self._progreso)

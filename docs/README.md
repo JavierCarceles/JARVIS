@@ -1746,9 +1746,9 @@ Funciones a nivel módulo:
 | `def register_mouse_capabilities()`  (L110) | Registra las capacidades del ratón en el sistema. |
 
 <a name="src-hands-system_inventory-py"></a>
-### `src/hands/system_inventory.py` [826 líneas] — Contrato, alcance y privacidad del inventario persistente del sistema de archivos.
+### `src/hands/system_inventory.py` — Contrato, alcance y privacidad del inventario persistente del sistema de archivos.
 
-**Descripción:** Define el contrato del inventario local de elementos del sistema de archivos del equipo donde se ejecuta JARVIS. No implementa escaneo ni persistencia (responsabilidades de unidades posteriores). Solo define la entrada de inventario con metadatos mínimos, el identificador local de equipo, el alcance predeterminado, exclusiones técnicas, controles de privacidad, operaciones de control del inventario, detección de sistema operativo y arquitectura, matriz de cobertura, enumeración de volúmenes en Windows, enumeración de puntos de montaje en Linux y enumeración de volúmenes montados en macOS.
+**Descripción:** Define el contrato del inventario local de elementos del sistema de archivos del equipo donde se ejecuta JARVIS. Define la entrada de inventario con metadatos mínimos, el identificador local de equipo, el alcance predeterminado, exclusiones técnicas, controles de privacidad, operaciones de control del inventario, detección de sistema operativo y arquitectura, matriz de cobertura, enumeración de volúmenes en Windows, enumeración de puntos de montaje en Linux y enumeración de volúmenes montados en macOS. Además identifica enlaces simbólicos, junctions, reparse points y bind mounts, y resuelve rutas atravesando enlaces de forma segura evitando ciclos. Incluye la diferenciación de estados de volumen: desmontado, inaccesible, permiso denegado, sistema de archivos no soportado y vacío. Implementa el recorrido iterativo y controlado de directorios por volumen, sin recursión ilimitada y sin búsquedas indiscriminadas desde cada consulta del usuario.
 
 **Características:**
 
@@ -1765,26 +1765,35 @@ Funciones a nivel módulo:
 - Enumeración de puntos de montaje Linux clasificando sistemas de archivos locales, virtuales, de red y extraibles (vía `/proc/mounts`, biblioteca estándar)
 - Enumeración de volúmenes montados en macOS clasificando sistemas de archivos locales, virtuales, de red y extraibles (vía salida del comando `mount`, biblioteca estándar)
 - Contrato común de volumen multiplataforma (`VolumenComun`) que representa un volumen sin forzar letras de unidad ni rutas de Windows en Linux ni macOS, con conversor desde `VolumeInfo` (`volumen_comun_desde_info`) y enumerador unificado (`enumerar_volumenes_comun`).
+- Diferenciación de estados de volumen (`EstadoVolumen`): disponible, desmontado, inaccesible, permiso denegado, sistema de archivos no soportado y vacío, con función `determinar_estado_volumen` para clasificar cada volumen sin leer su contenido.
+- Recorrido iterativo y controlado de directorios por volumen (`RecorridoVolumen`): pila explícita sin recursión ilimitada, captura de metadatos vía `InventoryEntry` sin leer contenido de archivos, manejo de errores por ruta sin abortar el recorrido, callbacks de progreso y de control (pausa/cancelar), respeto a exclusiones del contrato y protección contra ciclos.
 
-**Importaciones:** 10.
+**Importaciones:** 11.
 
 Clases:
 
 | Clase | Docstring |
 |---|---|
+| `class ControlRecorrido(Enum)` | Decisiones de flujo del recorrido iterativo de un volumen (continuar, pausar, cancelar). |
 | `class EntryType(Enum)` | Tipo de entrada del inventario, observado directamente del SO. |
+| `class ErrorRecorrido` | Error ocurrido al procesar una ruta durante el recorrido de un volumen (ruta, volumen, categoría, mensaje). |
+| `class EstadoVolumen(Enum)` | Estado de un volumen: disponible, desmontado, inaccesible, permiso denegado, sistema de archivos no soportado o vacío. |
 | `class InventoryScope(Enum)` | Alcance del inventario. |
 | `class InventoryEntry` | Entrada del inventario de un elemento del sistema de archivos. Solo metadatos observados por el sistema operativo. |
 | `class FactType(Enum)` | Clasifica si un dato es un hecho observado o una inferencia. |
 | `class InventoryControl(Enum)` | Controles disponibles para gestión del inventario. |
 | `class InventoryControlResult` | Resultado de una operación de control del inventario. |
 | `class InventoryContract` | Contrato del inventario persistente. Define alcance, metadatos, privacidad y exclusiones de forma centralizada. |
+| `class ProgresoRecorrido` | Estado de progreso de un recorrido de volumen (contadores, entrada actual, completado, interrumpido). |
+| `class RecorridoVolumen` | Recorrido iterativo y controlado de directorios por volumen, por pila explícita sin recursión ilimitada. |
 | `class CoverageMatrixEntry` | Una celda de la matriz de cobertura del inventario. |
 | `class SistemaOperativo(Enum)` | Sistemas operativos detectables mediante APIs del sistema (platform). |
 | `class InfoSistema` | Información del sistema operativo detectada mediante APIs del sistema. |
 | `class VolumeType(Enum)` | Tipo de unidad/volumen de Windows, observado vía `GetDriveType`. |
 | `class VolumeInfo` | Información de un volumen/unidad de Windows observada del SO. |
 | `class VolumenComun` | Contrato común de volumen multiplataforma que no impone letras de unidad ni rutas de Windows en otros SO. |
+| `class TipoEnlace(Enum)` | Tipo de mecanismo de redirección del sistema de archivos observado (ninguno, simbólico, junction, reparse point, bind mount, otro). |
+| `class InfoEnlace` | Resultado de la identificación de un enlace o redirección: si existe, tipo, objetivo declarado, si es cíclico y la decisión de seguir. |
 
 Funciones a nivel módulo:
 
@@ -1798,6 +1807,7 @@ Funciones a nivel módulo:
 | `def classify_entry(entry_type, extension)` | Clasifica una entrada como hecho observado o inferencia. |
 | `def validate_control(control, machine_id, current_machine_id)` | Valida que una operación de control sea aceptable. |
 | `def default_contract()` | Devuelve el contrato por defecto del inventario. |
+| `def determinar_estado_volumen(info, sistema_origen=None)` | Determina el estado diferenciado de un volumen (disponible, desmontado, inaccesible, permiso denegado, sistema de archivos no soportado o vacío). |
 | `def cobertura_soportada(sistema_operativo, version, arquitectura, tipo_volumen, tipo_entrada)` | Consulta la matriz de cobertura para saber si una combinación es soportada. |
 | `def entradas_cobertura_por_sistema(sistema_operativo)` | Devuelve todas las entradas de cobertura para un sistema operativo. |
 | `def normalizar_arquitectura(maquina)` | Normaliza el identificador de arquitectura de `platform.machine()`. |
@@ -1808,6 +1818,15 @@ Funciones a nivel módulo:
 | `def enumerar_volumenes_macos(mount_output=None)` | Enumerar en macOS volumenes montados clasificados como local, virtual, de red o extraible. |
 | `def volumen_comun_desde_info(info, sistema_origen=None)` | Convierte un `VolumeInfo` en el contrato común `VolumenComun` sin forzar letras de unidad ni rutas de Windows en otros SO. |
 | `def enumerar_volumenes_comun(sistema_origen=None)` | Enumerar los volúmenes del equipo usando el adaptador del SO real y devolver contratos comunes de volumen. |
+| `def detectar_tipo_enlace(path)` | Identifica si una ruta es un enlace simbólico, junction, reparse point o bind mount, y declara si se debe seguir (decisión conservadora por defecto). |
+| `def resolver_sin_ciclos(path, visitados=None, seguir_enlaces=False)` | Resuelve una ruta atravesando enlaces de forma segura, evitando ciclos por enlaces simbólicos, junctions, reparse points y bind mounts. |
+| `def debe_seguir_enlace(info, visitados, politica="conservadora")` | Decide explícitamente si se debe seguir un enlace según la política solicitada (nunca, conservadora o siempre). |
+| `def detectar_bind_mount_linux(path)` | Detecta bind mounts en Linux comparando device e inodo con el directorio padre; no falla en plataformas no Linux. |
+| Métodos de `RecorridoVolumen`: | |
+| `def __init__(volumen, raiz, contrato, maquina_id, callback_progreso=None, callback_control=None)` | Inicializa el recorrido iterativo de un volumen con contrato, callbacks de progreso y control. |
+| `def recorrer()` | Generador que recorre iterativamente el volumen emitiendo `InventoryEntry` por cada entrada accesible. |
+| `property progreso` | Devuelve el `ProgresoRecorrido` actual del recorrido. |
+| `property errores` | Devuelve la lista de `ErrorRecorrido` acumulados durante el recorrido. |
 
 ### `src/hands/system_inventory_storage.py` — Almacenamiento canonico SQLite del indice de inventario persistente del sistema de archivos.
 

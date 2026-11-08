@@ -10681,7 +10681,7 @@ da reconciled=False (coincidencia).
 <a name="hands/test-system_inventory"></a>
 ### `hands\test_system_inventory.py`
 
-**Descripción:** Tests de contrato del inventario persistente del sistema de archivos (unidad 3.8.5.1.4.1). Verifican serialización/deserialización de `InventoryEntry`, generación de identificador local de equipo estable (sin MAC ni serial), controles de privacidad por defecto (sin lectura de contenido, sin rutas completas en logs), exclusiones técnicas de rutas y puntos de montaje, separación entre hechos observados del SO e inferencias, truncamiento seguro de rutas para logs, controles de operación del inventario con aislamiento por equipo, valores por defecto del contrato y serialización para persistencia en JSON. También verifican el contrato común de volumen multiplataforma (`VolumenComun`), su conversión desde `VolumeInfo` sin forzar letras de unidad ni rutas de Windows en otros SO, y la enumeración unificada de volúmenes.
+**Descripción:** Tests de contrato del inventario persistente del sistema de archivos (unidad 3.8.5.1.4.1). Verifican serialización/deserialización de `InventoryEntry`, generación de identificador local de equipo estable (sin MAC ni serial), controles de privacidad por defecto (sin lectura de contenido, sin rutas completas en logs), exclusiones técnicas de rutas y puntos de montaje, separación entre hechos observados del SO e inferencias, truncamiento seguro de rutas para logs, controles de operación del inventario con aislamiento por equipo, valores por defecto del contrato y serialización para persistencia en JSON. También verifican el contrato común de volumen multiplataforma (`VolumenComun`), su conversión desde `VolumeInfo` sin forzar letras de unidad ni rutas de Windows en otros SO, la enumeración unificada de volúmenes y la diferenciación de estados de volumen: desmontado, inaccesible, permiso denegado, sistema de archivos no soportado y vacío.
 
 **Clases de test:**
 
@@ -10698,8 +10698,14 @@ da reconciled=False (coincidencia).
 | `TestVolumenComun` | Contrato común de volumen: no impone letra de unidad ni rutas Windows en SO no Windows. |
 | `TestVolumenComunDesdeInfo` | Conversión de `VolumeInfo` a `VolumenComun` sin forzar conceptos Windows. |
 | `TestEnumerarVolumenesComun` | Enumeración unificada de volúmenes que devuelve contratos comunes de volumen. |
+| `TestEstadoVolumen` | Enum de estados de volumen: disponible, desmontado, inaccesible, permiso denegado, sistema de archivos no soportado y vacío. |
+| `TestDeterminarEstadoVolumen` | Clasificación de estado de volumen: desmontado, permiso denegado, inaccesible, sistema de archivos no soportado, vacío y disponible. |
+| `TestVolumenComunConEstado` | Campo `estado` en `VolumenComun`: valor por defecto, asignación explícita y serialización en `to_dict`. |
+| `TestVolumenComunDesdeInfoConEstado` | Cálculo de estado en `volumen_comun_desde_info` desde `VolumeInfo`. |
+| `TestEnumerarVolumenesComunConEstado` | `enumerar_volumenes_comun` devuelve volúmenes con estado diferenciado válido. |
+| `TestCoberturaSoportada` | Consulta de la matriz de soporte SO/version sin inferencias: combinacion registrada soportada, no soportada, no registrada, SO desconocido, version no registrada, insensibilidad a mayusculas y filtrado de entradas por SO. |
 
-**Resultados:** 98 tests unitarios, 98 PASSED / 0 FAILED.
+**Resultados:** 133 tests unitarios, 133 PASSED / 0 FAILED / 3 SKIPPED (symlinks no creables en Windows sin privilegios).
 
 ---
 
