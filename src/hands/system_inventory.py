@@ -1618,6 +1618,9 @@ class RecorridoVolumen:
     - `callback_progreso`: función opcional llamada con `ProgresoRecorrido` tras procesar cada directorio.
     - `callback_control`: función opcional llamada antes de procesar cada directorio; si devuelve
       `ControlRecorrido.CANCELAR` el recorrido se interrumpe; si devuelve `PAUSAR` se detiene temporalmente.
+    - `seguir_enlaces`: si True, los enlaces simbolicos y junctions no ciclicos se atraviesan segun
+      `debe_seguir_enlace` (politica conservadora). Por defecto False: los enlaces se reportan como
+      entrada pero no se recorren, preservando el comportamiento seguro de recorrido controlado.
     """
 
     def __init__(
@@ -1626,6 +1629,7 @@ class RecorridoVolumen:
         raiz: str,
         contrato: InventoryContract,
         maquina_id: str,
+        seguir_enlaces: bool = False,
         callback_progreso: Optional[Callable[[ProgresoRecorrido], None]] = None,
         callback_control: Optional[Callable[[], ControlRecorrido]] = None,
     ) -> None:
@@ -1633,6 +1637,7 @@ class RecorridoVolumen:
         self.raiz = os.path.abspath(raiz)
         self.contrato = contrato
         self.maquina_id = maquina_id
+        self._seguir_enlaces = seguir_enlaces
         self.callback_progreso = callback_progreso
         self.callback_control = callback_control
         self._progreso = ProgresoRecorrido(volumen=volumen, raiz=self.raiz)
@@ -1649,6 +1654,42 @@ class RecorridoVolumen:
     def errores(self) -> list[ErrorRecorrido]:
         """Devuelve una copia de los errores acumulados durante el recorrido."""
         return list(self._errores)
+
+    def _clave_directorio(self, path: str) -> str:
+        """Identificador canonico de visita para un directorio.
+
+        Combina la ruta real resuelta (symlinks y junctions) con la identidad
+        de inodo en POSIX, de modo que dos rutas distintas que apuntan al
+        mismo objeto del sistema de archivos (enlace simbolico, junction,
+        reparse point o bind mount) generen la misma clave y no se recorran
+        dos veces (3.8.5.1.4.4.2).
+        """
+        try:
+            real = os.path.realpath(path)
+        except OSError:
+            real = path
+        clave = self._normalizar_visitado(real)
+        if os.name != "nt":
+            try:
+                st = os.stat(real)
+                clave += f"|{st.st_dev}:{st.st_ino}"
+            except OSError:
+                pass
+        return clave
+
+    def _considerar_directorio_para_pila(self, ruta: str, pila: list[str]) -> None:
+        """Agrega `ruta` a la pila de recorrido solo si aun no fue visitada.
+
+        Usa el identificador canonico de visita, por lo que descarta
+        silenciosamente ciclos, duplicados por punto de montaje y recorridos
+        repetidos de enlaces (3.8.5.1.4.4.2). Se registra la clave al apilar
+        para que la pila nunca contenga el mismo directorio dos veces.
+        """
+        clave = self._clave_directorio(ruta)
+        if clave in self._visitados:
+            return
+        self._visitados.add(clave)
+        pila.append(ruta)
 
     def _registrar_error(self, ruta: str, categoria: str, mensaje: str) -> None:
         """Añade un error al registro sin abortar el recorrido."""
@@ -1740,8 +1781,18 @@ class RecorridoVolumen:
 
         Usa una pila explícita en lugar de recursión, de modo que no hay
         riesgo de desbordamiento de pila en árboles de directorios profundos
-        (evita recursión sin límites, 3.8.5.1.4.4.1). Los errores por ruta
-        se registran y el recorrido continúa con la siguiente entrada.
+        (evita recursión sin límites). Los errores por ruta se registran y
+        el recorrido continúa con la siguiente entrada.
+
+        El conjunto de visitados usa identificadores canonicos por directorio
+        (ruta real resuelta y, en POSIX, identidad de dispositivo/inodo), por
+        lo que se evitan ciclos, duplicados por punto de montaje y
+        recorridos repetidos de enlaces. Las claves se registran al apilar,
+        de modo que la pila nunca contiene el mismo directorio dos veces.
+
+        `seguir_enlaces` controla si los enlaces simbolicos/junctions no
+        ciclicos se atraviesan (politica conservadora); por defecto no se
+        recorren.
 
         Genera:
         - `InventoryEntry` para cada archivo, directorio, enlace u otro elemento accesible.
@@ -1751,6 +1802,9 @@ class RecorridoVolumen:
         self._visitados = set()
         self._interrumpido = False
 
+        # Semilla del conjunto de visitados con la raiz: se visita exactamente
+        # una vez y nunca se vuelve a procesar.
+        self._visitados.add(self._clave_directorio(self.raiz))
         pila: list[str] = [self.raiz]
 
         while pila:
@@ -1767,13 +1821,6 @@ class RecorridoVolumen:
                     return
 
             directorio_actual = pila.pop()
-            clave_visitado = self._normalizar_visitado(directorio_actual)
-
-            # Evitar volver a procesar el mismo directorio (protege contra ciclos
-            # por enlaces simbólicos, junctions, reparse points y bind mounts).
-            if clave_visitado in self._visitados:
-                continue
-            self._visitados.add(clave_visitado)
 
             self._progreso.entrada_actual = directorio_actual
             self._progreso.directorios_procesados += 1
@@ -1801,15 +1848,23 @@ class RecorridoVolumen:
                         if entry.entry_type == EntryType.FILE:
                             self._progreso.archivos_procesados += 1
                         elif entry.entry_type == EntryType.DIRECTORY:
-                            # Añadir directorio a la pila para procesarlo después
-                            # (iterativo, sin recursión).
-                            try:
-                                real_path = os.path.realpath(ruta_absoluta)
-                            except OSError:
-                                real_path = ruta_absoluta
-                            clave_dir = self._normalizar_visitado(real_path)
-                            if clave_dir not in self._visitados:
-                                pila.append(ruta_absoluta)
+                            # Directorio real: apilar si su identificador de
+                            # visita aun no fue registrado.
+                            self._considerar_directorio_para_pila(ruta_absoluta, pila)
+                        elif (
+                            entry.entry_type == EntryType.SYMLINK
+                            and self._seguir_enlaces
+                        ):
+                            # Enlace simbolico/junction: atravesar solo si la
+                            # politica lo permite y su objetivo no genera ciclo
+                            # ni repite una visita ya registrada.
+                            info_enlace = detectar_tipo_enlace(ruta_absoluta)
+                            if debe_seguir_enlace(
+                                info_enlace, self._visitados, "conservadora"
+                            ):
+                                self._considerar_directorio_para_pila(
+                                    ruta_absoluta, pila
+                                )
 
                         yield entry
 

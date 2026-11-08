@@ -1766,7 +1766,7 @@ Funciones a nivel módulo:
 - Enumeración de volúmenes montados en macOS clasificando sistemas de archivos locales, virtuales, de red y extraibles (vía salida del comando `mount`, biblioteca estándar)
 - Contrato común de volumen multiplataforma (`VolumenComun`) que representa un volumen sin forzar letras de unidad ni rutas de Windows en Linux ni macOS, con conversor desde `VolumeInfo` (`volumen_comun_desde_info`) y enumerador unificado (`enumerar_volumenes_comun`).
 - Diferenciación de estados de volumen (`EstadoVolumen`): disponible, desmontado, inaccesible, permiso denegado, sistema de archivos no soportado y vacío, con función `determinar_estado_volumen` para clasificar cada volumen sin leer su contenido.
-- Recorrido iterativo y controlado de directorios por volumen (`RecorridoVolumen`): pila explícita sin recursión ilimitada, captura de metadatos vía `InventoryEntry` sin leer contenido de archivos, manejo de errores por ruta sin abortar el recorrido, callbacks de progreso y de control (pausa/cancelar), respeto a exclusiones del contrato y protección contra ciclos.
+- Recorrido iterativo y controlado de directorios por volumen (`RecorridoVolumen`): pila explícita sin recursión ilimitada, captura de metadatos vía `InventoryEntry` sin leer contenido de archivos, manejo de errores por ruta sin abortar el recorrido, callbacks de progreso y de control (pausa/cancelar), respeto a exclusiones del contrato y conjunto de visitados con identificadores canonicos para evitar ciclos, duplicados por punto de montaje y recorridos repetidos de enlaces; opción `seguir_enlaces` para traversal de enlaces bajo política conservadora.
 
 **Importaciones:** 11.
 
@@ -1785,7 +1785,7 @@ Clases:
 | `class InventoryControlResult` | Resultado de una operación de control del inventario. |
 | `class InventoryContract` | Contrato del inventario persistente. Define alcance, metadatos, privacidad y exclusiones de forma centralizada. |
 | `class ProgresoRecorrido` | Estado de progreso de un recorrido de volumen (contadores, entrada actual, completado, interrumpido). |
-| `class RecorridoVolumen` | Recorrido iterativo y controlado de directorios por volumen, por pila explícita sin recursión ilimitada. |
+| `class RecorridoVolumen` | Recorrido iterativo y controlado de directorios por volumen, por pila explícita sin recursión ilimitada, con conjunto de visitados por identificador canónico y opción de traversal de enlaces (`seguir_enlaces`). |
 | `class CoverageMatrixEntry` | Una celda de la matriz de cobertura del inventario. |
 | `class SistemaOperativo(Enum)` | Sistemas operativos detectables mediante APIs del sistema (platform). |
 | `class InfoSistema` | Información del sistema operativo detectada mediante APIs del sistema. |
@@ -1823,7 +1823,7 @@ Funciones a nivel módulo:
 | `def debe_seguir_enlace(info, visitados, politica="conservadora")` | Decide explícitamente si se debe seguir un enlace según la política solicitada (nunca, conservadora o siempre). |
 | `def detectar_bind_mount_linux(path)` | Detecta bind mounts en Linux comparando device e inodo con el directorio padre; no falla en plataformas no Linux. |
 | Métodos de `RecorridoVolumen`: | |
-| `def __init__(volumen, raiz, contrato, maquina_id, callback_progreso=None, callback_control=None)` | Inicializa el recorrido iterativo de un volumen con contrato, callbacks de progreso y control. |
+| `def __init__(volumen, raiz, contrato, maquina_id, seguir_enlaces=False, callback_progreso=None, callback_control=None)` | Inicializa el recorrido iterativo de un volumen con contrato, política de traversal de enlaces y callbacks de progreso y control. |
 | `def recorrer()` | Generador que recorre iterativamente el volumen emitiendo `InventoryEntry` por cada entrada accesible. |
 | `property progreso` | Devuelve el `ProgresoRecorrido` actual del recorrido. |
 | `property errores` | Devuelve la lista de `ErrorRecorrido` acumulados durante el recorrido. |

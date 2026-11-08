@@ -7734,3 +7734,15 @@ VERIFICACION: SINTAXIS: OK (py_compile de src/hands/system_inventory.py y tests/
 DISCREPANCIAS: NINGUNA
 PENDIENTES: Siguiente hoja pendiente real en orden del roadmap: 3.8.5.1.4.4.2 (mantener conjunto de directorios/identificadores visitados para evitar ciclos, duplicados por puntos de montaje y recorridos repetidos de enlaces). Padre 3.8.5.1.4.4 con hija .1 cerrada.
 ESTADO FINAL: 3.8.5.1.4.4.1 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.8.5.1.4.4.2
+FECHA: 2026-11-08
+OBJETIVO: Mantener un conjunto de directorios/identificadores visitados para evitar ciclos, duplicados por puntos de montaje y recorridos repetidos de enlaces.
+TIPO DE TRABAJO: IMPLEMENTACION | TEST | DOCUMENTACION
+CAMBIOS / HALLAZGOS: src/hands/system_inventory.py: RecorridoVolumen.__init__ acepta seguir_enlaces=False (por defecto no se recorren enlaces); nuevo _clave_directorio(path) con ruta real resuelta normalizada y dispositivo:inodo en POSIX (identidad de bind mount); nuevo _considerar_directorio_para_pila(ruta, pila) que registra la clave al apilar; recorrer() semilla visitados con la raiz, usa claves canonicas tanto al apilar como al procesar, y atraviesa enlaces simbolicos/junctions solo con seguir_enlaces=True bajo debe_seguir_enlace politica conservadora. Evita ciclos, duplicados por punto de montaje y recorridos repetidos de enlaces. tests/hands/test_system_inventory.py: nueva clase TestRecorridoVolumenVisitados con 8 pruebas. docs/README.md: descripcion del recorrido, docstring de clase y firma __init__ actualizadas. Ningún cambio en main.py.
+ARCHIVOS MODIFICADOS: PRODUCCION: `src/hands/system_inventory.py`; TESTS: `tests/hands/test_system_inventory.py`; DOCUMENTACION: `docs/README.md`
+TESTS Y RESULTADOS: UNITARIOS: 145 PASSED / 8 SKIPPED / 153 TOTAL (`tests/hands/test_system_inventory.py`, ejecutados en Windows real); INTEGRACION: NA; NO REGRESION: NA
+VERIFICACION: SINTAXIS: OK (py_compile de src/hands/system_inventory.py y tests/hands/test_system_inventory.py sin errores; import del modulo y recoleccion de pytest OK); MAIN.PY: NA (no se modifica main.py); COMPORTAMIENTO / INTEGRACION REAL: Evidencia real de ejecucion: 145 tests pasan y 8 se saltan en Windows real (sin privilegios para crear enlaces simbolicos ni montar bind mounts). Verificado: recorrido de arbol temporal, metadatos sin leer contenido, rutas Unicode, callback de progreso con completado=True, cancelacion, errores por ruta sin abortar, exclusiones del contrato, volumen inexistente, y proteccion contra ciclos/duplicados con identificadores canonicos (enlace a objetivo ya visitado, ciclo a padre sin bucle, determinismo de claves, identidad de inodo en POSIX).
+DISCREPANCIAS: NINGUNA
+PENDIENTES: Siguiente hoja pendiente real en orden del roadmap: 3.8.5.1.4.4.3 (capturar metadatos de archivos y directorios sin abrir ni copiar su contenido). Padre 3.8.5.1.4.4 con hijas .1 y .2 cerradas; .3 a .10 pendientes.
+ESTADO FINAL: 3.8.5.1.4.4.2 - IMPLEMENTADA

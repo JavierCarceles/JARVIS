@@ -1652,3 +1652,127 @@ class TestRecorridoVolumenCiclos:
         nombres = [e.name for e in entradas]
         assert nombres.count("sub") == 1
         assert nombres.count("archivo.txt") == 1
+
+
+class TestRecorridoVolumenVisitados:
+    """El conjunto de visitados con identificadores canonicos evita ciclos,
+    duplicados por punto de montaje y recorridos repetidos de enlaces."""
+
+    def _arbol_con_enlace(self, tmp_path: Path) -> Path:
+        """Crea raiz con subdirectorio y un simbolico hacia dicho subdirectorio."""
+        raiz = tmp_path / "volumen"
+        (raiz / "sub").mkdir(parents=True)
+        (raiz / "sub" / "dentro.txt").write_text("x", encoding="utf-8")
+        enlace = raiz / "link_a_sub"
+        if not _crear_simbolico_si_se_puede(str(raiz / "sub"), str(enlace)):
+            pytest.skip("El entorno no permite crear enlaces simbolicos")
+        return raiz
+
+    def test_clave_directorio_igual_para_enlace_y_objetivo(self, tmp_path: Path):
+        """El identificador canonico de un enlace y de su directorio objetivo coincide."""
+        raiz = self._arbol_con_enlace(tmp_path)
+        contrato = _ContratoPrueba()
+        recorrido = RecorridoVolumen(
+            volumen="V", raiz=str(raiz), contrato=contrato, maquina_id="maquina-test",
+        )
+        assert recorrido._clave_directorio(str(raiz / "link_a_sub")) == \
+            recorrido._clave_directorio(str(raiz / "sub"))
+
+    def test_clave_directorio_es_determinista(self, tmp_path: Path):
+        """Misma ruta produce siempre la misma clave; rutas distintas, claves distintas."""
+        raiz = tmp_path / "volumen"
+        (raiz / "sub").mkdir(parents=True)
+        contrato = _ContratoPrueba()
+        recorrido = RecorridoVolumen(
+            volumen="V", raiz=str(raiz), contrato=contrato, maquina_id="maquina-test",
+        )
+        clave_a = recorrido._clave_directorio(str(raiz))
+        clave_b = recorrido._clave_directorio(str(raiz))
+        clave_sub = recorrido._clave_directorio(str(raiz / "sub"))
+        assert clave_a == clave_b
+        assert clave_a != clave_sub
+
+    def test_clave_directorio_posix_incluye_identidad_de_inodo(self, tmp_path: Path):
+        """En POSIX la clave incorpora dispositivo/inodo para detectar bind mounts."""
+        if os.name == "nt":
+            pytest.skip("La identidad de inodo es un concepto POSIX")
+        raiz = tmp_path / "volumen"
+        raiz.mkdir()
+        contrato = _ContratoPrueba()
+        recorrido = RecorridoVolumen(
+            volumen="V", raiz=str(raiz), contrato=contrato, maquina_id="maquina-test",
+        )
+        clave = recorrido._clave_directorio(str(raiz))
+        partes = clave.split("|")
+        assert len(partes) == 3
+        int(partes[1])
+        int(partes[2])
+        assert recorrido._clave_directorio(str(raiz)) == clave
+
+    def test_seguir_enlaces_no_recorre_dos_veces_el_mismo_objetivo(self, tmp_path: Path):
+        """Con seguir_enlaces=True, un enlace a un directorio ya visitado no se repite."""
+        raiz = self._arbol_con_enlace(tmp_path)
+        contrato = _ContratoPrueba()
+        recorrido = RecorridoVolumen(
+            volumen="V", raiz=str(raiz), contrato=contrato,
+            maquina_id="maquina-test", seguir_enlaces=True,
+        )
+        entradas = list(recorrido.recorrer())
+        nombres = [e.name for e in entradas]
+        assert nombres.count("sub") == 1
+        assert nombres.count("dentro.txt") == 1
+        assert "link_a_sub" in nombres
+        assert recorrido.progreso.completado is True
+
+    def test_enlace_ciclico_a_padre_no_buclea_y_completa(self, tmp_path: Path):
+        """Un enlace de un subdirectorio hacia el padre no genera bucle infinito."""
+        raiz = tmp_path / "volumen"
+        sub = raiz / "sub"
+        sub.mkdir(parents=True)
+        (sub / "archivo.txt").write_text("x", encoding="utf-8")
+        ciclo = sub / "vuelta_al_padre"
+        if not _crear_simbolico_si_se_puede(str(raiz), str(ciclo)):
+            pytest.skip("El entorno no permite crear enlaces simbolicos")
+        contrato = _ContratoPrueba()
+        recorrido = RecorridoVolumen(
+            volumen="V", raiz=str(raiz), contrato=contrato,
+            maquina_id="maquina-test", seguir_enlaces=True,
+        )
+        entradas = list(recorrido.recorrer())
+        nombres = [e.name for e in entradas]
+        assert nombres.count("sub") == 1
+        assert nombres.count("archivo.txt") == 1
+        assert "vuelta_al_padre" in nombres
+        assert recorrido.progreso.completado is True
+        assert recorrido.progreso.interrumpido is False
+
+    def test_por_defecto_no_atraviesa_simbolicos(self, tmp_path: Path):
+        """Por defecto (seguir_enlaces=False) los simbolicos no se recorren ni duplican."""
+        raiz = self._arbol_con_enlace(tmp_path)
+        contrato = _ContratoPrueba()
+        recorrido = RecorridoVolumen(
+            volumen="V", raiz=str(raiz), contrato=contrato, maquina_id="maquina-test",
+        )
+        entradas = list(recorrido.recorrer())
+        nombres = [e.name for e in entradas]
+        assert "link_a_sub" in nombres
+        assert nombres.count("dentro.txt") == 1
+        assert recorrido.progreso.completado is True
+
+    def test_arbol_normal_visita_cada_directorio_una_vez(self, tmp_path: Path):
+        """Sin enlaces, cada directorio se procesa exactamente una vez."""
+        raiz = tmp_path / "volumen"
+        (raiz / "a" / "b").mkdir(parents=True)
+        (raiz / "a" / "c").mkdir(parents=True)
+        (raiz / "a" / "b" / "f.txt").write_text("x", encoding="utf-8")
+        contrato = _ContratoPrueba()
+        recorrido = RecorridoVolumen(
+            volumen="V", raiz=str(raiz), contrato=contrato, maquina_id="maquina-test",
+        )
+        entradas = list(recorrido.recorrer())
+        nombres = [e.name for e in entradas]
+        assert nombres.count("a") == 1
+        assert nombres.count("b") == 1
+        assert nombres.count("c") == 1
+        assert nombres.count("f.txt") == 1
+        assert recorrido.progreso.directorios_procesados == 4
