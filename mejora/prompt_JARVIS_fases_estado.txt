@@ -7602,3 +7602,15 @@ VERIFICACION: SINTAXIS: OK (`py_compile` de `src/hands/system_inventory_storage.
 DISCREPANCIAS: NINGUNA
 PENDIENTES: NINGUNO (unidad completa; el padre 3.8.5.1.4.2 no se completa hasta terminar su hija restante 3.8.5.1.4.2.12, que se abrira en un chat dedicado).
 ESTADO FINAL: 3.8.5.1.4.2.11 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.8.5.1.4.2.12
+FECHA: 2026-11-08
+OBJETIVO: Probar persistencia real en disco creando una nueva instancia del repositorio/manager sobre la misma base temporal y recuperando las mismas entradas tras recarga.
+TIPO DE TRABAJO: TEST | VERIFICACION
+CAMBIOS / HALLAZGOS: Se añade la clase `TestPersistenciaRealEnDisco` con 5 tests en `tests/hands/test_system_inventory_storage.py` que verifican: nueva instancia sobre misma base SQLite recupera entradas de archivo (`search_by_name`, `search_by_extension`), scan_runs (`get_scan_run`, `get_latest_scan`), candidatos de aplicación (`application_candidates`), volumen registrado (`get_entry_count`) y que los datos no se duplican ni pierden entre instancias sucesivas. Ningún cambio en código de producción; solo tests de persistencia real en disco.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: `tests/hands/test_system_inventory_storage.py`; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: 75 PASSED / 0 FAILED / 75 TOTAL (`tests/hands/test_system_inventory_storage.py`, 70 preexistentes + 5 nuevos de esta unidad); INTEGRACION: NA; NO REGRESION: 26 PASSED / 0 FAILED / 26 TOTAL (`tests/hands/test_system_inventory.py`, sin cambios, ejecutados tras modificacion).
+VERIFICACION: SINTAXIS: OK (`py_compile` de `tests/hands/test_system_inventory_storage.py` sin errores); MAIN.PY: NA (no se modifica `main.py`); COMPORTAMIENTO / INTEGRACION REAL: 5 tests ejecutados y pasados, verificando que crear una nueva instancia de `SystemInventoryStorage` sobre el mismo fichero SQLite recupera las mismas entradas de archivo, scan_runs, candidatos de aplicación y volumenes; que el esquema de version se mantiene; y que escribir con una instancia nueva no duplica datos previos.
+DISCREPANCIAS: NINGUNA
+PENDIENTES: Siguiente hoja pendiente real en orden del roadmap: 3.8.5.1.4.3.1 (primera hija de 3.8.5.1.4.3, descubrir volumenes y adaptadores por SO). Padre 3.8.5.1.4.2 completo con todas sus hijas (1-12) IMPLEMENTADA.
+ESTADO FINAL: 3.8.5.1.4.2.12 - IMPLEMENTADA

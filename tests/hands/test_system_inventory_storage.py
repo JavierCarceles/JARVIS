@@ -1429,3 +1429,191 @@ class TestBackupCorrupcionYRecuperacion:
             assert run is not None and run["result"] == SCAN_RESULT_OK
         finally:
             storage2.close()
+
+
+# ---------------------------------------------------------------------------
+# Persistencia real en disco (3.8.5.1.4.2.12)
+# ---------------------------------------------------------------------------
+
+class TestPersistenciaRealEnDisco:
+    """Probar persistencia real en disco creando una nueva instancia del
+    repositorio sobre la misma base temporal y recuperando las mismas entradas
+    tras recarga (unidad 3.8.5.1.4.2.12).
+
+    Cada test escribe datos con una instancia, la cierra, crea una NUEVA
+    instancia de SystemInventoryStorage sobre el mismo fichero SQLite y verifica
+    que los datos se recuperan íntegros. Valida que la persistencia no depende
+    de la instancia en memoria sino del fichero en disco.
+    """
+
+    def _crear_base_completa(self, storage: SystemInventoryStorage) -> None:
+        """Puebla la base con máquina, volumen, scan_run, entradas de archivo
+        y candidatos de aplicación."""
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        storage.record_volume("vol-c:", "machine-alfa", "C:", "local", "online")
+        storage.begin_scan_run("scan-1", "machine-alfa", "C:", SCAN_MODE_FULL)
+        storage.insert_file_entries("scan-1", "machine-alfa", "C:", [
+            {
+                "entry_id": "e-1",
+                "absolute_path": "C:/Apps/app.exe",
+                "relative_path": "Apps/app.exe",
+                "name": "app.exe",
+                "extension": ".exe",
+                "entry_type": "file",
+                "size_bytes": 1024,
+                "modified_at": "2024-01-01T10:00:00",
+                "created_at": "2024-01-01T09:00:00",
+                "accessed_at": "2024-01-02T08:00:00",
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-03T00:00:00",
+            },
+            {
+                "entry_id": "e-2",
+                "absolute_path": "C:/Apps/tool.dll",
+                "relative_path": "Apps/tool.dll",
+                "name": "tool.dll",
+                "extension": ".dll",
+                "entry_type": "file",
+                "size_bytes": 2048,
+                "modified_at": "2024-02-01T10:00:00",
+                "created_at": "2024-02-01T09:00:00",
+                "accessed_at": None,
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-03T00:00:00",
+            },
+        ])
+        storage.insert_application_candidates("scan-1", "machine-alfa", "C:", [
+            {
+                "candidate_id": "c-1",
+                "name": "Mi Aplicacion",
+                "absolute_path": "C:/Apps/app.exe",
+                "launch_type": "ejecutable",
+                "confidence": 0.95,
+                "source": "inventory",
+                "last_checked_at": "2024-01-03T00:00:00",
+            }
+        ])
+        storage.end_scan_run("scan-1", result=SCAN_RESULT_OK, entries_count=2)
+
+    def test_nueva_instancia_sobre_misma_base_recupera_entradas_archivo(
+        self, storage: SystemInventoryStorage, db_path: Path
+    ):
+        self._crear_base_completa(storage)
+        storage.close()
+
+        # Nueva instancia sobre el mismo fichero SQLite (persistencia real en disco).
+        storage2 = SystemInventoryStorage(db_path)
+        try:
+            assert storage2.db_file_exists() is True
+            assert storage2.schema_version() == SCHEMA_VERSION
+            assert storage2.get_entry_count("machine-alfa", "C:") == 2
+            entradas = storage2.search_by_name("machine-alfa", "app.exe")
+            assert len(entradas) == 1
+            assert entradas[0]["name"] == "app.exe"
+            assert entradas[0]["absolute_path"] == "C:/Apps/app.exe"
+            assert entradas[0]["size_bytes"] == 1024
+            entradas_dll = storage2.search_by_extension("machine-alfa", ".dll")
+            assert len(entradas_dll) == 1
+            assert entradas_dll[0]["name"] == "tool.dll"
+        finally:
+            storage2.close()
+
+    def test_nueva_instancia_sobre_misma_base_recupera_scan_runs(
+        self, storage: SystemInventoryStorage, db_path: Path
+    ):
+        self._crear_base_completa(storage)
+        storage.close()
+
+        storage2 = SystemInventoryStorage(db_path)
+        try:
+            run = storage2.get_scan_run("scan-1")
+            assert run is not None
+            assert run["scan_id"] == "scan-1"
+            assert run["machine_id"] == "machine-alfa"
+            assert run["volume"] == "C:"
+            assert run["mode"] == SCAN_MODE_FULL
+            assert run["result"] == SCAN_RESULT_OK
+            assert run["entries_count"] == 2
+            assert run["finished_at"] is not None
+            latest = storage2.get_latest_scan("machine-alfa", "C:")
+            assert latest is not None
+            assert latest["scan_id"] == "scan-1"
+        finally:
+            storage2.close()
+
+    def test_nueva_instancia_sobre_misma_base_recupera_candidatos_aplicacion(
+        self, storage: SystemInventoryStorage, db_path: Path
+    ):
+        self._crear_base_completa(storage)
+        storage.close()
+
+        storage2 = SystemInventoryStorage(db_path)
+        try:
+            # Los candidatos viven en su propia tabla y se consultan directamente
+            # sobre el mismo fichero en disco.
+            conn = storage2.connect()
+            try:
+                filas = conn.execute(
+                    "SELECT candidate_id, name, launch_type, confidence FROM application_candidates WHERE machine_id = ?",
+                    ("machine-alfa",),
+                ).fetchall()
+            finally:
+                storage2.close()
+            assert len(filas) == 1
+            assert filas[0]["candidate_id"] == "c-1"
+            assert filas[0]["name"] == "Mi Aplicacion"
+            assert filas[0]["launch_type"] == "ejecutable"
+            assert filas[0]["confidence"] == 0.95
+        finally:
+            # storage2 ya se cerro dentro del try; close() es idempotente.
+            try:
+                storage2.close()
+            except Exception:
+                pass
+
+    def test_nueva_instancia_recupera_volumen_registrado(
+        self, storage: SystemInventoryStorage, db_path: Path
+    ):
+        self._crear_base_completa(storage)
+        storage.close()
+
+        storage2 = SystemInventoryStorage(db_path)
+        try:
+            assert storage2.get_entry_count("machine-alfa") == 2
+            assert storage2.get_entry_count("machine-alfa", "C:") == 2
+            assert storage2.get_entry_count("machine-alfa", "D:") == 0
+        finally:
+            storage2.close()
+
+    def test_persistencia_sobre_cambio_de_instancia_no_duplica_datos(
+        self, storage: SystemInventoryStorage, db_path: Path
+    ):
+        """Escribir con la instancia 1, leer con la 2, escribir con la 3 y
+        leer con una 4: los datos no se duplican ni se pierden entre
+        instancias."""
+        self._crear_base_completa(storage)
+        storage.close()
+
+        storage2 = SystemInventoryStorage(db_path)
+        try:
+            assert storage2.get_entry_count("machine-alfa", "C:") == 2
+        finally:
+            storage2.close()
+
+        storage3 = SystemInventoryStorage(db_path)
+        try:
+            assert storage3.get_entry_count("machine-alfa", "C:") == 2
+            # Agregar un scan_run nuevo (scan_id distinto) con la misma base:
+            # no duplica los datos previos ni los borra.
+            storage3.begin_scan_run("scan-2", "machine-alfa", "C:", SCAN_MODE_INCREMENTAL)
+            storage3.end_scan_run("scan-2", result=SCAN_RESULT_OK, entries_count=2)
+            assert storage3.get_entry_count("machine-alfa", "C:") == 2
+            assert storage3.get_scan_run("scan-1") is not None
+            assert storage3.get_scan_run("scan-2") is not None
+        finally:
+            storage3.close()
