@@ -10681,7 +10681,7 @@ da reconciled=False (coincidencia).
 <a name="hands/test-system_inventory"></a>
 ### `hands\test_system_inventory.py`
 
-**Descripción:** Tests de contrato del inventario persistente del sistema de archivos (unidad 3.8.5.1.4.1). Verifican serialización/deserialización de `InventoryEntry`, generación de identificador local de equipo estable (sin MAC ni serial), controles de privacidad por defecto (sin lectura de contenido, sin rutas completas en logs), exclusiones técnicas de rutas y puntos de montaje, separación entre hechos observados del SO e inferencias, truncamiento seguro de rutas para logs, controles de operación del inventario con aislamiento por equipo, valores por defecto del contrato y serialización para persistencia en JSON.
+**Descripción:** Tests de contrato del inventario persistente del sistema de archivos (unidad 3.8.5.1.4.1). Verifican serialización/deserialización de `InventoryEntry`, generación de identificador local de equipo estable (sin MAC ni serial), controles de privacidad por defecto (sin lectura de contenido, sin rutas completas en logs), exclusiones técnicas de rutas y puntos de montaje, separación entre hechos observados del SO e inferencias, truncamiento seguro de rutas para logs, controles de operación del inventario con aislamiento por equipo, valores por defecto del contrato y serialización para persistencia en JSON. También verifican el contrato común de volumen multiplataforma (`VolumenComun`), su conversión desde `VolumeInfo` sin forzar letras de unidad ni rutas de Windows en otros SO, y la enumeración unificada de volúmenes.
 
 **Clases de test:**
 
@@ -10695,8 +10695,11 @@ da reconciled=False (coincidencia).
 | `TestControlInventario` | Operaciones de control con aislamiento por equipo. |
 | `TestContratoPorDefecto` | Valores por defecto del contrato de inventario. |
 | `TestSerializacionParaPersistencia` | Serialización de entrada como JSON válido para persistencia. |
+| `TestVolumenComun` | Contrato común de volumen: no impone letra de unidad ni rutas Windows en SO no Windows. |
+| `TestVolumenComunDesdeInfo` | Conversión de `VolumeInfo` a `VolumenComun` sin forzar conceptos Windows. |
+| `TestEnumerarVolumenesComun` | Enumeración unificada de volúmenes que devuelve contratos comunes de volumen. |
 
-**Resultados:** 26 tests unitarios, 26 PASSED / 0 FAILED.
+**Resultados:** 98 tests unitarios, 98 PASSED / 0 FAILED.
 
 ---
 

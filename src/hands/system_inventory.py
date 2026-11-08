@@ -21,7 +21,9 @@ documentado.
 
 from __future__ import annotations
 
+import ctypes
 import platform
+import subprocess
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -177,6 +179,8 @@ DEFAULT_EXCLUDED_MOUNT_PATTERNS: list[str] = [
     "/run",
     "/tmp",
     "/var/tmp",
+    "/private/var/vm",
+    "/private/var/folders",
     "C:\\Windows\\WinSxS",
     "C:\\$Recycle.Bin",
     "C:\\System Volume Information",
@@ -434,6 +438,21 @@ COVERAGE_MATRIX: list[CoverageMatrixEntry] = [
     # macOS - volumenes de red (no soportados por defecto)
     CoverageMatrixEntry("Darwin", "any", "arm64", "network", "file", False,
                         "Volumenes de red no montados localmente no se inventarian"),
+    # macOS - volumenes locales montados (Intel x86_64)
+    CoverageMatrixEntry("Darwin", "any", "x64", "local", "file", True),
+    CoverageMatrixEntry("Darwin", "any", "x64", "local", "directory", True),
+    CoverageMatrixEntry("Darwin", "any", "x64", "local", "symlink", True),
+    # macOS - volumenes extraibles (Apple Silicon)
+    CoverageMatrixEntry("Darwin", "any", "arm64", "removable", "file", True),
+    CoverageMatrixEntry("Darwin", "any", "arm64", "removable", "directory", True),
+    # macOS - volumenes extraibles (Intel x86_64)
+    CoverageMatrixEntry("Darwin", "any", "x64", "removable", "file", True),
+    CoverageMatrixEntry("Darwin", "any", "x64", "removable", "directory", True),
+    # macOS - volumenes virtuales (detectados; excluidos por defecto del inventario)
+    CoverageMatrixEntry("Darwin", "any", "arm64", "virtual", "file", True),
+    CoverageMatrixEntry("Darwin", "any", "arm64", "virtual", "directory", True),
+    CoverageMatrixEntry("Darwin", "any", "x64", "virtual", "file", True),
+    CoverageMatrixEntry("Darwin", "any", "x64", "virtual", "directory", True),
 ]
 
 
@@ -558,3 +577,521 @@ def es_sistema_soportado(sistema_operativo: str, arquitectura: str) -> bool:
                 and entrada.soportado):
             return True
     return False
+
+
+# ---------------------------------------------------------------------------
+# Enumeracion de volumenes Windows (3.8.5.1.4.3.2)
+# ---------------------------------------------------------------------------
+
+class VolumeType(Enum):
+    """Tipo de volumen/unidad observado del SO, compartido por los adaptadores
+    de descubrimiento de volumenes (Windows y Linux)."""
+
+    UNKNOWN = "unknown"
+    NO_ROOT_DIR = "no_root_dir"
+    REMOVABLE = "removable"
+    FIXED = "fixed"
+    REMOTE = "remote"
+    CD_ROM = "cd_rom"
+    RAM_DISK = "ram_disk"
+    VIRTUAL = "virtual"
+
+
+_VOLUME_TYPE_BY_CODE: dict[int, VolumeType] = {
+    0: VolumeType.UNKNOWN,
+    1: VolumeType.NO_ROOT_DIR,
+    2: VolumeType.REMOVABLE,
+    3: VolumeType.FIXED,
+    4: VolumeType.REMOTE,
+    5: VolumeType.CD_ROM,
+    6: VolumeType.RAM_DISK,
+}
+
+
+@dataclass
+class VolumeInfo:
+    """
+    Informacion de un volumen/unidad de Windows observada del SO.
+
+    Solo metadatos del volumen (letra, tipo, disponibilidad, sistema de archivos,
+    etiqueta). Nunca se lee el contenido del volumen (3.8.5.1.4.1.9).
+    """
+
+    letra: str                    # Ej. "C:"
+    ruta_raiz: str                # Ej. "C:\\"
+    tipo: VolumeType              # Tipo de unidad observado
+    disponible: bool              # True si el volumen esta listo para leer
+    sistema_archivos: str = ""    # Ej. "NTFS", "FAT32"
+    etiqueta_volumen: str = ""    # Etiqueta del volumen
+
+
+def _letra_de_indice_bit(indice_bit: int) -> str:
+    """Devuelve la letra de unidad correspondiente a un indice de bit (0=A, 1=B...)."""
+    return f"{chr(ord('A') + indice_bit)}:"
+
+
+def enumerar_volumenes_windows() -> list[VolumeInfo]:
+    """
+    Enumerar en Windows unidades y volumenes locales, letras, puntos de montaje,
+    tipo de unidad y estado de disponibilidad.
+
+    Reutiliza APIs de Windows mediante `ctypes` (biblioteca estandar), sin
+    dependencias de terceros:
+    - `GetLogicalDrives` para obtener la mascara de unidades logicas.
+    - `GetDriveType` para clasificar cada unidad (fija, extraíble, CD-ROM, red, RAM, etc.).
+    - `GetVolumeInformation` para sistema de archivos y etiqueta, solo cuando la
+      unidad esta disponible (no falla si no se puede leer).
+
+    Devuelve una lista de `VolumeInfo`, una por unidad detectada, ordenada por
+    letra de unidad. Las unidades sin raiz (p.ej. lector de tarjetas vacio) se
+    reportan con `disponible=False`.
+    """
+    kernel32 = ctypes.windll.kernel32
+
+    mascara = kernel32.GetLogicalDrives()
+    if mascara == 0:
+        return []
+
+    volumenes: list[VolumeInfo] = []
+    for indice in range(26):
+        if not (mascara >> indice) & 1:
+            continue
+        letra = _letra_de_indice_bit(indice)
+        ruta_raiz = f"{letra}\\"
+
+        codigo_tipo = kernel32.GetDriveTypeW(ruta_raiz)
+        tipo = _VOLUME_TYPE_BY_CODE.get(codigo_tipo, VolumeType.UNKNOWN)
+
+        # GetDriveType devuelve DRIVE_NO_ROOT_DIR (1) cuando la unidad no tiene
+        # medio insertado (p.ej. lector de tarjetas vacio). La unidad existe pero
+        # no esta disponible para lectura.
+        disponible = codigo_tipo != 1
+
+        sistema_archivos = ""
+        etiqueta_volumen = ""
+        if disponible:
+            nombre_volumen = ctypes.create_unicode_buffer(256)
+            sistema_archivos_buf = ctypes.create_unicode_buffer(256)
+            numero_serie = ctypes.c_ulong()
+            longitud_maxima = ctypes.c_ulong()
+            banderas = ctypes.c_ulong()
+            ok = kernel32.GetVolumeInformationW(
+                ruta_raiz,
+                nombre_volumen,
+                ctypes.sizeof(nombre_volumen),
+                ctypes.byref(numero_serie),
+                ctypes.byref(longitud_maxima),
+                ctypes.byref(banderas),
+                sistema_archivos_buf,
+                ctypes.sizeof(sistema_archivos_buf),
+            )
+            if ok:
+                etiqueta_volumen = nombre_volumen.value or ""
+                sistema_archivos = sistema_archivos_buf.value or ""
+
+        volumenes.append(
+            VolumeInfo(
+                letra=letra,
+                ruta_raiz=ruta_raiz,
+                tipo=tipo,
+                disponible=disponible,
+                sistema_archivos=sistema_archivos,
+                etiqueta_volumen=etiqueta_volumen,
+            )
+        )
+
+    return volumenes
+
+
+# ---------------------------------------------------------------------------
+# Enumeracion de volumenes Linux (3.8.5.1.4.3.3)
+# ---------------------------------------------------------------------------
+
+# Sistemas de archivos virtuales/pseudoficheros del kernel de Linux. Se
+# detectan pero el contrato por defecto los excluye del inventario
+# (3.8.5.1.4.1.6, DEFAULT_EXCLUDED_MOUNT_PATTERNS).
+_LINUX_VIRTUAL_FSTYPES: frozenset[str] = frozenset({
+    "proc", "sysfs", "devtmpfs", "devpts", "tmpfs", "cgroup", "cgroup2",
+    "pstore", "mqueue", "binfmt_misc", "securityfs", "efivarfs", "configfs",
+    "debugfs", "tracefs", "fusectl", "hugetlbfs", "ramfs", "rootfs",
+    "overlay", "squashfs", "iso9660",
+})
+
+# Sistemas de archivos de red (no montados localmente como volumen de bloque).
+_LINUX_NETWORK_FSTYPES: frozenset[str] = frozenset({
+    "nfs", "nfs4", "cifs", "cifsdfs", "smbfs", "sshfs", "fuse.sshfs",
+    "glusterfs", "ceph", "ocfs2", "lustre", "ncp", "smb3",
+})
+
+# Sistemas de archivos tipicamente asociados a medios extraibles.
+_LINUX_REMOVABLE_FSTYPES: frozenset[str] = frozenset({
+    "vfat", "exfat", "ntfs-3g", "ntfs", "fuseblk",
+})
+
+# Sistemas de archivos locales de disco.
+_LINUX_LOCAL_FSTYPES: frozenset[str] = frozenset({
+    "ext4", "ext3", "ext2", "xfs", "btrfs", "zfs", "jfs", "reiserfs",
+    "f2fs", "nilfs2", "ntfs-3g", "ntfs", "fuseblk",
+})
+
+
+# ---------------------------------------------------------------------------
+# Clasificadores de tipos de sistema de archivos macOS (3.8.5.1.4.3.4)
+# ---------------------------------------------------------------------------
+
+# Sistemas de archivos virtuales/pseudoficheros del kernel de macOS.
+_MACOS_VIRTUAL_FSTYPES: frozenset[str] = frozenset({
+    "devfs", "fdescfs", "tmpfs", "autofs",
+})
+
+# Sistemas de archivos de red en macOS.
+_MACOS_NETWORK_FSTYPES: frozenset[str] = frozenset({
+    "nfs", "smbfs", "afp", "webdav",
+})
+
+# Sistemas de archivos tipicamente asociados a medios extraibles en macOS.
+_MACOS_REMOVABLE_FSTYPES: frozenset[str] = frozenset({
+    "exfat", "msdos",
+})
+
+
+def _clasificar_tipo_volumen_linux(
+    dispositivo: str, fstype: str, opciones: str, mount_point: str
+) -> VolumeType:
+    """
+    Clasifica un montaje de Linux en local, virtual, de red o extraible.
+
+    La clasificacion se basa unicamente en el tipo de sistema de archivos
+    reportado por el kernel (/proc/mounts), en el punto de montaje y en las
+    opciones de montaje; nunca infiere el SO a partir de rutas (3.8.5.1.4.3.1)
+    ni declara soporte sin evidencia del adaptador (3.8.5.1.4.3.8).
+    """
+    f = (fstype or "").lower()
+    o = (opciones or "").lower()
+    mp = (mount_point or "").lower()
+    d = (dispositivo or "").lower()
+
+    # 1. Sistemas de archivos virtuales/pseudoficheros del kernel.
+    if f in _LINUX_VIRTUAL_FSTYPES:
+        return VolumeType.VIRTUAL
+    if mp in ("/proc", "/sys", "/dev", "/run", "/tmp", "/var/tmp"):
+        return VolumeType.VIRTUAL
+    if "noauto" in o and d.startswith(("none", "tmpfs", "cgroup")):
+        return VolumeType.VIRTUAL
+
+    # 2. Sistemas de archivos de red.
+    if f in _LINUX_NETWORK_FSTYPES:
+        return VolumeType.REMOTE
+    if "_netdev" in o or "nfs" in o or "cifs" in o:
+        return VolumeType.REMOTE
+
+    # 3. Medios extraibles (USB, discos externos) montados bajo /media o /mnt.
+    if f in _LINUX_REMOVABLE_FSTYPES and (
+        mp.startswith("/media/") or mp.startswith("/mnt/") or "removable" in o
+    ):
+        return VolumeType.REMOVABLE
+
+    # 4. Sistemas de archivos locales de disco.
+    if f in _LINUX_LOCAL_FSTYPES:
+        return VolumeType.FIXED
+
+    return VolumeType.UNKNOWN
+
+
+def _clasificar_tipo_volumen_macos(
+    dispositivo: str, fstype: str, opciones: str, mount_point: str
+) -> VolumeType:
+    """
+    Clasifica un volumen montado de macOS en local, virtual, de red o extraible.
+
+    La clasificacion se basa en el tipo de sistema de archivos reportado por
+    `mount`, en el punto de montaje y en las opciones de montaje; nunca infiere
+    el SO a partir de rutas (3.8.5.1.4.3.1) ni declara soporte sin evidencia
+    del adaptador (3.8.5.1.4.3.8).
+    """
+    f = (fstype or "").lower()
+    o = (opciones or "").lower()
+    mp = (mount_point or "").lower()
+    d = (dispositivo or "").lower()
+
+    # 1. Sistemas de archivos virtuales/pseudoficheros del kernel.
+    if f in _MACOS_VIRTUAL_FSTYPES:
+        return VolumeType.VIRTUAL
+    if mp in ("/dev", "/private/var/vm", "/private/var/folders"):
+        return VolumeType.VIRTUAL
+
+    # 2. Sistemas de archivos de red.
+    if f in _MACOS_NETWORK_FSTYPES:
+        return VolumeType.REMOTE
+    if "_netdev" in o or "nfs" in o or "cifs" in o:
+        return VolumeType.REMOTE
+
+    # 3. Medios extraibles montados bajo /Volumes.
+    if f in _MACOS_REMOVABLE_FSTYPES and mp.startswith("/volumes/"):
+        return VolumeType.REMOVABLE
+
+    # 4. Sistemas de archivos locales de disco.
+    if "local" in o:
+        return VolumeType.FIXED
+    if f in ("apfs", "hfs", "hfsplus"):
+        return VolumeType.FIXED
+
+    return VolumeType.UNKNOWN
+
+
+def enumerar_volumenes_linux(mounts_path: str = "/proc/mounts") -> list[VolumeInfo]:
+    """
+    Enumerar en Linux los puntos de montaje disponibles, diferenciando
+    sistemas de archivos locales, virtuales, de red y extraibles.
+
+    Lee `/proc/mounts` (ruta configurable para pruebas) usando solo la
+    biblioteca estandar, sin dependencias de terceros. Cada línea describe
+    un montaje con dispositivo, punto de montaje, tipo de sistema de
+    archivos y opciones, que se clasifican en `VolumeType`.
+
+    Devuelve una lista de `VolumeInfo`, una por punto de montaje detectado,
+    ordenada por orden de aparicion en `/proc/mounts`. Los campos de
+    `VolumeInfo` se rellenan así:
+    - `letra`: vacia (Linux no tiene letras de unidad).
+    - `ruta_raiz`: el punto de montaje (ej. "/", "/mnt/data").
+    - `tipo`: `VolumeType` clasificado (fixed/local, virtual, remote/red,
+      removable/extraible o unknown).
+    - `disponible`: True mientras el punto de montaje aparezca en /proc/mounts.
+    - `sistema_archivos`: el tipo de sistema de archivos reportado.
+    - `etiqueta_volumen`: el dispositivo de origen (ej. "/dev/sda1").
+
+    No lee el contenido de los volúmenes ni de archivos personales
+    (3.8.5.1.4.1.9). Si `/proc/mounts` no existe (no Linux), devuelve [].
+    """
+    ruta = Path(mounts_path)
+    if not ruta.exists():
+        return []
+
+    volumenes: list[VolumeInfo] = []
+    try:
+        lineas = ruta.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return []
+
+    for linea in lineas:
+        if not linea.strip() or linea.startswith("#"):
+            continue
+        partes = linea.split()
+        if len(partes) < 3:
+            continue
+        # Formato /proc/mounts: dispositivo punto_montaje tipo opciones dump pass
+        dispositivo = partes[0]
+        mount_point = partes[1]
+        fstype = partes[2]
+        opciones = partes[3] if len(partes) > 3 else ""
+
+        # Ignorar entradas sin punto de montaje valido.
+        if not mount_point:
+            continue
+
+        tipo = _clasificar_tipo_volumen_linux(dispositivo, fstype, opciones, mount_point)
+
+        volumenes.append(
+            VolumeInfo(
+                letra="",
+                ruta_raiz=mount_point,
+                tipo=tipo,
+                disponible=True,
+                sistema_archivos=fstype,
+                etiqueta_volumen=dispositivo,
+            )
+        )
+
+    return volumenes
+
+
+# ---------------------------------------------------------------------------
+# Enumeracion de volumenes macOS (3.8.5.1.4.3.4)
+# ---------------------------------------------------------------------------
+
+def enumerar_volumenes_macos(
+    mount_output: Optional[str] = None,
+) -> list[VolumeInfo]:
+    """
+    Enumerar en macOS los volumenes montados, diferenciando volumenes
+    locales, de red, virtuales y extraibles.
+
+    Ejecuta el comando `mount` (disponible por defecto en macOS) y parsea
+    su salida para obtener dispositivo, punto de montaje, tipo de sistema de
+    archivos y opciones de cada volumen montado. Usa solo la biblioteca
+    estandar, sin dependencias de terceros.
+
+    Para pruebas, `mount_output` permite inyectar la salida del comando
+    `mount` en lugar de ejecutarlo.
+
+    Devuelve una lista de `VolumeInfo`, una por volumen detectado, ordenada
+    por orden de aparicion en la salida de `mount`. Los campos de
+    `VolumeInfo` se rellenan asi:
+    - `letra`: vacia (macOS no tiene letras de unidad).
+    - `ruta_raiz`: el punto de montaje (ej. "/", "/Volumes/Datos").
+    - `tipo`: `VolumeType` clasificado (fixed/local, virtual, remote/red,
+      removable/extraible o unknown).
+    - `disponible`: True mientras el volumen aparezca en la salida de `mount`.
+    - `sistema_archivos`: el tipo de sistema de archivos reportado.
+    - `etiqueta_volumen`: el dispositivo de origen (ej. "/dev/disk1s1").
+
+    No lee el contenido de los volumenes ni de archivos personales
+    (3.8.5.1.4.1.9). Si el comando `mount` no esta disponible o falla,
+    devuelve [].
+    """
+    if mount_output is None:
+        try:
+            resultado = subprocess.run(
+                ["mount"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            mount_output = resultado.stdout
+        except (OSError, FileNotFoundError):
+            return []
+
+    volumenes: list[VolumeInfo] = []
+    for linea in mount_output.splitlines():
+        if not linea.strip():
+            continue
+        # Formato de mount en macOS: dispositivo on punto_montaje (fstype, opciones)
+        if " on " not in linea:
+            continue
+        try:
+            dispositivo, resto = linea.split(" on ", 1)
+            dispositivo = dispositivo.strip()
+            if "(" not in resto or ")" not in resto:
+                continue
+            mount_point, opciones_part = resto.split("(", 1)
+            mount_point = mount_point.strip()
+            opciones_part = opciones_part.rsplit(")", 1)[0]
+            partes_opciones = [p.strip() for p in opciones_part.split(",")]
+            fstype = partes_opciones[0] if partes_opciones else ""
+            opciones = ", ".join(partes_opciones[1:]) if len(partes_opciones) > 1 else ""
+        except (ValueError, IndexError):
+            continue
+
+        if not mount_point:
+            continue
+
+        tipo = _clasificar_tipo_volumen_macos(dispositivo, fstype, opciones, mount_point)
+
+        volumenes.append(
+            VolumeInfo(
+                letra="",
+                ruta_raiz=mount_point,
+                tipo=tipo,
+                disponible=True,
+                sistema_archivos=fstype,
+                etiqueta_volumen=dispositivo,
+            )
+        )
+
+    return volumenes
+
+
+# ---------------------------------------------------------------------------
+# Contrato comun de volumen multiplataforma (3.8.5.1.4.3.5)
+# ---------------------------------------------------------------------------
+
+@dataclass
+class VolumenComun:
+    """
+    Contrato comun de volumen que no impone conceptos de Windows (letras de
+    unidad ni rutas con barra invertida precedidas de letra de unidad) sobre
+    otros sistemas operativos.
+
+    Un volumen se identifica por un identificador estable y se accede mediante
+    su raiz de acceso, que es platform-agnostica:
+    - Windows: identificador = letra de unidad ("C:"), raiz = "C:\\", letra_unidad = "C:".
+    - Linux: identificador = punto de montaje ("/", "/mnt/data"), raiz igual,
+      letra_unidad = None.
+    - macOS: identificador = punto de montaje ("/", "/Volumes/Datos"), raiz igual,
+      letra_unidad = None.
+
+    Solo metadatos observados del SO; nunca se lee el contenido del volumen
+    (3.8.5.1.4.1.9).
+    """
+
+    identificador: str          # identificador estable del volumen (letra en Windows, punto de montaje en otros SO)
+    raiz: str                   # ruta de acceso a la raiz del volumen, segun el SO
+    tipo: VolumeType            # tipo de volumen observado
+    disponible: bool            # True si el volumen esta listo para leer
+    sistema_archivos: str = ""
+    etiqueta: str = ""
+    letra_unidad: Optional[str] = None  # solo tiene sentido en Windows; None en otros SO
+    sistema_origen: str = ""    # "Windows", "Linux", "Darwin" o "Desconocido"
+
+    def es_windows(self) -> bool:
+        """Devuelve True si el volumen pertenece a un equipo Windows."""
+        return self.sistema_origen == "Windows"
+
+    def tiene_letra_unidad(self) -> bool:
+        """Devuelve True si el volumen expone una letra de unidad (solo Windows)."""
+        return bool(self.letra_unidad)
+
+    def to_dict(self) -> dict:
+        """Serializa a diccionario plano."""
+        return {
+            "identificador": self.identificador,
+            "raiz": self.raiz,
+            "tipo": self.tipo.value,
+            "disponible": self.disponible,
+            "sistema_archivos": self.sistema_archivos,
+            "etiqueta": self.etiqueta,
+            "letra_unidad": self.letra_unidad,
+            "sistema_origen": self.sistema_origen,
+        }
+
+
+def volumen_comun_desde_info(
+    info: VolumeInfo, sistema_origen: Optional[str] = None
+) -> VolumenComun:
+    """
+    Convierte un `VolumeInfo` específico de plataforma en el contrato comun
+    `VolumenComun` sin forzar letras de unidad ni rutas de Windows en otros SO.
+
+    La letra de unidad solo se conserva cuando el origen es Windows o cuando
+    el `VolumeInfo` trae una letra no vacia; en Linux y macOS queda `None` y la
+    raiz es el punto de montaje. Nunca se inventa una letra de unidad para un
+    SO que no la usa (3.8.5.1.4.3.5).
+    """
+    sistema = sistema_origen or detectar_sistema().sistema_operativo
+    letra = info.letra or None
+    # La letra de unidad es un concepto Windows: no se conserva en otros SO.
+    if sistema != "Windows":
+        letra = None
+    identificador = letra if letra else info.ruta_raiz
+    return VolumenComun(
+        identificador=identificador,
+        raiz=info.ruta_raiz,
+        tipo=info.tipo,
+        disponible=info.disponible,
+        sistema_archivos=info.sistema_archivos,
+        etiqueta=info.etiqueta_volumen,
+        letra_unidad=letra if sistema == "Windows" else None,
+        sistema_origen=sistema,
+    )
+
+
+def enumerar_volumenes_comun(
+    sistema_origen: Optional[str] = None,
+) -> list[VolumenComun]:
+    """
+    Enumerar los volumenes del equipo usando el adaptador del SO real y devolver
+    el contrato comun de volumen (sin forzar conceptos de Windows en otros SO).
+
+    `sistema_origen` permite forzar el SO para pruebas ("Windows", "Linux",
+    "Darwin"); por defecto se detecta con `detectar_sistema()`.
+    """
+    sistema = sistema_origen or detectar_sistema().sistema_operativo
+    if sistema == "Windows":
+        infos = enumerar_volumenes_windows()
+    elif sistema == "Linux":
+        infos = enumerar_volumenes_linux()
+    elif sistema == "Darwin":
+        infos = enumerar_volumenes_macos()
+    else:
+        return []
+    return [volumen_comun_desde_info(info, sistema) for info in infos]

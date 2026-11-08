@@ -1746,22 +1746,27 @@ Funciones a nivel módulo:
 | `def register_mouse_capabilities()`  (L110) | Registra las capacidades del ratón en el sistema. |
 
 <a name="src-hands-system_inventory-py"></a>
-### `src/hands/system_inventory.py` [389 líneas] — Contrato, alcance y privacidad del inventario persistente del sistema de archivos.
+### `src/hands/system_inventory.py` [826 líneas] — Contrato, alcance y privacidad del inventario persistente del sistema de archivos.
 
-**Descripción:** Define el contrato del inventario local de elementos del sistema de archivos del equipo donde se ejecuta JARVIS. No implementa escaneo ni persistencia (responsabilidades de unidades posteriores). Solo define la entrada de inventario con metadatos mínimos, el identificador local de equipo, el alcance predeterminado, exclusiones técnicas, controles de privacidad y operaciones de control del inventario.
+**Descripción:** Define el contrato del inventario local de elementos del sistema de archivos del equipo donde se ejecuta JARVIS. No implementa escaneo ni persistencia (responsabilidades de unidades posteriores). Solo define la entrada de inventario con metadatos mínimos, el identificador local de equipo, el alcance predeterminado, exclusiones técnicas, controles de privacidad, operaciones de control del inventario, detección de sistema operativo y arquitectura, matriz de cobertura, enumeración de volúmenes en Windows, enumeración de puntos de montaje en Linux y enumeración de volúmenes montados en macOS.
 
 **Características:**
 
 - Entrada de inventario con metadatos mínimos observados del SO (machine_id, volumen, ruta absoluta/relativa, nombre, extensión, tipo de entrada, tamaño, fechas, atributos)
 - Identificador local de equipo estable (UUID v5 basado en nodo y plataforma; sin MAC, número de serie ni nombre de usuario)
 - Alcance predeterminado: volúmenes locales montados
-- Exclusiones técnicas justificadas (sistemas de archivos virtuales, puntos de montaje recursivos, papelera, archivos de paginación)
+- Exclusiones técnicas justificadas (sistemas de archivos virtuales, puntos de montaje recursivos, papelera, archivos de paginación, volúmenes de VM y carpetas temporales de macOS)
 - Separación entre hechos observados del SO e inferencias (no persistir inferencias como hechos)
 - Controles de privacidad: sin lectura de contenido de archivos personales, sin rutas completas en logs
 - Controles de operación del inventario: pausa, reanudación, cancelación, exclusión de ruta, reconstrucción con aislamiento por equipo
 - Matriz de cobertura por sistema operativo, versión, arquitectura, tipo de volumen y tipo de entrada
+- Detección de SO, versión y arquitectura mediante APIs del sistema (`platform`), sin deducir de rutas
+- Enumeración de unidades y volúmenes Windows con letra, tipo de unidad, disponibilidad, sistema de archivos y etiqueta (vía `ctypes` sobre Win32)
+- Enumeración de puntos de montaje Linux clasificando sistemas de archivos locales, virtuales, de red y extraibles (vía `/proc/mounts`, biblioteca estándar)
+- Enumeración de volúmenes montados en macOS clasificando sistemas de archivos locales, virtuales, de red y extraibles (vía salida del comando `mount`, biblioteca estándar)
+- Contrato común de volumen multiplataforma (`VolumenComun`) que representa un volumen sin forzar letras de unidad ni rutas de Windows en Linux ni macOS, con conversor desde `VolumeInfo` (`volumen_comun_desde_info`) y enumerador unificado (`enumerar_volumenes_comun`).
 
-**Importaciones:** 6.
+**Importaciones:** 10.
 
 Clases:
 
@@ -1775,6 +1780,11 @@ Clases:
 | `class InventoryControlResult` | Resultado de una operación de control del inventario. |
 | `class InventoryContract` | Contrato del inventario persistente. Define alcance, metadatos, privacidad y exclusiones de forma centralizada. |
 | `class CoverageMatrixEntry` | Una celda de la matriz de cobertura del inventario. |
+| `class SistemaOperativo(Enum)` | Sistemas operativos detectables mediante APIs del sistema (platform). |
+| `class InfoSistema` | Información del sistema operativo detectada mediante APIs del sistema. |
+| `class VolumeType(Enum)` | Tipo de unidad/volumen de Windows, observado vía `GetDriveType`. |
+| `class VolumeInfo` | Información de un volumen/unidad de Windows observada del SO. |
+| `class VolumenComun` | Contrato común de volumen multiplataforma que no impone letras de unidad ni rutas de Windows en otros SO. |
 
 Funciones a nivel módulo:
 
@@ -1790,6 +1800,14 @@ Funciones a nivel módulo:
 | `def default_contract()` | Devuelve el contrato por defecto del inventario. |
 | `def cobertura_soportada(sistema_operativo, version, arquitectura, tipo_volumen, tipo_entrada)` | Consulta la matriz de cobertura para saber si una combinación es soportada. |
 | `def entradas_cobertura_por_sistema(sistema_operativo)` | Devuelve todas las entradas de cobertura para un sistema operativo. |
+| `def normalizar_arquitectura(maquina)` | Normaliza el identificador de arquitectura de `platform.machine()`. |
+| `def detectar_sistema()` | Detecta sistema operativo, versión y arquitectura mediante APIs del sistema. |
+| `def es_sistema_soportado(sistema_operativo, arquitectura)` | Indica si el adaptador de descubrimiento de volumenes soporta la combinación SO/arquitectura. |
+| `def enumerar_volumenes_windows()` | Enumerar en Windows unidades y volúmenes locales, letras, tipo de unidad y estado de disponibilidad. |
+| `def enumerar_volumenes_linux(mounts_path="/proc/mounts")` | Enumerar en Linux puntos de montaje clasificados como local, virtual, de red o extraible. |
+| `def enumerar_volumenes_macos(mount_output=None)` | Enumerar en macOS volumenes montados clasificados como local, virtual, de red o extraible. |
+| `def volumen_comun_desde_info(info, sistema_origen=None)` | Convierte un `VolumeInfo` en el contrato común `VolumenComun` sin forzar letras de unidad ni rutas de Windows en otros SO. |
+| `def enumerar_volumenes_comun(sistema_origen=None)` | Enumerar los volúmenes del equipo usando el adaptador del SO real y devolver contratos comunes de volumen. |
 
 ### `src/hands/system_inventory_storage.py` — Almacenamiento canonico SQLite del indice de inventario persistente del sistema de archivos.
 

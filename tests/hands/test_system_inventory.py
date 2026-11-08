@@ -34,9 +34,19 @@ from src.hands.system_inventory import (
     InventoryContract,
     InventoryEntry,
     SistemaOperativo,
+    VolumeInfo,
+    VolumeType,
+    VolumenComun,
+    _clasificar_tipo_volumen_linux,
+    _clasificar_tipo_volumen_macos,
     classify_entry,
+    enumerar_volumenes_comun,
+    volumen_comun_desde_info,
     default_contract,
     detectar_sistema,
+    enumerar_volumenes_linux,
+    enumerar_volumenes_macos,
+    enumerar_volumenes_windows,
     es_sistema_soportado,
     generate_machine_id,
     is_excluded_mount,
@@ -460,3 +470,526 @@ class TestEsSistemaSoportado:
 
     def test_comparacion_es_insensible_a_mayusculas(self):
         assert es_sistema_soportado("windows", "X64") is True
+
+
+# ---------------------------------------------------------------------------
+# Enumeracion de volumenes Windows (3.8.5.1.4.3.2)
+# ---------------------------------------------------------------------------
+
+class TestVolumeType:
+    """VolumeType clasifica unidades Windows observadas via GetDriveType."""
+
+    def test_valores_esperados(self):
+        assert VolumeType.UNKNOWN.value == "unknown"
+        assert VolumeType.NO_ROOT_DIR.value == "no_root_dir"
+        assert VolumeType.REMOVABLE.value == "removable"
+        assert VolumeType.FIXED.value == "fixed"
+        assert VolumeType.REMOTE.value == "remote"
+        assert VolumeType.CD_ROM.value == "cd_rom"
+        assert VolumeType.RAM_DISK.value == "ram_disk"
+
+
+class TestVolumeInfo:
+    """VolumeInfo almacena metadatos de volumen sin leer contenido."""
+
+    def test_campos_requeridos(self):
+        info = VolumeInfo(
+            letra="C:",
+            ruta_raiz="C:\\",
+            tipo=VolumeType.FIXED,
+            disponible=True,
+        )
+        assert info.letra == "C:"
+        assert info.ruta_raiz == "C:\\"
+        assert info.tipo == VolumeType.FIXED
+        assert info.disponible is True
+        assert info.sistema_archivos == ""
+        assert info.etiqueta_volumen == ""
+
+    def test_campos_opcionales(self):
+        info = VolumeInfo(
+            letra="D:",
+            ruta_raiz="D:\\",
+            tipo=VolumeType.REMOVABLE,
+            disponible=False,
+            sistema_archivos="NTFS",
+            etiqueta_volumen="Datos",
+        )
+        assert info.sistema_archivos == "NTFS"
+        assert info.etiqueta_volumen == "Datos"
+
+
+class TestEnumerarVolumenesWindows:
+    """enumerar_volumenes_windows() descubre unidades reales en Windows."""
+
+    def test_devuelve_lista_de_volume_info(self):
+        volumenes = enumerar_volumenes_windows()
+        assert isinstance(volumenes, list)
+        for v in volumenes:
+            assert isinstance(v, VolumeInfo)
+
+    def test_almeno_una_unidad_detectada(self):
+        volumenes = enumerar_volumenes_windows()
+        assert len(volumenes) > 0, "Windows debe tener al menos una unidad logica"
+
+    def test_c_es_fixed_y_disponible(self):
+        """En este entorno C: existe, es fija y esta disponible."""
+        volumenes = enumerar_volumenes_windows()
+        por_letra = {v.letra: v for v in volumenes}
+        assert "C:" in por_letra, "Se esperaba la unidad C:"
+        c = por_letra["C:"]
+        assert c.tipo == VolumeType.FIXED, f"C: debe ser FIXED, obtuvo {c.tipo}"
+        assert c.disponible is True, "C: debe estar disponible"
+        assert c.ruta_raiz == "C:\\"
+        assert len(c.sistema_archivos) > 0, "C: debe reportar un sistema de archivos"
+
+    def test_letras_unicas(self):
+        volumenes = enumerar_volumenes_windows()
+        letras = [v.letra for v in volumenes]
+        assert len(letras) == len(set(letras)), "No debe haber letras de unidad duplicadas"
+
+    def test_todas_tienen_tipo_y_disponibilidad(self):
+        volumenes = enumerar_volumenes_windows()
+        for v in volumenes:
+            assert isinstance(v.tipo, VolumeType)
+            assert isinstance(v.disponible, bool)
+            assert v.letra.endswith(":")
+            assert v.ruta_raiz == f"{v.letra}\\"
+
+
+# ---------------------------------------------------------------------------
+# Enumeracion de volumenes Linux (3.8.5.1.4.3.3)
+# ---------------------------------------------------------------------------
+
+class TestVolumeTypeLinux:
+    """VolumeType debe incluir VIRTUAL para diferenciar sistemas de archivos
+    virtuales de Linux (3.8.5.1.4.3.3)."""
+
+    def test_existe_valor_virtual(self):
+        assert VolumeType.VIRTUAL.value == "virtual"
+
+
+class TestClasificacionVolumenLinux:
+    """_clasificar_tipo_volumen_linux clasifica local, virtual, red y extraible."""
+
+    def test_sistema_local_ext4_es_fixed(self):
+        from src.hands.system_inventory import _clasificar_tipo_volumen_linux
+        tipo = _clasificar_tipo_volumen_linux("/dev/sda1", "ext4", "rw,relatime", "/")
+        assert tipo == VolumeType.FIXED
+
+    def test_sistema_local_xfs_es_fixed(self):
+        from src.hands.system_inventory import _clasificar_tipo_volumen_linux
+        tipo = _clasificar_tipo_volumen_linux("/dev/sdb1", "xfs", "rw,relatime", "/datos")
+        assert tipo == VolumeType.FIXED
+
+    def test_sistema_virtual_proc_es_virtual(self):
+        from src.hands.system_inventory import _clasificar_tipo_volumen_linux
+        tipo = _clasificar_tipo_volumen_linux("proc", "proc", "rw,nosuid,nodev,noexec,relatime", "/proc")
+        assert tipo == VolumeType.VIRTUAL
+
+    def test_sistema_virtual_sysfs_es_virtual(self):
+        from src.hands.system_inventory import _clasificar_tipo_volumen_linux
+        tipo = _clasificar_tipo_volumen_linux("sysfs", "sysfs", "rw,nosuid,nodev,noexec,relatime", "/sys")
+        assert tipo == VolumeType.VIRTUAL
+
+    def test_sistema_virtual_tmpfs_es_virtual(self):
+        from src.hands.system_inventory import _clasificar_tipo_volumen_linux
+        tipo = _clasificar_tipo_volumen_linux("tmpfs", "tmpfs", "rw,nosuid,nodev", "/run")
+        assert tipo == VolumeType.VIRTUAL
+
+    def test_sistema_red_nfs_es_remote(self):
+        from src.hands.system_inventory import _clasificar_tipo_volumen_linux
+        tipo = _clasificar_tipo_volumen_linux("server:/export", "nfs", "rw,relatime,_netdev", "/mnt/nfs")
+        assert tipo == VolumeType.REMOTE
+
+    def test_sistema_red_cifs_es_remote(self):
+        from src.hands.system_inventory import _clasificar_tipo_volumen_linux
+        tipo = _clasificar_tipo_volumen_linux("//server/share", "cifs", "rw,_netdev", "/mnt/share")
+        assert tipo == VolumeType.REMOTE
+
+    def test_sistema_extraible_vfat_bajo_media_es_removable(self):
+        from src.hands.system_inventory import _clasificar_tipo_volumen_linux
+        tipo = _clasificar_tipo_volumen_linux("/dev/sdc1", "vfat", "rw,relatime", "/media/usuario/USB")
+        assert tipo == VolumeType.REMOVABLE
+
+    def test_sistema_extraible_exfat_bajo_mnt_es_removable(self):
+        from src.hands.system_inventory import _clasificar_tipo_volumen_linux
+        tipo = _clasificar_tipo_volumen_linux("/dev/sdd1", "exfat", "rw,relatime", "/mnt/disco_externo")
+        assert tipo == VolumeType.REMOVABLE
+
+    def test_sistema_desconocido_es_unknown(self):
+        from src.hands.system_inventory import _clasificar_tipo_volumen_linux
+        tipo = _clasificar_tipo_volumen_linux("/dev/sde1", "otro_fs", "rw", "/otro")
+        assert tipo == VolumeType.UNKNOWN
+
+
+class TestEnumerarVolumenesLinux:
+    """enumerar_volumenes_linux() lee /proc/mounts y devuelve VolumeInfo."""
+
+    def _escribir_mounts(self, tmp_path, contenido):
+        archivo = tmp_path / "mounts"
+        archivo.write_text(contenido, encoding="utf-8")
+        return str(archivo)
+
+    def test_devuelve_lista_de_volume_info(self, tmp_path):
+        ruta = self._escribir_mounts(tmp_path, """
+/dev/sda1 / ext4 rw,relatime 0 0
+proc /proc proc rw,nosuid,nodev,noexec,relatime 0 0
+""")
+        volumenes = enumerar_volumenes_linux(ruta)
+        assert isinstance(volumenes, list)
+        for v in volumenes:
+            assert isinstance(v, VolumeInfo)
+
+    def test_no_existe_proc_mounts_devuelve_lista_vacia(self, tmp_path):
+        ruta = str(tmp_path / "no_existe.mounts")
+        volumenes = enumerar_volumenes_linux(ruta)
+        assert volumenes == []
+
+    def test_distingue_local_virtual_red_y_extraible(self, tmp_path):
+        ruta = self._escribir_mounts(tmp_path, """
+/dev/sda1 / ext4 rw,relatime 0 0
+proc /proc proc rw,nosuid,nodev,noexec,relatime 0 0
+server:/export /mnt/nfs nfs rw,relatime,_netdev 0 0
+/dev/sdc1 /media/usuario/USB vfat rw,relatime 0 0
+""")
+        volumenes = enumerar_volumenes_linux(ruta)
+        por_ruta = {v.ruta_raiz: v for v in volumenes}
+        assert por_ruta["/"].tipo == VolumeType.FIXED, f"/ debe ser FIXED, obtuvo {por_ruta['/'].tipo}"
+        assert por_ruta["/proc"].tipo == VolumeType.VIRTUAL, f"/proc debe ser VIRTUAL, obtuvo {por_ruta['/proc'].tipo}"
+        assert por_ruta["/mnt/nfs"].tipo == VolumeType.REMOTE, f"/mnt/nfs debe ser REMOTE, obtuvo {por_ruta['/mnt/nfs'].tipo}"
+        assert por_ruta["/media/usuario/USB"].tipo == VolumeType.REMOVABLE, (
+            f"/media/usuario/USB debe ser REMOVABLE, obtuvo {por_ruta['/media/usuario/USB'].tipo}"
+        )
+
+    def test_volumen_info_sin_letra_linux(self, tmp_path):
+        """Linux no usa letras de unidad: letra queda vacia."""
+        ruta = self._escribir_mounts(tmp_path, "/dev/sda1 / ext4 rw,relatime 0 0\n")
+        volumenes = enumerar_volumenes_linux(ruta)
+        assert len(volumenes) == 1
+        assert volumenes[0].letra == "", "Linux no tiene letra de unidad"
+        assert volumenes[0].ruta_raiz == "/"
+        assert volumenes[0].sistema_archivos == "ext4"
+        assert volumenes[0].etiqueta_volumen == "/dev/sda1"
+        assert volumenes[0].disponible is True
+
+    def test_lineas_vacias_y_comentarios_no_rompen_el_parseo(self, tmp_path):
+        ruta = self._escribir_mounts(tmp_path, """
+# comentario
+
+/dev/sda1 / ext4 rw,relatime 0 0
+
+""")
+        volumenes = enumerar_volumenes_linux(ruta)
+        assert len(volumenes) == 1
+
+
+# ---------------------------------------------------------------------------
+# Clasificacion de volumenes macOS (3.8.5.1.4.3.4)
+# ---------------------------------------------------------------------------
+
+class TestClasificacionVolumenMacOS:
+    """_clasificar_tipo_volumen_macos clasifica local, virtual, red y extraible."""
+
+    def test_sistema_local_apfs_es_fixed(self):
+        tipo = _clasificar_tipo_volumen_macos(
+            "/dev/disk1s1", "apfs", "local, journaled", "/"
+        )
+        assert tipo == VolumeType.FIXED
+
+    def test_sistema_local_hfs_es_fixed(self):
+        tipo = _clasificar_tipo_volumen_macos(
+            "/dev/disk2s1", "hfs", "local, journaled", "/Volumes/Datos"
+        )
+        assert tipo == VolumeType.FIXED
+
+    def test_sistema_virtual_devfs_es_virtual(self):
+        tipo = _clasificar_tipo_volumen_macos(
+            "devfs", "devfs", "rw,nosuid", "/dev"
+        )
+        assert tipo == VolumeType.VIRTUAL
+
+    def test_sistema_virtual_fdescfs_es_virtual(self):
+        tipo = _clasificar_tipo_volumen_macos(
+            "fdescfs", "fdescfs", "rw,nosuid", "/dev/fd"
+        )
+        assert tipo == VolumeType.VIRTUAL
+
+    def test_sistema_virtual_tmpfs_es_virtual(self):
+        tipo = _clasificar_tipo_volumen_macos(
+            "tmpfs", "tmpfs", "rw,nosuid", "/private/var/vm"
+        )
+        assert tipo == VolumeType.VIRTUAL
+
+    def test_sistema_red_nfs_es_remote(self):
+        tipo = _clasificar_tipo_volumen_macos(
+            "server:/export", "nfs", "rw,_netdev", "/mnt/nfs"
+        )
+        assert tipo == VolumeType.REMOTE
+
+    def test_sistema_red_smbfs_es_remote(self):
+        tipo = _clasificar_tipo_volumen_macos(
+            "//server/share", "smbfs", "rw", "/mnt/share"
+        )
+        assert tipo == VolumeType.REMOTE
+
+    def test_sistema_extraible_exfat_bajo_volumes_es_removable(self):
+        tipo = _clasificar_tipo_volumen_macos(
+            "/dev/disk3s1", "exfat", "rw,nosuid", "/Volumes/USB"
+        )
+        assert tipo == VolumeType.REMOVABLE
+
+    def test_sistema_extraible_msdos_bajo_volumes_es_removable(self):
+        tipo = _clasificar_tipo_volumen_macos(
+            "/dev/disk4s1", "msdos", "rw,nosuid", "/Volumes/DiscoExterno"
+        )
+        assert tipo == VolumeType.REMOVABLE
+
+    def test_sistema_desconocido_es_unknown(self):
+        tipo = _clasificar_tipo_volumen_macos(
+            "/dev/disk5s1", "otro_fs", "rw", "/otro"
+        )
+        assert tipo == VolumeType.UNKNOWN
+
+
+# ---------------------------------------------------------------------------
+# Enumeracion de volumenes macOS (3.8.5.1.4.3.4)
+# ---------------------------------------------------------------------------
+
+class TestEnumerarVolumenesMacOS:
+    """enumerar_volumenes_macos() parsea la salida de `mount` en macOS."""
+
+    def _salida_mount(self, lineas):
+        return "\n".join(lineas)
+
+    def test_devuelve_lista_de_volume_info(self):
+        salida = self._salida_mount([
+            "/dev/disk1s1 on / (apfs, local, journaled)",
+            "/dev/disk2s1 on /Volumes/Datos (apfs, local, journaled)",
+        ])
+        volumenes = enumerar_volumenes_macos(salida)
+        assert isinstance(volumenes, list)
+        for v in volumenes:
+            assert isinstance(v, VolumeInfo)
+
+    def test_entrada_vacia_devuelve_lista_vacia(self):
+        assert enumerar_volumenes_macos("") == []
+
+    def test_sin_parentesis_no_se_parsea(self):
+        salida = "/dev/disk1s1 on /"
+        assert enumerar_volumenes_macos(salida) == []
+
+    def test_distingue_local_virtual_red_y_extraible(self):
+        salida = self._salida_mount([
+            "/dev/disk1s1 on / (apfs, local, journaled)",
+            "devfs on /dev (devfs, rw, nosuid)",
+            "server:/export on /mnt/nfs (nfs, rw, _netdev)",
+            "/dev/disk3s1 on /Volumes/USB (exfat, rw, nosuid)",
+        ])
+        volumenes = enumerar_volumenes_macos(salida)
+        por_ruta = {v.ruta_raiz: v for v in volumenes}
+        assert por_ruta["/"].tipo == VolumeType.FIXED, (
+            f"/ debe ser FIXED, obtuvo {por_ruta['/'].tipo}"
+        )
+        assert por_ruta["/dev"].tipo == VolumeType.VIRTUAL, (
+            f"/dev debe ser VIRTUAL, obtuvo {por_ruta['/dev'].tipo}"
+        )
+        assert por_ruta["/mnt/nfs"].tipo == VolumeType.REMOTE, (
+            f"/mnt/nfs debe ser REMOTE, obtuvo {por_ruta['/mnt/nfs'].tipo}"
+        )
+        assert por_ruta["/Volumes/USB"].tipo == VolumeType.REMOVABLE, (
+            f"/Volumes/USB debe ser REMOVABLE, obtuvo {por_ruta['/Volumes/USB'].tipo}"
+        )
+
+    def test_volumen_info_sin_letra_macos(self):
+        """macOS no usa letras de unidad: letra queda vacia."""
+        salida = "/dev/disk1s1 on / (apfs, local, journaled)"
+        volumenes = enumerar_volumenes_macos(salida)
+        assert len(volumenes) == 1
+        assert volumenes[0].letra == "", "macOS no tiene letra de unidad"
+        assert volumenes[0].ruta_raiz == "/"
+        assert volumenes[0].sistema_archivos == "apfs"
+        assert volumenes[0].etiqueta_volumen == "/dev/disk1s1"
+        assert volumenes[0].disponible is True
+
+    def test_lineas_sin_on_se_ignoran(self):
+        salida = """
+/dev/disk1s1 on / (apfs, local, journaled)
+linea invalida sin on
+
+"""
+        volumenes = enumerar_volumenes_macos(salida)
+        assert len(volumenes) == 1
+
+
+# ---------------------------------------------------------------------------
+# Contrato comun de volumen multiplataforma (3.8.5.1.4.3.5)
+# ---------------------------------------------------------------------------
+
+class TestVolumenComun:
+    """VolumenComun no impone letras de unidad ni rutas de Windows en otros SO."""
+
+    def test_construir_sin_letra_unidad_en_linux(self):
+        """Linux/macOS no tienen letra de unidad: letra_unidad queda None."""
+        v = VolumenComun(
+            identificador="/",
+            raiz="/",
+            tipo=VolumeType.FIXED,
+            disponible=True,
+            sistema_archivos="ext4",
+            sistema_origen="Linux",
+        )
+        assert v.letra_unidad is None
+        assert v.tiene_letra_unidad() is False
+        assert v.es_windows() is False
+        assert v.identificador == "/"
+        assert v.raiz == "/"
+
+    def test_construir_con_letra_unidad_en_windows(self):
+        """Windows conserva la letra de unidad."""
+        v = VolumenComun(
+            identificador="C:",
+            raiz="C:\\",
+            tipo=VolumeType.FIXED,
+            disponible=True,
+            sistema_archivos="NTFS",
+            letra_unidad="C:",
+            sistema_origen="Windows",
+        )
+        assert v.letra_unidad == "C:"
+        assert v.tiene_letra_unidad() is True
+        assert v.es_windows() is True
+        assert v.identificador == "C:"
+        assert v.raiz == "C:\\"
+
+    def test_construir_sin_letra_unidad_en_macos(self):
+        """macOS no usa letras de unidad."""
+        v = VolumenComun(
+            identificador="/Volumes/Datos",
+            raiz="/Volumes/Datos",
+            tipo=VolumeType.FIXED,
+            disponible=True,
+            sistema_archivos="apfs",
+            letra_unidad=None,
+            sistema_origen="Darwin",
+        )
+        assert v.letra_unidad is None
+        assert v.es_windows() is False
+        assert v.tiene_letra_unidad() is False
+
+    def test_to_dict(self):
+        """to_dict serializa todos los campos incluido letra_unidad None."""
+        v = VolumenComun(
+            identificador="/mnt/data",
+            raiz="/mnt/data",
+            tipo=VolumeType.REMOVABLE,
+            disponible=True,
+            sistema_archivos="exfat",
+            letra_unidad=None,
+            sistema_origen="Linux",
+        )
+        d = v.to_dict()
+        assert d["identificador"] == "/mnt/data"
+        assert d["raiz"] == "/mnt/data"
+        assert d["tipo"] == "removable"
+        assert d["disponible"] is True
+        assert d["sistema_archivos"] == "exfat"
+        assert d["letra_unidad"] is None
+        assert d["sistema_origen"] == "Linux"
+
+
+class TestVolumenComunDesdeInfo:
+    """volumen_comun_desde_info convierte VolumeInfo sin forzar conceptos Windows."""
+
+    def test_desde_info_windows_conserva_letra(self):
+        info = VolumeInfo(
+            letra="C:",
+            ruta_raiz="C:\\",
+            tipo=VolumeType.FIXED,
+            disponible=True,
+            sistema_archivos="NTFS",
+            etiqueta_volumen="Datos",
+        )
+        v = volumen_comun_desde_info(info, sistema_origen="Windows")
+        assert v.letra_unidad == "C:"
+        assert v.identificador == "C:"
+        assert v.raiz == "C:\\"
+        assert v.sistema_origen == "Windows"
+        assert v.es_windows() is True
+
+    def test_desde_info_linux_sin_letra(self):
+        info = VolumeInfo(
+            letra="",
+            ruta_raiz="/",
+            tipo=VolumeType.FIXED,
+            disponible=True,
+            sistema_archivos="ext4",
+            etiqueta_volumen="/dev/sda1",
+        )
+        v = volumen_comun_desde_info(info, sistema_origen="Linux")
+        assert v.letra_unidad is None
+        assert v.identificador == "/"
+        assert v.raiz == "/"
+        assert v.sistema_origen == "Linux"
+        assert v.es_windows() is False
+
+    def test_desde_info_macos_sin_letra(self):
+        info = VolumeInfo(
+            letra="",
+            ruta_raiz="/Volumes/USB",
+            tipo=VolumeType.REMOVABLE,
+            disponible=True,
+            sistema_archivos="exfat",
+            etiqueta_volumen="/dev/disk2s1",
+        )
+        v = volumen_comun_desde_info(info, sistema_origen="Darwin")
+        assert v.letra_unidad is None
+        assert v.identificador == "/Volumes/USB"
+        assert v.raiz == "/Volumes/USB"
+        assert v.sistema_origen == "Darwin"
+
+    def test_no_inventa_letra_unidad_en_no_windows(self):
+        """Aunque el VolumeInfo traiga letra, en SO no-Windows no se conserva."""
+        info = VolumeInfo(
+            letra="C:",
+            ruta_raiz="/",
+            tipo=VolumeType.FIXED,
+            disponible=True,
+        )
+        v = volumen_comun_desde_info(info, sistema_origen="Linux")
+        assert v.letra_unidad is None
+        assert v.identificador == "/"
+
+    def test_valor_default_sistema_origen(self):
+        """Sin sistema_origen se usa la deteccion del SO real."""
+        info = VolumeInfo(
+            letra="D:",
+            ruta_raiz="D:\\",
+            tipo=VolumeType.REMOVABLE,
+            disponible=True,
+        )
+        v = volumen_comun_desde_info(info)
+        assert v.sistema_origen == detectar_sistema().sistema_operativo
+
+
+class TestEnumerarVolumenesComun:
+    """enumerar_volumenes_comun devuelve contratos comunes sin forzar Windows."""
+
+    def test_devuelve_lista_de_volumen_comun_en_windows(self):
+        """En este entorno Windows devuelve VolumeInfo reales convertidos."""
+        volumenes = enumerar_volumenes_comun(sistema_origen="Windows")
+        assert isinstance(volumenes, list)
+        assert len(volumenes) > 0, "Windows debe tener al menos un volumen"
+        for v in volumenes:
+            assert isinstance(v, VolumenComun)
+
+    def test_elementos_no_forzan_letra_unidad(self):
+        """Cada volumen comun expone letra_unidad segun su SO real."""
+        volumenes = enumerar_volumenes_comun(sistema_origen="Windows")
+        for v in volumenes:
+            assert isinstance(v.tiene_letra_unidad(), bool)
+            assert isinstance(v.es_windows(), bool)
+
+    def test_so_no_reconocido_devuelve_vacio(self):
+        volumenes = enumerar_volumenes_comun(sistema_origen="Desconocido")
+        assert volumenes == []
