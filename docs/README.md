@@ -1784,7 +1784,7 @@ Clases:
 | `class InventoryControl(Enum)` | Controles disponibles para gestión del inventario. |
 | `class InventoryControlResult` | Resultado de una operación de control del inventario. |
 | `class InventoryContract` | Contrato del inventario persistente. Define alcance, metadatos, privacidad y exclusiones de forma centralizada. |
-| `class ProgresoRecorrido` | Estado de progreso de un recorrido de volumen (contadores, entrada actual, completado, interrumpido). |
+| `class ProgresoRecorrido` | Estado de progreso de un recorrido de volumen (contadores, cobertura, entrada actual, completado, interrumpido). |
 | `class RecorridoVolumen` | Recorrido iterativo y controlado de directorios por volumen, por pila explícita sin recursión ilimitada, con conjunto de visitados por identificador canónico y opción de traversal de enlaces (`seguir_enlaces`). |
 | `class CoverageMatrixEntry` | Una celda de la matriz de cobertura del inventario. |
 | `class SistemaOperativo(Enum)` | Sistemas operativos detectables mediante APIs del sistema (platform). |

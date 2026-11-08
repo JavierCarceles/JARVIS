@@ -1558,6 +1558,83 @@ class TestRecorridoVolumenIterativo:
         assert progresos[-1].completado is True
         assert progresos[-1].entradas_procesadas > 0
 
+    def test_progreso_incluye_cobertura(self, tmp_path: Path):
+        """El ProgresoRecorrido reportado por callback incluye el campo cobertura."""
+        raiz = self._crear_arbol(tmp_path)
+        contrato = _ContratoPrueba()
+        progresos: list[ProgresoRecorrido] = []
+        recorrido = RecorridoVolumen(
+            volumen="V",
+            raiz=str(raiz),
+            contrato=contrato,
+            maquina_id="maquina-test",
+            callback_progreso=lambda p: progresos.append(p),
+        )
+        list(recorrido.recorrer())
+        assert len(progresos) > 0
+        for p in progresos:
+            assert isinstance(p.cobertura, float)
+            assert 0.0 <= p.cobertura <= 100.0
+
+    def test_cobertura_al_completar_es_100(self, tmp_path: Path):
+        """Cuando el recorrido completa, la cobertura es 100%."""
+        raiz = self._crear_arbol(tmp_path)
+        contrato = _ContratoPrueba()
+        progresos: list[ProgresoRecorrido] = []
+        recorrido = RecorridoVolumen(
+            volumen="V",
+            raiz=str(raiz),
+            contrato=contrato,
+            maquina_id="maquina-test",
+            callback_progreso=lambda p: progresos.append(p),
+        )
+        list(recorrido.recorrer())
+        assert progresos[-1].completado is True
+        assert progresos[-1].cobertura == 100.0
+
+    def test_cobertura_no_es_100_si_interrumpido(self, tmp_path: Path):
+        """Si el recorrido se interrumpe con rutas pendientes, la cobertura no es 100%."""
+        raiz = self._crear_arbol(tmp_path)
+        contrato = _ContratoPrueba()
+        progresos: list[ProgresoRecorrido] = []
+        llamadas = [0]
+        def control() -> ControlRecorrido:
+            llamadas[0] += 1
+            return ControlRecorrido.CANCELAR if llamadas[0] > 1 else ControlRecorrido.CONTINUAR
+        recorrido = RecorridoVolumen(
+            volumen="V",
+            raiz=str(raiz),
+            contrato=contrato,
+            maquina_id="maquina-test",
+            callback_progreso=lambda p: progresos.append(p),
+            callback_control=control,
+        )
+        list(recorrido.recorrer())
+        assert progresos[-1].completado is False
+        assert progresos[-1].interrumpido is True
+        # Con rutas pendientes en la pila, la cobertura no puede ser 100%.
+        assert progresos[-1].cobertura < 100.0
+        assert progresos[-1].cobertura > 0.0
+
+    def test_cobertura_avanza_progresivamente(self, tmp_path: Path):
+        """La cobertura aumenta a medida que se procesan directorios."""
+        raiz = self._crear_arbol(tmp_path)
+        contrato = _ContratoPrueba()
+        progresos: list[ProgresoRecorrido] = []
+        recorrido = RecorridoVolumen(
+            volumen="V",
+            raiz=str(raiz),
+            contrato=contrato,
+            maquina_id="maquina-test",
+            callback_progreso=lambda p: progresos.append(p),
+        )
+        list(recorrido.recorrer())
+        coberturas = [p.cobertura for p in progresos]
+        # La cobertura debe ser no decreciente y terminar en 100.
+        for i in range(1, len(coberturas)):
+            assert coberturas[i] >= coberturas[i - 1], f"Cobertura no avanza: {coberturas}"
+        assert coberturas[-1] == 100.0
+
     def test_control_cancelar_interrumpe_recorrido(self, tmp_path: Path):
         """ControlRecorrido.CANCELAR detiene el recorrido antes de completar."""
         raiz = self._crear_arbol(tmp_path)

@@ -7806,3 +7806,15 @@ VERIFICACION: SINTAXIS: OK (py_compile de `src/hands/system_inventory.py` y `tes
 DISCREPANCIAS: NINGUNA
 PENDIENTES: Siguiente hoja pendiente real en orden del roadmap: 3.8.5.1.4.4.8 (informar progreso, entradas procesadas, volumen actual, errores, exclusiones y cobertura). Padre 3.8.5.1.4.4 con hijas .1 a .7 cerradas; .8 a .10 pendientes.
 ESTADO FINAL: 3.8.5.1.4.4.7 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.8.5.1.4.4.8
+FECHA: 2026-11-08
+OBJETIVO: Informar progreso, entradas procesadas, volumen actual, errores, exclusiones y cobertura; no mostrar 100% si quedan rutas relevantes sin inspeccionar.
+TIPO DE TRABAJO: IMPLEMENTACION | TEST
+CAMBIOS / HALLAZGOS: Añadido campo `cobertura: float` a `ProgresoRecorrido` en `src/hands/system_inventory.py`; implementado metodo `_calcular_cobertura()` que calcula el porcentaje de avance como directorios_procesados / (directorios_procesados + directorios pendientes en pila) * 100, nunca alcanzando 100% mientras queden rutas pendientes; `RecorridoVolumen.recorrer()` establece `cobertura` antes de cada callback de progreso y lo fija a 100.0 al completar. Añadidos 4 tests en `tests/hands/test_system_inventory.py` (clase TestRecorridoVolumenIterativo): progreso incluye cobertura, cobertura es 100% al completar, cobertura < 100% si se interrumpe con rutas pendientes, cobertura avanza progresivamente. Ningún cambio en `main.py`. Revisada `docs/README.md` (descripcion de ProgresoRecorrido actualizada con cobertura); revisada `docs/README_TESTS.md` (se añadio TestRecorridoVolumenIterativo y se actualizo el conteo de resultados).
+ARCHIVOS MODIFICADOS: PRODUCCION: `src/hands/system_inventory.py`; TESTS: `tests/hands/test_system_inventory.py`; DOCUMENTACION: `docs/README.md`, `docs/README_TESTS.md`
+TESTS Y RESULTADOS: UNITARIOS: 171 PASSED / 8 SKIPPED / 179 TOTAL (`tests/hands/test_system_inventory.py`, ejecutados en Windows real); INTEGRACION: NA; NO REGRESION: NA
+VERIFICACION: SINTAXIS: OK (py_compile de `src/hands/system_inventory.py` y `tests/hands/test_system_inventory.py` sin errores; import del modulo y recoleccion de pytest OK); MAIN.PY: NA (no se modifica `main.py`); COMPORTAMIENTO / INTEGRACION REAL: Evidencia real de ejecucion: 171 tests pasan y 8 se saltan en Windows real. Verificado: `cobertura` se informa en cada callback de progreso; al completar el recorrido `cobertura` es 100.0; si el recorrido se interrumpe con directorios pendientes en la pila, `cobertura` es menor a 100.0 y mayor a 0.0; la cobertura avanza de forma no decreciente.
+DISCREPANCIAS: NINGUNA
+PENDIENTES: Siguiente hoja pendiente real en orden del roadmap: 3.8.5.1.4.4.9 (conservar ultimo inventario valido y marcar ejecucion parcial si un volumen no termina de escanearse). Padre 3.8.5.1.4.4 con hijas .1 a .8 cerradas; .9 a .10 pendientes.
+ESTADO FINAL: 3.8.5.1.4.4.8 - IMPLEMENTADA

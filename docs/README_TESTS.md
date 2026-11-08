@@ -10704,8 +10704,9 @@ da reconciled=False (coincidencia).
 | `TestVolumenComunDesdeInfoConEstado` | Cálculo de estado en `volumen_comun_desde_info` desde `VolumeInfo`. |
 | `TestEnumerarVolumenesComunConEstado` | `enumerar_volumenes_comun` devuelve volúmenes con estado diferenciado válido. |
 | `TestCoberturaSoportada` | Consulta de la matriz de soporte SO/version sin inferencias: combinacion registrada soportada, no soportada, no registrada, SO desconocido, version no registrada, insensibilidad a mayusculas y filtrado de entradas por SO. |
+| `TestRecorridoVolumenIterativo` | Recorrido iterativo sin recursion, captura de metadatos, tipos observados, rutas Unicode, callback de progreso con contadores y cobertura, control de pausa/cancelar, errores por ruta sin abortar, respeto a exclusiones. |
 
-**Resultados:** 133 tests unitarios, 133 PASSED / 0 FAILED / 3 SKIPPED (symlinks no creables en Windows sin privilegios).
+**Resultados:** 171 tests unitarios, 171 PASSED / 0 FAILED / 8 SKIPPED (symlinks no creables en Windows sin privilegios).
 
 ---
 

@@ -1664,6 +1664,7 @@ class ProgresoRecorrido:
     errores: int = 0
     errores_por_categoria: dict[str, int] = field(default_factory=dict)
     exclusiones: int = 0
+    cobertura: float = 0.0          # porcentaje de avance (0.0 a 100.0), nunca 100 si quedan rutas pendientes
     entrada_actual: str = ""
     completado: bool = False
     interrumpido: bool = False
@@ -1804,6 +1805,21 @@ class RecorridoVolumen:
             self._progreso.errores_por_categoria.get(categoria, 0) + 1
         )
 
+    def _calcular_cobertura(self) -> float:
+        """Calcula el porcentaje de cobertura del recorrido.
+
+        La cobertura avanza a medida que se procesan directorios y nunca
+        alcanza el 100% mientras queden directorios pendientes en la pila
+        (rutas relevantes sin inspeccionar). Cuando la pila esta vacia y el
+        recorrido finalizo, la cobertura es 100%.
+        """
+        pila = getattr(self, "_pila", [])
+        pendientes = len(pila)
+        total = self._progreso.directorios_procesados + pendientes
+        if total == 0:
+            return 0.0
+        return round(self._progreso.directorios_procesados / total * 100.0, 2)
+
     def _normalizar_visitado(self, path: str) -> str:
         """Devuelve la representación normalizada de `path` para el conjunto de visitados."""
         absoluto = os.path.abspath(path)
@@ -1909,22 +1925,28 @@ class RecorridoVolumen:
         # Semilla del conjunto de visitados con la raiz: se visita exactamente
         # una vez y nunca se vuelve a procesar.
         self._visitados.add(self._clave_directorio(self.raiz))
-        pila: list[str] = [self.raiz]
+        self._pila: list[str] = [self.raiz]
 
-        while pila:
+        while self._pila:
             # Comprobar control de flujo (pausa/cancelar) antes de cada directorio.
             if self.callback_control is not None:
                 decision = self.callback_control()
                 if decision == ControlRecorrido.CANCELAR:
                     self._progreso.interrumpido = True
                     self._progreso.completado = False
+                    self._progreso.cobertura = self._calcular_cobertura()
+                    if self.callback_progreso is not None:
+                        self.callback_progreso(self._progreso)
                     return
                 if decision == ControlRecorrido.PAUSAR:
                     self._progreso.interrumpido = True
                     self._progreso.completado = False
+                    self._progreso.cobertura = self._calcular_cobertura()
+                    if self.callback_progreso is not None:
+                        self.callback_progreso(self._progreso)
                     return
 
-            directorio_actual = pila.pop()
+            directorio_actual = self._pila.pop()
 
             self._progreso.entrada_actual = directorio_actual
             self._progreso.directorios_procesados += 1
@@ -1955,7 +1977,7 @@ class RecorridoVolumen:
                         elif entry.entry_type == EntryType.DIRECTORY:
                             # Directorio real: apilar si su identificador de
                             # visita aun no fue registrado.
-                            self._considerar_directorio_para_pila(ruta_absoluta, pila)
+                            self._considerar_directorio_para_pila(ruta_absoluta, self._pila)
                         elif (
                             entry.entry_type == EntryType.SYMLINK
                             and self._seguir_enlaces
@@ -1968,7 +1990,7 @@ class RecorridoVolumen:
                                 info_enlace, self._visitados, "conservadora"
                             ):
                                 self._considerar_directorio_para_pila(
-                                    ruta_absoluta, pila
+                                    ruta_absoluta, self._pila
                                 )
 
                         yield entry
@@ -1985,9 +2007,11 @@ class RecorridoVolumen:
 
             # Notificar progreso tras procesar cada directorio.
             if self.callback_progreso is not None:
+                self._progreso.cobertura = self._calcular_cobertura()
                 self.callback_progreso(self._progreso)
 
         self._progreso.completado = True
         self._progreso.interrumpido = False
+        self._progreso.cobertura = 100.0
         if self.callback_progreso is not None:
             self.callback_progreso(self._progreso)
