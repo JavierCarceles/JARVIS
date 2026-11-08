@@ -1793,25 +1793,27 @@ Funciones a nivel módulo:
 
 ### `src/hands/system_inventory_storage.py` — Almacenamiento canonico SQLite del indice de inventario persistente del sistema de archivos.
 
-**Descripción:** Implementa el almacenamiento canonico `data/system_inventory.sqlite3` del índice de inventario del sistema de archivos (unidad 3.8.5.1.4.2.3). Provee inicialización y versionado de esquema (`schema_version`), tablas para equipos (`machines`), volúmenes (`volumes`), ejecuciones de escaneo (`scan_runs`), entradas de archivo (`file_entries`) y candidatos de aplicación (`application_candidates`), escritura por lotes en transacción atómica y consultas indexadas paginadas por nombre, extensión, tipo, ruta, volumen y estado. Aísla el inventario por equipo (`machine_id`) y usa WAL con claves foráneas. No implementa el recorrido de directorios ni la clasificación de aplicaciones (unidades posteriores).
+**Descripción:** Implementa el almacenamiento canonico `data/system_inventory.sqlite3` del índice de inventario del sistema de archivos. Provee inicialización y versionado de esquema (`schema_version`), tablas para equipos (`machines`), volúmenes (`volumes`), ejecuciones de escaneo (`scan_runs`), entradas de archivo (`file_entries`) y candidatos de aplicación (`application_candidates`), escritura por lotes en transacción atómica y consultas indexadas paginadas por nombre, extensión, tipo, ruta, volumen y estado. Aísla el inventario por equipo (`machine_id`) y usa WAL con claves foráneas. Incluye control de concurrencia para impedir que dos escaneos simultáneos sobre el mismo equipo y volumen corrompan o dupliquen el inventario, con bloqueo por `(machine_id, volumen)`, transacciones `BEGIN IMMEDIATE` en escrituras y verificación del modo de journaling. No implementa el recorrido de directorios ni la clasificación de aplicaciones.
 
 **Características:**
 
-- Creación de `data/system_inventory.sqlite3` como almacenamiento canonico del índice persistente (3.8.5.1.4.2.3).
+- Creación de `data/system_inventory.sqlite3` como almacenamiento canonico del índice persistente.
 - Esquema versionado con tabla `schema_version` (versión 2).
 - Migraciones de esquema verificables: `initialize()` aplica las migraciones registradas en orden (actual: v1 a v2), cada una dentro de su propia transacción, y comprueba que no se pierdan ni se reinterpreten datos de versiones previas antes de avanzar la versión.
 - Tablas `machines`, `volumes`, `scan_runs`, `file_entries` y `application_candidates` (candidatos de aplicación separados de los registros genéricos de archivo).
-- Escritura por lotes en transacción atómica (`BEGIN`/`COMMIT` con `ROLLBACK` ante fallo): un escaneo interrumpido no deja media base presentada como inventario completo.
+- Escritura por lotes en transacción atómica (`BEGIN IMMEDIATE`/`COMMIT` con `ROLLBACK` ante fallo): un escaneo interrumpido no deja media base presentada como inventario completo.
+- Control de concurrencia: `begin_scan_run` adquiere un bloqueo no bloqueante por `(machine_id, volumen)` y levanta `ConcurrentScanError` si otro escaneo está en curso para la misma clave; `end_scan_run` libera el bloqueo al terminar, incluso si la validación falla.
 - Consultas indexadas paginadas por nombre, extensión y prefijo de ruta absoluta; contador de entradas y recuperación de la última ejecución por equipo/volumen.
 - Aislamiento por equipo: un inventario pertenece al equipo que lo creó (sin MAC, número de serie ni nombre de usuario).
-- Modo de journaling WAL y claves foráneas activadas (`PRAGMA journal_mode=WAL`, `PRAGMA foreign_keys=ON`).
+- Modo de journaling WAL y claves foráneas activadas (`PRAGMA journal_mode=WAL`, `PRAGMA foreign_keys=ON`); `verify_journal_mode()` devuelve el modo activo.
 
-**Importaciones:** 4.
+**Importaciones:** 5.
 
 Clases:
 
 | Clase | Docstring |
 |---|---|
+| `class ConcurrentScanError` | Excepción levantada al intentar iniciar un escaneo mientras otro está en curso para el mismo equipo y volumen. |
 | `class SystemInventoryStorage` | Gestor del almacenamiento canonico SQLite del inventario de archivos. |
 
 Métodos de `SystemInventoryStorage`:
@@ -1825,8 +1827,8 @@ Métodos de `SystemInventoryStorage`:
 | `def schema_version()` | Devuelve la versión del esquema almacenada en disco. |
 | `def record_machine(machine_id, created_at)` | Registra el equipo local si aún no existe (aislamiento por equipo). |
 | `def record_volume(volume_id, machine_id, volume, ...)` | Registra o actualiza un volumen descubierto para un equipo. |
-| `def begin_scan_run(scan_id, machine_id, volume, mode, started_at)` | Registra el inicio de una ejecución de escaneo. Valida que el modo sea completo o incremental; el escaneo queda en estado interrumpido hasta que `end_scan_run` lo confirma con `ok`. |
-| `def end_scan_run(scan_id, finished_at, result, entries_count, errors_count, exclusions_count, coverage_estimate)` | Finaliza una ejecución de escaneo con su resultado y métricas. Valida que el resultado sea uno de los valores permitidos. |
+| `def begin_scan_run(scan_id, machine_id, volume, mode, started_at)` | Registra el inicio de una ejecución de escaneo. Valida que el modo sea completo o incremental; adquiere el bloqueo de concurrencia y levanta `ConcurrentScanError` si otro escaneo está en curso para el mismo equipo y volumen; el escaneo queda en estado interrumpido hasta que `end_scan_run` lo confirma con `ok`. |
+| `def end_scan_run(scan_id, finished_at, result, entries_count, errors_count, exclusions_count, coverage_estimate)` | Finaliza una ejecución de escaneo con su resultado y métricas. Valida que el resultado sea uno de los valores permitidos. Libera el bloqueo de concurrencia asociado al escaneo al terminar, incluso si la validación falla. |
 | `def get_scan_run(scan_id)` | Devuelve los datos de una ejecución de escaneo o None. |
 | `def get_latest_scan(machine_id, volume)` | Devuelve la última ejecución de escaneo de un equipo (y opcionalmente volumen). |
 | `def insert_file_entries(scan_id, machine_id, volume, entries)` | Inserta una lista de entradas de archivo en una transacción atómica. |
@@ -1836,6 +1838,8 @@ Métodos de `SystemInventoryStorage`:
 | `def search_by_path_prefix(machine_id, path_prefix, limit, offset)` | Busca entradas de archivo por prefijo de ruta absoluta (paginado). |
 | `def get_entry_count(machine_id, volume)` | Devuelve el número total de entradas de archivo de un equipo. |
 | `def db_file_exists()` | Devuelve True si el fichero de la base de datos existe en disco. |
+| `def has_active_scan(machine_id, volume)` | Devuelve True si hay un escaneo en curso para el equipo y volumen dados. |
+| `def verify_journal_mode()` | Devuelve el modo de journaling activo (p. ej. "wal") para verificar que sea adecuado a escrituras concurrentes. |
 
 ## 🗺️ `src/hands/planner/`
 

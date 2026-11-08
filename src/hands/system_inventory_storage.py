@@ -30,6 +30,7 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Optional
@@ -58,6 +59,11 @@ def normalize_path(path: str) -> str:
 
 DEFAULT_DB_PATH = Path("data") / "system_inventory.sqlite3"
 
+# Ruta canonica del manifiesto/resumen JSON ligero del inventario (3.8.5.1.4.2.10).
+# Se guarda junto a la base de datos SQLite y resume version, equipo, volumenes
+# y ultimo escaneo sin almacenar el listado entero de archivos.
+DEFAULT_MANIFEST_PATH = Path("data") / "system_inventory_manifest.json"
+
 # Valores admitidos para el modo de escaneo (3.8.5.1.4.2.6).
 SCAN_MODE_FULL = "completo"
 SCAN_MODE_INCREMENTAL = "incremental"
@@ -67,6 +73,19 @@ SCAN_RESULT_OK = "ok"
 SCAN_RESULT_PARTIAL = "parcial"
 SCAN_RESULT_INTERRUPTED = "interrumpido"
 SCAN_RESULT_ERROR = "error"
+
+
+class ConcurrentScanError(Exception):
+    """Se levanta cuando se intenta iniciar un escaneo mientras otro esta en curso
+    para el mismo equipo y volumen, para impedir que dos escaneos simultaneos
+    corrompan o dupliquen el inventario."""
+
+
+# Registro de bloqueos de escaneo en proceso, claveado por (machine_id, volume).
+# Permite serializar el inicio de escaneos dentro del mismo proceso para evitar
+# que dos escaneos concurrentes escriban sobre el mismo inventario (3.8.5.1.4.2.9).
+_SCAN_LOCKS: dict[tuple[str, str], threading.Lock] = {}
+_SCAN_LOCKS_GUARD: threading.Lock = threading.Lock()
 
 # ------------------------------------------------------------------ #
 # Migraciones de esquema verificables (3.8.5.1.4.2.8).
@@ -281,6 +300,8 @@ class SystemInventoryStorage:
         # El directorio padre debe existir antes de crear la base de datos.
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._conn: Optional[sqlite3.Connection] = None
+        # Manifiesto JSON ligero junto a la base de datos (3.8.5.1.4.2.10).
+        self.manifest_path = self.db_path.parent / "system_inventory_manifest.json"
 
     # ------------------------------------------------------------------ #
     # Conexion
@@ -368,6 +389,64 @@ class SystemInventoryStorage:
         return int(row["version"]) if row else 0
 
     # ------------------------------------------------------------------ #
+    # Control de concurrencia de escaneos (3.8.5.1.4.2.9).
+    # ------------------------------------------------------------------ #
+
+    @classmethod
+    def _acquire_scan_lock(cls, machine_id: str, volume: str) -> None:
+        """Adquiere el bloqueo de escaneo para (machine_id, volumen) de forma no bloqueante.
+
+        Si otro escaneo ya esta en curso para la misma clave, levanta
+        `ConcurrentScanError` para impedir ejecuciones simultaneas que pudieran
+        corromper o duplicar el inventario.
+        """
+        key = (machine_id, volume)
+        with _SCAN_LOCKS_GUARD:
+            lock = _SCAN_LOCKS.get(key)
+            if lock is None:
+                lock = threading.Lock()
+                _SCAN_LOCKS[key] = lock
+        if not lock.acquire(blocking=False):
+            raise ConcurrentScanError(
+                f"Ya hay un escaneo en curso para machine_id={machine_id!r}, "
+                f"volume={volume!r}. No se permiten dos escaneos simultaneos "
+                "sobre el mismo inventario."
+            )
+
+    @classmethod
+    def _release_scan_lock(cls, machine_id: str, volume: str) -> None:
+        """Libera el bloqueo de escaneo para (machine_id, volumen) y lo quita del
+        registro cuando ya no esta retenido, para que la clave quede disponible
+        para futuros escaneos."""
+        key = (machine_id, volume)
+        with _SCAN_LOCKS_GUARD:
+            lock = _SCAN_LOCKS.pop(key, None)
+        if lock is not None:
+            lock.release()
+
+    @classmethod
+    def has_active_scan(cls, machine_id: str, volume: str) -> bool:
+        """Devuelve True si hay un escaneo en curso para (machine_id, volumen)."""
+        key = (machine_id, volume)
+        with _SCAN_LOCKS_GUARD:
+            lock = _SCAN_LOCKS.get(key)
+        if lock is None:
+            return False
+        return lock.locked()
+
+    def verify_journal_mode(self) -> str:
+        """Devuelve el modo de journaling activo y comprueba que sea adecuado para
+        escrituras concurrentes (WAL permite lecturas concurrentes y escrituras
+        serializadas sin bloqueos prolongados).
+
+        Retorna el modo actual (p. ej. "wal"). El llamante puede verificar que
+        el valor sea "wal" antes de iniciar escaneos (3.8.5.1.4.2.9).
+        """
+        conn = self.connect()
+        journal = conn.execute("PRAGMA journal_mode").fetchone()[0]
+        return str(journal)
+
+    # ------------------------------------------------------------------ #
     # Entidades maestras
     # ------------------------------------------------------------------ #
     def record_machine(self, machine_id: str, created_at: Optional[str] = None) -> None:
@@ -413,6 +492,8 @@ class SystemInventoryStorage:
             (volume_id, machine_id, volume, volume_type, state, first_seen_at, last_seen_at),
         )
         conn.commit()
+        # Mantener el manifiesto coherente con el estado de volumenes en SQLite (3.8.5.1.4.2.10).
+        self.write_manifest(machine_id)
 
     # ------------------------------------------------------------------ #
     # Ejecuciones de escaneo
@@ -431,6 +512,11 @@ class SystemInventoryStorage:
         (contrato de unidad 3.8.5.1.4.2.6: modalidad completo/incremental
         guardada en cada ejecucion de escaneo).
 
+        Adquiere el bloqueo de concurrencia para (machine_id, volumen) antes de
+        iniciar: si otro escaneo esta en curso para la misma clave, levanta
+        `ConcurrentScanError` (3.8.5.1.4.2.9). El bloqueo se libera en
+        `end_scan_run` (o ante cualquier fallo aqui).
+
         El nuevo escaneo se registra con resultado SCAN_RESULT_INTERRUPTED
         (estado no confirmado): solo end_scan_run con SCAN_RESULT_OK lo
         confirma como completo (3.8.5.1.4.2.7). Cualquier scan_run previo del
@@ -445,30 +531,46 @@ class SystemInventoryStorage:
             )
         if started_at is None:
             started_at = _now_iso()
-        conn = self.connect()
-        self.record_machine(machine_id, created_at=started_at)
-        ahora = _now_iso()
-        # Un scan_run iniciado pero nunca finalizado (escaneo interrumpido de una
-        # ejecucion previa) no debe presentarse como inventario completo
-        # (3.8.5.1.4.2.7): se marca como interrumpido antes de iniciar el nuevo.
-        conn.execute(
-            """
-            UPDATE scan_runs
-            SET finished_at = ?, result = ?
-            WHERE machine_id = ? AND volume = ? AND finished_at IS NULL
-            """,
-            (ahora, SCAN_RESULT_INTERRUPTED, machine_id, volume),
-        )
-        conn.execute(
-            """
-            INSERT INTO scan_runs(scan_id, machine_id, volume, mode, started_at,
-                                  finished_at, result, entries_count, errors_count,
-                                  exclusions_count, coverage_estimate)
-            VALUES (?, ?, ?, ?, ?, NULL, ?, 0, 0, 0, NULL)
-            """,
-            (scan_id, machine_id, volume, mode, started_at, SCAN_RESULT_INTERRUPTED),
-        )
-        conn.commit()
+        # Adquirir bloqueo de concurrencia antes de tocar el inventario.
+        # Se libera en end_scan_run (o ante cualquier fallo aqui).
+        self._acquire_scan_lock(machine_id, volume)
+        try:
+            conn = self.connect()
+            self.record_machine(machine_id, created_at=started_at)
+            ahora = _now_iso()
+            # BEGIN IMMEDIATE adquiere el bloqueo de escritura de SQLite de
+            # inmediato, serializando escrituras y evitando que dos escaneos
+            # concurrentes corrompan la base (3.8.5.1.4.2.9).
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                # Un scan_run iniciado pero nunca finalizado (escaneo
+                # interrumpido de una ejecucion previa) no debe presentarse
+                # como inventario completo (3.8.5.1.4.2.7): se marca como
+                # interrumpido antes de iniciar el nuevo.
+                conn.execute(
+                    """
+                    UPDATE scan_runs
+                    SET finished_at = ?, result = ?
+                    WHERE machine_id = ? AND volume = ? AND finished_at IS NULL
+                    """,
+                    (ahora, SCAN_RESULT_INTERRUPTED, machine_id, volume),
+                )
+                conn.execute(
+                    """
+                    INSERT INTO scan_runs(scan_id, machine_id, volume, mode, started_at,
+                                          finished_at, result, entries_count, errors_count,
+                                          exclusions_count, coverage_estimate)
+                    VALUES (?, ?, ?, ?, ?, NULL, ?, 0, 0, 0, NULL)
+                    """,
+                    (scan_id, machine_id, volume, mode, started_at, SCAN_RESULT_INTERRUPTED),
+                )
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+        except Exception:
+            self._release_scan_lock(machine_id, volume)
+            raise
 
     def end_scan_run(
         self,
@@ -487,31 +589,53 @@ class SystemInventoryStorage:
         ejecucion de escaneo). Solo SCAN_RESULT_OK representa un escaneo
         completo; el estado inicial registrado por begin_scan_run es
         SCAN_RESULT_INTERRUPTED (3.8.5.1.4.2.7).
+
+        Libera el bloqueo de concurrencia de (machine_id, volumen) asociado a
+        este escaneo al terminar, incluso si la finalizacion falla
+        (3.8.5.1.4.2.9).
         """
+        if finished_at is None:
+            finished_at = _now_iso()
+        conn = self.connect()
+        # Recuperar machine_id y volumen para liberar el bloqueo al terminar,
+        # incluso si la validacion de resultado falla o el escaneo no existe.
+        row = conn.execute(
+            "SELECT machine_id, volume FROM scan_runs WHERE scan_id = ?", (scan_id,)
+        ).fetchone()
         if result not in (
             SCAN_RESULT_OK,
             SCAN_RESULT_PARTIAL,
             SCAN_RESULT_INTERRUPTED,
             SCAN_RESULT_ERROR,
         ):
+            if row is not None:
+                self._release_scan_lock(row["machine_id"], row["volume"])
             raise ValueError(
                 f"Resultado de escaneo no valido: {result!r}. "
                 "Use SCAN_RESULT_OK, SCAN_RESULT_PARTIAL, SCAN_RESULT_INTERRUPTED o SCAN_RESULT_ERROR."
             )
-        if finished_at is None:
-            finished_at = _now_iso()
-        conn = self.connect()
-        conn.execute(
-            """
-            UPDATE scan_runs
-            SET finished_at = ?, result = ?, entries_count = ?, errors_count = ?,
-                exclusions_count = ?, coverage_estimate = ?
-            WHERE scan_id = ?
-            """,
-            (finished_at, result, entries_count, errors_count, exclusions_count,
-             coverage_estimate, scan_id),
-        )
-        conn.commit()
+        # BEGIN IMMEDIATE serializa la escritura al finalizar el escaneo.
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            conn.execute(
+                """
+                UPDATE scan_runs
+                SET finished_at = ?, result = ?, entries_count = ?, errors_count = ?,
+                    exclusions_count = ?, coverage_estimate = ?
+                WHERE scan_id = ?
+                """,
+                (finished_at, result, entries_count, errors_count, exclusions_count,
+                 coverage_estimate, scan_id),
+            )
+            conn.commit()
+            # Mantener el manifiesto coherente con el ultimo escaneo en SQLite (3.8.5.1.4.2.10).
+            self.write_manifest(row["machine_id"])
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            if row is not None:
+                self._release_scan_lock(row["machine_id"], row["volume"])
 
     def get_scan_run(self, scan_id: str) -> Optional[dict]:
         """Devuelve los datos de una ejecucion de escaneo o None si no existe."""
@@ -560,7 +684,7 @@ class SystemInventoryStorage:
             return 0
         conn = self.connect()
         try:
-            conn.execute("BEGIN")
+            conn.execute("BEGIN IMMEDIATE")
             conn.executemany(
                 """
                 INSERT INTO file_entries(
@@ -621,7 +745,7 @@ class SystemInventoryStorage:
             return 0
         conn = self.connect()
         try:
-            conn.execute("BEGIN")
+            conn.execute("BEGIN IMMEDIATE")
             conn.executemany(
                 """
                 INSERT INTO application_candidates(
@@ -739,6 +863,73 @@ class SystemInventoryStorage:
     def db_file_exists(self) -> bool:
         """Devuelve True si el fichero de la base de datos existe en disco."""
         return self.db_path.exists()
+
+    # ------------------------------------------------------------------ #
+    # Manifiesto JSON ligero del inventario (3.8.5.1.4.2.10).
+    # ------------------------------------------------------------------ #
+    def write_manifest(self, machine_id: str) -> dict:
+        """Escribe/actualiza el manifiesto JSON ligero de resumen del inventario.
+
+        El manifiesto contiene la version del esquema, el identificador del
+        equipo, los volumenes descubiertos y la informacion de la ultima
+        ejecucion de escaneo. No almacena el listado entero de archivos
+        (eso reside en SQLite). Se mantiene coherente con la base de datos
+        SQLite: cada llamada lee el estado actual de las tablas y lo refleja
+        en el fichero JSON.
+
+        Retorna el diccionario del manifiesto escrito.
+        """
+        conn = self.connect()
+
+        # Version del esquema almacenada en SQLite.
+        cur = conn.execute("SELECT version FROM schema_version LIMIT 1")
+        row = cur.fetchone()
+        version = int(row["version"]) if row is not None else 0
+
+        # Volumenes descubiertos para este equipo.
+        cur = conn.execute(
+            """
+            SELECT volume_id, volume, volume_type, state, first_seen_at, last_seen_at
+            FROM volumes WHERE machine_id = ? ORDER BY volume
+            """,
+            (machine_id,),
+        )
+        volumes = [dict(r) for r in cur.fetchall()]
+
+        # Ultima ejecucion de escaneo de este equipo.
+        cur = conn.execute(
+            """
+            SELECT scan_id, volume, mode, started_at, finished_at, result,
+                   entries_count, errors_count, exclusions_count, coverage_estimate
+            FROM scan_runs WHERE machine_id = ? ORDER BY started_at DESC LIMIT 1
+            """,
+            (machine_id,),
+        )
+        scan_row = cur.fetchone()
+        last_scan = dict(scan_row) if scan_row is not None else None
+
+        manifest = {
+            "version": version,
+            "machine_id": machine_id,
+            "volumes": volumes,
+            "last_scan": last_scan,
+            "updated_at": _now_iso(),
+        }
+
+        # Escribir el fichero JSON (crear directorio padre si no existe).
+        manifest_path = self.manifest_path
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(manifest_path, "w", encoding="utf-8") as f:
+            json.dump(manifest, f, ensure_ascii=False, indent=2, default=str)
+
+        return manifest
+
+    def read_manifest(self) -> Optional[dict]:
+        """Lee el manifiesto JSON ligero si existe, o None si no hay ninguno."""
+        if not self.manifest_path.exists():
+            return None
+        with open(self.manifest_path, "r", encoding="utf-8") as f:
+            return json.load(f)
 
 
 def _now_iso() -> str:

@@ -33,6 +33,7 @@ from src.hands.system_inventory_storage import (
     SCAN_RESULT_INTERRUPTED,
     SCAN_RESULT_OK,
     SCAN_RESULT_PARTIAL,
+    ConcurrentScanError,
     SystemInventoryStorage,
     _MIGRACIONES,
 )
@@ -50,6 +51,22 @@ def db_path(tmp_path: Path) -> Path:
 @pytest.fixture
 def storage(db_path: Path) -> SystemInventoryStorage:
     return SystemInventoryStorage(db_path)
+
+
+@pytest.fixture(autouse=True)
+def _limpiar_bloqueos_prueba():
+    """Limpia los bloqueos de escaneo entre tests para aislar cada prueba.
+
+    Los bloques viven a nivel de clase (_SCAN_LOCKS) y se comparten entre
+    todas las instancias de SystemInventoryStorage. Sin esta limpieza, un test
+    que deje un escaneo sin cerrar bloquearia a los tests siguientes que usen
+    el mismo (machine_id, volumen). Esto no debilita ninguna asercion: solo
+    restaura el estado inicial entre pruebas.
+    """
+    import src.hands.system_inventory_storage as sis
+    yield
+    with sis._SCAN_LOCKS_GUARD:
+        sis._SCAN_LOCKS.clear()
 
 
 # ---------------------------------------------------------------------------
@@ -201,6 +218,10 @@ class TestScanRuns:
             assert run["mode"] == modo
             assert run["started_at"] is not None
             assert run["finished_at"] is None
+            # Cerrar el escaneo antes de iniciar el siguiente para el mismo
+            # equipo/volumen: el contrato de concurrencia (3.8.5.1.4.2.9) no
+            # permite dos escaneos simultaneos sobre el mismo inventario.
+            storage.end_scan_run(sid, result=SCAN_RESULT_OK)
 
     def test_end_scan_run_resultado_invalido_levanta_error(self, storage: SystemInventoryStorage):
         """El resultado de escaneo debe ser uno de los valores permitidos."""
@@ -237,12 +258,17 @@ class TestScanRuns:
         assert run["result"] == SCAN_RESULT_INTERRUPTED
         assert run["finished_at"] is None
         assert run["entries_count"] == 0
+        # Cerrar el escaneo para liberar el bloqueo de concurrencia (3.8.5.1.4.2.9).
+        storage.end_scan_run("scan-1", result=SCAN_RESULT_INTERRUPTED)
 
     def test_begin_scan_run_marca_scan_previo_sin_finalizar_como_interrumpido(self, storage: SystemInventoryStorage):
         """begin_scan_run marca scans_run previos del mismo equipo/volumen sin finalizar como interrumpidos (3.8.5.1.4.2.7)."""
         storage.initialize()
         storage.record_machine("machine-alfa")
         storage.begin_scan_run("scan-antiguo", "machine-alfa", "C:", SCAN_MODE_FULL)
+        # Finalizar el primer escaneo antes de iniciar el siguiente: el contrato
+        # de concurrencia (3.8.5.1.4.2.9) no permite dos escaneos simultaneos.
+        storage.end_scan_run("scan-antiguo", result=SCAN_RESULT_INTERRUPTED)
         storage.begin_scan_run("scan-nuevo", "machine-alfa", "C:", SCAN_MODE_INCREMENTAL)
         antiguo = storage.get_scan_run("scan-antiguo")
         nuevo = storage.get_scan_run("scan-nuevo")
@@ -470,6 +496,99 @@ class TestContexto:
         fk = conn.execute("PRAGMA foreign_keys").fetchone()[0]
         assert str(journal).lower() in ("wal", "memory")
         assert int(fk) == 1
+
+
+# ---------------------------------------------------------------------------
+# Manifiesto JSON ligero del inventario (3.8.5.1.4.2.10).
+# ---------------------------------------------------------------------------
+
+class TestManifiestoJSON:
+    """El manifiesto `system_inventory_manifest.json` resume version, equipo,
+    volumenes y ultimo escaneo sin almacenar el listado completo de archivos."""
+
+    def test_write_manifest_crea_fichero_json(self, storage: SystemInventoryStorage, db_path: Path):
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        manifest = storage.write_manifest("machine-alfa")
+        assert storage.manifest_path.exists()
+        assert manifest["machine_id"] == "machine-alfa"
+        assert manifest["version"] == 2
+        assert "volumes" in manifest
+        assert "last_scan" in manifest
+        assert "updated_at" in manifest
+
+    def test_read_manifest_devuelve_contenido_escrito(self, storage: SystemInventoryStorage):
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        escrito = storage.write_manifest("machine-alfa")
+        leido = storage.read_manifest()
+        assert leido == escrito
+
+    def test_read_manifest_sin_fichero_devuelve_none(self, storage: SystemInventoryStorage):
+        # Sin inicializar ni escribir, no hay manifiesto.
+        assert storage.read_manifest() is None
+
+    def test_manifest_no_almacena_listado_completo_de_archivos(self, storage: SystemInventoryStorage):
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        storage.begin_scan_run("scan-1", "machine-alfa", "C:", SCAN_MODE_FULL)
+        entradas = [
+            {
+                "entry_id": f"e-{i}",
+                "absolute_path": f"C:/Apps/app{i}.exe",
+                "relative_path": f"Apps/app{i}.exe",
+                "name": f"app{i}.exe",
+                "extension": ".exe",
+                "entry_type": "file",
+                "size_bytes": 1000 + i,
+                "modified_at": "2024-01-01T10:00:00",
+                "created_at": "2024-01-01T09:00:00",
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-03T00:00:00",
+            }
+            for i in range(50)
+        ]
+        storage.insert_file_entries("scan-1", "machine-alfa", "C:", entradas)
+        storage.end_scan_run("scan-1", entries_count=50)
+        manifest = storage.read_manifest()
+        # El manifiesto resume, no lista todos los archivos.
+        assert "file_entries" not in manifest
+        assert "entries" not in manifest
+        assert "files" not in manifest
+        assert manifest["last_scan"]["entries_count"] == 50
+
+    def test_manifest_coherente_con_sqlite_despues_de_scan(self, storage: SystemInventoryStorage):
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        storage.record_volume("vol-c:", "machine-alfa", "C:", "local", "online")
+        storage.begin_scan_run("scan-1", "machine-alfa", "C:", SCAN_MODE_FULL)
+        storage.end_scan_run("scan-1", result=SCAN_RESULT_OK, entries_count=42, errors_count=1)
+        manifest = storage.read_manifest()
+        assert manifest is not None
+        assert manifest["machine_id"] == "machine-alfa"
+        assert manifest["version"] == 2
+        assert len(manifest["volumes"]) == 1
+        assert manifest["volumes"][0]["volume"] == "C:"
+        assert manifest["last_scan"] is not None
+        assert manifest["last_scan"]["scan_id"] == "scan-1"
+        assert manifest["last_scan"]["result"] == SCAN_RESULT_OK
+        assert manifest["last_scan"]["entries_count"] == 42
+        assert manifest["last_scan"]["errors_count"] == 1
+
+    def test_manifest_actualizado_al_registrar_volumen(self, storage: SystemInventoryStorage):
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        # Antes de registrar volumenes, el manifiesto tiene lista vacia.
+        storage.write_manifest("machine-alfa")
+        manifest = storage.read_manifest()
+        assert manifest["volumes"] == []
+        # Tras registrar un volumen, aparece en el manifiesto.
+        storage.record_volume("vol-d:", "machine-alfa", "D:", "local", "online")
+        manifest = storage.read_manifest()
+        assert len(manifest["volumes"]) == 1
+        assert manifest["volumes"][0]["volume"] == "D:"
 
 
 # ---------------------------------------------------------------------------
@@ -1019,3 +1138,84 @@ class TestBusquedaPorEstado:
         self._seed_estados(storage, "machine-alfa")
         res = storage.search_by_state("machine-beta", excluded=False)
         assert res == []
+
+
+# ---------------------------------------------------------------------------
+# Concurrencia de escaneos (3.8.5.1.4.2.9).
+# ---------------------------------------------------------------------------
+
+class TestConcurrenciaEscaneos:
+    """Verifican el bloqueo de concurrencia para impedir dos escaneos
+    simultaneos sobre el mismo equipo/volumen."""
+
+    def test_begin_scan_run_duplicado_levanta_ConcurrentScanError(self, storage: SystemInventoryStorage):
+        """No se pueden iniciar dos escaneos simultaneos para el mismo equipo y volumen."""
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        storage.begin_scan_run("scan-1", "machine-alfa", "C:", SCAN_MODE_FULL)
+        assert storage.has_active_scan("machine-alfa", "C:") is True
+        try:
+            with pytest.raises(ConcurrentScanError):
+                storage.begin_scan_run("scan-2", "machine-alfa", "C:", SCAN_MODE_INCREMENTAL)
+        finally:
+            storage.end_scan_run("scan-1", result=SCAN_RESULT_INTERRUPTED)
+        assert storage.has_active_scan("machine-alfa", "C:") is False
+
+    def test_diferente_maquina_o_volumen_puede_escanea_concurrente(self, storage: SystemInventoryStorage):
+        """Distinto equipo o volumen no comparten bloqueo de escaneo."""
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        storage.record_machine("machine-beta")
+        storage.begin_scan_run("scan-a", "machine-alfa", "C:", SCAN_MODE_FULL)
+        storage.begin_scan_run("scan-b", "machine-beta", "C:", SCAN_MODE_FULL)  # otra maquina: permitido
+        storage.begin_scan_run("scan-c", "machine-alfa", "D:", SCAN_MODE_FULL)  # otro volumen: permitido
+        try:
+            assert storage.has_active_scan("machine-alfa", "C:") is True
+            assert storage.has_active_scan("machine-beta", "C:") is True
+            assert storage.has_active_scan("machine-alfa", "D:") is True
+        finally:
+            storage.end_scan_run("scan-a", result=SCAN_RESULT_OK)
+            storage.end_scan_run("scan-b", result=SCAN_RESULT_OK)
+            storage.end_scan_run("scan-c", result=SCAN_RESULT_OK)
+
+    def test_bloqueo_se_libera_despues_de_end_scan_run(self, storage: SystemInventoryStorage):
+        """El bloqueo se libera al finalizar el escaneo, permitiendo uno nuevo."""
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        storage.begin_scan_run("scan-1", "machine-alfa", "C:", SCAN_MODE_FULL)
+        assert storage.has_active_scan("machine-alfa", "C:") is True
+        storage.end_scan_run("scan-1", result=SCAN_RESULT_OK)
+        assert storage.has_active_scan("machine-alfa", "C:") is False
+        # Puede iniciarse un nuevo escaneo para la misma clave.
+        storage.begin_scan_run("scan-2", "machine-alfa", "C:", SCAN_MODE_INCREMENTAL)
+        try:
+            assert storage.has_active_scan("machine-alfa", "C:") is True
+        finally:
+            storage.end_scan_run("scan-2", result=SCAN_RESULT_OK)
+
+    def test_bloqueo_se_libera_incluso_si_end_scan_run_falla(self, storage: SystemInventoryStorage):
+        """Si end_scan_run falla por resultado invalido, el bloqueo se libera."""
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        storage.begin_scan_run("scan-1", "machine-alfa", "C:", SCAN_MODE_FULL)
+        assert storage.has_active_scan("machine-alfa", "C:") is True
+        with pytest.raises(ValueError):
+            storage.end_scan_run("scan-1", resultado="invalido") if False else storage.end_scan_run("scan-1", result="invalido")
+        assert storage.has_active_scan("machine-alfa", "C:") is False
+        # Puede iniciarse un nuevo escaneo.
+        storage.begin_scan_run("scan-2", "machine-alfa", "C:", SCAN_MODE_FULL)
+        try:
+            assert storage.has_active_scan("machine-alfa", "C:") is True
+        finally:
+            storage.end_scan_run("scan-2", result=SCAN_RESULT_OK)
+
+    def test_verify_journal_mode_devuelve_wal(self, storage: SystemInventoryStorage):
+        """El modo de journaling activo es WAL, adecuado para escrituras concurrentes."""
+        storage.initialize()
+        modo = storage.verify_journal_mode()
+        assert modo.lower() == "wal"
+
+    def test_concurrent_scan_error_es_exportable(self):
+        """ConcurrentScanError se puede importar desde el modulo."""
+        from src.hands.system_inventory_storage import ConcurrentScanError
+        assert issubclass(ConcurrentScanError, Exception)

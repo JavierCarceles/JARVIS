@@ -56,6 +56,7 @@ Los ficheros se consumen principalmente a través de:
 | `goal_adaptation_feedback.json` | JSON (objeto) | `contextual_adaptation_engine.py` | `contextual_adaptation_engine.py` | Feedback de adaptación de objetivos (métricas de rendimiento) |
 | `goal_adaptation_learning_results.json` | JSON (objeto) | `contextual_adaptation_engine.py` | `contextual_adaptation_engine.py` | Resultados de aprendizaje de adaptación de objetivos |
 | `system_inventory.sqlite3` | SQLite | `SystemInventoryStorage` (`src/hands/system_inventory_storage.py`) | `SystemInventoryStorage` (crea e inicializa `data/system_inventory.sqlite3`) | Índice canonico persistente del inventario de archivos del sistema (maquinas, volumenes, ejecuciones de escaneo, entradas de archivo y candidatos de aplicacion). |
+| `system_inventory_manifest.json` | JSON (objeto) | `SystemInventoryStorage` (`src/hands/system_inventory_storage.py`) | `SystemInventoryStorage.write_manifest()` (llamado tras registrar volumenes y finalizar escaneos) | Manifiesto/resumen JSON ligero del inventario: version del esquema, identificador del equipo, volumenes descubiertos y ultimo escaneo. No almacena el listado entero de archivos (eso reside en SQLite). Se mantiene coherente con la base de datos SQLite. |
 
 ---
 
@@ -188,6 +189,19 @@ Los ficheros se consumen principalmente a través de:
 - **Migraciones de esquema:** `initialize()` aplica las migraciones registradas en orden (actual: v1 a v2), cada una dentro de su propia transaccion, y verifica que los conteos de filas de todas las tablas se conserven, de modo que no se borren ni se reinterpretan datos de versiones previas al avanzar la version del esquema.
 - **Modo de journaling:** WAL, con claves foraneas activadas (`PRAGMA journal_mode=WAL`, `PRAGMA foreign_keys=ON`).
 - **Ruta por defecto:** `data/system_inventory.sqlite3` (creada por el gestor al inicializar; se crea el directorio padre si no existe).
+
+### 3.13 `system_inventory_manifest.json`
+
+- **Formato:** JSON objeto (un único documento de resumen).
+- **Campos principales:**
+  - `version` (int): versión del esquema SQLite almacenada en `schema_version`.
+  - `machine_id` (str): identificador del equipo que crea el inventario (aislamiento por equipo, sin MAC ni serial de hardware).
+  - `volumes` (array de objetos): cada volumen con `volume_id`, `volume`, `volume_type`, `state`, `first_seen_at`, `last_seen_at`.
+  - `last_scan` (objeto o null): última ejecución de escaneo del equipo con `scan_id`, `volume`, `mode`, `started_at`, `finished_at`, `result`, `entries_count`, `errors_count`, `exclusions_count`, `coverage_estimate`.
+  - `updated_at` (str): timestamp ISO 8601 (UTC) de la última escritura del manifiesto.
+- **Quién lo lee/escribe:** `SystemInventoryStorage` (`src/hands/system_inventory_storage.py`). `write_manifest()` se invoca tras registrar un volumen (`record_volume`) y tras finalizar un escaneo (`end_scan_run`), por lo que el manifiesto se mantiene coherente con SQLite automáticamente. `read_manifest()` lo devuelve o `None` si no existe.
+- **Contenido:** solo metadatos de resumen. **No almacena el listado entero de archivos** (eso reside en `system_inventory.sqlite3` en la tabla `file_entries`).
+- **Ruta por defecto:** `data/system_inventory_manifest.json` (junto a la base de datos SQLite; se crea el directorio padre si no existe).
 
 ## 4. Subdirectorio `data/knowledge/`
 
