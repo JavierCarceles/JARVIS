@@ -19,12 +19,14 @@ Todos los tests usan directorios temporales (tmp_path) y no tocan datos de produ
 from __future__ import annotations
 
 import os
+import sqlite3
 from pathlib import Path
 
 import pytest
 
 from src.hands.system_inventory_storage import (
     DEFAULT_DB_PATH,
+    SCHEMA_VERSION,
     SCAN_MODE_FULL,
     SCAN_MODE_INCREMENTAL,
     SCAN_RESULT_ERROR,
@@ -32,6 +34,7 @@ from src.hands.system_inventory_storage import (
     SCAN_RESULT_OK,
     SCAN_RESULT_PARTIAL,
     SystemInventoryStorage,
+    _MIGRACIONES,
 )
 
 
@@ -117,7 +120,10 @@ class TestScanRuns:
         assert run["machine_id"] == "machine-alfa"
         assert run["volume"] == "C:"
         assert run["mode"] == SCAN_MODE_FULL
-        assert run["result"] == SCAN_RESULT_OK
+        # El escaneo iniciado no se presenta como completo: queda en
+        # SCAN_RESULT_INTERRUPTED hasta que end_scan_run lo confirma con OK
+        # (3.8.5.1.4.2.7).
+        assert run["result"] == SCAN_RESULT_INTERRUPTED
         assert run["entries_count"] == 0
         assert run["finished_at"] is None
 
@@ -220,6 +226,56 @@ class TestScanRuns:
             assert run is not None
             assert run["result"] == resultado
             assert run["finished_at"] is not None
+
+    def test_begin_scan_run_estado_inicial_es_interrumpido_no_completo(self, storage: SystemInventoryStorage):
+        """Un escaneo iniciado no se presenta como completo hasta que end_scan_run lo confirma con OK (3.8.5.1.4.2.7)."""
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        storage.begin_scan_run("scan-1", "machine-alfa", "C:", SCAN_MODE_FULL)
+        run = storage.get_scan_run("scan-1")
+        assert run is not None
+        assert run["result"] == SCAN_RESULT_INTERRUPTED
+        assert run["finished_at"] is None
+        assert run["entries_count"] == 0
+
+    def test_begin_scan_run_marca_scan_previo_sin_finalizar_como_interrumpido(self, storage: SystemInventoryStorage):
+        """begin_scan_run marca scans_run previos del mismo equipo/volumen sin finalizar como interrumpidos (3.8.5.1.4.2.7)."""
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        storage.begin_scan_run("scan-antiguo", "machine-alfa", "C:", SCAN_MODE_FULL)
+        storage.begin_scan_run("scan-nuevo", "machine-alfa", "C:", SCAN_MODE_INCREMENTAL)
+        antiguo = storage.get_scan_run("scan-antiguo")
+        nuevo = storage.get_scan_run("scan-nuevo")
+        assert antiguo is not None
+        assert antiguo["result"] == SCAN_RESULT_INTERRUPTED
+        assert antiguo["finished_at"] is not None
+        assert nuevo is not None
+        assert nuevo["result"] == SCAN_RESULT_INTERRUPTED
+        assert nuevo["finished_at"] is None
+
+    def test_begin_scan_run_no_toca_scan_de_otro_volumen_ni_ya_finalizado(self, storage: SystemInventoryStorage):
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        storage.begin_scan_run("scan-c", "machine-alfa", "C:", SCAN_MODE_FULL)
+        storage.end_scan_run("scan-c", result=SCAN_RESULT_OK, entries_count=5)
+        storage.begin_scan_run("scan-d", "machine-alfa", "D:", SCAN_MODE_FULL)
+        c = storage.get_scan_run("scan-c")
+        d = storage.get_scan_run("scan-d")
+        assert c["result"] == SCAN_RESULT_OK
+        assert c["finished_at"] is not None
+        assert d["result"] == SCAN_RESULT_INTERRUPTED
+        assert d["finished_at"] is None
+
+    def test_end_scan_run_confirma_resultado_ok_despues_de_begin_interrumpido(self, storage: SystemInventoryStorage):
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        storage.begin_scan_run("scan-1", "machine-alfa", "C:", SCAN_MODE_FULL)
+        assert storage.get_scan_run("scan-1")["result"] == SCAN_RESULT_INTERRUPTED
+        storage.end_scan_run("scan-1", result=SCAN_RESULT_OK, entries_count=10)
+        run = storage.get_scan_run("scan-1")
+        assert run["result"] == SCAN_RESULT_OK
+        assert run["finished_at"] is not None
+        assert run["entries_count"] == 10
 
 
 # ---------------------------------------------------------------------------
@@ -639,6 +695,264 @@ class TestMigracionEsquemaV1AV2:
             "SELECT name FROM sqlite_master WHERE type='index' AND name='idx_file_entries_unique_path'"
         )
         assert cur.fetchone() is not None
+
+
+# ---------------------------------------------------------------------------
+# Migraciones verificables y preservacion de datos (3.8.5.1.4.2.8)
+# ---------------------------------------------------------------------------
+
+class TestMigracionesVerificables:
+    """Las migraciones de esquema son pasos versionados, atomicos y que no
+    pierden ni reinterpretan datos de versiones previas (3.8.5.1.4.2.8)."""
+
+    def _crear_db_v1_con_datos(self, db_path: Path) -> dict[str, int]:
+        """Crea una base v1 con filas en todas las tablas y devuelve sus conteos."""
+        conn = sqlite3.connect(str(db_path))
+        conn.execute("CREATE TABLE schema_version (version INTEGER PRIMARY KEY)")
+        conn.execute("INSERT INTO schema_version(version) VALUES (1)")
+        conn.execute("""
+            CREATE TABLE machines (
+                machine_id TEXT PRIMARY KEY,
+                created_at TEXT NOT NULL
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE volumes (
+                volume_id TEXT PRIMARY KEY,
+                machine_id TEXT NOT NULL,
+                volume TEXT NOT NULL,
+                volume_type TEXT,
+                state TEXT,
+                first_seen_at TEXT NOT NULL,
+                last_seen_at TEXT NOT NULL,
+                FOREIGN KEY (machine_id) REFERENCES machines(machine_id)
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE scan_runs (
+                scan_id TEXT PRIMARY KEY,
+                machine_id TEXT NOT NULL,
+                volume TEXT NOT NULL,
+                mode TEXT NOT NULL,
+                started_at TEXT NOT NULL,
+                finished_at TEXT,
+                result TEXT NOT NULL,
+                entries_count INTEGER NOT NULL DEFAULT 0,
+                errors_count INTEGER NOT NULL DEFAULT 0,
+                exclusions_count INTEGER NOT NULL DEFAULT 0,
+                coverage_estimate TEXT,
+                FOREIGN KEY (machine_id) REFERENCES machines(machine_id)
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE file_entries (
+                entry_id TEXT PRIMARY KEY,
+                scan_id TEXT NOT NULL,
+                machine_id TEXT NOT NULL,
+                volume TEXT NOT NULL,
+                absolute_path TEXT NOT NULL,
+                relative_path TEXT NOT NULL,
+                name TEXT NOT NULL,
+                extension TEXT NOT NULL DEFAULT '',
+                entry_type TEXT NOT NULL,
+                size_bytes INTEGER NOT NULL DEFAULT 0,
+                modified_at TEXT,
+                created_at TEXT,
+                accessed_at TEXT,
+                attributes TEXT NOT NULL DEFAULT '[]',
+                excluded INTEGER NOT NULL DEFAULT 0,
+                source TEXT NOT NULL DEFAULT 'filesystem_scan',
+                last_checked_at TEXT NOT NULL,
+                FOREIGN KEY (scan_id) REFERENCES scan_runs(scan_id),
+                FOREIGN KEY (machine_id) REFERENCES machines(machine_id)
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE application_candidates (
+                candidate_id TEXT PRIMARY KEY,
+                scan_id TEXT NOT NULL,
+                machine_id TEXT NOT NULL,
+                volume TEXT NOT NULL,
+                name TEXT NOT NULL,
+                absolute_path TEXT NOT NULL,
+                launch_type TEXT,
+                confidence REAL,
+                source TEXT NOT NULL DEFAULT 'inventory',
+                last_checked_at TEXT NOT NULL,
+                FOREIGN KEY (scan_id) REFERENCES scan_runs(scan_id),
+                FOREIGN KEY (machine_id) REFERENCES machines(machine_id)
+            )
+        """)
+        conn.execute(
+            "INSERT INTO machines(machine_id, created_at) VALUES ('m-1', '2024-01-01T00:00:00')"
+        )
+        conn.execute(
+            "INSERT INTO volumes(volume_id, machine_id, volume, volume_type, state, "
+            "first_seen_at, last_seen_at) VALUES ('v-1', 'm-1', 'C:', 'local', 'online', "
+            "'2024-01-01T00:00:00', '2024-01-01T00:00:00')"
+        )
+        conn.execute(
+            "INSERT INTO scan_runs(scan_id, machine_id, volume, mode, started_at, finished_at, "
+            "result, entries_count, errors_count, exclusions_count, coverage_estimate) "
+            "VALUES ('s-1', 'm-1', 'C:', 'completo', '2024-01-01T00:00:00', '2024-01-01T01:00:00', "
+            "'ok', 10, 0, 0, '100%')"
+        )
+        conn.execute(
+            "INSERT INTO file_entries(entry_id, scan_id, machine_id, volume, absolute_path, "
+            "relative_path, name, extension, entry_type, size_bytes, modified_at, created_at, "
+            "accessed_at, attributes, excluded, source, last_checked_at) "
+            "VALUES ('e-1', 's-1', 'm-1', 'C:', 'C:/App/app.exe', 'App/app.exe', 'app.exe', '.exe', "
+            "'file', 1024, '2024-01-01T00:00:00', '2024-01-01T00:00:00', '2024-01-01T00:00:00', "
+            "'[]', 0, 'filesystem_scan', '2024-01-01T00:00:00')"
+        )
+        conn.execute(
+            "INSERT INTO application_candidates(candidate_id, scan_id, machine_id, volume, name, "
+            "absolute_path, launch_type, confidence, source, last_checked_at) "
+            "VALUES ('c-1', 's-1', 'm-1', 'C:', 'app.exe', 'C:/App/app.exe', 'ejecutable', 0.9, "
+            "'inventory', '2024-01-01T00:00:00')"
+        )
+        conn.commit()
+        conteos = {
+            tabla: int(conn.execute(f"SELECT COUNT(*) FROM {tabla}").fetchone()[0])
+            for tabla in ("machines", "volumes", "scan_runs", "file_entries", "application_candidates")
+        }
+        conn.close()
+        return conteos
+        try:
+            conn.execute(
+                "INSERT INTO machines(machine_id, created_at) VALUES ('m-1', '2024-01-01T00:00:00')"
+            )
+            conn.execute(
+                "INSERT INTO volumes(volume_id, machine_id, volume, volume_type, state, "
+                "first_seen_at, last_seen_at) VALUES ('v-1', 'm-1', 'C:', 'local', 'online', "
+                "'2024-01-01T00:00:00', '2024-01-01T00:00:00')"
+            )
+            conn.execute(
+                "INSERT INTO scan_runs(scan_id, machine_id, volume, mode, started_at, finished_at, "
+                "result, entries_count, errors_count, exclusions_count, coverage_estimate) "
+                "VALUES ('s-1', 'm-1', 'C:', 'completo', '2024-01-01T00:00:00', '2024-01-01T01:00:00', "
+                "'ok', 10, 0, 0, '100%')"
+            )
+            conn.execute(
+                "INSERT INTO file_entries(entry_id, scan_id, machine_id, volume, absolute_path, "
+                "relative_path, name, extension, entry_type, size_bytes, modified_at, created_at, "
+                "accessed_at, attributes, excluded, source, last_checked_at) "
+                "VALUES ('e-1', 's-1', 'm-1', 'C:', 'C:/App/app.exe', 'App/app.exe', 'app.exe', '.exe', "
+                "'file', 1024, '2024-01-01T00:00:00', '2024-01-01T00:00:00', '2024-01-01T00:00:00', "
+                "'[]', 0, 'filesystem_scan', '2024-01-01T00:00:00')"
+            )
+            conn.execute(
+                "INSERT INTO application_candidates(candidate_id, scan_id, machine_id, volume, name, "
+                "absolute_path, launch_type, confidence, source, last_checked_at) "
+                "VALUES ('c-1', 's-1', 'm-1', 'C:', 'app.exe', 'C:/App/app.exe', 'ejecutable', 0.9, "
+                "'inventory', '2024-01-01T00:00:00')"
+            )
+            conn.commit()
+            conteos = {
+                tabla: int(conn.execute(f"SELECT COUNT(*) FROM {tabla}").fetchone()[0])
+                for tabla in ("machines", "volumes", "scan_runs", "file_entries", "application_candidates")
+            }
+        finally:
+            conn.close()
+        return conteos
+
+    def test_nueva_base_no_requiere_migracion_y_queda_en_version_actual(
+        self, storage: SystemInventoryStorage, db_path: Path
+    ):
+        """Una base nueva se crea directamente en el esquema actual sin migraciones."""
+        assert not db_path.exists()
+        version = storage.initialize()
+        assert version == SCHEMA_VERSION
+        assert storage.schema_version() == SCHEMA_VERSION
+        assert db_path.exists()
+        conn = storage.connect()
+        columnas = {row["name"] for row in conn.execute("PRAGMA table_info(file_entries)")}
+        assert "normalized_path" in columnas
+        # schema_version tiene una fila con la version actual.
+        assert int(conn.execute("SELECT COUNT(*) FROM schema_version").fetchone()[0]) == 1
+
+    def test_inicializacion_idempotente_con_datos_ya_en_version_actual(
+        self, storage: SystemInventoryStorage
+    ):
+        """Inicializar dos veces una base ya en v2 no altera los datos."""
+        storage.initialize()
+        storage.record_machine("m-1")
+        storage.record_volume("v-1", "m-1", "C:", "local", "online")
+        storage.begin_scan_run("s-1", "m-1", "C:", SCAN_MODE_FULL)
+        storage.end_scan_run("s-1", entries_count=3, errors_count=1)
+        conn = storage.connect()
+        antes = {
+            tabla: int(conn.execute(f"SELECT COUNT(*) FROM {tabla}").fetchone()[0])
+            for tabla in ("machines", "volumes", "scan_runs", "file_entries", "application_candidates")
+        }
+        storage.initialize()
+        assert storage.schema_version() == SCHEMA_VERSION
+        despues = {
+            tabla: int(conn.execute(f"SELECT COUNT(*) FROM {tabla}").fetchone()[0])
+            for tabla in ("machines", "volumes", "scan_runs", "file_entries", "application_candidates")
+        }
+        assert antes == despues
+
+    def test_migracion_v1_a_v2_preserva_todos_los_datos_y_agrega_columna(
+        self, db_path: Path
+    ):
+        """Una base v1 con datos se migra a v2 conservando cada fila y sus valores."""
+        esperados = self._crear_db_v1_con_datos(db_path)
+        storage = SystemInventoryStorage(db_path)
+        version = storage.initialize()
+        assert version == SCHEMA_VERSION
+        assert storage.schema_version() == SCHEMA_VERSION
+        conn = storage.connect()
+        columnas = {row["name"] for row in conn.execute("PRAGMA table_info(file_entries)")}
+        assert "normalized_path" in columnas
+        for tabla, esperado in esperados.items():
+            actual = int(conn.execute(f"SELECT COUNT(*) FROM {tabla}").fetchone()[0])
+            assert actual == esperado, f"La tabla {tabla} perdio filas en la migracion"
+        # Los valores previos no se reinterpretan: la entrada sigue accesible por su ruta original.
+        fila = conn.execute("SELECT absolute_path FROM file_entries WHERE entry_id = 'e-1'").fetchone()
+        assert fila is not None and fila[0] == "C:/App/app.exe"
+
+    def test_migraciones_registradas_forman_cadena_hasta_la_version_actual(self):
+        """Desde la version 1 existe una cadena de migraciones registradas que
+        llega hasta SCHEMA_VERSION (cada paso es verificable)."""
+        from src.hands.system_inventory_storage import _MIGRACIONES as migraciones
+        version = 1
+        visitadas = {version}
+        while version < SCHEMA_VERSION:
+            siguientes = [destino for origen, destino, nombre, fn in migraciones if origen == version]
+            assert len(siguientes) == 1, f"Falta migracion registrada desde v{version}"
+            version = siguientes[0]
+            visitadas.add(version)
+        assert version == SCHEMA_VERSION
+        assert SCHEMA_VERSION in visitadas
+
+    def test_fallo_en_migracion_no_avanza_la_version_ni_deja_cambios_parciales(
+        self, db_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """Si una migracion falla, se hace rollback: version sin avanzar y sin tablas nuevas."""
+        conteos = self._crear_db_v1_con_datos(db_path)
+
+        def falla(conn: sqlite3.Connection) -> None:
+            conn.execute("CREATE TABLE tabla_que_no_debe_quedar (x INTEGER)")
+            raise RuntimeError("migracion simulada fallida")
+
+        monkeypatch.setattr(
+            "src.hands.system_inventory_storage._MIGRACIONES",
+            [(1, 2, "fallida", falla)],
+        )
+        storage = SystemInventoryStorage(db_path)
+        with pytest.raises(RuntimeError, match="migracion simulada fallida"):
+            storage.initialize()
+        # La version no avanzo.
+        assert storage.schema_version() == 1
+        # Rollback atomico: la tabla auxiliar no quedo.
+        conn = storage.connect()
+        nombres = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        assert "tabla_que_no_debe_quedar" not in nombres
+        # Los datos originales siguen intactos (no se borro ni reelaboro nada).
+        for tabla, esperado in conteos.items():
+            actual = int(conn.execute(f"SELECT COUNT(*) FROM {tabla}").fetchone()[0])
+            assert actual == esperado
 
 
 # ---------------------------------------------------------------------------

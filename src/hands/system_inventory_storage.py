@@ -32,7 +32,7 @@ import os
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 
 SCHEMA_VERSION = 2
@@ -67,6 +67,99 @@ SCAN_RESULT_OK = "ok"
 SCAN_RESULT_PARTIAL = "parcial"
 SCAN_RESULT_INTERRUPTED = "interrumpido"
 SCAN_RESULT_ERROR = "error"
+
+# ------------------------------------------------------------------ #
+# Migraciones de esquema verificables (3.8.5.1.4.2.8).
+#
+# Cada migracion es un paso discreto, versionado y comprobable:
+# (version_origen, version_destino, nombre, funcion). Las funciones
+# reciben la conexion SQLite y se ejecutan dentro de una transaccion;
+# si alguna falla, se hace rollback y la version del esquema no avanza,
+# de modo que un inventario de version previa nunca se borra ni se
+# reinterpreta silenciosamente.
+# ------------------------------------------------------------------ #
+
+def _migracion_v1_a_v2(conn: sqlite3.Connection) -> None:
+    """Migracion v1 -> v2: agrega la columna `normalized_path` a `file_entries`.
+
+    Es una operacion aditiva: conserva todas las filas existentes y les
+    asigna el valor por defecto (cadena vacia) en la nueva columna. No
+    elimina, ni reinterpreta, datos de inventarios de version anterior.
+    """
+    try:
+        conn.execute(
+            "ALTER TABLE file_entries ADD COLUMN normalized_path TEXT NOT NULL DEFAULT ''"
+        )
+    except sqlite3.OperationalError:
+        # La columna ya existe (base creada ya en esquema v2): nada que migrar.
+        pass
+
+
+# (version_origen, version_destino, nombre, funcion_de_migracion)
+_MIGRACIONES: list[tuple[int, int, str, Callable[[sqlite3.Connection], None]]] = [
+    (1, 2, "agregar normalized_path a file_entries", _migracion_v1_a_v2),
+]
+
+
+def _conteos_tablas(conn: sqlite3.Connection) -> dict[str, int | None]:
+    """Devuelve el conteo de filas de cada tabla del esquema (integridad de datos)."""
+    tablas = (
+        "schema_version",
+        "machines",
+        "volumes",
+        "scan_runs",
+        "file_entries",
+        "application_candidates",
+    )
+    conteos: dict[str, int | None] = {}
+    for tabla in tablas:
+        try:
+            cur = conn.execute(f"SELECT COUNT(*) FROM {tabla}")
+            conteos[tabla] = int(cur.fetchone()[0])
+        except sqlite3.OperationalError:
+            conteos[tabla] = None
+    return conteos
+
+
+def _aplicar_migraciones(
+    conn: sqlite3.Connection, version_origen: int, version_destino: int
+) -> None:
+    """Aplica las migraciones pendientes de `version_origen` a `version_destino`.
+
+    Las migraciones se aplican en orden, una a una, cada una dentro de su
+    propia transaccion y con la version del esquema actualizada al terminar.
+    Antes y despues se comparan los conteos de filas de todas las tablas: si
+    una migracion pierde o agrega datos silenciosamente, se cancela y se
+    levanta un error (no se borra ni se reinterpreta el inventario previo).
+    """
+    version = version_origen
+    conteos_antes = _conteos_tablas(conn)
+    while version < version_destino:
+        siguiente: tuple[int, str, Callable[[sqlite3.Connection], None]] | None = None
+        for origen, destino, nombre, fn in _MIGRACIONES:
+            if origen == version:
+                siguiente = (destino, nombre, fn)
+                break
+        if siguiente is None:
+            raise RuntimeError(
+                f"No hay migracion registrada de esquema v{version} a v{version + 1}."
+            )
+        destino, nombre, fn = siguiente
+        try:
+            conn.execute("BEGIN")
+            fn(conn)
+        except Exception:
+            conn.rollback()
+            raise
+        version = destino
+        conn.execute("UPDATE schema_version SET version = ?", (version,))
+        conn.commit()
+    conteos_despues = _conteos_tablas(conn)
+    if conteos_antes != conteos_despues:
+        raise RuntimeError(
+            f"La migracion de esquema v{version_origen} a v{version_destino} "
+            f"altero el volumen de datos: antes={conteos_antes}, despues={conteos_despues}"
+        )
 
 _SCHEMA_TABLES_SQL = f"""
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -220,19 +313,24 @@ class SystemInventoryStorage:
     # Esquema
     # ------------------------------------------------------------------ #
     def initialize(self) -> int:
-        """Crea las tablas e indices si no existen y devuelve la version del esquema.
+        """Crea las tablas e indices si no existen, aplica migraciones pendientes
+        y devuelve la version del esquema.
 
-        Maneja la migracion del esquema v1 al v2 (3.8.5.1.4.2.5):
-        1. Crea tablas (IF NOT EXISTS). En bases nuevas, `file_entries` ya trae
-           `normalized_path`. En bases v1 existentes, la tabla ya existe sin ella.
-        2. Detecta version actual (0 si es base nueva).
-        3. Si viene de v1, agrega `normalized_path` a `file_entries` ANTES de crear
-           indices, para que `CREATE UNIQUE INDEX` no falle.
-        4. Crea todos los indices (incluido el unico por ruta normalizada).
+        Flujo (3.8.5.1.4.2.8):
+        1. Crea tablas (IF NOT EXISTS) con el esquema actual (v2). En bases nuevas
+           `file_entries` ya trae `normalized_path`; en bases v1 existentes no.
+        2. Detecta la version actual almacenada (0 si es una base nueva).
+        3. Si la base viene de una version anterior (0 < version < v2), aplica las
+           migraciones registradas en orden: cada una dentro de su propia
+           transaccion, actualizando la version del esquema al terminar. Una
+           base con version superior a la conocida no se degrada ni se le
+           reinterpreta el contenido.
+        4. Crea todos los indices (incluido el unico por ruta normalizada), que
+           requieren que las migraciones ya hayan ejecutado.
         5. Registra/actualiza la version del esquema sin borrar datos previos.
         """
         conn = self.connect()
-        # 1. Crear tablas (schema_version incluido).
+        # 1. Crear tablas (schema_version incluido) con el esquema actual.
         conn.executescript(_SCHEMA_TABLES_SQL)
 
         # 2. Detectar version actual (0 si la tabla schema_version esta vacia o nueva).
@@ -240,25 +338,25 @@ class SystemInventoryStorage:
         row = cur.fetchone()
         current_version = int(row["version"]) if row else 0
 
-        # 3. Migracion v1 -> v2: agregar columna normalized_path si falta.
-        if current_version < 2:
-            try:
-                conn.execute(
-                    "ALTER TABLE file_entries ADD COLUMN normalized_path TEXT NOT NULL DEFAULT ''"
-                )
-            except sqlite3.OperationalError:
-                # La columna ya existe (base nueva creada con el esquema v2); ignorar.
-                pass
+        # 3. Aplicar migraciones pendientes, si las hay.
+        if row is None or current_version == 0:
+            # Base nueva (o sin version inicializada): las tablas ya se crearon con
+            # el esquema actual; registrar/actualizar la version.
+            if row is None:
+                conn.execute("INSERT INTO schema_version(version) VALUES (?)", (SCHEMA_VERSION,))
+            else:
+                conn.execute("UPDATE schema_version SET version = ?", (SCHEMA_VERSION,))
+        elif 0 < current_version < SCHEMA_VERSION:
+            _aplicar_migraciones(conn, current_version, SCHEMA_VERSION)
+        elif current_version > SCHEMA_VERSION:
+            # Esquema mas nuevo del que este codigo entiende: no se baja la version
+            # ni se tocan los datos del inventario previo (3.8.5.1.4.2.8).
+            return current_version
 
-        # 4. Crear indices (ahora `normalized_path` existe en todas las bases).
+        # 4. Crear indices (despues de las migraciones, que pueden agregar columnas).
         conn.executescript(_SCHEMA_INDEXES_SQL)
 
         # 5. Registrar/actualizar version sin borrar datos.
-        if row is None:
-            conn.execute("INSERT INTO schema_version(version) VALUES (?)", (SCHEMA_VERSION,))
-        else:
-            if current_version != SCHEMA_VERSION:
-                conn.execute("UPDATE schema_version SET version = ?", (SCHEMA_VERSION,))
         conn.commit()
         return SCHEMA_VERSION
 
@@ -332,6 +430,13 @@ class SystemInventoryStorage:
         Valida que `mode` sea SCAN_MODE_FULL o SCAN_MODE_INCREMENTAL
         (contrato de unidad 3.8.5.1.4.2.6: modalidad completo/incremental
         guardada en cada ejecucion de escaneo).
+
+        El nuevo escaneo se registra con resultado SCAN_RESULT_INTERRUPTED
+        (estado no confirmado): solo end_scan_run con SCAN_RESULT_OK lo
+        confirma como completo (3.8.5.1.4.2.7). Cualquier scan_run previo del
+        mismo equipo y volumen que quede sin finalizar se marca como
+        interrumpido para no presentar media base de datos como inventario
+        completo.
         """
         if mode not in (SCAN_MODE_FULL, SCAN_MODE_INCREMENTAL):
             raise ValueError(
@@ -342,6 +447,18 @@ class SystemInventoryStorage:
             started_at = _now_iso()
         conn = self.connect()
         self.record_machine(machine_id, created_at=started_at)
+        ahora = _now_iso()
+        # Un scan_run iniciado pero nunca finalizado (escaneo interrumpido de una
+        # ejecucion previa) no debe presentarse como inventario completo
+        # (3.8.5.1.4.2.7): se marca como interrumpido antes de iniciar el nuevo.
+        conn.execute(
+            """
+            UPDATE scan_runs
+            SET finished_at = ?, result = ?
+            WHERE machine_id = ? AND volume = ? AND finished_at IS NULL
+            """,
+            (ahora, SCAN_RESULT_INTERRUPTED, machine_id, volume),
+        )
         conn.execute(
             """
             INSERT INTO scan_runs(scan_id, machine_id, volume, mode, started_at,
@@ -349,7 +466,7 @@ class SystemInventoryStorage:
                                   exclusions_count, coverage_estimate)
             VALUES (?, ?, ?, ?, ?, NULL, ?, 0, 0, 0, NULL)
             """,
-            (scan_id, machine_id, volume, mode, started_at, SCAN_RESULT_OK),
+            (scan_id, machine_id, volume, mode, started_at, SCAN_RESULT_INTERRUPTED),
         )
         conn.commit()
 
@@ -367,7 +484,9 @@ class SystemInventoryStorage:
 
         Valida que `result` sea uno de los valores permitidos
         (contrato de unidad 3.8.5.1.4.2.6: resultado guardado en cada
-        ejecucion de escaneo).
+        ejecucion de escaneo). Solo SCAN_RESULT_OK representa un escaneo
+        completo; el estado inicial registrado por begin_scan_run es
+        SCAN_RESULT_INTERRUPTED (3.8.5.1.4.2.7).
         """
         if result not in (
             SCAN_RESULT_OK,

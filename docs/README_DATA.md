@@ -179,12 +179,13 @@ Los ficheros se consumen principalmente a través de:
   - `schema_version(version)`: version del esquema.
   - `machines(machine_id PK, created_at)`: equipos que crean el inventario (aislamiento por equipo, sin MAC ni serial de hardware).
   - `volumes(volume_id PK, machine_id FK, volume, volume_type, state, first_seen_at, last_seen_at)`: volumenes descubiertos por equipo.
-  - `scan_runs(scan_id PK, machine_id FK, volume, mode, started_at, finished_at, result, entries_count, errors_count, exclusions_count, coverage_estimate)`: ejecuciones de escaneo (completo/incremental, resultado y metrica de cobertura).
+  - `scan_runs(scan_id PK, machine_id FK, volume, mode, started_at, finished_at, result, entries_count, errors_count, exclusions_count, coverage_estimate)`: ejecuciones de escaneo (completo/incremental, resultado y metrica de cobertura). El resultado inicial es `interrumpido` (no confirmado); solo `end_scan_run` con `ok` confirma un escaneo completo (3.8.5.1.4.2.7). Un escaneo interrumpido nunca se presenta como inventario completo.
   - `file_entries(entry_id PK, scan_id FK, machine_id FK, volume, absolute_path, normalized_path, relative_path, name, extension, entry_type, size_bytes, modified_at, created_at, accessed_at, attributes JSON, excluded, source, last_checked_at)`: entradas genericas de archivos y directorios (solo metadatos observados, nunca contenido de archivos personales). `normalized_path` es la ruta normalizada segun la case-sensitividad del sistema de archivos (minusculas en sistemas insensibles como Windows/macOS; tal cual en Linux).
   - `application_candidates(candidate_id PK, scan_id FK, machine_id FK, volume, name, absolute_path, launch_type, confidence, source, last_checked_at)`: candidatos de aplicacion, almacenados en tabla propia separada de las entradas genericas de archivo.
   - Indices de consulta por `(machine_id, volume)`, `lower(name)`, `lower(extension)`, `entry_type`, `absolute_path`, `normalized_path`, `excluded` y `(machine_id, started_at)`.
   - Indice unico `idx_file_entries_unique_path(machine_id, volume, normalized_path)`: impide duplicar la misma ruta de archivo para un equipo y volumen dados.
 - **Transacciones:** escrituras por lotes en transaccion atomica (`BEGIN`/`COMMIT` con `ROLLBACK` ante fallo); un escaneo interrumpido no deja media base presentada como inventario completo.
+- **Migraciones de esquema:** `initialize()` aplica las migraciones registradas en orden (actual: v1 a v2), cada una dentro de su propia transaccion, y verifica que los conteos de filas de todas las tablas se conserven, de modo que no se borren ni se reinterpretan datos de versiones previas al avanzar la version del esquema.
 - **Modo de journaling:** WAL, con claves foraneas activadas (`PRAGMA journal_mode=WAL`, `PRAGMA foreign_keys=ON`).
 - **Ruta por defecto:** `data/system_inventory.sqlite3` (creada por el gestor al inicializar; se crea el directorio padre si no existe).
 

@@ -1798,7 +1798,8 @@ Funciones a nivel módulo:
 **Características:**
 
 - Creación de `data/system_inventory.sqlite3` como almacenamiento canonico del índice persistente (3.8.5.1.4.2.3).
-- Esquema versionado con tabla `schema_version` (versión 1).
+- Esquema versionado con tabla `schema_version` (versión 2).
+- Migraciones de esquema verificables: `initialize()` aplica las migraciones registradas en orden (actual: v1 a v2), cada una dentro de su propia transacción, y comprueba que no se pierdan ni se reinterpreten datos de versiones previas antes de avanzar la versión.
 - Tablas `machines`, `volumes`, `scan_runs`, `file_entries` y `application_candidates` (candidatos de aplicación separados de los registros genéricos de archivo).
 - Escritura por lotes en transacción atómica (`BEGIN`/`COMMIT` con `ROLLBACK` ante fallo): un escaneo interrumpido no deja media base presentada como inventario completo.
 - Consultas indexadas paginadas por nombre, extensión y prefijo de ruta absoluta; contador de entradas y recuperación de la última ejecución por equipo/volumen.
@@ -1824,7 +1825,7 @@ Métodos de `SystemInventoryStorage`:
 | `def schema_version()` | Devuelve la versión del esquema almacenada en disco. |
 | `def record_machine(machine_id, created_at)` | Registra el equipo local si aún no existe (aislamiento por equipo). |
 | `def record_volume(volume_id, machine_id, volume, ...)` | Registra o actualiza un volumen descubierto para un equipo. |
-| `def begin_scan_run(scan_id, machine_id, volume, mode, started_at)` | Registra el inicio de una ejecución de escaneo. Valida que el modo sea completo o incremental. |
+| `def begin_scan_run(scan_id, machine_id, volume, mode, started_at)` | Registra el inicio de una ejecución de escaneo. Valida que el modo sea completo o incremental; el escaneo queda en estado interrumpido hasta que `end_scan_run` lo confirma con `ok`. |
 | `def end_scan_run(scan_id, finished_at, result, entries_count, errors_count, exclusions_count, coverage_estimate)` | Finaliza una ejecución de escaneo con su resultado y métricas. Valida que el resultado sea uno de los valores permitidos. |
 | `def get_scan_run(scan_id)` | Devuelve los datos de una ejecución de escaneo o None. |
 | `def get_latest_scan(machine_id, volume)` | Devuelve la última ejecución de escaneo de un equipo (y opcionalmente volumen). |
