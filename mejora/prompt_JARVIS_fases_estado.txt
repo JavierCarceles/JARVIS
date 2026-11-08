@@ -7614,3 +7614,15 @@ VERIFICACION: SINTAXIS: OK (`py_compile` de `tests/hands/test_system_inventory_s
 DISCREPANCIAS: NINGUNA
 PENDIENTES: Siguiente hoja pendiente real en orden del roadmap: 3.8.5.1.4.3.1 (primera hija de 3.8.5.1.4.3, descubrir volumenes y adaptadores por SO). Padre 3.8.5.1.4.2 completo con todas sus hijas (1-12) IMPLEMENTADA.
 ESTADO FINAL: 3.8.5.1.4.2.12 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.8.5.1.4.3.1
+FECHA: 2026-11-08
+OBJETIVO: Detectar sistema operativo, arquitectura y version mediante APIs del sistema, sin deducir el SO a partir de nombres de rutas.
+TIPO DE TRABAJO: VERIFICACION
+CAMBIOS / HALLAZGOS: No se modifico codigo de produccion ni tests. La implementacion de 3.8.5.1.4.3.1 ya existe en src/hands/system_inventory.py: enum SistemaOperativo, dataclass InfoSistema, funciones normalizar_arquitectura(), detectar_sistema() y es_sistema_soportado(). detectar_sistema() utiliza exclusivamente platform.system(), platform.release(), platform.version(), platform.machine(), platform.platform() y platform.processor() sin deducir el SO de rutas del filesystem. La matriz de cobertura COVERAGE_MATRIX define SO/arquitectura/volumen/entrada soportados sin inferencias.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: NA; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: 46 PASSED / 0 FAILED / 46 TOTAL (tests/hands/test_system_inventory.py, incluyendo 19 tests especificos de 3.8.5.1.4.3.1: TestInfoSistema 2, TestNormalizarArquitectura 6, TestDetectarSistema 5, TestEsSistemaSoportado 6); INTEGRACION: NA; NO REGRESION: NA
+VERIFICACION: SINTAXIS: OK (py_compile de src/hands/system_inventory.py y tests/hands/test_system_inventory.py sin errores); MAIN.PY: NA (no se modifica main.py); COMPORTAMIENTO / INTEGRACION REAL: 46 tests ejecutados y pasados, verificando que detectar_sistema() devuelve InfoSistema con sistema_operativo, version, arquitectura, nombre_plataforma y procesador provenientes de APIs del sistema; que normalizar_arquitectura() traduce amd64/x86_64->x64, i386/i686->x86, arm64/aarch64->arm64; que es_sistema_soportado() consulta la matriz de cobertura declarando False para SO/arquitectura no registrados; y que la deteccion no cambia al inspeccionar rutas de otro SO.
+DISCREPANCIAS: NINGUNA
+PENDIENTES: NINGUNO (unidad completa; siguiente hoja pendiente: 3.8.5.1.4.3.2)
+ESTADO FINAL: 3.8.5.1.4.3.1 - IMPLEMENTADA

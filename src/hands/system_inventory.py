@@ -459,3 +459,102 @@ def entradas_cobertura_por_sistema(sistema_operativo: str) -> list[CoverageMatri
     """Devuelve todas las entradas de cobertura para un sistema operativo."""
     return [e for e in COVERAGE_MATRIX
             if e.sistema_operativo.lower() == sistema_operativo.lower()]
+
+
+# ---------------------------------------------------------------------------
+# Deteccion de sistema operativo, arquitectura y version (3.8.5.1.4.3.1)
+# ---------------------------------------------------------------------------
+
+class SistemaOperativo(Enum):
+    """Sistemas operativos detectables mediante APIs del sistema (platform)."""
+
+    WINDOWS = "Windows"
+    LINUX = "Linux"
+    DARWIN = "Darwin"  # macOS
+    DESCONOCIDO = "Desconocido"
+
+
+@dataclass
+class InfoSistema:
+    """
+    Informacion del sistema operativo detectada mediante APIs del sistema.
+
+    Todos los campos se obtienen del modulo `platform` de la biblioteca
+    estandar (APIs del SO), nunca deducidos a partir de nombres de rutas ni
+    inspeccionando el sistema de archivos (3.8.5.1.4.3.1).
+    """
+
+    sistema_operativo: str      # platform.system(): "Windows", "Linux", "Darwin"...
+    version: str                # platform.release() o platform.version()
+    arquitectura: str           # platform.machine() normalizado: "x64", "x86", "arm64"...
+    nombre_plataforma: str      # platform.platform()
+    procesador: str             # platform.processor()
+
+
+def normalizar_arquitectura(maquina: str) -> str:
+    """
+    Normaliza el identificador de arquitectura de platform.machine().
+
+    Solo traduce el valor devuelto por la API del sistema; no infiere
+    arquitectura a partir de rutas ni de cualquier otro dato del filesystem.
+    """
+    m = maquina.lower()
+    if m in ("amd64", "x86_64", "x64"):
+        return "x64"
+    if m in ("i386", "i686", "x86", "x86-32"):
+        return "x86"
+    if m in ("arm64", "aarch64"):
+        return "arm64"
+    if m in ("armv7l", "armv7"):
+        return "armv7"
+    return maquina
+
+
+def detectar_sistema() -> InfoSistema:
+    """
+    Detecta sistema operativo, version y arquitectura mediante APIs del sistema.
+
+    Utiliza exclusivamente el modulo `platform` de la biblioteca estandar:
+    - sistema operativo: platform.system()
+    - version: platform.release() y, si falta, platform.version()
+    - arquitectura: platform.machine() (normalizada)
+    - nombre completo: platform.platform()
+    - procesador: platform.processor()
+
+    No deduce el SO a partir de nombres de rutas ni inspecciona el sistema de
+    archivos para determinar el SO (3.8.5.1.4.3.1).
+    """
+    sistema = platform.system() or "Desconocido"
+    release = platform.release() or ""
+    version_detallada = platform.version() or ""
+    version = release if release else version_detallada
+    maquina = platform.machine() or ""
+    arquitectura = normalizar_arquitectura(maquina) if maquina else maquina
+    nombre_plataforma = platform.platform() or ""
+    procesador = platform.processor() or ""
+
+    return InfoSistema(
+        sistema_operativo=sistema,
+        version=version,
+        arquitectura=arquitectura,
+        nombre_plataforma=nombre_plataforma,
+        procesador=procesador,
+    )
+
+
+def es_sistema_soportado(sistema_operativo: str, arquitectura: str) -> bool:
+    """
+    Indica si el adaptador de descubrimiento de volumenes soporta la
+    combinacion SO/arquitectura dada, consultando la matriz de cobertura.
+
+    Se considera soportado si existe al menos una entrada de cobertura para
+    ese SO y arquitectura con cualquier tipo de volumen y tipo de entrada.
+    No declara soporte por inferencia: solo lo que esta registrado en la
+    matriz (3.8.5.1.4.3.8).
+    """
+    for entrada in COVERAGE_MATRIX:
+        if (entrada.sistema_operativo.lower() == sistema_operativo.lower()
+                and entrada.arquitectura.lower() == arquitectura.lower()
+                and entrada.soportado):
+            return True
+    return False

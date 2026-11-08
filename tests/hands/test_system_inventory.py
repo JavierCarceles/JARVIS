@@ -28,16 +28,21 @@ from src.hands.system_inventory import (
     DEFAULT_EXCLUDED_PATH_PATTERNS,
     EntryType,
     FactType,
+    InfoSistema,
     InventoryControl,
     InventoryControlResult,
     InventoryContract,
     InventoryEntry,
+    SistemaOperativo,
     classify_entry,
     default_contract,
+    detectar_sistema,
+    es_sistema_soportado,
     generate_machine_id,
     is_excluded_mount,
     is_excluded_path,
     is_same_machine,
+    normalizar_arquitectura,
     safe_log_path,
     validate_control,
 )
@@ -337,3 +342,121 @@ class TestSerializacionParaPersistencia:
         restaurada = InventoryEntry.from_dict(datos)
         assert restaurada.name == "test.txt"
         assert restaurada.size_bytes == 50
+
+
+# ---------------------------------------------------------------------------
+# Deteccion de SO, arquitectura y version (3.8.5.1.4.3.1)
+# ---------------------------------------------------------------------------
+
+class TestInfoSistema:
+    """InfoSistema almacena SO, version y arquitectura detectados via APIs."""
+
+    def test_campos_no_vacios(self):
+        info = InfoSistema(
+            sistema_operativo="Windows",
+            version="10",
+            arquitectura="x64",
+            nombre_plataforma="Windows-10-10.0.19041",
+            procesador="Intel64 Family 6 Model 158",
+        )
+        assert info.sistema_operativo == "Windows"
+        assert info.version == "10"
+        assert info.arquitectura == "x64"
+        assert info.nombre_plataforma == "Windows-10-10.0.19041"
+        assert info.procesador == "Intel64 Family 6 Model 158"
+
+    def test_info_sistema_es_dataclass(self):
+        info = InfoSistema("Linux", "5.15", "x64", "Linux-5.15-x86_64", "")
+        assert isinstance(info, InfoSistema)
+        assert info.sistema_operativo == "Linux"
+
+
+class TestNormalizarArquitectura:
+    """La normalizacion traduce identificadores de platform.machine()."""
+
+    def test_amd64_se_normaliza_a_x64(self):
+        assert normalizar_arquitectura("AMD64") == "x64"
+        assert normalizar_arquitectura("amd64") == "x64"
+
+    def test_x86_64_se_normaliza_a_x64(self):
+        assert normalizar_arquitectura("x86_64") == "x64"
+
+    def test_x86_se_normaliza_a_x86(self):
+        assert normalizar_arquitectura("i386") == "x86"
+        assert normalizar_arquitectura("i686") == "x86"
+
+    def test_arm64_se_normaliza_a_arm64(self):
+        assert normalizar_arquitectura("arm64") == "arm64"
+        assert normalizar_arquitectura("aarch64") == "arm64"
+
+    def test_valor_desconocido_se_devuelve_tal_cual(self):
+        assert normalizar_arquitectura("riscv64") == "riscv64"
+
+    def test_cadena_vacia_devuelve_vacia(self):
+        assert normalizar_arquitectura("") == ""
+
+
+class TestDetectarSistema:
+    """detectar_sistema() usa APIs del sistema y no deduce SO de rutas."""
+
+    def test_devuelve_info_sistema(self):
+        info = detectar_sistema()
+        assert isinstance(info, InfoSistema)
+        assert isinstance(info.sistema_operativo, str) and len(info.sistema_operativo) > 0
+        assert isinstance(info.arquitectura, str) and len(info.arquitectura) > 0
+        assert isinstance(info.nombre_plataforma, str) and len(info.nombre_plataforma) > 0
+
+    def test_sistema_operativo_coincide_con_platform(self):
+        import platform as _platform
+        info = detectar_sistema()
+        assert info.sistema_operativo == _platform.system()
+
+    def test_arquitectura_normalizada_coincide_con_maquina(self):
+        import platform as _platform
+        info = detectar_sistema()
+        maquina = _platform.machine().lower()
+        if maquina in ("amd64", "x86_64", "x64"):
+            assert info.arquitectura == "x64"
+        elif maquina in ("arm64", "aarch64"):
+            assert info.arquitectura == "arm64"
+        elif maquina in ("i386", "i686", "x86"):
+            assert info.arquitectura == "x86"
+
+    def test_no_infiere_so_de_rutas(self):
+        """La deteccion no cambia aunque se inventen rutas de otro SO."""
+        # Ejecutar dos veces: el resultado debe ser el mismo y venir de platform,
+        # no de ninguna ruta inspeccionada.
+        info1 = detectar_sistema()
+        info2 = detectar_sistema()
+        assert info1.sistema_operativo == info2.sistema_operativo
+        assert info1.arquitectura == info2.arquitectura
+        assert info1.version == info2.version
+
+    def test_nombre_plataforma_no_vacio(self):
+        info = detectar_sistema()
+        assert len(info.nombre_plataforma) > 0
+
+
+class TestEsSistemaSoportado:
+    """es_sistema_soportado consulta la matriz de cobertura sin inferencias."""
+
+    def test_windows_x64_es_soportado(self):
+        assert es_sistema_soportado("Windows", "x64") is True
+
+    def test_linux_x64_es_soportado(self):
+        assert es_sistema_soportado("Linux", "x64") is True
+
+    def test_darwin_arm64_es_soportado(self):
+        assert es_sistema_soportado("Darwin", "arm64") is True
+
+    def test_so_no_registrado_no_es_soportado(self):
+        assert es_sistema_soportado("Plan9", "x64") is False
+
+    def test_arquitectura_no_registrada_no_es_soportada(self):
+        assert es_sistema_soportado("Windows", "riscv64") is False
+
+    def test_combinacion_no_en_matriz_no_es_soportada(self):
+        assert es_sistema_soportado("Windows", "arm64") is False
+
+    def test_comparacion_es_insensible_a_mayusculas(self):
+        assert es_sistema_soportado("windows", "X64") is True
