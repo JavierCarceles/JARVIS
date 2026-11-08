@@ -23,6 +23,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -48,6 +49,11 @@ from src.hands.system_inventory import (
     VolumeInfo,
     VolumeType,
     VolumenComun,
+    _WIN_ATTR_ARCHIVE,
+    _WIN_ATTR_HIDDEN,
+    _WIN_ATTR_READONLY,
+    _WIN_ATTR_SYSTEM,
+    _atributos_observados,
     _clasificar_tipo_volumen_linux,
     _clasificar_tipo_volumen_macos,
     classify_entry,
@@ -1776,3 +1782,91 @@ class TestRecorridoVolumenVisitados:
         assert nombres.count("c") == 1
         assert nombres.count("f.txt") == 1
         assert recorrido.progreso.directorios_procesados == 4
+
+
+# ---------------------------------------------------------------------------
+# Atributos observados sin descartar por extension (3.8.5.1.4.4.4)
+# ---------------------------------------------------------------------------
+
+class TestAtributosObservados:
+    """_atributos_observados registra atributos reales sin leer contenido."""
+
+    def _entrada(self, nombre: str) -> SimpleNamespace:
+        return SimpleNamespace(name=nombre)
+
+    def test_devuelve_lista_incluso_sin_atributos(self):
+        entrada = self._entrada("normal.txt")
+        stat = SimpleNamespace(st_file_attributes=0, st_mode=0o644)
+        attrs = _atributos_observados(entrada, stat)
+        assert isinstance(attrs, list)
+
+    def test_windows_hidden_se_registra(self):
+        entrada = self._entrada("oculto.txt")
+        stat = SimpleNamespace(st_file_attributes=_WIN_ATTR_HIDDEN, st_mode=0o644)
+        assert "hidden" in _atributos_observados(entrada, stat)
+
+    def test_windows_system_se_registra(self):
+        entrada = self._entrada("sistema.sys")
+        stat = SimpleNamespace(st_file_attributes=_WIN_ATTR_SYSTEM, st_mode=0o644)
+        assert "system" in _atributos_observados(entrada, stat)
+
+    def test_windows_readonly_y_archive(self):
+        entrada = self._entrada("solo_lectura.txt")
+        stat = SimpleNamespace(
+            st_file_attributes=_WIN_ATTR_READONLY | _WIN_ATTR_ARCHIVE, st_mode=0o644
+        )
+        attrs = _atributos_observados(entrada, stat)
+        assert "readonly" in attrs
+        assert "archive" in attrs
+
+    def test_windows_combinacion_hidden_sistema_readonly(self):
+        entrada = self._entrada("oculto_sistema.txt")
+        stat = SimpleNamespace(
+            st_file_attributes=(
+                _WIN_ATTR_HIDDEN | _WIN_ATTR_SYSTEM | _WIN_ATTR_READONLY
+            ),
+            st_mode=0o644,
+        )
+        attrs = _atributos_observados(entrada, stat)
+        assert "hidden" in attrs
+        assert "system" in attrs
+        assert "readonly" in attrs
+
+
+class TestRecorridoVolumenSinDescartarPorExtension:
+    """RecorridoVolumen registra archivos sin extension, ocultos y del sistema
+    siempre que sean accesibles, con sus atributos observados (3.8.5.1.4.4.4)."""
+
+    def test_archivo_sin_extension_se_registra_con_extension_vacia(self, tmp_path: Path):
+        """Un archivo sin extension se registra con extension "" y atributos observados."""
+        archivo = tmp_path / "README"
+        archivo.write_text("hola", encoding="utf-8")
+        contrato = _ContratoPrueba()
+        recorrido = RecorridoVolumen(
+            volumen="V", raiz=str(tmp_path), contrato=contrato, maquina_id="m"
+        )
+        entradas = list(recorrido.recorrer())
+        por_nombre = {e.name: e for e in entradas}
+        assert "README" in por_nombre
+        assert por_nombre["README"].extension == ""
+        assert por_nombre["README"].entry_type == EntryType.FILE
+        assert isinstance(por_nombre["README"].attributes, list)
+
+    def test_varios_tipos_de_extension_no_se_descartan(self, tmp_path: Path):
+        """Archivos con extension, sin extension y punto solitario se registran todos."""
+        (tmp_path / "a.txt").write_text("a", encoding="utf-8")
+        (tmp_path / "b").write_text("b", encoding="utf-8")
+        (tmp_path / ".oculto").write_text("c", encoding="utf-8")
+        contrato = _ContratoPrueba()
+        recorrido = RecorridoVolumen(
+            volumen="V", raiz=str(tmp_path), contrato=contrato, maquina_id="m"
+        )
+        entradas = list(recorrido.recorrer())
+        nombres = {e.name for e in entradas}
+        assert {"a.txt", "b", ".oculto"} <= nombres
+        por_extension = {e.name: e.extension for e in entradas}
+        assert por_extension["a.txt"] == ".txt"
+        assert por_extension["b"] == ""
+        assert por_extension[".oculto"] == ""
+
+

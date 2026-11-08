@@ -1552,6 +1552,51 @@ def debe_seguir_enlace(
 
 
 # ---------------------------------------------------------------------------
+# Atributos observados del SO para entradas de inventario (3.8.5.1.4.4.4)
+# ---------------------------------------------------------------------------
+
+# Flags de atributos de archivo de Windows (FILE_ATTRIBUTE_*).
+_WIN_ATTR_READONLY = 0x00000001
+_WIN_ATTR_HIDDEN = 0x00000002
+_WIN_ATTR_SYSTEM = 0x00000004
+_WIN_ATTR_ARCHIVE = 0x00000020
+
+
+def _atributos_observados(entrada: os.DirEntry, stat_result) -> list[str]:
+    """
+    Devuelve los atributos observados del SO para una entrada, sin leer su
+    contenido.
+
+    Registra atributos reales (oculto, sistema, solo lectura, archivo) para
+    que archivos sin extension, ocultos, del sistema y de formato desconocido
+    queden documentados con sus metadatos observados (3.8.5.1.4.4.4). Nunca
+    incluye inferencias sobre el tipo de archivo ni sobre lo que hace.
+
+    En Windows usa st_file_attributes del stat (nativos del SO). En POSIX
+    detecta oculto por nombre inicial punto y solo lectura por falta de bit de
+    escritura del propietario.
+    """
+    atributos: list[str] = []
+    if os.name == "nt":
+        attrs = getattr(stat_result, "st_file_attributes", 0)
+        if attrs & _WIN_ATTR_HIDDEN:
+            atributos.append("hidden")
+        if attrs & _WIN_ATTR_SYSTEM:
+            atributos.append("system")
+        if attrs & _WIN_ATTR_READONLY:
+            atributos.append("readonly")
+        if attrs & _WIN_ATTR_ARCHIVE:
+            atributos.append("archive")
+    else:
+        nombre = entrada.name
+        if nombre.startswith("."):
+            atributos.append("hidden")
+        if not (stat_result.st_mode & 0o200):  # sin bit de escritura del owner
+            atributos.append("readonly")
+    return atributos
+
+
+# ---------------------------------------------------------------------------
 # Recorrido iterativo y controlado de directorios por volumen (3.8.5.1.4.4.1)
 # ---------------------------------------------------------------------------
 
@@ -1755,6 +1800,7 @@ class RecorridoVolumen:
             relativa = nombre
 
         excluida = self._debe_excluir(ruta_absoluta)
+        atributos = _atributos_observados(entrada, stat)
 
         return InventoryEntry(
             machine_id=self.maquina_id,
@@ -1768,7 +1814,7 @@ class RecorridoVolumen:
             modified_at=self._timestamp_seguro(stat.st_mtime),
             created_at=self._timestamp_seguro(stat.st_ctime),
             accessed_at=self._timestamp_seguro(stat.st_atime),
-            attributes=[],
+            attributes=atributos,
             excluded=excluida,
             exclusion_reason="exclusion_tecnica" if excluida else None,
             source="filesystem_scan",

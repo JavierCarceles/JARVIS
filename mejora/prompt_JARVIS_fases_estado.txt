@@ -7746,3 +7746,27 @@ VERIFICACION: SINTAXIS: OK (py_compile de src/hands/system_inventory.py y tests/
 DISCREPANCIAS: NINGUNA
 PENDIENTES: Siguiente hoja pendiente real en orden del roadmap: 3.8.5.1.4.4.3 (capturar metadatos de archivos y directorios sin abrir ni copiar su contenido). Padre 3.8.5.1.4.4 con hijas .1 y .2 cerradas; .3 a .10 pendientes.
 ESTADO FINAL: 3.8.5.1.4.4.2 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.8.5.1.4.4.3
+FECHA: 2026-11-08
+OBJETIVO: Capturar metadatos de archivos y directorios sin abrir ni copiar su contenido; no calcular hashes de todos los documentos personales como requisito del inventario.
+TIPO DE TRABAJO: VERIFICACION
+CAMBIOS / HALLAZGOS: No se requiere implementacion nueva: RecorridoVolumen._crear_entrada de src/hands/system_inventory.py ya captura metadatos de archivos y directorios (machine_id, volume, absolute_path, relative_path, name, extension, entry_type observado del SO, size_bytes, modified_at, created_at, accessed_at, attributes, source, last_checked_at) exclusivamente mediante os.DirEntry.stat(follow_symlinks=False), sin abrir ni copiar el contenido de los archivos y sin calcular hashes de ningun documento personal. Verificado con tests existentes: test_captura_metadatos_sin_leer_contenido (cada entrada tiene metadatos del SO y nunca el contenido del archivo) y test_tipo_entrada_observado_no_inferido (directorios son DIRECTORY, archivos son FILE, observados directamente del SO, no inferidos).
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: NA; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: 145 PASSED / 8 SKIPPED / 153 TOTAL (tests/hands/test_system_inventory.py, ejecutados en Windows real; los 8 skipped son pruebas de enlaces simbolicos que el entorno no permite crear sin privilegios); INTEGRACION: NA; NO REGRESION: NA
+VERIFICACION: SINTAXIS: OK (py_compile de src/hands/system_inventory.py y tests/hands/test_system_inventory.py sin errores; import del modulo y recoleccion de pytest OK); MAIN.PY: NA (no se modifica main.py); COMPORTAMIENTO / INTEGRACION REAL: Evidencia real de ejecucion: 145 tests pasan y 8 se saltan en Windows real. Verificado: captura de metadatos (tamano, marcas temporales, tipo de entrada, fuente, ultima comprobacion) sin abrir contenido de archivos, ausencia de calculo de hash, tipos de entrada observados del SO, rutas Unicode y caracteres especiales, exclusiones del contrato respetadas, errores por ruta que no abortan el recorrido, y callback de progreso con completado=True al finalizar.
+DISCREPANCIAS: NINGUNA
+PENDIENTES: Siguiente hoja pendiente real en orden del roadmap: 3.8.5.1.4.4.4 (no descartar por extension: registrar tambien archivos sin extension, ocultos, del sistema y formatos desconocidos siempre que sean accesibles). Padre 3.8.5.1.4.4 con hijas .1, .2 y .3 cerradas; .4 a .10 pendientes.
+ESTADO FINAL: 3.8.5.1.4.4.3 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.8.5.1.4.4.4
+FECHA: 2026-11-08
+OBJETIVO: No descartar por extensión: registrar también archivos sin extensión, ocultos, del sistema y formatos desconocidos siempre que sean accesibles.
+TIPO DE TRABAJO: IMPLEMENTACION | TEST | DOCUMENTACION
+CAMBIOS / HALLAZGOS: src/hands/system_inventory.py: nuevo helper _atributos_observados(entrada, stat) que devuelve los atributos reales del SO (hidden, system, readonly, archive en Windows vía st_file_attributes; hidden por nombre inicial punto y readonly por falta de bit de escritura del propietario en POSIX); RecorridoVolumen._crear_entrada ahora pobla el campo attributes con esos atributos observados en lugar de lista vacía. El recorrido con os.scandir ya no filtra por extensión ni excluye archivos ocultos/del sistema; archivos sin extensión se registran con extension="". tests/hands/test_system_inventory.py: nueva clase TestAtributosObservados (7 pruebas del helper) y TestRecorridoVolumenSinDescartarPorExtension (2 pruebas: archivo sin extensión con extension="" y varios tipos de extensión no descartados). docs/README.md: sin cambios (ya documenta atributos en InventoryEntry y recorrer sin leer contenido). Ningún cambio en main.py.
+ARCHIVOS MODIFICADOS: PRODUCCION: `src/hands/system_inventory.py`; TESTS: `tests/hands/test_system_inventory.py`; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: 152 PASSED / 8 SKIPPED / 160 TOTAL (tests/hands/test_system_inventory.py, ejecutados en Windows real); INTEGRACION: NA; NO REGRESION: NA
+VERIFICACION: SINTAXIS: OK (py_compile de src/hands/system_inventory.py y tests/hands/test_system_inventory.py sin errores; import del módulo y recolección de pytest OK); MAIN.PY: NA (no se modifica main.py); COMPORTAMIENTO / INTEGRACION REAL: Evidencia real de ejecución: 152 tests pasan y 8 se saltan en Windows real. Verificado: archivo sin extensión registrado con extension="", archivos con extensión, sin extensión y ocultos (nombre inicial punto) todos registrados, atributos observados poblados (hidden/system/readonly/archive en Windows) en lugar de lista vacía, metadatos sin leer contenido, errores por ruta sin abortar, exclusiones del contrato respetadas.
+DISCREPANCIAS: NINGUNA
+PENDIENTES: Siguiente hoja pendiente real en orden del roadmap: 3.8.5.1.4.4.5 (gestionar rutas Unicode, largas, caracteres especiales, nombres duplicados y normalización). Padre 3.8.5.1.4.4 con hijas .1 a .4 cerradas; .5 a .10 pendientes.
+ESTADO FINAL: 3.8.5.1.4.4.4 - IMPLEMENTADA
