@@ -10730,11 +10730,12 @@ da reconciled=False (coincidencia).
 | `TestNormalizacionRutas` | Normalización de rutas según la distinción mayúsculas/minúsculas del sistema de archivos. |
 | `TestMigracionEsquemaV1AV2` | Migración de esquema v1 a v2 (columna `normalized_path` e índice único). |
 | `TestMigracionesVerificables` | Migraciones versionadas, atómicas, sin pérdida ni reinterpretación de datos; fallo sin cambios parciales. |
+| `TestLineaBaseVolumen` | Primera línea base (instantánea completa) por volumen: creación con fecha, estado y cobertura, preservación de la primera sin sobrescribir, independencia por máquina/volumen y persistencia al reabrir la instancia. |
 | `TestBusquedaPorEstado` | Consultas de entradas por estado de exclusión. |
 | `TestConcurrenciaEscaneos` | Bloqueo de concurrencia, `ConcurrentScanError`, liberación del bloqueo y modo de journaling WAL. |
 | `TestBackupCorrupcionYRecuperacion` | Copia de seguridad, verificación de integridad (`PRAGMA quick_check` / `integrity_check`) y restauración desde copia sin sobrescribir una base válida con una copia vacía, incompleta o corrupta. |
 
-**Resultados:** 70 tests unitarios, 70 PASSED / 0 FAILED.
+**Resultados:** 83 tests unitarios, 83 PASSED / 0 FAILED.
 
 ---
 

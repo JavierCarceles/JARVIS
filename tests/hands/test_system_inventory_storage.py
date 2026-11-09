@@ -82,7 +82,7 @@ class TestCreacionBaseDeDatos:
     def test_inicializacion_crea_fichero_en_ruta_dada(self, storage: SystemInventoryStorage, db_path: Path):
         assert not db_path.exists()
         version = storage.initialize()
-        assert version == 2
+        assert version == 3
         assert db_path.exists()
         assert storage.db_file_exists()
 
@@ -91,7 +91,7 @@ class TestCreacionBaseDeDatos:
 
     def test_esquema_versionado_se_registra(self, storage: SystemInventoryStorage):
         storage.initialize()
-        assert storage.schema_version() == 2
+        assert storage.schema_version() == 3
 
     def test_inicializacion_idempotente_no_borra_datos(self, storage: SystemInventoryStorage):
         storage.initialize()
@@ -308,6 +308,160 @@ class TestScanRuns:
 
 
 # ---------------------------------------------------------------------------
+# Linea base (primera instantanea completa por volumen) (3.8.5.1.4.5.1).
+# ---------------------------------------------------------------------------
+
+class TestLineaBaseVolumen:
+    """La primera instantanea completa por volumen se conserva como linea base
+    y no se sobrescribe por escaneos posteriores (3.8.5.1.4.5.1)."""
+
+    def test_registrar_linea_base_primera_guarda_fecha_estado_cobertura(
+        self, storage: SystemInventoryStorage
+    ):
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        linea = storage.registrar_linea_base_volumen(
+            machine_id="machine-alfa",
+            volume="C:",
+            estado_volumen="disponible",
+            cobertura=100.0,
+            entradas_count=42,
+            errores_count=1,
+            scan_id="scan-1",
+        )
+        assert linea is not None
+        assert linea["machine_id"] == "machine-alfa"
+        assert linea["volume"] == "C:"
+        assert linea["estado_volumen"] == "disponible"
+        assert linea["cobertura"] == 100.0
+        assert linea["entradas_count"] == 42
+        assert linea["errores_count"] == 1
+        assert linea["scan_id"] == "scan-1"
+        assert "linea_id" in linea
+        assert "fecha_base" in linea
+        assert "created_at" in linea
+
+    def test_obtener_linea_base_devuelve_registrada(self, storage: SystemInventoryStorage):
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        storage.registrar_linea_base_volumen(
+            machine_id="machine-alfa",
+            volume="C:",
+            estado_volumen="disponible",
+            cobertura=100.0,
+        )
+        obtenida = storage.obtener_linea_base_volumen("machine-alfa", "C:")
+        assert obtenida is not None
+        assert obtenida["volume"] == "C:"
+        assert obtenida["estado_volumen"] == "disponible"
+        assert obtenida["cobertura"] == 100.0
+
+    def test_obtener_linea_base_inexistente_devuelve_none(self, storage: SystemInventoryStorage):
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        assert storage.obtener_linea_base_volumen("machine-alfa", "C:") is None
+
+    def test_registrar_linea_base_segunda_no_sobrescribe_primera(
+        self, storage: SystemInventoryStorage
+    ):
+        """Solo la primera linea base se conserva; la segunda no la reemplaza."""
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        primera = storage.registrar_linea_base_volumen(
+            machine_id="machine-alfa",
+            volume="C:",
+            estado_volumen="disponible",
+            cobertura=100.0,
+            entradas_count=10,
+            scan_id="scan-1",
+        )
+        segunda = storage.registrar_linea_base_volumen(
+            machine_id="machine-alfa",
+            volume="C:",
+            estado_volumen="inaccesible",
+            cobertura=0.0,
+            entradas_count=0,
+            scan_id="scan-2",
+        )
+        assert segunda is not None
+        assert segunda["linea_id"] == primera["linea_id"]
+        assert segunda["estado_volumen"] == "disponible"
+        assert segunda["cobertura"] == 100.0
+        assert segunda["entradas_count"] == 10
+
+    def test_lineas_base_independientes_por_maquina_y_volumen(
+        self, storage: SystemInventoryStorage
+    ):
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        storage.record_machine("machine-beta")
+        storage.registrar_linea_base_volumen(
+            machine_id="machine-alfa", volume="C:", estado_volumen="disponible", cobertura=100.0
+        )
+        storage.registrar_linea_base_volumen(
+            machine_id="machine-beta", volume="C:", estado_volumen="disponible", cobertura=100.0
+        )
+        storage.registrar_linea_base_volumen(
+            machine_id="machine-alfa", volume="D:", estado_volumen="disponible", cobertura=50.0
+        )
+        assert storage.obtener_linea_base_volumen("machine-alfa", "C:")["cobertura"] == 100.0
+        assert storage.obtener_linea_base_volumen("machine-beta", "C:")["cobertura"] == 100.0
+        assert storage.obtener_linea_base_volumen("machine-alfa", "D:")["cobertura"] == 50.0
+
+    def test_linea_base_persiste_al_reabrir_instancia(
+        self, storage: SystemInventoryStorage, db_path: Path
+    ):
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        primera = storage.registrar_linea_base_volumen(
+            machine_id="machine-alfa",
+            volume="C:",
+            estado_volumen="disponible",
+            cobertura=100.0,
+        )
+        storage2 = SystemInventoryStorage(db_path)
+        storage2.initialize()
+        obtenida = storage2.obtener_linea_base_volumen("machine-alfa", "C:")
+        assert obtenida is not None
+        assert obtenida["linea_id"] == primera["linea_id"]
+        assert obtenida["cobertura"] == 100.0
+
+    def test_esquema_version_3_incluye_tabla_lineas_base(self, storage: SystemInventoryStorage):
+        storage.initialize()
+        assert storage.schema_version() == 3
+        conn = storage.connect()
+        cur = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='lineas_base'")
+        assert cur.fetchone() is not None
+        cur = conn.execute("PRAGMA table_info(lineas_base)")
+        columnas = {row["name"] for row in cur.fetchall()}
+        for requerida in (
+            "linea_id", "machine_id", "volume", "fecha_base", "estado_volumen",
+            "cobertura", "entradas_count", "errores_count", "scan_id", "created_at",
+        ):
+            assert requerida in columnas
+
+    def test_migracion_v2_a_v3_crea_tabla_lineas_base(self, db_path: Path):
+        """Una base ya en version 2 aplica la migracion v2->v3 y crea lineas_base."""
+        storage_v2 = SystemInventoryStorage(db_path)
+        storage_v2.initialize()  # queda en version 2 (migraciones v1->v2 si fuera v1)
+        # Forzar version 2 para simular una base previa sin lineas_base.
+        conn = storage_v2.connect()
+        conn.execute("UPDATE schema_version SET version = 2")
+        conn.commit()
+        storage_v2.close()
+
+        storage_v3 = SystemInventoryStorage(db_path)
+        version = storage_v3.initialize()
+        assert version == 3
+        assert storage_v3.obtener_linea_base_volumen("machine-alfa", "C:") is None
+        creada = storage_v3.registrar_linea_base_volumen(
+            machine_id="machine-alfa", volume="C:",
+            estado_volumen="disponible", cobertura=100.0,
+        )
+        assert creada is not None
+
+
+# ---------------------------------------------------------------------------
 # Escritura atomica por lotes
 # ---------------------------------------------------------------------------
 
@@ -515,7 +669,7 @@ class TestManifiestoJSON:
         manifest = storage.write_manifest("machine-alfa")
         assert storage.manifest_path.exists()
         assert manifest["machine_id"] == "machine-alfa"
-        assert manifest["version"] == 2
+        assert manifest["version"] == 3
         assert "volumes" in manifest
         assert "last_scan" in manifest
         assert "updated_at" in manifest
@@ -571,7 +725,7 @@ class TestManifiestoJSON:
         manifest = storage.read_manifest()
         assert manifest is not None
         assert manifest["machine_id"] == "machine-alfa"
-        assert manifest["version"] == 2
+        assert manifest["version"] == 3
         assert len(manifest["volumes"]) == 1
         assert manifest["volumes"][0]["volume"] == "C:"
         assert manifest["last_scan"] is not None
@@ -800,8 +954,8 @@ class TestMigracionEsquemaV1AV2:
         self._crear_db_v1(db_path)
         storage = SystemInventoryStorage(db_path)
         version = storage.initialize()
-        assert version == 2
-        assert storage.schema_version() == 2
+        assert version == 3
+        assert storage.schema_version() == 3
         # La columna normalized_path debe existir tras la migracion.
         conn = storage.connect()
         cur = conn.execute("PRAGMA table_info(file_entries)")

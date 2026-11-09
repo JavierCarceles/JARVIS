@@ -32,12 +32,13 @@ import os
 import shutil
 import sqlite3
 import threading
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Optional
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 # Detectar si el sistema de archivos es sensible a mayusculas y minusculas.
 # Windows y macOS (por defecto) son insensibles; Linux y la mayoria de Unix son sensibles.
@@ -130,9 +131,38 @@ def _migracion_v1_a_v2(conn: sqlite3.Connection) -> None:
         pass
 
 
+def _migracion_v2_a_v3(conn: sqlite3.Connection) -> None:
+    """Migracion v2 -> v3: crea la tabla `lineas_base` para conservar la
+    primera instantanea completa (linea base) por volumen.
+
+    Es una operacion aditiva: no elimina ni reinterpreta tablas ni datos
+    existentes. Cada equipo y volumen solo puede tener una linea base, la
+    primera, preservada como referencia para la deteccion de cambios
+    incrementales (unidad 3.8.5.1.4.5.1).
+    """
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS lineas_base (
+            linea_id TEXT PRIMARY KEY,
+            machine_id TEXT NOT NULL,
+            volume TEXT NOT NULL,
+            fecha_base TEXT NOT NULL,
+            estado_volumen TEXT NOT NULL,
+            cobertura REAL NOT NULL,
+            entradas_count INTEGER NOT NULL DEFAULT 0,
+            errores_count INTEGER NOT NULL DEFAULT 0,
+            scan_id TEXT,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (machine_id) REFERENCES machines(machine_id)
+        )
+        """
+    )
+
+
 # (version_origen, version_destino, nombre, funcion_de_migracion)
 _MIGRACIONES: list[tuple[int, int, str, Callable[[sqlite3.Connection], None]]] = [
     (1, 2, "agregar normalized_path a file_entries", _migracion_v1_a_v2),
+    (2, 3, "crear tabla lineas_base", _migracion_v2_a_v3),
 ]
 
 
@@ -269,6 +299,20 @@ CREATE TABLE IF NOT EXISTS application_candidates (
     FOREIGN KEY (scan_id) REFERENCES scan_runs(scan_id),
     FOREIGN KEY (machine_id) REFERENCES machines(machine_id)
 );
+
+CREATE TABLE IF NOT EXISTS lineas_base (
+    linea_id TEXT PRIMARY KEY,
+    machine_id TEXT NOT NULL,
+    volume TEXT NOT NULL,
+    fecha_base TEXT NOT NULL,
+    estado_volumen TEXT NOT NULL,
+    cobertura REAL NOT NULL,
+    entradas_count INTEGER NOT NULL DEFAULT 0,
+    errores_count INTEGER NOT NULL DEFAULT 0,
+    scan_id TEXT,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (machine_id) REFERENCES machines(machine_id)
+);
 """
 
 _SCHEMA_INDEXES_SQL = """
@@ -305,6 +349,12 @@ CREATE INDEX IF NOT EXISTS idx_scan_runs_machine_volume
     ON scan_runs(machine_id, volume);
 CREATE INDEX IF NOT EXISTS idx_scan_runs_started_at
     ON scan_runs(machine_id, started_at);
+
+-- Clave unica por equipo y volumen: solo puede existir una linea base (la
+-- primera) para cada (machine_id, volumen), preservada como referencia
+-- de cambios incrementales (3.8.5.1.4.5.1).
+CREATE UNIQUE INDEX IF NOT EXISTS idx_lineas_base_unique_maquina_volumen
+    ON lineas_base(machine_id, volume);
 """
 
 
@@ -843,6 +893,103 @@ class SystemInventoryStorage:
                 "ORDER BY started_at DESC LIMIT 1",
                 (machine_id, volume),
             )
+        row = cur.fetchone()
+        return dict(row) if row is not None else None
+
+    # ------------------------------------------------------------------ #
+    # Linea base (primera instantanea completa por volumen) (3.8.5.1.4.5.1).
+    # ------------------------------------------------------------------ #
+    def registrar_linea_base_volumen(
+        self,
+        machine_id: str,
+        volume: str,
+        estado_volumen: str,
+        cobertura: float,
+        entradas_count: int = 0,
+        errores_count: int = 0,
+        scan_id: Optional[str] = None,
+        fecha_base: Optional[str] = None,
+    ) -> Optional[dict]:
+        """Registra la primera linea base (instantanea completa) de un volumen.
+
+        Solo se crea una linea base por `(machine_id, volume)`: si ya existe
+        una linea base para ese equipo y volumen, no se sobrescribe y se
+        devuelve la existente. De esta forma se conserva la fecha, el estado
+        y la cobertura de la primera instantanea completa como referencia
+        para la deteccion de cambios incrementales (3.8.5.1.4.5.1).
+
+        `estado_volumen` es el estado diferenciado del volumen observado en
+        el primer escaneo completo (p. ej. un valor de `EstadoVolumen`).
+        `cobertura` es el porcentaje de avance del recorrido (0.0 a 100.0).
+        `scan_id`, cuando se proporciona, vincula la linea base con la
+        ejecucion de escaneo que la genero. `fecha_base` permite fijar la
+        fecha de la linea base (por defecto, la fecha actual).
+
+        Retorna el diccionario de la linea base (la creada o la ya existente)
+        o None si no se pudo registrar.
+        """
+        if fecha_base is None:
+            fecha_base = _now_iso()
+        created_at = _now_iso()
+        linea_id = str(uuid.uuid4())
+        self.record_machine(machine_id, created_at=fecha_base)
+        conn = self.connect()
+        existente = conn.execute(
+            "SELECT * FROM lineas_base WHERE machine_id = ? AND volume = ?",
+            (machine_id, volume),
+        ).fetchone()
+        if existente is not None:
+            return dict(existente)
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            # Re-comprobar dentro de la transaccion para evitar duplicados
+            # por concurrencia entre la lectura y la insercion.
+            existente = conn.execute(
+                "SELECT * FROM lineas_base WHERE machine_id = ? AND volume = ?",
+                (machine_id, volume),
+            ).fetchone()
+            if existente is not None:
+                conn.rollback()
+                return dict(existente)
+            conn.execute(
+                """
+                INSERT INTO lineas_base(
+                    linea_id, machine_id, volume, fecha_base, estado_volumen,
+                    cobertura, entradas_count, errores_count, scan_id, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    linea_id,
+                    machine_id,
+                    volume,
+                    fecha_base,
+                    estado_volumen,
+                    float(cobertura),
+                    int(entradas_count),
+                    int(errores_count),
+                    scan_id,
+                    created_at,
+                ),
+            )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        return self.obtener_linea_base_volumen(machine_id, volume)
+
+    def obtener_linea_base_volumen(self, machine_id: str, volume: str) -> Optional[dict]:
+        """Devuelve la linea base (primera instantanea completa) de un volumen.
+
+        Retorna el diccionario con `linea_id`, `machine_id`, `volume`,
+        `fecha_base`, `estado_volumen`, `cobertura`, `entradas_count`,
+        `errores_count`, `scan_id` y `created_at`, o None si no existe una
+        linea base para ese equipo y volumen.
+        """
+        conn = self.connect()
+        cur = conn.execute(
+            "SELECT * FROM lineas_base WHERE machine_id = ? AND volume = ?",
+            (machine_id, volume),
+        )
         row = cur.fetchone()
         return dict(row) if row is not None else None
 

@@ -1838,9 +1838,9 @@ Funciones a nivel módulo:
 **Características:**
 
 - Creación de `data/system_inventory.sqlite3` como almacenamiento canonico del índice persistente.
-- Esquema versionado con tabla `schema_version` (versión 2).
-- Migraciones de esquema verificables: `initialize()` aplica las migraciones registradas en orden (actual: v1 a v2), cada una dentro de su propia transacción, y comprueba que no se pierdan ni se reinterpreten datos de versiones previas antes de avanzar la versión.
-- Tablas `machines`, `volumes`, `scan_runs`, `file_entries` y `application_candidates` (candidatos de aplicación separados de los registros genéricos de archivo).
+- Esquema versionado con tabla `schema_version` (versión 3).
+- Migraciones de esquema verificables: `initialize()` aplica las migraciones registradas en orden (actual: v1 a v3), cada una dentro de su propia transacción, y comprueba que no se pierdan ni se reinterpreten datos de versiones previas antes de avanzar la versión. Incluye la migración v2 a v3 que crea la tabla `lineas_base`.
+- Tablas `machines`, `volumes`, `scan_runs`, `file_entries`, `application_candidates` (candidatos de aplicación separados de los registros genéricos de archivo) y `lineas_base` (primera instantánea completa o línea base por volumen).
 - Escritura por lotes en transacción atómica (`BEGIN IMMEDIATE`/`COMMIT` con `ROLLBACK` ante fallo): un escaneo interrumpido no deja media base presentada como inventario completo.
 - Control de concurrencia: `begin_scan_run` adquiere un bloqueo no bloqueante por `(machine_id, volumen)` y levanta `ConcurrentScanError` si otro escaneo está en curso para la misma clave; `end_scan_run` libera el bloqueo al terminar, incluso si la validación falla.
 - Consultas indexadas paginadas por nombre, extensión y prefijo de ruta absoluta; contador de entradas y recuperación de la última ejecución por equipo/volumen.
@@ -1877,6 +1877,8 @@ Métodos de `SystemInventoryStorage`:
 | `def end_scan_run(scan_id, finished_at, result, entries_count, errors_count, exclusions_count, coverage_estimate)` | Finaliza una ejecución de escaneo con su resultado y métricas. Valida que el resultado sea uno de los valores permitidos. Libera el bloqueo de concurrencia asociado al escaneo al terminar, incluso si la validación falla. |
 | `def get_scan_run(scan_id)` | Devuelve los datos de una ejecución de escaneo o None. |
 | `def get_latest_scan(machine_id, volume)` | Devuelve la última ejecución de escaneo de un equipo (y opcionalmente volumen). |
+| `def registrar_linea_base_volumen(machine_id, volume, estado_volumen, cobertura, entradas_count, errores_count, scan_id, fecha_base)` | Registra la primera línea base (instantánea completa) de un volumen. Solo se crea una por `(machine_id, volumen)` y no se sobrescribe la existente; conserva la fecha, el estado y la cobertura como referencia para cambios incrementales (3.8.5.1.4.5.1). |
+| `def obtener_linea_base_volumen(machine_id, volume)` | Devuelve la línea base de un volumen o None si no existe una para ese equipo y volumen. |
 | `def insert_file_entries(scan_id, machine_id, volume, entries)` | Inserta una lista de entradas de archivo en una transacción atómica. |
 | `def insert_application_candidates(scan_id, machine_id, volume, candidates)` | Inserta candidatos de aplicación en una transacción atómica (tabla separada). |
 | `def search_by_name(machine_id, name, limit, offset)` | Busca entradas de archivo por nombre normalizado (paginado). |
