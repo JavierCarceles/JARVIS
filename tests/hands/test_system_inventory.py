@@ -2419,3 +2419,157 @@ class TestRecorridoVolumenUltimoInventarioValido:
         assert recorrido.ejecucion_parcial is False
 
 
+# ---------------------------------------------------------------------------
+# Subdirectorios profundos (3.8.5.1.4.4.10)
+# ---------------------------------------------------------------------------
+
+class TestRecorridoVolumenSubdirectoriosProfundos:
+    """RecorridoVolumen recorre arboles de directorios profundamente anidados
+    sin desbordamiento (3.8.5.1.4.4.10: subdirectorios profundos). El recorrido
+    usa pila explicita (sin recursión), por lo que arboles muy profundos no
+    provocan desbordamiento de pila de Python."""
+
+    def _crear_arbol_profundo(self, tmp_path: Path, niveles: int = 200) -> Path:
+        """Crea un arbol de directorios anidado `niveles` niveles profundo,
+        con archivos de diversos tipos (.txt, .bin, .json) en cada nivel."""
+        raiz = tmp_path / "volumen"
+        actual = raiz
+        for i in range(niveles):
+            actual = actual / f"nivel_{i:04d}"
+            actual.mkdir(parents=True)
+            (actual / f"archivo_{i:04d}.txt").write_text(f"contenido nivel {i}", encoding="utf-8")
+            if i % 3 == 0:
+                (actual / f"datos_{i:04d}.bin").write_bytes(bytes([i % 256]))
+            if i % 5 == 0:
+                (actual / f"config_{i:04d}.json").write_text('{"nivel": %d}' % i, encoding="utf-8")
+        return raiz
+
+    def test_recorre_arbol_muy_profundo_sin_desbordamiento(self, tmp_path: Path):
+        """Un arbol con 200 niveles anidados se recorre completo sin error
+        de recursión ni desbordamiento de pila (pila explicita)."""
+        raiz = self._crear_arbol_profundo(tmp_path, niveles=200)
+        contrato = _ContratoPrueba()
+        recorrido = RecorridoVolumen(
+            volumen="V", raiz=str(raiz), contrato=contrato, maquina_id="maquina-test"
+        )
+        entradas = list(recorrido.recorrer())
+        assert recorrido.progreso.completado is True
+        assert recorrido.progreso.interrumpido is False
+        nombres = {e.name for e in entradas}
+        assert "archivo_0199.txt" in nombres
+        assert "datos_0198.bin" in nombres   # 198 % 3 == 0
+        assert "config_0195.json" in nombres # 195 % 5 == 0
+        archivos_txt = [n for n in nombres if n.startswith("archivo_") and n.endswith(".txt")]
+        assert len(archivos_txt) == 200, f"Esperaban 200 archivos txt, se encontraron {len(archivos_txt)}"
+        tipos = {e.entry_type for e in entradas}
+        assert EntryType.FILE in tipos
+        assert EntryType.DIRECTORY in tipos
+
+    def test_rutas_unicode_en_arbol_profundo(self, tmp_path: Path):
+        """Nombres con Unicode en rutas profundamente anidadas se registran
+        correctamente con sus metadatos observados."""
+        raiz = tmp_path / "volumen"
+        actual = raiz
+        for i in range(50):
+            actual = actual / f"carpeta_ñ_{i}_中文"
+            actual.mkdir(parents=True)
+            (actual / f"archivo_émoji_🎉_{i}.txt").write_text("unicode", encoding="utf-8")
+        contrato = _ContratoPrueba()
+        recorrido = RecorridoVolumen(
+            volumen="V", raiz=str(raiz), contrato=contrato, maquina_id="maquina-test"
+        )
+        entradas = list(recorrido.recorrer())
+        assert recorrido.progreso.completado is True
+        nombres = {e.name for e in entradas}
+        assert "archivo_émoji_🎉_49.txt" in nombres
+        for entrada in entradas:
+            if entrada.name.startswith("archivo_émoji"):
+                assert entrada.extension == ".txt"
+                assert entrada.entry_type == EntryType.FILE
+                assert entrada.source == "filesystem_scan"
+
+    def test_archivo_bloqueado_en_ruta_profunda_registra_error_y_continua(self, tmp_path: Path):
+        """Un archivo cuyos metadatos no se pueden leer (bloqueado) dentro de
+        una ruta profunda se registra como error_estado y el recorrido emite
+        las demas entradas sin abortar."""
+        raiz = tmp_path / "volumen"
+        for i in range(30):
+            (raiz / f"nivel_{i:04d}").mkdir(parents=True)
+        # Archivo accesible real en el nivel mas profundo.
+        (raiz / f"nivel_{29:04d}" / "accesible.txt").write_text("ok", encoding="utf-8")
+        contrato = _ContratoPrueba()
+        recorrido = RecorridoVolumen(
+            volumen="V", raiz=str(raiz), contrato=contrato, maquina_id="maquina-test"
+        )
+
+        # Capturar el scandir real antes de parchear.
+        import src.hands.system_inventory as si_module
+        real_scandir = si_module.os.scandir
+
+        def scandir_profundo(ruta):
+            ruta_path = Path(ruta)
+            if ruta_path == raiz / f"nivel_{29:04d}":
+                # Nivel mas profundo: entradas reales + archivo bloqueado simulado.
+                entradas_reales = list(real_scandir(ruta))
+                return self._ScandirFalsoProfundo(entradas_reales + [
+                    self._EntradaFalsaProfundo("bloqueado.txt", str(ruta_path / "bloqueado.txt"), stat_ok=False),
+                ])
+            return real_scandir(ruta)
+
+        with patch("src.hands.system_inventory.os.scandir", side_effect=scandir_profundo):
+            entradas = list(recorrido.recorrer())
+
+        nombres = {e.name for e in entradas}
+        assert "accesible.txt" in nombres
+        assert "bloqueado.txt" not in nombres
+        assert recorrido.progreso.completado is True
+        assert len(recorrido.errores) >= 1
+        err = recorrido.errores[0]
+        assert err.categoria == "error_estado"
+        assert "bloqueado.txt" in err.ruta
+
+    class _EntradaFalsaProfundo:
+        """DirEntry simulado para forzar fallos de lectura de metadatos."""
+        def __init__(self, nombre, ruta, stat_ok=True, tipo_ok=True, tipo_entrada="archivo"):
+            self.name = nombre
+            self.path = ruta
+            self._stat_ok = stat_ok
+            self._tipo_ok = tipo_ok
+            self._tipo_entrada = tipo_entrada
+
+        def stat(self, follow_symlinks=False):
+            if not self._stat_ok:
+                raise OSError("error simulado al leer metadatos")
+            return SimpleNamespace(st_size=10, st_mtime=0, st_ctime=0, st_atime=0)
+
+        def is_dir(self, follow_symlinks=False):
+            if not self._tipo_ok:
+                raise OSError("error simulado al inspeccionar entrada")
+            return self._tipo_entrada == "directorio"
+
+        def is_symlink(self):
+            if not self._tipo_ok:
+                raise OSError("error simulado al inspeccionar entrada")
+            return self._tipo_entrada == "enlace"
+
+        def is_file(self, follow_symlinks=False):
+            if not self._tipo_ok:
+                raise OSError("error simulado al inspeccionar entrada")
+            return self._tipo_entrada == "archivo"
+
+    class _ScandirFalsoProfundo:
+        """Iterador de entradas que cumple el protocolo de gestor de contexto de os.scandir."""
+        def __init__(self, entradas):
+            self._iter = iter(entradas)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def __iter__(self):
+            return self
+
+        def __next__(self):
+            return next(self._iter)

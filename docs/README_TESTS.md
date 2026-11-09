@@ -10705,8 +10705,9 @@ da reconciled=False (coincidencia).
 | `TestEnumerarVolumenesComunConEstado` | `enumerar_volumenes_comun` devuelve volúmenes con estado diferenciado válido. |
 | `TestCoberturaSoportada` | Consulta de la matriz de soporte SO/version sin inferencias: combinacion registrada soportada, no soportada, no registrada, SO desconocido, version no registrada, insensibilidad a mayusculas y filtrado de entradas por SO. |
 | `TestRecorridoVolumenIterativo` | Recorrido iterativo sin recursion, captura de metadatos, tipos observados, rutas Unicode, callback de progreso con contadores y cobertura, control de pausa/cancelar, errores por ruta sin abortar, respeto a exclusiones. |
+| `TestRecorridoVolumenSubdirectoriosProfundos` | Recorrido de arboles de directorios profundamente anidados sin desbordamiento de pila (pila explicita), rutas Unicode en profundidad, archivo bloqueado en ruta profunda que registra error y continua sin abortar. |
 
-**Resultados:** 171 tests unitarios, 171 PASSED / 0 FAILED / 8 SKIPPED (symlinks no creables en Windows sin privilegios).
+**Resultados:** 179 tests unitarios, 179 PASSED / 0 FAILED / 8 SKIPPED (symlinks no creables en Windows sin privilegios).
 
 ---
 

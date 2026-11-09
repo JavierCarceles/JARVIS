@@ -1453,6 +1453,12 @@ def _prefix_ruta_larga_windows(path: str) -> str:
         return path
 
     absoluto = os.path.abspath(path)
+
+    # Si la ruta ya tiene el prefijo de ruta larga de Windows, no volver a aplicarlo
+    # (evitar doble prefijo \\?\\UNC\\?\\... que romperia rutas profundas).
+    if absoluto.startswith("\\\\?\\"):
+        return absoluto
+
     if len(absoluto) <= 260:
         return path
 

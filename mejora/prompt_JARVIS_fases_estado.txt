@@ -7818,3 +7818,27 @@ VERIFICACION: SINTAXIS: OK (py_compile de `src/hands/system_inventory.py` y `tes
 DISCREPANCIAS: NINGUNA
 PENDIENTES: Siguiente hoja pendiente real en orden del roadmap: 3.8.5.1.4.4.9 (conservar ultimo inventario valido y marcar ejecucion parcial si un volumen no termina de escanearse). Padre 3.8.5.1.4.4 con hijas .1 a .8 cerradas; .9 a .10 pendientes.
 ESTADO FINAL: 3.8.5.1.4.4.8 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.8.5.1.4.4.9
+FECHA: 2026-11-09
+OBJETIVO: Si un volumen o subarbol no termina de escanearse, conservar el ultimo inventario valido y marcar la ejecucion como parcial/interrumpida; no marcar sus archivos como eliminados.
+TIPO DE TRABAJO: INSPECCION | VERIFICACION
+CAMBIOS / HALLAZGOS: Verificado que RecorridoVolumen en src/hands/system_inventory.py ya implementa el comportamiento de 3.8.5.1.4.4.9: la propiedad entradas_validas devuelve una copia de las entradas emitidas hasta el momento (ultimo inventario valido); la propiedad ejecucion_parcial devuelve True si recorrer() fue interrumpida (CANCEL/PAUSE) y False si se completo; recorrer() establece interrumpido=True y completado=False ante ControlRecorrido.CANCELAR o PAUSAR y retorna temprano sin abortar las entradas ya emitidas; no existe logica de borrado ni marcado como eliminado en RecorridoVolumen. No se modifico codigo de produccion ni tests. Se ejecutaron y pasaron todos los tests: 176 PASSED / 8 SKIPPED / 184 TOTAL en tests/hands/test_system_inventory.py (incluidos los 5 de TestRecorridoVolumenUltimoInventarioValido) y 75 PASSED en tests/hands/test_system_inventory_storage.py, en Windows real.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: NA; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: 176 PASSED / 8 SKIPPED / 184 TOTAL (tests/hands/test_system_inventory.py, ejecutados en Windows real); INTEGRACION: NA; NO REGRESION: 75 PASSED (tests/hands/test_system_inventory_storage.py)
+VERIFICACION: SINTAXIS: OK (py_compile y import del modulo sin errores); MAIN.PY: NA (no se modifica main.py); COMPORTAMIENTO / INTEGRACION REAL: Evidencia real de ejecucion de tests: entradas_validas devuelve copia de entradas emitidas; ejecucion_parcial es True tras interrupcion y False antes de ejecutar recorrer(); ninguna entrada se marca como eliminada tras interrupcion.
+DISCREPANCIAS: NINGUNA
+PENDIENTES: Siguiente hoja pendiente real en orden del roadmap: 3.8.5.1.4.4.10 (probar el recorrido sobre arboles temporales controlados con archivos reales de diversos tipos, rutas Unicode, subdirectorios profundos, enlaces, archivos bloqueados y permisos insuficientes). Padre 3.8.5.1.4.4 con hijas .1 a .9 cerradas; .10 pendiente.
+ESTADO FINAL: 3.8.5.1.4.4.9 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.8.5.1.4.4.10
+FECHA: 2026-11-09
+OBJETIVO: Probar el recorrido sobre arboles temporales controlados con archivos reales de diversos tipos, rutas Unicode, subdirectorios profundos, enlaces, archivos bloqueados y permisos insuficientes (RecorridoVolumen, unidad 3.8.5.1.4.4).
+TIPO DE TRABAJO: TEST | IMPLEMENTACION
+CAMBIOS / HALLAZGOS: Se añadio clase TestRecorridoVolumenSubdirectoriosProfundos en tests/hands/test_system_inventory.py con 3 tests: (1) recorrido de arbol de 200 niveles anidados sin desbordamiento de pila (pila explicita), verificando archivos .txt/.bin/.json en todos los niveles y completado=True; (2) rutas Unicode (ñ, 中文, emoji) en rutas profundamente anidadas registradas con metadatos observados del SO; (3) archivo bloqueado (stat fallido simulado) en ruta profunda registra error_estado y el recorrido emite accesible.txt y completa sin abortar. Ademas se corrigio un defecto en src/hands/system_inventory.py: _prefix_ruta_larga_windows no detectaba rutas que ya tenian el prefijo \\\\?\\, causando doble prefijo (\\\\?\\UNC\\\\?\\...) y fallo de os.scandir en rutas profundas (>260 caracteres), lo que impedía recorrer arboles mas alla del nivel aproximado 14. Se añade deteccion de prefijo existente para retornar la ruta tal cual.
+ARCHIVOS MODIFICADOS: PRODUCCION: `src/hands/system_inventory.py`; TESTS: `tests/hands/test_system_inventory.py`; DOCUMENTACION: `docs/README_TESTS.md`
+TESTS Y RESULTADOS: UNITARIOS: 179 PASSED / 8 SKIPPED / 187 TOTAL (tests/hands/test_system_inventory.py, ejecutados en Windows real; los 8 skipped son pruebas de enlaces simbolicos que el entorno Windows no permite crear sin privilegios); INTEGRACION: NA; NO REGRESION: NA
+VERIFICACION: SINTAXIS: OK (py_compile de src/hands/system_inventory.py y tests/hands/test_system_inventory.py sin errores); MAIN.PY: NA (no se modifica main.py); COMPORTAMIENTO / INTEGRACION REAL: Evidencia real de ejecucion: 179 tests pasan y 8 se saltan en Windows real. Verificado: arbol de 200 niveles se recorre completo (400 entradas, archivo_0199.txt encontrado, completado=True); rutas Unicode en profundidad registradas correctamente; archivo bloqueado en ruta profunda registra error_estado y el recorrido continua; no hay regresion en tests preexistentes.
+DISCREPANCIAS: NINGUNA
+PENDIENTES: Siguiente hoja pendiente real en orden del roadmap: 3.8.5.1.4.5.1 (crear primera instantanea completa por volumen y conservar fecha, estado y cobertura de linea base). Padre 3.8.5.1.4.4 con hijas .1 a .10 cerradas; .5.1 a .5.10 pendientes.
+ESTADO FINAL: 3.8.5.1.4.4.10 - IMPLEMENTADA
