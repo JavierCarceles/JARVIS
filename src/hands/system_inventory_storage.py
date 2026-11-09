@@ -1464,6 +1464,210 @@ class SystemInventoryStorage:
         )
 
     # ------------------------------------------------------------------ #
+    # Marcado de entradas ausentes / eliminadas (3.8.5.1.4.5.4).
+    # ------------------------------------------------------------------ #
+
+    def marcar_entradas_eliminadas(
+        self,
+        machine_id: str,
+        volume: str,
+        scan_id_referencia: str,
+        entradas_ausentes: list[dict],
+        errores_escaneo: Optional[list[dict]] = None,
+    ) -> dict:
+        """
+        Marca como ausente/eliminada las entradas indicadas solo despues de
+        verificar que el escaneo de referencia (`scan_id_referencia`) del
+        mismo equipo y volumen se completo correctamente con
+        `SCAN_RESULT_OK`.
+
+        Requisitos (3.8.5.1.4.5.4):
+        - Una entrada solo se marca como ausente/eliminada cuando el escaneo
+          del ambito que la contiene termino correctamente. Un escaneo
+          parcial, interrumpido o con error no justifica marcar entradas
+          como eliminadas: es posible que sigan existiendo pero no hayan
+          sido inspeccionadas (3.8.5.1.4.4.9). La marca se persiste como
+          `excluded = 1` en la entrada del escaneo base.
+        - Un error de permisos no equivale a una eliminacion: si el escaneo
+          registro `permiso_denegado` sobre una ruta, las entradas bajo esa
+          ruta no se marcan como eliminadas (pueden seguir existiendo pero
+          ser inaccesibles).
+
+        `entradas_ausentes` es la lista de entradas (output de
+        `detectar_cambios_incrementales` o `detectar_renombrados`) que
+        desaparecieron del escaneo nuevo y se consideran candidatas a
+        marcarse como eliminadas. Cada entrada debe llevar `scan_id`,
+        `machine_id`, `volume` y `normalized_path`.
+
+        `errores_escaneo` es una lista opcional de errores registrados durante
+        el escaneo de referencia, cada uno con claves `ruta`, `categoria` y
+        `mensaje`. Las entradas cuya ruta normalizada quede bajo un prefijo
+        con categoria `permiso_denegado` no se marcan.
+
+        Retorna un diccionario resumen con `marcadas`, `no_marcadas` (lista
+        de {normalized_path, motivo}) y `total_entradas`.
+        """
+        # 1. Validar que el escaneo de referencia exista y pertenezca al
+        #    equipo y volumen indicados.
+        scan = self.get_scan_run(scan_id_referencia)
+        if scan is None:
+            raise ValueError(
+                f"El escaneo de referencia {scan_id_referencia!r} no existe."
+            )
+        if scan["machine_id"] != machine_id or scan["volume"] != volume:
+            raise ValueError(
+                f"El escaneo {scan_id_referencia!r} no pertenece a "
+                f"machine_id={machine_id!r}, volume={volume!r}."
+            )
+
+        # 2. Solo se marca despues de completar correctamente el escaneo del
+        #    ambito (3.8.5.1.4.5.4). Resultado distinto de OK no autoriza
+        #    marcar como eliminada.
+        if scan["result"] != SCAN_RESULT_OK:
+            motivo = (
+                f"el escaneo de referencia no se completo correctamente "
+                f"(resultado={scan['result']})"
+            )
+            no_marcadas = [
+                {
+                    "normalized_path": e.get("normalized_path", ""),
+                    "motivo": motivo,
+                }
+                for e in entradas_ausentes
+            ]
+            return {
+                "machine_id": machine_id,
+                "volume": volume,
+                "scan_id_referencia": scan_id_referencia,
+                "resultado_scan": scan["result"],
+                "marcadas": 0,
+                "no_marcadas": no_marcadas,
+                "total_entradas": len(entradas_ausentes),
+            }
+
+        # 3. Calcular prefijos de ruta con error de permiso (si se proveen
+        #    errores). Un error de permisos no equivale a una eliminacion:
+        #    las entradas bajo esos prefijos no se marcan.
+        prefijos_permiso_denegado: set[str] = set()
+        if errores_escaneo:
+            for err in errores_escaneo:
+                if str(err.get("categoria", "")) == "permiso_denegado":
+                    ruta = err.get("ruta") or ""
+                    if ruta:
+                        prefijos_permiso_denegado.add(normalize_path(ruta))
+
+        # 4. Marcar cada entrada ausente como eliminada (excluded = 1),
+        #    salvo las que queden bajo un prefijo con permiso denegado o que
+        #    no pertenezcan al equipo/volumen indicados.
+        marcadas = 0
+        no_marcadas: list[dict] = []
+        ahora = _now_iso()
+
+        conn = self.connect()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            for e in entradas_ausentes:
+                ruta_normalizada = e.get("normalized_path") or ""
+                if not ruta_normalizada:
+                    no_marcadas.append(
+                        {
+                            "normalized_path": "",
+                            "motivo": "la entrada no tiene normalized_path",
+                        }
+                    )
+                    continue
+
+                # Permiso denegado sobre un ancestro => no es una eliminacion
+                # confirmada (3.8.5.1.4.5.4).
+                if self._ruta_bajo_prefijos(
+                    ruta_normalizada, prefijos_permiso_denegado
+                ):
+                    no_marcadas.append(
+                        {
+                            "normalized_path": ruta_normalizada,
+                            "motivo": "la ruta queda bajo un prefijo con error de permiso denegado; no equivale a eliminacion",
+                        }
+                    )
+                    continue
+
+                # La entrada debe pertenecer al mismo equipo y volumen.
+                if str(e.get("machine_id", "")) != machine_id or str(
+                    e.get("volume", "")
+                ) != volume:
+                    no_marcadas.append(
+                        {
+                            "normalized_path": ruta_normalizada,
+                            "motivo": "la entrada no pertenece al equipo/volumen indicados",
+                        }
+                    )
+                    continue
+
+                scan_id_entrada = e.get("scan_id")
+                if not scan_id_entrada:
+                    no_marcadas.append(
+                        {
+                            "normalized_path": ruta_normalizada,
+                            "motivo": "la entrada no tiene scan_id asociado",
+                        }
+                    )
+                    continue
+
+                cur = conn.execute(
+                    """
+                    UPDATE file_entries
+                    SET excluded = 1,
+                        last_checked_at = ?
+                    WHERE machine_id = ? AND volume = ?
+                      AND normalized_path = ? AND scan_id = ?
+                    """,
+                    (
+                        ahora,
+                        machine_id,
+                        volume,
+                        ruta_normalizada,
+                        scan_id_entrada,
+                    ),
+                )
+                if cur.rowcount == 0:
+                    no_marcadas.append(
+                        {
+                            "normalized_path": ruta_normalizada,
+                            "motivo": "no existe una entrada de archivo con esos identificadores",
+                        }
+                    )
+                    continue
+                marcadas += 1
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+
+        return {
+            "machine_id": machine_id,
+            "volume": volume,
+            "scan_id_referencia": scan_id_referencia,
+            "resultado_scan": scan["result"],
+            "marcadas": marcadas,
+            "no_marcadas": no_marcadas,
+            "total_entradas": len(entradas_ausentes),
+        }
+
+    @staticmethod
+    def _ruta_bajo_prefijos(
+        ruta_normalizada: str, prefijos: set[str]
+    ) -> bool:
+        """Devuelve True si `ruta_normalizada` queda bajo alguno de los
+        prefijos indicados (el propio directorio o un archivo dentro de
+        ese directorio)."""
+        if not prefijos or not ruta_normalizada:
+            return False
+        for prefijo in prefijos:
+            p = prefijo.rstrip("/")
+            if ruta_normalizada == p or ruta_normalizada.startswith(p + "/"):
+                return True
+        return False
+
+    # ------------------------------------------------------------------ #
     # Entradas de archivo (escritura por lote atomica)
     # ------------------------------------------------------------------ #
     def insert_file_entries(

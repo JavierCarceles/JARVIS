@@ -39,6 +39,7 @@ from src.hands.system_inventory_storage import (
     InventoryCorruptError,
     SystemInventoryStorage,
     _MIGRACIONES,
+    normalize_path,
 )
 
 
@@ -2704,3 +2705,376 @@ class TestPersistenciaRealEnDisco:
             assert storage3.get_scan_run("scan-2") is not None
         finally:
             storage3.close()
+
+
+# ---------------------------------------------------------------------------
+# Marcado de entradas ausentes / eliminadas (3.8.5.1.4.5.4).
+# ---------------------------------------------------------------------------
+
+class TestMarcadoEntradasEliminadas:
+    """Marcar como ausente/eliminada solo despues de completar correctamente
+    el escaneo del ambito que la contiene. Un error de permisos no equivale
+    a una eliminacion."""
+
+    def _escenario_base_y_nuevo(
+        self,
+        storage: SystemInventoryStorage,
+        resultado_nuevo: str = SCAN_RESULT_OK,
+        scan_base: str = "scan-base",
+        scan_nuevo: str = "scan-nuevo",
+    ) -> tuple[list[dict], list[dict], str, str]:
+        """Crea linea base con 4 entradas y un escaneo nuevo con solo
+        app.exe y tool.dll.
+
+        Desaparecen: readme.txt (bajo C:/Docs) y notes.txt (bajo C:/Docs2).
+        Retorna (entradas_base, entradas_ausentes, scan_base, scan_nuevo).
+        Las entradas ausentes llevan normalized_path, scan_id, machine_id y
+        volume como las entradas almacenadas en el escaneo base.
+        """
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        storage.record_volume("vol-c:", "machine-alfa", "C:", "local", "online")
+
+        entradas_base = [
+            {
+                "entry_id": "e-base-1",
+                "absolute_path": "C:/Apps/app.exe",
+                "relative_path": "Apps/app.exe",
+                "name": "app.exe",
+                "extension": ".exe",
+                "entry_type": "file",
+                "size_bytes": 1024,
+                "modified_at": "2024-01-01T10:00:00",
+                "created_at": "2024-01-01T09:00:00",
+                "accessed_at": "2024-01-02T08:00:00",
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-03T00:00:00",
+            },
+            {
+                "entry_id": "e-base-2",
+                "absolute_path": "C:/Apps/tool.dll",
+                "relative_path": "Apps/tool.dll",
+                "name": "tool.dll",
+                "extension": ".dll",
+                "entry_type": "file",
+                "size_bytes": 2048,
+                "modified_at": "2024-02-01T10:00:00",
+                "created_at": "2024-02-01T09:00:00",
+                "accessed_at": None,
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-03T00:00:00",
+            },
+            {
+                "entry_id": "e-base-3",
+                "absolute_path": "C:/Docs/readme.txt",
+                "relative_path": "Docs/readme.txt",
+                "name": "readme.txt",
+                "extension": ".txt",
+                "entry_type": "file",
+                "size_bytes": 500,
+                "modified_at": "2024-03-01T10:00:00",
+                "created_at": "2024-03-01T09:00:00",
+                "accessed_at": "2024-03-02T08:00:00",
+                "attributes": ["hidden"],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-03T00:00:00",
+            },
+            {
+                "entry_id": "e-base-4",
+                "absolute_path": "C:/Docs2/notes.txt",
+                "relative_path": "Docs2/notes.txt",
+                "name": "notes.txt",
+                "extension": ".txt",
+                "entry_type": "file",
+                "size_bytes": 300,
+                "modified_at": "2024-04-01T10:00:00",
+                "created_at": "2024-04-01T09:00:00",
+                "accessed_at": None,
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-03T00:00:00",
+            },
+        ]
+
+        # Anotar normalized_path, scan_id, machine_id y volume tal como
+        # quedan almacenadas tras insert_file_entries.
+        for e in entradas_base:
+            e["normalized_path"] = normalize_path(e["absolute_path"])
+            e["scan_id"] = scan_base
+            e["machine_id"] = "machine-alfa"
+            e["volume"] = "C:"
+
+        storage.begin_scan_run(scan_base, "machine-alfa", "C:", SCAN_MODE_FULL)
+        storage.insert_file_entries(scan_base, "machine-alfa", "C:", entradas_base)
+        storage.end_scan_run(scan_base, result=SCAN_RESULT_OK, entries_count=4)
+        storage.registrar_linea_base_volumen(
+            machine_id="machine-alfa",
+            volume="C:",
+            estado_volumen="disponible",
+            cobertura=100.0,
+            entradas_count=4,
+            errores_count=0,
+            scan_id=scan_base,
+        )
+
+        # Escaneo nuevo: solo app.exe y tool.dll (entry_id unico por scan).
+        entradas_nuevo = []
+        for e in entradas_base:
+            if e["name"] in ("app.exe", "tool.dll"):
+                e_nuevo = dict(e)
+                e_nuevo["entry_id"] = f"e-nuevo-{e['name']}"
+                e_nuevo["scan_id"] = scan_nuevo
+                entradas_nuevo.append(e_nuevo)
+        storage.begin_scan_run(scan_nuevo, "machine-alfa", "C:", SCAN_MODE_INCREMENTAL)
+        storage.insert_file_entries(scan_nuevo, "machine-alfa", "C:", entradas_nuevo)
+        storage.end_scan_run(scan_nuevo, result=resultado_nuevo, entries_count=2)
+
+        # Entradas ausentes = de base pero no en el nuevo.
+        nombres_nuevo = {e["name"] for e in entradas_nuevo}
+        entradas_ausentes = [e for e in entradas_base if e["name"] not in nombres_nuevo]
+
+        return entradas_base, entradas_ausentes, scan_base, scan_nuevo
+
+    def _fila_base(
+        self, storage: SystemInventoryStorage, scan_base: str, absolute_path: str
+    ) -> dict:
+        """Devuelve la fila de `file_entries` del escaneo base para la ruta
+        dada, o lanza si no existe."""
+        filas = storage.search_by_path_prefix("machine-alfa", absolute_path)
+        coincidentes = [f for f in filas if f["scan_id"] == scan_base]
+        assert len(coincidentes) == 1, (
+            f"se esperaba exactamente una fila del scan base para "
+            f"{absolute_path}, se encontraron {len(coincidentes)}"
+        )
+        return coincidentes[0]
+
+    def test_marca_entradas_desaparecidas_cuando_scan_referencia_ok(
+        self, storage: SystemInventoryStorage
+    ):
+        """Scan nuevo SCAN_RESULT_OK: las entradas desaparecidas se marcan
+        como eliminadas (excluded = 1)."""
+        _, entradas_ausentes, scan_base, scan_nuevo = self._escenario_base_y_nuevo(
+            storage, resultado_nuevo=SCAN_RESULT_OK
+        )
+
+        resumen = storage.marcar_entradas_eliminadas(
+            machine_id="machine-alfa",
+            volume="C:",
+            scan_id_referencia=scan_nuevo,
+            entradas_ausentes=entradas_ausentes,
+        )
+
+        assert resumen["marcadas"] == 2
+        assert resumen["total_entradas"] == 2
+        assert resumen["no_marcadas"] == []
+        assert resumen["resultado_scan"] == SCAN_RESULT_OK
+
+        for e in entradas_ausentes:
+            fila = self._fila_base(storage, scan_base, e["absolute_path"])
+            assert fila["excluded"] == 1
+            assert fila["last_checked_at"] != ""
+
+    def test_no_marca_cuando_scan_referencia_interrumpido(
+        self, storage: SystemInventoryStorage
+    ):
+        """Scan nuevo SCAN_RESULT_INTERRUPTED: no se marca ninguna entrada."""
+        _, entradas_ausentes, scan_base, scan_nuevo = self._escenario_base_y_nuevo(
+            storage, resultado_nuevo=SCAN_RESULT_INTERRUPTED
+        )
+
+        resumen = storage.marcar_entradas_eliminadas(
+            machine_id="machine-alfa",
+            volume="C:",
+            scan_id_referencia=scan_nuevo,
+            entradas_ausentes=entradas_ausentes,
+        )
+
+        assert resumen["marcadas"] == 0
+        assert resumen["total_entradas"] == 2
+        assert len(resumen["no_marcadas"]) == 2
+        assert all(
+            "no se completo correctamente" in n["motivo"]
+            for n in resumen["no_marcadas"]
+        )
+        # Nada persistido como eliminado.
+        for e in entradas_ausentes:
+            fila = self._fila_base(storage, scan_base, e["absolute_path"])
+            assert fila["excluded"] == 0
+
+    def test_no_marca_cuando_scan_referencia_parcial(
+        self, storage: SystemInventoryStorage
+    ):
+        """Scan nuevo SCAN_RESULT_PARTIAL: no se marca ninguna entrada."""
+        _, entradas_ausentes, scan_base, scan_nuevo = self._escenario_base_y_nuevo(
+            storage, resultado_nuevo=SCAN_RESULT_PARTIAL
+        )
+        resumen = storage.marcar_entradas_eliminadas(
+            machine_id="machine-alfa",
+            volume="C:",
+            scan_id_referencia=scan_nuevo,
+            entradas_ausentes=entradas_ausentes,
+        )
+        assert resumen["marcadas"] == 0
+        assert resumen["total_entradas"] == 2
+        for e in entradas_ausentes:
+            fila = self._fila_base(storage, scan_base, e["absolute_path"])
+            assert fila["excluded"] == 0
+
+    def test_no_marca_cuando_scan_referencia_error(
+        self, storage: SystemInventoryStorage
+    ):
+        """Scan nuevo SCAN_RESULT_ERROR: no se marca ninguna entrada."""
+        _, entradas_ausentes, scan_base, scan_nuevo = self._escenario_base_y_nuevo(
+            storage, resultado_nuevo=SCAN_RESULT_ERROR
+        )
+        resumen = storage.marcar_entradas_eliminadas(
+            machine_id="machine-alfa",
+            volume="C:",
+            scan_id_referencia=scan_nuevo,
+            entradas_ausentes=entradas_ausentes,
+        )
+        assert resumen["marcadas"] == 0
+        assert resumen["total_entradas"] == 2
+        for e in entradas_ausentes:
+            fila = self._fila_base(storage, scan_base, e["absolute_path"])
+            assert fila["excluded"] == 0
+
+    def test_error_permiso_no_equivale_a_eliminacion(
+        self, storage: SystemInventoryStorage
+    ):
+        """Scan nuevo OK con permiso_denegado en C:/Docs: readme.txt (bajo
+        C:/Docs) no se marca, pero notes.txt (bajo C:/Docs2, sin error de
+        permiso) sí se marca como eliminada."""
+        _, entradas_ausentes, scan_base, scan_nuevo = self._escenario_base_y_nuevo(
+            storage, resultado_nuevo=SCAN_RESULT_OK
+        )
+        errores_escaneo = [
+            {
+                "ruta": "C:/Docs",
+                "categoria": "permiso_denegado",
+                "mensaje": "Acceso denegado al directorio",
+            }
+        ]
+
+        resumen = storage.marcar_entradas_eliminadas(
+            machine_id="machine-alfa",
+            volume="C:",
+            scan_id_referencia=scan_nuevo,
+            entradas_ausentes=entradas_ausentes,
+            errores_escaneo=errores_escaneo,
+        )
+
+        assert resumen["marcadas"] == 1
+        assert resumen["total_entradas"] == 2
+        assert len(resumen["no_marcadas"]) == 1
+        no_marcada = resumen["no_marcadas"][0]
+        assert no_marcada["normalized_path"] == normalize_path("C:/Docs/readme.txt")
+        assert "permiso denegado" in no_marcada["motivo"]
+
+        # notes.txt (fuera del prefijo con permiso) SI marcada.
+        fila_notes = self._fila_base(storage, scan_base, "C:/Docs2/notes.txt")
+        assert fila_notes["excluded"] == 1
+
+        # readme.txt (bajo permiso denegado) NO marcada como eliminada.
+        fila_readme = self._fila_base(storage, scan_base, "C:/Docs/readme.txt")
+        assert fila_readme["excluded"] == 0
+
+    def test_scan_referencia_desconocido_levanta_valuerror(
+        self, storage: SystemInventoryStorage
+    ):
+        """scan_id_referencia inexistente levanta ValueError."""
+        _, entradas_ausentes, _, _ = self._escenario_base_y_nuevo(storage)
+        with pytest.raises(ValueError):
+            storage.marcar_entradas_eliminadas(
+                machine_id="machine-alfa",
+                volume="C:",
+                scan_id_referencia="scan-inexistente",
+                entradas_ausentes=entradas_ausentes,
+            )
+
+    def test_scan_referencia_de_otro_volumen_levanta_valuerror(
+        self, storage: SystemInventoryStorage
+    ):
+        """scan_id_referencia de otro volumen levanta ValueError."""
+        _, entradas_ausentes, _, _ = self._escenario_base_y_nuevo(storage)
+        storage.record_volume("vol-d:", "machine-alfa", "D:", "local", "online")
+        storage.begin_scan_run("scan-d", "machine-alfa", "D:", SCAN_MODE_FULL)
+        storage.end_scan_run("scan-d", result=SCAN_RESULT_OK, entries_count=0)
+        with pytest.raises(ValueError):
+            storage.marcar_entradas_eliminadas(
+                machine_id="machine-alfa",
+                volume="C:",
+                scan_id_referencia="scan-d",
+                entradas_ausentes=entradas_ausentes,
+            )
+
+    def test_entrada_sin_normalized_path_no_se_marca(
+        self, storage: SystemInventoryStorage
+    ):
+        """Entrada ausente sin normalized_path no se marca y se reporta el
+        motivo."""
+        _, _, scan_base, scan_nuevo = self._escenario_base_y_nuevo(storage)
+        entrada_sin_ruta = {
+            "scan_id": scan_base,
+            "machine_id": "machine-alfa",
+            "volume": "C:",
+            "name": "misterioso.txt",
+        }
+        resumen = storage.marcar_entradas_eliminadas(
+            machine_id="machine-alfa",
+            volume="C:",
+            scan_id_referencia=scan_nuevo,
+            entradas_ausentes=[entrada_sin_ruta],
+        )
+        assert resumen["marcadas"] == 0
+        assert resumen["total_entradas"] == 1
+        assert resumen["no_marcadas"][0]["motivo"] == "la entrada no tiene normalized_path"
+
+    def test_entrada_de_otro_volumen_no_se_marca(
+        self, storage: SystemInventoryStorage
+    ):
+        """Entrada ausente de otro volumen no se marca."""
+        _, _, scan_base, scan_nuevo = self._escenario_base_y_nuevo(storage)
+        entrada_otro_volumen = {
+            "scan_id": scan_base,
+            "machine_id": "machine-alfa",
+            "volume": "D:",
+            "normalized_path": normalize_path("D:/otro.txt"),
+        }
+        resumen = storage.marcar_entradas_eliminadas(
+            machine_id="machine-alfa",
+            volume="C:",
+            scan_id_referencia=scan_nuevo,
+            entradas_ausentes=[entrada_otro_volumen],
+        )
+        assert resumen["marcadas"] == 0
+        assert resumen["total_entradas"] == 1
+        assert "no pertenece al equipo/volumen" in resumen["no_marcadas"][0]["motivo"]
+
+    def test_entrada_inexistente_no_se_marca(
+        self, storage: SystemInventoryStorage
+    ):
+        """Entrada ausente cuyo identificador no coincide con ninguna fila
+        no se marca y se reporta el motivo."""
+        _, _, scan_base, scan_nuevo = self._escenario_base_y_nuevo(storage)
+        entrada_inexistente = {
+            "scan_id": scan_base,
+            "machine_id": "machine-alfa",
+            "volume": "C:",
+            "normalized_path": normalize_path("C:/NoExiste.txt"),
+        }
+        resumen = storage.marcar_entradas_eliminadas(
+            machine_id="machine-alfa",
+            volume="C:",
+            scan_id_referencia=scan_nuevo,
+            entradas_ausentes=[entrada_inexistente],
+        )
+        assert resumen["marcadas"] == 0
+        assert resumen["total_entradas"] == 1
+        assert "no existe una entrada de archivo" in resumen["no_marcadas"][0]["motivo"]
