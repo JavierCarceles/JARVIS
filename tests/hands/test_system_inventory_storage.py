@@ -82,7 +82,7 @@ class TestCreacionBaseDeDatos:
     def test_inicializacion_crea_fichero_en_ruta_dada(self, storage: SystemInventoryStorage, db_path: Path):
         assert not db_path.exists()
         version = storage.initialize()
-        assert version == 3
+        assert version == 4
         assert db_path.exists()
         assert storage.db_file_exists()
 
@@ -91,7 +91,7 @@ class TestCreacionBaseDeDatos:
 
     def test_esquema_versionado_se_registra(self, storage: SystemInventoryStorage):
         storage.initialize()
-        assert storage.schema_version() == 3
+        assert storage.schema_version() == 4
 
     def test_inicializacion_idempotente_no_borra_datos(self, storage: SystemInventoryStorage):
         storage.initialize()
@@ -428,7 +428,7 @@ class TestLineaBaseVolumen:
 
     def test_esquema_version_3_incluye_tabla_lineas_base(self, storage: SystemInventoryStorage):
         storage.initialize()
-        assert storage.schema_version() == 3
+        assert storage.schema_version() == 4
         conn = storage.connect()
         cur = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='lineas_base'")
         assert cur.fetchone() is not None
@@ -452,13 +452,946 @@ class TestLineaBaseVolumen:
 
         storage_v3 = SystemInventoryStorage(db_path)
         version = storage_v3.initialize()
-        assert version == 3
+        assert version == 4
         assert storage_v3.obtener_linea_base_volumen("machine-alfa", "C:") is None
         creada = storage_v3.registrar_linea_base_volumen(
             machine_id="machine-alfa", volume="C:",
             estado_volumen="disponible", cobertura=100.0,
         )
         assert creada is not None
+
+
+# ---------------------------------------------------------------------------
+# Deteccion de cambios incrementales (3.8.5.1.4.5.2).
+# ---------------------------------------------------------------------------
+
+class TestDeteccionCambiosIncrementales:
+    """Detectar altas, cambios y desapariciones comparando metadatos entre la
+    linea base y un escaneo nuevo, sin releer contenido de archivos."""
+
+    def _crear_linea_base_con_entradas(self, storage: SystemInventoryStorage, scan_id: str = "scan-base") -> None:
+        """Crea linea base y puebla entradas de archivo del escaneo base."""
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        storage.begin_scan_run(scan_id, "machine-alfa", "C:", SCAN_MODE_FULL)
+        storage.insert_file_entries(scan_id, "machine-alfa", "C:", [
+            {
+                "entry_id": "e-base-1",
+                "absolute_path": "C:/Apps/app.exe",
+                "relative_path": "Apps/app.exe",
+                "name": "app.exe",
+                "extension": ".exe",
+                "entry_type": "file",
+                "size_bytes": 1024,
+                "modified_at": "2024-01-01T10:00:00",
+                "created_at": "2024-01-01T09:00:00",
+                "accessed_at": "2024-01-02T08:00:00",
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-03T00:00:00",
+            },
+            {
+                "entry_id": "e-base-2",
+                "absolute_path": "C:/Apps/tool.dll",
+                "relative_path": "Apps/tool.dll",
+                "name": "tool.dll",
+                "extension": ".dll",
+                "entry_type": "file",
+                "size_bytes": 2048,
+                "modified_at": "2024-02-01T10:00:00",
+                "created_at": "2024-02-01T09:00:00",
+                "accessed_at": None,
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-03T00:00:00",
+            },
+            {
+                "entry_id": "e-base-3",
+                "absolute_path": "C:/Docs/readme.txt",
+                "relative_path": "Docs/readme.txt",
+                "name": "readme.txt",
+                "extension": ".txt",
+                "entry_type": "file",
+                "size_bytes": 500,
+                "modified_at": "2024-03-01T10:00:00",
+                "created_at": "2024-03-01T09:00:00",
+                "accessed_at": "2024-03-02T08:00:00",
+                "attributes": ["hidden"],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-03T00:00:00",
+            },
+        ])
+        storage.end_scan_run(scan_id, entries_count=3)
+        storage.registrar_linea_base_volumen(
+            machine_id="machine-alfa",
+            volume="C:",
+            estado_volumen="disponible",
+            cobertura=100.0,
+            entradas_count=3,
+            errores_count=0,
+            scan_id=scan_id,
+        )
+
+    def _escanear_nuevo(self, storage: SystemInventoryStorage, scan_id: str = "scan-nuevo") -> None:
+        """Crea un nuevo escaneo incremental sobre el mismo equipo/volumen."""
+        storage.begin_scan_run(scan_id, "machine-alfa", "C:", SCAN_MODE_INCREMENTAL)
+
+    def test_sin_linea_base_retorna_resultado_vacio(self, storage: SystemInventoryStorage):
+        """Si no hay linea base para el equipo/volumen, retorna resultado vacio."""
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        storage.begin_scan_run("scan-1", "machine-alfa", "C:", SCAN_MODE_FULL)
+        storage.end_scan_run("scan-1")
+        resultado = storage.detectar_cambios_incrementales("machine-alfa", "C:")
+        assert resultado.linea_base is None
+        resultado.scan_usado is None
+        assert resultado.altas == []
+        assert resultado.cambios == []
+        assert resultado.desapariciones == []
+        assert resultado.sin_cambios == 0
+
+    def test_sin_escaneo_nuevo_retorna_linea_base_sin_comparar(self, storage: SystemInventoryStorage):
+        """Si hay linea base pero no hay escaneo previo nuevo, retorna con scan_usado=None."""
+        self._crear_linea_base_con_entradas(storage)
+        # No crear escaneo nuevo
+        resultado = storage.detectar_cambios_incrementales("machine-alfa", "C:")
+        assert resultado.linea_base is not None
+        assert resultado.scan_usado is None
+        assert resultado.altas == []
+        assert resultado.cambios == []
+        assert resultado.desapariciones == []
+
+    def test_sin_cambios_entre_base_y_nuevo(self, storage: SystemInventoryStorage):
+        """Mismas entradas y mismos metadatos: sin cambios, sin altas, sin desapariciones."""
+        self._crear_linea_base_con_entradas(storage)
+        self._escanear_nuevo(storage, "scan-nuevo")
+        storage.insert_file_entries("scan-nuevo", "machine-alfa", "C:", [
+            {
+                "entry_id": "e-n-1",
+                "absolute_path": "C:/Apps/app.exe",
+                "relative_path": "Apps/app.exe",
+                "name": "app.exe",
+                "extension": ".exe",
+                "entry_type": "file",
+                "size_bytes": 1024,
+                "modified_at": "2024-01-01T10:00:00",
+                "created_at": "2024-01-01T09:00:00",
+                "accessed_at": "2024-01-02T08:00:00",
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-04T00:00:00",
+            },
+            {
+                "entry_id": "e-n-2",
+                "absolute_path": "C:/Apps/tool.dll",
+                "relative_path": "Apps/tool.dll",
+                "name": "tool.dll",
+                "extension": ".dll",
+                "entry_type": "file",
+                "size_bytes": 2048,
+                "modified_at": "2024-02-01T10:00:00",
+                "created_at": "2024-02-01T09:00:00",
+                "accessed_at": None,
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-04T00:00:00",
+            },
+            {
+                "entry_id": "e-n-3",
+                "absolute_path": "C:/Docs/readme.txt",
+                "relative_path": "Docs/readme.txt",
+                "name": "readme.txt",
+                "extension": ".txt",
+                "entry_type": "file",
+                "size_bytes": 500,
+                "modified_at": "2024-03-01T10:00:00",
+                "created_at": "2024-03-01T09:00:00",
+                "accessed_at": "2024-03-02T08:00:00",
+                "attributes": ["hidden"],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-04T00:00:00",
+            },
+        ])
+        storage.end_scan_run("scan-nuevo", entries_count=3)
+        resultado = storage.detectar_cambios_incrementales("machine-alfa", "C:", scan_id_nuevo="scan-nuevo")
+        assert resultado.total_base == 3
+        assert resultado.total_nuevo == 3
+        assert resultado.sin_cambios == 3
+        assert resultado.altas == []
+        assert resultado.cambios == []
+        assert resultado.desapariciones == []
+
+    def test_alta_nueva_entrada(self, storage: SystemInventoryStorage):
+        """Una entrada presente solo en el nuevo escaneo se detecta como alta."""
+        self._crear_linea_base_con_entradas(storage)
+        self._escanear_nuevo(storage, "scan-nuevo")
+        storage.insert_file_entries("scan-nuevo", "machine-alfa", "C:", [
+            {
+                "entry_id": "e-n-1",
+                "absolute_path": "C:/Apps/app.exe",
+                "relative_path": "Apps/app.exe",
+                "name": "app.exe",
+                "extension": ".exe",
+                "entry_type": "file",
+                "size_bytes": 1024,
+                "modified_at": "2024-01-01T10:00:00",
+                "created_at": "2024-01-01T09:00:00",
+                "accessed_at": "2024-01-02T08:00:00",
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-04T00:00:00",
+            },
+            {
+                "entry_id": "e-n-2",
+                "absolute_path": "C:/Apps/tool.dll",
+                "relative_path": "Apps/tool.dll",
+                "name": "tool.dll",
+                "extension": ".dll",
+                "entry_type": "file",
+                "size_bytes": 2048,
+                "modified_at": "2024-02-01T10:00:00",
+                "created_at": "2024-02-01T09:00:00",
+                "accessed_at": None,
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-04T00:00:00",
+            },
+            {
+                "entry_id": "e-n-3",
+                "absolute_path": "C:/Docs/readme.txt",
+                "relative_path": "Docs/readme.txt",
+                "name": "readme.txt",
+                "extension": ".txt",
+                "entry_type": "file",
+                "size_bytes": 500,
+                "modified_at": "2024-03-01T10:00:00",
+                "created_at": "2024-03-01T09:00:00",
+                "accessed_at": "2024-03-02T08:00:00",
+                "attributes": ["hidden"],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-04T00:00:00",
+            },
+            {
+                "entry_id": "e-n-4",
+                "absolute_path": "C:/Nuevo/nuevo.exe",
+                "relative_path": "Nuevo/nuevo.exe",
+                "name": "nuevo.exe",
+                "extension": ".exe",
+                "entry_type": "file",
+                "size_bytes": 9999,
+                "modified_at": "2024-06-01T10:00:00",
+                "created_at": "2024-06-01T09:00:00",
+                "accessed_at": "2024-06-02T08:00:00",
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-04T00:00:00",
+            },
+        ])
+        storage.end_scan_run("scan-nuevo", entries_count=4)
+        resultado = storage.detectar_cambios_incrementales("machine-alfa", "C:", scan_id_nuevo="scan-nuevo")
+        assert resultado.total_base == 3
+        assert resultado.total_nuevo == 4
+        assert len(resultado.altas) == 1
+        assert resultado.altas[0]["name"] == "nuevo.exe"
+        assert resultado.sin_cambios == 3
+        assert resultado.cambios == []
+        assert resultado.desapariciones == []
+
+    def test_desaparicion_entrada_eliminada(self, storage: SystemInventoryStorage):
+        """Una entrada presente solo en la base se detecta como desaparicion."""
+        self._crear_linea_base_con_entradas(storage)
+        self._escanear_nuevo(storage, "scan-nuevo")
+        storage.insert_file_entries("scan-nuevo", "machine-alfa", "C:", [
+            {
+                "entry_id": "e-n-1",
+                "absolute_path": "C:/Apps/app.exe",
+                "relative_path": "Apps/app.exe",
+                "name": "app.exe",
+                "extension": ".exe",
+                "entry_type": "file",
+                "size_bytes": 1024,
+                "modified_at": "2024-01-01T10:00:00",
+                "created_at": "2024-01-01T09:00:00",
+                "accessed_at": "2024-01-02T08:00:00",
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-04T00:00:00",
+            },
+            {
+                "entry_id": "e-n-2",
+                "absolute_path": "C:/Docs/readme.txt",
+                "relative_path": "Docs/readme.txt",
+                "name": "readme.txt",
+                "extension": ".txt",
+                "entry_type": "file",
+                "size_bytes": 500,
+                "modified_at": "2024-03-01T10:00:00",
+                "created_at": "2024-03-01T09:00:00",
+                "accessed_at": "2024-03-02T08:00:00",
+                "attributes": ["hidden"],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-04T00:00:00",
+            },
+        ])
+        storage.end_scan_run("scan-nuevo", entries_count=2)
+        resultado = storage.detectar_cambios_incrementales("machine-alfa", "C:", scan_id_nuevo="scan-nuevo")
+        assert resultado.total_base == 3
+        assert resultado.total_nuevo == 2
+        assert len(resultado.desapariciones) == 1
+        assert resultado.desapariciones[0]["name"] == "tool.dll"
+        assert resultado.sin_cambios == 2
+        assert resultado.altas == []
+        assert resultado.cambios == []
+
+    def test_cambio_de_tamano(self, storage: SystemInventoryStorage):
+        """Cambio en size_bytes se detecta como cambio."""
+        self._crear_linea_base_con_entradas(storage)
+        self._escanear_nuevo(storage, "scan-nuevo")
+        storage.insert_file_entries("scan-nuevo", "machine-alfa", "C:", [
+            {
+                "entry_id": "e-n-1",
+                "absolute_path": "C:/Apps/app.exe",
+                "relative_path": "Apps/app.exe",
+                "name": "app.exe",
+                "extension": ".exe",
+                "entry_type": "file",
+                "size_bytes": 9999,  # cambiado de 1024
+                "modified_at": "2024-01-01T10:00:00",
+                "created_at": "2024-01-01T09:00:00",
+                "accessed_at": "2024-01-02T08:00:00",
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-04T00:00:00",
+            },
+            {
+                "entry_id": "e-n-2",
+                "absolute_path": "C:/Apps/tool.dll",
+                "relative_path": "Apps/tool.dll",
+                "name": "tool.dll",
+                "extension": ".dll",
+                "entry_type": "file",
+                "size_bytes": 2048,
+                "modified_at": "2024-02-01T10:00:00",
+                "created_at": "2024-02-01T09:00:00",
+                "accessed_at": None,
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-04T00:00:00",
+            },
+            {
+                "entry_id": "e-n-3",
+                "absolute_path": "C:/Docs/readme.txt",
+                "relative_path": "Docs/readme.txt",
+                "name": "readme.txt",
+                "extension": ".txt",
+                "entry_type": "file",
+                "size_bytes": 500,
+                "modified_at": "2024-03-01T10:00:00",
+                "created_at": "2024-03-01T09:00:00",
+                "accessed_at": "2024-03-02T08:00:00",
+                "attributes": ["hidden"],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-04T00:00:00",
+            },
+        ])
+        storage.end_scan_run("scan-nuevo", entries_count=3)
+        resultado = storage.detectar_cambios_incrementales("machine-alfa", "C:", scan_id_nuevo="scan-nuevo")
+        assert len(resultado.cambios) == 1
+        assert resultado.cambios[0].campo == "size_bytes"
+        assert resultado.cambios[0].valor_base == 1024
+        assert resultado.cambios[0].valor_nuevo == 9999
+        assert resultado.cambios[0].normalized_path == "c:/apps/app.exe"
+        assert resultado.sin_cambios == 2
+        assert resultado.altas == []
+        assert resultado.desapariciones == []
+
+    def test_cambio_de_atributos(self, storage: SystemInventoryStorage):
+        """Cambio en attributes se detecta como cambio."""
+        self._crear_linea_base_con_entradas(storage)
+        self._escanear_nuevo(storage, "scan-nuevo")
+        storage.insert_file_entries("scan-nuevo", "machine-alfa", "C:", [
+            {
+                "entry_id": "e-n-1",
+                "absolute_path": "C:/Apps/app.exe",
+                "relative_path": "Apps/app.exe",
+                "name": "app.exe",
+                "extension": ".exe",
+                "entry_type": "file",
+                "size_bytes": 1024,
+                "modified_at": "2024-01-01T10:00:00",
+                "created_at": "2024-01-01T09:00:00",
+                "accessed_at": "2024-01-02T08:00:00",
+                "attributes": ["hidden", "solo_lectura"],  # cambiado de []
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-04T00:00:00",
+            },
+            {
+                "entry_id": "e-n-2",
+                "absolute_path": "C:/Apps/tool.dll",
+                "relative_path": "Apps/tool.dll",
+                "name": "tool.dll",
+                "extension": ".dll",
+                "entry_type": "file",
+                "size_bytes": 2048,
+                "modified_at": "2024-02-01T10:00:00",
+                "created_at": "2024-02-01T09:00:00",
+                "accessed_at": None,
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-04T00:00:00",
+            },
+            {
+                "entry_id": "e-n-3",
+                "absolute_path": "C:/Docs/readme.txt",
+                "relative_path": "Docs/readme.txt",
+                "name": "readme.txt",
+                "extension": ".txt",
+                "entry_type": "file",
+                "size_bytes": 500,
+                "modified_at": "2024-03-01T10:00:00",
+                "created_at": "2024-03-01T09:00:00",
+                "accessed_at": "2024-03-02T08:00:00",
+                "attributes": ["hidden"],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-04T00:00:00",
+            },
+        ])
+        storage.end_scan_run("scan-nuevo", entries_count=3)
+        resultado = storage.detectar_cambios_incrementales("machine-alfa", "C:", scan_id_nuevo="scan-nuevo")
+        assert len(resultado.cambios) == 1
+        assert resultado.cambios[0].campo == "attributes"
+        assert resultado.cambios[0].valor_base == []
+        assert resultado.cambios[0].valor_nuevo == ["hidden", "solo_lectura"]
+        assert resultado.sin_cambios == 2
+
+    def test_cambio_de_marca_temporal(self, storage: SystemInventoryStorage):
+        """Cambio en modified_at se detecta como cambio."""
+        self._crear_linea_base_con_entradas(storage)
+        self._escanear_nuevo(storage, "scan-nuevo")
+        storage.insert_file_entries("scan-nuevo", "machine-alfa", "C:", [
+            {
+                "entry_id": "e-n-1",
+                "absolute_path": "C:/Apps/app.exe",
+                "relative_path": "Apps/app.exe",
+                "name": "app.exe",
+                "extension": ".exe",
+                "entry_type": "file",
+                "size_bytes": 1024,
+                "modified_at": "2024-05-01T10:00:00",  # cambiado de 2024-01-01
+                "created_at": "2024-01-01T09:00:00",
+                "accessed_at": "2024-01-02T08:00:00",
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-04T00:00:00",
+            },
+            {
+                "entry_id": "e-n-2",
+                "absolute_path": "C:/Apps/tool.dll",
+                "relative_path": "Apps/tool.dll",
+                "name": "tool.dll",
+                "extension": ".dll",
+                "entry_type": "file",
+                "size_bytes": 2048,
+                "modified_at": "2024-02-01T10:00:00",
+                "created_at": "2024-02-01T09:00:00",
+                "accessed_at": None,
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-04T00:00:00",
+            },
+            {
+                "entry_id": "e-n-3",
+                "absolute_path": "C:/Docs/readme.txt",
+                "relative_path": "Docs/readme.txt",
+                "name": "readme.txt",
+                "extension": ".txt",
+                "entry_type": "file",
+                "size_bytes": 500,
+                "modified_at": "2024-03-01T10:00:00",
+                "created_at": "2024-03-01T09:00:00",
+                "accessed_at": "2024-03-02T08:00:00",
+                "attributes": ["hidden"],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-04T00:00:00",
+            },
+        ])
+        storage.end_scan_run("scan-nuevo", entries_count=3)
+        resultado = storage.detectar_cambios_incrementales("machine-alfa", "C:", scan_id_nuevo="scan-nuevo")
+        assert len(resultado.cambios) == 1
+        assert resultado.cambios[0].campo == "modified_at"
+        assert resultado.cambios[0].valor_base == "2024-01-01T10:00:00"
+        assert resultado.cambios[0].valor_nuevo == "2024-05-01T10:00:00"
+        assert resultado.sin_cambios == 2
+
+    def test_scan_id_no_pertenece_a_maquina_volumen_levanta_error(self, storage: SystemInventoryStorage):
+        """Un scan_id de otro equipo o volumen levanta ValueError."""
+        self._crear_linea_base_con_entradas(storage)
+        storage.record_machine("machine-otra")
+        storage.begin_scan_run("scan-otra", "machine-otra", "D:", SCAN_MODE_FULL)
+        storage.end_scan_run("scan-otra", entries_count=0)
+        with pytest.raises(ValueError):
+            storage.detectar_cambios_incrementales(
+                "machine-alfa", "C:", scan_id_nuevo="scan-otra"
+            )
+
+    def test_scan_id_desconocido_levanta_error(self, storage: SystemInventoryStorage):
+        """Un scan_id inexistente levanta ValueError."""
+        self._crear_linea_base_con_entradas(storage)
+        with pytest.raises(ValueError):
+            storage.detectar_cambios_incrementales(
+                "machine-alfa", "C:", scan_id_nuevo="scan-inexistente"
+            )
+
+    def test_usar_ultimo_escaneo_automaticamente(self, storage: SystemInventoryStorage):
+        """Si no se indica scan_id_nuevo, se usa el ultimo escaneo del equipo/volumen."""
+        self._crear_linea_base_con_entradas(storage)
+        self._escanear_nuevo(storage, "scan-auto")
+        storage.insert_file_entries("scan-auto", "machine-alfa", "C:", [
+            {
+                "entry_id": "e-a-1",
+                "absolute_path": "C:/Apps/app.exe",
+                "relative_path": "Apps/app.exe",
+                "name": "app.exe",
+                "extension": ".exe",
+                "entry_type": "file",
+                "size_bytes": 1024,
+                "modified_at": "2024-01-01T10:00:00",
+                "created_at": "2024-01-01T09:00:00",
+                "accessed_at": "2024-01-02T08:00:00",
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-04T00:00:00",
+            },
+            {
+                "entry_id": "e-a-2",
+                "absolute_path": "C:/Apps/tool.dll",
+                "relative_path": "Apps/tool.dll",
+                "name": "tool.dll",
+                "extension": ".dll",
+                "entry_type": "file",
+                "size_bytes": 2048,
+                "modified_at": "2024-02-01T10:00:00",
+                "created_at": "2024-02-01T09:00:00",
+                "accessed_at": None,
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-04T00:00:00",
+            },
+            {
+                "entry_id": "e-a-3",
+                "absolute_path": "C:/Docs/readme.txt",
+                "relative_path": "Docs/readme.txt",
+                "name": "readme.txt",
+                "extension": ".txt",
+                "entry_type": "file",
+                "size_bytes": 500,
+                "modified_at": "2024-03-01T10:00:00",
+                "created_at": "2024-03-01T09:00:00",
+                "accessed_at": "2024-03-02T08:00:00",
+                "attributes": ["hidden"],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-04T00:00:00",
+            },
+        ])
+        storage.end_scan_run("scan-auto", entries_count=3)
+        # Sin pasar scan_id_nuevo: debe usar el ultimo automaticamente.
+        resultado = storage.detectar_cambios_incrementales("machine-alfa", "C:")
+        assert resultado.scan_usado is not None
+        assert resultado.scan_usado["scan_id"] == "scan-auto"
+        assert resultado.sin_cambios == 3
+
+    def test_resumen_serializable(self, storage: SystemInventoryStorage):
+        """resumen() devuelve un diccionario serializable con contadores."""
+        self._crear_linea_base_con_entradas(storage)
+        self._escanear_nuevo(storage, "scan-nuevo")
+        storage.insert_file_entries("scan-nuevo", "machine-alfa", "C:", [
+            {
+                "entry_id": "e-n-1",
+                "absolute_path": "C:/Apps/app.exe",
+                "relative_path": "Apps/app.exe",
+                "name": "app.exe",
+                "extension": ".exe",
+                "entry_type": "file",
+                "size_bytes": 1024,
+                "modified_at": "2024-01-01T10:00:00",
+                "created_at": "2024-01-01T09:00:00",
+                "accessed_at": "2024-01-02T08:00:00",
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-04T00:00:00",
+            },
+            {
+                "entry_id": "e-n-2",
+                "absolute_path": "C:/Apps/tool.dll",
+                "relative_path": "Apps/tool.dll",
+                "name": "tool.dll",
+                "extension": ".dll",
+                "entry_type": "file",
+                "size_bytes": 2048,
+                "modified_at": "2024-02-01T10:00:00",
+                "created_at": "2024-02-01T09:00:00",
+                "accessed_at": None,
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-04T00:00:00",
+            },
+            {
+                "entry_id": "e-n-3",
+                "absolute_path": "C:/Docs/readme.txt",
+                "relative_path": "Docs/readme.txt",
+                "name": "readme.txt",
+                "extension": ".txt",
+                "entry_type": "file",
+                "size_bytes": 500,
+                "modified_at": "2024-03-01T10:00:00",
+                "created_at": "2024-03-01T09:00:00",
+                "accessed_at": "2024-03-02T08:00:00",
+                "attributes": ["hidden"],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-04T00:00:00",
+            },
+        ])
+        storage.end_scan_run("scan-nuevo", entries_count=3)
+        resultado = storage.detectar_cambios_incrementales("machine-alfa", "C:", scan_id_nuevo="scan-nuevo")
+        resumen = resultado.resumen()
+        assert resumen["machine_id"] == "machine-alfa"
+        assert resumen["volume"] == "C:"
+        assert resumen["total_base"] == 3
+        assert resumen["total_nuevo"] == 3
+        assert resumen["altas"] == 0
+        assert resumen["cambios"] == 0
+        assert resumen["desapariciones"] == 0
+        assert resumen["sin_cambios"] == 3
+
+
+# ---------------------------------------------------------------------------
+# Deteccion de renombrados / cambios de ruta y nombre (3.8.5.1.4.5.3).
+# ---------------------------------------------------------------------------
+
+class TestDeteccionRenombrados:
+    """Detectar cambios de ruta/nombre y renombrados cuando el sistema de
+    archivos proporcione evidencia suficiente, sin fusionar archivos distintos
+    solo por compartir nombre o tamaño."""
+
+    def _entrada(
+        self,
+        entry_id: str,
+        absolute_path: str,
+        name: str,
+        size_bytes: int,
+        modified_at: str,
+        entry_type: str = "file",
+        attributes=None,
+        created_at: str = "2024-01-01T09:00:00",
+        accessed_at: str = "2024-01-02T08:00:00",
+    ) -> dict:
+        return {
+            "entry_id": entry_id,
+            "absolute_path": absolute_path,
+            "relative_path": "/".join(Path(absolute_path).parts[1:]),
+            "name": name,
+            "extension": Path(absolute_path).suffix,
+            "entry_type": entry_type,
+            "size_bytes": size_bytes,
+            "modified_at": modified_at,
+            "created_at": created_at,
+            "accessed_at": accessed_at,
+            "attributes": attributes if attributes is not None else [],
+            "excluded": False,
+            "source": "filesystem_scan",
+            "last_checked_at": "2024-01-04T00:00:00",
+        }
+
+    def _crear_linea_base(
+        self, storage: SystemInventoryStorage, scan_id: str = "scan-base"
+    ) -> None:
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        storage.begin_scan_run(scan_id, "machine-alfa", "C:", SCAN_MODE_FULL)
+        storage.insert_file_entries(scan_id, "machine-alfa", "C:", [
+            self._entrada("e-b-1", "C:/Apps/app.exe", "app.exe", 1024, "2024-01-01T10:00:00"),
+            self._entrada("e-b-2", "C:/Apps/tool.dll", "tool.dll", 2048, "2024-02-01T10:00:00"),
+            self._entrada("e-b-3", "C:/Docs/readme.txt", "readme.txt", 500, "2024-03-01T10:00:00"),
+        ])
+        storage.end_scan_run(scan_id, entries_count=3)
+        storage.registrar_linea_base_volumen(
+            machine_id="machine-alfa",
+            volume="C:",
+            estado_volumen="disponible",
+            cobertura=100.0,
+            entradas_count=3,
+            errores_count=0,
+            scan_id=scan_id,
+        )
+
+    def _escanear_nuevo(
+        self, storage: SystemInventoryStorage, scan_id: str, entries: list[dict]
+    ) -> None:
+        storage.begin_scan_run(scan_id, "machine-alfa", "C:", SCAN_MODE_INCREMENTAL)
+        storage.insert_file_entries(scan_id, "machine-alfa", "C:", entries)
+        storage.end_scan_run(scan_id, entries_count=len(entries))
+
+    # ------------------------------------------------------------------ #
+    # Casos positivos: renombrado detectado con evidencia suficiente.
+    # ------------------------------------------------------------------ #
+
+    def test_renombrado_cambio_de_ruta_sin_cambio_de_nombre(
+        self, storage: SystemInventoryStorage
+    ):
+        """Misma ruta de archivo bajo distinto directorio, mismos metadatos:
+        se detecta como renombrado, no como alta + desapareción."""
+        self._crear_linea_base(storage)
+        self._escanear_nuevo(storage, "scan-nuevo", [
+            self._entrada("e-n-1", "C:/Nuevo/app.exe", "app.exe", 1024, "2024-01-01T10:00:00"),
+            self._entrada("e-n-2", "C:/Apps/tool.dll", "tool.dll", 2048, "2024-02-01T10:00:00"),
+            self._entrada("e-n-3", "C:/Docs/readme.txt", "readme.txt", 500, "2024-03-01T10:00:00"),
+        ])
+        resultado = storage.detectar_renombrados("machine-alfa", "C:", scan_id_nuevo="scan-nuevo")
+        assert len(resultado.renombrados) == 1
+        r = resultado.renombrados[0]
+        assert r.normalized_path_base == "c:/apps/app.exe"
+        assert r.normalized_path_nuevo == "c:/nuevo/app.exe"
+        assert r.name_base == "app.exe"
+        assert r.name_nuevo == "app.exe"
+        assert r.nombre_cambio is False
+        assert r.ruta_cambio is True
+        assert r.size_bytes == 1024
+        assert "size_bytes" in r.campos_coincidentes
+        assert "modified_at" in r.campos_coincidentes
+        assert resultado.altas == []
+        assert resultado.desapariciones == []
+        assert resultado.sin_cambios == 2
+        assert resultado.total_base == 3
+        assert resultado.total_nuevo == 3
+
+    def test_renombrado_cambio_de_nombre_misma_ruta(
+        self, storage: SystemInventoryStorage
+    ):
+        """Mismo directorio, distinto nombre, mismos metadatos: se detecta como
+        renombrado con nombre_cambio=True."""
+        self._crear_linea_base(storage)
+        self._escanear_nuevo(storage, "scan-nuevo", [
+            self._entrada("e-n-1", "C:/Apps/app.exe", "app.exe", 1024, "2024-01-01T10:00:00"),
+            self._entrada("e-n-2", "C:/Apps/tool.dll", "tool.dll", 2048, "2024-02-01T10:00:00"),
+            self._entrada("e-n-3", "C:/Docs/manual.txt", "manual.txt", 500, "2024-03-01T10:00:00"),
+        ])
+        resultado = storage.detectar_renombrados("machine-alfa", "C:", scan_id_nuevo="scan-nuevo")
+        assert len(resultado.renombrados) == 1
+        r = resultado.renombrados[0]
+        assert r.normalized_path_base == "c:/docs/readme.txt"
+        assert r.normalized_path_nuevo == "c:/docs/manual.txt"
+        assert r.name_base == "readme.txt"
+        assert r.name_nuevo == "manual.txt"
+        assert r.nombre_cambio is True
+        # La ruta normalizada incluye el nombre del archivo, por lo que un
+        # cambio de nombre también cambia la ruta normalizada completa.
+        assert r.ruta_cambio is True
+        assert resultado.altas == []
+        assert resultado.desapariciones == []
+        assert resultado.sin_cambios == 2
+
+    def test_varios_renombrados_en_mismo_escaneo(
+        self, storage: SystemInventoryStorage
+    ):
+        """Dos archivos renombrados en el mismo escaneo incremental."""
+        self._crear_linea_base(storage)
+        self._escanear_nuevo(storage, "scan-nuevo", [
+            self._entrada("e-n-1", "C:/Nuevo/app.exe", "app.exe", 1024, "2024-01-01T10:00:00"),
+            self._entrada("e-n-2", "C:/Nuevo/tool.dll", "tool.dll", 2048, "2024-02-01T10:00:00"),
+            self._entrada("e-n-3", "C:/Docs/readme.txt", "readme.txt", 500, "2024-03-01T10:00:00"),
+        ])
+        resultado = storage.detectar_renombrados("machine-alfa", "C:", scan_id_nuevo="scan-nuevo")
+        assert len(resultado.renombrados) == 2
+        rutas_base = {r.normalized_path_base for r in resultado.renombrados}
+        rutas_nuevo = {r.normalized_path_nuevo for r in resultado.renombrados}
+        assert rutas_base == {"c:/apps/app.exe", "c:/apps/tool.dll"}
+        assert rutas_nuevo == {"c:/nuevo/app.exe", "c:/nuevo/tool.dll"}
+        assert resultado.altas == []
+        assert resultado.desapariciones == []
+        assert resultado.sin_cambios == 1
+
+    def test_renombrado_mezclado_con_alta_y_desaparicion_genuinas(
+        self, storage: SystemInventoryStorage
+    ):
+        """Un renombrado, una alta genuina y una desaparición genuina en el
+        mismo escaneo: cada categoría se cuenta por separado."""
+        self._crear_linea_base(storage)
+        self._escanear_nuevo(storage, "scan-nuevo", [
+            # app.exe renombrado a C:/Nuevo/app.exe (mismos metadatos).
+            self._entrada("e-n-1", "C:/Nuevo/app.exe", "app.exe", 1024, "2024-01-01T10:00:00"),
+            # tool.dll se mantiene sin cambios.
+            self._entrada("e-n-2", "C:/Apps/tool.dll", "tool.dll", 2048, "2024-02-01T10:00:00"),
+            # readme.txt desaparece: no hay sustituto con mismos metadatos.
+            # nuevo.exe es una alta genuina: no existía en la base.
+            self._entrada("e-n-4", "C:/Nuevo/nuevo.exe", "nuevo.exe", 777, "2024-06-01T10:00:00"),
+        ])
+        resultado = storage.detectar_renombrados("machine-alfa", "C:", scan_id_nuevo="scan-nuevo")
+        assert len(resultado.renombrados) == 1
+        assert resultado.renombrados[0].normalized_path_base == "c:/apps/app.exe"
+        assert len(resultado.desapariciones) == 1
+        assert resultado.desapariciones[0]["name"] == "readme.txt"
+        assert len(resultado.altas) == 1
+        assert resultado.altas[0]["name"] == "nuevo.exe"
+        assert resultado.sin_cambios == 1
+
+    # ------------------------------------------------------------------ #
+    # Casos negativos: no fusionar archivos distintos.
+    # ------------------------------------------------------------------ #
+
+    def test_no_fusionar_por_mismo_nombre_distinto_tamano(
+        self, storage: SystemInventoryStorage
+    ):
+        """Mismo nombre en distinta ruta pero distinto tamaño: NO es renombrado;
+        queda como desaparición + alta."""
+        self._crear_linea_base(storage)
+        self._escanear_nuevo(storage, "scan-nuevo", [
+            self._entrada("e-n-1", "C:/Apps/app.exe", "app.exe", 1024, "2024-01-01T10:00:00"),
+            self._entrada("e-n-2", "C:/Apps/tool.dll", "tool.dll", 2048, "2024-02-01T10:00:00"),
+            # Mismo nombre "readme.txt", distinto tamaño: no fusionar.
+            self._entrada("e-n-3", "C:/Nuevo/readme.txt", "readme.txt", 9999, "2024-03-01T10:00:00"),
+        ])
+        resultado = storage.detectar_renombrados("machine-alfa", "C:", scan_id_nuevo="scan-nuevo")
+        assert resultado.renombrados == []
+        assert len(resultado.desapariciones) == 1
+        assert resultado.desapariciones[0]["name"] == "readme.txt"
+        assert len(resultado.altas) == 1
+        assert resultado.altas[0]["name"] == "readme.txt"
+        assert resultado.sin_cambios == 2
+
+    def test_no_fusionar_por_mismo_tamano_distinto_marcado_temporal(
+        self, storage: SystemInventoryStorage
+    ):
+        """Mismo tamaño en distinta ruta pero marca temporal distinta: NO es
+        renombrado."""
+        self._crear_linea_base(storage)
+        self._escanear_nuevo(storage, "scan-nuevo", [
+            self._entrada("e-n-1", "C:/Apps/app.exe", "app.exe", 1024, "2024-01-01T10:00:00"),
+            self._entrada("e-n-2", "C:/Apps/tool.dll", "tool.dll", 2048, "2024-02-01T10:00:00"),
+            # Mismo tamaño que readme.txt (500) pero modificado en otra fecha.
+            self._entrada("e-n-3", "C:/Nuevo/otro.txt", "otro.txt", 500, "2024-09-01T10:00:00"),
+        ])
+        resultado = storage.detectar_renombrados("machine-alfa", "C:", scan_id_nuevo="scan-nuevo")
+        assert resultado.renombrados == []
+        assert len(resultado.desapariciones) == 1
+        assert resultado.desapariciones[0]["name"] == "readme.txt"
+        assert len(resultado.altas) == 1
+        assert resultado.altas[0]["name"] == "otro.txt"
+        assert resultado.sin_cambios == 2
+
+    def test_no_fusionar_si_falta_marca_temporal_requerida(
+        self, storage: SystemInventoryStorage
+    ):
+        """Sin modified_at (campo obligatorio de evidencia) no hay renombrado
+        aunque el resto coincida."""
+        self._crear_linea_base(storage)
+        self._escanear_nuevo(storage, "scan-nuevo", [
+            self._entrada("e-n-1", "C:/Apps/app.exe", "app.exe", 1024, "2024-01-01T10:00:00"),
+            self._entrada("e-n-2", "C:/Apps/tool.dll", "tool.dll", 2048, "2024-02-01T10:00:00"),
+            self._entrada("e-n-3", "C:/Nuevo/readme.txt", "readme.txt", 500, None),
+        ])
+        resultado = storage.detectar_renombrados("machine-alfa", "C:", scan_id_nuevo="scan-nuevo")
+        assert resultado.renombrados == []
+        assert len(resultado.desapariciones) == 1
+        assert len(resultado.altas) == 1
+
+    def test_emparejamiento_no_cruza_archivos_con_mismo_tamano(
+        self, storage: SystemInventoryStorage
+    ):
+        """Dos archivos con tamaños distintos renombrados: el emparejamiento
+        respeta los metadatos de cada uno y no cruza rutas."""
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        storage.begin_scan_run("scan-base", "machine-alfa", "C:", SCAN_MODE_FULL)
+        storage.insert_file_entries("scan-base", "machine-alfa", "C:", [
+            self._entrada("e-b-1", "C:/Docs/alfa.txt", "alfa.txt", 100, "2024-01-01T10:00:00"),
+            self._entrada("e-b-2", "C:/Docs/beta.txt", "beta.txt", 200, "2024-02-01T10:00:00"),
+        ])
+        storage.end_scan_run("scan-base", entries_count=2)
+        storage.registrar_linea_base_volumen(
+            machine_id="machine-alfa", volume="C:",
+            estado_volumen="disponible", cobertura=100.0,
+            entradas_count=2, errores_count=0, scan_id="scan-base",
+        )
+        # Nombres cruzados pero tamaños propios: alfa(100) debe emparejarse con
+        # el archivo de 100 bytes y beta(200) con el de 200 bytes.
+        self._escanear_nuevo(storage, "scan-nuevo", [
+            self._entrada("e-n-1", "C:/Nuevo/beta.txt", "beta.txt", 100, "2024-01-01T10:00:00"),
+            self._entrada("e-n-2", "C:/Nuevo/alfa.txt", "alfa.txt", 200, "2024-02-01T10:00:00"),
+        ])
+        resultado = storage.detectar_renombrados("machine-alfa", "C:", scan_id_nuevo="scan-nuevo")
+        assert len(resultado.renombrados) == 2
+        pares = {(r.normalized_path_base, r.normalized_path_nuevo) for r in resultado.renombrados}
+        assert ("c:/docs/alfa.txt", "c:/nuevo/beta.txt") in pares
+        assert ("c:/docs/beta.txt", "c:/nuevo/alfa.txt") in pares
+
+    # ------------------------------------------------------------------ #
+    # Casos borde y validaciones.
+    # ------------------------------------------------------------------ #
+
+    def test_sin_linea_base_retorna_resultado_vacio(self, storage: SystemInventoryStorage):
+        """Sin línea base no hay renombrados ni comparación."""
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        storage.begin_scan_run("scan-1", "machine-alfa", "C:", SCAN_MODE_FULL)
+        storage.end_scan_run("scan-1")
+        resultado = storage.detectar_renombrados("machine-alfa", "C:")
+        assert resultado.linea_base is None
+        assert resultado.scan_usado is None
+        assert resultado.renombrados == []
+        assert resultado.altas == []
+        assert resultado.desapariciones == []
+
+    def test_scan_id_desconocido_levanta_error(self, storage: SystemInventoryStorage):
+        """Un scan_id inexistente propaga el ValueError de la detección base."""
+        self._crear_linea_base(storage)
+        with pytest.raises(ValueError):
+            storage.detectar_renombrados("machine-alfa", "C:", scan_id_nuevo="scan-inexistente")
+
+    def test_resumen_serializable(self, storage: SystemInventoryStorage):
+        """resumen() devuelve contadores serializables coherentes."""
+        self._crear_linea_base(storage)
+        self._escanear_nuevo(storage, "scan-nuevo", [
+            self._entrada("e-n-1", "C:/Nuevo/app.exe", "app.exe", 1024, "2024-01-01T10:00:00"),
+            self._entrada("e-n-2", "C:/Apps/tool.dll", "tool.dll", 2048, "2024-02-01T10:00:00"),
+            self._entrada("e-n-3", "C:/Docs/readme.txt", "readme.txt", 500, "2024-03-01T10:00:00"),
+        ])
+        resultado = storage.detectar_renombrados("machine-alfa", "C:", scan_id_nuevo="scan-nuevo")
+        resumen = resultado.resumen()
+        assert resumen["machine_id"] == "machine-alfa"
+        assert resumen["volume"] == "C:"
+        assert resumen["renombrados"] == 1
+        assert resumen["altas"] == 0
+        assert resumen["desapariciones"] == 0
+        assert resumen["sin_cambios"] == 2
+        assert resumen["total_base"] == 3
+        assert resumen["total_nuevo"] == 3
 
 
 # ---------------------------------------------------------------------------
@@ -669,7 +1602,7 @@ class TestManifiestoJSON:
         manifest = storage.write_manifest("machine-alfa")
         assert storage.manifest_path.exists()
         assert manifest["machine_id"] == "machine-alfa"
-        assert manifest["version"] == 3
+        assert manifest["version"] == 4
         assert "volumes" in manifest
         assert "last_scan" in manifest
         assert "updated_at" in manifest
@@ -725,7 +1658,7 @@ class TestManifiestoJSON:
         manifest = storage.read_manifest()
         assert manifest is not None
         assert manifest["machine_id"] == "machine-alfa"
-        assert manifest["version"] == 3
+        assert manifest["version"] == 4
         assert len(manifest["volumes"]) == 1
         assert manifest["volumes"][0]["volume"] == "C:"
         assert manifest["last_scan"] is not None
@@ -954,8 +1887,8 @@ class TestMigracionEsquemaV1AV2:
         self._crear_db_v1(db_path)
         storage = SystemInventoryStorage(db_path)
         version = storage.initialize()
-        assert version == 3
-        assert storage.schema_version() == 3
+        assert version == 4
+        assert storage.schema_version() == 4
         # La columna normalized_path debe existir tras la migracion.
         conn = storage.connect()
         cur = conn.execute("PRAGMA table_info(file_entries)")
@@ -968,7 +1901,7 @@ class TestMigracionEsquemaV1AV2:
         storage.initialize()
         conn = storage.connect()
         cur = conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='index' AND name='idx_file_entries_unique_path'"
+            "SELECT name FROM sqlite_master WHERE type='index' AND name='idx_file_entries_unique_path_scan'"
         )
         assert cur.fetchone() is not None
 

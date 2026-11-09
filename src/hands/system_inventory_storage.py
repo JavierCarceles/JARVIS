@@ -35,10 +35,11 @@ import threading
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from dataclasses import dataclass, field
 from typing import Callable, Optional
 
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 # Detectar si el sistema de archivos es sensible a mayusculas y minusculas.
 # Windows y macOS (por defecto) son insensibles; Linux y la mayoria de Unix son sensibles.
@@ -159,10 +160,37 @@ def _migracion_v2_a_v3(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migracion_v3_a_v4(conn: sqlite3.Connection) -> None:
+    """Migracion v3 -> v4: adapta la clave unica de `file_entries` para
+    soportar escaneos incrementales.
+
+    La clave unica anterior `(machine_id, volume, normalized_path)` impedía
+    que la misma ruta existiera en dos escaneos distintos (p. ej. linea base
+    y escaneo incremental). Para la deteccion de cambios incrementales
+    (3.8.5.1.4.5.2) es necesario que las entradas de diferentes scans
+    coexistan con la misma ruta normalizada, diferenciadas por `scan_id`.
+
+    Operacion:
+    1. Elimina el indice unico viejo `idx_file_entries_unique_path`.
+    2. Crea un nuevo indice unico `idx_file_entries_unique_path_scan` sobre
+       (machine_id, volume, normalized_path, scan_id), permitiendo que la
+       misma ruta aparezca en varios escaneos sin duplicarse dentro de uno
+       mismo.
+    """
+    conn.execute("DROP INDEX IF EXISTS idx_file_entries_unique_path")
+    conn.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_file_entries_unique_path_scan
+            ON file_entries(machine_id, volume, normalized_path, scan_id)
+        """
+    )
+
+
 # (version_origen, version_destino, nombre, funcion_de_migracion)
 _MIGRACIONES: list[tuple[int, int, str, Callable[[sqlite3.Connection], None]]] = [
     (1, 2, "agregar normalized_path a file_entries", _migracion_v1_a_v2),
     (2, 3, "crear tabla lineas_base", _migracion_v2_a_v3),
+    (3, 4, "clave unica de file_entries incluye scan_id", _migracion_v3_a_v4),
 ]
 
 
@@ -329,10 +357,11 @@ CREATE INDEX IF NOT EXISTS idx_file_entries_absolute_path
 CREATE INDEX IF NOT EXISTS idx_file_entries_excluded
     ON file_entries(machine_id, excluded);
 
--- Clave unica por equipo/volumen/ruta normalizada (3.8.5.1.4.2.5).
--- Impide duplicar la misma entrada de archivo para un equipo y volumen dados.
-CREATE UNIQUE INDEX IF NOT EXISTS idx_file_entries_unique_path
-    ON file_entries(machine_id, volume, normalized_path);
+-- Clave unica por equipo/volumen/ruta normalizada y scan (3.8.5.1.4.2.5, .5.2).
+-- Permite que la misma ruta exista en diferentes escaneos (linea base e
+-- incremental) sin duplicarse dentro de un mismo scan.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_file_entries_unique_path_scan
+    ON file_entries(machine_id, volume, normalized_path, scan_id);
 
 -- Indice de consulta por ruta normalizada (soporta busquedas case-correctas).
 CREATE INDEX IF NOT EXISTS idx_file_entries_normalized_path
@@ -992,6 +1021,447 @@ class SystemInventoryStorage:
         )
         row = cur.fetchone()
         return dict(row) if row is not None else None
+
+    # ------------------------------------------------------------------ #
+    # Deteccion de cambios incrementales (3.8.5.1.4.5.2).
+    # ------------------------------------------------------------------ #
+
+    @dataclass
+    class CambioEntrada:
+        """Describe un cambio detectado en una entrada entre la linea base y un escaneo nuevo."""
+
+        normalized_path: str
+        absolute_path: str
+        name: str
+        entry_type: str
+        campo: str
+        valor_base: object
+        valor_nuevo: object
+
+    @dataclass
+    class ResultadoCambiosIncrementales:
+        """Resultado completo de la deteccion de cambios incrementales."""
+
+        machine_id: str
+        volume: str
+        linea_base: Optional[dict]
+        scan_usado: Optional[dict]
+        altas: list[dict] = field(default_factory=list)
+        cambios: list[CambioEntrada] = field(default_factory=list)
+        desapariciones: list[dict] = field(default_factory=list)
+        sin_cambios: int = 0
+        total_base: int = 0
+        total_nuevo: int = 0
+
+        def resumen(self) -> dict:
+            """Devuelve un resumen serializable del resultado."""
+            return {
+                "machine_id": self.machine_id,
+                "volume": self.volume,
+                "linea_base_id": self.linea_base["linea_id"] if self.linea_base else None,
+                "scan_usado_id": self.scan_usado["scan_id"] if self.scan_usado else None,
+                "altas": len(self.altas),
+                "cambios": len(self.cambios),
+                "desapariciones": len(self.desapariciones),
+                "sin_cambios": self.sin_cambios,
+                "total_base": self.total_base,
+                "total_nuevo": self.total_nuevo,
+            }
+
+    def _obtener_entradas_escaneo(self, scan_id: str) -> list[dict]:
+        """Devuelve todas las entradas de archivo de una ejecucion de escaneo dada,
+        indexadas por ruta normalizada."""
+        conn = self.connect()
+        cur = conn.execute(
+            """
+            SELECT entry_id, scan_id, machine_id, volume, absolute_path,
+                   normalized_path, relative_path, name, extension, entry_type,
+                   size_bytes, modified_at, created_at, accessed_at, attributes,
+                   excluded, source, last_checked_at
+            FROM file_entries WHERE scan_id = ?
+            ORDER BY normalized_path
+            """,
+            (scan_id,),
+        )
+        return [dict(r) for r in cur.fetchall()]
+
+    def _campos_metadata_comparables(self) -> tuple[str, ...]:
+        """Campos de metadatos comparables para detectar cambios entre escaneos.
+
+        Se comparan tamaño, marcas temporales y atributos. Nunca el contenido
+        del archivo (privacidad, 3.8.5.1.4.1.9).
+        """
+        return ("size_bytes", "modified_at", "created_at", "accessed_at", "attributes")
+
+    def detectar_cambios_incrementales(
+        self,
+        machine_id: str,
+        volume: str,
+        scan_id_nuevo: Optional[str] = None,
+    ) -> ResultadoCambiosIncrementales:
+        """Detecta altas, cambios y desapariciones entre la linea base y un escaneo nuevo.
+
+        La comparacion se hace por `normalized_path` como clave unica, usando
+        solo metadatos observados del SO (tamaño, marcas temporales, atributos).
+        Nunca se lee ni compara el contenido de archivos.
+
+        Flujo:
+        1. Obtiene la linea base para (machine_id, volume). Si no existe,
+           retorna un resultado vacio con `linea_base=None`.
+        2. Si `scan_id_nuevo` no se indica, usa el ultimo escaneo del equipo y
+           volumen.
+        3. Recupera las entradas de archivo del escaneo de la linea base y del
+           escaneo nuevo.
+        4. Compara por normalized_path:
+           - **Altas**: presentes en el nuevo, ausentes en la base.
+           - **Desapariciones**: presentes en la base, ausentes en el nuevo.
+           - **Cambios**: presentes en ambas pero con metadatos diferentes.
+           - **Sin cambios**: presentes en ambas con metadatos identicos.
+
+        Retorna un `ResultadoCambiosIncrementales` con listas de altas,
+        cambios (con campo, valor_base y valor_nuevo), desapariciones y
+        contadores de sin cambios, total_base y total_nuevo.
+        """
+        linea_base = self.obtener_linea_base_volumen(machine_id, volume)
+        if linea_base is None:
+            return self.ResultadoCambiosIncrementales(
+                machine_id=machine_id,
+                volume=volume,
+                linea_base=None,
+                scan_usado=None,
+            )
+
+        # Determinar el escaneo nuevo a comparar.
+        if scan_id_nuevo is not None:
+            scan_usado = self.get_scan_run(scan_id_nuevo)
+            if scan_usado is None or scan_usado["machine_id"] != machine_id or scan_usado["volume"] != volume:
+                raise ValueError(
+                    f"El scan_id {scan_id_nuevo!r} no pertenece a "
+                    f"machine_id={machine_id!r}, volume={volume!r}."
+                )
+        else:
+            scan_usado = self.get_latest_scan(machine_id, volume)
+            if scan_usado is None:
+                return self.ResultadoCambiosIncrementales(
+                    machine_id=machine_id,
+                    volume=volume,
+                    linea_base=linea_base,
+                    scan_usado=None,
+                )
+            # Si el ultimo escaneo es el mismo que genero la linea base, no hay
+            # un escaneo nuevo distinto con el que comparar.
+            scan_base_id = linea_base.get("scan_id")
+            if scan_usado["scan_id"] == scan_base_id:
+                return self.ResultadoCambiosIncrementales(
+                    machine_id=machine_id,
+                    volume=volume,
+                    linea_base=linea_base,
+                    scan_usado=None,
+                )
+
+        scan_base_id = linea_base.get("scan_id")
+        scan_nuevo_id = scan_usado["scan_id"]
+
+        # Recuperar entradas de ambos escaneos.
+        entradas_base = self._obtener_entradas_escaneo(scan_base_id) if scan_base_id else []
+        entradas_nuevo = self._obtener_entradas_escaneo(scan_nuevo_id)
+
+        # Indexar por normalized_path.
+        base_por_ruta: dict[str, dict] = {}
+        for e in entradas_base:
+            base_por_ruta[e["normalized_path"]] = e
+
+        nuevo_por_ruta: dict[str, dict] = {}
+        for e in entradas_nuevo:
+            nuevo_por_ruta[e["normalized_path"]] = e
+
+        campos = self._campos_metadata_comparables()
+
+        resultado = self.ResultadoCambiosIncrementales(
+            machine_id=machine_id,
+            volume=volume,
+            linea_base=linea_base,
+            scan_usado=scan_usado,
+            total_base=len(base_por_ruta),
+            total_nuevo=len(nuevo_por_ruta),
+        )
+
+        # Altas: en el nuevo pero no en la base.
+        for ruta, e_nuevo in nuevo_por_ruta.items():
+            if ruta not in base_por_ruta:
+                resultado.altas.append(e_nuevo)
+
+        # Desapariciones: en la base pero no en el nuevo.
+        for ruta, e_base in base_por_ruta.items():
+            if ruta not in nuevo_por_ruta:
+                resultado.desapariciones.append(e_base)
+
+        # Cambios / sin cambios: en ambas.
+        for ruta in base_por_ruta.keys() & nuevo_por_ruta.keys():
+            e_base = base_por_ruta[ruta]
+            e_nuevo = nuevo_por_ruta[ruta]
+            campo_cambiado = None
+            for campo in campos:
+                v_base = e_base.get(campo)
+                v_nuevo = e_nuevo.get(campo)
+                # attributes se almacena como JSON string; comparar como lista.
+                if campo == "attributes":
+                    try:
+                        v_base_cmp = json.loads(v_base) if isinstance(v_base, str) else (v_base or [])
+                    except (json.JSONDecodeError, TypeError):
+                        v_base_cmp = v_base
+                    try:
+                        v_nuevo_cmp = json.loads(v_nuevo) if isinstance(v_nuevo, str) else (v_nuevo or [])
+                    except (json.JSONDecodeError, TypeError):
+                        v_nuevo_cmp = v_nuevo
+                    if v_base_cmp != v_nuevo_cmp:
+                        campo_cambiado = campo
+                        break
+                else:
+                    if v_base != v_nuevo:
+                        campo_cambiado = campo
+                        break
+            if campo_cambiado is not None:
+                vb = e_base.get(campo_cambiado)
+                vn = e_nuevo.get(campo_cambiado)
+                if campo_cambiado == "attributes":
+                    try:
+                        vb = json.loads(vb) if isinstance(vb, str) else (vb or [])
+                    except (json.JSONDecodeError, TypeError):
+                        vb = vb
+                    try:
+                        vn = json.loads(vn) if isinstance(vn, str) else (vn or [])
+                    except (json.JSONDecodeError, TypeError):
+                        vn = vn
+                resultado.cambios.append(
+                    self.CambioEntrada(
+                        normalized_path=ruta,
+                        absolute_path=e_nuevo["absolute_path"],
+                        name=e_nuevo["name"],
+                        entry_type=e_nuevo["entry_type"],
+                        campo=campo_cambiado,
+                        valor_base=vb,
+                        valor_nuevo=vn,
+                    )
+                )
+            else:
+                resultado.sin_cambios += 1
+
+        return resultado
+
+    # ------------------------------------------------------------------ #
+    # Deteccion de renombrados / cambios de ruta o nombre (3.8.5.1.4.5.3).
+    # ------------------------------------------------------------------ #
+
+    @dataclass
+    class RenombradoDetectado:
+        """Describe un renombrado detectado entre el escaneo base y un escaneo nuevo.
+
+        Se registra solo cuando el sistema de archivos proporciona evidencia
+        suficiente: los metadatos observados (tamaño, marcas temporales,
+        atributos y tipo de entrada) coinciden en ambas rutas, por lo que es
+        razonable tratar la entrada como el mismo archivo movido o renombrado,
+        y no como una eliminacion más una alta. Nunca se fusionan archivos
+        distintos solo por compartir nombre o tamaño.
+        """
+
+        normalized_path_base: str
+        normalized_path_nuevo: str
+        absolute_path_base: str
+        absolute_path_nuevo: str
+        name_base: str
+        name_nuevo: str
+        entry_type: str
+        size_bytes: int
+        campos_coincidentes: list[str]
+        nombre_cambio: bool
+        ruta_cambio: bool
+
+    @dataclass
+    class ResultadoDeteccionRenombrados:
+        """Resultado completo de la detección de renombrados entre un escaneo
+        base y uno nuevo."""
+
+        machine_id: str
+        volume: str
+        linea_base: Optional[dict]
+        scan_usado: Optional[dict]
+        renombrados: list[RenombradoDetectado] = field(default_factory=list)
+        altas: list[dict] = field(default_factory=list)
+        desapariciones: list[dict] = field(default_factory=list)
+        sin_cambios: int = 0
+        total_base: int = 0
+        total_nuevo: int = 0
+
+        def resumen(self) -> dict:
+            """Devuelve un resumen serializable del resultado."""
+            return {
+                "machine_id": self.machine_id,
+                "volume": self.volume,
+                "linea_base_id": self.linea_base["linea_id"] if self.linea_base else None,
+                "scan_usado_id": self.scan_usado["scan_id"] if self.scan_usado else None,
+                "renombrados": len(self.renombrados),
+                "altas": len(self.altas),
+                "desapariciones": len(self.desapariciones),
+                "sin_cambios": self.sin_cambios,
+                "total_base": self.total_base,
+                "total_nuevo": self.total_nuevo,
+            }
+
+    def _valor_comparable(self, valor: object, campo: str) -> object:
+        """Devuelve un valor comparable para metadatos de una entrada de archivo.
+
+        `attributes` se almacena como JSON string y se compara como lista; el
+        resto se compara tal cual. Los valores ausentes (None) se devuelven
+        como None para que el llamante decida si son evidencia suficiente.
+        """
+        if campo == "attributes":
+            try:
+                return json.loads(valor) if isinstance(valor, str) else (valor or [])
+            except (json.JSONDecodeError, TypeError):
+                return valor
+        return valor
+
+    def _campos_requisitos_renombrado(self) -> tuple[str, ...]:
+        """Campos que deben estar presentes y coincidir como evidencia mínima
+        de que una ruta base y una ruta nueva son el mismo archivo renombrado.
+
+        Son los metadatos más estables ante un cambio de nombre o de ruta:
+        tamaño y marca temporal de modificacion. Sin ellos no hay evidencia
+        suficiente para emparejar una desaparición con una alta.
+        """
+        return ("size_bytes", "modified_at")
+
+    def _metadatos_coinciden(
+        self, e_base: dict, e_nuevo: dict
+    ) -> tuple[bool, list[str]]:
+        """Comprueba si dos entradas comparten evidencia suficiente de ser el
+        mismo archivo renombrado.
+
+        Requisitos:
+        - Los campos requeridos (`size_bytes`, `modified_at`) deben estar
+          presentes (no None) en ambas y coincidir.
+        - Todos los demás campos comparables disponibles (no None en ambas)
+          deben coincidir también: `created_at`, `accessed_at`, `attributes`,
+          `entry_type`.
+        - Nunca se empareja solo por nombre ni solo por tamaño: ambos campos
+          requeridos y todos los disponibles deben concordar.
+        """
+        campos = self._campos_metadata_comparables()
+        requeridos = self._campos_requisitos_renombrado()
+        coincidentes: list[str] = []
+        for campo in campos:
+            v_base = self._valor_comparable(e_base.get(campo), campo)
+            v_nuevo = self._valor_comparable(e_nuevo.get(campo), campo)
+            disponible = v_base is not None and v_nuevo is not None
+            if campo in requeridos:
+                # Campo obligatorio: debe estar en ambos y coincidir.
+                if not disponible or v_base != v_nuevo:
+                    return False, coincidentes
+                coincidentes.append(campo)
+            elif disponible:
+                # Campo opcional: si esta disponible en ambos, debe coincidir.
+                if v_base != v_nuevo:
+                    return False, coincidentes
+                coincidentes.append(campo)
+        return True, coincidentes
+
+    def detectar_renombrados(
+        self,
+        machine_id: str,
+        volume: str,
+        scan_id_nuevo: Optional[str] = None,
+    ) -> ResultadoDeteccionRenombrados:
+        """Detecta cambios de ruta y renombrados entre la línea base y un
+        escaneo nuevo.
+
+        Reutiliza `detectar_cambios_incrementales` para obtener altas,
+        desapariciones y sin cambios. Luego empareja cada desaparición del
+        escaneo base con una alta del escaneo nuevo solo cuando hay evidencia
+        suficiente de que se trata del mismo archivo (tamaño y marca temporal
+        de modificación presentes e iguales, y todos los demás metadatos
+        disponibles coincidentes). Los emparejamientos aceptados se reportan
+        como renombrados y dejan de contarse como alta ni desaparición; el
+        resto se reporta como alta o desaparición genuina.
+
+        Nunca fusiona archivos distintos solo por compartir nombre o tamaño:
+        sin los metadatos requeridos coincidentes, no hay renombrado.
+
+        Retorna un `ResultadoDeteccionRenombrados` con listas de renombrados,
+        altas no emparejadas y desapariciones no emparejadas.
+        """
+        base = self.detectar_cambios_incrementales(
+            machine_id, volume, scan_id_nuevo=scan_id_nuevo
+        )
+        linea_base = base.linea_base
+        scan_usado = base.scan_usado
+
+        # Indexar desapariciones (base) y altas (nuevo) por ruta normalizada.
+        desapariciones: list[dict] = list(base.desapariciones)
+        altas: list[dict] = list(base.altas)
+        altas_usadas: set[int] = set()
+        renombrados: list[self.RenombradoDetectado] = []
+
+        # Determinista: procesar desapariciones ordenadas por ruta.
+        for e_base in sorted(desapariciones, key=lambda e: str(e.get("normalized_path", ""))):
+            mejor_idx: Optional[int] = None
+            mejor_coincidentes: list[str] = []
+            for idx, e_nuevo in enumerate(altas):
+                if idx in altas_usadas:
+                    continue
+                coinciden, campos = self._metadatos_coinciden(e_base, e_nuevo)
+                if not coinciden:
+                    continue
+                if mejor_idx is None or len(campos) > len(mejor_coincidentes):
+                    mejor_idx = idx
+                    mejor_coincidentes = campos
+            if mejor_idx is None:
+                continue
+            e_nuevo = altas[mejor_idx]
+            altas_usadas.add(mejor_idx)
+            nombre_cambio = str(e_base.get("name", "")) != str(e_nuevo.get("name", ""))
+            ruta_cambio = str(e_base.get("normalized_path", "")) != str(
+                e_nuevo.get("normalized_path", "")
+            )
+            renombrados.append(
+                self.RenombradoDetectado(
+                    normalized_path_base=str(e_base.get("normalized_path", "")),
+                    normalized_path_nuevo=str(e_nuevo.get("normalized_path", "")),
+                    absolute_path_base=str(e_base.get("absolute_path", "")),
+                    absolute_path_nuevo=str(e_nuevo.get("absolute_path", "")),
+                    name_base=str(e_base.get("name", "")),
+                    name_nuevo=str(e_nuevo.get("name", "")),
+                    entry_type=str(e_base.get("entry_type", "")),
+                    size_bytes=int(e_base.get("size_bytes", 0) or 0),
+                    campos_coincidentes=mejor_coincidentes,
+                    nombre_cambio=nombre_cambio,
+                    ruta_cambio=ruta_cambio,
+                )
+            )
+
+        altas_no_emparejadas = [
+            e for idx, e in enumerate(altas) if idx not in altas_usadas
+        ]
+        # Las desapariciones emparejadas son las usadas en renombrados.
+        rutas_base_emparejadas = {r.normalized_path_base for r in renombrados}
+        desapariciones_no_emparejadas = [
+            e
+            for e in desapariciones
+            if str(e.get("normalized_path", "")) not in rutas_base_emparejadas
+        ]
+
+        return self.ResultadoDeteccionRenombrados(
+            machine_id=machine_id,
+            volume=volume,
+            linea_base=linea_base,
+            scan_usado=scan_usado,
+            renombrados=renombrados,
+            altas=altas_no_emparejadas,
+            desapariciones=desapariciones_no_emparejadas,
+            sin_cambios=base.sin_cambios,
+            total_base=base.total_base,
+            total_nuevo=base.total_nuevo,
+        )
 
     # ------------------------------------------------------------------ #
     # Entradas de archivo (escritura por lote atomica)

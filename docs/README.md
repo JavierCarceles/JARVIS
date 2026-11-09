@@ -1838,9 +1838,9 @@ Funciones a nivel módulo:
 **Características:**
 
 - Creación de `data/system_inventory.sqlite3` como almacenamiento canonico del índice persistente.
-- Esquema versionado con tabla `schema_version` (versión 3).
-- Migraciones de esquema verificables: `initialize()` aplica las migraciones registradas en orden (actual: v1 a v3), cada una dentro de su propia transacción, y comprueba que no se pierdan ni se reinterpreten datos de versiones previas antes de avanzar la versión. Incluye la migración v2 a v3 que crea la tabla `lineas_base`.
-- Tablas `machines`, `volumes`, `scan_runs`, `file_entries`, `application_candidates` (candidatos de aplicación separados de los registros genéricos de archivo) y `lineas_base` (primera instantánea completa o línea base por volumen).
+- Esquema versionado con tabla `schema_version` (versión 4).
+- Migraciones de esquema verificables: `initialize()` aplica las migraciones registradas en orden (actual: v1 a v4), cada una dentro de su propia transacción, y comprueba que no se pierdan ni se reinterpreten datos de versiones previas antes de avanzar la versión. Incluye la migración v2 a v3 que crea la tabla `lineas_base` y la migración v3 a v4 que extiende la clave única de `file_entries` para incluir `scan_id`, permitiendo que la misma ruta exista en diferentes escaneos (línea base e incremental) para la detección de cambios incrementales (3.8.5.1.4.5.2).
+- Tablas `machines`, `volumes`, `scan_runs`, `file_entries`, `application_candidates` (candidatos de aplicación separados de los registros genéricos de archivo) y `lineas_base` (primera instantánea completa o línea base por volumen). La clave única de `file_entries` es `(machine_id, volumen, ruta normalizada, scan_id)`.
 - Escritura por lotes en transacción atómica (`BEGIN IMMEDIATE`/`COMMIT` con `ROLLBACK` ante fallo): un escaneo interrumpido no deja media base presentada como inventario completo.
 - Control de concurrencia: `begin_scan_run` adquiere un bloqueo no bloqueante por `(machine_id, volumen)` y levanta `ConcurrentScanError` si otro escaneo está en curso para la misma clave; `end_scan_run` libera el bloqueo al terminar, incluso si la validación falla.
 - Consultas indexadas paginadas por nombre, extensión y prefijo de ruta absoluta; contador de entradas y recuperación de la última ejecución por equipo/volumen.
@@ -1850,6 +1850,7 @@ Funciones a nivel módulo:
 - Detección de corrupción: `verify_integrity()` ejecuta `PRAGMA quick_check` y `PRAGMA integrity_check` y devuelve `ok` solo si ambas lo son, sin modificar la base.
 - Recuperación: `restaurar_desde_backup(backup_path)` reemplaza la base actual solo si la copia existe y pasa `integrity_check`; nunca sobrescribe una base válida con una copia vacía, incompleta o corrupta.
 - `initialize()` verifica la integridad al abrir una base existente: si está corrupta, intenta restaurar desde la copia de seguridad y, sin copia válida, falla sin crear tablas vacías sobre la base corrupta.
+- Detección de renombrados / cambios de ruta o nombre (3.8.5.1.4.5.3): `detectar_renombrados` reutiliza la detección de cambios incrementales y empareja cada desaparición del escaneo base con una alta del nuevo solo cuando hay evidencia suficiente de ser el mismo archivo (tamaño y marca temporal de modificación presentes e iguales, y todos los demás metadatos disponibles coincidentes). Nunca fusiona archivos distintos solo por compartir nombre o tamaño. Devuelve un `ResultadoDeteccionRenombrados` con las listas de renombrados, altas no emparejadas y desapariciones no emparejadas, junto con un resumen serializable.
 
 **Importaciones:** 5.
 
@@ -1861,6 +1862,10 @@ Clases:
 | `class InventoryBackupError` | Excepción levantada al crear o restaurar una copia de seguridad del inventario cuando la operación falla o la copia no es válida. |
 | `class InventoryCorruptError` | Excepción levantada cuando la base de datos del inventario está corrupta y no se puede recuperar desde copia de seguridad. |
 | `class SystemInventoryStorage` | Gestor del almacenamiento canonico SQLite del inventario de archivos. |
+| `SystemInventoryStorage.CambioEntrada` | Describe un cambio detectado en una entrada entre la línea base y un escaneo nuevo (ruta normalizada, campo, valor base, valor nuevo). |
+| `SystemInventoryStorage.ResultadoCambiosIncrementales` | Resultado completo de la detección de cambios incrementales con listas de altas, cambios, desapariciones y contadores. |
+| `SystemInventoryStorage.RenombradoDetectado` | Describe un renombrado detectado entre el escaneo base y uno nuevo (rutas normalizada y absoluta, nombre, tipo de entrada, tamaño, campos coincidentes y banderas de cambio de nombre y de ruta). |
+| `SystemInventoryStorage.ResultadoDeteccionRenombrados` | Resultado completo de la detección de renombrados con listas de renombrados, altas no emparejadas, desapariciones no emparejadas, contadores y resumen serializable. |
 
 Métodos de `SystemInventoryStorage`:
 
@@ -1879,6 +1884,8 @@ Métodos de `SystemInventoryStorage`:
 | `def get_latest_scan(machine_id, volume)` | Devuelve la última ejecución de escaneo de un equipo (y opcionalmente volumen). |
 | `def registrar_linea_base_volumen(machine_id, volume, estado_volumen, cobertura, entradas_count, errores_count, scan_id, fecha_base)` | Registra la primera línea base (instantánea completa) de un volumen. Solo se crea una por `(machine_id, volumen)` y no se sobrescribe la existente; conserva la fecha, el estado y la cobertura como referencia para cambios incrementales (3.8.5.1.4.5.1). |
 | `def obtener_linea_base_volumen(machine_id, volume)` | Devuelve la línea base de un volumen o None si no existe una para ese equipo y volumen. |
+| `def detectar_cambios_incrementales(machine_id, volume, scan_id_nuevo)` | Detecta altas, cambios y desapariciones entre la línea base y un escaneo nuevo comparando solo metadatos (tamaño, marcas temporales, atributos) por ruta normalizada, sin leer contenido de archivos. Retorna un `ResultadoCambiosIncrementales` con listas de altas, cambios y desapariciones. (3.8.5.1.4.5.2) |
+| `def detectar_renombrados(machine_id, volume, scan_id_nuevo)` | Detecta cambios de ruta y renombrados entre la línea base y un escaneo nuevo. Reutiliza `detectar_cambios_incrementales` y empareja desapariciones con altas solo cuando hay evidencia suficiente (tamaño, marca temporal de modificación y demás metadatos disponibles coincidentes), sin fusionar archivos distintos que solo compartan nombre o tamaño. Retorna un `ResultadoDeteccionRenombrados`. (3.8.5.1.4.5.3) |
 | `def insert_file_entries(scan_id, machine_id, volume, entries)` | Inserta una lista de entradas de archivo en una transacción atómica. |
 | `def insert_application_candidates(scan_id, machine_id, volume, candidates)` | Inserta candidatos de aplicación en una transacción atómica (tabla separada). |
 | `def search_by_name(machine_id, name, limit, offset)` | Busca entradas de archivo por nombre normalizado (paginado). |
