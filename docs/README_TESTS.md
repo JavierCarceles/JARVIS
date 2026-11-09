@@ -10733,11 +10733,12 @@ da reconciled=False (coincidencia).
 | `TestLineaBaseVolumen` | Primera línea base (instantánea completa) por volumen: creación con fecha, estado y cobertura, preservación de la primera sin sobrescribir, independencia por máquina/volumen y persistencia al reabrir la instancia. |
 | `TestDeteccionCambiosIncrementales` | Detección de altas, cambios y desapariciones entre línea base y escaneo nuevo comparando solo metadatos (tamaño, marcas temporales, atributos) sin leer contenido de archivos. |
 | `TestMarcadoEntradasEliminadas` | Marca como ausente/eliminada (`excluded = 1`) las entradas desaparecidas solo tras completar correctamente el escaneo del ámbito (`SCAN_RESULT_OK`); un error de permisos no equivale a una eliminación. |
+| `TestReanudarScan` | Reanudación de un escaneo interrumpido usando el mismo `scan_id` (misma generación), sin mezclar resultados de escaneos distintos ni degradar la última instantánea completa: validación de scan interrumpido, reuso del bloqueo de concurrencia, persistencia de la línea base y finalización con `end_scan_run`. |
 | `TestBusquedaPorEstado` | Consultas de entradas por estado de exclusión. |
 | `TestConcurrenciaEscaneos` | Bloqueo de concurrencia, `ConcurrentScanError`, liberación del bloqueo y modo de journaling WAL. |
 | `TestBackupCorrupcionYRecuperacion` | Copia de seguridad, verificación de integridad (`PRAGMA quick_check` / `integrity_check`) y restauración desde copia sin sobrescribir una base válida con una copia vacía, incompleta o corrupta. |
 
-**Resultados:** 95 tests unitarios, 95 PASSED / 0 FAILED.
+**Resultados:** 124 tests unitarios, 124 PASSED / 0 FAILED.
 
 ---
 

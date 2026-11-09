@@ -926,6 +926,63 @@ class SystemInventoryStorage:
         return dict(row) if row is not None else None
 
     # ------------------------------------------------------------------ #
+    # Reanudacion de escaneo interrumpido (3.8.5.1.4.5.5).
+    # ------------------------------------------------------------------ #
+    def reanudar_scan(
+        self,
+        scan_id: str,
+        machine_id: str,
+        volume: str,
+    ) -> dict:
+        """Reanuda un escaneo interrumpido usando el mismo scan_id (misma generacion).
+
+        Valida que el scan exista, pertenezca al equipo y volumen indicados, y que
+        este sin finalizar (finished_at IS NULL, resultado SCAN_RESULT_INTERRUPTED).
+        Si el bloqueo de concurrencia de (machine_id, volumen) no esta ya activo
+        (recuperacion tras cierre inesperado donde begin_scan_run lo habia
+        adquirido pero end_scan_run nunca lo libero), se adquiere ahora. Si ya
+        esta activo, es porque begin_scan_run inicio este mismo scan y no se
+        llamo a end_scan_run: no se vuelve a adquirir, se deja retenido para
+        seguir insertando entradas con el mismo scan_id.
+        No degrada la linea base ni el ultimo escaneo con resultado OK: solo
+        reactiva el scan existente para que se le puedan agregar mas entradas
+        antes de finalizarlo con end_scan_run.
+
+        El bloqueo, cuando se adquiere aqui, se libera en end_scan_run.
+
+        Retorna el diccionario del scan reanudado.
+        """
+        conn = self.connect()
+        row = conn.execute(
+            "SELECT * FROM scan_runs WHERE scan_id = ?", (scan_id,)
+        ).fetchone()
+        if row is None:
+            raise ValueError(
+                f"El scan_id {scan_id!r} no existe en el inventario."
+            )
+        row_dict = dict(row)
+        if row_dict["machine_id"] != machine_id:
+            raise ValueError(
+                f"El scan {scan_id!r} pertenece al equipo "
+                f"{row_dict['machine_id']!r}, no a {machine_id!r}."
+            )
+        if row_dict["volume"] != volume:
+            raise ValueError(
+                f"El scan {scan_id!r} pertenece al volumen "
+                f"{row_dict['volume']!r}, no a {volume!r}."
+            )
+        if row_dict["finished_at"] is not None:
+            raise ValueError(
+                f"El scan {scan_id!r} ya esta finalizado (resultado "
+                f"{row_dict['result']!r}) y no se puede reanudar. "
+                "Solo un escaneo interrumpido sin finalizar se puede reanudar."
+            )
+        # Adquirir bloqueo solo si no esta ya activo para esta clave.
+        if not self.has_active_scan(machine_id, volume):
+            self._acquire_scan_lock(machine_id, volume)
+        return row_dict
+
+    # ------------------------------------------------------------------ #
     # Linea base (primera instantanea completa por volumen) (3.8.5.1.4.5.1).
     # ------------------------------------------------------------------ #
     def registrar_linea_base_volumen(

@@ -2313,6 +2313,155 @@ class TestConcurrenciaEscaneos:
 
 
 # ---------------------------------------------------------------------------
+# Reanudacion de escaneo interrumpido (3.8.5.1.4.5.5).
+# ---------------------------------------------------------------------------
+
+class TestReanudarScan:
+    """Verifican la reanudacion de un escaneo interrumpido usando el mismo
+    scan_id (misma generacion), sin mezclar resultados de escaneos distintos
+    ni degradar la ultima instantanea completa."""
+
+    def _scan_interrumpido(self, storage: SystemInventoryStorage) -> str:
+        """Crea un scan interrumpido (sin finalizar) y devuelve su scan_id."""
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        storage.record_volume("vol-c:", "machine-alfa", "C:", "local", "online")
+        scan_id = "scan-interrumpido"
+        storage.begin_scan_run(scan_id, "machine-alfa", "C:", SCAN_MODE_FULL)
+        # No se llama a end_scan_run: queda interrumpido y sin finalizar.
+        return scan_id
+
+    def test_reanudar_scan_interrumpido_devuelve_datos_y_bloquea(self, storage: SystemInventoryStorage):
+        """Reanudar un scan interrumpido devuelve sus datos y deja el
+        bloqueo activo para seguir insertando entradas con el mismo scan_id."""
+        scan_id = self._scan_interrumpido(storage)
+
+        reanudado = storage.reanudar_scan(scan_id, "machine-alfa", "C:")
+
+        assert reanudado["scan_id"] == scan_id
+        assert reanudado["machine_id"] == "machine-alfa"
+        assert reanudado["volume"] == "C:"
+        assert reanudado["result"] == SCAN_RESULT_INTERRUPTED
+        assert reanudado["finished_at"] is None
+        # El bloqueo permanece activo (se libera en end_scan_run).
+        assert storage.has_active_scan("machine-alfa", "C:") is True
+
+    def test_reanudar_scan_no_existente_levanta_valuerror(self, storage: SystemInventoryStorage):
+        """Reanudar un scan_id inexistente levanta ValueError y no deja bloqueo."""
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        with pytest.raises(ValueError):
+            storage.reanudar_scan("scan-inexistente", "machine-alfa", "C:")
+        assert storage.has_active_scan("machine-alfa", "C:") is False
+
+    def test_reanudar_scan_de_otro_equipo_levanta_valuerror(self, storage: SystemInventoryStorage):
+        """Reanudar un scan de otro equipo levanta ValueError. El bloqueo
+        permanece retenido por begin_scan_run (end_scan_run nunca se llamo)."""
+        scan_id = self._scan_interrumpido(storage)
+        with pytest.raises(ValueError):
+            storage.reanudar_scan(scan_id, "machine-otro", "C:")
+        # El bloqueo sigue activo: begin_scan_run lo adquiro y no se libero.
+        assert storage.has_active_scan("machine-alfa", "C:") is True
+
+    def test_reanudar_scan_de_otro_volumen_levanta_valuerror(self, storage: SystemInventoryStorage):
+        """Reanudar un scan de otro volumen levanta ValueError. El bloqueo
+        permanece retenido por begin_scan_run (end_scan_run nunca se llamo)."""
+        scan_id = self._scan_interrumpido(storage)
+        with pytest.raises(ValueError):
+            storage.reanudar_scan(scan_id, "machine-alfa", "D:")
+        # El bloqueo sigue activo: begin_scan_run lo adquiro y no se libero.
+        assert storage.has_active_scan("machine-alfa", "C:") is True
+
+    def test_reanudar_scan_ya_finalizado_levanta_valuerror(self, storage: SystemInventoryStorage):
+        """Reanudar un scan ya finalizado (resultado OK) levanta ValueError."""
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        storage.record_volume("vol-c:", "machine-alfa", "C:", "local", "online")
+        scan_id = "scan-finalizado"
+        storage.begin_scan_run(scan_id, "machine-alfa", "C:", SCAN_MODE_FULL)
+        storage.end_scan_run(scan_id, result=SCAN_RESULT_OK, entries_count=0)
+        with pytest.raises(ValueError):
+            storage.reanudar_scan(scan_id, "machine-alfa", "C:")
+        assert storage.has_active_scan("machine-alfa", "C:") is False
+
+    def test_reanudar_scan_con_bloqueo_ya_activo_prosigue(self, storage: SystemInventoryStorage):
+        """Reanudar un scan cuyo bloqueo ya esta activo (begin_scan_run lo
+        adquiro y end_scan_run nunca se llamo) prosigue sin
+        ConcurrentScanError: se reusa el mismo scan_id y misma generacion."""
+        scan_id = self._scan_interrumpido(storage)
+        assert storage.has_active_scan("machine-alfa", "C:") is True
+        reanudado = storage.reanudar_scan(scan_id, "machine-alfa", "C:")
+        assert reanudado["scan_id"] == scan_id
+        assert reanudado["result"] == SCAN_RESULT_INTERRUPTED
+        assert reanudado["finished_at"] is None
+        # El bloqueo sigue retenido para poder insertar mas entradas.
+        assert storage.has_active_scan("machine-alfa", "C:") is True
+
+    def test_reanudar_scan_mismo_scan_id_no_crea_nueva_generacion(self, storage: SystemInventoryStorage):
+        """Reanudar y finalizar un scan conservan el mismo scan_id: no se
+        crea una nueva fila de scan_run ni se mezclan generaciones."""
+        scan_id = self._scan_interrumpido(storage)
+
+        storage.reanudar_scan(scan_id, "machine-alfa", "C:")
+        storage.insert_file_entries(scan_id, "machine-alfa", "C:", [
+            {
+                "entry_id": "e-1",
+                "absolute_path": "C:/Apps/app.exe",
+                "relative_path": "Apps/app.exe",
+                "name": "app.exe",
+                "extension": ".exe",
+                "entry_type": "file",
+                "size_bytes": 1024,
+                "modified_at": "2024-01-01T10:00:00",
+                "created_at": "2024-01-01T09:00:00",
+                "accessed_at": "2024-01-02T08:00:00",
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-03T00:00:00",
+            }
+        ])
+        storage.end_scan_run(scan_id, result=SCAN_RESULT_OK, entries_count=1)
+
+        # Solo debe existir una fila de scan_run con este scan_id.
+        filas = storage.get_scan_run(scan_id)
+        assert filas is not None
+        assert filas["scan_id"] == scan_id
+        assert filas["result"] == SCAN_RESULT_OK
+        assert filas["finished_at"] is not None
+        # El bloqueo se libero al finalizar.
+        assert storage.has_active_scan("machine-alfa", "C:") is False
+
+    def test_reanudar_scan_no_degrada_linea_base(self, storage: SystemInventoryStorage):
+        """Reanudar un scan interrumpido no modifica ni sobrescribe la
+        linea base registrada previamente (3.8.5.1.4.5.1)."""
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        storage.record_volume("vol-c:", "machine-alfa", "C:", "local", "online")
+
+        # Registrar linea base primero.
+        linea_base = storage.registrar_linea_base_volumen(
+            "machine-alfa", "C:", "online", 100.0, entradas_count=5,
+            scan_id="scan-base",
+        )
+        linea_id_base = linea_base["linea_id"]
+        fecha_base = linea_base["fecha_base"]
+
+        # Crear y reanudar un scan interrumpido (distinto scan_id).
+        scan_id = "scan-interrumpido"
+        storage.begin_scan_run(scan_id, "machine-alfa", "C:", SCAN_MODE_INCREMENTAL)
+        storage.reanudar_scan(scan_id, "machine-alfa", "C:")
+        storage.end_scan_run(scan_id, result=SCAN_RESULT_OK, entries_count=3)
+
+        # La linea base debe permanecer intacta.
+        linea_despues = storage.obtener_linea_base_volumen("machine-alfa", "C:")
+        assert linea_despues is not None
+        assert linea_despues["linea_id"] == linea_id_base
+        assert linea_despues["fecha_base"] == fecha_base
+        assert linea_despues["scan_id"] == "scan-base"
+
+
+# ---------------------------------------------------------------------------
 # Copia de seguridad, deteccion de corrupcion y recuperacion (3.8.5.1.4.2.11).
 # ---------------------------------------------------------------------------
 
