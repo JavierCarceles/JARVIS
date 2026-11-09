@@ -2462,6 +2462,265 @@ class TestReanudarScan:
 
 
 # ---------------------------------------------------------------------------
+# Refresco bajo demanda y revalidacion de destino (3.8.5.1.4.5.6).
+# ---------------------------------------------------------------------------
+
+class TestRefrescoBajoDemanda:
+    """Refresco bajo demanda de ruta/volumen, refresco incremental global y
+    revalidacion puntual del destino de una aplicación antes de abrirla.
+
+    Todos los tests usan directorios temporales y nunca tocan datos de
+    produccion.
+    """
+
+    def _escaneo_con_entrada(
+        self,
+        storage: SystemInventoryStorage,
+        ruta_archivo: str,
+        machine_id: str = "machine-alfa",
+        volume: str = "C:",
+        scan_id: str = "scan-1",
+    ) -> str:
+        """Crea y finaliza un escaneo con una entrada de archivo registrada,
+        retornando el scan_id."""
+        storage.initialize()
+        storage.record_machine(machine_id)
+        storage.begin_scan_run(scan_id, machine_id, volume, SCAN_MODE_FULL)
+        storage.insert_file_entries(
+            scan_id,
+            machine_id,
+            volume,
+            [
+                {
+                    "entry_id": "e-1",
+                    "absolute_path": ruta_archivo,
+                    "relative_path": Path(ruta_archivo).name,
+                    "name": Path(ruta_archivo).name,
+                    "extension": ".exe",
+                    "entry_type": "file",
+                    "size_bytes": 1024,
+                    "modified_at": "2024-01-01T10:00:00",
+                    "created_at": "2024-01-01T09:00:00",
+                    "accessed_at": "2024-01-02T08:00:00",
+                    "attributes": [],
+                    "excluded": False,
+                    "source": "filesystem_scan",
+                    "last_checked_at": "2024-01-03T00:00:00",
+                },
+            ],
+        )
+        storage.end_scan_run(scan_id, result=SCAN_RESULT_OK, entries_count=1)
+        return scan_id
+
+    def test_refrescar_entrada_sin_escaneo_previo(self, storage: SystemInventoryStorage):
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        resultado = storage.refrescar_entrada_por_ruta(
+            "machine-alfa", "C:", "C:/Apps/app.exe"
+        )
+        assert resultado["scan_id"] is None
+        assert resultado["existe_ahora"] is False
+        assert resultado["entradas_refrescadas"] == 0
+        assert resultado["razon"] is not None
+
+    def test_refrescar_entrada_ruta_no_registrada(self, storage: SystemInventoryStorage):
+        self._escaneo_con_entrada(storage, "C:/Apps/app.exe")
+        resultado = storage.refrescar_entrada_por_ruta(
+            "machine-alfa", "C:", "C:/NoExiste/xyz.exe"
+        )
+        assert resultado["scan_id"] == "scan-1"
+        assert resultado["existe_ahora"] is False
+        assert resultado["entradas_refrescadas"] == 0
+        assert "no está registrada" in resultado["razon"]
+
+    def test_refrescar_entrada_existe_sin_cambio(self, storage: SystemInventoryStorage, tmp_path: Path):
+        app = tmp_path / "Apps" / "app.exe"
+        app.parent.mkdir(parents=True, exist_ok=True)
+        app.write_bytes(b"x" * 1024)
+        ruta = str(app).replace("\\", "/")
+        self._escaneo_con_entrada(storage, ruta)
+        resultado = storage.refrescar_entrada_por_ruta("machine-alfa", "C:", ruta)
+        assert resultado["existe_ahora"] is True
+        assert resultado["cambio_detectado"] is False
+        assert resultado["entradas_refrescadas"] == 1
+        assert resultado["last_checked_at"] is not None
+
+    def test_refrescar_entrada_ya_no_existe(self, storage: SystemInventoryStorage):
+        self._escaneo_con_entrada(storage, "C:/Apps/app.exe")
+        # La ruta registrada no existe en este entorno.
+        resultado = storage.refrescar_entrada_por_ruta(
+            "machine-alfa", "C:", "C:/Apps/app.exe"
+        )
+        assert resultado["existe_ahora"] is False
+        assert resultado["entradas_refrescadas"] == 1
+        assert resultado["last_checked_at"] is not None
+
+    def test_refrescar_entrada_actualiza_last_checked_at(self, storage: SystemInventoryStorage, tmp_path: Path):
+        app = tmp_path / "Apps" / "app.exe"
+        app.parent.mkdir(parents=True, exist_ok=True)
+        app.write_text("contenido", encoding="utf-8")
+        ruta = str(app).replace("\\", "/")
+        self._escaneo_con_entrada(storage, ruta)
+        resultado = storage.refrescar_entrada_por_ruta("machine-alfa", "C:", ruta)
+        assert resultado["last_checked_at"] is not None
+        assert resultado["entradas_refrescadas"] == 1
+
+    def test_refrescar_volumen_sin_escaneo(self, storage: SystemInventoryStorage):
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        resultado = storage.refrescar_volumen("machine-alfa", "C:")
+        assert resultado["scan_id"] is None
+        assert resultado["total"] == 0
+        assert resultado["razon"] is not None
+
+    def test_refrescar_volumen_multiple_entradas(self, storage: SystemInventoryStorage, tmp_path: Path):
+        app1 = tmp_path / "Apps" / "app1.exe"
+        app2 = tmp_path / "Apps" / "app2.exe"
+        for p in (app1, app2):
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text("x", encoding="utf-8")
+        ruta1 = str(app1).replace("\\", "/")
+        ruta2 = str(app2).replace("\\", "/")
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        storage.begin_scan_run("scan-v", "machine-alfa", "C:", SCAN_MODE_FULL)
+        storage.insert_file_entries(
+            "scan-v",
+            "machine-alfa",
+            "C:",
+            [
+                {
+                    "entry_id": "e-a",
+                    "absolute_path": ruta1,
+                    "relative_path": "Apps/app1.exe",
+                    "name": "app1.exe",
+                    "extension": ".exe",
+                    "entry_type": "file",
+                    "size_bytes": 10,
+                    "modified_at": "2024-01-01T10:00:00",
+                    "created_at": "2024-01-01T09:00:00",
+                    "attributes": [],
+                    "excluded": False,
+                    "source": "filesystem_scan",
+                    "last_checked_at": "2024-01-03T00:00:00",
+                },
+                {
+                    "entry_id": "e-b",
+                    "absolute_path": ruta2,
+                    "relative_path": "Apps/app2.exe",
+                    "name": "app2.exe",
+                    "extension": ".exe",
+                    "entry_type": "file",
+                    "size_bytes": 20,
+                    "modified_at": "2024-01-01T10:00:00",
+                    "created_at": "2024-01-01T09:00:00",
+                    "attributes": [],
+                    "excluded": False,
+                    "source": "filesystem_scan",
+                    "last_checked_at": "2024-01-03T00:00:00",
+                },
+            ],
+        )
+        storage.end_scan_run("scan-v", result=SCAN_RESULT_OK, entries_count=2)
+        resultado = storage.refrescar_volumen("machine-alfa", "C:")
+        assert resultado["scan_id"] == "scan-v"
+        assert resultado["total"] == 2
+        assert resultado["existentes"] == 2
+        assert resultado["no_existentes"] == 0
+        assert resultado["entradas_refrescadas"] == 2
+
+    def test_refrescar_incremental_global_sin_volumenes(self, storage: SystemInventoryStorage):
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        resultado = storage.refrescar_incremental_global("machine-alfa")
+        assert resultado["machine_id"] == "machine-alfa"
+        assert resultado["total_volumenes"] == 0
+        assert resultado["total"] == 0
+
+    def test_refrescar_incremental_global_refresca_volumenes(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        app = tmp_path / "Apps" / "app.exe"
+        app.parent.mkdir(parents=True, exist_ok=True)
+        app.write_text("x", encoding="utf-8")
+        ruta = str(app).replace("\\", "/")
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        storage.record_volume("vol-c", "machine-alfa", "C:", "local", "online")
+        storage.begin_scan_run("scan-g", "machine-alfa", "C:", SCAN_MODE_FULL)
+        storage.insert_file_entries(
+            "scan-g",
+            "machine-alfa",
+            "C:",
+            [
+                {
+                    "entry_id": "e-g",
+                    "absolute_path": ruta,
+                    "relative_path": "Apps/app.exe",
+                    "name": "app.exe",
+                    "extension": ".exe",
+                    "entry_type": "file",
+                    "size_bytes": 5,
+                    "modified_at": "2024-01-01T10:00:00",
+                    "created_at": "2024-01-01T09:00:00",
+                    "attributes": [],
+                    "excluded": False,
+                    "source": "filesystem_scan",
+                    "last_checked_at": "2024-01-03T00:00:00",
+                },
+            ],
+        )
+        storage.end_scan_run("scan-g", result=SCAN_RESULT_OK, entries_count=1)
+        resultado = storage.refrescar_incremental_global("machine-alfa")
+        assert resultado["total_volumenes"] == 1
+        assert resultado["total"] == 1
+        assert resultado["existentes"] == 1
+        assert len(resultado["por_volumen"]) == 1
+        assert resultado["por_volumen"][0]["volume"] == "C:"
+
+    def test_revalidar_destino_aplicacion_valido(self, storage: SystemInventoryStorage, tmp_path: Path):
+        app = tmp_path / "Apps" / "app.exe"
+        app.parent.mkdir(parents=True, exist_ok=True)
+        app.write_text("contenido", encoding="utf-8")
+        ruta = str(app).replace("\\", "/")
+        self._escaneo_con_entrada(storage, ruta)
+        resultado = storage.revalidar_destino_aplicacion("machine-alfa", "C:", ruta)
+        assert resultado["valido"] is True
+        assert resultado["existe"] is True
+        assert resultado["es_archivo"] is True
+        assert resultado["entradas_refrescadas"] == 1
+        assert resultado["razon"] is None
+
+    def test_revalidar_destino_aplicacion_no_existe(self, storage: SystemInventoryStorage):
+        self._escaneo_con_entrada(storage, "C:/Apps/app.exe")
+        resultado = storage.revalidar_destino_aplicacion(
+            "machine-alfa", "C:", "C:/Apps/no_existe.exe"
+        )
+        assert resultado["valido"] is False
+        assert resultado["existe"] is False
+        assert resultado["es_archivo"] is False
+        assert "no existe" in resultado["razon"]
+
+    def test_revalidar_destino_aplicacion_directorio(self, storage: SystemInventoryStorage, tmp_path: Path):
+        carpeta = tmp_path / "Apps" / "una_carpeta"
+        carpeta.mkdir(parents=True, exist_ok=True)
+        ruta = str(carpeta).replace("\\", "/")
+        self._escaneo_con_entrada(storage, ruta)
+        resultado = storage.revalidar_destino_aplicacion("machine-alfa", "C:", ruta)
+        assert resultado["valido"] is False
+        assert resultado["existe"] is True
+        assert resultado["es_archivo"] is False
+        assert "no es un archivo lanzable" in resultado["razon"]
+
+    def test_revalidar_destino_vacio_devuelve_razon(self, storage: SystemInventoryStorage):
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        resultado = storage.revalidar_destino_aplicacion("machine-alfa", "C:", "")
+        assert resultado["valido"] is False
+        assert resultado["razon"] is not None
+
+
+# ---------------------------------------------------------------------------
 # Copia de seguridad, deteccion de corrupcion y recuperacion (3.8.5.1.4.2.11).
 # ---------------------------------------------------------------------------
 

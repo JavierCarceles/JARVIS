@@ -1851,6 +1851,7 @@ Funciones a nivel módulo:
 - Recuperación: `restaurar_desde_backup(backup_path)` reemplaza la base actual solo si la copia existe y pasa `integrity_check`; nunca sobrescribe una base válida con una copia vacía, incompleta o corrupta.
 - `initialize()` verifica la integridad al abrir una base existente: si está corrupta, intenta restaurar desde la copia de seguridad y, sin copia válida, falla sin crear tablas vacías sobre la base corrupta.
 - Detección de renombrados / cambios de ruta o nombre (3.8.5.1.4.5.3): `detectar_renombrados` reutiliza la detección de cambios incrementales y empareja cada desaparición del escaneo base con una alta del nuevo solo cuando hay evidencia suficiente de ser el mismo archivo (tamaño y marca temporal de modificación presentes e iguales, y todos los demás metadatos disponibles coincidentes). Nunca fusiona archivos distintos solo por compartir nombre o tamaño. Devuelve un `ResultadoDeteccionRenombrados` con las listas de renombrados, altas no emparejadas y desapariciones no emparejadas, junto con un resumen serializable.
+- Refresco bajo demanda y revalidación de destino: `refrescar_entrada_por_ruta` revalida puntualmente una ruta (comprueba existencia y cambio de tamaño) y actualiza `last_checked_at` sin crear un nuevo escaneo ni una nueva generación; `refrescar_volumen` y `refrescar_incremental_global` aplican el mismo revalidado a un volumen o a todos los volúmenes de un equipo sin nuevas generaciones; `revalidar_destino_aplicacion` comprueba si el destino de una aplicación existe y es un archivo lanzable antes de abrirla, sin lanzarla ni abrirla.
 
 **Importaciones:** 5.
 
@@ -1901,6 +1902,10 @@ Métodos de `SystemInventoryStorage`:
 | `def create_backup(backup_path)` | Crea una copia de seguridad del fichero SQLite activo (WAL incluido); nunca deja una copia parcial presentada como válida. |
 | `def verify_integrity()` | Diagnostica la integridad con `PRAGMA quick_check` y `PRAGMA integrity_check`; devuelve `ok`, `quick_check`, `integrity_check` y `error` sin modificar la base. |
 | `def restaurar_desde_backup(backup_path)` | Restaura la base actual desde una copia de seguridad solo si esta existe y pasa `integrity_check`; nunca sobrescribe una base válida con una copia vacía, incompleta o corrupta. |
+| `def refrescar_entrada_por_ruta(machine_id, volume, ruta_absoluta)` | Revalida puntualmente una única ruta del inventario: comprueba si sigue existiendo en el sistema de archivos y si su tamaño cambió respecto a lo almacenado, y actualiza `last_checked_at` sin crear un nuevo escaneo ni una nueva generación. No marca la entrada como eliminada. Retorna `existe_ahora`, `cambio_detectado`, `last_checked_at` y `entradas_refrescadas`. |
+| `def refrescar_volumen(machine_id, volume)` | Revalida puntualmente cada entrada del último escaneo de un volumen: comprueba existencia y cambio de tamaño, y actualiza `last_checked_at` de cada una. Devuelve un resumen con total, existentes, no existentes, cambios detectados y entradas refrescadas. |
+| `def refrescar_incremental_global(machine_id)` | Revalida puntualmente cada volumen conocido de un equipo aplicando `refrescar_volumen` a cada uno, sin crear nuevos escaneos ni nuevas generaciones. Devuelve un resumen agregado con detalle por volumen en `por_volumen`. |
+| `def revalidar_destino_aplicacion(machine_id, volume, ruta)` | Revalida puntualmente el destino de una aplicación antes de abrirla: comprueba si existe y si es un archivo lanzable (no un directorio), y actualiza `last_checked_at` de la entrada registrada. No lanza ni abre la aplicación. Retorna `valido`, `existe`, `es_archivo`, `last_checked_at`, `entradas_refrescadas` y `razon`. |
 
 ## 🗺️ `src/hands/planner/`
 

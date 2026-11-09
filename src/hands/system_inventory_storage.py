@@ -983,6 +983,365 @@ class SystemInventoryStorage:
         return row_dict
 
     # ------------------------------------------------------------------ #
+    # Refresco bajo demanda y revalidacion de destino (3.8.5.1.4.5.6).
+    # ------------------------------------------------------------------ #
+    def refrescar_entrada_por_ruta(
+        self,
+        machine_id: str,
+        volume: str,
+        ruta_absoluta: str,
+    ) -> dict:
+        """Refresca (revalida puntualmente) una única ruta del inventario.
+
+        Parte de la última ejecución de escaneo del equipo y volumen,
+        normaliza la ruta y localiza la entrada correspondiente. Comprueba en
+        el sistema de archivos si el destino sigue existiendo y si su tamaño
+        cambió respecto a lo almacenado. Actualiza `last_checked_at` de la
+        entrada sin crear un nuevo escaneo ni una nueva generación.
+
+        No marca la entrada como eliminada si ya no existe: esa decisión
+        corresponde a 3.8.5.1.4.5.4 y requiere un escaneo de referencia con
+        resultado `SCAN_RESULT_OK`.
+
+        Retorna un diccionario con `ruta`, `normalized_path`, `scan_id`,
+        `existe_ahora`, `cambio_detectado`, `last_checked_at`,
+        `entradas_refrescadas` y `razon`.
+        """
+        if not ruta_absoluta or not isinstance(ruta_absoluta, str):
+            return {
+                "ruta": ruta_absoluta,
+                "normalized_path": "",
+                "machine_id": machine_id,
+                "volume": volume,
+                "scan_id": None,
+                "existe_ahora": False,
+                "cambio_detectado": False,
+                "last_checked_at": None,
+                "entradas_refrescadas": 0,
+                "razon": "Ruta vacía o no es una cadena.",
+            }
+
+        self.record_machine(machine_id)
+        scan = self.get_latest_scan(machine_id, volume)
+        if scan is None:
+            return {
+                "ruta": ruta_absoluta,
+                "normalized_path": normalize_path(ruta_absoluta),
+                "machine_id": machine_id,
+                "volume": volume,
+                "scan_id": None,
+                "existe_ahora": False,
+                "cambio_detectado": False,
+                "last_checked_at": None,
+                "entradas_refrescadas": 0,
+                "razon": "No hay escaneo previo para este equipo y volumen.",
+            }
+
+        normalized_path = normalize_path(ruta_absoluta)
+        scan_id = scan["scan_id"]
+        ahora = _now_iso()
+
+        conn = self.connect()
+        cur = conn.execute(
+            """
+            SELECT entry_id, absolute_path, size_bytes
+            FROM file_entries
+            WHERE machine_id = ? AND volume = ? AND scan_id = ?
+              AND normalized_path = ?
+            """,
+            (machine_id, volume, scan_id, normalized_path),
+        )
+        filas = cur.fetchall()
+        if not filas:
+            return {
+                "ruta": ruta_absoluta,
+                "normalized_path": normalized_path,
+                "machine_id": machine_id,
+                "volume": volume,
+                "scan_id": scan_id,
+                "existe_ahora": False,
+                "cambio_detectado": False,
+                "last_checked_at": None,
+                "entradas_refrescadas": 0,
+                "razon": "La ruta no está registrada en el último escaneo de este volumen.",
+            }
+
+        existe_ahora = False
+        cambio_detectado = False
+        entradas_refrescadas = 0
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            for fila in filas:
+                absolute_path = fila["absolute_path"]
+                existe = os.path.exists(absolute_path)
+                cambio = False
+                if existe:
+                    existe_ahora = True
+                    try:
+                        stat = os.stat(absolute_path)
+                        if int(fila["size_bytes"] or 0) != int(stat.st_size):
+                            cambio = True
+                    except OSError:
+                        # Existe pero no se pueden leer sus metadatos.
+                        pass
+                if cambio:
+                    cambio_detectado = True
+                cur.execute(
+                    """
+                    UPDATE file_entries
+                    SET last_checked_at = ?
+                    WHERE entry_id = ? AND scan_id = ?
+                    """,
+                    (ahora, fila["entry_id"], scan_id),
+                )
+                entradas_refrescadas += 1
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+
+        return {
+            "ruta": ruta_absoluta,
+            "normalized_path": normalized_path,
+            "machine_id": machine_id,
+            "volume": volume,
+            "scan_id": scan_id,
+            "existe_ahora": existe_ahora,
+            "cambio_detectado": cambio_detectado,
+            "last_checked_at": ahora,
+            "entradas_refrescadas": entradas_refrescadas,
+            "razon": None,
+        }
+
+    def refrescar_volumen(
+        self,
+        machine_id: str,
+        volume: str,
+    ) -> dict:
+        """Refresca todas las entradas de un volumen.
+
+        Revalida puntualmente cada entrada del último escaneo del volumen:
+        comprueba si sigue existiendo en el sistema de archivos y si su
+        tamaño cambió, y actualiza `last_checked_at` de cada una. No crea un
+        nuevo escaneo ni una nueva generación, y no marca entradas como
+        eliminadas.
+
+        Retorna un resumen con `machine_id`, `volume`, `scan_id`, `total`,
+        `existentes`, `no_existentes`, `cambios_detectados`,
+        `entradas_refrescadas`, `last_checked_at` y `razon`.
+        """
+        self.record_machine(machine_id)
+        scan = self.get_latest_scan(machine_id, volume)
+        if scan is None:
+            return {
+                "machine_id": machine_id,
+                "volume": volume,
+                "scan_id": None,
+                "total": 0,
+                "existentes": 0,
+                "no_existentes": 0,
+                "cambios_detectados": 0,
+                "entradas_refrescadas": 0,
+                "last_checked_at": None,
+                "razon": "No hay escaneo previo para este equipo y volumen.",
+            }
+
+        scan_id = scan["scan_id"]
+        ahora = _now_iso()
+        entradas = self._obtener_entradas_escaneo(scan_id)
+
+        existentes = 0
+        no_existentes = 0
+        cambios_detectados = 0
+        entradas_refrescadas = 0
+
+        conn = self.connect()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            for e in entradas:
+                absolute_path = e.get("absolute_path", "")
+                existe = os.path.exists(absolute_path)
+                cambio = False
+                if existe:
+                    existentes += 1
+                    try:
+                        stat = os.stat(absolute_path)
+                        if int(e.get("size_bytes") or 0) != int(stat.st_size):
+                            cambio = True
+                    except OSError:
+                        pass
+                else:
+                    no_existentes += 1
+                if cambio:
+                    cambios_detectados += 1
+                conn.execute(
+                    """
+                    UPDATE file_entries
+                    SET last_checked_at = ?
+                    WHERE entry_id = ? AND scan_id = ?
+                    """,
+                    (ahora, e["entry_id"], scan_id),
+                )
+                entradas_refrescadas += 1
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+
+        return {
+            "machine_id": machine_id,
+            "volume": volume,
+            "scan_id": scan_id,
+            "total": entradas_refrescadas,
+            "existentes": existentes,
+            "no_existentes": no_existentes,
+            "cambios_detectados": cambios_detectados,
+            "entradas_refrescadas": entradas_refrescadas,
+            "last_checked_at": ahora,
+            "razon": None,
+        }
+
+    def refrescar_incremental_global(self, machine_id: str) -> dict:
+        """Refresco incremental global de todos los volúmenes de un equipo.
+
+        Revalida puntualmente cada volumen conocido del equipo aplicando el
+        mismo comportamiento que `refrescar_volumen` a cada uno, sin crear
+        nuevos escaneos ni nuevas generaciones.
+
+        Retorna un resumen agregado por equipo con el detalle por volumen en
+        `por_volumen`.
+        """
+        self.record_machine(machine_id)
+        conn = self.connect()
+        cur = conn.execute(
+            "SELECT DISTINCT volume FROM volumes WHERE machine_id = ? ORDER BY volume",
+            (machine_id,),
+        )
+        volumes = [row["volume"] for row in cur.fetchall()]
+
+        total = 0
+        existentes = 0
+        no_existentes = 0
+        cambios_detectados = 0
+        entradas_refrescadas = 0
+        por_volumen = []
+        for volume in volumes:
+            resultado = self.refrescar_volumen(machine_id, volume)
+            por_volumen.append(
+                {
+                    "volume": volume,
+                    "total": resultado["total"],
+                    "existentes": resultado["existentes"],
+                    "no_existentes": resultado["no_existentes"],
+                    "cambios_detectados": resultado["cambios_detectados"],
+                }
+            )
+            total += resultado["total"]
+            existentes += resultado["existentes"]
+            no_existentes += resultado["no_existentes"]
+            cambios_detectados += resultado["cambios_detectados"]
+            entradas_refrescadas += resultado["entradas_refrescadas"]
+
+        return {
+            "machine_id": machine_id,
+            "total_volumenes": len(volumes),
+            "total": total,
+            "existentes": existentes,
+            "no_existentes": no_existentes,
+            "cambios_detectados": cambios_detectados,
+            "entradas_refrescadas": entradas_refrescadas,
+            "por_volumen": por_volumen,
+            "last_checked_at": _now_iso(),
+        }
+
+    def revalidar_destino_aplicacion(
+        self,
+        machine_id: str,
+        volume: str,
+        ruta: str,
+    ) -> dict:
+        """Revalida puntualmente el destino de una aplicación antes de abrirla.
+
+        Comprueba si el destino sigue existiendo en el sistema de archivos y
+        si es un archivo lanzable (no un directorio). Actualiza
+        `last_checked_at` de la entrada del inventario cuando la ruta está
+        registrada en el último escaneo del volumen.
+
+        No lanza la aplicación ni abre nada; solo devuelve el resultado de la
+        revalidación para que el flujo de apertura decida si procede.
+
+        Retorna un diccionario con `valido`, `existe`, `es_archivo`, `ruta`,
+        `normalized_path`, `scan_id`, `last_checked_at`,
+        `entradas_refrescadas` y `razon`.
+        """
+        if not ruta or not isinstance(ruta, str):
+            return {
+                "valido": False,
+                "existe": False,
+                "es_archivo": False,
+                "ruta": ruta,
+                "normalized_path": "",
+                "machine_id": machine_id,
+                "volume": volume,
+                "scan_id": None,
+                "last_checked_at": None,
+                "entradas_refrescadas": 0,
+                "razon": "Destino vacío o no es una cadena.",
+            }
+
+        self.record_machine(machine_id)
+        scan = self.get_latest_scan(machine_id, volume)
+        scan_id = scan["scan_id"] if scan is not None else None
+        ahora = _now_iso()
+        normalized_path = normalize_path(ruta)
+
+        ruta_resuelta = os.path.abspath(ruta)
+        existe = os.path.exists(ruta_resuelta)
+        es_archivo = existe and os.path.isfile(ruta_resuelta)
+        valido = existe and es_archivo
+
+        entradas_refrescadas = 0
+        if scan_id is not None:
+            conn = self.connect()
+            try:
+                conn.execute("BEGIN IMMEDIATE")
+                cur = conn.execute(
+                    """
+                    UPDATE file_entries
+                    SET last_checked_at = ?
+                    WHERE machine_id = ? AND volume = ? AND scan_id = ?
+                      AND normalized_path = ?
+                    """,
+                    (ahora, machine_id, volume, scan_id, normalized_path),
+                )
+                entradas_refrescadas = cur.rowcount
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+
+        razon = None
+        if not valido:
+            if not existe:
+                razon = "El destino no existe en el sistema de archivos."
+            else:
+                razon = "El destino no es un archivo lanzable (es un directorio o no es accesible)."
+
+        return {
+            "valido": valido,
+            "existe": existe,
+            "es_archivo": es_archivo,
+            "ruta": ruta,
+            "normalized_path": normalized_path,
+            "machine_id": machine_id,
+            "volume": volume,
+            "scan_id": scan_id,
+            "last_checked_at": ahora,
+            "entradas_refrescadas": entradas_refrescadas,
+            "razon": razon,
+        }
+
+    # ------------------------------------------------------------------ #
     # Linea base (primera instantanea completa por volumen) (3.8.5.1.4.5.1).
     # ------------------------------------------------------------------ #
     def registrar_linea_base_volumen(
