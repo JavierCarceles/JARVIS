@@ -90,6 +90,7 @@
 - [`hands\test_system_inventory.py`](#hands/test-system_inventory)
 - [`hands\test_system_inventory_storage.py`](#hands/test-system_inventory_storage)
 - [`hands\test_diferenciacion_estado_acceso_entorno_real.py`](#hands/test-diferenciacion_estado_acceso_entorno_real)
+- [`hands\test_revalidar_destino_aplicacion_entorno_real.py`](#hands/test-revalidar_destino_aplicacion_entorno_real)
 - [`hands\test_filesystem_observer.py`](#hands/test-filesystem_observer)
 - [`hands\test_ui_elements.py`](#hands/test-ui_elements)
 - [`hands\test_ui_elements_final.py`](#hands/test-ui_elements_final)
@@ -10766,6 +10767,23 @@ extension de lanzamiento ejecutable y decision de preflight real).
 **Clases de test:** ninguna (funcion de test de modulo).
 
 **Resultados:** 1 test de verificacion en entorno real, 1 PASSED / 0 FAILED.
+
+---
+
+### `hands\test_revalidar_destino_aplicacion_entorno_real.py`
+
+**Descripción:** Verificacion en el entorno real del equipo (Windows) de
+`SystemInventoryStorage.revalidar_destino_aplicacion` (3.8.5.1.4.6.5). Usa
+archivos y carpetas temporales reales en un volumen montado, el
+identificador real de equipo (`generate_machine_id`), una ejecucion de
+escaneo real y la validacion real contra el sistema operativo
+(`revalidar_destino_aplicacion`). No usa mocks: cada valor se compara
+contra el estado observable del SO (existencia, tipo de archivo y
+resultado de revalidacion antes de abrir).
+
+**Clases de test:** ninguna (funciones de test de modulo).
+
+**Resultados:** 4 tests de verificacion en entorno real, 4 PASSED / 0 FAILED.
 
 ---
 
