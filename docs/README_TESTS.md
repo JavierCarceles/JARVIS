@@ -92,6 +92,7 @@
 - [`hands\test_diferenciacion_estado_acceso_entorno_real.py`](#hands/test-diferenciacion_estado_acceso_entorno_real)
 - [`hands\test_revalidar_destino_aplicacion_entorno_real.py`](#hands/test-revalidar_destino_aplicacion_entorno_real)
 - [`hands\test_volumes_montados_entorno_real.py`](#hands/test-volumes_montados_entorno_real)
+- [`hands\test_buscar_candidatos_para_orden_entorno_real.py`](#hands/test-buscar_candidatos_para_orden_entorno_real)
 - [`hands\test_filesystem_observer.py`](#hands/test-filesystem_observer)
 - [`hands\test_ui_elements.py`](#hands/test-ui_elements)
 - [`hands\test_ui_elements_final.py`](#hands/test-ui_elements_final)
@@ -10748,10 +10749,11 @@ da reconciled=False (coincidencia).
 | `TestBusquedaConEvidencia` | Búsqueda con evidencia de revalidación real (`search_con_evidencia`): devuelve procedencia, volumen, fecha de última comprobación, estado, evidencia de validación contra el SO (existencia, tipo, volumen, identidad, accesibilidad) y caducidad para que el consumidor decida si necesita revalidar (3.8.5.1.4.6.3). |
 | `TestDiferenciacionEstadoAcceso` | Diferenciación de estado de acceso (`diferenciar_estado_acceso`): separa, para cada resultado de búsqueda, encontrado en inventario, existe ahora, accesible ahora, ejecutable, candidato a aplicación y autorizado para lanzamiento, con preflight real (3.8.5.1.4.6.4). |
 | `TestVolumenesMontados` | Verifica que las consultas de inventario no devuelven rutas de volúmenes no montados en el equipo actual: `obtener_volumes_montados()` con `psutil.disk_partitions`, `search`/`count`/`search_paginated`/`search_con_evidencia` con `solo_volumes_montados=True` excluyen volúmenes no montados, y `solo_volumes_montados=False` los incluye (3.8.5.1.4.6.6). |
+| `TestCandidatosParaOrden` | Verifica que `buscar_candidatos_para_orden` devuelve solo candidatos relevantes para la orden y no el inventario completo (3.8.5.1.4.6.7): búsqueda por nombre exacto y parcial (LIKE), límite de resultados, campos limitados sin exponer rutas privadas completas, aislamiento por equipo y metadatos de filtro. |
 | `TestConcurrenciaEscaneos` | Bloqueo de concurrencia, `ConcurrentScanError`, liberación del bloqueo y modo de journaling WAL. |
 | `TestBackupCorrupcionYRecuperacion` | Copia de seguridad, verificación de integridad (`PRAGMA quick_check` / `integrity_check`) y restauración desde copia sin sobrescribir una base válida con una copia vacía, incompleta o corrupta. |
 
-**Resultados:** 215 tests unitarios, 215 PASSED / 0 FAILED.
+**Resultados:** 223 tests unitarios, 223 PASSED / 0 FAILED.
 
 ---
 
@@ -10802,6 +10804,23 @@ base de datos SQLite. No usa mocks que decidan el resultado.
 **Clases de test:** ninguna (funciones de test de modulo).
 
 **Resultados:** 3 tests de verificacion en entorno real, 3 PASSED / 0 FAILED.
+
+---
+
+### `hands\test_buscar_candidatos_para_orden_entorno_real.py`
+
+**Descripción:** Verificacion en el entorno real del equipo (Windows) de
+`SystemInventoryStorage.buscar_candidatos_para_orden` (3.8.5.1.4.6.7).
+Crea archivos temporales reales en el volumen C:, ejecuta un escaneo real
+y verifica que el metodo devuelve solo candidatos relevantes para la orden
+sin exponer el inventario completo ni rutas privadas completas en el
+contexto conversacional. Incluye evidencia de validacion real contra el SO
+(existencia, tipo, accesibilidad) y aislamiento por equipo. No usa mocks
+que decidan el resultado.
+
+**Clases de test:** ninguna (funciones de test de modulo).
+
+**Resultados:** 7 tests de verificacion en entorno real, 7 PASSED / 0 FAILED.
 
 ---
 

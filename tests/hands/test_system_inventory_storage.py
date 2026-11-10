@@ -5030,3 +5030,217 @@ class TestVolumenesMontados:
         self._seed_volumenes(storage, "machine-alfa")
         res = storage.search("machine-beta", solo_volumes_montados=True)
         assert res == []
+
+
+class TestCandidatosParaOrden:
+    """Unidad 3.8.5.1.4.6.7: limitar los datos enviados a Brain/LLM a los
+    candidatos relevantes para la orden, sin exponer el inventario completo
+    ni rutas privadas en el contexto conversacional."""
+
+    def _seed_inventario(
+        self,
+        storage: SystemInventoryStorage,
+        machine_id: str = "machine-alfa",
+    ) -> str:
+        """Inserta una variedad de entradas para probar filtrado por orden."""
+        storage.initialize()
+        storage.record_machine(machine_id)
+        storage.begin_scan_run("scan-ord", machine_id, "C:", SCAN_MODE_FULL)
+        entradas = [
+            {
+                "entry_id": "e-chrome",
+                "absolute_path": "C:/Program Files/Google/Chrome/Application/chrome.exe",
+                "relative_path": "Program Files/Google/Chrome/Application/chrome.exe",
+                "name": "chrome.exe",
+                "extension": ".exe",
+                "entry_type": "file",
+                "size_bytes": 1000000,
+                "modified_at": "2024-01-01T10:00:00",
+                "created_at": "2024-01-01T09:00:00",
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-03T00:00:00",
+            },
+            {
+                "entry_id": "e-notepad",
+                "absolute_path": "C:/Windows/System32/notepad.exe",
+                "relative_path": "Windows/System32/notepad.exe",
+                "name": "notepad.exe",
+                "extension": ".exe",
+                "entry_type": "file",
+                "size_bytes": 200000,
+                "modified_at": "2024-01-01T10:00:00",
+                "created_at": "2024-01-01T09:00:00",
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-03T00:00:00",
+            },
+            {
+                "entry_id": "e-reporte",
+                "absolute_path": "C:/Users/usuario/Documentos/reporte_2024.pdf",
+                "relative_path": "Users/usuario/Documentos/reporte_2024.pdf",
+                "name": "reporte_2024.pdf",
+                "extension": ".pdf",
+                "entry_type": "file",
+                "size_bytes": 500000,
+                "modified_at": "2024-01-02T10:00:00",
+                "created_at": "2024-01-02T09:00:00",
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-03T00:00:00",
+            },
+            {
+                "entry_id": "e-foto-privada",
+                "absolute_path": "C:/Users/usuario/Documentos/foto_privada.jpg",
+                "relative_path": "Users/usuario/Documentos/foto_privada.jpg",
+                "name": "foto_privada.jpg",
+                "extension": ".jpg",
+                "entry_type": "file",
+                "size_bytes": 3000000,
+                "modified_at": "2024-01-02T11:00:00",
+                "created_at": "2024-01-02T10:00:00",
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-03T00:00:00",
+            },
+            {
+                "entry_id": "e-script",
+                "absolute_path": "C:/Tools/miscript.py",
+                "relative_path": "Tools/miscript.py",
+                "name": "miscript.py",
+                "extension": ".py",
+                "entry_type": "file",
+                "size_bytes": 5000,
+                "modified_at": "2024-01-03T10:00:00",
+                "created_at": "2024-01-03T09:00:00",
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-04T00:00:00",
+            },
+            {
+                "entry_id": "e-carpeta",
+                "absolute_path": "C:/Proyectos",
+                "relative_path": "Proyectos",
+                "name": "Proyectos",
+                "extension": "",
+                "entry_type": "directory",
+                "size_bytes": 4096,
+                "modified_at": "2024-01-01T10:00:00",
+                "created_at": "2024-01-01T09:00:00",
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-03T00:00:00",
+            },
+        ]
+        storage.insert_file_entries("scan-ord", machine_id, "C:", entradas)
+        storage.end_scan_run("scan-ord", entries_count=len(entradas))
+        return "scan-ord"
+
+    def test_devuelve_solo_candidatos_relevantes_no_todo_el_inventario(
+        self, storage: SystemInventoryStorage
+    ):
+        """La busqueda por orden devuelve solo candidatos relevantes, no el inventario completo."""
+        self._seed_inventario(storage)
+        res = storage.buscar_candidatos_para_orden("machine-alfa", "abre chrome")
+        assert res["total_devuelto"] >= 1
+        assert res["total_devuelto"] <= res["limit"]
+        # El total del inventario es mayor que lo devuelto (se limito).
+        assert res["total_candidatos_inventario"] >= res["total_devuelto"]
+        # Cada resultado debe contener chrome en su nombre.
+        for r in res["resultados"]:
+            assert "chrome" in r["name"].lower()
+
+    def test_no_devuelve_inventario_completo_sin_palabras_clave(
+        self, storage: SystemInventoryStorage
+    ):
+        """Sin palabras clave en la orden, no se devuelve el inventario completo."""
+        self._seed_inventario(storage)
+        res = storage.buscar_candidatos_para_orden("machine-alfa", "el y la")
+        assert res["total_devuelto"] == 0
+        assert res["palabras_clave"] == []
+        assert res["filtro_aplicado"] == "sin_palabras_clave"
+
+    def test_respeta_limite_de_resultados(
+        self, storage: SystemInventoryStorage
+    ):
+        """El parametro limit restringe el numero de resultados devueltos."""
+        self._seed_inventario(storage)
+        res = storage.buscar_candidatos_para_orden(
+            "machine-alfa", "exe", limit=2
+        )
+        assert res["total_devuelto"] <= 2
+        assert res["limit"] == 2
+
+    def test_campos_limitados_no_exponen_ruta_completa_privada(
+        self, storage: SystemInventoryStorage
+    ):
+        """Las rutas privadas se resumen (volumen + nombre) en el contexto."""
+        self._seed_inventario(storage)
+        res = storage.buscar_candidatos_para_orden("machine-alfa", "reporte pdf")
+        assert res["total_devuelto"] >= 1
+        for r in res["resultados"]:
+            if r["es_ruta_privada"]:
+                # La ruta de contexto no debe ser la ruta completa del usuario.
+                assert r["ruta_contexto"] != r.get("absolute_path", "")
+                assert r["ruta_contexto"] != ""
+                # Debe contener el nombre del archivo.
+                assert r["name"] in r["ruta_contexto"]
+
+    def test_incluye_metadatos_de_filtro(
+        self, storage: SystemInventoryStorage
+    ):
+        """El resultado incluye palabras clave, total del inventario y filtro aplicado."""
+        self._seed_inventario(storage)
+        res = storage.buscar_candidatos_para_orden("machine-alfa", "abre notepad")
+        assert "orden_original" in res
+        assert res["orden_original"] == "abre notepad"
+        assert "palabras_clave" in res
+        assert "notepad" in res["palabras_clave"]
+        assert "total_candidatos_inventario" in res
+        assert "total_devuelto" in res
+        assert "filtro_aplicado" in res
+        assert res["filtro_aplicado"] == "palabras_clave_orden"
+
+    def test_aislamiento_por_equipo(
+        self, storage: SystemInventoryStorage
+    ):
+        """Consulta de otro equipo no devuelve candidatos de este equipo."""
+        self._seed_inventario(storage, "machine-alfa")
+        res = storage.buscar_candidatos_para_orden("machine-beta", "chrome")
+        assert res["total_devuelto"] == 0
+        assert res["resultados"] == []
+
+    def test_maquina_id_vacio_raise(
+        self, storage: SystemInventoryStorage
+    ):
+        """machine_id vacio levanta ValueError."""
+        try:
+            storage.buscar_candidatos_para_orden("", "chrome")
+            assert False, "Se esperaba ValueError"
+        except ValueError:
+            pass
+
+    def test_resultado_tiene_campos_esenciales(
+        self, storage: SystemInventoryStorage
+    ):
+        """Cada candidato devuelto tiene los campos esenciales para el contexto."""
+        self._seed_inventario(storage)
+        res = storage.buscar_candidatos_para_orden("machine-alfa", "chrome")
+        assert res["total_devuelto"] >= 1
+        for r in res["resultados"]:
+            assert "name" in r
+            assert "extension" in r
+            assert "entry_type" in r
+            assert "volume" in r
+            assert "ruta_contexto" in r
+            assert "es_ruta_privada" in r
+            assert "evidencia" in r
+            assert "candidato_a_aplicacion" in r
+            assert "excluida" in r
+

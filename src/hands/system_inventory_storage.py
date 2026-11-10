@@ -3036,6 +3036,295 @@ class SystemInventoryStorage:
             return False
         return extension.lower() in SystemInventoryStorage.EXTENSIONES_EJECUTABLES
 
+    # ------------------------------------------------------------------ #
+    # Candidatos relevantes para Brain/LLM (unidad 3.8.5.1.4.6.7).
+    # ------------------------------------------------------------------ #
+
+    @staticmethod
+    def _extraer_palabras_clave_orden(orden: str) -> list[str]:
+        """Extrae palabras clave significativas de una orden de usuario.
+
+        Divide la orden en tokens, elimina palabras vacias muy comunes y
+        conserva tokens con al menos 2 caracteres que puedan corresponder a
+        nombres de aplicaciones, archivos o extensiones. No interpreta
+        intencion: solo normaliza el texto para usarlo como criterio de
+        busqueda en el inventario.
+        """
+        if not orden or not isinstance(orden, str):
+            return []
+        palabras_vacias = {
+            "el", "la", "los", "las", "un", "una", "unos", "unas",
+            "de", "del", "en", "a", "al", "por", "para", "con", "sin",
+            "sobre", "entre", "hasta", "desde", "y", "o", "pero", "si",
+            "que", "como", "cuando", "donde", "quien", "cual", "cuales",
+            "abre", "abrir", "lanzar", "ejecutar", "buscar", "busca",
+            "encuentra", "encuentre", "muestra", "mostrar", "listar",
+            "lista", "orden", "comando", "ejecuta", "inicia", "iniciar",
+            "run", "open", "close", "start", "stop", "find", "search",
+            "the", "a", "an", "of", "in", "to", "for", "with", "from",
+            "by", "at", "on", "as", "is", "it", "be", "or", "and", "jarvis",
+        }
+        tokens: list[str] = []
+        for token in orden.split():
+            token_limpio = token.strip(".,;:!?()[]{}\"'").lower()
+            if len(token_limpio) >= 2 and token_limpio not in palabras_vacias:
+                tokens.append(token_limpio)
+        # Eliminar duplicados preservando orden.
+        vistos: set[str] = set()
+        resultado: list[str] = []
+        for t in tokens:
+            if t not in vistos:
+                vistos.add(t)
+                resultado.append(t)
+        return resultado
+
+    @staticmethod
+    def _es_ruta_privada(ruta: str) -> bool:
+        """True si la ruta parece ser una ruta privada/usuario que no debe
+        exponerse completa en el contexto conversacional.
+
+        Se trata como privada cualquier ruta que contenga segmentos de
+        perfil de usuario (Users/<nombre>), datos de aplicacion locales
+        (AppData), o carpetas de usuario estandar (Documentos, Descargas,
+        Desktop, etc.) cuando el nombre del usuario es detectable.
+        """
+        if not ruta:
+            return False
+        r = ruta.replace("\\", "/")
+        segmentos_privados = {
+            "appdata", "local", "locallow", "roaming",
+            "users", "documentos", "downloads", "desktop",
+            "document", "download", "onedrive", "dropbox",
+        }
+        partes = [p.lower() for p in r.split("/") if p]
+        return any(p in segmentos_privados for p in partes)
+
+    @staticmethod
+    def _resumir_ruta_para_contexto(ruta: str, es_privada: bool) -> str:
+        """Devuelve una version de la ruta segura para el contexto conversacional.
+
+        Si la ruta es privada, devuelve solo el nombre del archivo y el volumen,
+        sin la ruta completa. Si no es privada, devuelve la ruta completa
+        normalizada (el contexto ya esta limitado a candidatos relevantes).
+        """
+        if not ruta:
+            return ""
+        if es_privada:
+            # Solo volumen + nombre de archivo, sin directorios intermedios.
+            nombre = Path(ruta).name
+            drive = os.path.splitdrive(ruta.replace("\\", "/"))[0]
+            if drive:
+                return f"{drive}/{nombre}"
+            return nombre
+        return ruta
+
+    def _buscar_nombre_parcial(
+        self,
+        machine_id: str,
+        palabra: str,
+        limit: int,
+        solo_volumes_montados: bool = True,
+    ) -> list[dict]:
+        """Busqueda parcial (LIKE) sobre el nombre de entrada.
+
+        Se usa como fallback cuando la coincidencia exacta de `search` no
+        devuelve resultados (ej. buscar "chrome" no coincide con
+        name="chrome.exe"). Hace una consulta directa con LIKE sobre el
+        campo name, aplicando aislamiento por machine_id y filtro de
+        volumenes montados si procede.
+        """
+        conn = self.connect()
+        where_clauses: list[str] = ["machine_id = ?", "lower(name) LIKE lower(?)"]
+        params: list[object] = [machine_id, f"%{palabra}%"]
+        where_sql = " AND ".join(where_clauses)
+
+        sql = f"""
+            SELECT * FROM file_entries
+            WHERE {where_sql}
+            ORDER BY absolute_path
+            LIMIT ? OFFSET 0
+        """
+        params.extend([limit])
+        cur = conn.execute(sql, params)
+        resultados = [dict(r) for r in cur.fetchall()]
+
+        # Filtrar por volumenes montados si procede.
+        if solo_volumes_montados:
+            volumes_montados = self.obtener_volumes_montados()
+            if volumes_montados:
+                resultados = [
+                    r for r in resultados
+                    if self._volumen_de_entrada_esta_montado(r.get("volume", ""), volumes_montados)
+                ]
+
+        return resultados
+
+    def buscar_candidatos_para_orden(
+        self,
+        machine_id: str,
+        orden: str,
+        limit: int = 10,
+        machine_id_actual: Optional[str] = None,
+        solo_volumes_montados: bool = True,
+    ) -> dict:
+        """Busca candidatos de inventario relevantes para una orden de usuario.
+
+        Unidad 3.8.5.1.4.6.7: limitar los datos enviados a Brain/LLM a los
+        candidatos relevantes para la orden, sin introducir el inventario
+        completo ni rutas privadas en el contexto conversacional.
+
+        El metodo extrae palabras clave de la orden y las usa como filtros
+        de busqueda (nombre y extension), de modo que solo se devuelven
+        candidatos que puedan estar relacionados con la orden. Cada resultado
+        incluye un resumen limitado de campos y una ruta segura para el
+        contexto conversacional (rutas privadas se resumen a volumen +
+        nombre de archivo).
+
+        Parametros:
+        - machine_id: identificador del equipo (aislamiento por equipo).
+        - orden: texto de la orden del usuario (ej. "abre chrome",
+          "busca el archivo reporte").
+        - limit: numero maximo de candidatos a devolver.
+        - machine_id_actual: identificador del equipo actual para comprobacion
+          de identidad en la evidencia.
+        - solo_volumes_montados: si True, solo devuelve entradas de volumenes
+          montados en el equipo actual.
+
+        Retorna:
+        - dict con:
+          - `orden_original`: la orden recibida.
+          - `palabras_clave`: palabras clave extraidas para la busqueda.
+          - `total_candidatos_inventario`: total de entradas en el inventario
+            del equipo (para comparar con lo devuelto; demuestra limitacion).
+          - `total_devuelto`: numero de candidatos devueltos.
+          - `limit`: limite aplicado.
+          - `resultados`: lista de diccionarios con campos limitados:
+            `name`, `extension`, `entry_type`, `volume`, `ruta_contexto`,
+            `evidencia` (resumen de validacion real), `candidato_a_aplicacion`,
+            `es_ruta_privada`.
+          - `filtro_aplicado`: descripcion del filtro usado.
+        """
+        if not machine_id:
+            raise ValueError("machine_id es obligatorio.")
+
+        palabras_clave = self._extraer_palabras_clave_orden(orden)
+
+        # Total de entradas en el inventario para este equipo (antes de filtrar).
+        try:
+            total_inventario = self.count(machine_id, solo_volumes_montados=solo_volumes_montados)
+        except Exception:
+            total_inventario = 0
+
+        resultados: list[dict] = []
+
+        if palabras_clave:
+            # Buscar por cada palabra clave. Primero coincidencia exacta de
+            # nombre y extension mediante la API `search`; si no hay
+            # resultados, hacer busqueda parcial (LIKE) sobre el nombre.
+            entry_ids_vistos: set[str] = set()
+            for palabra in palabras_clave:
+                # Busqueda por nombre exacto y por extension.
+                por_nombre = self.search(
+                    machine_id=machine_id,
+                    name=palabra,
+                    limit=limit,
+                    solo_volumes_montados=solo_volumes_montados,
+                )
+                por_extension: list[dict] = []
+                if palabra.startswith(".") or len(palabra) <= 5:
+                    por_extension = self.search(
+                        machine_id=machine_id,
+                        extension=palabra,
+                        limit=limit,
+                        solo_volumes_montados=solo_volumes_montados,
+                    )
+                candidatos = list({e.get("entry_id"): e for e in por_nombre + por_extension if e.get("entry_id")}.values())
+                # Fallback: busqueda parcial (LIKE) sobre el nombre si la
+                # exacta no devolvio nada para esta palabra clave.
+                if not candidatos:
+                    candidatos = self._buscar_nombre_parcial(
+                        machine_id, palabra, limit,
+                        solo_volumes_montados=solo_volumes_montados,
+                    )
+                for entrada in candidatos:
+                    eid = entrada.get("entry_id")
+                    if eid in entry_ids_vistos:
+                        continue
+                    entry_ids_vistos.add(eid)
+                    if len(resultados) >= limit:
+                        break
+                    resultados.append(self._formato_candidato_contexto(
+                        entrada, machine_id_actual=machine_id_actual
+                    ))
+                if len(resultados) >= limit:
+                    break
+        else:
+            # Sin palabras clave: no devolver el inventario completo.
+            # Devolver una lista vacia con indicacion de que no hay filtro.
+            pass
+
+        # Ordenar: primero ejecutables/candidatos a aplicacion, luego por nombre.
+        resultados.sort(
+            key=lambda r: (
+                not r.get("candidato_a_aplicacion", False),
+                str(r.get("name", "")),
+            )
+        )
+
+        return {
+            "orden_original": orden,
+            "palabras_clave": palabras_clave,
+            "total_candidatos_inventario": total_inventario,
+            "total_devuelto": len(resultados),
+            "limit": limit,
+            "resultados": resultados,
+            "filtro_aplicado": "palabras_clave_orden" if palabras_clave else "sin_palabras_clave",
+        }
+
+    def _formato_candidato_contexto(
+        self, entrada: dict, machine_id_actual: Optional[str] = None
+    ) -> dict:
+        """Formatea una entrada de inventario para el contexto conversacional.
+
+        Incluye solo campos esenciales y una ruta segura (rutas privadas se
+        resumen). Ademas incluye un resumen de evidencia de validacion real
+        cuando este disponible.
+        """
+        ruta = str(entrada.get("absolute_path") or "")
+        es_privada = self._es_ruta_privada(ruta)
+        nombre = str(entrada.get("name") or "")
+        extension = str(entrada.get("extension") or "")
+        entry_type = entrada.get("entry_type")
+        volumen = entrada.get("volume")
+        excluida = bool(entrada.get("excluded", False))
+
+        # Resumen de evidencia real si esta disponible.
+        evidencia = entrada.get("evidencia") or {}
+        evid_resumen = {
+            "disponible": bool(evidencia.get("disponible")),
+            "existencia_ok": bool(evidencia.get("existencia_ok")),
+            "valido": bool(evidencia.get("valido")),
+            "razon": str(evidencia.get("razon") or ""),
+        }
+
+        # Diferenciacion si esta disponible.
+        diff = entrada.get("diferenciacion") or {}
+        candidato_app = bool(diff.get("candidato_a_aplicacion"))
+        autorizado = bool(diff.get("autorizado_para_lanzamiento"))
+
+        return {
+            "name": nombre,
+            "extension": extension,
+            "entry_type": entry_type,
+            "volume": volumen,
+            "ruta_contexto": self._resumir_ruta_para_contexto(ruta, es_privada),
+            "es_ruta_privada": es_privada,
+            "excluida": excluida,
+            "evidencia": evid_resumen,
+            "candidato_a_aplicacion": candidato_app,
+            "autorizado_para_lanzamiento": autorizado,
+        }
+
     def db_file_exists(self) -> bool:
         """Devuelve True si el fichero de la base de datos existe en disco."""
         return self.db_path.exists()
