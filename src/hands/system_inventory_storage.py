@@ -38,6 +38,8 @@ from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Callable, Optional
 
+import psutil
+
 from src.hands.application_preflight import (
     ApplicationPreflight,
     get_application_preflight,
@@ -2296,6 +2298,46 @@ class SystemInventoryStorage:
         )
         return [dict(r) for r in cur.fetchall()]
 
+    # ------------------------------------------------------------------ #
+    # Volumenes montados en el equipo actual (unidad 3.8.5.1.4.6.6).
+    # ------------------------------------------------------------------ #
+    def obtener_volumes_montados(self) -> set[str]:
+        """
+        Devuelve los identificadores de volumen actualmente montados en el
+        equipo donde se ejecuta JARVIS.
+
+        Utiliza `psutil.disk_partitions(all=False)` para obtener solo los
+        volumenes realmente montados y con medios disponibles (no unidades
+        de CD-ROM sin disco, ni recursos de red no conectados).
+
+        En Windows devuelve letras de unidad con dos puntos (ej. {"C:", "D:"}).
+        En POSIX devuelve puntos de montaje (ej. {"/", "/mnt/data"}).
+
+        Este metodo no consulta la base de datos: refleja el estado real del
+        sistema de archivos en el momento de la llamada.
+        """
+        montados: set[str] = set()
+        try:
+            for particion in psutil.disk_partitions(all=False):
+                punto = particion.mountpoint or ""
+                if not punto:
+                    continue
+                if os.name == "nt":
+                    # Windows: normalizar a "C:" (letra de unidad + dos puntos).
+                    # os.path.splitdrive ya incluye los dos puntos en la letra.
+                    drive = os.path.splitdrive(punto)[0]
+                    if drive:
+                        montados.add(drive.upper())
+                    else:
+                        montados.add(punto.upper())
+                else:
+                    montados.add(punto)
+        except (OSError, PermissionError):
+            # Si no se puede enumerar, devolver conjunto vacio: el llamante
+            # tratara que no hay volumenes montados y no retornara rutas.
+            pass
+        return montados
+
     def search(
         self,
         machine_id: str,
@@ -2308,14 +2350,17 @@ class SystemInventoryStorage:
         limit: int = 50,
         offset: int = 0,
         order_by: str = "absolute_path",
+        solo_volumes_montados: bool = True,
     ) -> list[dict]:
         """
         Busqueda unificada de entradas de inventario por multiples criterios.
 
         Combina filtros de nombre exacto/normalizado, ruta, extension, tipo,
         volumen y disponibilidad en una sola consulta SQL parametrizada.
-        Siempre filtra por machine_id (aislamiento por equipo, 3.8.5.1.4.1.3)
-        y solo devuelve entradas de volumenes locales montados (3.8.5.1.4.6.6).
+        Siempre filtra por machine_id (aislamiento por equipo, 3.8.5.1.4.1.3).
+        Cuando `solo_volumes_montados` es True (por defecto), solo devuelve
+        entradas de volumenes locales montados en el equipo actual
+        (3.8.5.1.4.6.6), evitando devolver rutas de volúmenes no montados.
 
         Parametros:
         - machine_id: identificador del equipo (obligatorio, aislamiento por equipo).
@@ -2328,6 +2373,8 @@ class SystemInventoryStorage:
         - limit: numero maximo de resultados (paginacion).
         - offset: desplazamiento para paginacion.
         - order_by: campo por el que ordenar (absolute_path por defecto).
+        - solo_volumes_montados: si True, filtra para excluir entradas de
+          volumenes que no estan montados en el equipo actual.
 
         Retorna:
         - lista de diccionarios con todos los campos de file_entries.
@@ -2376,7 +2423,42 @@ class SystemInventoryStorage:
         params.extend([limit, offset])
 
         cur = conn.execute(sql, params)
-        return [dict(r) for r in cur.fetchall()]
+        resultados = [dict(r) for r in cur.fetchall()]
+
+        # Filtrar por volumenes montados: evitar devolver rutas de volúmenes
+        # que no estan disponibles en el equipo actual (3.8.5.1.4.6.6).
+        if solo_volumes_montados:
+            volumes_montados = self.obtener_volumes_montados()
+            if volumes_montados:
+                resultados = [
+                    r for r in resultados
+                    if self._volumen_de_entrada_esta_montado(r.get("volume", ""), volumes_montados)
+                ]
+
+        return resultados
+
+    @staticmethod
+    def _volumen_de_entrada_esta_montado(volumen_entrada: str, volumes_montados: set[str]) -> bool:
+        """
+        Determina si el volumen de una entrada de inventario está montado
+        en el equipo actual.
+
+        Normaliza el volumen de la entrada (Windows: letra de unidad con dos
+        puntos) y compara contra el conjunto de volumenes montados obtenido
+        del sistema operativo real.
+        """
+        if not volumen_entrada:
+            return False
+        v = volumen_entrada.strip()
+        if os.name == "nt":
+            # Windows: normalizar a "C:" (letra de unidad + dos puntos, mayusculas).
+            # os.path.splitdrive ya incluye los dos puntos en la letra.
+            drive = os.path.splitdrive(v)[0]
+            if drive:
+                v = drive.upper()
+            else:
+                v = v.upper()
+        return v in volumes_montados
 
     def count(
         self,
@@ -2387,6 +2469,7 @@ class SystemInventoryStorage:
         tipo: Optional[str] = None,
         volume: Optional[str] = None,
         disponible: Optional[bool] = None,
+        solo_volumes_montados: bool = True,
     ) -> int:
         """
         Devuelve el total de entradas que coinciden con los mismos filtros que
@@ -2396,6 +2479,9 @@ class SystemInventoryStorage:
         has_more) sin materializar el conjunto completo de resultados.
 
         Aplica los mismos filtros y aislamiento por `machine_id` que `search`.
+        Cuando `solo_volumes_montados` es True (por defecto), solo cuenta
+        entradas de volumenes locales montados en el equipo actual
+        (3.8.5.1.4.6.6).
         """
         conn = self.connect()
 
@@ -2423,6 +2509,24 @@ class SystemInventoryStorage:
 
         where_sql = " AND ".join(where_clauses)
 
+        if solo_volumes_montados:
+            # Para contar solo entradas de volumenes montados, obtenemos
+            # entry_id y volumen de cada fila coincidente y filtramos en
+            # Python contra el estado real del sistema de archivos.
+            cur = conn.execute(
+                f"SELECT entry_id, volume FROM file_entries WHERE {where_sql}",
+                params,
+            )
+            rows = cur.fetchall()
+            volumes_montados = self.obtener_volumes_montados()
+            if not volumes_montados:
+                return 0
+            return sum(
+                1
+                for r in rows
+                if self._volumen_de_entrada_esta_montado(r["volume"], volumes_montados)
+            )
+
         cur = conn.execute(
             f"SELECT COUNT(*) AS c FROM file_entries WHERE {where_sql}",
             params,
@@ -2442,6 +2546,7 @@ class SystemInventoryStorage:
         offset: int = 0,
         order_by: str = "absolute_path",
         cursor: Optional[str] = None,
+        solo_volumes_montados: bool = True,
     ) -> dict:
         """
         Busqueda paginada que devuelve resultados junto con metadatos de
@@ -2455,6 +2560,10 @@ class SystemInventoryStorage:
         - `next_cursor`: entry_id de la ultima entrada devuelta (para
           paginacion por cursor en la siguiente solicitud) o None.
         - `limit`, `offset`, `order_by`: parametros de paginacion usados.
+
+        Cuando `solo_volumes_montados` es True (por defecto), solo devuelve
+        entradas de volumenes locales montados en el equipo actual
+        (3.8.5.1.4.6.6).
 
         La paginacion por cursor (`cursor`) es mas eficiente que OFFSET para
         grandes volúmenes porque evita que SQLite examine y descarte filas
@@ -2501,6 +2610,19 @@ class SystemInventoryStorage:
             params.append(limit)
             cur = conn.execute(sql, params)
             results = [dict(r) for r in cur.fetchall()]
+
+            # Filtrar por volumenes montados en la rama de cursor (3.8.5.1.4.6.6).
+            if solo_volumes_montados:
+                volumes_montados = self.obtener_volumes_montados()
+                if volumes_montados:
+                    results = [
+                        r
+                        for r in results
+                        if self._volumen_de_entrada_esta_montado(r.get("volume", ""), volumes_montados)
+                    ]
+                else:
+                    results = []
+
             total = self.count(
                 machine_id=machine_id,
                 name=name,
@@ -2509,6 +2631,7 @@ class SystemInventoryStorage:
                 tipo=tipo,
                 volume=volume,
                 disponible=disponible,
+                solo_volumes_montados=solo_volumes_montados,
             )
             next_cursor = results[-1]["entry_id"] if results else None
             # has_more: existen mas entradas despues del cursor con los mismos filtros.
@@ -2533,6 +2656,7 @@ class SystemInventoryStorage:
                 limit=limit,
                 offset=offset,
                 order_by=order_by,
+                solo_volumes_montados=solo_volumes_montados,
             )
             total = self.count(
                 machine_id=machine_id,
@@ -2542,6 +2666,7 @@ class SystemInventoryStorage:
                 tipo=tipo,
                 volume=volume,
                 disponible=disponible,
+                solo_volumes_montados=solo_volumes_montados,
             )
             next_cursor = results[-1]["entry_id"] if results else None
             has_more = offset + len(results) < total
@@ -2572,6 +2697,7 @@ class SystemInventoryStorage:
         offset: int = 0,
         order_by: str = "absolute_path",
         machine_id_actual: Optional[str] = None,
+        solo_volumes_montados: bool = True,
     ) -> dict:
         """
         Busqueda unificada de entradas de inventario con evidencia de
@@ -2591,6 +2717,10 @@ class SystemInventoryStorage:
         - `caducidad`: estado de caducidad (vigente/obsoleto/expirado/desconocido)
           y edad desde la ultima comprobacion.
 
+        Cuando `solo_volumes_montados` es True (por defecto), solo devuelve
+        entradas de volumenes locales montados en el equipo actual
+        (3.8.5.1.4.6.6).
+
         La evidencia de validacion se obtiene ejecutando `validar_destino`
         y `esta_caducado` contra el sistema operativo real para cada
         entrada devuelta. Nunca se usa un mock para decidir si una entrada
@@ -2603,6 +2733,8 @@ class SystemInventoryStorage:
         - order_by: campo de ordenamiento (idem `search`).
         - machine_id_actual: identificador del equipo actual para la
           comprobacion de identidad. Si None, la identidad se omite.
+        - solo_volumes_montados: si True, filtra para excluir entradas de
+          volumenes que no estan montados en el equipo actual.
 
         Retorna:
         - dict con `results`, `total`, `has_more`, `next_cursor`, `limit`,
@@ -2620,6 +2752,7 @@ class SystemInventoryStorage:
             limit=limit,
             offset=offset,
             order_by=order_by,
+            solo_volumes_montados=solo_volumes_montados,
         )
 
         resultados_enriquecidos: list[dict] = []
@@ -2727,6 +2860,7 @@ class SystemInventoryStorage:
         order_by: str = "absolute_path",
         machine_id_actual: Optional[str] = None,
         preflight: Optional[ApplicationPreflight] = None,
+        solo_volumes_montados: bool = True,
     ) -> dict:
         """
         Busqueda unificada de entradas de inventario con diferenciacion
@@ -2751,6 +2885,10 @@ class SystemInventoryStorage:
         - `autorizado_para_lanzamiento`: es candidato a aplicacion y
           pasa la política de preflight real
           (`ApplicationPreflight.check`).
+
+        Cuando `solo_volumes_montados` es True (por defecto), solo devuelve
+        entradas de volumenes locales montados en el equipo actual
+        (3.8.5.1.4.6.6).
 
         El preflight solo se consulta cuando la entrada es candidata a
         aplicacion, para no invocar politicas de lanzamiento sobre
@@ -2780,6 +2918,7 @@ class SystemInventoryStorage:
             offset=offset,
             order_by=order_by,
             machine_id_actual=machine_id_actual,
+            solo_volumes_montados=solo_volumes_montados,
         )
 
         resultados_diferenciados: list[dict] = []

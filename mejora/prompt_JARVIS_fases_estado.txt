@@ -8208,3 +8208,20 @@ VERIFICACION: SINTAXIS: OK (py_compile + import + pytest sin errores); MAIN.PY: 
 DISCREPANCIAS: NINGUNA
 PENDIENTES: Ninguno para esta unidad. Padre 3.8.5.1.4.6 con hijas .1 completada, .2 completada, .3 completada, .4 completada, .5 completada, .6 a .8 pendientes. Siguiente hoja pendiente real: 3.8.5.1.4.6.6 (Evitar que una consulta de inventario devuelva rutas de otro host o de volumenes que no estan montados en el equipo actual).
 ESTADO FINAL: 3.8.5.1.4.6.5 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.8.5.1.4.6.6
+FECHA: 2026-11-10
+OBJETIVO: Evitar que una consulta de inventario devuelva rutas de otro host o de volumenes que no estan montados en el equipo actual. Las rutas de otro host ya estaban aisladas por `machine_id`; esta unidad añade el filtro de volumenes montados para excluir entradas de volumenes no disponibles en el SO actual.
+TIPO DE TRABAJO: IMPLEMENTACION | TEST | VERIFICACION REAL
+CAMBIOS / HALLAZGOS:
+- Añadido `import psutil` a `src/hands/system_inventory_storage.py`.
+- Añadido metodo `obtener_volumes_montados()` a `SystemInventoryStorage`: usa `psutil.disk_partitions(all=False)` para devolver el conjunto de volumenes realmente montados en el equipo (letras de unidad en Windows, puntos de montaje en POSIX). Captura `OSError`/`PermissionError` y devuelve conjunto vacio si no se puede enumerar.
+- Añadido metodo estatico `_volumen_de_entrada_esta_montado(volumen_entrada, volumes_montados)`: normaliza el volumen de la entrada (Windows: letra de unidad con dos puntos, mayusculas) y compara contra el conjunto de volumenes montados.
+- Añadido parametro `solo_volumes_montados: bool = True` a `search()`, `count()`, `search_paginated()`, `search_con_evidencia()` y `diferenciar_estado_acceso()`. Cuando es True (por defecto), filtra resultados para excluir entradas de volumenes no montados en el equipo actual (3.8.5.1.4.6.6). En `count()` y en la rama de cursor de `search_paginated()`, el filtro se aplica para que `total` sea coherente con los resultados devueltos.
+- El filtro por `machine_id` (aislamiento por equipo, 3.8.5.1.4.1.3) ya existia y sigue funcionando para evitar rutas de otro host.
+ARCHIVOS MODIFICADOS: PRODUCCION: `src/hands/system_inventory_storage.py` (se añade `import psutil`, metodo `obtener_volumes_montados`, metodo estatico `_volumen_de_entrada_esta_montados`, parametro `solo_volumes_montados` en `search`, `count`, `search_paginated`, `search_con_evidencia`, `diferenciar_estado_acceso`); TESTS: `tests/hands/test_system_inventory_storage.py` (se añade clase `TestVolumenesMontados` con 11 pruebas unitarias); `tests/hands/test_volumes_montados_entorno_real.py` (nuevo, 3 pruebas de entorno real); DOCUMENTACION: `docs/README.md` (filas actualizadas de `search`, `count`, `search_paginated`, `search_con_evidencia`, `diferenciar_estado_acceso` y nueva fila de `obtener_volumes_montados`); `docs/README_TESTS.md` (clase `TestVolumenesMontados` en tabla, recuento 204 -> 215, nueva seccion para test de entorno real, entrada en indice).
+TESTS Y RESULTADOS: UNITARIOS: 215 PASSED / 215 TOTAL (test_system_inventory_storage.py completo, sin regresion); TEST ENTORNO REAL: 3 PASSED / 3 TOTAL (test_volumes_montados_entorno_real.py); ademas 4 PASSED / 4 TOTAL de test_revalidar_destino_aplicacion_entorno_real.py (sin regresion).
+VERIFICACION: SINTAXIS: OK (ast.parse + pytest sin errores); MAIN.PY: NA (no se modifica main.py); COMPORTAMIENTO / INTEGRACION REAL: Evidencia real en Windows 11, Python 3.14.7: `obtener_volumes_montados()` coincide con `psutil.disk_partitions` real; `search` con `solo_volumes_montados=True` devuelve solo entradas de C: (montado) y excluye Z: (no montado); `count` y `search_paginated` coherentes con el filtro; archivos temporales y base de datos SQLite eliminados tras cada prueba.
+DISCREPANCIAS: NINGUNA
+PENDIENTES: Ninguno para esta unidad. Padre 3.8.5.1.4.6 con hijas .1 completada, .2 completada, .3 completada, .4 completada, .5 completada, .6 completada, .7 a .8 pendientes. Siguiente hoja pendiente real: 3.8.5.1.4.6.7 (Limitar los datos enviados a Brain/LLM a los candidatos relevantes para la orden).
+ESTADO FINAL: 3.8.5.1.4.6.6 - IMPLEMENTADA

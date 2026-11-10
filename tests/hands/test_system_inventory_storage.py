@@ -4846,3 +4846,187 @@ class TestMarcadoEntradasEliminadas:
         assert resumen["marcadas"] == 0
         assert resumen["total_entradas"] == 1
         assert "no existe una entrada de archivo" in resumen["no_marcadas"][0]["motivo"]
+
+
+# ---------------------------------------------------------------------------
+# Volumenes montados en el equipo actual (unidad 3.8.5.1.4.6.6).
+# ---------------------------------------------------------------------------
+
+class TestVolumenesMontados:
+    """Verificar que las consultas no devuelven rutas de volumenes no montados."""
+
+    def _seed_volumenes(
+        self,
+        storage: SystemInventoryStorage,
+        machine_id: str = "machine-alfa",
+    ) -> str:
+        """Inserta entradas en C: (montado) y Z: (no montado en el equipo)."""
+        storage.initialize()
+        storage.record_machine(machine_id)
+        storage.begin_scan_run("scan-vol", machine_id, "C:", SCAN_MODE_FULL)
+        entradas = [
+            {
+                "entry_id": "e-c-exe",
+                "absolute_path": "C:/Apps/app.exe",
+                "relative_path": "Apps/app.exe",
+                "name": "app.exe",
+                "extension": ".exe",
+                "entry_type": "file",
+                "size_bytes": 1000,
+                "modified_at": "2024-01-01T10:00:00",
+                "created_at": "2024-01-01T09:00:00",
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-03T00:00:00",
+            },
+            {
+                "entry_id": "e-c-txt",
+                "absolute_path": "C:/Docs/readme.txt",
+                "relative_path": "Docs/readme.txt",
+                "name": "readme.txt",
+                "extension": ".txt",
+                "entry_type": "file",
+                "size_bytes": 200,
+                "modified_at": "2024-01-01T10:00:00",
+                "created_at": "2024-01-01T09:00:00",
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-03T00:00:00",
+            },
+            {
+                "entry_id": "e-z-exe",
+                "absolute_path": "Z:/Remoto/app.exe",
+                "relative_path": "Remoto/app.exe",
+                "name": "app.exe",
+                "extension": ".exe",
+                "entry_type": "file",
+                "size_bytes": 3000,
+                "modified_at": "2024-01-01T10:00:00",
+                "created_at": "2024-01-01T09:00:00",
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-03T00:00:00",
+            },
+        ]
+        storage.insert_file_entries("scan-vol", machine_id, "C:", entradas[:2])
+        # La entrada de Z: se registra con volumen Z: para simular un volumen
+        # que no esta montado en el equipo actual.
+        storage.insert_file_entries("scan-vol", machine_id, "Z:", [entradas[2]])
+        storage.end_scan_run("scan-vol", entries_count=len(entradas))
+        return "scan-vol"
+
+    def test_obtener_volumes_montados_devuelve_conjunto_no_vacio_en_windows(
+        self, storage: SystemInventoryStorage
+    ):
+        """obtener_volumes_montados devuelve al menos el volumen del sistema."""
+        montados = storage.obtener_volumes_montados()
+        assert isinstance(montados, set)
+        assert len(montados) >= 1
+        # En Windows el volumen del sistema (C:) siempre debe estar montado.
+        tiene_sistema = any(v.upper().endswith(":") for v in montados)
+        assert tiene_sistema, f"Se esperaba al menos una letra de unidad, obtuvo {montados}"
+
+    def test_search_solo_volumes_montados_excluye_volumen_no_montado(
+        self, storage: SystemInventoryStorage
+    ):
+        """search con solo_volumes_montados=True no devuelve Z: (no montado)."""
+        self._seed_volumenes(storage)
+        res = storage.search("machine-alfa", solo_volumes_montados=True)
+        volumes_devueltos = {e["volume"] for e in res}
+        assert "C:" in volumes_devueltos
+        assert "Z:" not in volumes_devueltos
+        # Todas las entradas devueltas deben ser de volumenes montados.
+        montados = storage.obtener_volumes_montados()
+        for e in res:
+            assert e["volume"] in montados or any(
+                e["volume"].upper() == m.upper() for m in montados
+            )
+
+    def test_search_sin_filtro_devuelve_ambos_volumenes(
+        self, storage: SystemInventoryStorage
+    ):
+        """search con solo_volumes_montados=False devuelve C: y Z:."""
+        self._seed_volumenes(storage)
+        res = storage.search("machine-alfa", solo_volumes_montados=False)
+        volumes_devueltos = {e["volume"] for e in res}
+        assert "C:" in volumes_devueltos
+        assert "Z:" in volumes_devueltos
+
+    def test_count_solo_volumes_montados_excluye_no_montado(
+        self, storage: SystemInventoryStorage
+    ):
+        """count con solo_volumes_montados=True no cuenta Z:."""
+        self._seed_volumenes(storage)
+        total_montados = storage.count("machine-alfa", solo_volumes_montados=True)
+        total_todos = storage.count("machine-alfa", solo_volumes_montados=False)
+        assert total_montados == 2  # solo las 2 entradas de C:
+        assert total_todos == 3  # C: + Z:
+
+    def test_count_con_volumen_filtrado_y_montados(
+        self, storage: SystemInventoryStorage
+    ):
+        """count filtra primero por volumen y luego por montado."""
+        self._seed_volumenes(storage)
+        # Pedir volumen Z: especificamente pero solo montados -> debe ser 0.
+        res = storage.count("machine-alfa", volume="Z:", solo_volumes_montados=True)
+        assert res == 0
+        # Pedir volumen C: montados -> debe ser 2.
+        res = storage.count("machine-alfa", volume="C:", solo_volumes_montados=True)
+        assert res == 2
+
+    def test_search_paginated_solo_volumes_montados(
+        self, storage: SystemInventoryStorage
+    ):
+        """search_paginated con solo_volumes_montados=True excluye Z:."""
+        self._seed_volumenes(storage)
+        pagina = storage.search_paginated(
+            "machine-alfa", solo_volumes_montados=True, limit=10, offset=0
+        )
+        volumes_devueltos = {e["volume"] for e in pagina["results"]}
+        assert "C:" in volumes_devueltos
+        assert "Z:" not in volumes_devueltos
+        assert pagina["total"] == 2
+
+    def test_search_con_evidencia_solo_volumes_montados(
+        self, storage: SystemInventoryStorage
+    ):
+        """search_con_evidencia con solo_volumes_montados=True excluye Z:."""
+        self._seed_volumenes(storage)
+        pagina = storage.search_con_evidencia(
+            "machine-alfa", solo_volumes_montados=True, limit=10, offset=0
+        )
+        volumes_devueltos = {e["volume"] for e in pagina["results"]}
+        assert "C:" in volumes_devueltos
+        assert "Z:" not in volumes_devueltos
+        assert pagina["total"] == 2
+
+    def test_search_volumen_no_montado_no_devuelve_nada(
+        self, storage: SystemInventoryStorage
+    ):
+        """Buscar entradas de un volumen no montado devuelve vacio."""
+        self._seed_volumenes(storage)
+        res = storage.search(
+            "machine-alfa", volume="Z:", solo_volumes_montados=True
+        )
+        assert res == []
+
+    def test_volumen_vacio_no_esta_montado(self, storage: SystemInventoryStorage):
+        """_volumen_de_entrada_esta_montado con volumen vacio retorna False."""
+        montados = storage.obtener_volumes_montados()
+        assert storage._volumen_de_entrada_esta_montado("", montados) is False
+
+    def test_volumen_no_montado_retorna_false(
+        self, storage: SystemInventoryStorage
+    ):
+        """_volumen_de_entrada_esta_montado con volumen inexistente retorna False."""
+        montados = storage.obtener_volumes_montados()
+        assert storage._volumen_de_entrada_esta_montado("Z:", montados) is False
+
+    def test_equipo_diferente_con_volumen_no_montado(self, storage: SystemInventoryStorage):
+        """Aislamiento por equipo: consulta de otro equipo no devuelve Z: ni C:."""
+        self._seed_volumenes(storage, "machine-alfa")
+        res = storage.search("machine-beta", solo_volumes_montados=True)
+        assert res == []
