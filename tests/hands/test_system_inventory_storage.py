@@ -27,9 +27,12 @@ import pytest
 from src.hands.system_inventory import (
     ControlRecorrido,
     EntryType,
+    EstadoCaducidad,
     InventoryContract,
     InventoryEntry,
     RecorridoVolumen,
+    esta_caducado,
+    validar_destino,
 )
 from src.hands.system_inventory_storage import (
     DEFAULT_BACKUP_SUFFIX,
@@ -1670,11 +1673,461 @@ class TestConsultasIndexadas:
         assert res[0]["volume"] == "C:"
         assert res[0]["machine_id"] == "machine-alfa"
 
+    # ---------------------------------------------------------------------------
+    # Count y paginacion con cursor (unidad 3.8.5.1.4.6.2).
+    # ---------------------------------------------------------------------------
+
+    def test_count_devuelve_total_con_filtros(self, storage: SystemInventoryStorage):
+        self._seed(storage)
+        assert storage.count("machine-alfa") == 6
+        assert storage.count("machine-alfa", extension=".exe") == 5
+        assert storage.count("machine-alfa", extension=".txt") == 1
+        assert storage.count("machine-alfa", tipo="file") == 6
+        assert storage.count("machine-alfa", volume="C:") == 6
+        assert storage.count("machine-alfa", disponible=True) == 6
+        assert storage.count("machine-alfa", name="app2.exe") == 1
+
+    def test_count_devuelve_cero_para_maquina_sin_datos(self, storage: SystemInventoryStorage):
+        self._seed(storage, "machine-alfa")
+        assert storage.count("machine-beta") == 0
+        assert storage.count("machine-beta", extension=".exe") == 0
+
+    def test_count_coincide_con_resultados_sin_limite(self, storage: SystemInventoryStorage):
+        self._seed(storage)
+        total = storage.count("machine-alfa")
+        todos = storage.search("machine-alfa")
+        assert total == len(todos) == 6
+
+    def test_count_con_ruta_y_disponible(self, storage: SystemInventoryStorage):
+        self._seed(storage)
+        assert storage.count("machine-alfa", ruta="C:/Apps/app") == 5
+        assert storage.count("machine-alfa", disponible=True, extension=".exe") == 5
+
+    def test_search_paginated_offset_devuelve_metadatos(self, storage: SystemInventoryStorage):
+        self._seed(storage)
+        pagina = storage.search_paginated("machine-alfa", limit=2, offset=0)
+        assert len(pagina["results"]) == 2
+        assert pagina["total"] == 6
+        assert pagina["has_more"] is True
+        assert pagina["next_cursor"] is not None
+        assert pagina["limit"] == 2
+        assert pagina["offset"] == 0
+
+    def test_search_paginated_offset_ultima_pagina_sin_has_more(self, storage: SystemInventoryStorage):
+        self._seed(storage)
+        pagina = storage.search_paginated("machine-alfa", limit=10, offset=0)
+        assert len(pagina["results"]) == 6
+        assert pagina["total"] == 6
+        assert pagina["has_more"] is False
+        # next_cursor es el ultimo entry_id devuelto (incluso en la ultima pagina);
+        # has_more=False indica que no hay mas datos.
+        assert pagina["next_cursor"] is not None
+
+    def test_search_paginated_cursor_recorre_sin_duplicados(self, storage: SystemInventoryStorage):
+        self._seed(storage)
+        ids_vistos: set[str] = set()
+        cursor: Optional[str] = None
+        paginas = 0
+        while True:
+            pagina = storage.search_paginated("machine-alfa", limit=2, cursor=cursor)
+            for entrada in pagina["results"]:
+                assert entrada["entry_id"] not in ids_vistos, f"Duplicado: {entrada['entry_id']}"
+                ids_vistos.add(entrada["entry_id"])
+            paginas += 1
+            if not pagina["has_more"]:
+                break
+            cursor = pagina["next_cursor"]
+            assert cursor is not None
+        assert len(ids_vistos) == 6
+        assert paginas == 3  # 6 entradas, 2 por pagina = 3 paginas
+
+    def test_search_paginated_cursor_ignora_offset(self, storage: SystemInventoryStorage):
+        self._seed(storage)
+        primera = storage.search_paginated("machine-alfa", limit=2, cursor=None, offset=0)
+        cursor = primera["next_cursor"]
+        assert cursor is not None
+        segunda = storage.search_paginated("machine-alfa", limit=2, cursor=cursor, offset=999)
+        ids_primera = {e["entry_id"] for e in primera["results"]}
+        ids_segunda = {e["entry_id"] for e in segunda["results"]}
+        assert ids_primera.isdisjoint(ids_segunda)
+
+    def test_search_paginated_con_filtros(self, storage: SystemInventoryStorage):
+        self._seed(storage)
+        pagina = storage.search_paginated(
+            "machine-alfa", extension=".exe", limit=2, offset=0,
+        )
+        assert len(pagina["results"]) == 2
+        assert pagina["total"] == 5
+        assert pagina["has_more"] is True
+        for entrada in pagina["results"]:
+            assert entrada["extension"].lower() == ".exe"
+
+    def test_search_paginated_cursor_con_filtros(self, storage: SystemInventoryStorage):
+        self._seed(storage)
+        ids_vistos: set[str] = set()
+        cursor: Optional[str] = None
+        while True:
+            pagina = storage.search_paginated(
+                "machine-alfa", extension=".exe", limit=2, cursor=cursor,
+            )
+            for entrada in pagina["results"]:
+                assert entrada["extension"].lower() == ".exe"
+                ids_vistos.add(entrada["entry_id"])
+            if not pagina["has_more"]:
+                break
+            cursor = pagina["next_cursor"]
+        assert len(ids_vistos) == 5
+
+    # ---------------------------------------------------------------------------
+    # Verificacion a escala (500 entradas, base de datos real en tmp_path).
+    # ---------------------------------------------------------------------------
+
+    def _seed_escala(self, storage: SystemInventoryStorage, n: int = 500) -> None:
+        storage.initialize()
+        storage.record_machine("maquina-escala")
+        storage.begin_scan_run("scan-escala", "maquina-escala", "C:", SCAN_MODE_FULL)
+        entradas = []
+        for i in range(n):
+            entradas.append({
+                "entry_id": f"e-{i:06d}",
+                "absolute_path": f"C:/Apps/app{i:06d}.exe",
+                "relative_path": f"Apps/app{i:06d}.exe",
+                "name": f"app{i:06d}.exe",
+                "extension": ".exe" if i % 2 == 0 else ".dll",
+                "entry_type": "file",
+                "size_bytes": 1000 + i,
+                "modified_at": "2024-01-01T10:00:00",
+                "created_at": "2024-01-01T09:00:00",
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-03T00:00:00",
+            })
+        storage.insert_file_entries("scan-escala", "maquina-escala", "C:", entradas)
+        storage.end_scan_run("scan-escala", entries_count=n)
+
+    def test_escala_count_500_entradas(self, storage: SystemInventoryStorage):
+        self._seed_escala(storage, 500)
+        assert storage.count("maquina-escala") == 500
+        assert storage.count("maquina-escala", extension=".exe") == 250
+        assert storage.count("maquina-escala", extension=".dll") == 250
+
+    def test_escala_offset_recorre_todos_sin_duplicados(self, storage: SystemInventoryStorage):
+        self._seed_escala(storage, 500)
+        ids_vistos: set[str] = set()
+        offset = 0
+        limite = 100
+        paginas = 0
+        while True:
+            pagina = storage.search_paginated("maquina-escala", limit=limite, offset=offset)
+            for e in pagina["results"]:
+                assert e["entry_id"] not in ids_vistos
+                ids_vistos.add(e["entry_id"])
+            paginas += 1
+            if not pagina["has_more"]:
+                break
+            offset += limite
+        assert len(ids_vistos) == 500
+        assert paginas == 5
+
+    def test_escala_cursor_recorre_todos_sin_duplicados(self, storage: SystemInventoryStorage):
+        self._seed_escala(storage, 500)
+        ids_vistos: set[str] = set()
+        cursor = None
+        paginas = 0
+        while True:
+            pagina = storage.search_paginated("maquina-escala", limit=100, cursor=cursor)
+            for e in pagina["results"]:
+                assert e["entry_id"] not in ids_vistos
+                ids_vistos.add(e["entry_id"])
+            paginas += 1
+            if not pagina["has_more"]:
+                break
+            cursor = pagina["next_cursor"]
+        assert len(ids_vistos) == 500
+        assert paginas == 5
+
+    def test_escala_offset_y_cursor_mismo_conjunto(self, storage: SystemInventoryStorage):
+        self._seed_escala(storage, 500)
+        ids_offset: set[str] = set()
+        offset = 0
+        while True:
+            pagina = storage.search_paginated("maquina-escala", limit=100, offset=offset)
+            for e in pagina["results"]:
+                ids_offset.add(e["entry_id"])
+            if not pagina["has_more"]:
+                break
+            offset += 100
+
+        ids_cursor: set[str] = set()
+        cursor = None
+        while True:
+            pagina = storage.search_paginated("maquina-escala", limit=100, cursor=cursor)
+            for e in pagina["results"]:
+                ids_cursor.add(e["entry_id"])
+            if not pagina["has_more"]:
+                break
+            cursor = pagina["next_cursor"]
+
+        assert ids_offset == ids_cursor
+
+
+# ---------------------------------------------------------------------------
+# Busqueda con evidencia de revalidacion real (unidad 3.8.5.1.4.6.3).
+# ---------------------------------------------------------------------------
+
+class TestBusquedaConEvidencia:
+    """search_con_evidencia devuelve procedencia, volumen, fecha de ultima
+    comprobacion, estado y evidencia de validacion real para cada resultado,
+    para que el consumidor decida si necesita revalidar (3.8.5.1.4.6.3)."""
+
+    def _seed_evidencia(self, storage: SystemInventoryStorage, machine_id: str = "machine-alfa") -> str:
+        storage.initialize()
+        storage.record_machine(machine_id)
+        storage.begin_scan_run("scan-evid", machine_id, "C:", SCAN_MODE_FULL)
+        entradas = [
+            {
+                "entry_id": "e-evid-1",
+                "absolute_path": "C:/Apps/app.exe",
+                "relative_path": "Apps/app.exe",
+                "name": "app.exe",
+                "extension": ".exe",
+                "entry_type": "file",
+                "size_bytes": 1024,
+                "modified_at": "2024-01-01T10:00:00",
+                "created_at": "2024-01-01T09:00:00",
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-03T00:00:00",
+            },
+            {
+                "entry_id": "e-evid-2",
+                "absolute_path": "C:/Docs/readme.txt",
+                "relative_path": "Docs/readme.txt",
+                "name": "readme.txt",
+                "extension": ".txt",
+                "entry_type": "file",
+                "size_bytes": 500,
+                "modified_at": "2024-03-01T10:00:00",
+                "created_at": "2024-03-01T09:00:00",
+                "attributes": ["hidden"],
+                "excluded": True,
+                "source": "preflight",
+                "last_checked_at": "2024-03-05T00:00:00",
+            },
+            {
+                "entry_id": "e-evid-3",
+                "absolute_path": "C:/Tools",
+                "relative_path": "Tools",
+                "name": "Tools",
+                "extension": "",
+                "entry_type": "directory",
+                "size_bytes": 0,
+                "modified_at": "2024-02-01T10:00:00",
+                "created_at": "2024-02-01T09:00:00",
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "",
+            },
+        ]
+        storage.insert_file_entries("scan-evid", machine_id, "C:", entradas)
+        storage.end_scan_run("scan-evid", entries_count=3)
+        return "scan-evid"
+
+    def test_devuelve_campos_procedencia_volumen_fecha_estado(
+        self, storage: SystemInventoryStorage
+    ):
+        self._seed_evidencia(storage)
+        pagina = storage.search_con_evidencia("machine-alfa")
+        assert len(pagina["results"]) == 3
+        for entrada in pagina["results"]:
+            assert "procedencia" in entrada
+            assert "volumen" in entrada
+            assert "fecha_ultima_comprobacion" in entrada
+            assert "estado" in entrada
+            assert "tipo" in entrada["estado"]
+            assert "excluida" in entrada["estado"]
+            assert "evidencia" in entrada
+            assert "caducidad" in entrada
+
+    def test_procedencia_es_source_de_entrada(self, storage: SystemInventoryStorage):
+        self._seed_evidencia(storage)
+        pagina = storage.search_con_evidencia("machine-alfa")
+        por_id = {e["entry_id"]: e for e in pagina["results"]}
+        assert por_id["e-evid-1"]["procedencia"] == "filesystem_scan"
+        assert por_id["e-evid-2"]["procedencia"] == "preflight"
+        assert por_id["e-evid-3"]["procedencia"] == "filesystem_scan"
+
+    def test_volumen_coincide_con_entrada(self, storage: SystemInventoryStorage):
+        self._seed_evidencia(storage)
+        pagina = storage.search_con_evidencia("machine-alfa")
+        for entrada in pagina["results"]:
+            assert entrada["volumen"] == "C:"
+
+    def test_fecha_ultima_comprobacion_coincide(self, storage: SystemInventoryStorage):
+        self._seed_evidencia(storage)
+        pagina = storage.search_con_evidencia("machine-alfa")
+        por_id = {e["entry_id"]: e for e in pagina["results"]}
+        assert por_id["e-evid-1"]["fecha_ultima_comprobacion"] == "2024-01-03T00:00:00"
+        assert por_id["e-evid-2"]["fecha_ultima_comprobacion"] == "2024-03-05T00:00:00"
+        assert por_id["e-evid-3"]["fecha_ultima_comprobacion"] == ""
+
+    def test_estado_incluye_tipo_y_excluida(self, storage: SystemInventoryStorage):
+        self._seed_evidencia(storage)
+        pagina = storage.search_con_evidencia("machine-alfa")
+        por_id = {e["entry_id"]: e for e in pagina["results"]}
+        assert por_id["e-evid-1"]["estado"]["tipo"] == "file"
+        assert por_id["e-evid-1"]["estado"]["excluida"] is False
+        assert por_id["e-evid-2"]["estado"]["tipo"] == "file"
+        assert por_id["e-evid-2"]["estado"]["excluida"] is True
+        assert por_id["e-evid-3"]["estado"]["tipo"] == "directory"
+        assert por_id["e-evid-3"]["estado"]["excluida"] is False
+
+    def test_evidencia_incluye_validacion_real(self, storage: SystemInventoryStorage):
+        self._seed_evidencia(storage)
+        pagina = storage.search_con_evidencia("machine-alfa")
+        for entrada in pagina["results"]:
+            evidencia = entrada["evidencia"]
+            assert "disponible" in evidencia
+            assert isinstance(evidencia["existencia_ok"], bool)
+            assert isinstance(evidencia["tipo_ok"], bool)
+            assert isinstance(evidencia["volumen_ok"], bool)
+            assert isinstance(evidencia["identidad_ok"], bool)
+            assert isinstance(evidencia["accesible_ok"], bool)
+            assert isinstance(evidencia["valido"], bool)
+            assert isinstance(evidencia["errores"], list)
+            assert isinstance(evidencia["razon"], str)
+
+    def test_evidencia_no_usa_mocks(self, storage: SystemInventoryStorage):
+        """La evidencia de validacion proviene del SO real, nunca de mocks."""
+        self._seed_evidencia(storage)
+        pagina = storage.search_con_evidencia("machine-alfa")
+        # Las rutas C:/Apps/app.exe y C:/Docs/readme.txt no existen en este
+        # equipo, por lo que existencia_ok debe ser False (evidencia real, no
+        # simulada).
+        por_id = {e["entry_id"]: e for e in pagina["results"]}
+        assert por_id["e-evid-1"]["evidencia"]["existencia_ok"] is False
+        assert por_id["e-evid-2"]["evidencia"]["existencia_ok"] is False
+        # C:/Tools tampoco existe como directorio en C:
+        assert por_id["e-evid-3"]["evidencia"]["existencia_ok"] is False
+
+    def test_caducidad_incluye_estado_y_edad(self, storage: SystemInventoryStorage):
+        self._seed_evidencia(storage)
+        pagina = storage.search_con_evidencia("machine-alfa")
+        for entrada in pagina["results"]:
+            caducidad = entrada["caducidad"]
+            assert caducidad["estado"] in (
+                EstadoCaducidad.VIGENTE.value,
+                EstadoCaducidad.OBSOLETO.value,
+                EstadoCaducidad.EXPIRADO.value,
+                EstadoCaducidad.DESCONOCIDO.value,
+            )
+            assert "edad_segundos" in caducidad
+            assert "ultimo_check" in caducidad
+            assert "es_valido_para_uso" in caducidad
+            assert "razon" in caducidad
+            assert isinstance(caducidad["es_valido_para_uso"], bool)
+
+    def test_entrada_sin_last_checked_esta_expirada(self, storage: SystemInventoryStorage):
+        self._seed_evidencia(storage)
+        pagina = storage.search_con_evidencia("machine-alfa")
+        por_id = {e["entry_id"]: e for e in pagina["results"]}
+        # e-evid-3 tiene last_checked_at vacio: caducidad EXPIRADO.
+        assert por_id["e-evid-3"]["caducidad"]["estado"] == EstadoCaducidad.EXPIRADO.value
+        assert por_id["e-evid-3"]["caducidad"]["es_valido_para_uso"] is False
+
+    def test_con_machine_id_actual_identidad_ok(self, storage: SystemInventoryStorage):
+        self._seed_evidencia(storage)
+        pagina = storage.search_con_evidencia(
+            "machine-alfa", machine_id_actual="machine-alfa"
+        )
+        for entrada in pagina["results"]:
+            # La identidad del equipo coincide: identidad_ok debe ser True.
+            assert entrada["evidencia"]["identidad_ok"] is True
+
+    def test_con_machine_id_actual_distinto_identidad_falla(
+        self, storage: SystemInventoryStorage
+    ):
+        self._seed_evidencia(storage)
+        pagina = storage.search_con_evidencia(
+            "machine-alfa", machine_id_actual="otro-equipo"
+        )
+        for entrada in pagina["results"]:
+            assert entrada["evidencia"]["identidad_ok"] is False
+            assert any("Identidad de equipo" in err for err in entrada["evidencia"]["errores"])
+
+    def test_sin_machine_id_actual_identidad_omitida(self, storage: SystemInventoryStorage):
+        self._seed_evidencia(storage)
+        pagina = storage.search_con_evidencia("machine-alfa")
+        # Sin machine_id_actual, la identidad se omite (no se falla por eso).
+        for entrada in pagina["results"]:
+            assert entrada["evidencia"]["identidad_ok"] is True
+            assert any("omitida" in err for err in entrada["evidencia"]["errores"])
+
+    def test_filtros_se_aplican_antes_de_la_evidencia(self, storage: SystemInventoryStorage):
+        self._seed_evidencia(storage)
+        # Solo .exe: 1 resultado (e-evid-1).
+        pagina = storage.search_con_evidencia("machine-alfa", extension=".exe")
+        assert pagina["total"] == 1
+        assert len(pagina["results"]) == 1
+        assert pagina["results"][0]["entry_id"] == "e-evid-1"
+
+    def test_paginacion_con_evidencia(self, storage: SystemInventoryStorage):
+        self._seed_evidencia(storage)
+        pagina = storage.search_con_evidencia("machine-alfa", limit=1, offset=0)
+        assert len(pagina["results"]) == 1
+        assert pagina["total"] == 3
+        assert pagina["has_more"] is True
+        # La unica entrada de la pagina debe tener evidencia completa.
+        assert "evidencia" in pagina["results"][0]
+        assert "caducidad" in pagina["results"][0]
+
+    def test_maquina_sin_datos_devuelve_lista_vacia(self, storage: SystemInventoryStorage):
+        storage.initialize()
+        storage.record_machine("machine-vacia")
+        pagina = storage.search_con_evidencia("machine-vacia")
+        assert pagina["results"] == []
+        assert pagina["total"] == 0
+
+    def test_entrada_no_reconstruible_devuelve_evidencia_no_disponible(
+        self, storage: SystemInventoryStorage
+    ):
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        storage.begin_scan_run("scan-mal", "machine-alfa", "C:", SCAN_MODE_FULL)
+        # Entrada con entry_type invalido: no se puede reconstruir InventoryEntry.
+        storage.insert_file_entries("scan-mal", "machine-alfa", "C:", [
+            {
+                "entry_id": "e-mal",
+                "absolute_path": "C:/Apps/bad.exe",
+                "relative_path": "Apps/bad.exe",
+                "name": "bad.exe",
+                "extension": ".exe",
+                "entry_type": "tipo_inexistente",
+                "size_bytes": 100,
+                "modified_at": "2024-01-01T10:00:00",
+                "created_at": "2024-01-01T09:00:00",
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-03T00:00:00",
+            },
+        ])
+        storage.end_scan_run("scan-mal", entries_count=1)
+        pagina = storage.search_con_evidencia("machine-alfa")
+        assert len(pagina["results"]) == 1
+        assert pagina["results"][0]["evidencia"]["disponible"] is False
+        assert "No se pudo reconstruir" in pagina["results"][0]["evidencia"]["razon"]
+        assert pagina["results"][0]["caducidad"]["estado"] == EstadoCaducidad.DESCONOCIDO.value
 
 
 # ---------------------------------------------------------------------------
 # Contexto y cierre limpio
 # ---------------------------------------------------------------------------
+
+
 
 class TestContexto:
     """Uso como gestor de contexto y cierre limpio de la conexion."""

@@ -38,6 +38,16 @@ from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Callable, Optional
 
+from src.hands.system_inventory import (
+    EntryType,
+    EstadoCaducidad,
+    InventoryEntry,
+    ResultadoCaducidad,
+    ResultadoValidacionDestino,
+    esta_caducado,
+    validar_destino,
+)
+
 
 SCHEMA_VERSION = 4
 
@@ -2363,6 +2373,329 @@ class SystemInventoryStorage:
 
         cur = conn.execute(sql, params)
         return [dict(r) for r in cur.fetchall()]
+
+    def count(
+        self,
+        machine_id: str,
+        name: Optional[str] = None,
+        ruta: Optional[str] = None,
+        extension: Optional[str] = None,
+        tipo: Optional[str] = None,
+        volume: Optional[str] = None,
+        disponible: Optional[bool] = None,
+    ) -> int:
+        """
+        Devuelve el total de entradas que coinciden con los mismos filtros que
+        `search`, sin cargar filas en memoria.
+
+        Se usa para construir metadatos de paginacion (total de paginas,
+        has_more) sin materializar el conjunto completo de resultados.
+
+        Aplica los mismos filtros y aislamiento por `machine_id` que `search`.
+        """
+        conn = self.connect()
+
+        where_clauses: list[str] = ["machine_id = ?"]
+        params: list[object] = [machine_id]
+
+        if name is not None:
+            where_clauses.append("lower(name) = lower(?)")
+            params.append(name)
+        if ruta is not None:
+            where_clauses.append("absolute_path LIKE ?")
+            params.append(ruta + "%")
+        if extension is not None:
+            where_clauses.append("lower(extension) = lower(?)")
+            params.append(extension)
+        if tipo is not None:
+            where_clauses.append("entry_type = ?")
+            params.append(tipo)
+        if volume is not None:
+            where_clauses.append("volume = ?")
+            params.append(volume)
+        if disponible is not None:
+            where_clauses.append("excluded = ?")
+            params.append(0 if disponible else 1)
+
+        where_sql = " AND ".join(where_clauses)
+
+        cur = conn.execute(
+            f"SELECT COUNT(*) AS c FROM file_entries WHERE {where_sql}",
+            params,
+        )
+        return int(cur.fetchone()["c"])
+
+    def search_paginated(
+        self,
+        machine_id: str,
+        name: Optional[str] = None,
+        ruta: Optional[str] = None,
+        extension: Optional[str] = None,
+        tipo: Optional[str] = None,
+        volume: Optional[str] = None,
+        disponible: Optional[bool] = None,
+        limit: int = 50,
+        offset: int = 0,
+        order_by: str = "absolute_path",
+        cursor: Optional[str] = None,
+    ) -> dict:
+        """
+        Busqueda paginada que devuelve resultados junto con metadatos de
+        paginacion sin cargar toda la base de datos en memoria.
+
+        Combina `search` (con soporte de cursor y offset) y `count` para
+        ofrecer al consumidor:
+        - `results`: lista de entradas de la pagina solicitada.
+        - `total`: numero total de entradas que coinciden con los filtros.
+        - `has_more`: True si hay mas entradas despues de esta pagina.
+        - `next_cursor`: entry_id de la ultima entrada devuelta (para
+          paginacion por cursor en la siguiente solicitud) o None.
+        - `limit`, `offset`, `order_by`: parametros de paginacion usados.
+
+        La paginacion por cursor (`cursor`) es mas eficiente que OFFSET para
+        grandes volúmenes porque evita que SQLite examine y descarte filas
+        ya recorridas. Cuando se proporciona `cursor`, se usa `entry_id > ?`
+        con ORDER BY entry_id, ignorando `offset`.
+        """
+        results: list[dict]
+
+        if cursor is not None:
+            # Paginacion por cursor: mas eficiente que OFFSET en grandes volúmenes.
+            conn = self.connect()
+            where_clauses: list[str] = [
+                "machine_id = ?",
+                "entry_id > ?",
+            ]
+            params: list[object] = [machine_id, cursor]
+
+            if name is not None:
+                where_clauses.append("lower(name) = lower(?)")
+                params.append(name)
+            if ruta is not None:
+                where_clauses.append("absolute_path LIKE ?")
+                params.append(ruta + "%")
+            if extension is not None:
+                where_clauses.append("lower(extension) = lower(?)")
+                params.append(extension)
+            if tipo is not None:
+                where_clauses.append("entry_type = ?")
+                params.append(tipo)
+            if volume is not None:
+                where_clauses.append("volume = ?")
+                params.append(volume)
+            if disponible is not None:
+                where_clauses.append("excluded = ?")
+                params.append(0 if disponible else 1)
+
+            where_sql = " AND ".join(where_clauses)
+            sql = f"""
+                SELECT * FROM file_entries
+                WHERE {where_sql}
+                ORDER BY entry_id
+                LIMIT ?
+            """
+            params.append(limit)
+            cur = conn.execute(sql, params)
+            results = [dict(r) for r in cur.fetchall()]
+            total = self.count(
+                machine_id=machine_id,
+                name=name,
+                ruta=ruta,
+                extension=extension,
+                tipo=tipo,
+                volume=volume,
+                disponible=disponible,
+            )
+            next_cursor = results[-1]["entry_id"] if results else None
+            # has_more: existen mas entradas despues del cursor con los mismos filtros.
+            if next_cursor is not None:
+                cur2 = conn.execute(
+                    f"SELECT COUNT(*) AS c FROM file_entries WHERE {where_sql} AND entry_id > ?",
+                    params[:-1] + [next_cursor],
+                )
+                has_more = int(cur2.fetchone()["c"]) > 0
+            else:
+                has_more = False
+        else:
+            # Paginacion por offset (clasica).
+            results = self.search(
+                machine_id=machine_id,
+                name=name,
+                ruta=ruta,
+                extension=extension,
+                tipo=tipo,
+                volume=volume,
+                disponible=disponible,
+                limit=limit,
+                offset=offset,
+                order_by=order_by,
+            )
+            total = self.count(
+                machine_id=machine_id,
+                name=name,
+                ruta=ruta,
+                extension=extension,
+                tipo=tipo,
+                volume=volume,
+                disponible=disponible,
+            )
+            next_cursor = results[-1]["entry_id"] if results else None
+            has_more = offset + len(results) < total
+
+        return {
+            "results": results,
+            "total": total,
+            "has_more": has_more,
+            "next_cursor": next_cursor,
+            "limit": limit,
+            "offset": offset if cursor is None else 0,
+            "order_by": order_by if cursor is None else "entry_id",
+        }
+
+    # ------------------------------------------------------------------ #
+    # Busqueda con evidencia de revalidacion real (unidad 3.8.5.1.4.6.3).
+    # ------------------------------------------------------------------ #
+    def search_con_evidencia(
+        self,
+        machine_id: str,
+        name: Optional[str] = None,
+        ruta: Optional[str] = None,
+        extension: Optional[str] = None,
+        tipo: Optional[str] = None,
+        volume: Optional[str] = None,
+        disponible: Optional[bool] = None,
+        limit: int = 50,
+        offset: int = 0,
+        order_by: str = "absolute_path",
+        machine_id_actual: Optional[str] = None,
+    ) -> dict:
+        """
+        Busqueda unificada de entradas de inventario con evidencia de
+        revalidacion real en el sistema operativo para cada resultado.
+
+        Extiende `search()` anexando a cada entrada los datos de evidencia
+        que el consumidor necesita para decidir si revalidar el destino
+        antes de usarlo (unidad 3.8.5.1.4.6.3):
+
+        - `procedencia` (source): fuente de descubrimiento de la entrada.
+        - `volumen`: volumen donde reside la entrada.
+        - `fecha_ultima_comprobacion` (last_checked_at): ultima vez que se
+          comprobó la entrada en el inventario.
+        - `estado`: tipo de entrada y si esta excluida.
+        - `evidencia`: resultado de validar la entrada contra el SO real
+          (existencia, tipo, volumen, identidad, accesibilidad).
+        - `caducidad`: estado de caducidad (vigente/obsoleto/expirado/desconocido)
+          y edad desde la ultima comprobacion.
+
+        La evidencia de validacion se obtiene ejecutando `validar_destino`
+        y `esta_caducado` contra el sistema operativo real para cada
+        entrada devuelta. Nunca se usa un mock para decidir si una entrada
+        necesita revalidacion: la evidencia es siempre observable en el SO.
+
+        Parametros:
+        - machine_id: identificador del equipo (obligatorio, aislamiento).
+        - name, ruta, extension, tipo, volume, disponible: filtros de busqueda.
+        - limit, offset: paginacion (idem `search`).
+        - order_by: campo de ordenamiento (idem `search`).
+        - machine_id_actual: identificador del equipo actual para la
+          comprobacion de identidad. Si None, la identidad se omite.
+
+        Retorna:
+        - dict con `results`, `total`, `has_more`, `next_cursor`, `limit`,
+          `offset`, `order_by` (como `search_paginated`) donde cada entrada
+          de `results` incluye ademas los campos de evidencia y caducidad.
+        """
+        pagina = self.search_paginated(
+            machine_id=machine_id,
+            name=name,
+            ruta=ruta,
+            extension=extension,
+            tipo=tipo,
+            volume=volume,
+            disponible=disponible,
+            limit=limit,
+            offset=offset,
+            order_by=order_by,
+        )
+
+        resultados_enriquecidos: list[dict] = []
+        for entrada in pagina["results"]:
+            enriquecida = dict(entrada)
+
+            # Construir InventoryEntry a partir de los datos de la fila.
+            try:
+                entry = InventoryEntry(
+                    machine_id=entrada.get("machine_id", ""),
+                    volume=entrada.get("volume", ""),
+                    absolute_path=entrada.get("absolute_path", ""),
+                    relative_path=entrada.get("relative_path", ""),
+                    name=entrada.get("name", ""),
+                    extension=entrada.get("extension", ""),
+                    entry_type=EntryType(entrada.get("entry_type", EntryType.OTHER.value)),
+                    size_bytes=int(entrada.get("size_bytes", 0)),
+                    modified_at=entrada.get("modified_at", "") or "",
+                    created_at=entrada.get("created_at", "") or "",
+                    accessed_at=entrada.get("accessed_at"),
+                    attributes=list(entrada.get("attributes", []) or []),
+                    excluded=bool(entrada.get("excluded", False)),
+                    exclusion_reason=entrada.get("exclusion_reason"),
+                    source=entrada.get("source", "filesystem_scan"),
+                    last_checked_at=entrada.get("last_checked_at", "") or "",
+                )
+            except (ValueError, TypeError, KeyError):
+                # Si no se puede reconstruir la entrada, se devuelve sin
+                # evidencia de validacion (el consumidor debe revalidar).
+                enriquecida["evidencia"] = {
+                    "disponible": False,
+                    "razon": "No se pudo reconstruir la entrada de inventario para validar.",
+                }
+                enriquecida["caducidad"] = {
+                    "estado": EstadoCaducidad.DESCONOCIDO.value,
+                    "edad_segundos": None,
+                    "ultimo_check": entrada.get("last_checked_at"),
+                    "es_valido_para_uso": False,
+                    "razon": "Entrada no reconstruible: caducidad indeterminada.",
+                }
+                resultados_enriquecidos.append(enriquecida)
+                continue
+
+            # Validacion real contra el sistema operativo.
+            validacion = validar_destino(entry, machine_id_actual=machine_id_actual)
+            enriquecida["evidencia"] = {
+                "disponible": True,
+                "existencia_ok": validacion.existencia_ok,
+                "tipo_ok": validacion.tipo_ok,
+                "volumen_ok": validacion.volumen_ok,
+                "identidad_ok": validacion.identidad_ok,
+                "accesible_ok": validacion.accesible_ok,
+                "valido": validacion.valido,
+                "errores": validacion.errores,
+                "razon": validacion.razon,
+            }
+
+            # Caducidad respecto a last_checked_at.
+            caducidad = esta_caducado(entry)
+            enriquecida["caducidad"] = {
+                "estado": caducidad.estado.value,
+                "edad_segundos": caducidad.edad_segundos,
+                "ultimo_check": caducidad.ultimo_check,
+                "es_valido_para_uso": caducidad.es_valido_para_uso,
+                "razon": caducidad.razon,
+            }
+
+            # Campos planos de conveniencia para el consumidor.
+            enriquecida["procedencia"] = entrada.get("source", "filesystem_scan")
+            enriquecida["volumen"] = entrada.get("volume")
+            enriquecida["fecha_ultima_comprobacion"] = entrada.get("last_checked_at")
+            enriquecida["estado"] = {
+                "tipo": entrada.get("entry_type"),
+                "excluida": bool(entrada.get("excluded", False)),
+            }
+
+            resultados_enriquecidos.append(enriquecida)
+
+        pagina["results"] = resultados_enriquecidos
+        return pagina
 
     def db_file_exists(self) -> bool:
         """Devuelve True si el fichero de la base de datos existe en disco."""

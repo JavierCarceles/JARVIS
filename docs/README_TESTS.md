@@ -10729,7 +10729,7 @@ da reconciled=False (coincidencia).
 | `TestMaquinasYVolumenes` | Registro de equipos y volumenes con aislamiento por `machine_id`. |
 | `TestScanRuns` | Inicio y finalización de ejecuciones de escaneo, resultados permitidos y última ejecución. |
 | `TestInsercionAtomica` | Inserción por lotes atómica, lote vacío y ausencia de entradas parciales tras fallo. |
-| `TestConsultasIndexadas` | Búsquedas por nombre, extensión y prefijo de ruta con paginación y aislamiento por equipo, y búsqueda unificada `search` por múltiples criterios (nombre, ruta, extensión, tipo, volumen, disponibilidad). |
+| `TestConsultasIndexadas` | Búsquedas por nombre, extensión y prefijo de ruta con paginación y aislamiento por equipo, búsqueda unificada `search` por múltiples criterios (nombre, ruta, extensión, tipo, volumen, disponibilidad), `count` para total sin cargar filas en memoria, y `search_paginated` con paginación por offset y por cursor (3.8.5.1.4.6.2). |
 | `TestContexto` | Uso como gestor de contexto, cierre de conexión, WAL y claves foráneas. |
 | `TestClaveUnicaRutaNormalizada` | Clave unica `(machine_id, volumen, ruta normalizada)` y ausencia de duplicados. |
 | `TestNormalizacionRutas` | Normalización de rutas según la distinción mayúsculas/minúsculas del sistema de archivos. |
@@ -10742,10 +10742,11 @@ da reconciled=False (coincidencia).
 | `TestInterrupcionReanudacionSistemaReal` | Interrupción y reanudación de un escaneo controlado en el sistema real (directorio temporal real + SQLite real): mismo `scan_id` sin nueva generación, reanudación tras interrupción con entradas adicionales, línea base no degradada por scans interrumpidos, y bloqueo original preservado ante reanudación de otro equipo. |
 | `TestRefrescoBajoDemanda` | Refresco bajo demanda de una ruta o volumen (revalida existencia y tamaño, actualiza `last_checked_at` sin nuevo escaneo), refresco incremental global de todos los volúmenes de un equipo y revalidación puntual del destino de una aplicación antes de abrirla. |
 | `TestBusquedaPorEstado` | Consultas de entradas por estado de exclusión. |
+| `TestBusquedaConEvidencia` | Búsqueda con evidencia de revalidación real (`search_con_evidencia`): devuelve procedencia, volumen, fecha de última comprobación, estado, evidencia de validación contra el SO (existencia, tipo, volumen, identidad, accesibilidad) y caducidad para que el consumidor decida si necesita revalidar (3.8.5.1.4.6.3). |
 | `TestConcurrenciaEscaneos` | Bloqueo de concurrencia, `ConcurrentScanError`, liberación del bloqueo y modo de journaling WAL. |
 | `TestBackupCorrupcionYRecuperacion` | Copia de seguridad, verificación de integridad (`PRAGMA quick_check` / `integrity_check`) y restauración desde copia sin sobrescribir una base válida con una copia vacía, incompleta o corrupta. |
 
-**Resultados:** 164 tests unitarios, 164 PASSED / 0 FAILED.
+**Resultados:** 194 tests unitarios, 194 PASSED / 0 FAILED.
 
 ---
 

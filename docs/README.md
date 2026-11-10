@@ -41,7 +41,7 @@
 - [`src/hands/keyboard.py` (901 líneas)](#src-hands-keyboard-py)
 - [`src/hands/mouse.py` (129 líneas)](#src-hands-mouse-py)
 - [`src/hands/system_inventory.py` (389 líneas)](#src-hands-system_inventory-py)
-- [`src/hands/system_inventory_storage.py` (471 líneas)](#src-hands-system_inventory_storage-py)
+- [`src/hands/system_inventory_storage.py` (2620 líneas)](#src-hands-system_inventory_storage-py)
 - [`src/hands/filesystem_observer.py` (145 líneas)](#src-hands-filesystem_observer-py)
 - [`src/hands/planner/__init__.py` (235 líneas)](#src-hands-planner-_init_-py)
 - [`src/hands/planner/application_integration.py` (864 líneas)](#src-hands-planner-application_integration-py)
@@ -1910,6 +1910,9 @@ Métodos de `SystemInventoryStorage`:
 | `def search_by_extension(machine_id, extension, limit, offset)` | Busca entradas de archivo por extensión (paginado). |
 | `def search_by_path_prefix(machine_id, path_prefix, limit, offset)` | Busca entradas de archivo por prefijo de ruta absoluta (paginado). |
 | `def search(machine_id, name=None, ruta=None, extension=None, tipo=None, volume=None, disponible=None, limit=50, offset=0, order_by='absolute_path')` | Busqueda unificada de entradas de inventario por múltiples criterios (nombre exacto/normalizado, ruta, extensión, tipo, volumen, disponibilidad) con paginación y ordenación; siempre filtra por `machine_id` (aislamiento por equipo). |
+| `def count(machine_id, name=None, ruta=None, extension=None, tipo=None, volume=None, disponible=None)` | Devuelve el total de entradas que coinciden con los mismos filtros que `search`, sin cargar filas en memoria; se usa para metadatos de paginación (total de páginas, has_more). |
+| `def search_paginated(machine_id, name=None, ruta=None, extension=None, tipo=None, volume=None, disponible=None, limit=50, offset=0, order_by='absolute_path', cursor=None)` | Búsqueda paginada que devuelve resultados con metadatos (`results`, `total`, `has_more`, `next_cursor`, `limit`, `offset`, `order_by`). Soporta paginación por offset clásica y paginación por cursor (`entry_id > cursor`, ORDER BY entry_id) más eficiente para grandes volúmenes. |
+| `def search_con_evidencia(machine_id, name=None, ruta=None, extension=None, tipo=None, volume=None, disponible=None, limit=50, offset=0, order_by='absolute_path', machine_id_actual=None)` | Búsqueda unificada como `search_paginated` que enriquece cada resultado con evidencia de validación real contra el sistema operativo (`evidencia`: existencia, tipo, volumen, identidad, accesibilidad) y estado de caducidad (`caducidad`: vigente/obsoleto/expirado/desconocido). Incluye campos planos `procedencia`, `volumen`, `fecha_ultima_comprobacion` y `estado` para que el consumidor decida si necesita revalidar el destino antes de usarlo. |
 | `def get_entry_count(machine_id, volume)` | Devuelve el número total de entradas de archivo de un equipo. |
 | `def db_file_exists()` | Devuelve True si el fichero de la base de datos existe en disco. |
 | `def has_active_scan(machine_id, volume)` | Devuelve True si hay un escaneo en curso para el equipo y volumen dados. |
