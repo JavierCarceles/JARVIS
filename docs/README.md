@@ -42,6 +42,7 @@
 - [`src/hands/mouse.py` (129 líneas)](#src-hands-mouse-py)
 - [`src/hands/system_inventory.py` (389 líneas)](#src-hands-system_inventory-py)
 - [`src/hands/system_inventory_storage.py` (471 líneas)](#src-hands-system_inventory_storage-py)
+- [`src/hands/filesystem_observer.py` (145 líneas)](#src-hands-filesystem_observer-py)
 - [`src/hands/planner/__init__.py` (235 líneas)](#src-hands-planner-_init_-py)
 - [`src/hands/planner/application_integration.py` (864 líneas)](#src-hands-planner-application_integration-py)
 - [`src/hands/planner/goal_state_mapper.py` (1485 líneas)](#src-hands-planner-goal_state_mapper-py)
@@ -1906,6 +1907,28 @@ Métodos de `SystemInventoryStorage`:
 | `def refrescar_volumen(machine_id, volume)` | Revalida puntualmente cada entrada del último escaneo de un volumen: comprueba existencia y cambio de tamaño, y actualiza `last_checked_at` de cada una. Devuelve un resumen con total, existentes, no existentes, cambios detectados y entradas refrescadas. |
 | `def refrescar_incremental_global(machine_id)` | Revalida puntualmente cada volumen conocido de un equipo aplicando `refrescar_volumen` a cada uno, sin crear nuevos escaneos ni nuevas generaciones. Devuelve un resumen agregado con detalle por volumen en `por_volumen`. |
 | `def revalidar_destino_aplicacion(machine_id, volume, ruta)` | Revalida puntualmente el destino de una aplicación antes de abrirla: comprueba si existe y si es un archivo lanzable (no un directorio), y actualiza `last_checked_at` de la entrada registrada. No lanza ni abre la aplicación. Retorna `valido`, `existe`, `es_archivo`, `last_checked_at`, `entradas_refrescadas` y `razon`. |
+
+### `src/hands/filesystem_observer.py` (145 líneas) — Observador opcional de cambios del sistema de archivos.
+
+**Descripción:** Implementa una optimizacion opcional de notificaciones de cambios del sistema de archivos (unidad 3.8.5.1.4.5.7). Nunca sustituye al escaneo basado en almacenamiento ni al refresco bajo demanda (3.8.5.1.4.5.6): los observadores pueden perder eventos y tienen limites por plataforma, por lo que el inventario sigue siendo fuente de verdad mediante escaneos y revalidaciones puntuales. Usa `watchdog` cuando esta disponible y degrada de forma segura (sin fallar) cuando no lo esta. No toca la base de datos del inventario.
+
+**Características:**
+
+- `FileSystemObserver(callback)` inicia y detiene la observacion de una ruta; `is_available()` indica si `watchdog` esta instalado y `is_running` indica si esta observando activamente.
+- `start(path, recursive=True)` inicia la observacion y levanta `ObserverUnavailableError` si `watchdog` no esta disponible, orientando al refresco bajo demanda (`refrescar_entrada_por_ruta`, `refrescar_volumen`, `revalidar_destino_aplicacion`) como alternativa que no depende de observadores.
+- `stop()` detiene la observacion de forma segura; es seguro llamarlo varias veces o antes de `start()`.
+- Traduce eventos de watchdog (creado, modificado, eliminado, movido) a `FileSystemChangeEvent` (tipo de evento, ruta y marca de tiempo ISO 8601 UTC) entregados al callback del consumidor.
+- El observador no modifica el inventario ni marca entradas como eliminadas; solo notifica cambios para que el consumidor decida si revalida mediante refresco bajo demanda.
+
+**Importaciones:** 4.
+
+Clases:
+
+| Clase | Docstring |
+|---|---|
+| `class ObserverUnavailableError` | Excepcion levantada al intentar iniciar el observador cuando `watchdog` no esta disponible. |
+| `class FileSystemChangeEvent` | Evento de cambio del sistema de archivos observado (tipo de evento, ruta y marca de tiempo ISO 8601 UTC). |
+| `class FileSystemObserver` | Observador opcional de cambios del sistema de archivos; inicio, detencion y consulta de disponibilidad. |
 
 ## 🗺️ `src/hands/planner/`
 

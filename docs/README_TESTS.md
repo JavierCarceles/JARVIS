@@ -89,6 +89,7 @@
 - [`hands\test_restore_window_state.py`](#hands/test-restore_window_state)
 - [`hands\test_system_inventory.py`](#hands/test-system_inventory)
 - [`hands\test_system_inventory_storage.py`](#hands/test-system_inventory_storage)
+- [`hands\test_filesystem_observer.py`](#hands/test-filesystem_observer)
 - [`hands\test_ui_elements.py`](#hands/test-ui_elements)
 - [`hands\test_ui_elements_final.py`](#hands/test-ui_elements_final)
 - [`hands\test_ui_elements_minimal.py`](#hands/test-ui_elements_minimal)
@@ -10740,6 +10741,17 @@ da reconciled=False (coincidencia).
 | `TestBackupCorrupcionYRecuperacion` | Copia de seguridad, verificación de integridad (`PRAGMA quick_check` / `integrity_check`) y restauración desde copia sin sobrescribir una base válida con una copia vacía, incompleta o corrupta. |
 
 **Resultados:** 137 tests unitarios, 137 PASSED / 0 FAILED.
+
+---
+
+<a name="hands/test-filesystem_observer"></a>
+### `hands\test_filesystem_observer.py` (162 líneas)
+
+**Descripción:** Tests de contrato del observador opcional de cambios del sistema de archivos (unidad 3.8.5.1.4.5.7). Verifican que el observador reporta no disponible cuando `watchdog` no esta instalado (entorno actual), degrada de forma segura sin fallar el sistema, su error orienta al refresco bajo demanda como alternativa, el constructor exige un callback invocable, `stop()` es seguro antes de start y varias veces, `FileSystemChangeEvent` tiene los campos del contrato y es inmutable, y el modulo no acopla al almacenamiento del inventario. El camino con observador activo se simula sustituyendo los componentes de watchdog para verificar el contrato de traduccion de eventos sin depender del paquete externo.
+
+**Clases de test:** ninguna (funciones de test de modulo).
+
+**Resultados:** 9 tests unitarios, 9 PASSED / 0 FAILED.
 
 ---
 
