@@ -93,6 +93,7 @@
 - [`hands\test_revalidar_destino_aplicacion_entorno_real.py`](#hands/test-revalidar_destino_aplicacion_entorno_real)
 - [`hands\test_volumes_montados_entorno_real.py`](#hands/test-volumes_montados_entorno_real)
 - [`hands\test_buscar_candidatos_para_orden_entorno_real.py`](#hands/test-buscar_candidatos_para_orden_entorno_real)
+- [`hands\test_inventario_volumen_significativo_entorno_real.py`](#hands/test-inventario_volumen_significativo_entorno_real)
 - [`hands\test_filesystem_observer.py`](#hands/test-filesystem_observer)
 - [`hands\test_ui_elements.py`](#hands/test-ui_elements)
 - [`hands\test_ui_elements_final.py`](#hands/test-ui_elements_final)
@@ -10821,6 +10822,29 @@ que decidan el resultado.
 **Clases de test:** ninguna (funciones de test de modulo).
 
 **Resultados:** 7 tests de verificacion en entorno real, 7 PASSED / 0 FAILED.
+
+---
+
+<a name="hands/test-inventario_volumen_significativo_entorno_real"></a>
+### `hands\test_inventario_volumen_significativo_entorno_real.py`
+
+**Descripción:** Verificacion en entorno real de la unidad 3.8.5.1.4.6.8 sobre
+`SystemInventoryStorage`: busquedas, paginacion (offset y cursor), orden,
+rendimiento y revalidacion con una base de datos de volumen significativo
+(3000 archivos REALES creados en un directorio temporal). Verifica que las
+entradas se almacenan y cuentan correctamente, que la paginacion recorre
+todas las entradas sin duplicados ni omisiones, que los resultados se ordenan
+por nombre y extension, que las consultas indexadas completan en tiempo
+razonable y que `search_con_evidencia` y `diferenciar_estado_acceso`
+adjuntan evidencia real de validacion contra el sistema operativo
+(existencia, tipo, volumen, identidad, accesibilidad). No usa mocks que
+decidan el resultado. Todo se limpia al finalizar.
+
+**Modulos de origen probados:** src.hands.system_inventory_storage
+
+**Clases de test:** ninguna (funciones de test de modulo).
+
+**Resultados:** 12 tests de verificacion en entorno real, 12 PASSED / 0 FAILED.
 
 ---
 

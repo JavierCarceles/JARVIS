@@ -8241,3 +8241,19 @@ VERIFICACION: SINTAXIS: OK (ast.parse + pytest sin errores); MAIN.PY: NA (no se 
 DISCREPANCIAS: NINGUNA
 PENDIENTES: Ninguno para esta unidad. Padre 3.8.5.1.4.6 con hijas .1 completada, .2 completada, .3 completada, .4 completada, .5 completada, .6 completada, .7 completada, .8 pendiente. Siguiente hoja pendiente real: 3.8.5.1.4.6.8 (Probar busquedas, paginacion, orden, rendimiento y revalidacion con una base de datos de volumen significativo generada en entorno temporal).
 ESTADO FINAL: 3.8.5.1.4.6.7 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.8.5.1.4.6.8
+FECHA: 2026-11-10
+OBJETIVO: Probar busquedas, paginacion, orden, rendimiento y revalidacion con una base de datos de volumen significativo generada en entorno temporal, sobre la implementacion real de SystemInventoryStorage (unidades .6.1 a .6.7 ya implementadas).
+TIPO DE TRABAJO: VERIFICACION REAL
+CAMBIOS / HALLAZGOS:
+- Se creo `tests/hands/test_inventario_volumen_significativo_entorno_real.py` con 12 pruebas de verificacion en entorno real sobre una base de datos de 3000 archivos REALES creados en un directorio temporal (volumen significativo).
+- Se verifico: almacenamiento y conteo (count == 3000, desglose por extension), busqueda por nombre exacto, extension y prefijo de ruta/tipo; paginacion offset y cursor recorrendo todas las entradas sin duplicados ni omisiones (3000/3000); orden por nombre y extension; rendimiento de busqueda indexada y de recorrido paginado completo; revalidacion real contra el SO (search_con_evidencia: existencia, tipo, volumen, identidad, accesibilidad, valido) para archivos existentes y para ruta inexistente (existencia_ok=False, valido=False); diferenciacion de estado de acceso para .exe (ejecutable, candidato_a_aplicacion=True).
+- HALLAZGO Y CORRECCION en produccion: `search_paginated` ordenaba la primera pagina (cursor=None) por `order_by` pero las paginas cursor por `entry_id`; cuando ambos ordenos divergen (rutas no correlacionadas con entry_id), el recorrido paginado saltaba entradas. Se corrigió para que la primera pagina tambien ordene por `entry_id`, haciendo consistente la cadena next_cursor. Firma y contrato publico sin cambios.
+- Durante la verificacion se detecto que `search` (no paginado) devuelve una lista, no un dict; los tests se ajustaron a ese contrato real (no se debilito ninguna asercion).
+ARCHIVOS MODIFICADOS: PRODUCCION: `src/hands/system_inventory_storage.py` (correccion de consistencia de orden en la primera pagina de `search_paginated`); TESTS: `tests/hands/test_inventario_volumen_significativo_entorno_real.py` (nuevo, 12 pruebas de entorno real); DOCUMENTACION: `docs/README_TESTS.md` (indice y nueva seccion para el test de entorno real). `docs/README.md` revisado: el contrato documentado de `search_paginated` ya es correcto y no requiere cambio.
+TESTS Y RESULTADOS: UNITARIOS (regresion): 230 PASSED / 230 TOTAL (test_system_inventory_storage.py + test_buscar_candidatos_para_orden_entorno_real.py, sin regresion por el cambio de search_paginated); TEST ENTORNO REAL (unidad .6.8): 12 PASSED / 12 TOTAL (test_inventario_volumen_significativo_entorno_real.py).
+VERIFICACION: SINTAXIS: OK (ast.parse + pytest sin errores); MAIN.PY: NA (no se modifica main.py); COMPORTAMIENTO / INTEGRACION REAL: Evidencia real en Windows 11, Python 3.14.7: 3000 archivos reales en directorio temporal, base de datos SQLite real, consultas contra implementacion de produccion, revalidacion real contra el SO sin mocks que decidan el resultado. Directorios temporales y base de datos SQLite eliminados al finalizar cada prueba (tmp_path).
+DISCREPANCIAS: NINGUNA
+PENDIENTES: Ninguno para esta unidad. Padre 3.8.5.1.4.6 con hijas .1 a .8 completadas. Siguiente hoja pendiente real: 3.8.5.1.4.7.1 (Clasificar candidatos por tipo de lanzamiento propio de cada SO).
+ESTADO FINAL: 3.8.5.1.4.6.8 - IMPLEMENTADA

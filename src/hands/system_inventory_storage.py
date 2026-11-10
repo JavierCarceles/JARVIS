@@ -2644,20 +2644,57 @@ class SystemInventoryStorage:
             else:
                 has_more = False
         else:
-            # Paginacion por offset (clasica).
-            results = self.search(
-                machine_id=machine_id,
-                name=name,
-                ruta=ruta,
-                extension=extension,
-                tipo=tipo,
-                volume=volume,
-                disponible=disponible,
-                limit=limit,
-                offset=offset,
-                order_by=order_by,
-                solo_volumes_montados=solo_volumes_montados,
-            )
+            # Primera pagina de recorrido por cursor. Se ordena siempre por
+            # entry_id (y no por order_by) para que la cadena de next_cursor
+            # sea consistente con las paginas siguientes, que tambien ordenan
+            # por entry_id. Ordenar por otro campo haria que el cursor avance
+            # sobre un orden distinto y se saltaran o duplicaran entradas.
+            conn = self.connect()
+            where_clauses: list[str] = ["machine_id = ?"]
+            params: list[object] = [machine_id]
+
+            if name is not None:
+                where_clauses.append("lower(name) = lower(?)")
+                params.append(name)
+            if ruta is not None:
+                where_clauses.append("absolute_path LIKE ?")
+                params.append(ruta + "%")
+            if extension is not None:
+                where_clauses.append("lower(extension) = lower(?)")
+                params.append(extension)
+            if tipo is not None:
+                where_clauses.append("entry_type = ?")
+                params.append(tipo)
+            if volume is not None:
+                where_clauses.append("volume = ?")
+                params.append(volume)
+            if disponible is not None:
+                where_clauses.append("excluded = ?")
+                params.append(0 if disponible else 1)
+
+            where_sql = " AND ".join(where_clauses)
+            sql = f"""
+                SELECT * FROM file_entries
+                WHERE {where_sql}
+                ORDER BY entry_id
+                LIMIT ? OFFSET ?
+            """
+            params.extend([limit, offset])
+            cur = conn.execute(sql, params)
+            results = [dict(r) for r in cur.fetchall()]
+
+            # Filtrar por volumenes montados en la primera pagina
+            # (3.8.5.1.4.6.6), igual que las paginas cursor posteriores.
+            if solo_volumes_montados:
+                volumes_montados = self.obtener_volumes_montados()
+                if volumes_montados:
+                    results = [
+                        r for r in results
+                        if self._volumen_de_entrada_esta_montado(r.get("volume", ""), volumes_montados)
+                    ]
+                else:
+                    results = []
+
             total = self.count(
                 machine_id=machine_id,
                 name=name,
