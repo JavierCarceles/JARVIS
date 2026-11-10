@@ -2123,6 +2123,301 @@ class TestBusquedaConEvidencia:
         assert pagina["results"][0]["caducidad"]["estado"] == EstadoCaducidad.DESCONOCIDO.value
 
 
+class TestDiferenciacionEstadoAcceso:
+    """diferenciar_estado_acceso diferencia, para cada resultado de
+    busqueda, entre encontrado en inventario, existe ahora, accesible
+    ahora, ejecutable, candidato a aplicacion y autorizado para
+    lanzamiento (3.8.5.1.4.6.4). Toda la evidencia de existencia,
+    tipo, volumen, identidad y accesibilidad se obtiene contra el
+    sistema operativo real; no hay mocks que decidan los flags."""
+
+    def _seed_acceso(
+        self,
+        storage: SystemInventoryStorage,
+        tmp_path: Path,
+        machine_id: str = "machine-alfa",
+    ) -> dict[str, object]:
+        storage.initialize()
+        storage.record_machine(machine_id)
+        storage.begin_scan_run("scan-acceso", machine_id, "C:", SCAN_MODE_FULL)
+
+        app_exe = tmp_path / "Apps" / "app.exe"
+        app_exe.parent.mkdir(parents=True, exist_ok=True)
+        app_exe.write_bytes(b"MZplaceholder")
+
+        readme_txt = tmp_path / "Docs" / "readme.txt"
+        readme_txt.parent.mkdir(parents=True, exist_ok=True)
+        readme_txt.write_text("hola", encoding="utf-8")
+
+        tools_dir = tmp_path / "Tools"
+        tools_dir.mkdir()
+
+        inexistente = tmp_path / "NoExiste" / "fantasma.exe"
+
+        # Volumen real de la ruta (Windows devuelve la letra de unidad).
+        volumen = os.path.splitdrive(str(app_exe))[0] or "C:"
+
+        entradas = [
+            {
+                "entry_id": "e-acceso-1",
+                "absolute_path": str(app_exe),
+                "relative_path": "Apps/app.exe",
+                "name": "app.exe",
+                "extension": ".exe",
+                "entry_type": EntryType.FILE.value,
+                "size_bytes": app_exe.stat().st_size,
+                "modified_at": "2024-01-01T10:00:00",
+                "created_at": "2024-01-01T09:00:00",
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-01-03T00:00:00",
+            },
+            {
+                "entry_id": "e-acceso-2",
+                "absolute_path": str(readme_txt),
+                "relative_path": "Docs/readme.txt",
+                "name": "readme.txt",
+                "extension": ".txt",
+                "entry_type": EntryType.FILE.value,
+                "size_bytes": readme_txt.stat().st_size,
+                "modified_at": "2024-03-01T10:00:00",
+                "created_at": "2024-03-01T09:00:00",
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-03-05T00:00:00",
+            },
+            {
+                "entry_id": "e-acceso-3",
+                "absolute_path": str(tools_dir),
+                "relative_path": "Tools",
+                "name": "Tools",
+                "extension": "",
+                "entry_type": EntryType.DIRECTORY.value,
+                "size_bytes": 0,
+                "modified_at": "2024-02-01T10:00:00",
+                "created_at": "2024-02-01T09:00:00",
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-02-03T00:00:00",
+            },
+            {
+                "entry_id": "e-acceso-4",
+                "absolute_path": str(inexistente),
+                "relative_path": "NoExiste/fantasma.exe",
+                "name": "fantasma.exe",
+                "extension": ".exe",
+                "entry_type": EntryType.FILE.value,
+                "size_bytes": 0,
+                "modified_at": "",
+                "created_at": "",
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": "2024-04-01T00:00:00",
+            },
+        ]
+        storage.insert_file_entries("scan-acceso", machine_id, volumen, entradas)
+        storage.end_scan_run("scan-acceso", entries_count=4)
+        return {
+            "app_exe": app_exe,
+            "readme_txt": readme_txt,
+            "tools_dir": tools_dir,
+            "inexistente": inexistente,
+            "volumen": volumen,
+        }
+
+    def _pagina(self, storage: SystemInventoryStorage, machine_id: str = "machine-alfa") -> dict:
+        return storage.diferenciar_estado_acceso(
+            machine_id, machine_id_actual=machine_id
+        )
+
+    def _por_id(self, pagina: dict) -> dict[str, dict]:
+        return {e["entry_id"]: e for e in pagina["results"]}
+
+    def test_devuelve_bloque_diferenciacion_completo_en_cada_resultado(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        self._seed_acceso(storage, tmp_path)
+        pagina = self._pagina(storage)
+        assert pagina["total"] == 4
+        claves_esperadas = {
+            "encontrado_en_inventario",
+            "existe_ahora",
+            "accesible_ahora",
+            "ejecutable",
+            "candidato_a_aplicacion",
+            "autorizado_para_lanzamiento",
+            "detalle",
+            "preflight_permitido",
+            "preflight_motivo",
+        }
+        for entrada in pagina["results"]:
+            assert "diferenciacion" in entrada
+            dif = entrada["diferenciacion"]
+            assert set(dif.keys()) == claves_esperadas
+            assert dif["encontrado_en_inventario"] is True
+            assert isinstance(dif["existe_ahora"], bool)
+            assert isinstance(dif["accesible_ahora"], bool)
+            assert isinstance(dif["ejecutable"], bool)
+            assert isinstance(dif["candidato_a_aplicacion"], bool)
+            assert isinstance(dif["autorizado_para_lanzamiento"], bool)
+            assert isinstance(dif["detalle"], str) and dif["detalle"]
+
+    def test_existe_ahora_coincide_con_validacion_real_del_sistema(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        self._seed_acceso(storage, tmp_path)
+        pagina = self._pagina(storage)
+        por_id = self._por_id(pagina)
+        # Las tres primeras rutas existen en el SO real; la cuarta no.
+        assert por_id["e-acceso-1"]["diferenciacion"]["existe_ahora"] is True
+        assert por_id["e-acceso-2"]["diferenciacion"]["existe_ahora"] is True
+        assert por_id["e-acceso-3"]["diferenciacion"]["existe_ahora"] is True
+        assert por_id["e-acceso-4"]["diferenciacion"]["existe_ahora"] is False
+        # Coincidencia uno a uno con la evidencia de validacion real.
+        for entrada in pagina["results"]:
+            assert (
+                entrada["diferenciacion"]["existe_ahora"]
+                == entrada["evidencia"]["existencia_ok"]
+            )
+
+    def test_accesible_ahora_coincide_con_validacion_real_del_sistema(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        self._seed_acceso(storage, tmp_path)
+        pagina = self._pagina(storage)
+        por_id = self._por_id(pagina)
+        assert por_id["e-acceso-1"]["diferenciacion"]["accesible_ahora"] is True
+        assert por_id["e-acceso-2"]["diferenciacion"]["accesible_ahora"] is True
+        assert por_id["e-acceso-3"]["diferenciacion"]["accesible_ahora"] is True
+        assert por_id["e-acceso-4"]["diferenciacion"]["accesible_ahora"] is False
+        for entrada in pagina["results"]:
+            assert (
+                entrada["diferenciacion"]["accesible_ahora"]
+                == entrada["evidencia"]["accesible_ok"]
+            )
+
+    def test_ejecutable_detecta_por_tipo_y_extension_no_por_existencia(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        self._seed_acceso(storage, tmp_path)
+        pagina = self._pagina(storage)
+        por_id = self._por_id(pagina)
+        # .exe FILE es ejecutable aunque el fichero no exista (separado de existe_ahora).
+        assert por_id["e-acceso-1"]["diferenciacion"]["ejecutable"] is True
+        assert por_id["e-acceso-4"]["diferenciacion"]["ejecutable"] is True
+        # .txt no es ejecutable; un directorio nunca lo es.
+        assert por_id["e-acceso-2"]["diferenciacion"]["ejecutable"] is False
+        assert por_id["e-acceso-3"]["diferenciacion"]["ejecutable"] is False
+
+    def test_candidato_a_aplicacion_requiere_conjunto_completo_de_condiciones(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        self._seed_acceso(storage, tmp_path)
+        pagina = self._pagina(storage)
+        por_id = self._por_id(pagina)
+        # app.exe: ejecutable, existe, accesible, no excluida, valido -> candidato.
+        assert por_id["e-acceso-1"]["diferenciacion"]["candidato_a_aplicacion"] is True
+        # readme.txt: no es ejecutable.
+        assert por_id["e-acceso-2"]["diferenciacion"]["candidato_a_aplicacion"] is False
+        # Tools: directorio, no es ejecutable.
+        assert por_id["e-acceso-3"]["diferenciacion"]["candidato_a_aplicacion"] is False
+        # fantasma.exe: no existe, por tanto no es destino valido.
+        assert por_id["e-acceso-4"]["diferenciacion"]["candidato_a_aplicacion"] is False
+
+    def test_autorizado_para_lanzamiento_respeta_preflight_real_con_aplicacion_desconocida(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        self._seed_acceso(storage, tmp_path)
+        pagina = self._pagina(storage)
+        por_id = self._por_id(pagina)
+        # Ninguna aplicacion temporal esta registrada: preflight deniega.
+        for entrada in pagina["results"]:
+            assert entrada["diferenciacion"]["autorizado_para_lanzamiento"] is False
+        # Solo el candidato consulta el preflight; para los demas queda sin consultar.
+        assert por_id["e-acceso-1"]["diferenciacion"]["preflight_permitido"] is False
+        assert isinstance(
+            por_id["e-acceso-1"]["diferenciacion"]["preflight_motivo"], str
+        )
+        assert len(por_id["e-acceso-1"]["diferenciacion"]["preflight_motivo"]) > 0
+        for entry_id in ("e-acceso-2", "e-acceso-3", "e-acceso-4"):
+            assert por_id[entry_id]["diferenciacion"]["preflight_permitido"] is None
+
+    def test_filtros_se_aplican_antes_de_la_diferenciacion(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        self._seed_acceso(storage, tmp_path)
+        # Solo .exe: dos resultados (app.exe y fantasma.exe), ambos con diferenciacion.
+        pagina_exe = storage.diferenciar_estado_acceso(
+            "machine-alfa", extension=".exe", machine_id_actual="machine-alfa"
+        )
+        assert pagina_exe["total"] == 2
+        assert len(pagina_exe["results"]) == 2
+        ids_exe = {e["entry_id"] for e in pagina_exe["results"]}
+        assert ids_exe == {"e-acceso-1", "e-acceso-4"}
+        assert pagina_exe["results"][0]["diferenciacion"]["ejecutable"] is True
+        assert pagina_exe["results"][0]["diferenciacion"]["existe_ahora"] is True
+        assert pagina_exe["results"][1]["diferenciacion"]["ejecutable"] is True
+        assert pagina_exe["results"][1]["diferenciacion"]["existe_ahora"] is False
+
+        # Solo directorios: un resultado, no ejecutable.
+        pagina_dir = storage.diferenciar_estado_acceso(
+            "machine-alfa", tipo=EntryType.DIRECTORY.value, machine_id_actual="machine-alfa"
+        )
+        assert pagina_dir["total"] == 1
+        assert pagina_dir["results"][0]["entry_id"] == "e-acceso-3"
+        assert pagina_dir["results"][0]["diferenciacion"]["ejecutable"] is False
+
+    def test_paginacion_preservada_con_diferenciacion(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        self._seed_acceso(storage, tmp_path)
+        pagina = storage.diferenciar_estado_acceso(
+            "machine-alfa", limit=2, offset=0, machine_id_actual="machine-alfa"
+        )
+        assert pagina["total"] == 4
+        assert len(pagina["results"]) == 2
+        assert pagina["has_more"] is True
+        assert pagina["next_cursor"] is not None
+        assert all("diferenciacion" in e for e in pagina["results"])
+
+        pagina2 = storage.diferenciar_estado_acceso(
+            "machine-alfa", limit=2, offset=2, machine_id_actual="machine-alfa"
+        )
+        assert len(pagina2["results"]) == 2
+        assert pagina2["has_more"] is False
+        ids1 = {e["entry_id"] for e in pagina["results"]}
+        ids2 = {e["entry_id"] for e in pagina2["results"]}
+        assert ids1.isdisjoint(ids2)
+        assert ids1 | ids2 == {
+            "e-acceso-1", "e-acceso-2", "e-acceso-3", "e-acceso-4"
+        }
+
+    def test_aislamiento_por_maquina_no_mezcla_inventarios(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        self._seed_acceso(storage, tmp_path)
+        pagina = storage.diferenciar_estado_acceso(
+            "otro-equipo", machine_id_actual="otro-equipo"
+        )
+        assert pagina["results"] == []
+        assert pagina["total"] == 0
+
+    def test_maquina_sin_datos_devuelve_lista_vacia(
+        self, storage: SystemInventoryStorage
+    ):
+        storage.initialize()
+        storage.record_machine("machine-vacia")
+        pagina = storage.diferenciar_estado_acceso(
+            "machine-vacia", machine_id_actual="machine-vacia"
+        )
+        assert pagina["results"] == []
+        assert pagina["total"] == 0
+
+
 # ---------------------------------------------------------------------------
 # Contexto y cierre limpio
 # ---------------------------------------------------------------------------

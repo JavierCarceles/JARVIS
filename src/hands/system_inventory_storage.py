@@ -38,6 +38,10 @@ from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Callable, Optional
 
+from src.hands.application_preflight import (
+    ApplicationPreflight,
+    get_application_preflight,
+)
 from src.hands.system_inventory import (
     EntryType,
     EstadoCaducidad,
@@ -2696,6 +2700,202 @@ class SystemInventoryStorage:
 
         pagina["results"] = resultados_enriquecidos
         return pagina
+
+    # ------------------------------------------------------------------ #
+    # Diferenciacion de estado de acceso (unidad 3.8.5.1.4.6.4).
+    # ------------------------------------------------------------------ #
+
+    # Extensiones de archivo admitidas como lanzamiento de tipo
+    # "ejecutable" por el validador de destinos de lanzamiento y el
+    # preflight (ApplicationPreflight._is_executable /
+    # validate_launch_destination). Se mantiene sincronizada con ese
+    # contrato real: solo se considera ejecutable lo que el preflight
+    # clasifica como ejecutable lanzable.
+    EXTENSIONES_EJECUTABLES: frozenset[str] = frozenset({".exe"})
+
+    def diferenciar_estado_acceso(
+        self,
+        machine_id: str,
+        name: Optional[str] = None,
+        ruta: Optional[str] = None,
+        extension: Optional[str] = None,
+        tipo: Optional[str] = None,
+        volume: Optional[str] = None,
+        disponible: Optional[bool] = None,
+        limit: int = 50,
+        offset: int = 0,
+        order_by: str = "absolute_path",
+        machine_id_actual: Optional[str] = None,
+        preflight: Optional[ApplicationPreflight] = None,
+    ) -> dict:
+        """
+        Busqueda unificada de entradas de inventario con diferenciacion
+        de estado de acceso para cada resultado (3.8.5.1.4.6.4).
+
+        Extiende `search_con_evidencia` anexando a cada entrada un bloque
+        `diferenciacion` que separa, con evidencia observable del sistema
+        operativo real:
+
+        - `encontrado_en_inventario`: la entrada fue devuelta por la
+          consulta de inventario (siempre True en los resultados de esta
+          busqueda).
+        - `existe_ahora`: la ruta existe en el sistema operativo en este
+          momento (evidencia de `validar_destino` contra el SO real).
+        - `accesible_ahora`: los metadatos de la ruta se pueden leer sin
+          error (evidencia de `validar_destino` contra el SO real).
+        - `ejecutable`: es un archivo cuyo tipo es FILE y cuya extension
+          es admitida como lanzamiento ejecutable (`.exe`, coherente con
+          `ApplicationPreflight`).
+        - `candidato_a_aplicacion`: es ejecutable, existe, es accesible,
+          no esta excluida y pasa la validacion completa de destino.
+        - `autorizado_para_lanzamiento`: es candidato a aplicacion y
+          pasa la política de preflight real
+          (`ApplicationPreflight.check`).
+
+        El preflight solo se consulta cuando la entrada es candidata a
+        aplicacion, para no invocar politicas de lanzamiento sobre
+        entradas que no pueden lanzarse.
+
+        Los parametros de busqueda son iguales que `search_con_evidencia`,
+        además de:
+        - preflight: instancia de ApplicationPreflight para la consulta
+          de autorizacion. Si se omite, se obtiene la instancia global
+          (`get_application_preflight`).
+
+        Retorna el mismo dict paginado que `search_paginated` donde cada
+        entrada de `results` incluye el bloque `diferenciacion`.
+        """
+        if preflight is None:
+            preflight = get_application_preflight()
+
+        pagina = self.search_con_evidencia(
+            machine_id=machine_id,
+            name=name,
+            ruta=ruta,
+            extension=extension,
+            tipo=tipo,
+            volume=volume,
+            disponible=disponible,
+            limit=limit,
+            offset=offset,
+            order_by=order_by,
+            machine_id_actual=machine_id_actual,
+        )
+
+        resultados_diferenciados: list[dict] = []
+        for entrada in pagina["results"]:
+            diferenciada = dict(entrada)
+            diferenciada["diferenciacion"] = self._diferenciar_entrada(
+                entrada, preflight
+            )
+            resultados_diferenciados.append(diferenciada)
+
+        pagina["results"] = resultados_diferenciados
+        return pagina
+
+    def _diferenciar_entrada(
+        self, entrada: dict, preflight: ApplicationPreflight
+    ) -> dict:
+        """
+        Calcula el bloque `diferenciacion` de una unica entrada de
+        inventario.
+
+        Toda la evidencia de existencia, tipo, volumen, identidad y
+        accesibilidad proviene de la validacion real contra el sistema
+        operativo ya incorporada en `search_con_evidencia`
+        (`validar_destino`); aqui no se vuelve a tocar el disco salvo lo
+        que el preflight haga internamente para resolver el ejecutable.
+        """
+        evidencia = entrada.get("evidencia") or {}
+        estado = entrada.get("estado") or {}
+        extension = str(entrada.get("extension") or "").lower()
+        entry_type = entrada.get("entry_type")
+        nombre = str(entrada.get("name") or "")
+        ruta = str(entrada.get("absolute_path") or "")
+
+        existe_ahora = bool(evidencia.get("existencia_ok"))
+        accesible_ahora = bool(evidencia.get("accesible_ok"))
+        valido_destino = bool(evidencia.get("valido"))
+        excluida = bool(estado.get("excluida"))
+
+        ejecutable = entry_type == EntryType.FILE.value and self._es_extension_ejecutable(
+            extension
+        )
+
+        candidato_a_aplicacion = (
+            ejecutable
+            and existe_ahora
+            and accesible_ahora
+            and not excluida
+            and valido_destino
+        )
+
+        autorizado_para_lanzamiento = False
+        preflight_permitido: Optional[bool] = None
+        preflight_motivo: Optional[str] = None
+
+        if candidato_a_aplicacion:
+            aplicacion = {
+                "name": nombre,
+                "app_id": ruta,
+                "login_required": None,
+                "logged_in": None,
+                "resources_available": True,
+            }
+            resultado_preflight = preflight.check(aplicacion)
+            preflight_permitido = bool(
+                resultado_preflight.get("allowed", False)
+            )
+            preflight_motivo = str(resultado_preflight.get("reason", ""))
+            autorizado_para_lanzamiento = preflight_permitido
+
+        partes: list[str] = []
+        if not existe_ahora:
+            partes.append("no existe en el sistema operativo")
+        if not accesible_ahora:
+            partes.append("no accesible")
+        if not ejecutable:
+            partes.append("no es ejecutable lanzable")
+        if excluida:
+            partes.append("excluida del inventario")
+        if not valido_destino:
+            partes.append("no pasa validacion de destino")
+        if candidato_a_aplicacion and not autorizado_para_lanzamiento:
+            partes.append(
+                f"preflight denegado: {preflight_motivo or 'no permitido'}"
+            )
+
+        if autorizado_para_lanzamiento:
+            detalle = (
+                "Autorizado para lanzamiento: ejecutable existente, "
+                "accesible y permitido por preflight."
+            )
+        elif partes:
+            detalle = "No autorizado para lanzamiento: " + "; ".join(partes) + "."
+        else:
+            detalle = (
+                "No es candidato a aplicacion: no cumple condiciones de lanzamiento."
+            )
+
+        return {
+            "encontrado_en_inventario": True,
+            "existe_ahora": existe_ahora,
+            "accesible_ahora": accesible_ahora,
+            "ejecutable": ejecutable,
+            "candidato_a_aplicacion": candidato_a_aplicacion,
+            "autorizado_para_lanzamiento": autorizado_para_lanzamiento,
+            "detalle": detalle,
+            "preflight_permitido": preflight_permitido,
+            "preflight_motivo": preflight_motivo,
+        }
+
+    @staticmethod
+    def _es_extension_ejecutable(extension: Optional[str]) -> bool:
+        """True si la extension es una de las admitidas como ejecutable
+        lanzable por el contrato real de `ApplicationPreflight`."""
+        if not extension:
+            return False
+        return extension.lower() in SystemInventoryStorage.EXTENSIONES_EJECUTABLES
 
     def db_file_exists(self) -> bool:
         """Devuelve True si el fichero de la base de datos existe en disco."""
