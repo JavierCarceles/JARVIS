@@ -828,6 +828,8 @@ if ($found) { exit 0 } else { exit 1 }
     LAUNCH_TYPE_SHORTCUT = "acceso_directo"
     LAUNCH_TYPE_URI = "uri_aplicacion"
     LAUNCH_TYPE_PACKAGE = "paquete"
+    LAUNCH_TYPE_BUNDLE = "bundle"
+    LAUNCH_TYPE_LAUNCHER = "lanzador"
 
     # Esquemas de URI de aplicación reconocidos como destino de lanzamiento
     # admitido. No requieren archivo en disco. El tipo "paquete" se admite

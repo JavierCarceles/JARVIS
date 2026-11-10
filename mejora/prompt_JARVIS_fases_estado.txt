@@ -8257,3 +8257,24 @@ VERIFICACION: SINTAXIS: OK (ast.parse + pytest sin errores); MAIN.PY: NA (no se 
 DISCREPANCIAS: NINGUNA
 PENDIENTES: Ninguno para esta unidad. Padre 3.8.5.1.4.6 con hijas .1 a .8 completadas. Siguiente hoja pendiente real: 3.8.5.1.4.7.1 (Clasificar candidatos por tipo de lanzamiento propio de cada SO).
 ESTADO FINAL: 3.8.5.1.4.6.8 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.8.5.1.4.7.1
+FECHA: 2026-11-11
+OBJETIVO: Clasificar candidatos del inventario por tipo de lanzamiento propio de cada SO (ejecutable, bundle, paquete, acceso directo, URI o lanzador) sin asumir que todo archivo ejecutable es una aplicación GUI, exponiendo subtipo de rol, evidencia, confianza, nombre comercial, aliases y versión/producto, con deduplicación por destino real e integración con ApplicationPreflight sin lanzar nada.
+TIPO DE TRABAJO: IMPLEMENTACIÓN + VERIFICACIÓN REAL
+CAMBIOS / HALLAZGOS:
+- Creado `src/hands/application_launch_classifier.py` con `LaunchClassifier`, `LaunchClassification`, `LaunchType`, `LaunchSubtype`, `leer_version_archivo_windows` (API real de Windows `version.dll` vía `ctypes`) y `resolver_target_acceso_directo` (PowerShell `Shell.Application` real).
+- Clasifica por tipo de lanzamiento: ejecutable, acceso_directo, uri_aplicacion, paquete, bundle, lanzador; nunca asume GUI por extensión .exe (requisito .7.4).
+- Subtipos de rol: gui_aplicacion, herramienta_cli, servicio, controlador, biblioteca, instalador, actualizador, desinstalador, componente_auxiliar, desconocido (.7.3).
+- Lanzabilidad basada en evidencia real del sistema (archivo existente, versión de recurso leída, acceso directo resuelto, URI admitida por preflight); niveles de confianza: ninguna/baja/media/alta (.7.6).
+- Nombre comercial y aliases independientes del nombre del ejecutable; se conservan todas las rutas cuando hay varias instalaciones (.7.5).
+- Deduplicación por identidad y destino real, no solo por nombre, sin fusionar instalaciones distintas (.7.7).
+- No modifica `data/knowledge/entities.json` ni su esquema; solo clasifica en memoria (.7.8, .7.9).
+- Método `validar_destino_antes_de_lanzar` que delega en `ApplicationPreflight.validate_launch_destination` sin lanzar nada (.7.10).
+- Aditivas en `src/hands/application_preflight.py`: constantes `LAUNCH_TYPE_BUNDLE = "bundle"` y `LAUNCH_TYPE_LAUNCHER = "lanzador"` en el vocabulario existente.
+ARCHIVOS MODIFICADOS: PRODUCCIÓN: `src/hands/application_launch_classifier.py` (nuevo); `src/hands/application_preflight.py` (2 constantes añadidas, contrato sin cambios); TESTS: `tests/hands/test_application_launch_classifier.py` (nuevo, 28 pruebas unitarias); `tests/hands/test_clasificacion_candidatos_lanzamiento_entorno_real.py` (nuevo, 13 pruebas de entorno real); DOCUMENTACIÓN: `docs/README.md` (sección y índice del nuevo módulo); `docs/README_TESTS.md` (índice y secciones de los dos tests).
+TESTS Y RESULTADOS: UNITARIOS: 28 PASSED / 28 TOTAL (test_application_launch_classifier.py); ENTORNO REAL: 13 PASSED / 13 TOTAL (test_clasificacion_candidatos_lanzamiento_entorno_real.py); REGRESIÓN PREVIA: tests de application_preflight y validate_launch_destination siguen en verde (110 PASSED en conjunto sobre los tres ficheros de preflight/clasificador).
+VERIFICACIÓN: SINTAXIS: OK (ast.parse + pytest sin errores); MAIN.PY: NA (no se modifica main.py); COMPORTAMIENTO / INTEGRACIÓN REAL: Evidencia real en Windows 11, Python 3.14.7 sobre implementación de producción: python.exe (ejecutable lanzable con versión y nombre comercial reales), cmd.exe (herramienta_cli), notepad.exe (GUI lanzable), kernel32.dll (biblioteca no lanzable), URI ms-settings: (uri_aplicacion lanzable), URI custom-app:algo (no lanzable), steam:// (lanzador no lanzable sin preflight), acceso directo .lnk roto (acceso_directo no lanzable), .exe temporal vacío (solo extensión, no lanzable por requisito .7.4), ruta inexistente (sin tipo, confianza ninguna). Validación de destinos vía preflight real sin lanzar ninguna aplicación. Archivos temporales eliminados tras cada prueba.
+DISCREPANCIAS: NINGUNA
+PENDIENTES: Ninguno para esta unidad. Padre 3.8.5.1.4.7 con hija .7.1 completada; siguiente hoja pendiente real: 3.8.5.1.4.7.2 (Reutilizar primero las fuentes de descubrimiento ya existentes).
+ESTADO FINAL: 3.8.5.1.4.7.1 - IMPLEMENTADA

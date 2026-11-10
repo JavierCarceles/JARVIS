@@ -46,6 +46,7 @@
 - [`hands\test_action_registry.py`](#hands/test-action_registry)
 - [`hands\test_application_alias_resolution.py`](#hands/test-application_alias_resolution)
 - [`hands\test_application_classification.py`](#hands/test-application_classification)
+- [`hands\test_application_launch_classifier.py`](#hands/test-application_launch_classifier)
 - [`hands\test_application_consumers_real_model.py`](#hands/test-application_consumers_real_model)
 - [`hands\test_application_contract_no_duplication.py`](#hands/test-application_contract_no_duplication)
 - [`hands\test_application_data_format.py`](#hands/test-application_data_format)
@@ -74,6 +75,7 @@
 - [`hands\test_application_resolution_evidence.py`](#hands/test-application_resolution_evidence)
 - [`hands\test_application_source_missing.py`](#hands/test-application_source_missing)
 - [`hands\test_applications_core.py`](#hands/test-applications_core)
+- [`hands\test_clasificacion_candidatos_lanzamiento_entorno_real.py`](#hands/test-clasificacion_candidatos_lanzamiento_entorno_real)
 - [`hands\test_calibration_manager.py`](#hands/test-calibration_manager)
 - [`hands\test_calibration_requirements.py`](#hands/test-calibration_requirements)
 - [`hands\test_calibrator.py`](#hands/test-calibrator)
@@ -8048,6 +8050,49 @@ required_capability son opcionales.
   - **`test_clear_cache_removes_executable_entry`** (L147)
 
   Métodos auxiliares (no test): setup_method
+
+---
+
+<a name="hands/test-application_launch_classifier"></a>
+### `hands\test_application_launch_classifier.py`
+
+**Descripción:** Tests unitarios de `src.hands.application_launch_classifier` (unidad 3.8.5.1.4.7.1):
+clasificación de candidatos por tipo de lanzamiento propio de cada SO, subtipos de rol, lanzabilidad
+basada en evidencia real, deduplicación por destino real e integración con preflight sin lanzar nada.
+
+**Módulos de origen probados:** src.hands.application_launch_classifier, src.hands.application_preflight, src.hands.system_inventory
+
+**Clases de test:**
+
+- **`TestLeerVersionArchivoWindows`** (línea 43) — 3 método(s) de test
+- **`TestLaunchClassification`** (línea 103) — 2 método(s) de test
+- **`TestTipoLanzamientoExecutable`** (línea 116) — 4 método(s) de test
+- **`TestTipoLanzamientoAccesoDirecto`** (línea 137) — 2 método(s) de test
+- **`TestTipoLanzamientoURI`** (línea 163) — 3 método(s) de test
+- **`TestTipoLanzamientoVacio`** (línea 201) — 2 método(s) de test
+- **`TestSubtipoRol`** (línea 222) — 5 método(s) de test
+- **`TestNombreComercialYAliases`** (línea 266) — 2 método(s) de test
+- **`TestDeduplicacion`** (línea 287) — 3 método(s) de test
+- **`TestEntradaInventoryEntry`** (línea 326) — 1 método(s) de test
+- **`TestIntegracionPreflight`** (línea 352) — 2 método(s) de test
+
+---
+
+<a name="hands/test-clasificacion_candidatos_lanzamiento_entorno_real"></a>
+### `hands\test_clasificacion_candidatos_lanzamiento_entorno_real.py`
+
+**Descripción:** Verificación en entorno real de `src.hands.application_launch_classifier` sobre elementos
+reales de Windows (ejecutables del sistema, herramientas CLI, URI de aplicación, accesos directos rotos,
+archivos con extensión engañosa). No lanza ninguna aplicación ni modifica datos de usuario.
+
+**Módulos de origen probados:** src.hands.application_launch_classifier, src.hands.application_preflight
+
+**Clases de test:**
+
+- **`TestClasificacionEntornoRealEjecutablesSistema`** (línea 43) — 5 método(s) de test
+- **`TestClasificacionEntornoRealURI`** (línea 79) — 3 método(s) de test
+- **`TestClasificacionEntornoRealAccesosDirectos`** (línea 102) — 2 método(s) de test
+- **`TestPreflightSinLanzarEntornoReal`** (línea 116) — 3 método(s) de test
 
 ---
 

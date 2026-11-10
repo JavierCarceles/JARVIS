@@ -23,6 +23,7 @@
 - [`src/eyes/vision_only.py` (417 líneas)](#src-eyes-vision_only-py)
 - [`src/hands/__init__.py` (30 líneas)](#src-hands-_init_-py)
 - [`src/hands/action_registry.py` (1272 líneas)](#src-hands-action_registry-py)
+- [`src/hands/application_launch_classifier.py` (777 líneas)](#src-hands-application_launch_classifier-py)
 - [`src/hands/application_preflight.py` (894 líneas)](#src-hands-application_preflight-py)
 - [`src/hands/applications_core.py` (1357 líneas)](#src-hands-applications_core-py)
 - [`src/hands/calibration_manager.py` (2343 líneas)](#src-hands-calibration_manager-py)
@@ -772,6 +773,69 @@ Funciones a nivel módulo:
 | `def get_action_registry()`  (L1204) | Obtiene el singleton de ActionRegistry con inicialización segura. |
 | `def register_action(name, description, action_type, category, tags, parameters, confidence_threshold, preconditions, effects, cost, dependencies, capability, application, required_resources, requires_ui_element, success_checker, planner_enabled, preconditions_functions, effects_functions)`  (L1213) | Decorador de conveniencia para registrar acciones en el singleton. |
 | `def register_module(module_path)`  (L1258) | Registra acciones decoradas que se encuentren en el módulo indicado. |
+
+<a name="src-hands-application_launch_classifier-py"></a>
+### `src/hands/application_launch_classifier.py` [777 líneas] — Clasificador de candidatos por tipo de lanzamiento.
+
+**Descripción:** Clasifica candidatos de inventario por tipo de lanzamiento propio de cada SO
+(ejecutable, acceso directo, URI de aplicación, paquete, bundle, lanzador) y por rol real
+(GUI, herramienta CLI, servicio, controlador, biblioteca, instalador, actualizador,
+desinstalador, componente auxiliar, desconocido), sin asumir que todo archivo ejecutable es una
+aplicación GUI lanzable.
+
+**Características:**
+
+- Clasificación de tipo de lanzamiento a partir del destino real observado, no solo de la extensión.
+- Detección de subtipo de rol con reglas basadas en nombre, ruta y recursos de versión del archivo.
+- Lectura real de metadatos de versión de Windows mediante `version.dll` a través de `ctypes`
+  (nombre comercial, producto, versión), sin dependencias externas.
+- Nivel de confianza y evidencia registrada por clasificación; lanzabilidad requiere evidencia
+  real del sistema (archivo existente, versión leída, acceso directo resuelto, URI admitida).
+- Nombre comercial y aliases independientes del nombre del ejecutable; conserva todas las rutas
+  cuando existen varias instalaciones.
+- Deduplicación por identidad y destino real, no solo por nombre, sin fusionar instalaciones distintas.
+- Integración con `ApplicationPreflight.validate_launch_destination` para validar antes de lanzar
+  sin ejecutar nada.
+
+**Importaciones:** 6.
+
+`class LaunchSubtype(Enum)`  (línea 70) — Rol observado o inferido del candidato.
+
+**Decoradores:** Sin decoradores.
+
+_Sin métodos definidos en el AST._
+
+`class LaunchType(str, Enum)`  (línea 42) — Tipo de lanzamiento propio de cada SO.
+
+**Decoradores:** Sin decoradores.
+
+_Sin métodos definidos en el AST._
+
+`class LaunchClassification`  (línea 263) — Resultado completo de clasificar un candidato de aplicación.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` | Serializa el resultado a diccionario plano. |
+
+`class LaunchClassifier`  (línea 680) — Clasifica candidatos de inventario por tipo de lanzamiento y rol real.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(preflight)` | Crea el clasificador con una instancia de `ApplicationPreflight` (por defecto el singleton). |
+| `def classify_candidate(candidate)` | Clasifica un candidato individual y devuelve su `LaunchClassification`. |
+| `def classify_candidates(candidates)` | Clasifica una lista y deduplica por destino real. |
+| `def validar_destino_antes_de_lanzar(destino)` | Pasa un destino a `ApplicationPreflight` sin lanzar nada. |
+
+Funciones a nivel módulo:
+
+| Firma | Docstring |
+|---|---|
+| `def leer_version_archivo_windows(ruta)`  (L168) | Lee metadatos de versión de un archivo PE de Windows mediante la API del SO. |
+| `def resolver_target_acceso_directo(ruta_lnk)`  (L215) | Resuelve el destino de un acceso directo `.lnk` mediante `Shell.Application` de PowerShell. |
 
 <a name="src-hands-application_preflight-py"></a>
 ### `src/hands/application_preflight.py` [894 líneas] — Preflight de aplicaciones para JARVIS.
