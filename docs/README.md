@@ -23,6 +23,7 @@
 - [`src/eyes/vision_only.py` (417 líneas)](#src-eyes-vision_only-py)
 - [`src/hands/__init__.py` (30 líneas)](#src-hands-_init_-py)
 - [`src/hands/action_registry.py` (1272 líneas)](#src-hands-action_registry-py)
+- [`src/hands/application_discovery.py` (684 líneas)](#src-hands-application_discovery-py)
 - [`src/hands/application_launch_classifier.py` (777 líneas)](#src-hands-application_launch_classifier-py)
 - [`src/hands/application_preflight.py` (894 líneas)](#src-hands-application_preflight-py)
 - [`src/hands/applications_core.py` (1357 líneas)](#src-hands-applications_core-py)
@@ -773,6 +774,56 @@ Funciones a nivel módulo:
 | `def get_action_registry()`  (L1204) | Obtiene el singleton de ActionRegistry con inicialización segura. |
 | `def register_action(name, description, action_type, category, tags, parameters, confidence_threshold, preconditions, effects, cost, dependencies, capability, application, required_resources, requires_ui_element, success_checker, planner_enabled, preconditions_functions, effects_functions)`  (L1213) | Decorador de conveniencia para registrar acciones en el singleton. |
 | `def register_module(module_path)`  (L1258) | Registra acciones decoradas que se encuentren en el módulo indicado. |
+
+<a name="src-hands-application_discovery-py"></a>
+### `src/hands/application_discovery.py` [684 líneas] — Descubrimiento de aplicaciones reutilizando fuentes existentes del SO.
+
+**Descripción:** Descubre destinos de aplicaciones consultando, en orden, (1) las fuentes de
+descubrimiento ya existentes del SO (menu de aplicaciones/Get-StartApps, accesos directos .lnk
+del menu Inicio, paquetes AppX, registro de desinstaladores, rutas PATH y App Paths del registro
+de Windows) y (2), solo para destinos faltantes, el inventario persistente del sistema de
+archivos como fuente complementaria. Reutiliza `CalibrationManager.discover_applications`,
+`LaunchClassifier` y `ApplicationPreflight.validate_launch_destination` (sin lanzar nada). Es de
+lectura sola: no lanza aplicaciones, no modifica `data/knowledge/entities.json` ni el catalogo
+conocido, y no persiste capacidades inferidas.
+
+**Características:**
+
+- Consulta primero las fuentes existentes del SO (menu de aplicaciones, paquetes, registro,
+  accesos directos, PATH, App Paths) antes que el inventario persistente.
+- El inventario (`SystemInventoryStorage`) solo se consulta como fuente complementaria para
+  localizar destinos que no aparecieron en las fuentes primarias.
+- Clasifica cada candidato con `LaunchClassifier` (tipo de lanzamiento, rol, evidencia,
+  confianza, nombre comercial, alias, versión/producto).
+- Valida cada destino con `ApplicationPreflight.validate_launch_destination` sin lanzar nada.
+- Deduplica por identidad y destino real, no solo por nombre; conserva rutas candidatas de
+  instalaciones distintas.
+- Resiliente: el fallo de una fuente de descubrimiento no interrumpe las demas.
+
+**Importaciones:** 10.
+
+`class DiscoveredCandidate` — Resultado completo de un candidato descubierto, que combina la
+clasificación de lanzamiento con metadatos de descubrimiento (fuente, esta_en_inventario,
+preflight_decision, fuentes_consultadas).
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def from_classification(clasificacion, fuente, destino_original, preflight_decision, fuentes_consultadas, esta_en_inventario)` | Construye una instancia a partir de una `LaunchClassification` y metadatos de descubrimiento. |
+| `def to_dict()` | Serializa el resultado a diccionario plano. |
+
+`class ApplicationDiscovery` — Orquestador de descubrimiento que reutiliza primero las fuentes
+existentes del SO y usa el inventario como fuente complementaria para destinos faltantes.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(preflight, clasificador, storage, calibration, machine_id)` | Crea el orquestador con dependencias inyectables (por defecto instancias reales). |
+| `def descubrir_todos(limite_por_fuente, incluir_inventario)` | Devuelve candidatos descubiertos: fuentes primarias primero y, opcionalmente, el inventario para destinos faltantes. |
+| `def buscar_por_nombre(nombre, incluir_inventario, limite_por_fuente)` | Busca por nombre en fuentes primarias y, solo si no hay coincidencia, en el inventario. |
+| `def candidatos_lanzables(limite_por_fuente, incluir_inventario)` | Devuelve solo candidatos clasificados como lanzables tras validar con preflight (sin lanzar). |
 
 <a name="src-hands-application_launch_classifier-py"></a>
 ### `src/hands/application_launch_classifier.py` [777 líneas] — Clasificador de candidatos por tipo de lanzamiento.

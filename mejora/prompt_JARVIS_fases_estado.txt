@@ -8278,3 +8278,24 @@ VERIFICACIÓN: SINTAXIS: OK (ast.parse + pytest sin errores); MAIN.PY: NA (no se
 DISCREPANCIAS: NINGUNA
 PENDIENTES: Ninguno para esta unidad. Padre 3.8.5.1.4.7 con hija .7.1 completada; siguiente hoja pendiente real: 3.8.5.1.4.7.2 (Reutilizar primero las fuentes de descubrimiento ya existentes).
 ESTADO FINAL: 3.8.5.1.4.7.1 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.8.5.1.4.7.2
+FECHA: 2026-11-11
+OBJETIVO: Descubrir aplicaciones reutilizando primero las fuentes existentes del SO (menu de aplicaciones/Get-StartApps, accesos directos .lnk del menu Inicio, paquetes AppX, registro de desinstaladores, rutas PATH y App Paths del registro de Windows) y usando el inventario persistente (SystemInventoryStorage) como fuente complementaria solo para localizar destinos faltantes. Clasifica cada candidato con LaunchClassifier y valida el destino con ApplicationPreflight.validate_launch_destination sin lanzar nada.
+TIPO DE TRABAJO: IMPLEMENTACION + VERIFICACION REAL
+CAMBIOS / HALLAZGOS:
+- Creado `src/hands/application_discovery.py` con `ApplicationDiscovery` y `DiscoveredCandidate`.
+  - `descubrir_todos()` consulta fuentes primarias existentes (CalibrationManager.discover_applications: menu de aplicaciones, .lnk menu Inicio, AppX, registro de desinstaladores; rutas PATH; App Paths del registro de Windows) y, solo para destinos faltantes, complementa con el inventario persistente (.7.2).
+  - `buscar_por_nombre()` consulta primero fuentes primarias y, solo si no hay coincidencia, el inventario como fuente complementaria para localizar destinos faltantes (.7.2).
+  - `candidatos_lanzables()` retorna solo candidatos con es_lanzable True tras validar con preflight.
+  - Clasifica cada candidato con LaunchClassifier (tipo de lanzamiento, rol, evidencia, confianza, nombre comercial, alias, version/producto).
+  - Valida cada destino con ApplicationPreflight.validate_launch_destination (lectura sola, no lanza nada).
+  - Deduplica por destino real (ruta normalizada o URI), no solo por nombre; conserva todas las rutas candidatas cuando hay varias instalaciones (.7.5/.7.7).
+  - Resiliente: el fallo de una fuente de descubrimiento no interrumpe las demas. No modifica `data/knowledge/entities.json` ni su esquema; no lanza aplicaciones; no persiste capacidades inferidas (.7.8, .7.9).
+- No se modificaron modulos existentes.
+ARCHIVOS MODIFICADOS: PRODUCCION: `src/hands/application_discovery.py` (nuevo, 684 lineas); DOCUMENTACION: `docs/README.md` (indice y seccion del modulo); `docs/README_TESTS.md` (indice y seccion de los tests). TESTS: `tests/hands/test_application_discovery.py` (nuevo, 22 pruebas unitarias); `tests/hands/test_descubrimiento_fuentes_existentes_entorno_real.py` (nuevo, 6 pruebas de entorno real).
+TESTS Y RESULTADOS: UNITARIOS: 22 PASSED / 22 TOTAL (test_application_discovery.py; clasificador/preflight reales, fuentes de datos mockeadas solo para aislar la orquestacion); ENTORNO REAL: 6 PASSED / 6 TOTAL (test_descubrimiento_fuentes_existentes_entorno_real.py; implementacion de produccion real sobre Windows 11: CalibrationManager, rutas PATH, App Paths del registro, LaunchClassifier, ApplicationPreflight e inventario SQLite temporal real). REGRESION: tests de application_launch_classifier (28 PASSED) y test_clasificacion_candidatos_lanzamiento_entorno_real (13 PASSED) siguen en verde.
+VERIFICACION: SINTAXIS: OK (ast.parse + pytest sin errores); MAIN.PY: NA (no se modifica main.py); COMPORTAMIENTO / INTEGRACION REAL: Evidencia real en Windows 11, Python 3.14.7: descubrimiento real de aplicaciones del SO sin lanzar ninguna; decision de preflight presente en cada candidato con destino; deduplicacion por destino real verificada; inventario temporal real (SQLite) creado, consultado y eliminado al finalizar cada prueba; directorios temporales y base de datos eliminados tras cada prueba. La unidad no requiere interaccion grafica (sin ventanas, monitores ni entrada de teclado/raton).
+DISCREPANCIAS: NINGUNA
+PENDIENTES: Ninguno para esta unidad. Padre 3.8.5.1.4.7 con hijas .7.1 y .7.2 completadas; siguiente hoja pendiente real: 3.8.5.1.4.7.3 (Diferenciar aplicacion GUI, herramienta CLI, servicio, controlador, biblioteca, instalador, actualizador, desinstalador, componente auxiliar y archivo ejecutable desconocido).
+ESTADO FINAL: 3.8.5.1.4.7.2 - IMPLEMENTADA

@@ -52,6 +52,7 @@
 - [`hands\test_application_data_format.py`](#hands/test-application_data_format)
 - [`hands\test_application_data_incomplete.py`](#hands/test-application_data_incomplete)
 - [`hands\test_application_discovered_temporary.py`](#hands/test-application_discovered_temporary)
+- [`hands\test_application_discovery.py`](#hands/test-application_discovery)
 - [`hands\test_application_discovery_no_recursive_disk_search.py`](#hands/test-application_discovery_no_recursive_disk_search)
 - [`hands\test_application_discovery_persistence_contract.py`](#hands/test-application_discovery_persistence_contract)
 - [`hands\test_application_discovery_separation.py`](#hands/test-application_discovery_separation)
@@ -6762,6 +6763,63 @@ tipo de excepcion.
   - Integracion con la instancia global get_application_manager (no persiste).
 
   - **`test_global_manager_puede_registrar_descubierta`** (L278)
+
+---
+
+<a name="hands/test-application_discovery"></a>
+### `hands\test_application_discovery.py`
+
+**Descripción:** Tests unitarios de la unidad 3.8.5.1.4.7.2: descubrimiento de aplicaciones
+reutilizando primero las fuentes existentes del SO (menu de aplicaciones, paquetes, registro,
+accesos directos, PATH, App Paths) y usando el inventario persistente como fuente complementaria
+solo para destinos faltantes.
+
+**Módulos de origen probados:** src.hands.application_discovery, src.hands.application_preflight,
+src.hands.application_launch_classifier
+
+**Estrategia de mocks:** solo se mockean las fuentes de datos
+(`CalibrationManager.discover_applications` y `SystemInventoryStorage`). La clasificacion y el
+preflight son reales (`LaunchClassifier` + `ApplicationPreflight` sobre archivos reales del
+equipo), por lo que ningún mock decide el resultado de clasificacion ni de validacion. No se
+lanza ninguna aplicacion.
+
+**Clases de test:**
+
+- **`TestDiscoveredCandidate`** (línea 116) — 2 método(s) de test
+  - `test_from_classification_mapea_campos` (L119)
+  - `test_to_dict_contiene_metadatos_descubrimiento` (L145)
+
+- **`TestApplicationDiscoveryInit`** (línea 154) — 2 método(s) de test
+  - `test_crea_instancias_reales_por_defecto` (L157)
+  - `test_acepta_dependencias_inyectadas` (L172)
+
+- **`TestFuentesPrimarias`** (línea 183) — 5 método(s) de test
+  - `test_menu_aplicaciones_start_menu` (L186)
+  - `test_paquetes_appx` (L202)
+  - `test_registro_desinstaladores` (L209)
+  - `test_fuentes_primarias_tiene_orden_esperado` (L216)
+  - `test_fallo_fuente_calibration_no_interrumpe` (L224)
+
+- **`TestPrioridadFallback`** (línea 237) — 5 método(s) de test
+  - `test_descubrir_todos_incluir_inventario_false_no_consulta_inventario` (L240)
+  - `test_buscar_por_nombre_encontrado_en_primarias_no_consulta_inventario` (L251)
+  - `test_buscar_por_nombre_faltante_consulta_inventario` (L264)
+  - `test_buscar_por_nombre_faltante_sin_inventario_retorna_vacio` (L278)
+  - `test_buscar_por_nombre_vacio_retorna_vacio` (L288)
+
+- **`TestClasificacionValidacion`** (línea 292) — 5 método(s) de test
+  - `test_clasifica_ejecutivo_real_lanzable` (L295)
+  - `test_clasifica_herramienta_cli_real` (L307)
+  - `test_uri_aplicacion_admitida_sin_lanzar` (L318)
+  - `test_solo_extension_exe_no_asume_lanzable` (L332)
+  - `test_todo_candidato_con_destino_tiene_preflight_decision` (L348)
+
+- **`TestDeduplicacion`** (línea 368) — 2 método(s) de test
+  - `test_mismo_destino_dos_fuentes_queda_uno_con_mayor_prioridad` (L371)
+  - `test_rutas_distintas_se_conservan_todas` (L385)
+
+- **`TestCandidatosLanzables`** (línea 403) — 1 método(s) de test
+  - `test_solo_retorna_lanzables` (L406)
 
 ---
 
