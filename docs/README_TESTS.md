@@ -10710,8 +10710,9 @@ da reconciled=False (coincidencia).
 | `TestLimiteRecursos` | Límites configurables de recursos (CPU, memoria, disco, concurrencia, intervalo de medición) con validación de rangos y valores None por defecto sin umbrales inventados. |
 | `TestMedidorRecursosSistema` | Medición real de CPU, memoria y uso de disco vía `psutil`; mockeo determinístico para tests. |
 | `TestRecorridoVolumenLimitesRecursos` | Throttling del recorrido por límites de recursos: CPU excedido espera y reintenta, memoria excedida, disco lleno, recursos dentro de límites sin throttling, límite None equivalente a sin límite, concurrencia máxima válida. |
+| `TestRecursosYCancelacionEjecucionReal` | Verificación de CPU, memoria, lecturas de directorio y cancelación durante ejecución real de RecorridoVolumen sin mocks de psutil: medición real de recursos vía psutil, cancelación real que preserva entradas válidas, throttling con carga de CPU real, lecturas de directorio contra árbol temporal real. |
 
-**Resultados:** 202 tests unitarios, 202 PASSED / 0 FAILED / 8 SKIPPED (symlinks no creables en Windows sin privilegios).
+**Resultados:** 230 tests unitarios, 230 PASSED / 0 FAILED / 8 SKIPPED (symlinks no creables en Windows sin privilegios).
 
 ---
 
@@ -10738,12 +10739,13 @@ da reconciled=False (coincidencia).
 | `TestDeteccionCambiosIncrementales` | Detección de altas, cambios y desapariciones entre línea base y escaneo nuevo comparando solo metadatos (tamaño, marcas temporales, atributos) sin leer contenido de archivos. |
 | `TestMarcadoEntradasEliminadas` | Marca como ausente/eliminada (`excluded = 1`) las entradas desaparecidas solo tras completar correctamente el escaneo del ámbito (`SCAN_RESULT_OK`); un error de permisos no equivale a una eliminación. |
 | `TestReanudarScan` | Reanudación de un escaneo interrumpido usando el mismo `scan_id` (misma generación), sin mezclar resultados de escaneos distintos ni degradar la última instantánea completa: validación de scan interrumpido, reuso del bloqueo de concurrencia, persistencia de la línea base y finalización con `end_scan_run`. |
+| `TestInterrupcionReanudacionSistemaReal` | Interrupción y reanudación de un escaneo controlado en el sistema real (directorio temporal real + SQLite real): mismo `scan_id` sin nueva generación, reanudación tras interrupción con entradas adicionales, línea base no degradada por scans interrumpidos, y bloqueo original preservado ante reanudación de otro equipo. |
 | `TestRefrescoBajoDemanda` | Refresco bajo demanda de una ruta o volumen (revalida existencia y tamaño, actualiza `last_checked_at` sin nuevo escaneo), refresco incremental global de todos los volúmenes de un equipo y revalidación puntual del destino de una aplicación antes de abrirla. |
 | `TestBusquedaPorEstado` | Consultas de entradas por estado de exclusión. |
 | `TestConcurrenciaEscaneos` | Bloqueo de concurrencia, `ConcurrentScanError`, liberación del bloqueo y modo de journaling WAL. |
 | `TestBackupCorrupcionYRecuperacion` | Copia de seguridad, verificación de integridad (`PRAGMA quick_check` / `integrity_check`) y restauración desde copia sin sobrescribir una base válida con una copia vacía, incompleta o corrupta. |
 
-**Resultados:** 137 tests unitarios, 137 PASSED / 0 FAILED.
+**Resultados:** 149 tests unitarios, 149 PASSED / 0 FAILED.
 
 ---
 

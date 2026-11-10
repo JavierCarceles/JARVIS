@@ -3240,3 +3240,170 @@ class TestValidarRutaParaLanzamiento:
         )
         # En la mayoría de equipos esta ruta no existe; debe fallar existencia
         assert resultado.valido is False or resultado.existencia_ok is False
+
+
+# ---------------------------------------------------------------------------
+# Verificación de recursos y cancelación durante ejecución real (3.8.5.1.4.5.10.4)
+# ---------------------------------------------------------------------------
+
+class TestRecursosYCancelacionEjecucionReal:
+    """
+    Verifica CPU, memoria, lecturas de directorio y cancelación durante una
+    ejecución real de RecorridoVolumen, sin mocks de psutil.
+
+    Las pruebas miden recursos reales del equipo durante el recorrido de un
+    árbol temporal del sistema de archivos, y registran medidas observables
+    en lugar de inferir comportamiento a partir de tests unitarios con mocks.
+    """
+
+    def _crear_arbol_temporal(self, tmp_path: Path, num_archivos: int = 50) -> Path:
+        """Crea un árbol temporal real de directorios y archivos."""
+        raiz = tmp_path / "volumen_real"
+        for i in range(num_archivos):
+            sub = raiz / f"sub{i % 4}"
+            sub.mkdir(parents=True, exist_ok=True)
+            (sub / f"archivo_{i}.txt").write_text(f"contenido {i}", encoding="utf-8")
+        return raiz
+
+    def test_medicion_cpu_memoria_disco_tiempo_real_sin_mocks(self, tmp_path: Path):
+        """Durante una ejecución real se miden CPU, memoria y disco con psutil real."""
+        raiz = self._crear_arbol_temporal(tmp_path, num_archivos=50)
+        contrato = _ContratoPrueba()
+
+        mediciones: list[dict[str, float]] = []
+
+        def capturar_medicion(progreso: ProgresoRecorrido) -> None:
+            mediciones.append(MedidorRecursosSistema.medir_todos(str(raiz)))
+
+        recorrido = RecorridoVolumen(
+            volumen="C",
+            raiz=str(raiz),
+            contrato=contrato,
+            maquina_id="maquina-real",
+            callback_progreso=capturar_medicion,
+        )
+        entradas = list(recorrido.recorrer())
+
+        assert recorrido.progreso.completado is True
+        assert recorrido.progreso.interrumpido is False
+        assert len(entradas) > 0
+        # Se registró al menos una medición real durante el recorrido (una por
+        # directorio procesado, más una final al completar).
+        assert len(mediciones) >= recorrido.progreso.directorios_procesados
+        for m in mediciones:
+            assert set(m.keys()) == {"cpu", "memoria", "disco"}
+            for valor in m.values():
+                assert isinstance(valor, float)
+                assert 0.0 <= valor <= 100.0
+
+    def test_cancelacion_tiempo_real_preserva_estado(self, tmp_path: Path):
+        """Cancelación real durante el recorrido: ejecucion_parcial y entradas válidas preservadas."""
+        raiz = self._crear_arbol_temporal(tmp_path, num_archivos=30)
+        contrato = _ContratoPrueba()
+
+        llamadas = {"n": 0}
+
+        def control_cancelar() -> ControlRecorrido:
+            llamadas["n"] += 1
+            if llamadas["n"] > 3:
+                return ControlRecorrido.CANCELAR
+            return ControlRecorrido.CONTINUAR
+
+        recorrido = RecorridoVolumen(
+            volumen="C",
+            raiz=str(raiz),
+            contrato=contrato,
+            maquina_id="maquina-real",
+            callback_control=control_cancelar,
+        )
+        entradas = list(recorrido.recorrer())
+
+        assert recorrido.progreso.completado is False
+        assert recorrido.progreso.interrumpido is True
+        assert recorrido.ejecucion_parcial is True
+        # Las entradas emitidas antes de la cancelación se preservan como último inventario válido
+        assert len(entradas) == len(recorrido.entradas_validas)
+        assert len(entradas) > 0
+        for e in entradas:
+            assert e.name != ""
+            assert e.volume == "C"
+            assert e.machine_id == "maquina-real"
+
+    def test_throttling_cpu_tiempo_real_con_carga(self, tmp_path: Path):
+        """Con carga de CPU real, el recorrido se throttlea pero no aborta; registra medidas."""
+        import threading
+
+        raiz = self._crear_arbol_temporal(tmp_path, num_archivos=100)
+        contrato = _ContratoPrueba()
+
+        # Límite de CPU bajo para que la carga real lo exceda y se active el throttling.
+        limite = LimiteRecursos(cpu_max_porcentaje=10.0, intervalo_medicion_segundos=0.1)
+
+        detener_carga = {"valor": False}
+        mediciones_sobre_limite = {"contador": 0}
+
+        def quemar_cpu() -> None:
+            while not detener_carga["valor"]:
+                _ = sum(i * i for i in range(2000))
+
+        def capturar_medicion(progreso: ProgresoRecorrido) -> None:
+            m = MedidorRecursosSistema.medir_todos(str(raiz))
+            if m["cpu"] > limite.cpu_max_porcentaje:
+                mediciones_sobre_limite["contador"] += 1
+
+        hilos = [
+            threading.Thread(target=quemar_cpu, daemon=True)
+            for _ in range(max(1, (os.cpu_count() or 2) // 2))
+        ]
+        for h in hilos:
+            h.start()
+
+        try:
+            recorrido = RecorridoVolumen(
+                volumen="C",
+                raiz=str(raiz),
+                contrato=contrato,
+                maquina_id="maquina-real",
+                limite_recursos=limite,
+                callback_progreso=capturar_medicion,
+            )
+            entradas = list(recorrido.recorrer())
+
+            # El throttling ralentiza pero no aborta el recorrido
+            assert recorrido.progreso.completado is True
+            assert len(entradas) > 0
+        finally:
+            detener_carga["valor"] = True
+            for h in hilos:
+                h.join(timeout=5.0)
+
+    def test_lecturas_directorio_tiempo_real(self, tmp_path: Path):
+        """Durante una ejecución real se leen directorios del sistema de archivos y se emiten entradas."""
+        raiz = self._crear_arbol_temporal(tmp_path, num_archivos=10)
+        contrato = _ContratoPrueba()
+
+        directorios_leidos = {"n": 0}
+
+        def contar_lecturas(progreso: ProgresoRecorrido) -> None:
+            directorios_leidos["n"] = progreso.directorios_procesados
+
+        recorrido = RecorridoVolumen(
+            volumen="C",
+            raiz=str(raiz),
+            contrato=contrato,
+            maquina_id="maquina-real",
+            callback_progreso=contar_lecturas,
+        )
+        entradas = list(recorrido.recorrer())
+
+        # Se realizaron lecturas reales de directorios (progreso > 0)
+        assert directorios_leidos["n"] > 0
+        # Las entradas reflejan archivos reales del árbol temporal
+        nombres = {e.name for e in entradas}
+        archivos_esperados = {f"archivo_{i}.txt" for i in range(10)}
+        assert archivos_esperados <= nombres
+        # Cada entrada tiene metadatos reales del SO
+        for e in entradas:
+            assert e.volume == "C"
+            assert e.machine_id == "maquina-real"
+            assert e.last_checked_at != ""

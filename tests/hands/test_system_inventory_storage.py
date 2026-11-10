@@ -24,6 +24,13 @@ from pathlib import Path
 
 import pytest
 
+from src.hands.system_inventory import (
+    ControlRecorrido,
+    EntryType,
+    InventoryContract,
+    InventoryEntry,
+    RecorridoVolumen,
+)
 from src.hands.system_inventory_storage import (
     DEFAULT_BACKUP_SUFFIX,
     DEFAULT_DB_PATH,
@@ -2459,6 +2466,261 @@ class TestReanudarScan:
         assert linea_despues["linea_id"] == linea_id_base
         assert linea_despues["fecha_base"] == fecha_base
         assert linea_despues["scan_id"] == "scan-base"
+
+
+# ---------------------------------------------------------------------------
+# Interrupcion y reanudacion de escaneo en sistema real (3.8.5.1.4.5.10.3).
+# ---------------------------------------------------------------------------
+
+class _ContratoPruebaStorage(InventoryContract):
+    """Contrato de prueba que no excluye nada, para recorrer arboles temporales."""
+
+    def __init__(self, maquina_id: str = "maquina-test") -> None:
+        super().__init__(
+            machine_id=maquina_id,
+            excluded_paths=[],
+            excluded_mounts=[],
+        )
+
+
+class TestInterrupcionReanudacionSistemaReal:
+    """Verifican la interrupcion y reanudacion de un escaneo controlado en el
+    sistema real (directorio temporal real + SQLite real), manteniendo el
+    mismo scan_id/generacion y sin degradar la ultima instantanea completa."""
+
+    def _crear_arbol(self, tmp_path: Path) -> Path:
+        """Crea un arbol de directorios y archivos de prueba en el FS real."""
+        raiz = tmp_path / "volumen"
+        (raiz / "sub1").mkdir(parents=True)
+        (raiz / "sub1" / "a.txt").write_text("contenido a", encoding="utf-8")
+        (raiz / "sub1" / "b.log").write_text("contenido b", encoding="utf-8")
+        (raiz / "sub2").mkdir(parents=True)
+        (raiz / "sub2" / "c.txt").write_text("contenido c", encoding="utf-8")
+        (raiz / "raiz_file.dat").write_text("contenido raiz", encoding="utf-8")
+        return raiz
+
+    def _entradas_a_dict(self, entradas: list[InventoryEntry]) -> list[dict]:
+        """Convierte una lista de InventoryEntry en lista de dict para insertar."""
+        return [e.to_dict() for e in entradas]
+
+    def test_interrumpir_y_reanudar_mismo_scan_id_sin_nueva_generacion(
+        self, tmp_path: Path, storage: SystemInventoryStorage
+    ):
+        """Un escaneo interrumpido y reanudado conserva el mismo scan_id:
+        no se crea una nueva fila de scan_run ni nueva generacion."""
+        raiz = self._crear_arbol(tmp_path)
+        storage.initialize()
+        storage.record_machine("maquina-test")
+        storage.record_volume("vol-c:", "maquina-test", "C:", "local", "online")
+
+        scan_id = "scan-real-interrumpible"
+        storage.begin_scan_run(scan_id, "maquina-test", "C:", SCAN_MODE_FULL)
+
+        # Recorrer el FS real e interrumpir tras el segundo directorio.
+        contrato = _ContratoPruebaStorage()
+        llamadas = [0]
+        emitidas: list[InventoryEntry] = []
+
+        def control() -> ControlRecorrido:
+            llamadas[0] += 1
+            return ControlRecorrido.CANCELAR if llamadas[0] > 2 else ControlRecorrido.CONTINUAR
+
+        recorrido = RecorridoVolumen(
+            volumen="C:",
+            raiz=str(raiz),
+            contrato=contrato,
+            maquina_id="maquina-test",
+            callback_control=control,
+        )
+        for entrada in recorrido.recorrer():
+            emitidas.append(entrada)
+
+        assert recorrido.progreso.interrumpido is True
+        assert recorrido.progreso.completado is False
+        assert len(emitidas) > 0
+
+        # Insertar las entradas emitidas antes de la interrupcion.
+        storage.insert_file_entries(
+            scan_id, "maquina-test", "C:", self._entradas_a_dict(emitidas)
+        )
+
+        # Reanudar con el MISMO scan_id: misma generacion.
+        reanudado = storage.reanudar_scan(scan_id, "maquina-test", "C:")
+        assert reanudado["scan_id"] == scan_id
+        assert reanudado["machine_id"] == "maquina-test"
+        assert reanudado["volume"] == "C:"
+        assert reanudado["result"] == SCAN_RESULT_INTERRUPTED
+        assert reanudado["finished_at"] is None
+
+        # Solo debe existir una fila de scan_run con este scan_id (misma generacion).
+        fila = storage.get_scan_run(scan_id)
+        assert fila is not None
+        assert fila["scan_id"] == scan_id
+
+        # Finalizar el scan reanudado.
+        storage.end_scan_run(scan_id, result=SCAN_RESULT_OK, entries_count=len(emitidas))
+        assert storage.has_active_scan("maquina-test", "C:") is False
+
+    def test_interrumpir_reanudar_y_completar_con_entradas_posteriores(
+        self, tmp_path: Path, storage: SystemInventoryStorage
+    ):
+        """Tras reanudar, se pueden agregar mas entradas y completar el escaneo
+        con el mismo scan_id."""
+        raiz = self._crear_arbol(tmp_path)
+        storage.initialize()
+        storage.record_machine("maquina-test")
+        storage.record_volume("vol-c:", "maquina-test", "C:", "local", "online")
+
+        scan_id = "scan-real-reanudable"
+        storage.begin_scan_run(scan_id, "maquina-test", "C:", SCAN_MODE_FULL)
+
+        # Primera pasada: interrumpir temprano.
+        contrato = _ContratoPruebaStorage()
+        llamadas = [0]
+        emitidas_parte1: list[InventoryEntry] = []
+
+        def control() -> ControlRecorrido:
+            llamadas[0] += 1
+            return ControlRecorrido.CANCELAR if llamadas[0] > 1 else ControlRecorrido.CONTINUAR
+
+        recorrido1 = RecorridoVolumen(
+            volumen="C:",
+            raiz=str(raiz),
+            contrato=contrato,
+            maquina_id="maquina-test",
+            callback_control=control,
+        )
+        for entrada in recorrido1.recorrer():
+            emitidas_parte1.append(entrada)
+
+        assert recorrido1.progreso.interrumpido is True
+        storage.insert_file_entries(
+            scan_id, "maquina-test", "C:", self._entradas_a_dict(emitidas_parte1)
+        )
+
+        # Reanudar con el mismo scan_id (misma generacion).
+        reanudado = storage.reanudar_scan(scan_id, "maquina-test", "C:")
+        assert reanudado["scan_id"] == scan_id
+        assert reanudado["result"] == SCAN_RESULT_INTERRUPTED
+        assert reanudado["finished_at"] is None
+
+        # Añadir archivos nuevos tras la reanudacion y recorrer de nuevo.
+        (raiz / "sub2" / "d_nuevo.txt").write_text("nuevo", encoding="utf-8")
+        (raiz / "sub3").mkdir(parents=True)
+        (raiz / "sub3" / "e_nuevo.txt").write_text("nuevo2", encoding="utf-8")
+
+        recorrido2 = RecorridoVolumen(
+            volumen="C:",
+            raiz=str(raiz),
+            contrato=contrato,
+            maquina_id="maquina-test",
+        )
+        emitidas_parte2 = list(recorrido2.recorrer())
+        assert recorrido2.progreso.completado is True
+
+        # Insertar solo las entradas que no estaban en la primera pasada
+        # (rutas absolutas distintas de las ya insertadas).
+        rutas_parte1 = {e.absolute_path for e in emitidas_parte1}
+        entradas_nuevas = [
+            e for e in emitidas_parte2 if e.absolute_path not in rutas_parte1
+        ]
+        assert len(entradas_nuevas) > 0
+        storage.insert_file_entries(
+            scan_id, "maquina-test", "C:", self._entradas_a_dict(entradas_nuevas)
+        )
+
+        storage.end_scan_run(scan_id, result=SCAN_RESULT_OK, entries_count=len(emitidas_parte2))
+
+        fila = storage.get_scan_run(scan_id)
+        assert fila["result"] == SCAN_RESULT_OK
+        assert fila["finished_at"] is not None
+        assert storage.has_active_scan("maquina-test", "C:") is False
+
+    def test_reanudacion_no_degrada_linea_base_existente(
+        self, tmp_path: Path, storage: SystemInventoryStorage
+    ):
+        """Reanudar un escaneo interrumpido no modifica ni sobrescribe la
+        linea base registrada previamente (3.8.5.1.4.5.1)."""
+        raiz = self._crear_arbol(tmp_path)
+        storage.initialize()
+        storage.record_machine("maquina-test")
+        storage.record_volume("vol-c:", "maquina-test", "C:", "local", "online")
+
+        # Registrar linea base primero.
+        linea_base = storage.registrar_linea_base_volumen(
+            "maquina-test", "C:", "online", 100.0, entradas_count=5,
+            scan_id="scan-base",
+        )
+        linea_id_base = linea_base["linea_id"]
+        fecha_base = linea_base["fecha_base"]
+
+        # Crear e interrumpir un scan (distinto scan_id).
+        scan_id = "scan-interrumpido"
+        storage.begin_scan_run(scan_id, "maquina-test", "C:", SCAN_MODE_INCREMENTAL)
+        storage.reanudar_scan(scan_id, "maquina-test", "C:")
+
+        # Insertar algunas entradas del FS real.
+        contrato = _ContratoPruebaStorage()
+        recorrido = RecorridoVolumen(
+            volumen="C:",
+            raiz=str(raiz),
+            contrato=contrato,
+            maquina_id="maquina-test",
+        )
+        emitidas = list(recorrido.recorrer())
+        storage.insert_file_entries(
+            scan_id, "maquina-test", "C:", self._entradas_a_dict(emitidas)
+        )
+        storage.end_scan_run(scan_id, result=SCAN_RESULT_OK, entries_count=len(emitidas))
+
+        # La linea base debe permanecer intacta.
+        linea_despues = storage.obtener_linea_base_volumen("maquina-test", "C:")
+        assert linea_despues is not None
+        assert linea_despues["linea_id"] == linea_id_base
+        assert linea_despues["fecha_base"] == fecha_base
+        assert linea_despues["scan_id"] == "scan-base"
+
+    def test_scan_interrumpido_sin_reanudar_no_degrada_linea_base(
+        self, tmp_path: Path, storage: SystemInventoryStorage
+    ):
+        """Un scan interrumpido que nunca se reanuda no degrada la linea base."""
+        raiz = self._crear_arbol(tmp_path)
+        storage.initialize()
+        storage.record_machine("maquina-test")
+        storage.record_volume("vol-c:", "maquina-test", "C:", "local", "online")
+
+        linea_base = storage.registrar_linea_base_volumen(
+            "maquina-test", "C:", "online", 100.0, entradas_count=3,
+            scan_id="scan-base",
+        )
+        linea_id_base = linea_base["linea_id"]
+
+        scan_id = "scan-nunca-reanudado"
+        storage.begin_scan_run(scan_id, "maquina-test", "C:", SCAN_MODE_FULL)
+        # No se llama a reanudar_scan ni a end_scan_run: queda interrumpido.
+
+        linea_despues = storage.obtener_linea_base_volumen("maquina-test", "C:")
+        assert linea_despues is not None
+        assert linea_despues["linea_id"] == linea_id_base
+
+    def test_reanudar_scan_de_otro_equipo_no_libera_bloqueo_original(
+        self, tmp_path: Path, storage: SystemInventoryStorage
+    ):
+        """Intentar reanudar un scan de otro equipo falla y no libera el
+        bloqueo del scan original."""
+        storage.initialize()
+        storage.record_machine("maquina-test")
+        storage.record_volume("vol-c:", "maquina-test", "C:", "local", "online")
+
+        scan_id = "scan-original"
+        storage.begin_scan_run(scan_id, "maquina-test", "C:", SCAN_MODE_FULL)
+        assert storage.has_active_scan("maquina-test", "C:") is True
+
+        with pytest.raises(ValueError):
+            storage.reanudar_scan(scan_id, "maquina-otra", "C:")
+
+        # El bloqueo original sigue activo.
+        assert storage.has_active_scan("maquina-test", "C:") is True
 
 
 # ---------------------------------------------------------------------------
