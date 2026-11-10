@@ -1909,6 +1909,7 @@ Métodos de `SystemInventoryStorage`:
 | `def search_by_name(machine_id, name, limit, offset)` | Busca entradas de archivo por nombre normalizado (paginado). |
 | `def search_by_extension(machine_id, extension, limit, offset)` | Busca entradas de archivo por extensión (paginado). |
 | `def search_by_path_prefix(machine_id, path_prefix, limit, offset)` | Busca entradas de archivo por prefijo de ruta absoluta (paginado). |
+| `def search(machine_id, name=None, ruta=None, extension=None, tipo=None, volume=None, disponible=None, limit=50, offset=0, order_by='absolute_path')` | Busqueda unificada de entradas de inventario por múltiples criterios (nombre exacto/normalizado, ruta, extensión, tipo, volumen, disponibilidad) con paginación y ordenación; siempre filtra por `machine_id` (aislamiento por equipo). |
 | `def get_entry_count(machine_id, volume)` | Devuelve el número total de entradas de archivo de un equipo. |
 | `def db_file_exists()` | Devuelve True si el fichero de la base de datos existe en disco. |
 | `def has_active_scan(machine_id, volume)` | Devuelve True si hay un escaneo en curso para el equipo y volumen dados. |

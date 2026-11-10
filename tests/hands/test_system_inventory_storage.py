@@ -1572,6 +1572,105 @@ class TestConsultasIndexadas:
         assert res == []
         assert storage.get_entry_count("machine-beta") == 0
 
+    # ---------------------------------------------------------------------------
+    # Busqueda unificada (unidad 3.8.5.1.4.6.1).
+    # ---------------------------------------------------------------------------
+
+    def test_search_unificado_por_nombre(self, storage: SystemInventoryStorage):
+        self._seed(storage)
+        res = storage.search("machine-alfa", name="app2.exe")
+        assert len(res) == 1
+        assert res[0]["name"] == "app2.exe"
+
+    def test_search_unificado_por_nombre_case_insensitive(self, storage: SystemInventoryStorage):
+        self._seed(storage)
+        res = storage.search("machine-alfa", name="APP2.EXE")
+        assert len(res) == 1
+        assert res[0]["name"] == "app2.exe"
+
+    def test_search_unificado_por_extension(self, storage: SystemInventoryStorage):
+        self._seed(storage)
+        res = storage.search("machine-alfa", extension=".txt")
+        assert len(res) == 1
+        assert res[0]["name"] == "readme.txt"
+
+    def test_search_unificado_por_extension_case_insensitive(self, storage: SystemInventoryStorage):
+        self._seed(storage)
+        res = storage.search("machine-alfa", extension=".TXT")
+        assert len(res) == 1
+        assert res[0]["name"] == "readme.txt"
+
+    def test_search_unificado_por_ruta(self, storage: SystemInventoryStorage):
+        self._seed(storage)
+        res = storage.search("machine-alfa", ruta="C:/Apps/app")
+        assert len(res) == 5
+
+    def test_search_unificado_por_tipo(self, storage: SystemInventoryStorage):
+        self._seed(storage)
+        res = storage.search("machine-alfa", tipo="file")
+        assert len(res) == 6
+
+    def test_search_unificado_por_volumen(self, storage: SystemInventoryStorage):
+        self._seed(storage)
+        res = storage.search("machine-alfa", volume="C:")
+        assert len(res) == 6
+
+    def test_search_unificado_por_disponible(self, storage: SystemInventoryStorage):
+        self._seed(storage)
+        res = storage.search("machine-alfa", disponible=True)
+        assert len(res) == 6
+
+    def test_search_unificado_varios_criterios(self, storage: SystemInventoryStorage):
+        self._seed(storage)
+        res = storage.search("machine-alfa", name="app2.exe", extension=".exe", disponible=True)
+        assert len(res) == 1
+        assert res[0]["name"] == "app2.exe"
+
+    def test_search_unificado_paginacion(self, storage: SystemInventoryStorage):
+        self._seed(storage)
+        primera = storage.search("machine-alfa", ruta="C:/Apps/app", limit=2, offset=0)
+        assert len(primera) == 2
+        segunda = storage.search("machine-alfa", ruta="C:/Apps/app", limit=2, offset=2)
+        assert len(segunda) == 2
+        ids_primera = {e["entry_id"] for e in primera}
+        ids_segunda = {e["entry_id"] for e in segunda}
+        assert ids_primera.isdisjoint(ids_segunda)
+
+    def test_search_unificado_equipo_diferente_vacio(self, storage: SystemInventoryStorage):
+        self._seed(storage, "machine-alfa")
+        res = storage.search("machine-beta", name="app2.exe")
+        assert res == []
+
+    def test_search_unificado_sin_filtros_devuelve_todas(self, storage: SystemInventoryStorage):
+        self._seed(storage)
+        res = storage.search("machine-alfa")
+        assert len(res) == 6
+
+    def test_search_unificado_orden_por_nombre(self, storage: SystemInventoryStorage):
+        self._seed(storage)
+        res = storage.search("machine-alfa", order_by="name")
+        nombres = [e["name"] for e in res]
+        assert nombres == sorted(nombres)
+
+    def test_search_unificado_orden_invalido_usa_defecto(self, storage: SystemInventoryStorage):
+        self._seed(storage)
+        res = storage.search("machine-alfa", order_by="campo_inexistente")
+        assert len(res) == 6
+        # Por defecto se ordena por absolute_path
+        rutas = [e["absolute_path"] for e in res]
+        assert rutas == sorted(rutas)
+
+    def test_search_unificado_incluye_campos_procedencia_y_volumen(self, storage: SystemInventoryStorage):
+        self._seed(storage)
+        res = storage.search("machine-alfa", name="app2.exe")
+        assert len(res) == 1
+        assert "machine_id" in res[0]
+        assert "volume" in res[0]
+        assert "last_checked_at" in res[0]
+        assert res[0]["volume"] == "C:"
+        assert res[0]["machine_id"] == "machine-alfa"
+
+
 
 # ---------------------------------------------------------------------------
 # Contexto y cierre limpio

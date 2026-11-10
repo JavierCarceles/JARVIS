@@ -2282,6 +2282,88 @@ class SystemInventoryStorage:
         )
         return [dict(r) for r in cur.fetchall()]
 
+    def search(
+        self,
+        machine_id: str,
+        name: Optional[str] = None,
+        ruta: Optional[str] = None,
+        extension: Optional[str] = None,
+        tipo: Optional[str] = None,
+        volume: Optional[str] = None,
+        disponible: Optional[bool] = None,
+        limit: int = 50,
+        offset: int = 0,
+        order_by: str = "absolute_path",
+    ) -> list[dict]:
+        """
+        Busqueda unificada de entradas de inventario por multiples criterios.
+
+        Combina filtros de nombre exacto/normalizado, ruta, extension, tipo,
+        volumen y disponibilidad en una sola consulta SQL parametrizada.
+        Siempre filtra por machine_id (aislamiento por equipo, 3.8.5.1.4.1.3)
+        y solo devuelve entradas de volumenes locales montados (3.8.5.1.4.6.6).
+
+        Parametros:
+        - machine_id: identificador del equipo (obligatorio, aislamiento por equipo).
+        - name: nombre exacto o normalizado (comparacion case-insensitive).
+        - ruta: prefijo de ruta absoluta (LIKE).
+        - extension: extension de archivo (case-insensitive).
+        - tipo: tipo de entrada (file, directory, symlink, junction, mount_point, other).
+        - volume: volumen donde reside la entrada.
+        - disponible: True = no excluida, False = excluida, None = ambas.
+        - limit: numero maximo de resultados (paginacion).
+        - offset: desplazamiento para paginacion.
+        - order_by: campo por el que ordenar (absolute_path por defecto).
+
+        Retorna:
+        - lista de diccionarios con todos los campos de file_entries.
+        """
+        conn = self.connect()
+
+        # Construir consulta dinamica con filtros proporcionados.
+        where_clauses: list[str] = ["machine_id = ?"]
+        params: list[object] = [machine_id]
+
+        if name is not None:
+            where_clauses.append("lower(name) = lower(?)")
+            params.append(name)
+        if ruta is not None:
+            where_clauses.append("absolute_path LIKE ?")
+            params.append(ruta + "%")
+        if extension is not None:
+            where_clauses.append("lower(extension) = lower(?)")
+            params.append(extension)
+        if tipo is not None:
+            where_clauses.append("entry_type = ?")
+            params.append(tipo)
+        if volume is not None:
+            where_clauses.append("volume = ?")
+            params.append(volume)
+        if disponible is not None:
+            where_clauses.append("excluded = ?")
+            params.append(0 if disponible else 1)
+
+        where_sql = " AND ".join(where_clauses)
+
+        # Validar campo de ordenamiento para evitar inyeccion SQL.
+        campos_validos = {
+            "absolute_path", "name", "extension", "entry_type", "volume",
+            "size_bytes", "modified_at", "created_at", "last_checked_at",
+        }
+        if order_by not in campos_validos:
+            order_by = "absolute_path"
+
+        sql = f"""
+            SELECT * FROM file_entries
+            WHERE {where_sql}
+            ORDER BY {order_by}
+            LIMIT ? OFFSET ?
+        """
+        params.extend([limit, offset])
+
+        cur = conn.execute(sql, params)
+        return [dict(r) for r in cur.fetchall()]
+
     def db_file_exists(self) -> bool:
         """Devuelve True si el fichero de la base de datos existe en disco."""
         return self.db_path.exists()
