@@ -1,12 +1,15 @@
 # -*- coding: utf-8 -*-
-"""Tests unitarios de la unidad 3.8.5.1.4.7.1: clasificacion de candidatos por
-tipo de lanzamiento propio de cada SO.
+"""Tests unitarios de las unidades 3.8.5.1.4.7.1 y 3.8.5.1.4.7.3: clasificacion
+de candidatos por tipo de lanzamiento propio de cada SO y diferenciacion de
+subtipos de rol (GUI, CLI, servicio, controlador, biblioteca, instalador,
+actualizador, desinstalador, componente auxiliar, desconocido).
 
 Cubre `src.hands.application_launch_classifier`:
 - `LaunchClassifier.classify_candidate` y `classify_candidates`.
 - Deteccion de tipos: ejecutable, acceso directo, URI, paquete, bundle, lanzador.
 - Subtipos de rol: GUI, CLI, servicio, controlador, biblioteca, instalador,
   actualizador, desinstalador, componente auxiliar, desconocido.
+- Diferenciacion GUI vs CLI mediante subsistema PE del ejecutable (.7.3).
 - Lanzabilidad basada en evidencia real (no solo extension .exe, requisito .7.4).
 - Nombre comercial y aliases independientes del nombre del ejecutable (.7.5).
 - Deduplicacion por destino real, no solo por nombre (.7.7).
@@ -31,10 +34,13 @@ from src.hands.application_launch_classifier import (
     CONFIANZA_BAJA,
     CONFIANZA_MEDIA,
     CONFIANZA_NINGUNA,
+    IMAGE_SUBSYSTEM_CUI,
+    IMAGE_SUBSYSTEM_GUI,
     LaunchClassifier,
     LaunchClassification,
     LaunchSubtype,
     leer_version_archivo_windows,
+    _leer_subsistema_pe,
 )
 from src.hands.application_preflight import ApplicationPreflight
 from src.hands.system_inventory import EntryType, InventoryEntry
@@ -390,6 +396,78 @@ class TestEntradaInventoryEntry:
         c = clasificador.classify_candidate(entry)
         assert c.launch_type == "ejecutable"
         assert c.name == "python.exe"
+
+
+# ---------------------------------------------------------------------------
+# Lectura de subsistema PE (diferenciacion GUI vs CLI, unidad 3.8.5.1.4.7.3)
+# ---------------------------------------------------------------------------
+
+class TestLeerSubsistemaPe:
+    @pytest.mark.skipif(os.name != "nt", reason="Lectura de PE solo en Windows")
+    def test_pe_subsistema_notepad_es_gui(self):
+        subsistema = _leer_subsistema_pe(r"C:\Windows\System32\notepad.exe")
+        assert subsistema == IMAGE_SUBSYSTEM_GUI
+
+    @pytest.mark.skipif(os.name != "nt", reason="Lectura de PE solo en Windows")
+    def test_pe_subsistema_cmd_es_cli(self):
+        subsistema = _leer_subsistema_pe(r"C:\Windows\System32\cmd.exe")
+        assert subsistema == IMAGE_SUBSYSTEM_CUI
+
+    @pytest.mark.skipif(os.name != "nt", reason="Lectura de PE solo en Windows")
+    def test_pe_subsistema_ping_es_cli(self):
+        subsistema = _leer_subsistema_pe(r"C:\Windows\System32\ping.exe")
+        assert subsistema == IMAGE_SUBSYSTEM_CUI
+
+    @pytest.mark.skipif(os.name != "nt", reason="Lectura de PE solo en Windows")
+    def test_pe_archivo_no_pe_retorna_none(self):
+        with tempfile.NamedTemporaryFile(suffix=".exe", delete=False) as f:
+            ruta = f.name
+        try:
+            assert _leer_subsistema_pe(ruta) is None
+        finally:
+            os.unlink(ruta)
+
+    @pytest.mark.skipif(os.name != "nt", reason="Lectura de PE solo en Windows")
+    def test_pe_archivo_inexistente_retorna_none(self):
+        assert _leer_subsistema_pe(r"C:\No\Existe\archivo.exe") is None
+
+    @pytest.mark.skipif(os.name != "nt", reason="Lectura de PE solo en Windows")
+    def test_pe_directorio_retorna_none(self):
+        with tempfile.TemporaryDirectory() as d:
+            assert _leer_subsistema_pe(d) is None
+
+
+class TestDiferenciacionGuiCliPorSubsistemaPe:
+    """Diferenciacion de ejecutables GUI vs CLI mediante subsistema PE (.7.3)."""
+
+    @pytest.mark.skipif(os.name != "nt", reason="Diferenciacion PE solo en Windows")
+    def test_ejecutable_con_version_subsistema_gui_es_gui_aplicacion(self):
+        clasificador = LaunchClassifier()
+        c = clasificador.classify_candidate(
+            {"name": "notepad", "absolute_path": r"C:\Windows\System32\notepad.exe"}
+        )
+        assert c.launch_subtype == LaunchSubtype.GUI_APLICACION
+
+    @pytest.mark.skipif(os.name != "nt", reason="Diferenciacion PE solo en Windows")
+    def test_ejecutable_con_version_subsistema_cli_es_herramienta_cli(self):
+        clasificador = LaunchClassifier()
+        c = clasificador.classify_candidate(
+            {"name": "ping", "absolute_path": r"C:\Windows\System32\ping.exe"}
+        )
+        assert c.launch_subtype == LaunchSubtype.HERRAMIENTA_CLI
+
+    @pytest.mark.skipif(os.name != "nt", reason="Diferenciacion PE solo en Windows")
+    def test_ejecutivo_sin_version_sin_pe_es_desconocido(self):
+        clasificador = LaunchClassifier()
+        with tempfile.NamedTemporaryFile(suffix=".exe", delete=False) as f:
+            ruta = f.name
+        try:
+            c = clasificador.classify_candidate(
+                {"name": "vacio", "absolute_path": ruta}
+            )
+            assert c.launch_subtype == LaunchSubtype.DESCONOCIDO
+        finally:
+            os.unlink(ruta)
 
 
 # ---------------------------------------------------------------------------

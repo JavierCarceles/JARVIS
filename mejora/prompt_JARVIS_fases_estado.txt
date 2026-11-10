@@ -8299,3 +8299,19 @@ VERIFICACION: SINTAXIS: OK (ast.parse + pytest sin errores); MAIN.PY: NA (no se 
 DISCREPANCIAS: NINGUNA
 PENDIENTES: Ninguno para esta unidad. Padre 3.8.5.1.4.7 con hijas .7.1 y .7.2 completadas; siguiente hoja pendiente real: 3.8.5.1.4.7.3 (Diferenciar aplicacion GUI, herramienta CLI, servicio, controlador, biblioteca, instalador, actualizador, desinstalador, componente auxiliar y archivo ejecutable desconocido).
 ESTADO FINAL: 3.8.5.1.4.7.2 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.8.5.1.4.7.3
+FECHA: 2026-11-11
+OBJETIVO: Diferenciar subtipos de rol de candidatos de aplicación (GUI, herramienta CLI, servicio, controlador, biblioteca, instalador, actualizador, desinstalador, componente auxiliar, desconocido) mediante lectura del subsistema PE del encabezado del ejecutable, corrigiendo la clasificación de ejecutables CLI con recursos de versión que antes se asumían como aplicaciones GUI. No lanza aplicaciones, no modifica entities.json ni persiste nada.
+TIPO DE TRABAJO: IMPLEMENTACIÓN + VERIFICACIÓN REAL
+CAMBIOS / HALLAZGOS:
+- Añadido `src/hands/application_launch_classifier._leer_subsistema_pe()`: lee el campo Subsystem del encabezado PE (offset 0x44 del Optional Header, válido para PE32 0x10B y PE32+ 0x20B) para distinguir GUI (subsistema 2) de CLI/consola (subsistema 3). Retorna None en SO no Windows, archivo inexistente, no-PE o error de lectura.
+- Añadidas constantes `IMAGE_SUBSYSTEM_GUI = 2` y `IMAGE_SUBSYSTEM_CUI = 3`.
+- Modificado `LaunchClassifier._detectar_subtipo()`: ejecutables con recursos de versión ahora se clasifican como `HERRAMIENTA_CLI` si el subsistema PE es 3 (CUI), en lugar de asumirse siempre como `GUI_APLICACION`. Sin version_info ni PE legible se mantiene como `DESCONOCIDO`.
+- No se lanza ninguna aplicación, no se modifica `data/knowledge/entities.json` ni su esquema, no se persiste capacidad inferida.
+ARCHIVOS MODIFICADOS: PRODUCCIÓN: `src/hands/application_launch_classifier.py` (función `_leer_subsistema_pe`, constantes `IMAGE_SUBSYSTEM_*`, modificación de `_detectar_subtipo`); TESTS: `tests/hands/test_application_launch_classifier.py` (nuevas clases `TestLeerSubsistemaPe` con 6 tests y `TestDiferenciacionGuiCliPorSubsistemaPe` con 3 tests); `tests/hands/test_clasificacion_candidatos_lanzamiento_entorno_real.py` (nueva clase `TestDiferenciacionGuiCliSubsistemaPeEntornoReal` con 2 tests); DOCUMENTACIÓN: `docs/README.md` (características y tabla de funciones de nivel módulo); `docs/README_TESTS.md` (índices y secciones de los dos tests).
+TESTS Y RESULTADOS: UNITARIOS: 37 PASSED / 37 TOTAL (`test_application_launch_classifier.py`, incluidos 9 tests nuevos de .7.3); ENTORNO REAL: 15 PASSED / 15 TOTAL (`test_clasificacion_candidatos_lanzamiento_entorno_real.py`, incluidos 2 tests nuevos de .7.3); REGRESIÓN: tests previos de .7.1 (28 PASSED) y .7.2 (22 + 6 PASSED) siguen en verde.
+VERIFICACIÓN: SINTAXIS: OK (ast.parse + pytest sin errores); MAIN.PY: NA (no se modifica main.py); COMPORTAMIENTO / INTEGRACIÓN REAL: Evidencia real en Windows 11, Python 3.14.7 sobre implementación de producción: `ping.exe` (CLI con subsistema PE 3, no en `_NOMBRES_CLI`) correctamente clasificado como `HERRAMIENTA_CLI`; `notepad.exe` (GUI con subsistema PE 2) correctamente clasificado como `GUI_APLICACION`; `cmd.exe` (CLI, subsistema PE 3) correctamente clasificado como `HERRAMIENTA_CLI`. Ninguna aplicación lanzada. Ningún dato de usuario modificado.
+DISCREPANCIAS: NINGUNA
+PENDIENTES: Ninguno para esta unidad. Padre 3.8.5.1.4.7 con hijas .7.1, .7.2 y .7.3 completadas. Siguiente hoja pendiente real: 3.8.5.1.4.7.4 (No clasificar como aplicación lanzable un archivo solo por su extensión; requerir evidencia adicional del sistema).
+ESTADO FINAL: 3.8.5.1.4.7.3 - IMPLEMENTADA

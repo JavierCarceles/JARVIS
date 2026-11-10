@@ -79,6 +79,11 @@ CONFIANZA_BAJA = "baja"
 CONFIANZA_MEDIA = "media"
 CONFIANZA_ALTA = "alta"
 
+# Subsistemas PE de Windows (campo Subsystem del Optional Header).
+IMAGE_SUBSYSTEM_UNKNOWN = 0
+IMAGE_SUBSYSTEM_GUI = 2      # Aplicacion de ventanas (GUI)
+IMAGE_SUBSYSTEM_CUI = 3      # Aplicacion de consola (CLI / herramienta de linea de comandos)
+
 CONFIDENCIAS_VALIDAS = frozenset({
     CONFIANZA_NINGUNA, CONFIANZA_BAJA, CONFIANZA_MEDIA, CONFIANZA_ALTA,
 })
@@ -159,6 +164,67 @@ def _volumen_de_ruta(ruta_absoluta: str) -> str:
 def _ahora_iso() -> str:
     from datetime import datetime, timezone
     return datetime.now(timezone.utc).isoformat()
+
+
+# ---------------------------------------------------------------------------
+# Lectura de subsistema PE de un ejecutable Windows (GUI vs CLI/consola)
+# ---------------------------------------------------------------------------
+
+def _leer_subsistema_pe(ruta: str) -> Optional[int]:
+    """
+    Lee el campo Subsystem del encabezado PE de un ejecutable Windows.
+
+    Retorna:
+      IMAGE_SUBSYSTEM_GUI (2) si es aplicacion de ventanas.
+      IMAGE_SUBSYSTEM_CUI (3) si es aplicacion de consola / herramienta CLI.
+      IMAGE_SUBSYSTEM_UNKNOWN (0) si no se puede leer o no es un PE valido.
+      None en SO no Windows, archivo inexistente o cualquier error de lectura.
+    """
+    if os.name != "nt":
+        return None
+    if not ruta or not os.path.isfile(ruta):
+        return None
+    try:
+        with open(ruta, "rb") as f:
+            # DOS header: e_lfanew en el offset 0x3C (puntero al encabezado PE).
+            f.seek(0x3C)
+            e_lfanew_bytes = f.read(4)
+            if len(e_lfanew_bytes) < 4:
+                return None
+            e_lfanew = int.from_bytes(e_lfanew_bytes, "little")
+
+            # Firma PE en e_lfanew.
+            f.seek(e_lfanew)
+            pe_signature = f.read(4)
+            if pe_signature != b"PE\x00\x00":
+                return None
+
+            # COFF header: SizeOfOptionalHeader en el offset 16 del COFF header.
+            # El COFF header empieza en e_lfanew + 4.
+            f.seek(e_lfanew + 20)
+            size_opt_bytes = f.read(2)
+            if len(size_opt_bytes) < 2:
+                return None
+
+            # Magic al inicio del Optional Header (e_lfanew + 24).
+            f.seek(e_lfanew + 24)
+            magic_bytes = f.read(2)
+            if len(magic_bytes) < 2:
+                return None
+            magic = int.from_bytes(magic_bytes, "little")
+
+            # Subsystem esta en el offset 0x44 (68) del Optional Header para
+            # PE32 (0x10B) y PE32+ (0x20B).
+            subsys_offset = e_lfanew + 24 + 0x44
+            f.seek(subsys_offset)
+            subsys_bytes = f.read(2)
+            if len(subsys_bytes) < 2:
+                return None
+            return int.from_bytes(subsys_bytes, "little")
+    except (OSError, ValueError):
+        return None
+    except Exception:
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -550,9 +616,13 @@ class LaunchClassifier:
             return LaunchSubtype.GUI_APLICACION
 
         if launch_type == LaunchType.EJECUTABLE.value:
-            # Ejecutable real: con version de producto se trata como GUI; sin
-            # evidencia adicional se mantiene como desconocido (no se asume GUI).
+            # Ejecutable real: con version de producto, se usa el subsistema PE
+            # para diferenciar GUI (subsistema 2) de CLI/consola (subsistema 3).
+            # Sin version_info ni PE legible se mantiene como desconocido.
             if version_info:
+                subsistema = _leer_subsistema_pe(destino)
+                if subsistema == IMAGE_SUBSYSTEM_CUI:
+                    return LaunchSubtype.HERRAMIENTA_CLI
                 return LaunchSubtype.GUI_APLICACION
             return LaunchSubtype.DESCONOCIDO
 

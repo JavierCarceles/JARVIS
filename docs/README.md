@@ -837,7 +837,8 @@ aplicación GUI lanzable.
 **Características:**
 
 - Clasificación de tipo de lanzamiento a partir del destino real observado, no solo de la extensión.
-- Detección de subtipo de rol con reglas basadas en nombre, ruta y recursos de versión del archivo.
+- Detección de subtipo de rol con reglas basadas en nombre, ruta, recursos de versión del archivo y subsistema PE del ejecutable (para diferenciar aplicaciones GUI de herramientas de consola/CLI, unidad 3.8.5.1.4.7.3).
+- Lectura real del subsistema PE del encabezado de ejecutables Windows (campo `Subsystem` del Optional Header) para distinguir `gui_aplicacion` (subsistema 2) de `herramienta_cli` (subsistema 3).
 - Lectura real de metadatos de versión de Windows mediante `version.dll` a través de `ctypes`
   (nombre comercial, producto, versión), sin dependencias externas.
 - Nivel de confianza y evidencia registrada por clasificación; lanzabilidad requiere evidencia
@@ -886,6 +887,7 @@ Funciones a nivel módulo:
 | Firma | Docstring |
 |---|---|
 | `def leer_version_archivo_windows(ruta)`  (L168) | Lee metadatos de versión de un archivo PE de Windows mediante la API del SO. |
+| `def _leer_subsistema_pe(ruta)`  (L178) | Lee el campo Subsystem del encabezado PE de un ejecutable Windows (GUI vs CLI/consola). |
 | `def resolver_target_acceso_directo(ruta_lnk)`  (L215) | Resuelve el destino de un acceso directo `.lnk` mediante `Shell.Application` de PowerShell. |
 
 <a name="src-hands-application_preflight-py"></a>

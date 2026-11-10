@@ -104,6 +104,38 @@ class TestClasificacionEntornoRealEjecutablesSistema:
         assert c.es_lanzable is False
 
 
+class TestDiferenciacionGuiCliSubsistemaPeEntornoReal:
+    """Diferenciacion GUI vs CLI mediante subsistema PE del ejecutable (unidad 3.8.5.1.4.7.3).
+
+    ping.exe es una herramienta CLI con recursos de version pero NO esta en
+    _NOMBRES_CLI, por lo que su clasificacion como HERRAMIENTA_CLI solo puede
+    obtenerse leyendo el subsistema PE del encabezado del ejecutable.
+    """
+
+    def test_ping_herramienta_cli_mediante_subsistema_pe(self, clasificador):
+        ruta = r"C:\Windows\System32\ping.exe"
+        if not _existe(ruta):
+            pytest.skip("ping.exe no disponible en este equipo")
+        c = clasificador.classify_candidate(
+            {"name": "ping", "absolute_path": ruta, "source": "sistema_real"}
+        )
+        assert c.launch_type == "ejecutable"
+        assert c.launch_subtype == LaunchSubtype.HERRAMIENTA_CLI
+        assert c.version is not None  # tiene recursos de version
+        assert c.es_lanzable is True
+
+    def test_notepad_aplicacion_gui_mediante_subsistema_pe(self, clasificador):
+        ruta = r"C:\Windows\System32\notepad.exe"
+        if not _existe(ruta):
+            pytest.skip("notepad.exe no disponible en este equipo")
+        c = clasificador.classify_candidate(
+            {"name": "notepad", "absolute_path": ruta, "source": "sistema_real"}
+        )
+        assert c.launch_type == "ejecutable"
+        assert c.launch_subtype == LaunchSubtype.GUI_APLICACION
+        assert c.es_lanzable is True
+
+
 class TestClasificacionEntornoRealURI:
     def test_uri_ms_settings_admitida(self, clasificador):
         c = clasificador.classify_candidate(

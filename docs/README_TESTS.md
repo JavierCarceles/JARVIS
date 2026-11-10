@@ -8132,7 +8132,9 @@ basada en evidencia real, deduplicación por destino real e integración con pre
 - **`TestNombreComercialYAliases`** (línea 266) — 2 método(s) de test
 - **`TestDeduplicacion`** (línea 287) — 3 método(s) de test
 - **`TestEntradaInventoryEntry`** (línea 326) — 1 método(s) de test
-- **`TestIntegracionPreflight`** (línea 352) — 2 método(s) de test
+- **`TestLeerSubsistemaPe`** (línea 402) — 6 método(s) de test
+- **`TestDiferenciacionGuiCliPorSubsistemaPe`** (línea 417) — 3 método(s) de test
+- **`TestIntegracionPreflight`** (línea 441) — 2 método(s) de test
 
 ---
 
@@ -8148,6 +8150,7 @@ archivos con extensión engañosa). No lanza ninguna aplicación ni modifica dat
 **Clases de test:**
 
 - **`TestClasificacionEntornoRealEjecutablesSistema`** (línea 43) — 5 método(s) de test
+- **`TestDiferenciacionGuiCliSubsistemaPeEntornoReal`** (línea 107) — 2 método(s) de test
 - **`TestClasificacionEntornoRealURI`** (línea 79) — 3 método(s) de test
 - **`TestClasificacionEntornoRealAccesosDirectos`** (línea 102) — 2 método(s) de test
 - **`TestPreflightSinLanzarEntornoReal`** (línea 116) — 3 método(s) de test
