@@ -8090,3 +8090,16 @@ VERIFICACIÓN: SINTAXIS: OK (recopilación y ejecución de pytest del archivo de
 DISCREPANCIAS: NINGUNA
 PENDIENTES: Ninguno para esta unidad. Siguiente hoja pendiente real: 3.8.5.1.4.5.10.2 (permisos recuperados sobre directorio temporal). Padre 3.8.5.1.4.5.10 con hijas .1 (cerrada) y .2 a .4 pendientes.
 ESTADO FINAL: 3.8.5.1.4.5.10.1 - IMPLEMENTADA
+
+
+REGISTRO DE UNIDAD: 3.8.5.1.4.5.10.2
+FECHA: 2026-11-10
+OBJETIVO: Crear un escenario de permisos restringidos sobre un directorio temporal cuando Windows lo permita sin elevar privilegios; comprobar que el error no se interpreta como eliminacion. Restaurar y verificar los permisos al finalizar.
+TIPO DE TRABAJO: TEST | VERIFICACION
+CAMBIOS / HALLAZGOS: Se modifica 1 prueba en tests/hands/test_system_inventory.py (metodo test_ruta_con_permisos_restringidos_no_se_interpreta_como_eliminacion en la clase TestValidacionDestino) para verificar contra el sistema de archivos real sin eventos simulados: crea un directorio temporal, comprueba que validar_destino lo reporta valido/accesible inicialmente, restringe permisos sin elevar privilegios y verifica que validar_destino devuelve existencia_ok=True, accesible_ok=False, valido=False (tipo_ok=True, error con "permiso") — no interpreta el error de permiso como eliminacion — y finalmente restaura los permisos y comprueba que vuelve a ser accesible y valido. En Windows se usa icacls /deny <usuario>:(R) + takeown + icacls /grant <usuario>:F porque chmod(0o000) solo gestiona el atributo de solo-lectura y no deniega acceso real. En POSIX se usa chmod(0o000). No se modifica codigo de produccion en src/; validar_destino ya maneja PermissionError correctamente (existencia_ok=True, accesible_ok=False, valido=False). docs/README.md: no requiere actualizacion (no cambia contrato ni comportamiento de codigo fuente).
+ARCHIVOS MODIFICADOS: PRODUCCIÓN: NA; TESTS: `tests/hands/test_system_inventory.py`; DOCUMENTACIÓN: NA
+TESTS Y RESULTADOS: UNITARIOS: 1 PASSED (metodo test_ruta_con_permisos_restringidos_no_se_interpreta_como_eliminacion con verificacion real en Windows mediante icacls/takeown); archivo completo 226 PASSED / 8 SKIPPED / 234 TOTAL, sin regresión. INTEGRACIÓN: NA; NO REGRESIÓN: NA
+VERIFICACIÓN: SINTAXIS: OK (recopilacion y ejecucion de pytest del archivo tests/hands/test_system_inventory.py sin errores de sintaxis); MAIN.PY: NA (no se modifica main.py); COMPORTAMIENTO / INTEGRACIÓN REAL: VERIFICADO en Windows 11, Python 3.14.7: escenario real de denegacion de lectura creado con icacls /deny (sin elevacion de privilegios), os.scandir lanza PermissionError real, validar_destino reporta existencia_ok=True / accesible_ok=False / valido=False (no confundido con eliminacion), y tras takeown + icacls /grant se restaura el acceso y validar_destino vuelve a reportar valido=True / accesible_ok=True / existencia_ok=True. Limpieza del directorio temporal completada.
+DISCREPANCIAS: NINGUNA
+PENDIENTES: Ninguno para esta unidad. Siguiente hoja pendiente real: 3.8.5.1.4.5.10.3 (interrumpir y reanudar un escaneo controlado en el sistema real). Padre 3.8.5.1.4.5.10 con hijas .1 cerrada, .2 cerrada, .3 y .4 pendientes.
+ESTADO FINAL: 3.8.5.1.4.5.10.2 - IMPLEMENTADA

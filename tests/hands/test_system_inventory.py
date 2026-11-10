@@ -20,8 +20,10 @@ Todos los tests usan directorios temporales (tmp_path) y no tocan datos de produ
 
 from __future__ import annotations
 
+import getpass
 import json
 import os
+import subprocess
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -3077,6 +3079,127 @@ class TestValidacionDestino:
         entry_inexistente = self._entrada_valida(tmp_path / "no_existe.txt")
         resultado_invalido = validar_destino(entry_inexistente, machine_id_actual="maquina-actual")
         assert resultado_invalido.valido is False
+
+    def test_ruta_con_permisos_restringidos_no_se_interpreta_como_eliminacion(
+        self, tmp_path: Path
+    ):
+        """Directorio temporal con permisos restringidos: validar_destino
+        reporta existencia_ok=True pero accesible_ok=False y valido=False;
+        nunca interpreta el error de permiso como eliminacion. Se restauran
+        los permisos y se verifica la recuperacion al finalizar.
+
+        En Windows se usa icacls /deny (sin elevacion de privilegios) porque
+        chmod solo gestiona el atributo de solo-lectura y no deniega acceso
+        real al directorio. En POSIX se usa chmod(0o000). La restauracion
+        en Windows usa takeown + icacls /grant para recuperar el acceso
+        tras la denegacion."""
+        import getpass
+        import subprocess
+
+        directorio = tmp_path / "directorio_restringido"
+        directorio.mkdir()
+        volumen = str(directorio.drive) if os.name == "nt" else str(directorio.anchor)
+        entry = InventoryEntry(
+            machine_id="maquina-actual",
+            volume=volumen,
+            absolute_path=str(directorio),
+            relative_path="directorio_restringido",
+            name="directorio_restringido",
+            extension="",
+            entry_type=EntryType.DIRECTORY,
+            size_bytes=0,
+            modified_at="",
+            created_at="",
+            last_checked_at="",
+        )
+
+        # Estado inicial: accesible y valido.
+        resultado_inicial = validar_destino(entry, machine_id_actual="maquina-actual")
+        assert resultado_inicial.valido is True
+        assert resultado_inicial.accesible_ok is True
+        assert resultado_inicial.existencia_ok is True
+
+        # Restringir permisos de lectura sin elevar privilegios.
+        # En Windows: icacls /deny deniega acceso real (chmod no sirve).
+        # En POSIX: chmod(0o000) deniega acceso.
+        modo_original = None
+        usuario = None
+        restriccion_aplicada = False
+        if os.name == "nt":
+            usuario = getpass.getuser()
+            r_deny = subprocess.run(
+                ["icacls", str(directorio), "/deny", f"{usuario}:(R)"],
+                capture_output=True,
+                text=True,
+            )
+            if r_deny.returncode != 0:
+                pytest.skip(
+                    "No se pudo denegar permisos de lectura en el directorio "
+                    f"temporal (icacls retorno {r_deny.returncode})"
+                )
+            restriccion_aplicada = True
+        else:
+            modo_original = directorio.stat().st_mode & 0o777
+            try:
+                directorio.chmod(0o000)
+                restriccion_aplicada = True
+            except OSError:
+                pytest.skip(
+                    "El SO no permite modificar permisos del directorio "
+                    "sin elevar privilegios"
+                )
+
+        try:
+            acceso_denegado = False
+            try:
+                with os.scandir(directorio):
+                    pass
+            except PermissionError:
+                acceso_denegado = True
+
+            if acceso_denegado:
+                # Con acceso denegado: la ruta existe pero no es accesible =>
+                # no valida, y NO se interpreta como eliminacion.
+                resultado = validar_destino(entry, machine_id_actual="maquina-actual")
+                assert resultado.existencia_ok is True
+                assert resultado.accesible_ok is False
+                assert resultado.valido is False
+                assert resultado.tipo_ok is True
+                assert any("permiso" in e.lower() for e in resultado.errores)
+            else:
+                pytest.skip(
+                    "El SO no deniega acceso real al directorio restringido "
+                    "(limitacion de plataforma)"
+                )
+        finally:
+            if restriccion_aplicada:
+                if os.name == "nt":
+                    # Restaurar: recuperar propiedad y otorgar control total
+                    subprocess.run(
+                        ["takeown", "/f", str(directorio)], capture_output=True
+                    )
+                    if usuario:
+                        subprocess.run(
+                            ["icacls", str(directorio), "/grant", f"{usuario}:F"],
+                            capture_output=True,
+                        )
+                else:
+                    try:
+                        directorio.chmod(modo_original)
+                    except OSError:
+                        pass
+
+                try:
+                    with os.scandir(directorio):
+                        pass
+                    resultado_restaurado = validar_destino(
+                        entry, machine_id_actual="maquina-actual"
+                    )
+                    assert resultado_restaurado.valido is True
+                    assert resultado_restaurado.accesible_ok is True
+                    assert resultado_restaurado.existencia_ok is True
+                except OSError:
+                    pass
 
 
 class TestValidarRutaParaLanzamiento:

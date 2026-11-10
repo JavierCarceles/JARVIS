@@ -1,34 +1,158 @@
 ESTADO PERSISTENTE ACTUAL
 CURRENT_PHASE: 3.8
-CURRENT_WORK_UNIT: 3.8.5.1.4.5.10.2
+CURRENT_WORK_UNIT: 3.8.5.1.4.5.10.3
 CURRENT_WORK_STATUS: PENDIENTE
-LAST_COMPLETED_UNIT: 3.8.5.1.4.5.10.1
+LAST_COMPLETED_UNIT: 3.8.5.1.4.5.10.2
 
-PROMPT PRINCIPAL JARVIS — PUNTO DE ENTRADA Y CONTINUIDAD
+# PROMPT PRINCIPAL JARVIS — PUNTO DE ENTRADA Y CONTINUIDAD
 
-OBJETIVO
+## OBJETIVO
+
 Evolucionar de `intencion -> comando -> funcion -> ejecucion` a `intencion -> Goal -> Task/HTN -> State/Knowledge -> Graph -> Planner -> Plan -> Executor -> Verification -> State actualizado -> Replan`.
 
-ARCHIVOS QUE FORMAN EL PROMPT
-- `mejora/prompt_mejoraActual.txt` (este archivo): unica fuente del estado persistente actual y punto de entrada de cada chat.
-- `mejora/prompt_JARVIS_reglas.txt`: reglas operativas, restricciones, tests, verificacion y transiciones de estado. Leerlo completo antes de trabajar.
-- `mejora/prompt_JARVIS_fases_estado.txt`: roadmap de fases/unidades y registros historicos de trabajo. Consultar la rama relevante de la unidad activa y los registros necesarios; no cargar todo el historial si no hace falta.
-- `docs/README.md`: documentacion tecnica del codigo existente. Leerlo completo antes de modificar codigo.
+El desarrollo debe producir capacidades funcionales, integradas y verificadas en el entorno real. No basta con implementar estructuras, superar tests aislados o simular resultados: JARVIS debe demostrar que sus funcionalidades trabajan realmente con los componentes, recursos y APIs del sistema a los que afectan.
 
-ORDEN OBLIGATORIO DE INICIO
-1. Leer los cuatro campos de ESTADO PERSISTENTE ACTUAL de este archivo. Estos campos son el unico puntero operativo: ni las marcas del roadmap ni los registros historicos pueden sustituirlos.
-2. Leer completo `prompt_JARVIS_reglas.txt`.
-3. Leer completo `README.md`.
-4. Abrir `prompt_JARVIS_fases_estado.txt`, localizar `CURRENT_WORK_UNIT` y consultar su definicion, padre, hijas, posicion en el orden del roadmap y los registros/discrepancias pertinentes. No elegir otra unidad por referencias historicas.
-5. Trabajar solo `CURRENT_WORK_UNIT`. Si el estado es `PENDIENTE`, cambiar unicamente `CURRENT_WORK_STATUS` a `EN PROCESO` en este archivo y guardar este archivo antes de tocar codigo. Si ya esta `EN PROCESO` o `PARCIALMENTE IMPLEMENTADA`, continuar esa misma unidad.
+## ARCHIVOS QUE FORMAN EL PROMPT
 
-CONTINUIDAD Y CIERRE
-- Una sola unidad hoja por chat. Si es demasiado grande, subdividirla antes de implementar, registrar padre/hijas en `prompt_JARVIS_fases_estado.txt` y trabajar solo la primera hija pendiente.
-- Si se completa: agregar/actualizar su unico registro canonico en `prompt_JARVIS_fases_estado.txt`; establecer `LAST_COMPLETED_UNIT` a la unidad terminada; mover `CURRENT_WORK_UNIT` y `CURRENT_PHASE` a la siguiente hoja realmente pendiente del roadmap; dejar `CURRENT_WORK_STATUS: EN PROCESO`; guardar este archivo y terminar el chat. No abrir ni empezar la siguiente hoja.
-- Si queda incompleta o bloqueada: mantener `CURRENT_WORK_UNIT` en la misma hoja, establecer `CURRENT_WORK_STATUS: PARCIALMENTE IMPLEMENTADA`, registrar pendientes y no avanzar.
-- No dejar el puntero actual en una unidad completada ni marcar la siguiente `EN PROCESO` antes de empezar un chat dedicado a ella.
-- Si se detecta una contradiccion, conservarla y documentar evidencias en el registro pertinente; no reconciliarla por intuicion. El bloque persistente de este archivo sigue siendo el unico estado operativo.
-- No declarar tests, ejecuciones, integraciones o comportamientos como verificados si no existe evidencia real.
+- `mejora/prompt_mejoraActual.txt` (este archivo): única fuente del estado persistente actual y punto de entrada de cada chat. Contiene exclusivamente el puntero operativo.
+- `mejora/prompt_JARVIS_reglas.txt`: reglas operativas, restricciones, seguridad, tests, verificación real, entorno gráfico, documentación y transiciones de estado. Leerlo completo antes de trabajar.
+- `mejora/prompt_JARVIS_fases_estado.txt`: roadmap de fases/unidades, dependencias técnicas, criterios de aceptación y registros históricos de trabajo. Consultar la rama relevante de la unidad activa y los registros necesarios; no cargar todo el historial si no hace falta.
+- `docs/README.md`: documentación técnica del código existente. Leerlo completo antes de modificar código.
+- `docs/README_TESTS.md`: documentación técnica de los tests existentes. Consultarlo antes de modificar tests y revisar si necesita actualizarse cuando estos cambien.
 
-No comenzar ninguna tarea de codigo hasta completar las lecturas obligatorias y aplicar las reglas de `prompt_JARVIS_reglas.txt`.
+## PRECEDENCIA Y RESPONSABILIDAD DE LOS DOCUMENTOS
 
+- Este archivo determina exclusivamente qué unidad debe trabajarse y el estado de continuidad.
+- `prompt_JARVIS_reglas.txt` determina cómo debe realizarse el trabajo, qué restricciones deben cumplirse y qué condiciones son obligatorias para verificar y cerrar una unidad.
+- `prompt_JARVIS_fases_estado.txt` determina la estructura del desarrollo, la jerarquía, las dependencias, el orden lógico, los criterios de aceptación y la trazabilidad histórica.
+- Los README describen el comportamiento técnico real del código y de los tests; nunca determinan el estado del roadmap.
+- Ningún registro histórico, marcador de completado, recuerdo de otro chat o inferencia puede sustituir los cuatro campos persistentes de este archivo.
+- Si se detecta una contradicción entre documentos, no corregirla por intuición ni modificar retrospectivamente información válida. Identificar la contradicción, reunir la evidencia necesaria y documentarla en el registro pertinente.
+- Si la contradicción afecta a la seguridad, al alcance o a una dependencia necesaria, no ejecutar la actuación afectada hasta resolverla. Mantener el puntero persistente en la unidad que corresponda.
+
+## ORDEN OBLIGATORIO DE INICIO
+
+1. Leer los cuatro campos de ESTADO PERSISTENTE ACTUAL de este archivo. Estos campos son el único puntero operativo.
+2. Leer COMPLETO `prompt_JARVIS_reglas.txt`. No empezar código ni ejecutar actuaciones de desarrollo antes de conocer todas las reglas.
+3. Leer COMPLETO `docs/README.md` para conocer la arquitectura y el comportamiento documentado del código existente.
+4. Consultar `docs/README_TESTS.md` para conocer la cobertura documentada de los tests que puedan verse afectados.
+5. Abrir `prompt_JARVIS_fases_estado.txt`, localizar `CURRENT_WORK_UNIT` y consultar su definición, padre, hijas, posición en el orden del roadmap, dependencias, criterios de aceptación y registros/discrepancias pertinentes. No elegir otra unidad por referencias históricas.
+6. Comprobar que la unidad activa es realmente una hoja de trabajo y que sus dependencias están disponibles. No adelantar capacidades pertenecientes a otras unidades ni duplicar implementaciones existentes.
+7. Trabajar exclusivamente `CURRENT_WORK_UNIT`.
+
+Si `CURRENT_WORK_STATUS` es `PENDIENTE`, cambiar únicamente `CURRENT_WORK_STATUS` a `EN PROCESO` en este archivo y guardar este archivo antes de tocar código.
+
+Si ya está `EN PROCESO` o `PARCIALMENTE IMPLEMENTADA`, continuar esa misma unidad, inspeccionando primero lo realizado y sus pendientes. No reiniciar el trabajo ni cambiar de unidad por conveniencia.
+
+## PLANIFICACIÓN Y VERIFICACIÓN ANTES DE IMPLEMENTAR
+
+Antes de modificar código:
+
+- Identificar exactamente el comportamiento que debe proporcionar la unidad.
+- Consultar sus criterios de aceptación en el roadmap.
+- Inspeccionar las implementaciones, contratos, dependencias y tests existentes que puedan estar relacionados.
+- Identificar los componentes reales que ejecutarán el comportamiento.
+- Determinar qué pruebas unitarias, de integración y de entorno real son necesarias.
+- Definir qué resultado observable permitirá afirmar que la funcionalidad funciona.
+- Identificar los recursos del sistema que podrían verse afectados y cómo protegerlos durante la prueba.
+- Comprobar si la unidad necesita interacción gráfica y, en ese caso, aplicar obligatoriamente las reglas de las dos pantallas.
+
+No implementar primero para decidir después cómo se comprobará que funciona. La estrategia de verificación debe estar definida antes de desarrollar la capacidad.
+
+## VERIFICACIÓN REAL OBLIGATORIA
+
+La superación de tests automatizados no demuestra por sí sola que JARVIS funcione en el sistema operativo real.
+
+- Toda unidad que afecte al sistema operativo, sistema de archivos, procesos, aplicaciones, ventanas, monitores, UI, audio, visión, servicios locales o modelos debe verificarse utilizando la implementación real y los recursos reales o temporales controlados que correspondan.
+- Separar siempre tests unitarios, tests de integración y verificación en el equipo real.
+- No considerar un test con mocks como prueba de comportamiento real del componente sustituido.
+- Comprobar resultados observables antes y después de la operación.
+- No declarar una unidad `IMPLEMENTADA` si una prueba real obligatoria está pendiente.
+- Si una prueba real es técnicamente imposible, insegura o está impedida por hardware, permisos o recursos ausentes, documentarlo con evidencia y mantener la unidad sin completar.
+- Nunca inventar resultados, ejecuciones, permisos, capacidades del sistema, pruebas ni evidencias.
+
+Las reglas detalladas de verificación, seguridad y registro se encuentran en `prompt_JARVIS_reglas.txt` y deben cumplirse íntegramente.
+
+## PROTECCIÓN DEL ENTORNO GRÁFICO Y MULTIPANTALLA
+
+El equipo dispone de dos pantallas y Visual Studio Code se ejecuta en la segunda.
+
+Para las pruebas gráficas:
+
+- La segunda pantalla es el destino predeterminado de las ventanas de prueba.
+- La selección se realizará mediante la enumeración real de monitores, no mediante índices, coordenadas o identificadores supuestos.
+- Visual Studio Code es una ventana protegida: no moverla, minimizarla, cerrarla, redimensionarla, utilizarla como ventana de prueba ni enviarle entradas.
+- No interferir con la actividad del usuario en la primera pantalla.
+- No superponer ventanas de prueba sobre VS Code.
+- Antes de introducir teclado o ratón, verificar la identidad de la ventana de prueba y su foco real.
+- Si no puede garantizarse el aislamiento, detener la prueba y registrar `BLOQUEADA/NO VERIFICADA`.
+- No utilizar la primera pantalla como alternativa silenciosa.
+
+Las comprobaciones gráficas detalladas se rigen por `prompt_JARVIS_reglas.txt`.
+
+## CONTINUIDAD Y CIERRE
+
+- Un chat trabaja una sola unidad hoja. No implementar varias unidades independientes en un mismo chat.
+- Si la unidad activa es demasiado grande, subdividirla técnicamente antes de implementar, registrar padre e hijas en `prompt_JARVIS_fases_estado.txt` y trabajar exclusivamente la primera hija pendiente.
+- No subdividir una unidad por comodidad si puede completarse de forma segura y verificable como está definida.
+- No empezar la siguiente unidad hasta cerrar la actual.
+- No declarar una unidad completa por haber terminado la implementación si faltan tests, verificaciones reales, integraciones o evidencias exigidas por sus criterios de aceptación.
+
+### Si se completa la unidad
+
+1. Ejecutar y registrar las comprobaciones exigidas.
+2. Actualizar su único registro canónico en `prompt_JARVIS_fases_estado.txt` con los hechos y resultados reales.
+3. Establecer `LAST_COMPLETED_UNIT` a la unidad terminada.
+4. Localizar la siguiente hoja realmente pendiente, respetando la jerarquía y las dependencias del roadmap.
+5. Actualizar `CURRENT_WORK_UNIT` y `CURRENT_PHASE` en este archivo.
+6. Establecer `CURRENT_WORK_STATUS: PENDIENTE` para la nueva unidad.
+7. Guardar los cuatro campos persistentes.
+8. Terminar el chat sin abrir, inspeccionar, probar ni implementar la siguiente hoja.
+
+La unidad terminada queda reflejada en su registro histórico y en `LAST_COMPLETED_UNIT`. El estado `CURRENT_WORK_STATUS` siempre describe la unidad a la que apunta `CURRENT_WORK_UNIT`.
+
+### Si queda incompleta o bloqueada
+
+- Mantener `CURRENT_WORK_UNIT` apuntando a la misma unidad.
+- Establecer `CURRENT_WORK_STATUS: PARCIALMENTE IMPLEMENTADA`.
+- Registrar los cambios realizados, los resultados reales, las causas del bloqueo y los pendientes concretos.
+- No avanzar a otra unidad.
+- No presentar como completado aquello que únicamente está implementado parcialmente.
+
+Si el bloqueo se produce antes de realizar cualquier trabajo y no se ha iniciado materialmente la unidad, no simular una implementación parcial: documentar el impedimento y mantener el estado coherente con el trabajo efectivamente realizado.
+
+### Reglas de continuidad
+
+- No dejar el puntero actual en una unidad completada.
+- No marcar la siguiente unidad `EN PROCESO` al cerrar la anterior.
+- No repetir el cierre de `LAST_COMPLETED_UNIT`.
+- No alterar los registros históricos de otras unidades.
+- No modificar unidades completadas anteriores por iniciativa propia.
+- Si una unidad necesita una dependencia posterior o una modificación fuera de su alcance, documentar el problema y respetar el orden del roadmap.
+
+## DOCUMENTACIÓN TÉCNICA
+
+Cuando se modifique de forma relevante código de `src/`, revisar si `docs/README.md` necesita actualizarse.
+
+Cuando se modifiquen tests, revisar si `docs/README_TESTS.md` necesita actualizarse.
+
+La documentación debe describir únicamente el comportamiento técnico actual y comprobable. Nunca debe utilizarse para registrar fases, IDs de mejora, fechas, avances, historial o cierres del roadmap.
+
+## RESTRICCIONES ABSOLUTAS
+
+- Está prohibido ejecutar comandos Git bajo cualquier circunstancia, incluidos los comandos de solo lectura y las consultas indirectas.
+- No crear commits ni utilizar Git o `.git` como mecanismo de comparación, respaldo, recuperación o documentación.
+- No debilitar tests válidos para conseguir resultados positivos.
+- No introducir mocks que decidan artificialmente el resultado que se pretende demostrar.
+- No ejecutar operaciones destructivas sobre datos originales del usuario.
+- No ejecutar masivamente aplicaciones descubiertas ni candidatos desconocidos.
+- No cerrar procesos o ventanas preexistentes del usuario.
+- No modificar la configuración física de los monitores para facilitar pruebas.
+- No inventar funcionalidades, contratos, APIs, archivos, clases, métodos ni resultados.
+- No implementar anticipadamente unidades posteriores.
+
+Las instrucciones completas de estas restricciones están en `prompt_JARVIS_reglas.txt` y son obligatorias.
+
+## FIN DEL PROMPT PRINCIPAL
+
+No comenzar ninguna tarea de código hasta completar las lecturas obligatorias, verificar la unidad activa y aplicar todas las reglas de `prompt_JARVIS_reglas.txt`.
