@@ -2721,8 +2721,259 @@ class TestRefrescoBajoDemanda:
 
 
 # ---------------------------------------------------------------------------
-# Copia de seguridad, deteccion de corrupcion y recuperacion (3.8.5.1.4.2.11).
+# Ciclo crear / modificar / renombrar / eliminar sobre FS real y refresco
+# incremental (unidad 3.8.5.1.4.5.10.1).
 # ---------------------------------------------------------------------------
+
+class TestCicloCrearModificarRenombrarEliminarRefrescoFSReal:
+    """
+    Pruebas reales contra el sistema de archivos y SQLite (sin eventos
+    simulados) que comprueban que crear, modificar, renombrar y eliminar
+    archivos de prueba dentro de un directorio temporal propio se reflejan
+    en el refresco incremental (`refrescar_volumen`, `refrescar_incremental_global`,
+    `detectar_cambios_incrementales`, `detectar_renombrados`).
+    """
+
+    def _volumen_de(self, tmp_path: Path) -> str:
+        """Devuelve el identificador de volumen de la ruta temporal (p. ej. 'C:')."""
+        anchor = str(tmp_path).split("\\")[0] if os.name == "nt" else "/"
+        return anchor or "/"
+
+    def _crear_archivos(
+        self, directorio: Path, archivos: list[tuple[str, str]]
+    ) -> list[str]:
+        """Crea archivos reales con el contenido dado y devuelve sus rutas absolutas normalizadas."""
+        rutas: list[str] = []
+        for nombre, contenido in archivos:
+            ruta = directorio / nombre
+            ruta.write_text(contenido, encoding="utf-8")
+            rutas.append(str(ruta).replace("\\", "/"))
+        return rutas
+
+    def _escaneo_con_entradas(
+        self,
+        storage: SystemInventoryStorage,
+        scan_id: str,
+        machine_id: str,
+        volume: str,
+        rutas: list[str],
+    ) -> None:
+        """Registra equipo y volumen, inicia escaneo completo, inserta entradas reales y lo finaliza."""
+        storage.initialize()
+        storage.record_machine(machine_id)
+        storage.record_volume("vol-tmp", machine_id, volume, "local", "online")
+        storage.begin_scan_run(scan_id, machine_id, volume, SCAN_MODE_FULL)
+        entradas = []
+        for i, ruta in enumerate(rutas):
+            p = Path(ruta)
+            stat = p.stat()
+            entradas.append(
+                {
+                    "entry_id": f"{scan_id}-e-{i}",
+                    "absolute_path": ruta,
+                    "relative_path": p.name,
+                    "name": p.name,
+                    "extension": p.suffix,
+                    "entry_type": "file",
+                    "size_bytes": stat.st_size,
+                    "modified_at": "2024-01-01T10:00:00",
+                    "created_at": "2024-01-01T09:00:00",
+                    "accessed_at": "2024-01-02T08:00:00",
+                    "attributes": [],
+                    "excluded": False,
+                    "source": "filesystem_scan",
+                    "last_checked_at": "2024-01-03T00:00:00",
+                }
+            )
+        storage.insert_file_entries(scan_id, machine_id, volume, entradas)
+        storage.end_scan_run(scan_id, result=SCAN_RESULT_OK, entries_count=len(rutas))
+
+    def test_crear_archivos_refresco_volumen_refleja_existentes(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        """Al crear archivos reales y escanearlos, refrescar_volumen los reporta como existentes."""
+        volumen = self._volumen_de(tmp_path)
+        directorio = tmp_path / "jarvis_prueba_fs"
+        directorio.mkdir(parents=True, exist_ok=True)
+        rutas = self._crear_archivos(
+            directorio,
+            [
+                ("alfa.txt", "contenido alfa"),
+                ("beta.txt", "contenido beta"),
+                ("gamma.txt", "contenido gamma"),
+            ],
+        )
+        self._escaneo_con_entradas(storage, "scan-alta", "machine-alfa", volumen, rutas)
+        resultado = storage.refrescar_volumen("machine-alfa", volumen)
+        assert resultado["scan_id"] == "scan-alta"
+        assert resultado["total"] == 3
+        assert resultado["existentes"] == 3
+        assert resultado["no_existentes"] == 0
+        assert resultado["cambios_detectados"] == 0
+        assert resultado["entradas_refrescadas"] == 3
+
+    def test_refrescar_incremental_global_refleja_creacion_real(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        """refrescar_incremental_global sobre el volumen real refleja los archivos creados."""
+        volumen = self._volumen_de(tmp_path)
+        directorio = tmp_path / "jarvis_prueba_fs"
+        directorio.mkdir(parents=True, exist_ok=True)
+        rutas = self._crear_archivos(directorio, [("alfa.txt", "contenido alfa")])
+        self._escaneo_con_entradas(storage, "scan-global", "machine-alfa", volumen, rutas)
+        resultado = storage.refrescar_incremental_global("machine-alfa")
+        assert resultado["total_volumenes"] >= 1
+        assert resultado["total"] >= 1
+        assert resultado["existentes"] >= 1
+        assert any(pv["volume"] == volumen for pv in resultado["por_volumen"])
+
+    def test_modificar_archivo_refresco_volumen_detecta_cambio(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        """Al modificar el tamaño de un archivo real, refrescar_volumen detecta el cambio."""
+        volumen = self._volumen_de(tmp_path)
+        directorio = tmp_path / "jarvis_prueba_fs"
+        directorio.mkdir(parents=True, exist_ok=True)
+        rutas = self._crear_archivos(directorio, [("alfa.txt", "contenido alfa")])
+        self._escaneo_con_entradas(storage, "scan-mod", "machine-alfa", volumen, rutas)
+        # Modificacion real en el sistema de archivos: el archivo crece.
+        Path(rutas[0]).write_text("contenido alfa modificado mas largo", encoding="utf-8")
+        resultado = storage.refrescar_volumen("machine-alfa", volumen)
+        assert resultado["total"] == 1
+        assert resultado["existentes"] == 1
+        assert resultado["no_existentes"] == 0
+        assert resultado["cambios_detectados"] >= 1, (
+            "El cambio de tamano real en el sistema de archivos debe detectarse"
+        )
+
+    def test_eliminar_archivo_refresco_volumen_refleja_no_existente(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        """Al eliminar un archivo real, refrescar_volumen lo reporta como no existente."""
+        volumen = self._volumen_de(tmp_path)
+        directorio = tmp_path / "jarvis_prueba_fs"
+        directorio.mkdir(parents=True, exist_ok=True)
+        rutas = self._crear_archivos(directorio, [("alfa.txt", "a"), ("beta.txt", "b")])
+        self._escaneo_con_entradas(storage, "scan-del", "machine-alfa", volumen, rutas)
+        # Eliminacion real en el sistema de archivos.
+        Path(rutas[1]).unlink()
+        resultado = storage.refrescar_volumen("machine-alfa", volumen)
+        assert resultado["total"] == 2
+        assert resultado["existentes"] == 1
+        assert resultado["no_existentes"] == 1
+
+    def test_refrescar_entrada_por_ruta_detecta_modificacion_real(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        """refrescar_entrada_por_ruta revalida una ruta individual y detecta su cambio de tamaño."""
+        volumen = self._volumen_de(tmp_path)
+        directorio = tmp_path / "jarvis_prueba_fs"
+        directorio.mkdir(parents=True, exist_ok=True)
+        rutas = self._crear_archivos(directorio, [("alfa.txt", "contenido alfa")])
+        self._escaneo_con_entradas(storage, "scan-ruta", "machine-alfa", volumen, rutas)
+        # Modificacion real del archivo.
+        Path(rutas[0]).write_text("contenido alfa modificado y mas largo", encoding="utf-8")
+        resultado = storage.refrescar_entrada_por_ruta("machine-alfa", volumen, rutas[0])
+        assert resultado["existe_ahora"] is True
+        assert resultado["cambio_detectado"] is True
+        assert resultado["entradas_refrescadas"] == 1
+        assert resultado["last_checked_at"] is not None
+
+    def test_renombrar_archivo_detecta_cambios_incrementales(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        """Al renombrar un archivo real, detectar_cambios_incrementales refleja alta y desaparicion
+        y detectar_renombrados los empareja como un mismo archivo sin fusionar distintos."""
+        volumen = self._volumen_de(tmp_path)
+        directorio = tmp_path / "jarvis_prueba_fs"
+        directorio.mkdir(parents=True, exist_ok=True)
+        rutas_base = self._crear_archivos(directorio, [("alfa.txt", "contenido alfa")])
+        self._escaneo_con_entradas(storage, "scan-base", "machine-alfa", volumen, rutas_base)
+        storage.registrar_linea_base_volumen(
+            machine_id="machine-alfa",
+            volume=volumen,
+            estado_volumen="disponible",
+            cobertura=100.0,
+            entradas_count=1,
+            errores_count=0,
+            scan_id="scan-base",
+        )
+        # Renombrado real en el sistema de archivos (mismo contenido y tamano).
+        ruta_nueva = str(Path(rutas_base[0]).parent / "alfa_renombrado.txt").replace("\\", "/")
+        Path(rutas_base[0]).rename(ruta_nueva)
+        # Nuevo escaneo sobre el estado actual del sistema de archivos.
+        self._escaneo_con_entradas(storage, "scan-nuevo", "machine-alfa", volumen, [ruta_nueva])
+        resultado = storage.detectar_cambios_incrementales(
+            "machine-alfa", volumen, scan_id_nuevo="scan-nuevo"
+        )
+        assert resultado.scan_usado is not None
+        assert resultado.total_base == 1
+        assert resultado.total_nuevo == 1
+        assert len(resultado.altas) == 1, "La ruta renombrada aparece como alta"
+        assert len(resultado.desapariciones) == 1, "La ruta original aparece como desaparicion"
+        # Detectar renombrados debe emparejar alta y desaparicion como un mismo archivo.
+        renombrados = storage.detectar_renombrados(
+            "machine-alfa", volumen, scan_id_nuevo="scan-nuevo"
+        )
+        assert len(renombrados.renombrados) == 1, "El renombrado real debe emparejarse"
+        r = renombrados.renombrados[0]
+        assert r.nombre_cambio is True
+        assert r.normalized_path_base != r.normalized_path_nuevo
+        assert len(renombrados.altas) == 0
+        assert len(renombrados.desapariciones) == 0
+
+    def test_ciclo_completo_crear_modificar_renombrar_eliminar(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        """Ciclo real: crear -> modificar -> renombrar -> eliminar, verificando cada cambio
+        con el refresco incremental sobre SQLite y el sistema de archivos reales."""
+        volumen = self._volumen_de(tmp_path)
+        directorio = tmp_path / "jarvis_prueba_fs"
+        directorio.mkdir(parents=True, exist_ok=True)
+
+        # 1. Crear tres archivos reales.
+        rutas = self._crear_archivos(
+            directorio,
+            [("alfa.txt", "alfa"), ("beta.txt", "beta"), ("gamma.txt", "gamma")],
+        )
+        self._escaneo_con_entradas(storage, "scan-ciclo-base", "machine-alfa", volumen, rutas)
+        storage.registrar_linea_base_volumen(
+            machine_id="machine-alfa",
+            volume=volumen,
+            estado_volumen="disponible",
+            cobertura=100.0,
+            entradas_count=3,
+            errores_count=0,
+            scan_id="scan-ciclo-base",
+        )
+        r = storage.refrescar_volumen("machine-alfa", volumen)
+        assert r["existentes"] == 3 and r["no_existentes"] == 0
+
+        # 2. Modificar alfa.txt (tamano real cambia).
+        Path(rutas[0]).write_text("alfa modificado con mas contenido", encoding="utf-8")
+        r = storage.refrescar_volumen("machine-alfa", volumen)
+        assert r["cambios_detectados"] >= 1
+
+        # 3. Eliminar beta.txt.
+        Path(rutas[1]).unlink()
+        r = storage.refrescar_volumen("machine-alfa", volumen)
+        assert r["no_existentes"] >= 1
+        assert r["existentes"] == 2
+
+        # 4. Renombrar gamma.txt -> gamma_renombrado.txt.
+        ruta_gamma_nueva = str(Path(rutas[2]).parent / "gamma_renombrado.txt").replace("\\", "/")
+        Path(rutas[2]).rename(ruta_gamma_nueva)
+        rutas_despues = [rutas[0], ruta_gamma_nueva]
+        self._escaneo_con_entradas(storage, "scan-ciclo-nuevo", "machine-alfa", volumen, rutas_despues)
+        resultado = storage.detectar_cambios_incrementales(
+            "machine-alfa", volumen, scan_id_nuevo="scan-ciclo-nuevo"
+        )
+        assert len(resultado.altas) >= 1
+        assert len(resultado.desapariciones) >= 1
+        renombrados = storage.detectar_renombrados(
+            "machine-alfa", volumen, scan_id_nuevo="scan-ciclo-nuevo"
+        )
+        assert len(renombrados.renombrados) >= 1, "El renombrado real del ciclo debe emparejarse"
 
 class TestBackupCorrupcionYRecuperacion:
     """Copia de seguridad, deteccion de corrupcion y recuperacion del inventario.

@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -29,10 +30,12 @@ from unittest.mock import patch
 import pytest
 
 from src.hands.system_inventory import (
+    ConfigCaducidad,
     ControlRecorrido,
     DEFAULT_EXCLUDED_MOUNT_PATTERNS,
     DEFAULT_EXCLUDED_PATH_PATTERNS,
     EntryType,
+    EstadoCaducidad,
     EstadoVolumen,
     ErrorRecorrido,
     FactType,
@@ -46,6 +49,8 @@ from src.hands.system_inventory import (
     MedidorRecursosSistema,
     ProgresoRecorrido,
     RecorridoVolumen,
+    ResultadoCaducidad,
+    ResultadoValidacionDestino,
     SistemaOperativo,
     TipoEnlace,
     VolumeInfo,
@@ -61,13 +66,18 @@ from src.hands.system_inventory import (
     _clasificar_tipo_volumen_macos,
     _normalizar_para_visitado,
     _prefix_ruta_larga_windows,
+    clasificar_entradas_por_caducidad,
     classify_entry,
     determinar_estado_volumen,
     detectar_bind_mount_linux,
     detectar_tipo_enlace,
     debe_seguir_enlace,
+    edad_segundos_desde_check,
     enumerar_volumenes_comun,
+    esta_caducado,
     resolver_sin_ciclos,
+    validar_destino,
+    validar_ruta_para_lanzamiento,
     volumen_comun_desde_info,
     default_contract,
     detectar_sistema,
@@ -2817,3 +2827,293 @@ class TestRecorridoVolumenLimitesRecursos:
         )
         entradas = list(recorrido.recorrer())
         assert recorrido.progreso.completado is True
+
+
+# ---------------------------------------------------------------------------
+# Caducidad y detección de inventario obsoleto (3.8.5.1.4.5.9)
+# ---------------------------------------------------------------------------
+
+class TestEstadoCaducidad:
+    """Tests del enum EstadoCaducidad."""
+
+    def test_valores_esperados(self):
+        assert EstadoCaducidad.VIGENTE.value == "vigente"
+        assert EstadoCaducidad.OBSOLETO.value == "obsoleto"
+        assert EstadoCaducidad.EXPIRADO.value == "expirado"
+        assert EstadoCaducidad.DESCONOCIDO.value == "desconocido"
+
+
+class TestConfigCaducidad:
+    """Tests de ConfigCaducidad."""
+
+    def test_valores_por_defecto(self):
+        cfg = ConfigCaducidad()
+        assert cfg.ttl_segundos is None
+        assert cfg.usar_last_checked is True
+        assert cfg.usar_modificado is False
+        assert cfg.usar_creado is False
+        assert cfg.umbral_efectivo() is None
+
+    def test_con_ttl_configurado(self):
+        cfg = ConfigCaducidad(ttl_segundos=3600.0)
+        assert cfg.ttl_segundos == 3600.0
+        assert cfg.umbral_efectivo() == 3600.0
+
+    def test_ttl_cero_es_valido(self):
+        cfg = ConfigCaducidad(ttl_segundos=0.0)
+        assert cfg.umbral_efectivo() == 0.0
+
+
+class TestEdadSegundosDesdeCheck:
+    """Tests de edad_segundos_desde_check."""
+
+    def test_con_last_checked_valido(self, tmp_path: Path):
+        ahora = datetime.now()
+        entry = InventoryEntry(
+            machine_id="m", volume="V", absolute_path=str(tmp_path / "f.txt"),
+            relative_path="f.txt", name="f.txt", extension=".txt",
+            entry_type=EntryType.FILE, size_bytes=0,
+            modified_at=ahora.isoformat(), created_at=ahora.isoformat(),
+            last_checked_at=ahora.isoformat(),
+        )
+        edad = edad_segundos_desde_check(entry)
+        assert edad is not None
+        assert 0.0 <= edad < 5.0  # justo ahora
+
+    def test_sin_last_checked_retorna_none(self):
+        entry = InventoryEntry(
+            machine_id="m", volume="V", absolute_path="C:/f.txt",
+            relative_path="f.txt", name="f.txt", extension=".txt",
+            entry_type=EntryType.FILE, size_bytes=0,
+            modified_at="", created_at="", last_checked_at="",
+        )
+        assert edad_segundos_desde_check(entry) is None
+
+    def test_timestamp_invalido_retorna_none(self):
+        entry = InventoryEntry(
+            machine_id="m", volume="V", absolute_path="C:/f.txt",
+            relative_path="f.txt", name="f.txt", extension=".txt",
+            entry_type=EntryType.FILE, size_bytes=0,
+            modified_at="", created_at="", last_checked_at="no-es-una-fecha",
+        )
+        assert edad_segundos_desde_check(entry) is None
+
+
+class TestEstaCaducidad:
+    """Tests de esta_caducado."""
+
+    def test_sin_ttl_nunca_caduca_por_tiempo(self):
+        entry = InventoryEntry(
+            machine_id="m", volume="V", absolute_path="C:/f.txt",
+            relative_path="f.txt", name="f.txt", extension=".txt",
+            entry_type=EntryType.FILE, size_bytes=0,
+            modified_at="", created_at="",
+            last_checked_at=datetime.now().isoformat(),
+        )
+        resultado = esta_caducado(entry, ConfigCaducidad())  # sin ttl
+        assert resultado.estado == EstadoCaducidad.VIGENTE
+        assert resultado.es_valido_para_uso is False  # sigue necesitando revalidación real
+
+    def test_con_ttl_excedido_es_obsoleto(self):
+        pasado = datetime.now().timestamp() - 7200  # hace 2 horas
+        entry = InventoryEntry(
+            machine_id="m", volume="V", absolute_path="C:/f.txt",
+            relative_path="f.txt", name="f.txt", extension=".txt",
+            entry_type=EntryType.FILE, size_bytes=0,
+            modified_at="", created_at="",
+            last_checked_at=datetime.fromtimestamp(pasado).isoformat(),
+        )
+        resultado = esta_caducado(entry, ConfigCaducidad(ttl_segundos=3600.0))  # 1 hora
+        assert resultado.estado == EstadoCaducidad.OBSOLETO
+        assert resultado.edad_segundos is not None
+        assert resultado.edad_segundos > 3600.0
+        assert resultado.es_valido_para_uso is False
+
+    def test_con_ttl_no_excedido_es_vigente(self):
+        ahora = datetime.now()
+        entry = InventoryEntry(
+            machine_id="m", volume="V", absolute_path="C:/f.txt",
+            relative_path="f.txt", name="f.txt", extension=".txt",
+            entry_type=EntryType.FILE, size_bytes=0,
+            modified_at="", created_at="",
+            last_checked_at=ahora.isoformat(),
+        )
+        resultado = esta_caducado(entry, ConfigCaducidad(ttl_segundos=3600.0))
+        assert resultado.estado == EstadoCaducidad.VIGENTE
+        assert resultado.es_valido_para_uso is False
+
+    def test_sin_last_checked_es_expirado(self):
+        entry = InventoryEntry(
+            machine_id="m", volume="V", absolute_path="C:/f.txt",
+            relative_path="f.txt", name="f.txt", extension=".txt",
+            entry_type=EntryType.FILE, size_bytes=0,
+            modified_at="", created_at="", last_checked_at="",
+        )
+        resultado = esta_caducado(entry, ConfigCaducidad(ttl_segundos=3600.0))
+        assert resultado.estado == EstadoCaducidad.EXPIRADO
+        assert resultado.edad_segundos is None
+        assert resultado.es_valido_para_uso is False
+
+    def test_ruta_historica_no_autoriza_por_si_sola(self):
+        """Incluso con caducidad vigente, es_valido_para_uso es False (necesita revalidación real)."""
+        entry = InventoryEntry(
+            machine_id="m", volume="V", absolute_path="C:/f.txt",
+            relative_path="f.txt", name="f.txt", extension=".txt",
+            entry_type=EntryType.FILE, size_bytes=0,
+            modified_at="", created_at="",
+            last_checked_at=datetime.now().isoformat(),
+        )
+        resultado = esta_caducado(entry, ConfigCaducidad(ttl_segundos=3600.0))
+        assert resultado.es_valido_para_uso is False
+
+
+class TestClasificarEntradasPorCaducidad:
+    """Tests de clasificar_entradas_por_caducidad."""
+
+    def test_clasifica_multiples_entradas(self):
+        entradas = [
+            InventoryEntry(
+                machine_id="m", volume="V", absolute_path=f"C:/f{i}.txt",
+                relative_path=f"f{i}.txt", name=f"f{i}.txt", extension=".txt",
+                entry_type=EntryType.FILE, size_bytes=0,
+                modified_at="", created_at="",
+                last_checked_at=datetime.now().isoformat() if i % 2 == 0 else "",
+            )
+            for i in range(4)
+        ]
+        resultados = clasificar_entradas_por_caducidad(entradas, ConfigCaducidad(ttl_segundos=3600.0))
+        assert len(resultados) == 4
+        # Las entradas con last_checked deben ser VIGENTE; las sin él, EXPIRADO
+        for i, (ruta, res) in enumerate(resultados.items()):
+            if i % 2 == 0:
+                assert res.estado == EstadoCaducidad.VIGENTE
+            else:
+                assert res.estado == EstadoCaducidad.EXPIRADO
+
+
+class TestValidacionDestino:
+    """Tests de validar_destino (revalidación antes de usar un destino)."""
+
+    def _entrada_valida(self, tmp_path: Path, **sobreescritura) -> InventoryEntry:
+        datos = dict(
+            machine_id="maquina-actual",
+            volume="C:",
+            absolute_path=str(tmp_path / "destino.txt"),
+            relative_path="destino.txt",
+            name="destino.txt",
+            extension=".txt",
+            entry_type=EntryType.FILE,
+            size_bytes=0,
+            modified_at="",
+            created_at="",
+            last_checked_at="",
+        )
+        datos.update(sobreescritura)
+        return InventoryEntry(**datos)
+
+    def test_ruta_valida_pasa_todas_las_comprobaciones(self, tmp_path: Path):
+        archivo = tmp_path / "destino.txt"
+        archivo.write_text("contenido de prueba")
+        entry = self._entrada_valida(tmp_path)
+        resultado = validar_destino(entry, machine_id_actual="maquina-actual")
+        assert resultado.valido is True
+        assert resultado.existencia_ok is True
+        assert resultado.tipo_ok is True
+        assert resultado.volumen_ok is True
+        assert resultado.identidad_ok is True
+        assert resultado.accesible_ok is True
+        assert resultado.errores == []
+
+    def test_ruta_inexistente_falla_existencia(self, tmp_path: Path):
+        entry = self._entrada_valida(tmp_path)  # ruta que no existe
+        resultado = validar_destino(entry, machine_id_actual="maquina-actual")
+        assert resultado.valido is False
+        assert resultado.existencia_ok is False
+        assert "no existe" in resultado.razon.lower() or "no existe" in " ".join(resultado.errores).lower()
+
+    def test_tipo_no_coincide_falla(self, tmp_path: Path):
+        archivo = tmp_path / "destino.txt"
+        archivo.write_text("contenido")
+        # Entrada dice que es directorio pero el archivo es FILE
+        entry = self._entrada_valida(tmp_path, entry_type=EntryType.DIRECTORY)
+        resultado = validar_destino(entry, machine_id_actual="maquina-actual")
+        assert resultado.valido is False
+        assert resultado.tipo_ok is False
+
+    def test_volumen_no_coincide_falla(self, tmp_path: Path):
+        archivo = tmp_path / "destino.txt"
+        archivo.write_text("contenido")
+        entry = self._entrada_valida(tmp_path, volume="D:")  # volumen distinto
+        resultado = validar_destino(entry, machine_id_actual="maquina-actual")
+        assert resultado.valido is False
+        assert resultado.volumen_ok is False
+
+    def test_identidad_no_coincide_falla(self, tmp_path: Path):
+        archivo = tmp_path / "destino.txt"
+        archivo.write_text("contenido")
+        entry = self._entrada_valida(tmp_path)
+        resultado = validar_destino(entry, machine_id_actual="otra-maquina")
+        assert resultado.valido is False
+        assert resultado.identidad_ok is False
+
+    def test_sin_machine_id_actual_omite_identidad(self, tmp_path: Path):
+        archivo = tmp_path / "destino.txt"
+        archivo.write_text("contenido")
+        entry = self._entrada_valida(tmp_path)
+        resultado = validar_destino(entry, machine_id_actual=None)
+        # Identidad se omite, no falla por eso (pero se añade advertencia)
+        assert resultado.identidad_ok is True
+        assert "omitida" in " ".join(resultado.errores).lower()
+
+    def test_ruta_historica_no_autoriza_por_si_sola(self, tmp_path: Path):
+        """Aunque la entrada esté en el inventario, sin revalidación real no se autoriza."""
+        archivo = tmp_path / "destino.txt"
+        archivo.write_text("contenido")
+        entry = self._entrada_valida(tmp_path)
+        # Sin machine_id_actual, identidad se omite pero el resto debe pasar
+        resultado = validar_destino(entry, machine_id_actual="maquina-actual")
+        assert resultado.valido is True  # ruta real existente pasa todo
+        # Pero el punto clave: una entrada con ruta inexistente nunca pasa
+        entry_inexistente = self._entrada_valida(tmp_path / "no_existe.txt")
+        resultado_invalido = validar_destino(entry_inexistente, machine_id_actual="maquina-actual")
+        assert resultado_invalido.valido is False
+
+
+class TestValidarRutaParaLanzamiento:
+    """Tests de validar_ruta_para_lanzamiento (validación sin InventoryEntry previa)."""
+
+    def test_ruta_existente_pasa(self, tmp_path: Path):
+        archivo = tmp_path / "app.exe"
+        archivo.write_text("fake exe")
+        resultado = validar_ruta_para_lanzamiento(
+            absolute_path=str(archivo),
+            entry_type=EntryType.FILE,
+            volume="C:",
+            machine_id="maquina-actual",
+            machine_id_actual="maquina-actual",
+        )
+        assert resultado.valido is True
+        assert resultado.existencia_ok is True
+
+    def test_ruta_inexistente_falla(self):
+        resultado = validar_ruta_para_lanzamiento(
+            absolute_path="C:/no/existe/app.exe",
+            entry_type=EntryType.FILE,
+            volume="C:",
+            machine_id="maquina-actual",
+            machine_id_actual="maquina-actual",
+        )
+        assert resultado.valido is False
+        assert resultado.existencia_ok is False
+
+    def test_ruta_historica_no_autoriza_lanzamiento(self):
+        """Una ruta que estuvo en el inventario pero ya no existe no autoriza lanzamiento."""
+        resultado = validar_ruta_para_lanzamiento(
+            absolute_path="C:/Program Files/AntiguaApp/app.exe",
+            entry_type=EntryType.FILE,
+            volume="C:",
+            machine_id="maquina-actual",
+            machine_id_actual="maquina-actual",
+        )
+        # En la mayoría de equipos esta ruta no existe; debe fallar existencia
+        assert resultado.valido is False or resultado.existencia_ok is False

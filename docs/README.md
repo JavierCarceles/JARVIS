@@ -1749,7 +1749,7 @@ Funciones a nivel módulo:
 <a name="src-hands-system_inventory-py"></a>
 ### `src/hands/system_inventory.py` — Contrato, alcance y privacidad del inventario persistente del sistema de archivos.
 
-**Descripción:** Define el contrato del inventario local de elementos del sistema de archivos del equipo donde se ejecuta JARVIS. Define la entrada de inventario con metadatos mínimos, el identificador local de equipo, el alcance predeterminado, exclusiones técnicas, controles de privacidad, operaciones de control del inventario, detección de sistema operativo y arquitectura, matriz de cobertura, enumeración de volúmenes en Windows, enumeración de puntos de montaje en Linux y enumeración de volúmenes montados en macOS. Además identifica enlaces simbólicos, junctions, reparse points y bind mounts, y resuelve rutas atravesando enlaces de forma segura evitando ciclos. Incluye la diferenciación de estados de volumen: desmontado, inaccesible, permiso denegado, sistema de archivos no soportado y vacío. Implementa el recorrido iterativo y controlado de directorios por volumen, sin recursión ilimitada y sin búsquedas indiscriminadas desde cada consulta del usuario. Incluye limitación de recursos (CPU, memoria, disco y concurrencia) del escaneo basada en mediciones reales del equipo mediante `psutil`, sin umbrales inventados (todos los límites son opcionales y se configuran a partir de mediciones reales).
+**Descripción:** Define el contrato del inventario local de elementos del sistema de archivos del equipo donde se ejecuta JARVIS. Define la entrada de inventario con metadatos mínimos, el identificador local de equipo, el alcance predeterminado, exclusiones técnicas, controles de privacidad, operaciones de control del inventario, detección de sistema operativo y arquitectura, matriz de cobertura, enumeración de volúmenes en Windows, enumeración de puntos de montaje en Linux y enumeración de volúmenes montados en macOS. Además identifica enlaces simbólicos, junctions, reparse points y bind mounts, y resuelve rutas atravesando enlaces de forma segura evitando ciclos. Incluye la diferenciación de estados de volumen: desmontado, inaccesible, permiso denegado, sistema de archivos no soportado y vacío. Implementa el recorrido iterativo y controlado de directorios por volumen, sin recursión ilimitada y sin búsquedas indiscriminadas desde cada consulta del usuario. Incluye limitación de recursos (CPU, memoria, disco y concurrencia) del escaneo basada en mediciones reales del equipo mediante `psutil`, sin umbrales inventados (todos los límites son opcionales y se configuran a partir de mediciones reales). Añade caducidad y detección de inventario obsoleto a partir de timestamps/estado reales, y revalidación de destino antes de lanzar (existencia, tipo, volumen, identidad y accesibilidad en el sistema operativo); una ruta histórica nunca autoriza por sí sola un lanzamiento.
 
 **Características:**
 
@@ -1769,6 +1769,8 @@ Funciones a nivel módulo:
 - Diferenciación de estados de volumen (`EstadoVolumen`): disponible, desmontado, inaccesible, permiso denegado, sistema de archivos no soportado y vacío, con función `determinar_estado_volumen` para clasificar cada volumen sin leer su contenido.
 - Recorrido iterativo y controlado de directorios por volumen (`RecorridoVolumen`): pila explícita sin recursión ilimitada, captura de metadatos vía `InventoryEntry` sin leer contenido de archivos, manejo de errores por ruta sin abortar el recorrido con contador total y contador agregado por categoría, callbacks de progreso y de control (pausa/cancelar), respeto a exclusiones del contrato y conjunto de visitados con identificadores canonicos (ruta real resuelta, dispositivo/inodo en POSIX y normalización Unicode NFC) para evitar ciclos, duplicados por punto de montaje y recorridos repetidos de enlaces; opción `seguir_enlaces` para traversal de enlaces bajo política conservadora; soporte de rutas largas en Windows mediante prefijo `\\?\` para superar el límite MAX_PATH.
 - Limitación de recursos del escaneo (`LimiteRecursos` con límites configurables de CPU, memoria, uso de disco y concurrencia; `MedidorRecursosSistema` que mide recursos reales del equipo vía `psutil`): antes de procesar cada directorio se comprueban los límites y, si alguno se excede, se espera brevemente y se reintenta (throttling) sin abortar el recorrido ni perder las entradas ya emitidas.
+- Caducidad de inventario (`EstadoCaducidad`, `ConfigCaducidad`, `ResultadoCaducidad`): determina si una entrada está vigente, obsoleta o expirada a partir de `last_checked_at` y un umbral TTL configurable; sin umbral no caduca por tiempo. Funciones `edad_segundos_desde_check`, `esta_caducado` y `clasificar_entradas_por_caducidad`.
+- Revalidación de destino antes de uso (`ResultadoValidacionDestino`): `validar_destino` comprueba existencia, tipo, volumen, identidad del equipo y accesibilidad de una entrada de inventario en el sistema operativo real; `validar_ruta_para_lanzamiento` hace lo mismo para una ruta suelta. Una ruta histórica nunca autoriza por sí sola un lanzamiento.
 
 **Importaciones:** 13.
 
@@ -1779,6 +1781,7 @@ Clases:
 | `class ControlRecorrido(Enum)` | Decisiones de flujo del recorrido iterativo de un volumen (continuar, pausar, cancelar). |
 | `class EntryType(Enum)` | Tipo de entrada del inventario, observado directamente del SO. |
 | `class ErrorRecorrido` | Error ocurrido al procesar una ruta durante el recorrido de un volumen (ruta, volumen, categoría, mensaje). |
+| `class EstadoCaducidad(Enum)` | Estado de caducidad de una entrada de inventario respecto a un umbral de tiempo (vigente, obsoleto, expirado, desconocido). |
 | `class EstadoVolumen(Enum)` | Estado de un volumen: disponible, desmontado, inaccesible, permiso denegado, sistema de archivos no soportado o vacío. |
 | `class InventoryScope(Enum)` | Alcance del inventario. |
 | `class InventoryEntry` | Entrada del inventario de un elemento del sistema de archivos. Solo metadatos observados por el sistema operativo. |
@@ -1798,6 +1801,9 @@ Clases:
 | `class InfoEnlace` | Resultado de la identificación de un enlace o redirección: si existe, tipo, objetivo declarado, si es cíclico y la decisión de seguir. |
 | `class LimiteRecursos` | Límites configurables de recursos para el escaneo de inventario (CPU, memoria, uso de disco, concurrencia, intervalo de medición); todos los valores por defecto son None (sin límite) para no inventar umbrales. |
 | `class MedidorRecursosSistema` | Mide recursos reales del equipo (CPU, memoria RAM, uso de disco) usando `psutil` para establecer límites basados en evidencia, no en umbrales inventados. |
+| `class ConfigCaducidad` | Configuración de caducidad para entradas de inventario (TTL en segundos, campos de referencia). |
+| `class ResultadoCaducidad` | Resultado de la comprobación de caducidad de una entrada de inventario (estado, edad, último check, razón, es válido para uso). |
+| `class ResultadoValidacionDestino` | Resultado de la revalidación de un destino de inventario antes de usarlo (existencia, tipo, volumen, identidad, accesibilidad, errores, razón). |
 
 Funciones a nivel módulo:
 
@@ -1826,6 +1832,11 @@ Funciones a nivel módulo:
 | `def resolver_sin_ciclos(path, visitados=None, seguir_enlaces=False)` | Resuelve una ruta atravesando enlaces de forma segura, evitando ciclos por enlaces simbólicos, junctions, reparse points y bind mounts. |
 | `def debe_seguir_enlace(info, visitados, politica="conservadora")` | Decide explícitamente si se debe seguir un enlace según la política solicitada (nunca, conservadora o siempre). |
 | `def detectar_bind_mount_linux(path)` | Detecta bind mounts en Linux comparando device e inodo con el directorio padre; no falla en plataformas no Linux. |
+| `def edad_segundos_desde_check(entry)` | Calcula la edad en segundos desde last_checked_at de una entrada; None si no hay timestamp. |
+| `def esta_caducado(entry, config=None)` | Determina si una entrada de inventario está caducada u obsoleta según un umbral TTL configurable. |
+| `def clasificar_entradas_por_caducidad(entradas, config=None)` | Clasifica una lista de entradas por su estado de caducidad, claveado por ruta absoluta. |
+| `def validar_destino(entry, machine_id_actual=None)` | Revalida un destino de inventario antes de usarlo: existencia, tipo, volumen, identidad y accesibilidad en el SO real. |
+| `def validar_ruta_para_lanzamiento(absolute_path, entry_type, volume, machine_id, machine_id_actual=None)` | Valida una ruta suelta para lanzamiento sin requerir InventoryEntry previa. |
 | Métodos de `RecorridoVolumen`: | |
 | `def __init__(volumen, raiz, contrato, maquina_id, seguir_enlaces=False, callback_progreso=None, callback_control=None, limite_recursos=None, medidor_recursos=None)` | Inicializa el recorrido iterativo de un volumen con contrato, política de traversal de enlaces, callbacks de progreso y control, y límites opcionales de recursos con medidor propio. |
 | `def recorrer()` | Generador que recorre iterativamente el volumen emitiendo `InventoryEntry` por cada entrada accesible. |

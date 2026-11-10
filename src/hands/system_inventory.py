@@ -491,6 +491,364 @@ class MedidorRecursosSistema:
 
 
 # ---------------------------------------------------------------------------
+# Caducidad y detección de inventario obsoleto (3.8.5.1.4.5.9)
+# ---------------------------------------------------------------------------
+
+class EstadoCaducidad(Enum):
+    """Estado de caducidad de una entrada de inventario respecto a un umbral de tiempo.
+
+    VIGENTE: la entrada fue comprobada recientemente y se considera válida.
+    OBSOLETO: la entrada superó el umbral de antigüedad; sus datos pueden no reflejar el estado real.
+    EXPIRADO: la entrada carece de timestamp de comprobación o es claramente inválida.
+    DESCONOCIDO: no hay suficiente información para determinar el estado.
+    """
+
+    VIGENTE = "vigente"
+    OBSOLETO = "obsoleto"
+    EXPIRADO = "expirado"
+    DESCONOCIDO = "desconocido"
+
+
+@dataclass
+class ConfigCaducidad:
+    """Configuración de caducidad para entradas de inventario.
+
+    Todos los valores son opcionales (None = sin límite). Los umbrales se
+    configuran a partir de mediciones reales del equipo o necesidades del
+    consumidor, nunca por inferencia.
+    """
+
+    ttl_segundos: Optional[float] = None
+    """Tiempo máximo de vida en segundos desde last_checked_at. None = sin caducidad por tiempo."""
+
+    usar_last_checked: bool = True
+    """Si True, usa last_checked_at como referencia de caducidad."""
+
+    usar_modificado: bool = False
+    """Si True, también considera modified_at para detectar cambios externos."""
+
+    usar_creado: bool = False
+    """Si True, también considera created_at como referencia secundaria."""
+
+    def umbral_efectivo(self) -> Optional[float]:
+        """Devuelve el umbral efectivo en segundos o None si no hay caducidad configurada."""
+        return self.ttl_segundos
+
+
+@dataclass
+class ResultadoCaducidad:
+    """Resultado de la comprobación de caducidad de una entrada de inventario."""
+
+    ruta: str
+    """Ruta absoluta de la entrada evaluada."""
+
+    estado: EstadoCaducidad
+    """Estado de caducidad determinado."""
+
+    edad_segundos: Optional[float]
+    """Edad en segundos desde la última comprobación (None si no hay timestamp)."""
+
+    ultimo_check: Optional[str]
+    """Valor de last_checked_at de la entrada."""
+
+    razon: str
+    """Explicación legible del estado determinado."""
+
+    es_valido_para_uso: bool
+    """True si la entrada se considera válida para usar como destino."""
+
+
+def edad_segundos_desde_check(entry: InventoryEntry) -> Optional[float]:
+    """Calcula la edad en segundos desde last_checked_at de una entrada.
+
+    Retorna None si la entrada no tiene last_checked_at o no se puede parsear.
+    Nunca lanza excepción por timestamps inválidos: los trata como desconocidos.
+    """
+    if not entry.last_checked_at:
+        return None
+    try:
+        ultimo = datetime.fromisoformat(entry.last_checked_at)
+        ahora = datetime.now()
+        if ultimo.tzinfo is not None:
+            ahora = ahora.astimezone()
+        return max(0.0, (ahora - ultimo).total_seconds())
+    except (ValueError, TypeError, OverflowError):
+        return None
+
+
+def esta_caducado(entry: InventoryEntry, config: Optional[ConfigCaducidad] = None) -> ResultadoCaducidad:
+    """Determina si una entrada de inventario está caducada u obsoleta.
+
+    Usa last_checked_at como referencia principal (config.usar_last_checked).
+    Si config.ttl_segundos es None, la entrada nunca caduca por tiempo.
+
+    La edad se compara contra el umbral configurado; si se supera, la entrada
+    se marca como OBSOLETO. Si no hay timestamp de comprobación, se marca como
+    EXPIRADO (no hay evidencia de que siga siendo válida).
+
+    Una ruta histórica nunca se considera válida por sí sola: sin
+    last_checked_at reciente o sin revalidación real, el estado es OBSOLETO o
+    EXPIRADO.
+    """
+    cfg = config or ConfigCaducidad()
+    ruta = entry.absolute_path
+    ultimo_check = entry.last_checked_at or ""
+    edad = edad_segundos_desde_check(entry)
+
+    if edad is None:
+        return ResultadoCaducidad(
+            ruta=ruta,
+            estado=EstadoCaducidad.EXPIRADO,
+            edad_segundos=None,
+            ultimo_check=ultimo_check,
+            razon="Sin timestamp de última comprobación (last_checked_at vacío o no parseable).",
+            es_valido_para_uso=False,
+        )
+
+    umbral = cfg.umbral_efectivo()
+    if umbral is None:
+        # Sin umbral configurado: no caduca por tiempo, pero sigue necesitando
+        # revalidación real antes de usarse como destino.
+        return ResultadoCaducidad(
+            ruta=ruta,
+            estado=EstadoCaducidad.VIGENTE,
+            edad_segundos=edad,
+            ultimo_check=ultimo_check,
+            razon=f"Sin umbral de caducidad configurado. Edad {edad:.1f}s desde última comprobación.",
+            es_valido_para_uso=False,
+        )
+
+    if edad > umbral:
+        return ResultadoCaducidad(
+            ruta=ruta,
+            estado=EstadoCaducidad.OBSOLETO,
+            edad_segundos=edad,
+            ultimo_check=ultimo_check,
+            razon=f"Edad {edad:.1f}s supera el umbral de {umbral:.1f}s.",
+            es_valido_para_uso=False,
+        )
+
+    return ResultadoCaducidad(
+        ruta=ruta,
+        estado=EstadoCaducidad.VIGENTE,
+        edad_segundos=edad,
+        ultimo_check=ultimo_check,
+        razon=f"Edad {edad:.1f}s dentro del umbral de {umbral:.1f}s.",
+        es_valido_para_uso=False,
+    )
+
+
+def clasificar_entradas_por_caducidad(
+    entradas: list[InventoryEntry], config: Optional[ConfigCaducidad] = None
+) -> dict[str, ResultadoCaducidad]:
+    """Clasifica una lista de entradas de inventario por su estado de caducidad.
+
+    Devuelve un diccionario claveado por ruta absoluta con el
+    ResultadoCaducidad de cada entrada.
+    """
+    cfg = config or ConfigCaducidad()
+    resultados: dict[str, ResultadoCaducidad] = {}
+    for entry in entradas:
+        resultados[entry.absolute_path] = esta_caducado(entry, cfg)
+    return resultados
+
+
+@dataclass
+class ResultadoValidacionDestino:
+    """Resultado de la revalidación de un destino de inventario antes de usarlo.
+
+    Todos los campos son booleans independientes: un destino puede pasar
+    algunas comprobaciones y fallar otras. `valido` es True solo si todas
+    las comprobaciones críticas pasan.
+    """
+
+    ruta: str
+    """Ruta absoluta validada."""
+
+    valido: bool
+    """True solo si todas las comprobaciones críticas pasaron."""
+
+    existencia_ok: bool
+    """True si la ruta existe en el sistema operativo."""
+
+    tipo_ok: bool
+    """True si el tipo observado coincide con entry_type de la entrada."""
+
+    volumen_ok: bool
+    """True si el volumen de la ruta coincide con el volume de la entrada."""
+
+    identidad_ok: bool
+    """True si el machine_id de la entrada coincide con el equipo actual."""
+
+    accesible_ok: bool
+    """True si la ruta es accesible (lectura de metadatos sin error)."""
+
+    errores: list[str]
+    """Lista de motivos de fallo (vacío si todo pasó)."""
+
+    razon: str
+    """Explicación legible del resultado."""
+
+
+def _volumen_de_ruta(ruta_absoluta: str) -> str:
+    """Extrae el identificador de volumen de una ruta absoluta.
+
+    En Windows devuelve la letra de unidad (ej. "C:"). En otros SO devuelve
+    el punto de montaje o la raíz del sistema de archivos.
+    """
+    p = Path(ruta_absoluta)
+    if os.name == "nt":
+        # Windows: letra de unidad (C:)
+        anchura = p.drive
+        return anchura if anchura else str(p.anchor)
+    # POSIX: punto de montaje (/, /mnt/data, etc.)
+    return p.anchor
+
+
+def validar_destino(
+    entry: InventoryEntry,
+    machine_id_actual: Optional[str] = None,
+) -> ResultadoValidacionDestino:
+    """Revalida un destino de inventario antes de usarlo.
+
+    Comprueba, contra el sistema operativo real:
+    1. Existencia: la ruta existe (os.path.exists / os.path.islink).
+    2. Tipo: el tipo observado coincide con entry.entry_type.
+    3. Volumen: el volumen de la ruta coincide con entry.volume.
+    4. Identidad: entry.machine_id coincide con el equipo actual.
+    5. Accesibilidad: se pueden leer los metadatos de la ruta sin error.
+
+    Una ruta histórica nunca autoriza por sí sola un lanzamiento: incluso si
+    la entrada está en el inventario, debe pasar todas estas comprobaciones
+    reales antes de usarse como destino.
+
+    Parametros:
+    - entry: entrada de inventario a validar.
+    - machine_id_actual: identificador del equipo actual; si None, se omite
+      la comprobación de identidad (se registra como advertencia en errores).
+    """
+    ruta = entry.absolute_path
+    errores: list[str] = []
+
+    # 1. Existencia
+    try:
+        existe = os.path.exists(ruta) or os.path.islink(ruta)
+    except OSError:
+        existe = False
+    existencia_ok = bool(existe)
+    if not existencia_ok:
+        errores.append(f"La ruta no existe en el sistema operativo: {ruta}")
+
+    # 2. Tipo de entrada
+    tipo_ok = True
+    try:
+        if os.path.isdir(ruta) and not os.path.islink(ruta):
+            tipo_observado = EntryType.DIRECTORY
+        elif os.path.islink(ruta):
+            tipo_observado = EntryType.SYMLINK
+        elif os.path.isfile(ruta):
+            tipo_observado = EntryType.FILE
+        else:
+            tipo_observado = EntryType.OTHER
+        tipo_ok = tipo_observado == entry.entry_type
+        if not tipo_ok:
+            errores.append(
+                f"Tipo no coincide: esperado {entry.entry_type.value}, "
+                f"observado {tipo_observado.value}"
+            )
+    except OSError:
+        tipo_ok = False
+        errores.append(f"No se pudo determinar el tipo de la ruta: {ruta}")
+
+    # 3. Volumen
+    volumen_observado = _volumen_de_ruta(ruta)
+    volumen_ok = volumen_observado == entry.volume
+    if not volumen_ok:
+        errores.append(
+            f"Volumen no coincide: esperado {entry.volume}, observado {volumen_observado}"
+        )
+
+    # 4. Identidad del equipo
+    identidad_ok = True
+    if machine_id_actual is not None:
+        identidad_ok = entry.machine_id == machine_id_actual
+        if not identidad_ok:
+            errores.append(
+                f"Identidad de equipo no coincide: esperado {machine_id_actual}, "
+                f"entrada tiene {entry.machine_id}"
+            )
+    else:
+        identidad_ok = True
+        errores.append("machine_id_actual no proporcionado: comprobación de identidad omitida")
+
+    # 5. Accesibilidad
+    accesible_ok = True
+    try:
+        if os.path.isdir(ruta) and not os.path.islink(ruta):
+            with os.scandir(ruta) as _:
+                pass
+        else:
+            os.stat(ruta)
+    except PermissionError:
+        accesible_ok = False
+        errores.append(f"Permiso denegado al acceder a la ruta: {ruta}")
+    except OSError:
+        accesible_ok = False
+        errores.append(f"No se puede acceder a la ruta: {ruta}")
+
+    valido = all([existencia_ok, tipo_ok, volumen_ok, identidad_ok, accesible_ok])
+
+    if valido:
+        razon = f"Destino válido: {ruta} existe, tipo/volumen/identidad/accesibilidad verificados."
+    else:
+        razon = f"Destino inválido: {ruta}; {'; '.join(errores) if errores else 'errores no especificados'}"
+
+    return ResultadoValidacionDestino(
+        ruta=ruta,
+        valido=valido,
+        existencia_ok=existencia_ok,
+        tipo_ok=tipo_ok,
+        volumen_ok=volumen_ok,
+        identidad_ok=identidad_ok,
+        accesible_ok=accesible_ok,
+        errores=errores,
+        razon=razon,
+    )
+
+
+def validar_ruta_para_lanzamiento(
+    absolute_path: str,
+    entry_type: EntryType,
+    volume: str,
+    machine_id: str,
+    machine_id_actual: Optional[str] = None,
+) -> ResultadoValidacionDestino:
+    """Valida una ruta suelta para lanzamiento, sin requerir una InventoryEntry previa.
+
+    Construye una entrada temporal y aplica validar_destino. Útil para
+    comprobar candidatos de aplicación o rutas recuperadas del inventario
+    antes de usarlas como destino de lanzamiento.
+
+    Una ruta histórica nunca autoriza por sí sola un lanzamiento: esta
+    función exige verificación real en el sistema operativo.
+    """
+    entrada_temp = InventoryEntry(
+        machine_id=machine_id,
+        volume=volume,
+        absolute_path=absolute_path,
+        relative_path="",
+        name=Path(absolute_path).name,
+        extension=Path(absolute_path).suffix,
+        entry_type=entry_type,
+        size_bytes=0,
+        modified_at="",
+        created_at="",
+        last_checked_at="",
+    )
+    return validar_destino(entrada_temp, machine_id_actual)
+
+
+# ---------------------------------------------------------------------------
 # Matriz de cobertura del inventario (3.8.5.1.4.1.12)
 # ---------------------------------------------------------------------------
 
