@@ -1749,7 +1749,7 @@ Funciones a nivel módulo:
 <a name="src-hands-system_inventory-py"></a>
 ### `src/hands/system_inventory.py` — Contrato, alcance y privacidad del inventario persistente del sistema de archivos.
 
-**Descripción:** Define el contrato del inventario local de elementos del sistema de archivos del equipo donde se ejecuta JARVIS. Define la entrada de inventario con metadatos mínimos, el identificador local de equipo, el alcance predeterminado, exclusiones técnicas, controles de privacidad, operaciones de control del inventario, detección de sistema operativo y arquitectura, matriz de cobertura, enumeración de volúmenes en Windows, enumeración de puntos de montaje en Linux y enumeración de volúmenes montados en macOS. Además identifica enlaces simbólicos, junctions, reparse points y bind mounts, y resuelve rutas atravesando enlaces de forma segura evitando ciclos. Incluye la diferenciación de estados de volumen: desmontado, inaccesible, permiso denegado, sistema de archivos no soportado y vacío. Implementa el recorrido iterativo y controlado de directorios por volumen, sin recursión ilimitada y sin búsquedas indiscriminadas desde cada consulta del usuario.
+**Descripción:** Define el contrato del inventario local de elementos del sistema de archivos del equipo donde se ejecuta JARVIS. Define la entrada de inventario con metadatos mínimos, el identificador local de equipo, el alcance predeterminado, exclusiones técnicas, controles de privacidad, operaciones de control del inventario, detección de sistema operativo y arquitectura, matriz de cobertura, enumeración de volúmenes en Windows, enumeración de puntos de montaje en Linux y enumeración de volúmenes montados en macOS. Además identifica enlaces simbólicos, junctions, reparse points y bind mounts, y resuelve rutas atravesando enlaces de forma segura evitando ciclos. Incluye la diferenciación de estados de volumen: desmontado, inaccesible, permiso denegado, sistema de archivos no soportado y vacío. Implementa el recorrido iterativo y controlado de directorios por volumen, sin recursión ilimitada y sin búsquedas indiscriminadas desde cada consulta del usuario. Incluye limitación de recursos (CPU, memoria, disco y concurrencia) del escaneo basada en mediciones reales del equipo mediante `psutil`, sin umbrales inventados (todos los límites son opcionales y se configuran a partir de mediciones reales).
 
 **Características:**
 
@@ -1768,8 +1768,9 @@ Funciones a nivel módulo:
 - Contrato común de volumen multiplataforma (`VolumenComun`) que representa un volumen sin forzar letras de unidad ni rutas de Windows en Linux ni macOS, con conversor desde `VolumeInfo` (`volumen_comun_desde_info`) y enumerador unificado (`enumerar_volumenes_comun`).
 - Diferenciación de estados de volumen (`EstadoVolumen`): disponible, desmontado, inaccesible, permiso denegado, sistema de archivos no soportado y vacío, con función `determinar_estado_volumen` para clasificar cada volumen sin leer su contenido.
 - Recorrido iterativo y controlado de directorios por volumen (`RecorridoVolumen`): pila explícita sin recursión ilimitada, captura de metadatos vía `InventoryEntry` sin leer contenido de archivos, manejo de errores por ruta sin abortar el recorrido con contador total y contador agregado por categoría, callbacks de progreso y de control (pausa/cancelar), respeto a exclusiones del contrato y conjunto de visitados con identificadores canonicos (ruta real resuelta, dispositivo/inodo en POSIX y normalización Unicode NFC) para evitar ciclos, duplicados por punto de montaje y recorridos repetidos de enlaces; opción `seguir_enlaces` para traversal de enlaces bajo política conservadora; soporte de rutas largas en Windows mediante prefijo `\\?\` para superar el límite MAX_PATH.
+- Limitación de recursos del escaneo (`LimiteRecursos` con límites configurables de CPU, memoria, uso de disco y concurrencia; `MedidorRecursosSistema` que mide recursos reales del equipo vía `psutil`): antes de procesar cada directorio se comprueban los límites y, si alguno se excede, se espera brevemente y se reintenta (throttling) sin abortar el recorrido ni perder las entradas ya emitidas.
 
-**Importaciones:** 11.
+**Importaciones:** 13.
 
 Clases:
 
@@ -1795,6 +1796,8 @@ Clases:
 | `class VolumenComun` | Contrato común de volumen multiplataforma que no impone letras de unidad ni rutas de Windows en otros SO. |
 | `class TipoEnlace(Enum)` | Tipo de mecanismo de redirección del sistema de archivos observado (ninguno, simbólico, junction, reparse point, bind mount, otro). |
 | `class InfoEnlace` | Resultado de la identificación de un enlace o redirección: si existe, tipo, objetivo declarado, si es cíclico y la decisión de seguir. |
+| `class LimiteRecursos` | Límites configurables de recursos para el escaneo de inventario (CPU, memoria, uso de disco, concurrencia, intervalo de medición); todos los valores por defecto son None (sin límite) para no inventar umbrales. |
+| `class MedidorRecursosSistema` | Mide recursos reales del equipo (CPU, memoria RAM, uso de disco) usando `psutil` para establecer límites basados en evidencia, no en umbrales inventados. |
 
 Funciones a nivel módulo:
 
@@ -1824,7 +1827,7 @@ Funciones a nivel módulo:
 | `def debe_seguir_enlace(info, visitados, politica="conservadora")` | Decide explícitamente si se debe seguir un enlace según la política solicitada (nunca, conservadora o siempre). |
 | `def detectar_bind_mount_linux(path)` | Detecta bind mounts en Linux comparando device e inodo con el directorio padre; no falla en plataformas no Linux. |
 | Métodos de `RecorridoVolumen`: | |
-| `def __init__(volumen, raiz, contrato, maquina_id, seguir_enlaces=False, callback_progreso=None, callback_control=None)` | Inicializa el recorrido iterativo de un volumen con contrato, política de traversal de enlaces y callbacks de progreso y control. |
+| `def __init__(volumen, raiz, contrato, maquina_id, seguir_enlaces=False, callback_progreso=None, callback_control=None, limite_recursos=None, medidor_recursos=None)` | Inicializa el recorrido iterativo de un volumen con contrato, política de traversal de enlaces, callbacks de progreso y control, y límites opcionales de recursos con medidor propio. |
 | `def recorrer()` | Generador que recorre iterativamente el volumen emitiendo `InventoryEntry` por cada entrada accesible. |
 | `property progreso` | Devuelve el `ProgresoRecorrido` actual del recorrido. |
 | `property errores` | Devuelve la lista de `ErrorRecorrido` acumulados durante el recorrido. |

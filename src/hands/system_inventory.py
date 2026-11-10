@@ -24,7 +24,9 @@ from __future__ import annotations
 import ctypes
 import os
 import platform
+import psutil
 import subprocess
+import time
 import unicodedata
 import uuid
 from dataclasses import dataclass, field
@@ -390,6 +392,102 @@ def default_contract() -> InventoryContract:
     Privacidad: sin lectura de contenido, sin rutas completas en logs.
     """
     return InventoryContract(machine_id=generate_machine_id())
+
+
+# ---------------------------------------------------------------------------
+# Limites de recursos para el escaneo (3.8.5.1.4.5.8)
+# ---------------------------------------------------------------------------
+
+@dataclass
+class LimiteRecursos:
+    """
+    Limites configurables de recursos para el escaneo de inventario.
+
+    Todos los valores por defecto son None (sin limite): el escaneo usa los
+    recursos disponibles sin restriccion artificial. Los limites se configuran
+    a partir de mediciones reales del equipo, nunca de umbrales inventados
+    (3.8.5.1.4.5.8: "No inventar umbrales fijos sin medir").
+    """
+
+    cpu_max_porcentaje: Optional[float] = None
+    """Porcentaje máximo de CPU del sistema que el escaneo puede ocupar (0-100). None = sin limite."""
+
+    memoria_max_porcentaje: Optional[float] = None
+    """Porcentaje máximo de memoria RAM del sistema que el escaneo puede ocupar (0-100). None = sin limite."""
+
+    disco_uso_max_porcentaje: Optional[float] = None
+    """Porcentaje máximo de uso de disco del volumen escaneado (0-100). None = sin limite."""
+
+    concurrencia_maxima: Optional[int] = None
+    """Numero máximo de operaciones de escaneo concurrentes. None = sin limite."""
+
+    intervalo_medicion_segundos: float = 1.0
+    """Segundos entre mediciones consecutivas de recursos para evitar overhead."""
+
+    def __post_init__(self) -> None:
+        for campo, valor in (
+            ("cpu_max_porcentaje", self.cpu_max_porcentaje),
+            ("memoria_max_porcentaje", self.memoria_max_porcentaje),
+            ("disco_uso_max_porcentaje", self.disco_uso_max_porcentaje),
+        ):
+            if valor is not None and not (0.0 <= valor <= 100.0):
+                raise ValueError(
+                    f"{campo} debe estar entre 0 y 100, obtuvo {valor!r}"
+                )
+        if self.concurrencia_maxima is not None and self.concurrencia_maxima < 1:
+            raise ValueError(
+                f"concurrencia_maxima debe ser >= 1, obtuvo {self.concurrencia_maxima!r}"
+            )
+        if self.intervalo_medicion_segundos <= 0:
+            raise ValueError(
+                f"intervalo_medicion_segundos debe ser > 0, obtuvo {self.intervalo_medicion_segundos!r}"
+            )
+
+
+class MedidorRecursosSistema:
+    """
+    Mide recursos reales del equipo usando psutil (dependencia ya presente
+    en el proyecto).
+
+    Provee mediciones de CPU, memoria y disco del sistema real para establecer
+    límites de escaneo basados en evidencia, no en umbrales inventados.
+    """
+
+    @staticmethod
+    def cpu_porcentaje() -> float:
+        """Devuelve el porcentaje de CPU actual del sistema (0-100)."""
+        return float(psutil.cpu_percent(interval=None))
+
+    @staticmethod
+    def memoria_porcentaje() -> float:
+        """Devuelve el porcentaje de memoria RAM usada del sistema (0-100)."""
+        return float(psutil.virtual_memory().percent)
+
+    @staticmethod
+    def disco_uso_porcentaje(ruta: str) -> float:
+        """
+        Devuelve el porcentaje de uso de disco de la ruta dada (0-100).
+
+        Si la ruta no existe o no se puede consultar, retorna 0.0 para no
+        bloquear el escaneo por un error de lectura de disco.
+        """
+        try:
+            return float(psutil.disk_usage(ruta).percent)
+        except OSError:
+            return 0.0
+
+    @staticmethod
+    def medir_todos(ruta_volumen: str) -> dict[str, float]:
+        """
+        Mide CPU, memoria y disco de una sola vez.
+
+        Retorna un diccionario con claves "cpu", "memoria", "disco".
+        """
+        return {
+            "cpu": MedidorRecursosSistema.cpu_porcentaje(),
+            "memoria": MedidorRecursosSistema.memoria_porcentaje(),
+            "disco": MedidorRecursosSistema.disco_uso_porcentaje(ruta_volumen),
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -1726,6 +1824,8 @@ class RecorridoVolumen:
         seguir_enlaces: bool = False,
         callback_progreso: Optional[Callable[[ProgresoRecorrido], None]] = None,
         callback_control: Optional[Callable[[], ControlRecorrido]] = None,
+        limite_recursos: Optional[LimiteRecursos] = None,
+        medidor_recursos: Optional[MedidorRecursosSistema] = None,
     ) -> None:
         self.volumen = volumen
         self.raiz = _aplicar_prefijo_ruta_larga(os.path.abspath(raiz))
@@ -1734,6 +1834,11 @@ class RecorridoVolumen:
         self._seguir_enlaces = seguir_enlaces
         self.callback_progreso = callback_progreso
         self.callback_control = callback_control
+        self.limite_recursos = limite_recursos
+        self._medidor = medidor_recursos or MedidorRecursosSistema()
+        self._ultima_medicion = 0.0
+        self._recursos_ultimos: dict[str, float] = {}
+        self._concurrencia_actual = 0
         self._progreso = ProgresoRecorrido(volumen=volumen, raiz=self.raiz)
         self._errores: list[ErrorRecorrido] = []
         self._visitados: set[str] = set()
@@ -1925,6 +2030,70 @@ class RecorridoVolumen:
             self._registrar_error(ruta_absoluta, "error_estado", f"No se pudieron leer los metadatos de la entrada durante el recorrido: {exc}")
             return None
 
+    def _recursos_dentro_de_limites(self) -> tuple[bool, str]:
+        """
+        Comprueba si los recursos actuales estan dentro de los límites configurados.
+
+        Mide CPU, memoria y disco solo si ha pasado el intervalo de medicion
+        configurado, para evitar overhead por mediciones demasiado frecuentes.
+
+        Retorna (dentro_de_limites, motivo). Si dentro_de_limites es False,
+        el motivo explica qué límite se excedió.
+        """
+        if self.limite_recursos is None:
+            return True, ""
+
+        ahora = time.time()
+        if (
+            ahora - self._ultima_medicion
+            < self.limite_recursos.intervalo_medicion_segundos
+        ):
+            # Todavía no toca medir: usar la última medición conocida.
+            if not self._recursos_ultimos:
+                return True, ""
+            recursos = self._recursos_ultimos
+        else:
+            self._ultima_medicion = ahora
+            self._recursos_ultimos = self._medidor.medir_todos(self.raiz)
+            recursos = self._recursos_ultimos
+
+        limites = self.limite_recursos
+
+        if (
+            limites.cpu_max_porcentaje is not None
+            and recursos["cpu"] > limites.cpu_max_porcentaje
+        ):
+            return (
+                False,
+                f"CPU {recursos['cpu']:.1f}% > límite {limites.cpu_max_porcentaje}%",
+            )
+        if (
+            limites.memoria_max_porcentaje is not None
+            and recursos["memoria"] > limites.memoria_max_porcentaje
+        ):
+            return (
+                False,
+                f"Memoria {recursos['memoria']:.1f}% > límite {limites.memoria_max_porcentaje}%",
+            )
+        if (
+            limites.disco_uso_max_porcentaje is not None
+            and recursos["disco"] > limites.disco_uso_max_porcentaje
+        ):
+            return (
+                False,
+                f"Disco {recursos['disco']:.1f}% > límite {limites.disco_uso_max_porcentaje}%",
+            )
+        if (
+            limites.concurrencia_maxima is not None
+            and self._concurrencia_actual >= limites.concurrencia_maxima
+        ):
+            return (
+                False,
+                f"Concurrencia {self._concurrencia_actual} >= límite {limites.concurrencia_maxima}",
+            )
+
+        return True, ""
+
     def recorrer(self) -> Iterator[InventoryEntry]:
         """
         Recorre iterativamente el volumen emitiendo `InventoryEntry` por cada entrada accesible.
@@ -1943,6 +2112,13 @@ class RecorridoVolumen:
         `seguir_enlaces` controla si los enlaces simbolicos/junctions no
         ciclicos se atraviesan (politica conservadora); por defecto no se
         recorren.
+
+        `limite_recursos` (si se configura) limita CPU, memoria, disco y
+        concurrencia del escaneo usando mediciones reales del equipo. Antes
+        de procesar cada directorio se comprueban los límites y, si algún
+        recurso está por encima del umbral configurado, se espera brevemente
+        y se reintenta (throttling), sin abortar el recorrido ni perder las
+        entradas ya emitidas.
 
         Genera:
         - `InventoryEntry` para cada archivo, directorio, enlace u otro elemento accesible.
@@ -1977,6 +2153,15 @@ class RecorridoVolumen:
                         self.callback_progreso(self._progreso)
                     return
 
+            # Comprobar límites de recursos antes de procesar el directorio.
+            # Si algún recurso está por encima del umbral, se espera brevemente
+            # y se reintenta (throttling) sin abortar el recorrido.
+            dentro, motivo = self._recursos_dentro_de_limites()
+            if not dentro:
+                time.sleep(self.limite_recursos.intervalo_medicion_segundos)
+                continue
+
+            self._concurrencia_actual += 1
             directorio_actual = self._pila.pop()
 
             self._progreso.entrada_actual = directorio_actual
@@ -2036,6 +2221,8 @@ class RecorridoVolumen:
             except OSError as exc:
                 self._registrar_error(directorio_actual, "error_e_s", str(exc))
                 continue
+            finally:
+                self._concurrencia_actual -= 1
 
             # Notificar progreso tras procesar cada directorio.
             if self.callback_progreso is not None:

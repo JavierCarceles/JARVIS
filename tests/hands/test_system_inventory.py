@@ -42,6 +42,8 @@ from src.hands.system_inventory import (
     InventoryControlResult,
     InventoryContract,
     InventoryEntry,
+    LimiteRecursos,
+    MedidorRecursosSistema,
     ProgresoRecorrido,
     RecorridoVolumen,
     SistemaOperativo,
@@ -2573,3 +2575,245 @@ class TestRecorridoVolumenSubdirectoriosProfundos:
 
         def __next__(self):
             return next(self._iter)
+
+
+# ---------------------------------------------------------------------------
+# Limites de recursos para el escaneo (3.8.5.1.4.5.8)
+# ---------------------------------------------------------------------------
+
+class TestLimiteRecursos:
+    """LimiteRecursos define límites configurables sin umbrales inventados."""
+
+    def test_valores_por_defecto_sin_limites(self):
+        """Por defecto todos los límites son None (sin restricción)."""
+        limite = LimiteRecursos()
+        assert limite.cpu_max_porcentaje is None
+        assert limite.memoria_max_porcentaje is None
+        assert limite.disco_uso_max_porcentaje is None
+        assert limite.concurrencia_maxima is None
+        assert limite.intervalo_medicion_segundos == 1.0
+
+    def test_configurar_limite_cpu_valido(self):
+        """Se puede configurar un límite de CPU entre 0 y 100."""
+        limite = LimiteRecursos(cpu_max_porcentaje=50.0)
+        assert limite.cpu_max_porcentaje == 50.0
+
+    def test_configurar_todos_los_limites(self):
+        """Se pueden configurar todos los límites a la vez."""
+        limite = LimiteRecursos(
+            cpu_max_porcentaje=70.0,
+            memoria_max_porcentaje=80.0,
+            disco_uso_max_porcentaje=90.0,
+            concurrencia_maxima=3,
+            intervalo_medicion_segundos=2.0,
+        )
+        assert limite.cpu_max_porcentaje == 70.0
+        assert limite.memoria_max_porcentaje == 80.0
+        assert limite.disco_uso_max_porcentaje == 90.0
+        assert limite.concurrencia_maxima == 3
+        assert limite.intervalo_medicion_segundos == 2.0
+
+    def test_cpu_fuera_de_rango_levanta_error(self):
+        """CPU fuera de 0-100 levanta ValueError."""
+        import pytest
+        with pytest.raises(ValueError):
+            LimiteRecursos(cpu_max_porcentaje=101.0)
+        with pytest.raises(ValueError):
+            LimiteRecursos(cpu_max_porcentaje=-1.0)
+
+    def test_memoria_fuera_de_rango_levanta_error(self):
+        """Memoria fuera de 0-100 levanta ValueError."""
+        import pytest
+        with pytest.raises(ValueError):
+            LimiteRecursos(memoria_max_porcentaje=150.0)
+
+    def test_disco_fuera_de_rango_levanta_error(self):
+        """Disco fuera de 0-100 levanta ValueError."""
+        import pytest
+        with pytest.raises(ValueError):
+            LimiteRecursos(disco_uso_max_porcentaje=-0.1)
+
+    def test_concurrencia_cero_levanta_error(self):
+        """Concurrencia máxima de 0 levanta ValueError."""
+        import pytest
+        with pytest.raises(ValueError):
+            LimiteRecursos(concurrencia_maxima=0)
+
+    def test_intervalo_medicion_no_positivo_levanta_error(self):
+        """Intervalo de medición <= 0 levanta ValueError."""
+        import pytest
+        with pytest.raises(ValueError):
+            LimiteRecursos(intervalo_medicion_segundos=0.0)
+
+
+class TestMedidorRecursosSistema:
+    """MedidorRecursosSistema mide recursos reales usando psutil."""
+
+    def test_cpu_porcentaje_devuelve_float(self):
+        """cpu_porcentaje() devuelve un float entre 0 y 100."""
+        valor = MedidorRecursosSistema.cpu_porcentaje()
+        assert isinstance(valor, float)
+        assert 0.0 <= valor <= 100.0
+
+    def test_memoria_porcentaje_devuelve_float(self):
+        """memoria_porcentaje() devuelve un float entre 0 y 100."""
+        valor = MedidorRecursosSistema.memoria_porcentaje()
+        assert isinstance(valor, float)
+        assert 0.0 <= valor <= 100.0
+
+    def test_disco_uso_porcentaje_devuelve_float(self):
+        """disco_uso_porcentaje() devuelve un float."""
+        valor = MedidorRecursosSistema.disco_uso_porcentaje("/")
+        assert isinstance(valor, float)
+        assert 0.0 <= valor <= 100.0
+
+    def test_disco_uso_ruta_inexistente_retorna_cero(self):
+        """Una ruta inexistente retorna 0.0 sin levantar excepción."""
+        valor = MedidorRecursosSistema.disco_uso_porcentaje("/ruta/que/no/existe/12345")
+        assert valor == 0.0
+
+    def test_medir_todos_retorna_dict_con_claves(self):
+        """medir_todos() retorna dict con claves cpu, memoria, disco."""
+        resultado = MedidorRecursosSistema.medir_todos("/")
+        assert set(resultado.keys()) == {"cpu", "memoria", "disco"}
+        for valor in resultado.values():
+            assert isinstance(valor, float)
+            assert 0.0 <= valor <= 100.0
+
+    @patch("src.hands.system_inventory.psutil.cpu_percent")
+    def test_cpu_mockeado(self, mock_cpu):
+        """Se puede mockear psutil.cpu_percent para tests determinísticos."""
+        mock_cpu.return_value = 42.5
+        assert MedidorRecursosSistema.cpu_porcentaje() == 42.5
+
+    @patch("src.hands.system_inventory.psutil.virtual_memory")
+    def test_memoria_mockeada(self, mock_vm):
+        """Se puede mockear psutil.virtual_memory."""
+        mock_vm.return_value = SimpleNamespace(percent=75.0)
+        assert MedidorRecursosSistema.memoria_porcentaje() == 75.0
+
+    @patch("src.hands.system_inventory.psutil.disk_usage")
+    def test_disco_mockeado(self, mock_du):
+        """Se puede mockear psutil.disk_usage."""
+        mock_du.return_value = SimpleNamespace(percent=60.0)
+        assert MedidorRecursosSistema.disco_uso_porcentaje("/") == 60.0
+
+
+class TestRecorridoVolumenLimitesRecursos:
+    """RecorridoVolumen respeta los límites de recursos (throttling)."""
+
+    def _crear_arbol_simple(self, tmp_path: Path) -> Path:
+        raiz = tmp_path / "volumen"
+        (raiz / "sub1").mkdir(parents=True)
+        (raiz / "sub1" / "a.txt").write_text("a", encoding="utf-8")
+        (raiz / "sub2").mkdir(parents=True)
+        (raiz / "sub2" / "b.txt").write_text("b", encoding="utf-8")
+        (raiz / "c.txt").write_text("c", encoding="utf-8")
+        return raiz
+
+    def test_sin_limite_recursos_recorre_completo(self, tmp_path: Path):
+        """Sin límite de recursos, el recorrido se completa normalmente."""
+        raiz = self._crear_arbol_simple(tmp_path)
+        contrato = _ContratoPrueba()
+        recorrido = RecorridoVolumen(
+            volumen="V", raiz=str(raiz), contrato=contrato, maquina_id="m"
+        )
+        entradas = list(recorrido.recorrer())
+        assert recorrido.progreso.completado is True
+        assert recorrido.progreso.interrumpido is False
+        nombres = {e.name for e in entradas}
+        assert {"a.txt", "b.txt", "c.txt", "sub1", "sub2"} <= nombres
+
+    @patch("src.hands.system_inventory.MedidorRecursosSistema.cpu_porcentaje")
+    def test_limite_cpu_excedido_espera_y_reintenta(self, mock_cpu, tmp_path: Path):
+        """Si CPU excede el límite, se espera y se reintenta sin abortar."""
+        mock_cpu.side_effect = [95.0, 95.0, 10.0]
+        raiz = self._crear_arbol_simple(tmp_path)
+        contrato = _ContratoPrueba()
+        limite = LimiteRecursos(cpu_max_porcentaje=50.0, intervalo_medicion_segundos=0.01)
+        recorrido = RecorridoVolumen(
+            volumen="V", raiz=str(raiz), contrato=contrato, maquina_id="m",
+            limite_recursos=limite,
+        )
+        entradas = list(recorrido.recorrer())
+        assert recorrido.progreso.completado is True
+        nombres = {e.name for e in entradas}
+        assert {"a.txt", "b.txt", "c.txt"} <= nombres
+
+    @patch("src.hands.system_inventory.MedidorRecursosSistema.cpu_porcentaje")
+    @patch("src.hands.system_inventory.MedidorRecursosSistema.memoria_porcentaje")
+    def test_limite_memoria_excedido(self, mock_mem, mock_cpu, tmp_path: Path):
+        """Si memoria excede el límite, se throttlea."""
+        mock_cpu.return_value = 10.0
+        mock_mem.side_effect = [95.0, 95.0, 30.0]
+        raiz = self._crear_arbol_simple(tmp_path)
+        contrato = _ContratoPrueba()
+        limite = LimiteRecursos(
+            memoria_max_porcentaje=50.0, intervalo_medicion_segundos=0.01
+        )
+        recorrido = RecorridoVolumen(
+            volumen="V", raiz=str(raiz), contrato=contrato, maquina_id="m",
+            limite_recursos=limite,
+        )
+        entradas = list(recorrido.recorrer())
+        assert recorrido.progreso.completado is True
+
+    @patch("src.hands.system_inventory.MedidorRecursosSistema.disco_uso_porcentaje")
+    def test_limite_disco_excedido(self, mock_disco, tmp_path: Path):
+        """Si uso de disco excede el límite, se throttlea."""
+        mock_disco.side_effect = [95.0, 95.0, 40.0]
+        raiz = self._crear_arbol_simple(tmp_path)
+        contrato = _ContratoPrueba()
+        limite = LimiteRecursos(
+            disco_uso_max_porcentaje=50.0, intervalo_medicion_segundos=0.01
+        )
+        recorrido = RecorridoVolumen(
+            volumen="V", raiz=str(raiz), contrato=contrato, maquina_id="m",
+            limite_recursos=limite,
+        )
+        entradas = list(recorrido.recorrer())
+        assert recorrido.progreso.completado is True
+
+    @patch("src.hands.system_inventory.MedidorRecursosSistema.cpu_porcentaje")
+    def test_recursos_dentro_de_limites_no_throttlea(self, mock_cpu, tmp_path: Path):
+        """Si los recursos están dentro de los límites, no hay throttling."""
+        mock_cpu.return_value = 10.0
+        raiz = self._crear_arbol_simple(tmp_path)
+        contrato = _ContratoPrueba()
+        limite = LimiteRecursos(cpu_max_porcentaje=90.0)
+        recorrido = RecorridoVolumen(
+            volumen="V", raiz=str(raiz), contrato=contrato, maquina_id="m",
+            limite_recursos=limite,
+        )
+        entradas = list(recorrido.recorrer())
+        assert recorrido.progreso.completado is True
+        assert recorrido.progreso.interrumpido is False
+
+    def test_limite_recursos_none_es_equivalente_a_sin_limite(self, tmp_path: Path):
+        """limite_recursos=None se comporta igual que no pasarlo."""
+        raiz = self._crear_arbol_simple(tmp_path)
+        contrato = _ContratoPrueba()
+        recorrido_sin_limite = RecorridoVolumen(
+            volumen="V", raiz=str(raiz), contrato=contrato, maquina_id="m"
+        )
+        recorrido_con_none = RecorridoVolumen(
+            volumen="V", raiz=str(raiz), contrato=contrato, maquina_id="m",
+            limite_recursos=None,
+        )
+        entradas_sin = list(recorrido_sin_limite.recorrer())
+        entradas_con_none = list(recorrido_con_none.recorrer())
+        assert len(entradas_sin) == len(entradas_con_none)
+        assert recorrido_sin_limite.progreso.completado is True
+        assert recorrido_con_none.progreso.completado is True
+
+    def test_concurrencia_maxima_uno(self, tmp_path: Path):
+        """concurrencia_maxima=1 es válida y el recorrido (un hilo) la respeta."""
+        raiz = self._crear_arbol_simple(tmp_path)
+        contrato = _ContratoPrueba()
+        limite = LimiteRecursos(concurrencia_maxima=1)
+        recorrido = RecorridoVolumen(
+            volumen="V", raiz=str(raiz), contrato=contrato, maquina_id="m",
+            limite_recursos=limite,
+        )
+        entradas = list(recorrido.recorrer())
+        assert recorrido.progreso.completado is True

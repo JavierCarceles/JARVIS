@@ -10682,7 +10682,7 @@ da reconciled=False (coincidencia).
 <a name="hands/test-system_inventory"></a>
 ### `hands\test_system_inventory.py`
 
-**Descripción:** Tests de contrato del inventario persistente del sistema de archivos (unidad 3.8.5.1.4.1). Verifican serialización/deserialización de `InventoryEntry`, generación de identificador local de equipo estable (sin MAC ni serial), controles de privacidad por defecto (sin lectura de contenido, sin rutas completas en logs), exclusiones técnicas de rutas y puntos de montaje, separación entre hechos observados del SO e inferencias, truncamiento seguro de rutas para logs, controles de operación del inventario con aislamiento por equipo, valores por defecto del contrato y serialización para persistencia en JSON. También verifican el contrato común de volumen multiplataforma (`VolumenComun`), su conversión desde `VolumeInfo` sin forzar letras de unidad ni rutas de Windows en otros SO, la enumeración unificada de volúmenes y la diferenciación de estados de volumen: desmontado, inaccesible, permiso denegado, sistema de archivos no soportado y vacío.
+**Descripción:** Tests de contrato del inventario persistente del sistema de archivos (unidad 3.8.5.1.4.1). Verifican serialización/deserialización de `InventoryEntry`, generación de identificador local de equipo estable (sin MAC ni serial), controles de privacidad por defecto (sin lectura de contenido, sin rutas completas en logs), exclusiones técnicas de rutas y puntos de montaje, separación entre hechos observados del SO e inferencias, truncamiento seguro de rutas para logs, controles de operación del inventario con aislamiento por equipo, valores por defecto del contrato y serialización para persistencia en JSON. También verifican el contrato común de volumen multiplataforma (`VolumenComun`), su conversión desde `VolumeInfo` sin forzar letras de unidad ni rutas de Windows en otros SO, la enumeración unificada de volúmenes y la diferenciación de estados de volumen: desmontado, inaccesible, permiso denegado, sistema de archivos no soportado y vacío. Además verifican la limitación de recursos del escaneo (CPU, memoria, disco y concurrencia basada en mediciones reales del equipo vía `psutil`, sin umbrales inventados) y el throttling del recorrido cuando un recurso excede su límite.
 
 **Clases de test:**
 
@@ -10707,8 +10707,11 @@ da reconciled=False (coincidencia).
 | `TestCoberturaSoportada` | Consulta de la matriz de soporte SO/version sin inferencias: combinacion registrada soportada, no soportada, no registrada, SO desconocido, version no registrada, insensibilidad a mayusculas y filtrado de entradas por SO. |
 | `TestRecorridoVolumenIterativo` | Recorrido iterativo sin recursion, captura de metadatos, tipos observados, rutas Unicode, callback de progreso con contadores y cobertura, control de pausa/cancelar, errores por ruta sin abortar, respeto a exclusiones. |
 | `TestRecorridoVolumenSubdirectoriosProfundos` | Recorrido de arboles de directorios profundamente anidados sin desbordamiento de pila (pila explicita), rutas Unicode en profundidad, archivo bloqueado en ruta profunda que registra error y continua sin abortar. |
+| `TestLimiteRecursos` | Límites configurables de recursos (CPU, memoria, disco, concurrencia, intervalo de medición) con validación de rangos y valores None por defecto sin umbrales inventados. |
+| `TestMedidorRecursosSistema` | Medición real de CPU, memoria y uso de disco vía `psutil`; mockeo determinístico para tests. |
+| `TestRecorridoVolumenLimitesRecursos` | Throttling del recorrido por límites de recursos: CPU excedido espera y reintenta, memoria excedida, disco lleno, recursos dentro de límites sin throttling, límite None equivalente a sin límite, concurrencia máxima válida. |
 
-**Resultados:** 179 tests unitarios, 179 PASSED / 0 FAILED / 8 SKIPPED (symlinks no creables en Windows sin privilegios).
+**Resultados:** 202 tests unitarios, 202 PASSED / 0 FAILED / 8 SKIPPED (symlinks no creables en Windows sin privilegios).
 
 ---
 

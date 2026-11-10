@@ -24,7 +24,44 @@ El orden numerico organiza el trabajo y conserva referencias historicas, pero no
 - FASE 15: integra el flujo de alto nivel y depende de los contratos verificados de aplicaciones (3.8), Goal/HTN (4), memoria (5), Graph/Planner/Executor (6-9), precondiciones, preflight, calibracion y acciones (10-14). No declarar un flujo end-to-end universal por haber probado solo una aplicacion o un tipo de lanzamiento.
 - FASE 16 mantiene compatibilidad legacy despues de disponer del flujo nuevo; FASES 17-18 optimizan y aprenden solo de resultados observables y persistidos, sin alterar primero la correccion funcional.
 - FASES 19-20 describen el ciclo operativo de automejora y continuidad. FASE 21 es una auditoria posterior del repositorio/proyecto JARVIS, no un requisito para el inventario del ordenador completo definido en 3.8.5.1.4.
+- Dentro de 3.8.5.1.4, tras la unidad ya cerrada 3.8.5.1.4.5.7, el orden pendiente será: límites/pausa/cancelación y obsolescencia (.5.8-.5.9), pruebas incrementales (.5.10), API de consulta (.6), clasificación de aplicaciones (.7), operación/privacidad/mantenimiento (.8), integración con el descubrimiento (.9) y verificación real/cierre (.10). La operación segura precede a la integración porque debe controlar el escaneo que consumirán los demás componentes.
+- En FASE 6, 6.5 prepara el contrato Graph/Planner; 6.7 construye el GraphBuilder real; la integración definitiva del resultado del GraphBuilder con Planner y el cierre se hacen en 6.9. No declarar el flujo completo integrado antes de 6.9.
+- En FASE 7, Brain/Goal debe conectarse con el Planner antes de probar la ejecución; después se ejecuta y finalmente se verifica el efecto. En FASE 8, StateGraph debe quedar definido antes del núcleo A*; en FASE 9, límites anti-bucle y de reintento deben estar establecidos antes del recálculo y la selección de fallback.
+- En FASE 12, la capability calibrate solo se expone al Planner después de disponer de CoordinateManager, cobertura multipantalla, Vision y sus controles de seguridad. FASE 13 sigue siendo la migración/normalización posterior del conocimiento persistido y no se presupone completada desde FASE 12.
+- En FASE 15, validar primero el contrato de Goal/precondiciones; después mapear intenciones, resolver entidades, preparar navegación/multipaso, integrar Brain y finalmente conectar Planner/Executor.
+- En FASE 19, preparar primero estados, límites de contexto y continuidad; después reunir contexto y solicitar/generar/validar la propuesta; solo entonces aplicar cambios en VS Code/Supercomplete, persistir el estado y cambiar de chat. La verificación real se realiza después de aplicar el cambio y antes del cierre.
+- FASE 21 audita exclusivamente el árbol del proyecto JARVIS y sus recursos asociados; no sustituye ni repite el inventario del ordenador completo de 3.8.5.1.4.
 No mover unidades completadas ni inventar estados para hacer coincidir este orden conceptual. Cuando una unidad posterior necesite una capacidad anterior aun no cerrada, registrar la dependencia concreta y no simular su cumplimiento.
+
+
+POLÍTICA TRANSVERSAL DE VERIFICACIÓN REAL Y ENTORNO DE PRUEBAS (OBLIGATORIA DESDE LA UNIDAD SIGUIENTE AL PUNTERO ACTUAL)
+- Esta política se aplica a `3.8.5.1.4.5.8` y a todas las unidades posteriores. No modifica retrospectivamente los criterios ni los resultados históricos de unidades anteriores.
+- Ninguna capacidad que interactúe con el sistema operativo, sistema de archivos, procesos, aplicaciones, ventanas, UI, monitores, voz, visión, servicios locales o modelos se considerará verificada únicamente porque una suite de `tests/` termine en PASSED. Los tests automatizados son una capa de comprobación, no sustituyen la ejecución real de la funcionalidad en el equipo.
+- Para cada unidad se separarán y registrarán, cuando procedan: (a) tests unitarios de lógica/contrato; (b) tests de integración con componentes reales; (c) verificación en el entorno real del equipo, utilizando las APIs, archivos, procesos, ventanas, dispositivos o aplicaciones reales afectados. Nunca sumar sus resultados como si fueran una única categoría.
+- Una prueba en `tests/` solo cuenta como prueba de comportamiento real si ejecuta la ruta de producción relevante y las dependencias que se pretenden verificar. Un test ejecutado en Windows que sustituye el sistema bajo prueba, el escáner, el repositorio, el preflight, el selector de ventanas, el lanzador o la autorización con mocks no demuestra el comportamiento real de esos componentes.
+- Los mocks, stubs y monkeypatches se permiten para aislar fronteras externas, provocar errores difíciles de reproducir o verificar llamadas que sean parte de un contrato; no pueden decidir por adelantado el resultado que el test afirma demostrar. Cuando se simule una condición, debe existir una prueba separada del flujo real siempre que la condición pueda reproducirse con seguridad en el equipo.
+- Las pruebas destructivas o que cambien datos usarán directorios temporales/copiados y recursos creados por la propia prueba. Las pruebas de lectura del sistema completo serán de solo lectura. No alterar documentos personales, datos persistentes reales, configuración del usuario ni ficheros originales para fabricar escenarios.
+- Para escaneo global, inventario o descubrimiento del equipo, ejecutar el código real sobre todos los volúmenes locales montados que el adaptador detecte dentro del alcance aprobado. Registrar volumen por volumen cobertura, exclusiones, errores, permisos y resultados parciales. No afirmar que se ha escaneado todo el equipo si hay volúmenes, subárboles o entradas no inspeccionados. No elevar privilegios ni eludir permisos sin autorización explícita; los elementos inaccesibles se informan como tales.
+- Prohibición absoluta de Git: no ejecutar comandos Git bajo ninguna circunstancia (incluidos status, diff, log, show, branch, checkout, restore, reset, add, commit, push, pull, fetch, merge, rebase, stash ni consultas equivalentes); no crear commits ni utilizar Git/historial/metadatos como mecanismo de comparación, respaldo, recuperación o documentación. Las menciones a Git que permanezcan dentro de registros históricos son datos históricos y no instrucciones operativas.
+- Para pruebas de aplicaciones, utilizar una allowlist de aplicaciones inocuas instaladas en el equipo y probar destinos individualmente. No ejecutar en lote todos los `.exe` ni los candidatos descubiertos. No cerrar ni terminar procesos/ventanas preexistentes; limpiar exclusivamente los procesos/ventanas creados por la propia prueba y cuya propiedad se haya demostrado.
+- Registrar evidencia reproducible: fecha, sistema operativo/versión/arquitectura, versión de Python y dependencias relevantes, comando o procedimiento ejecutado, componente real, escenario, resultado observable, recuento, errores, limitaciones y recursos protegidos antes/después. Para pruebas gráficas, registrar también el monitor elegido, geometría, DPI/escalado y ventana objetivo sin capturar contenido privado innecesario.
+
+CONFIGURACIÓN REAL DE MONITORES DEL EQUIPO Y REGLAS DE INTERACCIÓN GRÁFICA
+- El equipo del usuario tiene dos pantallas y Visual Studio Code se ejecuta en la segunda. Por defecto, toda prueba que cree, abra, mueva, calibre o interactúe con una ventana gráfica debe dirigir la ventana de prueba a la segunda pantalla para no interferir con el trabajo de la primera.
+- La segunda pantalla es el destino predeterminado, no una coordenada ni un índice fijo. Antes de cada sesión de pruebas gráficas, enumerar las pantallas mediante la API real del sistema/ScreenManager y comprobar cantidad, identificador, geometría, monitor principal, resolución y DPI/escalado. No asumir que `DISPLAY2`, un índice interno o las dimensiones observadas anteriormente seguirán siendo idénticos.
+- No mover, minimizar, maximizar, redimensionar, cerrar ni enviar teclado/ratón a la ventana de Visual Studio Code. No utilizarla como ventana de prueba. Crear una ventana de prueba propia y comprobar su identificador de proceso/ventana antes de interactuar con ella.
+- La ventana de prueba debe ubicarse en la segunda pantalla usando el mecanismo real de selección de monitor. No cubrir ni superponer Visual Studio Code cuando esté ocupando esa pantalla y no desplazarlo para abrir espacio. Si existe una zona libre segura, utilizarla; si la ventana de prueba necesita foco exclusivo o espacio que obligaría a ocultar/interrumpir VS Code, usar un escritorio virtual/sesión de prueba aislada solo si el mecanismo real está disponible y verificado. Si no puede garantizarse el aislamiento, registrar esa prueba GUI como BLOQUEADA/NO VERIFICADA y no ejecutarla sobre la primera pantalla como alternativa.
+- Antes de enviar entrada, verificar que el primer plano pertenece exactamente a la ventana de prueba y que el dispositivo de entrada no se dirige a Visual Studio Code ni a otra ventana del usuario. Si el foco, el destino o la propiedad de la ventana son ambiguos, detener la interacción.
+- Al terminar, cerrar únicamente la ventana/proceso creado por la prueba, restaurar el foco anterior cuando sea seguro y verificar que la disposición de ambas pantallas y las ventanas preexistentes permanecen intactas. No modificar resolución, escala, orientación ni disposición física para hacer pasar una prueba.
+- Las pruebas de la pantalla principal solo se ejecutarán cuando la unidad esté comprobando expresamente el monitor principal o una función multipantalla que requiera ambos. En ese caso, mantener la interacción limitada a la ventana controlada y comprobar que no se altera el trabajo del usuario.
+- Si el equipo no presenta dos pantallas en el momento de la prueba, registrar BLOQUEADO/NO VERIFICADO para el escenario que requiere la segunda pantalla; no redirigir silenciosamente la prueba a la primera ni declarar completada la cobertura multipantalla.
+
+CRITERIO DE CIERRE DE CADA UNIDAD FUTURA
+- Cada hoja incluirá evidencia de la verificación real correspondiente a su efecto observable. La comprobación real debe utilizar la implementación de producción y recursos reales o temporales controlados en el sistema operativo real.
+- Para una función puramente determinista que no produzca por sí misma un efecto externo, ejecutar el código real con objetos/datos reales representativos y justificar por qué no existe una prueba GUI/OS adicional; no usar NO APLICA como atajo para evitar una integración real disponible.
+- Si una prueba real es segura y técnicamente posible pero no se ejecuta, la unidad queda pendiente. Si está impedida por hardware, permisos, aplicación no instalada, plataforma ausente o riesgo no aceptable, registrar BLOQUEADO o NO VERIFICADO con causa y evidencia; no convertirlo en PASSED ni en IMPLEMENTADA.
+- Un resultado satisfactorio en una máquina, SO, versión, volumen, tipo de lanzamiento o configuración de monitor no demuestra soporte universal. La matriz de cobertura debe identificar expresamente qué combinaciones se probaron, cuáles no y cuáles no se soportan.
+- Antes de cerrar una fase, revisar todos sus escenarios reales requeridos, no solo el estado de las suites automatizadas. Un test fallido no se elimina, omite o debilita para conseguir un cierre; primero se clasifica y se corrige el defecto real o se documenta el bloqueo.
 
 --- INICIO DEL ROADMAP: ENUMERACION DE FASES Y UNIDADES ---
 
@@ -853,9 +890,13 @@ Nota de alcance: 3.8.5.1.1-3.8.5.1.3 implementan y verifican la puerta real de p
 3.8.5.1.4.5.5 Permitir reanudar un escaneo interrumpido sin mezclar resultados de generaciones distintas ni degradar la ultima instantanea completa. [HIJA de 3.8.5.1.4.5]
 3.8.5.1.4.5.6 Definir refresco bajo demanda para una ruta/volumen y refresco incremental global; la apertura de una aplicacion debe poder solicitar una revalidacion puntual de su destino. [HIJA de 3.8.5.1.4.5]
 3.8.5.1.4.5.7 Evaluar observadores/notificaciones del sistema de archivos como optimizacion opcional; no depender exclusivamente de ellos porque pueden perder eventos o tener limites. [HIJA de 3.8.5.1.4.5]
-3.8.5.1.4.5.8 Limitar CPU, disco, memoria y concurrencia del escaneo, permitiendo pausar y cancelar sin corromper la base. [HIJA de 3.8.5.1.4.5]
-3.8.5.1.4.5.9 Definir caducidad y deteccion de inventario obsoleto; no confiar en una ruta historica sin comprobar que sigue existiendo justo antes de lanzarla. [HIJA de 3.8.5.1.4.5]
-3.8.5.1.4.5.10 Probar altas, cambios, renombrados, eliminaciones, permisos recuperados, ejecuciones parciales y reanudacion contra directorios temporales reales. [HIJA de 3.8.5.1.4.5]
+3.8.5.1.4.5.8 Limitar CPU, disco, memoria y concurrencia del escaneo usando mediciones del equipo real y configuración existente; permitir pausar, reanudar y cancelar sin corromper la base ni degradar la ultima instantanea valida. No inventar umbrales fijos sin medir. [HIJA de 3.8.5.1.4.5]
+3.8.5.1.4.5.9 Definir caducidad y deteccion de inventario obsoleto a partir de timestamps/estado reales; antes de usar un destino, revalidar existencia, tipo, volumen, identidad y accesibilidad en el sistema operativo. Una ruta historica nunca autoriza por si sola un lanzamiento. [HIJA de 3.8.5.1.4.5]
+3.8.5.1.4.5.10 Probar altas, cambios, renombrados, eliminaciones, permisos recuperados, ejecuciones parciales, pausa/cancelacion y reanudacion contra directorios temporales reales del equipo, usando el sistema de archivos y SQLite reales. [HIJA de 3.8.5.1.4.5]
+    3.8.5.1.4.5.10.1 Crear, modificar, renombrar y eliminar archivos de prueba dentro de un directorio temporal propio; comprobar que la API real del sistema de archivos y el refresco incremental reflejan cada cambio sin depender de eventos simulados. [HIJA de 3.8.5.1.4.5.10]
+    3.8.5.1.4.5.10.2 Crear un escenario de permisos restringidos sobre un directorio temporal cuando Windows lo permita sin elevar privilegios; comprobar que el error no se interpreta como eliminacion. Restaurar y verificar los permisos al finalizar. [HIJA de 3.8.5.1.4.5.10]
+    3.8.5.1.4.5.10.3 Interrumpir y reanudar un escaneo controlado en el sistema real; comprobar que mantiene el mismo identificador/generacion segun el contrato y no degrada la ultima instantanea completa. [HIJA de 3.8.5.1.4.5.10]
+    3.8.5.1.4.5.10.4 Verificar CPU, memoria, lecturas y cancelacion durante una ejecucion real; registrar medidas, no inferir que los limites funcionan por el mero hecho de que los tests unitarios pasen. [HIJA de 3.8.5.1.4.5.10]
 3.8.5.1.4.6 ? CONSULTA DEL INVENTARIO Y API DE ACCESO
 3.8.5.1.4.6.1 Exponer una API unica para buscar por nombre exacto/normalizado, ruta, extension, tipo, volumen y criterios de disponibilidad. [HIJA de 3.8.5.1.4.6]
 3.8.5.1.4.6.2 Permitir resultados paginados y ordenados sin cargar toda la base de datos en memoria. [HIJA de 3.8.5.1.4.6]
@@ -877,29 +918,36 @@ Nota de alcance: 3.8.5.1.1-3.8.5.1.3 implementan y verifican la puerta real de p
 3.8.5.1.4.7.9 No persistir como capacidad confirmada una inferencia sobre lo que puede hacer la aplicacion; mantener el contrato observed_facts/inferred_data/unverified_capabilities de ApplicationKnowledge. [HIJA de 3.8.5.1.4.7]
 3.8.5.1.4.7.10 Pasar todo candidato que se pretenda abrir por ApplicationPreflight y las politicas existentes; rechazar ejecutables desconocidos, destinos ambiguos o rutas manipuladas. [HIJA de 3.8.5.1.4.7]
 3.8.5.1.4.7.11 Probar candidatos reales de aplicaciones conocidas, aplicaciones no registradas, herramientas CLI, instaladores, accesos directos rotos, paquetes y falsos positivos. [HIJA de 3.8.5.1.4.7]
-3.8.5.1.4.8 ? INTEGRACION CON EL DESCUBRIMIENTO Y APERTURA UNIVERSAL DE 3.8
-3.8.5.1.4.8.1 Integrar la consulta al inventario como fuente complementaria de 3.8.1-3.8.3, sin duplicar los mecanismos de descubrimiento que ya funcionan. [HIJA de 3.8.5.1.4.8]
-3.8.5.1.4.8.2 Definir orden de precedencia entre aplicacion ya abierta, catalogo conocido, fuentes nativas instaladas y candidatos del inventario; conservar procedencia y confianza. [HIJA de 3.8.5.1.4.8]
-3.8.5.1.4.8.3 Si existen varias coincidencias plausibles, no elegir silenciosamente: conservar alternativas y solicitar desambiguacion cuando la evidencia no permita decidir. [HIJA de 3.8.5.1.4.8]
-3.8.5.1.4.8.4 Si la ruta de un candidato ha cambiado, desaparecido o ya no es accesible, actualizar su estado y repetir la resolucion mediante fuentes vigentes; no intentar la ruta obsoleta. [HIJA de 3.8.5.1.4.8]
-3.8.5.1.4.8.5 Conectar el resultado con ApplicationManager/ApplicationKnowledge solo mediante sus contratos verificados y sin crear un segundo registro paralelo de aplicaciones. [HIJA de 3.8.5.1.4.8]
-3.8.5.1.4.8.6 Reutilizar ApplicationPreflight, CalibrationManager.launch_application y la verificacion proceso/ventana de 3.8.5; el inventario localiza, pero no ejecuta ni autoriza. [HIJA de 3.8.5.1.4.8]
-3.8.5.1.4.8.7 Mantener aislamiento por equipo y volumen incluso si se copia la base de datos; detectar host distinto y exigir reescaneo/revalidacion antes de usar destinos. [HIJA de 3.8.5.1.4.8]
-3.8.5.1.4.8.8 Verificar integracion con el flujo de aplicaciones ya registradas y descubiertas sin crear rutas paralelas Brain/Planner/Executor. [HIJA de 3.8.5.1.4.8]
-3.8.5.1.4.9 ? OPERACION, PRIVACIDAD Y MANTENIMIENTO
-3.8.5.1.4.9.1 Definir cuando se realiza el primer inventario, como se informa de su alcance y como se muestra el progreso sin bloquear el arranque o la conversacion de JARVIS. [HIJA de 3.8.5.1.4.9]
-3.8.5.1.4.9.2 Definir actualizaciones incrementales bajo demanda y una politica configurable de refresco; no escanear todos los volumenes completos en cada peticion. [HIJA de 3.8.5.1.4.9]
-3.8.5.1.4.9.3 Permitir escaneo por volumen o ruta, exclusion de ubicaciones elegidas por el usuario y reconstruccion controlada del catalogo. [HIJA de 3.8.5.1.4.9]
-3.8.5.1.4.9.4 Proteger la base de datos local con permisos adecuados y evitar exponerla por red o sincronizarla con otros equipos sin una decision explicita. [HIJA de 3.8.5.1.4.9]
-3.8.5.1.4.9.5 Evitar logs con listados completos de nombres/rutas; registrar resumenes, errores agregados y evidencia minima necesaria para diagnostico. [HIJA de 3.8.5.1.4.9]
-3.8.5.1.4.9.6 Definir limpieza/retencion de generaciones antiguas, entradas obsoletas y backups sin borrar informacion valida durante un escaneo parcial. [HIJA de 3.8.5.1.4.9]
-3.8.5.1.4.9.7 Medir tiempo, CPU, memoria, lecturas de disco, crecimiento de SQLite y rendimiento de consultas con volumenes representativos. [HIJA de 3.8.5.1.4.9]
-3.8.5.1.4.9.8 Verificar que JARVIS puede seguir respondiendo y ejecutar acciones mientras un escaneo esta pausado, limitado o ejecutandose en segundo plano controlado. [HIJA de 3.8.5.1.4.9]
-3.8.5.1.4.9.9 Probar permisos de acceso al inventario, exclusion de rutas, cancelacion, reanudacion y recuperacion ante cierre inesperado. [HIJA de 3.8.5.1.4.9]
+3.8.5.1.4.8 ? OPERACION, PRIVACIDAD Y MANTENIMIENTO
+3.8.5.1.4.8.1 Definir cuando se realiza el primer inventario, como se informa de su alcance y como se muestra el progreso sin bloquear el arranque o la conversacion de JARVIS. [HIJA de 3.8.5.1.4.8]
+3.8.5.1.4.8.2 Definir actualizaciones incrementales bajo demanda y una politica configurable de refresco; no escanear todos los volumenes completos en cada peticion. [HIJA de 3.8.5.1.4.8]
+3.8.5.1.4.8.3 Permitir escaneo por volumen o ruta, exclusion de ubicaciones elegidas por el usuario y reconstruccion controlada del catalogo. [HIJA de 3.8.5.1.4.8]
+3.8.5.1.4.8.4 Proteger la base de datos local con permisos adecuados y evitar exponerla por red o sincronizarla con otros equipos sin una decision explicita. [HIJA de 3.8.5.1.4.8]
+3.8.5.1.4.8.5 Evitar logs con listados completos de nombres/rutas; registrar resumenes, errores agregados y evidencia minima necesaria para diagnostico. [HIJA de 3.8.5.1.4.8]
+3.8.5.1.4.8.6 Definir limpieza/retencion de generaciones antiguas, entradas obsoletas y backups sin borrar informacion valida durante un escaneo parcial. [HIJA de 3.8.5.1.4.8]
+3.8.5.1.4.8.7 Medir tiempo, CPU, memoria, lecturas de disco, crecimiento de SQLite y rendimiento de consultas con volumenes representativos; fijar limites a partir de mediciones y configuracion real, no de umbrales inventados. [HIJA de 3.8.5.1.4.8]
+3.8.5.1.4.8.8 Verificar que JARVIS puede seguir respondiendo y ejecutar acciones mientras un escaneo esta pausado, limitado o ejecutandose en segundo plano controlado. [HIJA de 3.8.5.1.4.8]
+3.8.5.1.4.8.9 Probar permisos de acceso al inventario, exclusion de rutas, cancelacion, reanudacion y recuperacion ante cierre inesperado con el sistema operativo real y recursos temporales controlados. [HIJA de 3.8.5.1.4.8]
+3.8.5.1.4.8.10 Verificar en el equipo real que el escaneo no bloquea el uso normal de JARVIS ni provoca una carga que impida seguir utilizando el ordenador; registrar mediciones y limitaciones. [HIJA de 3.8.5.1.4.8]
+3.8.5.1.4.9 ? INTEGRACION CON EL DESCUBRIMIENTO Y APERTURA UNIVERSAL DE 3.8
+3.8.5.1.4.9.1 Integrar la consulta al inventario como fuente complementaria de 3.8.1-3.8.3, sin duplicar los mecanismos de descubrimiento que ya funcionan. [HIJA de 3.8.5.1.4.9]
+3.8.5.1.4.9.2 Definir orden de precedencia entre aplicacion ya abierta, catalogo conocido, fuentes nativas instaladas y candidatos del inventario; conservar procedencia y confianza. [HIJA de 3.8.5.1.4.9]
+3.8.5.1.4.9.3 Si existen varias coincidencias plausibles, no elegir silenciosamente: conservar alternativas y solicitar desambiguacion cuando la evidencia no permita decidir. [HIJA de 3.8.5.1.4.9]
+3.8.5.1.4.9.4 Si la ruta de un candidato ha cambiado, desaparecido o ya no es accesible, actualizar su estado y repetir la resolucion mediante fuentes vigentes; no intentar la ruta obsoleta. [HIJA de 3.8.5.1.4.9]
+3.8.5.1.4.9.5 Conectar el resultado con ApplicationManager/ApplicationKnowledge solo mediante sus contratos verificados y sin crear un segundo registro paralelo de aplicaciones. [HIJA de 3.8.5.1.4.9]
+3.8.5.1.4.9.6 Reutilizar ApplicationPreflight, CalibrationManager.launch_application y la verificacion proceso/ventana de 3.8.5; el inventario localiza, pero no ejecuta ni autoriza. [HIJA de 3.8.5.1.4.9]
+3.8.5.1.4.9.7 Mantener aislamiento por equipo y volumen incluso si se copia la base de datos; detectar host distinto y exigir reescaneo/revalidacion antes de usar destinos. [HIJA de 3.8.5.1.4.9]
+3.8.5.1.4.9.8 Verificar integracion con el flujo de aplicaciones ya registradas y descubiertas sin crear rutas paralelas Brain/Planner/Executor. [HIJA de 3.8.5.1.4.9]
+3.8.5.1.4.9.9 Ejecutar la integración en el equipo real con una aplicación inocua conocida y otra descubierta por el inventario que no estuviera registrada previamente; no simular la consulta del inventario ni el preflight. [HIJA de 3.8.5.1.4.9]
+3.8.5.1.4.9.10 Comprobar que una ruta obsoleta, un volumen desmontado y una coincidencia ambigua se bloquean o resuelven de forma segura en el flujo real, sin lanzar destinos no validados. [HIJA de 3.8.5.1.4.9]
 3.8.5.1.4.10 ? VERIFICACION REAL, REGRESION Y CIERRE
 3.8.5.1.4.10.1 Crear tests unitarios del contrato y almacenamiento usando bases temporales; no tocar los ficheros reales de datos del proyecto. [HIJA de 3.8.5.1.4.10]
 3.8.5.1.4.10.2 Verificar persistencia real en disco y recuperacion desde una nueva instancia, incluyendo migracion de esquema y base corrupta/ausente. [HIJA de 3.8.5.1.4.10]
-3.8.5.1.4.10.3 Ejecutar un escaneo real sobre el equipo donde corre JARVIS y registrar SO/version, volumenes detectados, entradas encontradas, errores, exclusiones, tiempo, recursos y cobertura; no sustituir este resultado por fixtures o mocks. [HIJA de 3.8.5.1.4.10]
+3.8.5.1.4.10.3 Ejecutar el escáner de producción en el equipo real donde corre JARVIS y recorrer todos los volúmenes locales montados que el adaptador detecte y que estén dentro del alcance aprobado. Registrar por volumen SO/versión/arquitectura, identificador, tipo, entradas y directorios encontrados, errores, exclusiones, permisos, duración, CPU, memoria, lecturas y cobertura. La ejecución debe ser de solo lectura sobre los archivos originales; no sustituirla por fixtures, mocks ni por el mero resultado de ejecutar pytest. [HIJA de 3.8.5.1.4.10]
+    3.8.5.1.4.10.3.1 Contrastar la enumeración de volúmenes con una consulta independiente al sistema operativo y explicar toda diferencia. [HIJA de 3.8.5.1.4.10.3]
+    3.8.5.1.4.10.3.2 Mantener un resultado separado para cada volumen: COMPLETO, PARCIAL, INTERRUMPIDO, INACCESIBLE o NO SOPORTADO, según evidencia; no sumar volúmenes incompletos como cobertura total. [HIJA de 3.8.5.1.4.10.3]
+    3.8.5.1.4.10.3.3 No incluir por defecto unidades de red o extraíbles en el total de volúmenes locales; detectarlas, identificarlas y registrar su estado para que su inclusión requiera la política explícita definida. [HIJA de 3.8.5.1.4.10.3]
+    3.8.5.1.4.10.3.4 No obtener privilegios elevados para forzar cobertura; informar de forma explícita de los archivos y directorios inaccesibles y del porcentaje/alcance no verificado. [HIJA de 3.8.5.1.4.10.3]
 3.8.5.1.4.10.4 Contrastar una muestra representativa de rutas del inventario con el sistema de archivos real y demostrar que altas, cambios y eliminaciones se reflejan correctamente. [HIJA de 3.8.5.1.4.10]
 3.8.5.1.4.10.5 Verificar en el entorno real que archivos ocultos, rutas Unicode, rutas largas y permisos denegados se registran conforme al contrato, indicando expresamente lo que no pudo inspeccionarse. [HIJA de 3.8.5.1.4.10]
 3.8.5.1.4.10.6 Confirmar que no se copiaron contenidos de documentos/archivos personales, no se modificaron archivos originales y la base de inventario permanece limitada al almacenamiento definido. [HIJA de 3.8.5.1.4.10]
@@ -909,7 +957,10 @@ Nota de alcance: 3.8.5.1.1-3.8.5.1.3 implementan y verifican la puerta real de p
 3.8.5.1.4.10.10 Verificar la matriz de sistemas operativos y declarar como NO SOPORTADO/NO VERIFICADO cualquier adaptador o tipo de lanzamiento sin pruebas nativas satisfactorias. [HIJA de 3.8.5.1.4.10]
 3.8.5.1.4.10.11 Ejecutar las suites de no regresion de ApplicationPreflight, ApplicationManager, CalibrationManager, MemoryManager, EntityResolver y las integraciones Brain/Planner/Executor afectadas. [HIJA de 3.8.5.1.4.10]
 3.8.5.1.4.10.12 Actualizar `README_DATA.md` con rutas, formato SQLite/JSON, tablas, campos, responsables de lectura/escritura, flujo, versionado y estado real de integridad; actualizar `README.md` solo si cambian modulos de `src/`, describiendo comportamiento implementado y verificado sin referencias a fases. [HIJA de 3.8.5.1.4.10]
-3.8.5.1.4.10.13 Cerrar esta unidad solo cuando el escaneo real, las consultas, la persistencia, la integracion con preflight, la seguridad, la privacidad y la no regresion tengan evidencia registrada. La apertura real de aplicaciones queda reservada para 3.8.5.4 y la integracion posterior de 3.8.9; los casos no probados permanecen explicitamente pendientes. [HIJA de 3.8.5.1.4.10]
+3.8.5.1.4.10.13 Consolidar la matriz de cobertura por volumen, tipo de entrada, estado de acceso, consulta, persistencia, actualización incremental, mantenimiento e integración con preflight; enumerar explícitamente todos los escenarios pendientes, parciales o bloqueados. [HIJA de 3.8.5.1.4.10]
+    3.8.5.1.4.10.14 Comparar una muestra estratificada del inventario real por volumen y tipo de entrada con consultas directas del sistema operativo; incluir directorios raíz, subdirectorios profundos, ocultos, del sistema, Unicode y zonas con permisos restringidos. Registrar falsos positivos, omisiones y causas. [HIJA de 3.8.5.1.4.10]
+    3.8.5.1.4.10.15 Verificar que la ejecución completa no altera los archivos originales, los datos persistentes protegidos ni la configuración de pantalla/ventanas del usuario. [HIJA de 3.8.5.1.4.10]
+    3.8.5.1.4.10.16 Cerrar esta unidad solo cuando el escaneo real de todos los volúmenes locales dentro del alcance, las consultas, la persistencia, la operación controlada, la integración con preflight, la seguridad, la privacidad, las comprobaciones independientes de cobertura y la no regresión tengan evidencia registrada. La apertura real de aplicaciones queda reservada para 3.8.5.4; los volúmenes/escenarios no probados permanecen explícitamente pendientes o bloqueados. [HIJA de 3.8.5.1.4.10]
 
 3.8.5.2 Rechazar aplicaciones bloqueadas, elevacion no permitida o destinos de ejecucion no verificables.
 3.8.5.3 Comprobar si la aplicacion ya esta abierta y reutilizarla cuando el contrato lo permita.
@@ -919,22 +970,25 @@ Nota de alcance: 3.8.5.1.1-3.8.5.1.3 implementan y verifican la puerta real de p
         3.8.5.4.1.2 Mantener una allowlist explicita de aplicaciones GUI inocuas y disponibles en el equipo de pruebas; no ejecutar en lote todos los ejecutables encontrados por el inventario. [HIJA de 3.8.5.4.1]
         3.8.5.4.1.3 Registrar la identidad exacta del proceso/ventana creado por cada prueba y distinguirlo de procesos preexistentes, procesos compartidos y servicios del sistema. [HIJA de 3.8.5.4.1]
         3.8.5.4.1.4 Permitir limpieza unicamente de ventanas o procesos creados por la propia prueba y cuya propiedad exclusiva se haya demostrado; nunca terminar procesos preexistentes, compartidos o ambiguos. [HIJA de 3.8.5.4.1]
-        3.8.5.4.1.5 Verificar que el arnes restaura el estado de prueba y no altera las ventanas activas, el foco, los monitores ni las aplicaciones previas del usuario. [HIJA de 3.8.5.4.1]
+        3.8.5.4.1.5 Verificar que el arnes restaura el estado de prueba y no altera las ventanas activas, el foco, los monitores ni las aplicaciones previas del usuario; preservar expresamente Visual Studio Code, que se encuentra en la segunda pantalla. [HIJA de 3.8.5.4.1]
         3.8.5.4.1.6 Probar el arnes primero con una aplicacion de prueba controlada y despues con una aplicacion GUI inocua real del sistema. [HIJA de 3.8.5.4.1]
+        3.8.5.4.1.7 Enumerar las dos pantallas reales antes de las pruebas GUI y dirigir la ventana creada por el arnes a la segunda pantalla por defecto. No mover ni interactuar con Visual Studio Code. [HIJA de 3.8.5.4.1]
+        3.8.5.4.1.8 Verificar el foco y el identificador de ventana antes de cada entrada; si el primer plano no pertenece a la ventana de prueba, abortar la entrada y registrar el motivo. [HIJA de 3.8.5.4.1]
+        3.8.5.4.1.9 Comprobar al finalizar que la primera pantalla, Visual Studio Code, las ventanas preexistentes y el foco/estado que corresponda siguen intactos. [HIJA de 3.8.5.4.1]
     3.8.5.4.2 Abrir una aplicacion cerrada mediante la API real de ejecucion, sin cerrar ni alterar ventanas ajenas. [HIJA de 3.8.5.4]
         3.8.5.4.2.1 Ejecutar el destino validado por el preflight mediante el mecanismo nativo que corresponda al tipo real (ejecutable, acceso directo, URI, paquete o bundle), sin construir una orden arbitraria desde el texto del usuario. [HIJA de 3.8.5.4.2]
         3.8.5.4.2.2 Confirmar que el mecanismo de lanzamiento devuelve un resultado interpretable y conservar codigo de salida, PID, identificador de activacion o evidencia equivalente cuando el sistema operativo lo proporcione. [HIJA de 3.8.5.4.2]
         3.8.5.4.2.3 Diferenciar lanzamiento solicitado, proceso creado, activacion aceptada por el sistema y aplicacion GUI realmente disponible; no declarar exito solo porque la llamada de lanzamiento no lanzo una excepcion. [HIJA de 3.8.5.4.2]
         3.8.5.4.2.4 Gestionar timeout, rechazo del sistema, ejecutable eliminado entre preflight y apertura, permisos insuficientes y cierre inmediato del proceso, devolviendo un motivo concreto. [HIJA de 3.8.5.4.2]
         3.8.5.4.2.5 Evitar aperturas duplicadas: si la aplicacion ya esta abierta, reutilizarla solo cuando se identifique inequívocamente y el contrato lo permita. [HIJA de 3.8.5.4.2]
-        3.8.5.4.2.6 Verificar en el entorno real al menos un lanzamiento correcto por cada tipo de destino que el adaptador del sistema operativo declare soportar; los tipos no disponibles se registran como NO VERIFICADOS, no como completados. [HIJA de 3.8.5.4.2]
+        3.8.5.4.2.6 Verificar en el equipo real al menos un lanzamiento correcto por cada tipo de destino que el adaptador del sistema operativo declare soportar, utilizando aplicaciones inocuas disponibles y sin mockear el lanzador, procesos ni ventanas; los tipos no disponibles se registran como NO VERIFICADOS, no como completados. Para GUI, dirigir la ventana de prueba a la segunda pantalla y preservar Visual Studio Code y la primera pantalla. [HIJA de 3.8.5.4.2]
         3.8.5.4.2.7 Mantener una matriz de resultados por sistema operativo, version, arquitectura y tipo de destino (ejecutable, acceso directo, URI, paquete, bundle u otros realmente soportados); no extrapolar el exito de Windows a Linux/macOS ni el de un tipo de lanzamiento a los demas. [HIJA de 3.8.5.4.2]
         3.8.5.4.2.8 Declarar explicitamente NO SOPORTADO o NO VERIFICADO cualquier aplicacion cuyo instalador, runtime, servicio externo, licencia, controlador, arquitectura, sesion o interfaz impida una apertura real reproducible; ofrecer el motivo concreto en lugar de intentar ejecutar a ciegas. [HIJA de 3.8.5.4.2]
 3.8.5.5 Verificar proceso, ventana y estado posterior a la apertura.
     3.8.5.5.1 Comprobar mediante el sistema operativo que el proceso objetivo existe y sigue vivo despues del lanzamiento; correlacionarlo con la ruta, PID, identificador de paquete o evidencia de activacion. [HIJA de 3.8.5.5]
     3.8.5.5.2 Para aplicaciones GUI, detectar una ventana perteneciente al proceso/aplicacion objetivo mediante identificadores y propietario; no aceptar una coincidencia basada solo en el titulo. [HIJA de 3.8.5.5]
     3.8.5.5.3 Esperar la ventana durante un timeout acotado y configurable, distinguiendo inicio lento, aplicacion de fondo, proceso sin interfaz y fallo de apertura. [HIJA de 3.8.5.5]
-    3.8.5.5.4 Verificar que la ventana detectada es visible y corresponde a la aplicacion solicitada, sin forzar foco, maximizar ni moverla salvo que la peticion lo solicite. [HIJA de 3.8.5.5]
+    3.8.5.5.4 Verificar que la ventana detectada es visible y corresponde a la aplicacion solicitada, sin forzar foco, maximizar ni moverla salvo que la peticion lo solicite; en las pruebas controladas, la ventana creada debe quedar en la segunda pantalla y no puede confundirse con Visual Studio Code. [HIJA de 3.8.5.5]
     3.8.5.5.5 Comprobar la estabilidad minima del proceso/ventana durante un intervalo definido para evitar declarar exito a un proceso que se cierra inmediatamente. [HIJA de 3.8.5.5]
     3.8.5.5.6 Representar por separado los estados ABRIENDO, PROCESO_INICIADO, VENTANA_DETECTADA, ABIERTA_VERIFICADA, ABIERTA_SIN_VENTANA, FALLO y TIMEOUT, solo si el contrato real permite esos estados. [HIJA de 3.8.5.5]
     3.8.5.5.7 Guardar evidencia tecnica minima del resultado (tipo de destino, fuente, ruta/identificador validado, PID o identificador equivalente, ventana y tiempos), sin registrar contenido privado ni argumentos que puedan contener secretos. [HIJA de 3.8.5.5]
@@ -943,7 +997,8 @@ Nota de alcance: 3.8.5.1.1-3.8.5.1.3 implementan y verifican la puerta real de p
     3.8.5.6.2 Ejecutar pruebas de integracion reales con aplicaciones GUI inocuas de la allowlist del equipo, sin mockear la API de lanzamiento, la enumeracion de procesos ni la identificacion de ventanas que se estan verificando. [HIJA de 3.8.5.6]
     3.8.5.6.3 Comprobar los casos aplicacion ya abierta, aplicacion cerrada, apertura correcta, proceso que termina, ausencia de ventana, permiso denegado, ruta obsoleta y timeout. [HIJA de 3.8.5.6]
     3.8.5.6.4 Comparar antes y despues los procesos y ventanas ajenos a la prueba y demostrar que permanecen intactos. [HIJA de 3.8.5.6]
-    3.8.5.6.5 Registrar por separado resultados simulados, pruebas unitarias con mocks, pruebas de integracion del sistema operativo y aperturas GUI verificadas visualmente; nunca mezclar sus conteos. [HIJA de 3.8.5.6]
+    3.8.5.6.5 Registrar por separado resultados simulados, pruebas unitarias con mocks, pruebas de integración del sistema operativo y aperturas GUI verificadas visualmente; nunca mezclar sus conteos. [HIJA de 3.8.5.6]
+    3.8.5.6.6 Ejecutar al menos un ciclo real de abrir -> detectar proceso -> detectar ventana -> verificar estado -> cerrar solo la ventana/proceso creado por la prueba en la segunda pantalla. Comprobar que Visual Studio Code y las ventanas preexistentes permanecen intactos. [HIJA de 3.8.5.6]
 3.8.6 ? CALIBRACION DE APLICACIONES DESCUBIERTAS
 3.8.6.1 Conectar el descubrimiento con el requisito de calibracion de 3.5 y el CalibrationManager/UniversalVisualCalibrator existentes.
     3.8.6.1.1 Delimitar el alcance: 3.8.6 reutiliza CalibrationManager, UniversalVisualCalibrator y CoordinateManager tal como existen hoy, con sus mecanismos de identificacion de ventana y monitor; el contrato de la capability calibrate, la calibracion multipantalla completa y la seguridad operativa se definen en FASE 12 y no se anticipan aqui. Registrar como limitaciones conocidas lo que 3.8.6 no cubra. [HIJA de 3.8.6.1]
@@ -956,7 +1011,8 @@ Nota de alcance: 3.8.5.1.1-3.8.5.1.3 implementan y verifican la puerta real de p
 3.8.6.4 Rechazar o detenerse ante politicas de bloqueo, pantalla inaccesible, deteccion insuficiente o confianza inadecuada.
 3.8.6.5 Verificar que las coordenadas/resultados pertenecen a la ventana y monitor correctos.
 3.8.6.6 Persistir la calibracion solo mediante el mecanismo existente y tras validar el resultado.
-3.8.6.7 Tests de calibracion valida, interfaz no reconocida, confianza insuficiente, monitor incorrecto y politica de bloqueo.
+3.8.6.7 Tests de calibración válida, interfaz no reconocida, confianza insuficiente, monitor incorrecto y política de bloqueo.
+3.8.6.8 Verificar en el escritorio real la calibración de una aplicación inocua en la segunda pantalla, usando captura y coordenadas reales; confirmar que el elemento detectado pertenece a la ventana y monitor correctos y no a Visual Studio Code ni a la primera pantalla.
 3.8.7 ? CAPACIDADES DISPONIBLES PARA PLANIFICACION
 3.8.7.1 Exponer al Planner solo capacidades sustentadas por acciones reales registradas.
 3.8.7.2 No inferir que una aplicacion puede rellenar formularios, enviar, guardar o borrar datos solo por estar instalada.
@@ -1160,7 +1216,8 @@ Objetivo: un unico canal reutilizable para pedir aclaracion o confirmacion al us
 4.8.3 Verificar compatibilidad legacy.
 4.8.4 Verificar main.py.
 4.8.5 Actualizar README/estado cuando corresponda.
-4.8.6 Cerrar FASE 4.
+4.8.6 Ejecutar en el equipo real un flujo mínimo Goal -> HTN -> Task hoja -> ActionRegistry/Executor -> State, con una acción inocua disponible y comprobación del efecto externo; si no hay una acción segura real, registrar el bloqueo y no cerrar.
+4.8.7 Cerrar FASE 4 solo con evidencia de ejecución real aplicable y no regresión.
 FASE 5 ? DOMAIN MEMORY
 
 5.1 ? ENTIDADES
@@ -1227,6 +1284,7 @@ FASE 5 ? DOMAIN MEMORY
 5.6.6 Verificar que una mala resolucion no contamine permanentemente la memoria.
 5.6.7 Tests de aprendizaje.
 5.6.8 Tests de no regresion.
+5.6.9 Verificar en runtime con almacenamiento temporal real la carga, resolución, escritura permitida y recuperación tras reinicio; leer la fuente real de entidades solo en modo lectura y demostrar que los archivos persistentes originales no cambian.
 FASE 6 ? ACTION GRAPH
 
 6.1 ? TRANSICIONES
@@ -1266,7 +1324,7 @@ FASE 6 ? ACTION GRAPH
 6.4.5 Registrar diagnostico.
 6.4.6 Tests de rechazo.
 6.4.7 Tests de aceptacion.
-6.5 ? INTEGRACION GRAPH <-> PLANNER
+6.5 ? CONTRATO E INTEGRACION PRELIMINAR GRAPH <-> PLANNER
 6.5.1 ? Contrato
 6.5.1.1 Definir entrada Goal.
 6.5.1.2 Definir entrada State.
@@ -1289,13 +1347,14 @@ FASE 6 ? ACTION GRAPH
 6.5.5.1 Verificar contrato de Plan.
 6.5.5.2 Entregar steps al Executor.
 6.5.5.3 Propagar resultados.
-6.5.6 ? End-to-end
+6.5.6 ? Flujo preliminar con un Graph construido de forma controlada
 6.5.6.1 Goal real.
 6.5.6.2 State real.
-6.5.6.3 Graph real.
+6.5.6.3 Graph real ya disponible, sin presuponer todavía la integración del GraphBuilder.
 6.5.6.4 Plan real.
-6.5.6.5 Executor real.
-6.5.6.6 State actualizado.
+6.5.6.5 Executor real cuando el contrato lo permita.
+6.5.6.6 State actualizado y contrastado con la evidencia observable.
+6.5.6.7 Reservar la integración definitiva del GraphBuilder para 6.9, una vez cerrada 6.7.
 6.5.7 ? Regresion
 6.5.7.1 Legacy.
 6.5.7.2 Acciones directas.
@@ -1362,12 +1421,14 @@ FASE 6 ? ACTION GRAPH
 6.8.4.2 Metricas.
 6.8.4.3 Fallos.
 6.8.4.4 Recuperacion.
-6.9 ? CIERRE
-6.9.1 Integracion final.
-6.9.2 Regresion completa de Graph.
-6.9.3 README.
-6.9.4 main.py.
-6.9.5 Marcar FASE 6 solo si todas las hojas estan IMPLEMENTADA.
+6.9 ? INTEGRACION FINAL, REGRESION Y CIERRE
+6.9.1 Integrar el Graph producido por GraphBuilder (6.7) con el contrato Graph/Planner preparado en 6.5; no consumir grafos de prueba como sustituto de la fuente real.
+6.9.2 Verificar que el Planner recibe las aplicaciones, capabilities y transiciones que el GraphBuilder obtiene de las fuentes reales disponibles.
+6.9.3 Ejecutar una ruta real de la arquitectura con GraphBuilder, Planner y State; verificar el resultado observable sin ejecutar acciones destructivas.
+6.9.4 Ejecutar también las rutas puramente algorítmicas con el código de producción, GraphBuilder, Graph y State reales del proyecto; reservar NO APLICA únicamente para una comprobación específica de sistema operativo que no forme parte de esa ruta. Verificar en el equipo real las integraciones que sí dependan del sistema operativo.
+6.9.5 Regresion completa de Graph, GraphBuilder, Planner y consumidores afectados.
+6.9.6 README y main.py cuando corresponda.
+6.9.7 Marcar FASE 6 solo si todas las hojas estan IMPLEMENTADA y las verificaciones reales aplicables tienen evidencia.
 FASE 7 ? DETERMINISTIC PLANNER
 
 7.1 ? CONTRATO
@@ -1442,60 +1503,69 @@ FASE 7 ? DETERMINISTIC PLANNER
 7.4.4.1 Serializacion si existe.
 7.4.4.2 Orden.
 7.4.4.3 Coste.
-7.4.4.4 Trazabilidad.
-7.5 ? EJECUCION
-7.5.1 ? Executor
-7.5.1.1 Entregar Plan.
-7.5.1.2 Ejecutar primer step.
-7.5.1.3 Propagar resultado.
-7.5.2 ? Secuencia
-7.5.2.1 Ejecutar steps en orden.
-7.5.2.2 Detener ante fallo no recuperable.
-7.5.2.3 Actualizar State cuando corresponda.
-7.5.3 ? Resultado
-7.5.3.1 Resultado por step.
-7.5.3.2 Resultado total.
-7.5.3.3 Diferenciar exito parcial de exito total.
+7.4.4.4 Trazabilidad
+7.5 ? BRAIN / GOAL
+7.5.1 ? Intent -> Goal
+7.5.1.1 Verificar transformacion.
+7.5.1.2 Verificar parametros.
+7.5.1.3 Verificar ambiguedad.
+7.5.2 ? Goal -> Planner
+7.5.2.1 Entregar Goal correcto.
+7.5.2.2 Entregar State correcto.
+7.5.2.3 Recibir Plan.
+7.5.3 ? Compatibilidad
+7.5.3.1 Mantener acciones legacy.
+7.5.3.2 Mantener accion directa donde sea necesario.
+7.5.3.3 Evitar doble ejecucion.
 7.5.4 ? Tests
-7.5.4.1 Plan de un step.
-7.5.4.2 Plan multi-step.
-7.5.4.3 Fallo intermedio.
-7.5.4.4 Estado actualizado.
-7.6 ? VERIFICACION
-7.6.1 ? Comprobacion
-7.6.1.1 Verificar resultado real de cada step cuando sea necesario.
-7.6.1.2 Verificar cumplimiento del objetivo.
-7.6.2 ? State
-7.6.2.1 Actualizar solo con evidencia.
-7.6.2.2 Registrar cambios relevantes.
-7.6.2.3 Mantener coherencia.
-7.6.3 ? Errores
-7.6.3.1 Error de ejecucion.
-7.6.3.2 Error de verificacion.
-7.6.3.3 Divergencia entre resultado y State.
+7.5.4.1 Intent -> Goal valido.
+7.5.4.2 Goal ambiguo o incompleto.
+7.5.4.3 Goal y State entregados al Planner real.
+7.5.4.4 Compatibilidad legacy.
+7.6 ? EJECUCION
+7.6.1 ? Executor
+7.6.1.1 Entregar Plan.
+7.6.1.2 Ejecutar primer step.
+7.6.1.3 Propagar resultado.
+7.6.2 ? Secuencia
+7.6.2.1 Ejecutar steps en orden.
+7.6.2.2 Detener ante fallo no recuperable.
+7.6.2.3 Actualizar State cuando corresponda.
+7.6.3 ? Resultado
+7.6.3.1 Resultado por step.
+7.6.3.2 Resultado total.
+7.6.3.3 Diferenciar exito parcial de exito total.
 7.6.4 ? Tests
-7.6.4.1 Verificacion correcta.
-7.6.4.2 Verificacion fallida.
-7.6.4.3 Divergencia.
-7.7 ? BRAIN / GOAL
-7.7.1 ? Intent -> Goal
-7.7.1.1 Verificar transformacion.
-7.7.1.2 Verificar parametros.
-7.7.1.3 Verificar ambiguedad.
-7.7.2 ? Goal -> Planner
-7.7.2.1 Entregar Goal correcto.
-7.7.2.2 Entregar State correcto.
-7.7.2.3 Recibir Plan.
-7.7.3 ? Compatibilidad
-7.7.3.1 Mantener acciones legacy.
-7.7.3.2 Mantener accion directa donde sea necesario.
-7.7.3.3 Evitar doble ejecucion.
+7.6.4.1 Plan de un step.
+7.6.4.2 Plan multi-step.
+7.6.4.3 Fallo intermedio.
+7.6.4.4 Estado actualizado.
+7.6.4.5 Ejecutar al menos un escenario inocuo con las dependencias reales disponibles en el equipo; si implica GUI, utilizar la segunda pantalla y el arnes seguro de 3.8.5.4.
+7.7 ? VERIFICACION
+7.7.1 ? Comprobacion
+7.7.1.1 Verificar resultado real de cada step cuando sea necesario.
+7.7.1.2 Verificar cumplimiento del objetivo.
+7.7.2 ? State
+7.7.2.1 Actualizar solo con evidencia.
+7.7.2.2 Registrar cambios relevantes.
+7.7.2.3 Mantener coherencia.
+7.7.3 ? Errores
+7.7.3.1 Error de ejecucion.
+7.7.3.2 Error de verificacion.
+7.7.3.3 Divergencia entre resultado y State.
+7.7.4 ? Tests
+7.7.4.1 Verificacion correcta.
+7.7.4.2 Verificacion fallida.
+7.7.4.3 Divergencia.
+7.7.4.4 Contrastar el resultado con el estado del sistema real, no solo con el objeto State devuelto.
 7.8 ? CIERRE
-7.8.1 Tests completos.
-7.8.2 No regresion.
-7.8.3 main.py.
-7.8.4 Documentacion.
-7.8.5 Cierre FASE 7.
+7.8.1 Tests unitarios pertinentes.
+7.8.2 Tests de integracion con contratos y dependencias reales.
+7.8.3 No regresion.
+7.8.4 Verificacion real de la ruta Brain -> Goal -> Planner -> Executor -> verificacion en el equipo, para una accion inocua soportada.
+7.8.5 main.py.
+7.8.6 Documentacion.
+7.8.7 Cerrar FASE 7 solo cuando los resultados reales aplicables esten registrados.
 FASE 8 ? A*
 
 8.1 ? COSTES
@@ -1521,54 +1591,58 @@ FASE 8 ? A*
 8.2.3.1 Verificar estabilidad.
 8.2.3.2 Comparar con fallback determinista.
 8.2.3.3 Tests.
-8.3 ? NUCLEO A*
-8.3.1 ? Open / Closed
-8.3.1.1 Inicializar open.
-8.3.1.2 Inicializar closed.
-8.3.1.3 Extraer mejor candidato.
-8.3.1.4 Marcar procesado.
-8.3.2 ? g / h / f
-8.3.2.1 Calcular g.
-8.3.2.2 Calcular h.
-8.3.2.3 Calcular f.
-8.3.2.4 Comparar candidatos.
-8.3.3 ? Expansion
-8.3.3.1 Obtener vecinos.
-8.3.3.2 Filtrar invalidos.
-8.3.3.3 Actualizar mejor coste.
-8.3.3.4 Insertar/actualizar open.
-8.3.3.5 Terminar por Goal.
+8.3 ? STATEGRAPH
+8.3.1 ? Estados
+8.3.1.1 Representar estado minimo.
+8.3.1.2 Comparar estados.
+8.3.1.3 Detectar estado equivalente.
+8.3.2 ? Transiciones
+8.3.2.1 Aplicar transicion.
+8.3.2.2 Verificar precondicion.
+8.3.2.3 Calcular estado sucesor.
+8.3.3 ? Costes
+8.3.3.1 Obtener coste.
+8.3.3.2 Mantener coste acumulado.
+8.3.3.3 No modificar coste real sin evidencia.
 8.3.4 ? Tests
-8.3.4.1 Grafo lineal.
-8.3.4.2 Varias rutas.
-8.3.4.3 Sin ruta.
-8.3.4.4 Ciclos.
-8.3.4.5 Limites.
-8.4 ? RECONSTRUCCION DE RUTA
-8.4.1 ? Predecesores
-8.4.1.1 Registrar predecessor.
-8.4.1.2 Actualizar predecessor cuando mejora coste.
-8.4.2 ? Final
-8.4.2.1 Reconstruir desde Goal.
-8.4.2.2 Invertir ruta.
-8.4.2.3 Verificar continuidad.
-8.4.3 ? Tests
-8.4.3.1 Ruta simple.
-8.4.3.2 Ruta con varios saltos.
-8.4.3.3 Ruta inexistente.
-8.5 ? STATEGRAPH
-8.5.1 ? Estados
-8.5.1.1 Representar estado minimo.
-8.5.1.2 Comparar estados.
-8.5.1.3 Detectar estado equivalente.
-8.5.2 ? Transiciones
-8.5.2.1 Aplicar transicion.
-8.5.2.2 Verificar precondicion.
-8.5.2.3 Calcular estado sucesor.
-8.5.3 ? Costes
-8.5.3.1 Obtener coste.
-8.5.3.2 Mantener coste acumulado.
-8.5.3.3 No modificar coste real sin evidencia.
+8.3.4.1 Estado inicial.
+8.3.4.2 Estado sucesor.
+8.3.4.3 Equivalencia y transicion invalida.
+8.4 ? NUCLEO A*
+8.4.1 ? Open / Closed
+8.4.1.1 Inicializar open.
+8.4.1.2 Inicializar closed.
+8.4.1.3 Extraer mejor candidato.
+8.4.1.4 Marcar procesado.
+8.4.2 ? g / h / f
+8.4.2.1 Calcular g.
+8.4.2.2 Calcular h.
+8.4.2.3 Calcular f.
+8.4.2.4 Comparar candidatos.
+8.4.3 ? Expansion
+8.4.3.1 Obtener vecinos.
+8.4.3.2 Filtrar invalidos.
+8.4.3.3 Actualizar mejor coste.
+8.4.3.4 Insertar/actualizar open.
+8.4.3.5 Terminar por Goal.
+8.4.4 ? Tests
+8.4.4.1 Grafo lineal.
+8.4.4.2 Varias rutas.
+8.4.4.3 Sin ruta.
+8.4.4.4 Ciclos.
+8.4.4.5 Limites.
+8.5 ? RECONSTRUCCION DE RUTA
+8.5.1 ? Predecesores
+8.5.1.1 Registrar predecessor.
+8.5.1.2 Actualizar predecessor cuando mejora coste.
+8.5.2 ? Final
+8.5.2.1 Reconstruir desde Goal.
+8.5.2.2 Invertir ruta.
+8.5.2.3 Verificar continuidad.
+8.5.3 ? Tests
+8.5.3.1 Ruta simple.
+8.5.3.2 Ruta con varios saltos.
+8.5.3.3 Ruta inexistente.
 8.6 ? PLANNER
 8.6.1 ? Seleccion
 8.6.1.1 Seleccionar A* cuando este disponible y proceda.
@@ -1581,20 +1655,26 @@ FASE 8 ? A*
 8.6.3.2 Volver al planner determinista.
 8.6.3.3 Registrar fallback.
 8.6.3.4 No duplicar ejecucion.
-8.7 ? REGRESION
+8.6.4 ? Tests
+8.6.4.1 Ruta A* a Plan.
+8.6.4.2 Fallback determinista.
+8.6.4.3 No doble ejecucion.
+8.7 ? REGRESION Y VERIFICACION
 8.7.1 ? Correccion
 8.7.1.1 Tests de ruta.
 8.7.1.2 Tests de coste.
 8.7.1.3 Tests de fallback.
 8.7.2 ? Rendimiento
-8.7.2.1 Medir solo si ya existe mecanismo de medicion.
+8.7.2.1 Medir antes/despues con datos representativos cuando exista mecanismo de medicion.
 8.7.2.2 Verificar limites.
 8.7.2.3 Evitar regresiones evidentes.
 8.7.3 ? No regresion
 8.7.3.1 Planner determinista.
-8.7.3.2 Graph.
+8.7.3.2 Graph/GraphBuilder.
 8.7.3.3 Executor.
-8.7.3.4 main.py.
+8.7.3.4 main.py cuando corresponda.
+8.7.4 Ejecutar el Planner real sobre un Graph y State reales de la aplicación disponible, contrastando la ruta y el resultado sin ejecutar acciones destructivas.
+8.7.5 Registrar la comparacion A* vs fallback con la misma entrada y resultado observable; no declarar mejora solo por un menor coste interno.
 FASE 9 ? REPLANNING
 
 9.1 ? CHECKPOINTS
@@ -1610,26 +1690,26 @@ FASE 9 ? REPLANNING
 9.2.4 Actualizar State con informacion confirmada.
 9.2.5 Evitar marcar como correcto un estado no verificado.
 9.2.6 Tests.
-9.3 ? RECALCULO
-9.3.1 Construir nuevo estado.
-9.3.2 Revisar Goal todavia vigente.
-9.3.3 Solicitar nueva ruta.
-9.3.4 Respetar limites existentes.
-9.3.5 Verificar que la nueva ruta no repita el mismo fallo sin cambio de contexto.
-9.3.6 Tests.
-9.4 ? FALLBACKS
-9.4.1 Identificar alternativas existentes.
-9.4.2 Elegir alternativa solo si es valida para State/Goal.
-9.4.3 Permitir accion segura de recuperacion.
-9.4.4 Registrar la alternativa usada.
-9.4.5 Propagar fallo si no existe alternativa valida.
+9.3 ? LIMITES Y ANTI-BUCLE
+9.3.1 Contador de replan.
+9.3.2 Contador de reintentos por step.
+9.3.3 Deteccion de repeticion.
+9.3.4 Anti-bucle.
+9.3.5 Resultado al alcanzar limite.
+9.3.6 Tests de limites y repeticion.
+9.4 ? RECALCULO
+9.4.1 Construir nuevo estado desde evidencia confirmada.
+9.4.2 Revisar Goal todavia vigente.
+9.4.3 Solicitar nueva ruta.
+9.4.4 Respetar limites establecidos en 9.3.
+9.4.5 Verificar que la nueva ruta no repita el mismo fallo sin cambio de contexto.
 9.4.6 Tests.
-9.5 ? LIMITES
-9.5.1 Contador de replan.
-9.5.2 Contador de reintentos por step.
-9.5.3 Deteccion de repeticion.
-9.5.4 Anti-bucle.
-9.5.5 Resultado al alcanzar limite.
+9.5 ? FALLBACKS
+9.5.1 Identificar alternativas existentes.
+9.5.2 Elegir alternativa solo si es valida para State/Goal.
+9.5.3 Permitir accion segura de recuperacion.
+9.5.4 Registrar la alternativa usada.
+9.5.5 Propagar fallo si no existe alternativa valida.
 9.5.6 Tests.
 9.6 ? EXECUTOR
 9.6.1 Interrumpir de forma segura.
@@ -1639,13 +1719,15 @@ FASE 9 ? REPLANNING
 9.6.5 Continuar ejecucion desde punto valido.
 9.6.6 No ejecutar steps obsoletos.
 9.6.7 Tests.
+9.6.8 Verificar un replanning real con una tarea inocua y un fallo recuperable controlado, comprobando que no se repiten acciones ya completadas ni se alteran recursos ajenos.
 9.7 ? CIERRE
 9.7.1 Tests de fallos recuperables.
 9.7.2 Tests de fallos no recuperables.
 9.7.3 Tests anti-bucle.
-9.7.4 No regresion.
-9.7.5 main.py.
-9.7.6 Cerrar FASE 9.
+9.7.4 No regresion de Planner, Graph y Executor.
+9.7.5 main.py cuando corresponda.
+9.7.6 Verificacion real de la secuencia fallo -> State confirmado -> limites -> recálculo/fallback -> resultado.
+9.7.7 Cerrar FASE 9 solo con evidencia de las rutas reales aplicables.
 FASE 10 ? PRECONDITIONS/EFFECTS
 
 10.1 ? TIPOS
@@ -1700,6 +1782,7 @@ FASE 10 ? PRECONDITIONS/EFFECTS
 10.8.3 Tests de no regresion.
 10.8.4 main.py.
 10.8.5 Documentacion.
+10.8.6 Ejecutar una operación inocua que atraviese precondición -> acción real -> verificación del efecto -> actualización confirmada de State; contrastar el efecto con el recurso real y no solo con el estado en memoria.
 FASE 11 ? PREFLIGHT/LOGIN
 
 11.1 ? CONTRATO
@@ -1751,7 +1834,8 @@ FASE 11 ? PREFLIGHT/LOGIN
 11.8.1 Regresion.
 11.8.2 main.py.
 11.8.3 README.
-11.8.4 Cerrar FASE 11.
+11.8.4 Verificar en el equipo real el preflight positivo y negativo sobre una aplicación inocua instalada, incluyendo disponibilidad/proceso/ventana/monitor y bloqueo seguro cuando falte una condición; no introducir credenciales ni automatizar el login.
+11.8.5 Cerrar FASE 11 solo con el flujo real de preflight antes de una acción y evidencia de que un bloqueo impide esa acción.
 FASE 12 ? CALIBRATION CAPABILITY
 
 12.1 ? CALIBRATE
@@ -1766,52 +1850,59 @@ FASE 12 ? CALIBRATION CAPABILITY
 12.2.3 Comprobar sesion.
 12.2.4 Evitar acciones destructivas.
 12.2.5 Definir cancelacion.
-12.2.6 Tests.
-12.3 ? PLANNER
-12.3.1 Exponer capability calibrate.
-12.3.2 Detectar requisito de calibracion.
-12.3.3 Insertar calibracion antes de la accion dependiente.
-12.3.4 No insertar calibracion innecesaria.
-12.3.5 Tests.
-12.4 ? COORDINATEMANAGER
-12.4.1 Localizar CoordinateManager/get_coords real.
-12.4.2 Resolver coordenada calibrada.
-12.4.3 Resolver monitor.
-12.4.4 Manejar ausencia de coordenada.
-12.4.5 Fallback permitido por codigo real.
-12.4.6 Tests.
-12.5 ? MULTIPANTALLA
-12.5.1 Un monitor.
-12.5.2 Dos monitores.
-12.5.3 Mas de dos si el codigo lo soporta.
-12.5.4 Monitores intercambiados.
-12.5.5 Resoluciones distintas.
-12.5.6 DPI/escalado.
-12.5.7 Ventana en segundo plano.
-12.5.8 Maximizada/restaurada.
-12.5.9 Tests por escenario soportado.
-12.6 ? VISION
-12.6.1 Capturar monitor/ventana correcto.
-12.6.2 Detectar elemento visible.
-12.6.3 Obtener punto de interaccion.
-12.6.4 Persistir resultado real.
-12.6.5 Verificar que la vision no decide la estrategia.
-12.6.6 Integrar con flujo universal de calibracion.
-12.6.7 Tests.
-12.7 ? SEGURIDAD OPERATIVA
-12.7.1 Identificar ventana correcta antes de interactuar.
-12.7.2 Identificar aplicacion/proceso correcto.
-12.7.3 No usar offsets fijos.
-12.7.4 No cerrar ventanas no creadas por JARVIS.
-12.7.5 Restaurar estado original cuando corresponda.
-12.7.6 Tests de seguridad operativa.
+12.2.6 Tests positivos y negativos.
+12.3 ? COORDINATEMANAGER
+12.3.1 Localizar CoordinateManager/get_coords real.
+12.3.2 Resolver coordenada calibrada.
+12.3.3 Resolver monitor.
+12.3.4 Manejar ausencia de coordenada.
+12.3.5 Fallback permitido por codigo real.
+12.3.6 Tests con el CoordinateManager real.
+12.4 ? MULTIPANTALLA
+12.4.1 Un monitor.
+12.4.2 Dos monitores.
+12.4.3 Mas de dos si el codigo lo soporta.
+12.4.4 Monitores intercambiados.
+12.4.5 Resoluciones distintas.
+12.4.6 DPI/escalado.
+12.4.7 Ventana en segundo plano.
+12.4.8 Maximizada/restaurada.
+12.4.9 Tests por escenario soportado.
+12.4.10 Verificar en el equipo real del usuario el escenario de dos pantallas: enumerar ambas, confirmar cual es la secundaria, ubicar una ventana inocua de prueba en la segunda y comprobar coordenadas/DPI/monitor. Visual Studio Code permanece intacto en esa pantalla y no se envian entradas a su ventana; la primera pantalla no debe recibir interacciones de prueba.
+12.4.11 Si una prueba necesita cambiar temporalmente la disposicion o resolucion, no hacerlo en el equipo de uso normal; marcar ese escenario como BLOQUEADO y diseñar una prueba controlada separada.
+12.5 ? VISION
+12.5.1 Capturar monitor/ventana correcto.
+12.5.2 Detectar elemento visible.
+12.5.3 Obtener punto de interaccion.
+12.5.4 Persistir resultado real.
+12.5.5 Verificar que la vision no decide la estrategia.
+12.5.6 Integrar con flujo universal de calibracion.
+12.5.7 Tests con captura real de ventana/monitor, sin sustituir el objetivo visual por una imagen prefabricada cuando se afirma que se ha validado la captura.
+12.6 ? SEGURIDAD OPERATIVA
+12.6.1 Identificar ventana correcta antes de interactuar.
+12.6.2 Identificar aplicacion/proceso correcto.
+12.6.3 No usar offsets fijos.
+12.6.4 No cerrar ventanas no creadas por JARVIS.
+12.6.5 Restaurar estado original cuando corresponda.
+12.6.6 Comprobar antes/despues que Visual Studio Code, las ventanas previas y la primera pantalla no han sido alterados por las pruebas.
+12.6.7 Tests de seguridad operativa con comprobaciones de estado antes/despues y sin mockear la seleccion de objetivo que se pretende validar.
+12.6.8 Verificar que las pruebas gráficas pueden aislarse en la segunda pantalla sin cubrir ni tomar control de Visual Studio Code; si no, BLOQUEADO/NO VERIFICADO.
+12.7 ? PLANNER
+12.7.1 Exponer capability calibrate solo despues de cerrar 12.1-12.6.
+12.7.2 Detectar requisito de calibracion.
+12.7.3 Insertar calibracion antes de la accion dependiente.
+12.7.4 No insertar calibracion innecesaria.
+12.7.5 Tests.
+12.7.6 Verificar en una tarea GUI inocua que el Planner inserta y ejecuta calibracion real solo cuando falta una calibracion valida.
 12.8 ? CIERRE
-12.8.1 Tests completos.
-12.8.2 Regresion multipantalla.
-12.8.3 Regresion de calibradores existentes.
-12.8.4 main.py.
-12.8.5 README.
-12.8.6 Cerrar FASE 12.
+12.8.1 Tests unitarios pertinentes.
+12.8.2 Tests de integracion.
+12.8.3 Verificacion real multipantalla en el equipo.
+12.8.4 Regresion multipantalla.
+12.8.5 Regresion de calibradores existentes.
+12.8.6 main.py.
+12.8.7 README.
+12.8.8 Cerrar FASE 12 solo con la capability integrada despues de sus dependencias y evidencia real aplicable.
 FASE 13 ? MACROS_COORDS COMO UI KNOWLEDGE
 Dependencia con FASE 12: esta fase completa la validacion/migracion del conocimiento persistente de UI que FASE 12 consume. FASE 12 puede reutilizar los formatos existentes y verificar sus APIs, pero no debe asumir que la migracion de todos los formatos coexistentes o la consistencia global ya esta completada hasta cerrar 13.3 y 13.4.
 
@@ -1845,6 +1936,7 @@ Dependencia con FASE 12: esta fase completa la validacion/migracion del conocimi
 13.4.4 Tests.
 13.4.5 main.py.
 13.4.6 README.
+13.4.7 Contrastar en el equipo real una entrada de UI/calibración persistida con la aplicación y el monitor reales; utilizar la segunda pantalla sin cubrir ni controlar Visual Studio Code, y no reescribir los datos reales para fabricar el escenario.
 FASE 14 ? ACCIONES PRIMITIVAS REUTILIZABLES
 Alcance y dependencia: esta fase consolida, normaliza y expone acciones primitivas ya presentes en el codigo; no vuelve a implementar desde cero las acciones que Graph/Planner/Executor ya consumen en FASES 6-9. La integracion de 14.8 debe reutilizar ActionRegistry/Executor y demostrar compatibilidad, sin crear un segundo canal de ejecucion.
 
@@ -1916,47 +2008,49 @@ Alcance y dependencia: esta fase consolida, normaliza y expone acciones primitiv
 14.9.3 Legacy.
 14.9.4 main.py.
 14.9.5 README.
-14.9.6 Cerrar FASE 14.
+14.9.6 Ejecutar en el equipo real al menos una primitiva no destructiva por cada familia que tenga efecto externo (ventana/UI/navegador/captura/archivo/chat), usando el destino inocuo correspondiente; para GUI, segunda pantalla y arnés aislado. Las familias sin capacidad real disponible se marcan NO VERIFICADAS.
+14.9.7 Cerrar FASE 14 solo con resultados reales por familia y compatibilidad con ActionRegistry/Executor.
 FASE 15 ? HIGH LEVEL GOALS
 
-15.1 ? INTENT -> GOAL
-15.1.1 Identificar intenciones soportadas.
-15.1.2 Mapear intencion a goal_type.
-15.1.3 Mapear target.
-15.1.4 Mapear parametros.
-15.1.5 Mapear restricciones.
-15.1.6 Manejar intencion ambigua.
-15.1.7 Tests.
-15.2 ? ENTIDADES / URL
-15.2.1 Resolver entidad.
-15.2.2 Obtener datos asociados.
-15.2.3 Resolver URL existente.
-15.2.4 Construir Goal de navegacion.
-15.2.5 Verificar ausencia de URL.
-15.2.6 Tests.
-15.3 ? NAVEGACION / BROWSER STATE
-15.3.1 Detectar navegador adecuado.
-15.3.2 Detectar si ya esta abierto.
-15.3.3 Detectar ventana correcta.
-15.3.4 Decidir uso de pestana existente/temporal segun contrato real.
-15.3.5 Navegar.
-15.3.6 Verificar URL/estado.
-15.3.7 Tests.
-15.4 ? MULTIPASO / DEPENDENCIAS
-15.4.1 Separar objetivo en pasos.
-15.4.2 Identificar dependencias.
-15.4.3 Ordenar.
-15.4.4 Verificar precondiciones.
-15.4.5 Generar Plan.
-15.4.6 Ejecutar.
-15.4.7 Verificar.
-15.4.8 Tests.
-15.5 ? CONTRATO / PRECONDICIONES
-15.5.1 Definir Goal valido.
-15.5.2 Definir precondiciones.
-15.5.3 Definir resultado esperado.
-15.5.4 Rechazar Goal incompleto.
-15.5.5 Tests.
+15.1 ? CONTRATO / PRECONDICIONES
+15.1.1 Definir Goal valido reutilizando el contrato consolidado de FASE 4.
+15.1.2 Definir precondiciones y restricciones reutilizando FASE 10; no crear un segundo modelo.
+15.1.3 Definir resultado esperado verificable.
+15.1.4 Rechazar Goal incompleto, contradictorio o no soportado.
+15.1.5 Verificar compatibilidad con Goal, State, Planner y Executor existentes.
+15.1.6 Tests positivos y negativos del contrato.
+15.2 ? INTENT -> GOAL
+15.2.1 Identificar intenciones soportadas.
+15.2.2 Mapear intencion a goal_type.
+15.2.3 Mapear target.
+15.2.4 Mapear parametros.
+15.2.5 Mapear restricciones.
+15.2.6 Manejar intencion ambigua.
+15.2.7 Tests.
+15.3 ? ENTIDADES / URL
+15.3.1 Resolver entidad.
+15.3.2 Obtener datos asociados.
+15.3.3 Resolver URL existente.
+15.3.4 Construir Goal de navegacion.
+15.3.5 Verificar ausencia de URL.
+15.3.6 Tests.
+15.4 ? NAVEGACION / BROWSER STATE
+15.4.1 Detectar navegador adecuado.
+15.4.2 Detectar si ya esta abierto.
+15.4.3 Detectar ventana correcta.
+15.4.4 Decidir uso de pestana existente/temporal segun contrato real.
+15.4.5 Navegar.
+15.4.6 Verificar URL/estado.
+15.4.7 Tests.
+15.5 ? MULTIPASO / DEPENDENCIAS
+15.5.1 Separar objetivo en pasos.
+15.5.2 Identificar dependencias.
+15.5.3 Ordenar.
+15.5.4 Verificar precondiciones.
+15.5.5 Generar Plan.
+15.5.6 Ejecutar.
+15.5.7 Verificar.
+15.5.8 Tests.
 15.6 ? BRAIN
 15.6.1 Interpretacion.
 15.6.2 Parseo estructurado.
@@ -1989,13 +2083,16 @@ FASE 15 ? HIGH LEVEL GOALS
 15.7.21 Comprobar que no se repiten aperturas, clics, envios o acciones con efectos externos tras un timeout o replanificacion.
 15.7.22 Verificar integracion real entre transcripcion normalizada, deteccion de aplicacion, preflight, calibracion, Planner, Executor y verificacion del resultado.
 15.7.23 Traducir el resultado final del flujo (exito verificado, exito parcial, detenido con motivo, aclaracion pendiente, confirmacion pendiente) en la respuesta que el bucle de `main.py` entrega a Mouth o al modo texto, reutilizando el canal de 4.5.7; Planner, Executor y Verification no llaman a Mouth directamente y ninguna respuesta declara exito sin verificacion.
+15.7.24 Ejecutar un flujo end-to-end inocuo en el equipo real. Si abre o manipula una GUI, la ventana de prueba debe ir a la segunda pantalla; comprobar que Visual Studio Code y la primera pantalla permanecen intactos.
+15.7.25 Conservar evidencia del estado del sistema antes y despues, incluyendo proceso/ventana/resultado, y cerrar solo recursos creados por la prueba.
 15.8 ? REGRESION / LEGACY
 15.8.1 Comando existente.
 15.8.2 Accion legacy.
 15.8.3 Goal nuevo.
 15.8.4 No doble ejecucion.
-15.8.5 main.py.
-15.8.6 Cierre FASE 15.
+15.8.5 Verificacion real de compatibilidad en los flujos que puedan ejecutarse de forma segura.
+15.8.6 main.py.
+15.8.7 Cierre FASE 15 solo con evidencia end-to-end real aplicable.
 FASE 16 ? LEGACY COMPATIBILITY
 
 16.1 ? LEGACY -> GOAL
@@ -2034,7 +2131,8 @@ FASE 16 ? LEGACY COMPATIBILITY
 16.6.1 Actualizar README.
 16.6.2 Documentar rutas compatibles.
 16.6.3 Verificar main.py.
-16.6.4 Cerrar FASE 16.
+16.6.4 Verificar en el equipo real al menos una ruta legacy y su equivalente nueva con una acción inocua; comprobar que se ejecuta exactamente una ruta y comparar el efecto observable.
+16.6.5 Cerrar FASE 16 solo con compatibilidad real demostrada para las rutas declaradas soportadas.
 FASE 17 ? OPTIMIZATION
 
 17.1 ? REDUNDANCIAS
@@ -2079,7 +2177,8 @@ FASE 17 ? OPTIMIZATION
 17.7.2 Medir antes/despues solo cuando sea posible.
 17.7.3 No declarar mejora sin medicion o evidencia disponible.
 17.7.4 Documentar resultado real.
-17.7.5 Cerrar FASE 17.
+17.7.5 Ejecutar mediciones antes/después en runtime real con una tarea inocua representativa, mismas condiciones y recursos; registrar carga, latencia, uso de memoria/CPU y resultado funcional, sin declarar mejora por métricas internas aisladas.
+17.7.6 Cerrar FASE 17 solo si la mejora se demuestra sin degradar el resultado funcional, la seguridad ni la respuesta del equipo.
 FASE 18 ? LEARNING COSTS
 
 18.1 ? RESULTADOS
@@ -2130,137 +2229,151 @@ FASE 18 ? LEARNING COSTS
 18.8.2 Verificacion.
 18.8.3 README.
 18.8.4 main.py.
-18.8.5 Cerrar FASE 18.
+18.8.5 Verificar con ejecuciones inocuas reales que los resultados capturados reflejan el efecto y duración observables; persistir/aprender inicialmente en almacenamiento temporal y comprobar reinicio, límites y ausencia de contaminación de datos de producción.
+18.8.6 Cerrar FASE 18 solo cuando el coste aprendido se contraste con resultados reales suficientes y no degrade el comportamiento.
 FASE 19 ? AUTOMEJORA
 
-19.1 ? DETECTAR ?MEJORATE?
+19.1 ? DETECTAR "MEJORATE"
 19.1.1 Localizar deteccion actual.
 19.1.2 Verificar condicion de activacion.
 19.1.3 Evitar activacion accidental.
-19.1.4 Tests.
-19.2 ? README COMPLETO
-19.2.1 Leer README completo.
-19.2.2 Identificar estructura relevante.
-19.2.3 Preparar contexto sin inventar datos.
-19.2.4 Verificar tamano/contexto.
-19.3 ? CHATGPT
-19.3.1 Definir peticion de analisis.
-19.3.2 Enviar contexto permitido.
-19.3.3 Recibir respuesta.
-19.3.4 Detectar respuesta incompleta.
-19.3.5 Tests.
-19.4 ? MODO PENSAR
-19.4.1 Identificar mecanismo real disponible.
-19.4.2 Activarlo de manera explicita.
-19.4.3 Verificar que el resultado se recibe completo.
-19.4.4 Manejar indisponibilidad.
-19.4.5 Tests.
-19.5 ? SOLICITAR MEJORA
-19.5.1 Construir solicitud.
-19.5.2 Incluir estado actual.
-19.5.3 Incluir README relevante.
-19.5.4 Incluir restricciones del prompt.
-19.5.5 Evitar pedir cambios no relacionados.
-19.6 ? OBTENER PROMPT
-19.6.1 Recibir propuesta.
-19.6.2 Extraer prompt.
-19.6.3 Preservar reglas maestras.
-19.6.4 Detectar cambios estructurales.
-19.6.5 Tests de extraccion.
-19.7 ? VALIDAR PROMPT
-19.7.1 Verificar que conserva la posicion actual.
-19.7.2 Verificar que conserva reglas.
-19.7.3 Verificar que no adelanta hojas.
-19.7.4 Verificar continuidad.
-19.7.5 Verificar formato.
-19.7.6 Rechazar prompt invalido.
-19.8 ? VS CODE
-19.8.1 Identificar mecanismo real de interaccion.
-19.8.2 Abrir/seleccionar archivo necesario.
-19.8.3 Aplicar un cambio controlado.
-19.8.4 Verificar que el cambio llego al archivo correcto.
-19.8.5 Evitar modificar otro archivo.
-19.8.6 Tests/reproduccion.
-19.9 ? SUPERCOMPLETE
-19.9.1 Detectar estado READY/EXECUTING segun senales reales.
-19.9.2 Iniciar una sola operacion.
-19.9.3 Esperar mientras EXECUTING.
-19.9.4 Detectar finalizacion.
-19.9.5 Detectar necesidad de nuevo chat.
-19.9.6 Tests de estados.
-19.10 ? UNA HOJA POR CHAT
-19.10.1 Obtener hoja activa.
-19.10.2 No enviar la siguiente hoja.
-19.10.3 Cerrar hoja antes de continuar.
-19.10.4 Registrar resultado.
-19.10.5 Tests.
-19.11 ? READY / EXECUTING
-19.11.1 Modelar READY.
-19.11.2 Modelar EXECUTING.
-19.11.3 Modelar finalizacion.
-19.11.4 Manejar transicion inesperada.
-19.11.5 Evitar doble envio.
-19.12 ? TOKENS / CONTEXTO
-19.12.1 Detectar contexto disponible.
-19.12.2 Detectar riesgo de agotamiento.
-19.12.3 Reducir contexto sin perder requisitos.
-19.12.4 Decidir NEED_NEW_CHAT.
-19.12.5 Guardar estado antes del cambio.
-19.13 ? CAMBIO DE CHAT
-19.13.1 Finalizar operacion segura.
-19.13.2 Guardar codigo.
-19.13.3 Guardar estado.
-19.13.4 Cerrar chat.
-19.13.5 Abrir nuevo chat.
-19.13.6 Reanudar la misma hoja.
-19.13.7 No depender del chat anterior.
-19.14 ? ACTUALIZAR PROMPT / README
-19.14.1 Actualizar estado minimo.
-19.14.2 Actualizar archivos modificados.
-19.14.3 Actualizar tests.
-19.14.4 Actualizar verificacion.
-19.14.5 Actualizar pendientes.
-19.14.6 Actualizar NEXT_DOCUMENTED_UNIT.
-19.14.7 Modificar README solo cuando corresponda.
-19.14.8 Sustituir la referencia obsoleta de 19.14.6 (NEXT_DOCUMENTED_UNIT, que ya no existe) por los cuatro campos persistentes vigentes de `prompt_mejoraActual.txt` (CURRENT_PHASE, CURRENT_WORK_UNIT, CURRENT_WORK_STATUS, LAST_COMPLETED_UNIT) y aplicar la transicion vigente de `prompt_JARVIS_reglas.txt` seccion 5: al cerrar una hoja el puntero queda PENDIENTE y solo pasa a EN PROCESO cuando empieza su chat dedicado.
-19.15 ? VERIFICACION
-19.15.1 Verificar archivo objetivo.
-19.15.2 Verificar sintaxis.
-19.15.3 Ejecutar tests pertinentes.
-19.15.4 Verificar comportamiento real.
-19.15.5 Verificar main.py cuando corresponda.
-19.15.6 No declarar mejora sin evidencia.
-19.16 ? ERRORES
-19.16.1 Detectar error de generacion.
-19.16.2 Detectar error de aplicacion.
-19.16.3 Detectar error de verificacion.
-19.16.4 Recuperar de forma segura.
-19.16.5 Registrar causa.
-19.16.6 Evitar repetir una operacion destructiva.
-19.17 ? CONTINUIDAD
-19.17.1 Leer prompt al iniciar.
-19.17.2 Resolver posicion desde estado.
-19.17.3 Reanudar hoja correcta.
-19.17.4 No usar memoria del chat anterior como fuente de estado.
-19.17.5 Tests de reinicio/reanudacion.
-19.18 ? MULTIPANTALLA
-19.18.1 Verificar que la automejora identifica monitor real.
-19.18.2 Verificar ventanas.
-19.18.3 Verificar DPI/escalado.
-19.18.4 Evitar offsets fijos.
-19.18.5 Tests cuando exista interaccion grafica.
+19.1.4 Tests con entrada real del bucle cuando sea posible.
+19.2 ? READY / EXECUTING
+19.2.1 Modelar READY.
+19.2.2 Modelar EXECUTING.
+19.2.3 Modelar finalizacion.
+19.2.4 Manejar transicion inesperada.
+19.2.5 Evitar doble envio.
+19.2.6 Verificar estados con el mecanismo real de Supercomplete/VS Code cuando exista; no simular su estado y darlo por comprobado.
+19.3 ? UNA HOJA POR CHAT
+19.3.1 Obtener hoja activa desde el estado persistente.
+19.3.2 No enviar la siguiente hoja antes de cerrar la actual.
+19.3.3 Cerrar la hoja activa antes de continuar.
+19.3.4 Registrar resultado.
+19.3.5 Tests de continuidad y de no adelanto.
+19.4 ? TOKENS / CONTEXTO
+19.4.1 Detectar contexto disponible.
+19.4.2 Detectar riesgo de agotamiento.
+19.4.3 Reducir contexto sin perder requisitos.
+19.4.4 Decidir NEED_NEW_CHAT.
+19.4.5 Guardar estado antes del cambio.
+19.4.6 Verificar con los limites reales del proveedor/interfaz cuando sean observables; no fingir mediciones de tokens.
+19.5 ? CONTINUIDAD
+19.5.1 Leer prompt al iniciar.
+19.5.2 Resolver posicion desde estado persistente.
+19.5.3 Reanudar hoja correcta.
+19.5.4 No usar memoria del chat anterior como fuente de estado.
+19.5.5 Tests de reinicio/reanudacion.
+19.5.6 Verificar en una nueva sesion real que se reanuda la misma hoja sin saltar ni duplicar trabajo.
+19.6 ? README COMPLETO
+19.6.1 Leer README completo.
+19.6.2 Identificar estructura relevante.
+19.6.3 Preparar contexto sin inventar datos.
+19.6.4 Verificar tamano/contexto.
+19.6.5 Contrastar la documentacion con el codigo y el comportamiento actual antes de enviarla como fuente a ChatGPT.
+19.7 ? MODO PENSAR
+19.7.1 Identificar mecanismo real disponible.
+19.7.2 Activarlo de manera explicita cuando la interfaz/proveedor lo permita.
+19.7.3 Verificar que el resultado recibido esta completo.
+19.7.4 Manejar indisponibilidad.
+19.7.5 Tests del control/fallback; no afirmar que se activo un modo que la API no expone.
+19.8 ? CHATGPT
+19.8.1 Definir peticion de analisis.
+19.8.2 Enviar contexto permitido.
+19.8.3 Recibir respuesta.
+19.8.4 Detectar respuesta incompleta.
+19.8.5 Tests de contrato y una prueba real con el proveedor configurado cuando exista acceso.
+19.9 ? SOLICITAR MEJORA
+19.9.1 Construir solicitud.
+19.9.2 Incluir estado actual.
+19.9.3 Incluir README relevante.
+19.9.4 Incluir restricciones del prompt.
+19.9.5 Evitar pedir cambios no relacionados.
+19.10 ? OBTENER PROMPT
+19.10.1 Recibir propuesta.
+19.10.2 Extraer prompt.
+19.10.3 Preservar reglas maestras.
+19.10.4 Detectar cambios estructurales.
+19.10.5 Tests de extraccion.
+19.11 ? VALIDAR PROMPT
+19.11.1 Verificar que conserva la posicion actual.
+19.11.2 Verificar que conserva reglas.
+19.11.3 Verificar que no adelanta hojas.
+19.11.4 Verificar continuidad.
+19.11.5 Verificar formato.
+19.11.6 Rechazar prompt invalido.
+19.11.7 Comparar de forma estructural la propuesta con el estado y las reglas reales, sin usar Git ni depender de historial Git.
+19.12 ? ERRORES Y RECUPERACION
+19.12.1 Detectar error de generacion.
+19.12.2 Detectar error de aplicacion.
+19.12.3 Detectar error de verificacion.
+19.12.4 Recuperar de forma segura.
+19.12.5 Registrar causa.
+19.12.6 Evitar repetir una operacion destructiva.
+19.12.7 Probar recuperacion con copias temporales y verificar el archivo real antes de sustituirlo.
+19.13 ? VS CODE
+19.13.1 Identificar mecanismo real de interaccion.
+19.13.2 Abrir/seleccionar archivo necesario.
+19.13.3 Aplicar un cambio controlado.
+19.13.4 Verificar que el cambio llego al archivo correcto.
+19.13.5 Evitar modificar otro archivo.
+19.13.6 Verificar en el equipo real el resultado del archivo escrito, no solo la accion de escritura.
+19.13.7 Toda prueba de interfaz de VS Code se realiza en la segunda pantalla sin enviar entradas a la ventana de trabajo del usuario; usar una ventana/sesion de prueba separada si la aplicacion lo permite. No tocar la ventana de VS Code que el usuario mantiene abierta.
+19.14 ? SUPERCOMPLETE
+19.14.1 Detectar estado READY/EXECUTING segun senales reales.
+19.14.2 Iniciar una sola operacion.
+19.14.3 Esperar mientras EXECUTING.
+19.14.4 Detectar finalizacion.
+19.14.5 Detectar necesidad de nuevo chat.
+19.14.6 Tests de estados.
+19.14.7 Prueba real de una operacion no destructiva, comprobando que no se inicia una segunda ejecucion ni se modifica un archivo distinto.
+19.15 ? CAMBIO DE CHAT
+19.15.1 Finalizar operacion segura.
+19.15.2 Guardar codigo.
+19.15.3 Guardar estado.
+19.15.4 Cerrar chat.
+19.15.5 Abrir nuevo chat.
+19.15.6 Reanudar la misma hoja.
+19.15.7 No depender del chat anterior.
+19.15.8 Verificar el cambio de sesion real sin perder ni adelantar la unidad activa.
+19.16 ? ACTUALIZAR PROMPT / README
+19.16.1 Actualizar estado minimo.
+19.16.2 Actualizar archivos modificados.
+19.16.3 Actualizar tests.
+19.16.4 Actualizar verificacion.
+19.16.5 Actualizar pendientes.
+19.16.6 Sustituir la referencia obsoleta de NEXT_DOCUMENTED_UNIT por los cuatro campos persistentes vigentes de `prompt_mejoraActual.txt` (`CURRENT_PHASE`, `CURRENT_WORK_UNIT`, `CURRENT_WORK_STATUS`, `LAST_COMPLETED_UNIT`) y aplicar la transicion vigente de `prompt_JARVIS_reglas.txt` seccion 5: al cerrar una hoja el puntero queda PENDIENTE y solo pasa a EN PROCESO cuando empieza su chat dedicado.
+19.16.7 Modificar README solo cuando corresponda y describir el comportamiento implementado actualmente, sin anotaciones de fase.
+19.16.8 Verificar que los ficheros actualizados pueden volver a leerse y reanudar el trabajo real.
+19.17 ? MULTIPANTALLA
+19.17.1 Verificar que la automejora identifica los monitores reales.
+19.17.2 Verificar ventanas de prueba en la segunda pantalla.
+19.17.3 Verificar DPI/escalado.
+19.17.4 Evitar offsets fijos.
+19.17.5 No mover, cerrar ni enviar entradas a Visual Studio Code; no interferir en la primera pantalla.
+19.17.6 Tests cuando exista interaccion grafica.
+19.17.7 Prueba real con una ventana inocua creada por la prueba y comprobacion del estado de ambas pantallas.
+19.18 ? VERIFICACION
+19.18.1 Verificar archivo objetivo.
+19.18.2 Verificar sintaxis.
+19.18.3 Ejecutar tests pertinentes.
+19.18.4 Verificar comportamiento real en el sistema con la ruta de produccion.
+19.18.5 Verificar main.py cuando corresponda.
+19.18.6 No declarar mejora sin evidencia.
+19.18.7 Comprobar que la primera pantalla, Visual Studio Code y los recursos preexistentes no han sido alterados.
 19.19 ? REGRESION
 19.19.1 Tests de automejora.
 19.19.2 Tests de edicion.
 19.19.3 Tests de continuidad.
 19.19.4 Tests de seguridad.
 19.19.5 Tests de no regresion del sistema.
+19.19.6 Prueba real del flujo completo de automejora con un cambio inocuo, reversible y previamente validado.
 19.20 ? CIERRE
 19.20.1 Verificar todo el flujo.
 19.20.2 Verificar README.
 19.20.3 Verificar main.py.
 19.20.4 Verificar estado.
-19.20.5 Cerrar FASE 19 solo con todas las hojas completadas.
+19.20.5 Cerrar FASE 19 solo con todas las hojas completadas y las pruebas reales aplicables documentadas.
 FASE 20 ? AUTOMEJORA CONTINUA
 
 20.1 ? FIN DE CICLO
@@ -2359,7 +2472,8 @@ FASE 20 ? AUTOMEJORA CONTINUA
 20.13.3 Detectar errores y volver a la hoja activa cuando corresponda.
 20.13.4 Nunca iniciar otro ciclo sin solicitud explicita del usuario.
 20.13.5 Mantener trazabilidad completa.
-20.13.6 Cerrar FASE 20 unicamente cuando el ciclo completo este verificado.
+20.13.6 Ejecutar una repeticion real y controlada del ciclo completo, verificando los estados persistentes, la continuidad y que no se adelantan hojas.
+20.13.7 Cerrar FASE 20 unicamente cuando el ciclo completo este verificado con evidencia real y las pruebas automatizadas pertinentes.
 
 FASE 21 ? AUDITORIA, DEPURACION Y LIMPIEZA GLOBAL DEL PROYECTO JARVIS
 Objetivo: localizar, justificar y retirar de forma controlada archivos realmente innecesarios, obsoletos, desactualizados o redundantes, sin perder codigo, conocimiento, datos persistentes, configuracion, compatibilidad ni evidencia util. La ausencia de referencias directas o una fecha antigua no demuestra por si sola que un archivo sea prescindible. Mantener esta fase pendiente hasta que el puntero operativo autorice comenzarla.
@@ -2510,7 +2624,7 @@ Alcance obligatorio: esta unidad inventaria exclusivamente el arbol del proyecto
 21.13 ? VERIFICACION DINAMICA DE CANDIDATOS
 21.13.1 Elegir pruebas de verificacion para cada candidato cuyo uso no pueda determinarse solo por analisis estatico.
 21.13.2 Verificar rutas alternativas, imports dinamicos, plugins, registro de acciones y descubrimiento de recursos cuando correspondan.
-21.13.3 Ejecutar comprobaciones aisladas sin modificar los datos persistentes ni la configuracion real del usuario.
+21.13.3 Ejecutar comprobaciones aisladas en el equipo real sin modificar los datos persistentes ni la configuracion real del usuario; las retiradas simuladas se hacen solo sobre copias temporales/cuarentena controlada.
 21.13.4 Utilizar directorios temporales y copias aisladas cuando la prueba necesite provocar corrupcion, ausencia o retirada de un recurso.
 21.13.5 Verificar el arranque de JARVIS y la carga de sus componentes relevantes cuando el candidato pueda afectarlos.
 21.13.6 Comprobar que una ausencia simulada produce el comportamiento esperado y no queda oculta por defaults, mocks o fallbacks.
@@ -2562,7 +2676,7 @@ Alcance obligatorio: esta unidad inventaria exclusivamente el arbol del proyecto
 21.17.4 Ejecutar la suite de no regresion pertinente y ampliar su alcance si la limpieza afecta a componentes transversales.
 21.17.5 Comprobar coleccion de tests y detectar errores de imports, fixtures o recursos ausentes.
 21.17.6 Verificar el arranque de `main.py` cuando el alcance de los cambios lo requiera.
-21.17.7 Verificar flujos reales que carguen configuracion, datos, memoria, modelos, prompts, plugins o recursos afectados.
+21.17.7 Verificar flujos reales que carguen configuracion, datos, memoria, modelos, prompts, plugins o recursos afectados; no sustituirlos por tests con mocks cuando el flujo pueda ejecutarse de forma segura en el equipo.
 21.17.8 Comparar los datos persistentes protegidos antes y despues y comprobar que no se hayan perdido registros o cambiado formatos sin justificacion.
 21.17.9 Confirmar que la limpieza no ha eliminado logs o evidencias que sigan siendo necesarios para diagnostico y trazabilidad.
 21.17.10 Distinguir fallos nuevos de fallos preexistentes y problemas del entorno; no declarar PASSED un test que no se haya ejecutado.
@@ -2580,7 +2694,7 @@ Alcance obligatorio: esta unidad inventaria exclusivamente el arbol del proyecto
 21.18.8 Actualizar los registros y el estado operativo conforme a las reglas maestras, sin adelantar ni marcar completadas unidades no ejecutadas.
 21.18.9 Verificar que cada candidato eliminado tiene evidencia y prueba posterior, y que no queda una retirada destructiva sin comprobar.
 21.18.10 No cerrar FASE 21 con candidatos relevantes sin clasificar, regresiones nuevas abiertas o recuperaciones incompletas.
-21.18.11 Marcar FASE 21 como completada unicamente cuando la auditoria, las retiradas justificadas y todas las verificaciones aplicables dispongan de evidencia real.
+21.18.11 Marcar FASE 21 como completada unicamente cuando la auditoria, las retiradas justificadas y todas las verificaciones aplicables dispongan de evidencia real del equipo y no queden escenarios seguros sin ejecutar.
 21.18.12 Eliminar las copias de cuarentena solo cuando la retirada haya quedado validada, no exista regresion atribuible y la copia ya no sea necesaria para recuperar el estado previo; verificar la ruta exacta antes de eliminarlas.
 21.18.13 No borrar copias de recuperacion dudosas ni material ajeno a los candidatos inventariados; documentar cualquier cuarentena que deba conservarse.
 
@@ -7926,3 +8040,15 @@ VERIFICACION: SINTAXIS: OK (py_compile de src/hands/filesystem_observer.py y tes
 DISCREPANCIAS: El bloque CONTINUIDAD Y CIERRE de prompt_mejoraActual.txt indica dejar CURRENT_WORK_STATUS: EN PROCESO al cerrar una unidad, mientras que la seccion 5 (TRANSICION DE ESTADO Y CONTINUIDAD, reglas 46.e, 47, 49 y 50) exige dejar CURRENT_WORK_STATUS: PENDIENTE para la siguiente hoja pendiente. Se sigue la seccion 5 (maquina de transicion de estado) y se deja el puntero en PENDIENTE; se documenta la contradiccion sin reconciliarla por intuicion.
 PENDIENTES: Ninguno para esta unidad. Siguiente hoja pendiente real: 3.8.5.1.4.5.8 (limitar CPU, disco, memoria y concurrencia del escaneo, permitiendo pausar y cancelar sin corromper la base). Padre 3.8.5.1.4.5 con hijas .1 a .7 cerradas; .8 a .10 pendientes.
 ESTADO FINAL: 3.8.5.1.4.5.7 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.8.5.1.4.5.8
+FECHA: 2026-11-10
+OBJETIVO: Limitar CPU, disco, memoria y concurrencia del escaneo usando mediciones del equipo real y configuración existente; permitir pausar, reanudar y cancelar sin corromper la base ni degradar la última instantánea válida. No inventar umbrales fijos sin medir.
+TIPO DE TRABAJO: IMPLEMENTACION | TEST | DOCUMENTACION
+CAMBIOS / HALLAZGOS: src/hands/system_inventory.py: se añade `LimiteRecursos` (dataclass con límites configurables de cpu_max_porcentaje, memoria_max_porcentaje, disco_uso_max_porcentaje, concurrencia_maxima e intervalo_medicion_segundos; todos None por defecto, sin umbrales inventados), `MedidorRecursosSistema` (mide CPU, memoria y disco reales del equipo vía psutil), y se integra en `RecorridoVolumen` los parámetros `limite_recursos` y `medidor_recursos`; antes de procesar cada directorio se comprueban los límites y, si alguno se excede, se espera brevemente (throttling) y se reintenta sin abortar el recorrido ni perder las entradas ya emitidas. El seguimiento de concurrencia (`_concurrencia_actual`) se incrementa al entrar al procesamiento de un directorio y se decrementa en `finally`. tests/hands/test_system_inventory.py: nuevas clases TestLimiteRecursos (7 pruebas: valores por defecto, configurar límite CPU, configurar todos los límites, CPU fuera de rango, memoria fuera de rango, disco fuera de rango, concurrencia cero, intervalo no positivo), TestMedidorRecursosSistema (6 pruebas: CPU/memoria/disco devuelven float, ruta inexistente retorna 0.0, medir_todos retorna dict, mockeo de cpu/virtual_memory/disk_usage), TestRecorridoVolumenLimitesRecursos (7 pruebas: sin límite recorre completo, límite CPU excedido espera y reintenta, límite memoria excedido, límite disco excedido, recursos dentro de límites no throttlea, límite None equivalente a sin límite, concurrencia máxima 1). Ejecutados en Windows real: 202 PASSED / 0 FAILED / 8 SKIPPED / 210 TOTAL en tests/hands/test_system_inventory.py; sin regresión en tests previos (179 PASSED / 8 SKIPPED / 187 TOTAL previos mantenidos). docs/README.md actualizado (descripción, características, importaciones 11→13, tabla de clases con LimiteRecursos y MedidorRecursosSistema, firma de RecorridoVolumen.__init__). docs/README_TESTS.md actualizado (descripción, 3 nuevas clases de test, resultados 179→202 PASSED). Ningún cambio en main.py.
+ARCHIVOS MODIFICADOS: PRODUCCIÓN: `src/hands/system_inventory.py`; TESTS: `tests/hands/test_system_inventory.py`; DOCUMENTACIÓN: `docs/README.md`, `docs/README_TESTS.md`
+TESTS Y RESULTADOS: UNITARIOS: 202 PASSED / 0 FAILED / 210 TOTAL (tests/hands/test_system_inventory.py, ejecutados en Windows real; incluye las 179 previas sin regresión y las 20 nuevas); INTEGRACIÓN: NA; NO REGRESIÓN: NA
+VERIFICACIÓN: SINTAXIS: OK (py_compile de src/hands/system_inventory.py sin errores); MAIN.PY: NA (no se modifica main.py); COMPORTAMIENTO / INTEGRACIÓN REAL: Evidencia real de ejecución: 202 tests pasan en Windows real. Medición real de recursos del equipo vía psutil verificada (CPU % leído del equipo real). Throttling verificado con psutil mockeado (CPU/memoria/disco excedidos provocan espera y reintento; dentro de límites no hay throttling). El recorrido conserva entradas ya emitidas antes de cualquier interrupción (3.8.5.1.4.4.9). Sin regresión en tests previos (179 PASSED / 8 SKIPPED).
+DISCREPANCIAS: El bloque CONTINUIDAD Y CIERRE de prompt_mejoraActual.txt indica dejar CURRENT_WORK_STATUS: EN PROCESO al cerrar una unidad, mientras que la sección 5 (TRANSICIÓN DE ESTADO Y CONTINUIDAD, reglas 46.e, 47, 49 y 50) exige dejar CURRENT_WORK_STATUS: PENDIENTE para la siguiente hoja pendiente. Se sigue la sección 5 (máquina de transición de estado) y se deja el puntero en PENDIENTE; se documenta la contradicción sin reconciliarla por intuición.
+PENDIENTES: Siguiente hoja pendiente real: 3.8.5.1.4.5.9 (definir caducidad y detección de inventario obsoleto). Padre 3.8.5.1.4.5 con hijas .1 a .8 cerradas; .9 a .10 pendientes.
+ESTADO FINAL: 3.8.5.1.4.5.8 - IMPLEMENTADA
