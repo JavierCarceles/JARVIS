@@ -1899,6 +1899,9 @@ Funciones a nivel módulo:
 - Limitación de recursos del escaneo (`LimiteRecursos` con límites configurables de CPU, memoria, uso de disco y concurrencia; `MedidorRecursosSistema` que mide recursos reales del equipo vía `psutil`): antes de procesar cada directorio se comprueban los límites y, si alguno se excede, se espera brevemente y se reintenta (throttling) sin abortar el recorrido ni perder las entradas ya emitidas.
 - Caducidad de inventario (`EstadoCaducidad`, `ConfigCaducidad`, `ResultadoCaducidad`): determina si una entrada está vigente, obsoleta o expirada a partir de `last_checked_at` y un umbral TTL configurable; sin umbral no caduca por tiempo. Funciones `edad_segundos_desde_check`, `esta_caducado` y `clasificar_entradas_por_caducidad`.
 - Revalidación de destino antes de uso (`ResultadoValidacionDestino`): `validar_destino` comprueba existencia, tipo, volumen, identidad del equipo y accesibilidad de una entrada de inventario en el sistema operativo real; `validar_ruta_para_lanzamiento` hace lo mismo para una ruta suelta. Una ruta histórica nunca autoriza por sí sola un lanzamiento.
+- Escaneo por volumen o ruta (`EscanerRutaVolumen`, `escanear_ruta`, `escanear_volumen`): motor de escaneo controlado que recorre una raíz dada (raíz de volumen o cualquier subárbol de ruta) con `RecorridoVolumen`, registra la ejecución en `scan_runs` (`begin_scan_run`/`end_scan_run`), inserta las entradas en lotes atómicos (`insert_file_entries`) y soporta progreso, control de pausa/cancelar y límites de recursos; no destructivo, cada ejecución genera un `scan_id` nuevo y conserva las entradas de escaneos previos como historial.
+- Exclusiones de ubicaciones elegidas por el usuario (`InventoryContract.exclusiones_usuario`, `agregar_exclusion_usuario`, `quitar_exclusion_usuario`, `obtener_exclusiones_usuario`, `limpiar_exclusiones_usuario`, `razon_exclusion`): respetadas por el recorrido y reportadas con motivo `exclusion_usuario`, separadas de las exclusiones técnicas justificadas.
+- Reconstrucción controlada del catálogo (`reconstruir_catalogo`): escaneo completo sobre un volumen o ruta que genera un `scan_id` nuevo como el más reciente del ámbito, sin borrar ni sobrescribir las entradas de escaneos previos (no destructivo, versionado por `scan_id`).
 
 **Importaciones:** 13.
 
@@ -1932,6 +1935,8 @@ Clases:
 | `class ConfigCaducidad` | Configuración de caducidad para entradas de inventario (TTL en segundos, campos de referencia). |
 | `class ResultadoCaducidad` | Resultado de la comprobación de caducidad de una entrada de inventario (estado, edad, último check, razón, es válido para uso). |
 | `class ResultadoValidacionDestino` | Resultado de la revalidación de un destino de inventario antes de usarlo (existencia, tipo, volumen, identidad, accesibilidad, errores, razón). |
+| `class EscanerRutaVolumen` | Motor de escaneo controlado por volumen o por ruta: recorre una raíz dada con `RecorridoVolumen`, registra el `scan_run` (`begin_scan_run`/`end_scan_run`), inserta entradas en lotes (`insert_file_entries`) y soporta progreso, control de pausa/cancelar y límites de recursos; no destructivo, cada ejecución genera un `scan_id` nuevo y conserva el historial previo. |
+| `class ResultadoEscaneo` | Resultado observable de una ejecución de escaneo controlado (scan_id, volumen, ruta, modo, contadores de entradas/directorios/archivos, errores por categoría, exclusiones, cobertura, inicio/finalización y estado de finalización). |
 
 Funciones a nivel módulo:
 
@@ -1965,6 +1970,9 @@ Funciones a nivel módulo:
 | `def clasificar_entradas_por_caducidad(entradas, config=None)` | Clasifica una lista de entradas por su estado de caducidad, claveado por ruta absoluta. |
 | `def validar_destino(entry, machine_id_actual=None)` | Revalida un destino de inventario antes de usarlo: existencia, tipo, volumen, identidad y accesibilidad en el SO real. |
 | `def validar_ruta_para_lanzamiento(absolute_path, entry_type, volume, machine_id, machine_id_actual=None)` | Valida una ruta suelta para lanzamiento sin requerir InventoryEntry previa. |
+| `def escanear_ruta(ruta_absoluta, contrato=None, maquina_id=None, storage=None, modo="completo", **kwargs)` | Escanea un subárbol de ruta concreto (no necesariamente raíz de volumen); deriva el volumen de la ruta y retorna un `ResultadoEscaneo` observable. |
+| `def escanear_volumen(volumen, ruta_raiz, contrato=None, maquina_id=None, storage=None, modo="completo", **kwargs)` | Escanea la raíz de un volumen (o ruta indicada como raíz de volumen) con ciclo de vida de escaneo real y retorna un `ResultadoEscaneo`. |
+| `def reconstruir_catalogo(volumen, raiz, contrato=None, maquina_id=None, storage=None, **kwargs)` | Reconstrucción controlada del catálogo: escaneo completo (`modo="completo"`) sobre un volumen o ruta; nuevo `scan_id` como más reciente del ámbito sin borrar ni sobrescribir entradas previas. |
 | Métodos de `RecorridoVolumen`: | |
 | `def __init__(volumen, raiz, contrato, maquina_id, seguir_enlaces=False, callback_progreso=None, callback_control=None, limite_recursos=None, medidor_recursos=None)` | Inicializa el recorrido iterativo de un volumen con contrato, política de traversal de enlaces, callbacks de progreso y control, y límites opcionales de recursos con medidor propio. |
 | `def recorrer()` | Generador que recorre iterativamente el volumen emitiendo `InventoryEntry` por cada entrada accesible. |
@@ -1973,6 +1981,12 @@ Funciones a nivel módulo:
 | `property errores_por_categoria` | Devuelve una copia del conteo de errores agrupado por categoría. |
 | `property entradas_validas` | Devuelve una copia de las entradas emitidas hasta el momento (último inventario válido), incluidas las emitidas antes de una interrupción (3.8.5.1.4.4.9). |
 | `property ejecucion_parcial` | Devuelve True si la última ejecución de `recorrer()` fue interrumpida (cancelada o pausada) antes de completar; el volumen o subárbol no terminó de escanearse (3.8.5.1.4.4.9). |
+| Métodos de `InventoryContract`: | |
+| `def agregar_exclusion_usuario(ruta)` | Añade una ubicación elegida por el usuario a las exclusiones del inventario (normalizada, sin duplicados). |
+| `def quitar_exclusion_usuario(ruta)` | Elimina una ubicación de las exclusiones de usuario. |
+| `def obtener_exclusiones_usuario()` | Devuelve una copia de las exclusiones de usuario. |
+| `def limpiar_exclusiones_usuario()` | Elimina todas las exclusiones de usuario. |
+| `def razon_exclusion(path)` | Devuelve `exclusion_usuario`, `exclusion_tecnica` o None según el motivo por el que la ruta está excluida. |
 | `class EstadoPrimerInventario(Enum)` | Estado del ciclo de vida del primer inventario de un equipo: `pendiente`, `ejecutandose`, `completado`, `interrumpido`. |
 | `class AlcanceInventario` | Informe de alcance del primer inventario: máquina, SO, modo, volúmenes a escanear, excluidos, exclusiones de ruta, privacidad y motivo de ejecución (sin ejecutar el escaneo). |
 | `class ProgresoInventario` | Progreso agregado del primer inventario en todos los volúmenes: volumen actual, completados, entradas/directorios/archivos procesados, errores, cobertura global (0-100) y estados de inicio/finalización. |

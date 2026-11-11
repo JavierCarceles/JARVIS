@@ -93,7 +93,7 @@ class TestCreacionBaseDeDatos:
     def test_inicializacion_crea_fichero_en_ruta_dada(self, storage: SystemInventoryStorage, db_path: Path):
         assert not db_path.exists()
         version = storage.initialize()
-        assert version == 4
+        assert version == SCHEMA_VERSION
         assert db_path.exists()
         assert storage.db_file_exists()
 
@@ -102,7 +102,7 @@ class TestCreacionBaseDeDatos:
 
     def test_esquema_versionado_se_registra(self, storage: SystemInventoryStorage):
         storage.initialize()
-        assert storage.schema_version() == 4
+        assert storage.schema_version() == SCHEMA_VERSION
 
     def test_inicializacion_idempotente_no_borra_datos(self, storage: SystemInventoryStorage):
         storage.initialize()
@@ -439,7 +439,7 @@ class TestLineaBaseVolumen:
 
     def test_esquema_version_3_incluye_tabla_lineas_base(self, storage: SystemInventoryStorage):
         storage.initialize()
-        assert storage.schema_version() == 4
+        assert storage.schema_version() == SCHEMA_VERSION
         conn = storage.connect()
         cur = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='lineas_base'")
         assert cur.fetchone() is not None
@@ -463,7 +463,7 @@ class TestLineaBaseVolumen:
 
         storage_v3 = SystemInventoryStorage(db_path)
         version = storage_v3.initialize()
-        assert version == 4
+        assert version == SCHEMA_VERSION
         assert storage_v3.obtener_linea_base_volumen("machine-alfa", "C:") is None
         creada = storage_v3.registrar_linea_base_volumen(
             machine_id="machine-alfa", volume="C:",
@@ -2595,7 +2595,7 @@ class TestManifiestoJSON:
         manifest = storage.write_manifest("machine-alfa")
         assert storage.manifest_path.exists()
         assert manifest["machine_id"] == "machine-alfa"
-        assert manifest["version"] == 4
+        assert manifest["version"] == SCHEMA_VERSION
         assert "volumes" in manifest
         assert "last_scan" in manifest
         assert "updated_at" in manifest
@@ -2651,7 +2651,7 @@ class TestManifiestoJSON:
         manifest = storage.read_manifest()
         assert manifest is not None
         assert manifest["machine_id"] == "machine-alfa"
-        assert manifest["version"] == 4
+        assert manifest["version"] == SCHEMA_VERSION
         assert len(manifest["volumes"]) == 1
         assert manifest["volumes"][0]["volume"] == "C:"
         assert manifest["last_scan"] is not None
@@ -2880,8 +2880,8 @@ class TestMigracionEsquemaV1AV2:
         self._crear_db_v1(db_path)
         storage = SystemInventoryStorage(db_path)
         version = storage.initialize()
-        assert version == 4
-        assert storage.schema_version() == 4
+        assert version == SCHEMA_VERSION
+        assert storage.schema_version() == SCHEMA_VERSION
         # La columna normalized_path debe existir tras la migracion.
         conn = storage.connect()
         cur = conn.execute("PRAGMA table_info(file_entries)")

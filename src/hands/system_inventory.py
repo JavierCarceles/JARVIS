@@ -365,6 +365,8 @@ class InventoryContract:
     include_system: bool = True
     read_file_content: bool = False  # Nunca True: privacidad (3.8.5.1.4.1.9)
     log_full_paths: bool = False     # Nunca True: privacidad (3.8.5.1.4.1.9)
+    exclusiones_usuario: list[str] = field(default_factory=list)
+    """Rutas que el usuario elige excluir del inventario, ademas de las exclusiones tecnicas."""
 
     def __post_init__(self) -> None:
         if not self.excluded_paths:
@@ -372,9 +374,55 @@ class InventoryContract:
         if not self.excluded_mounts:
             self.excluded_mounts = list(DEFAULT_EXCLUDED_MOUNT_PATTERNS)
 
-    def should_exclude_path(self, path: str) -> bool:
-        """Devuelve True si la ruta debe excluirse segun el contrato."""
+    def _exclusion_tecnica(self, path: str) -> bool:
+        """Devuelve True si `path` coincide con una exclusion tecnica del contrato."""
         return is_excluded_path(path, self.excluded_paths)
+
+    def _exclusion_usuario(self, path: str) -> bool:
+        """Devuelve True si `path` coincide con una exclusion elegida por el usuario."""
+        return _coincide_alguna_exclusion_ruta(path, self.exclusiones_usuario)
+
+    def should_exclude_path(self, path: str) -> bool:
+        """Devuelve True si la ruta debe excluirse segun el contrato.
+
+        Considera tanto las exclusiones tecnicas justificadas como las
+        exclusiones de ubicaciones elegidas por el usuario (3.8.5.1.4.8.3).
+        """
+        return self._exclusion_tecnica(path) or self._exclusion_usuario(path)
+
+    def razon_exclusion(self, path: str) -> Optional[str]:
+        """Devuelve el motivo de exclusión de `path` (`exclusion_usuario` o
+        `exclusion_tecnica`) o None si la ruta no está excluida."""
+        if self._exclusion_usuario(path):
+            return "exclusion_usuario"
+        if self._exclusion_tecnica(path):
+            return "exclusion_tecnica"
+        return None
+
+    def agregar_exclusion_usuario(self, ruta: str) -> None:
+        """Añade una ubicación elegida por el usuario a las exclusiones del inventario.
+
+        La ruta se normaliza (separadores y mayúsculas según el SO) antes de
+        almacenarla; rutas duplicadas no se añaden dos veces.
+        """
+        normalizada = os.path.normpath(ruta)
+        if normalizada not in self.exclusiones_usuario:
+            self.exclusiones_usuario.append(normalizada)
+
+    def quitar_exclusion_usuario(self, ruta: str) -> None:
+        """Elimina una ubicación de las exclusiones elegidas por el usuario."""
+        normalizada = os.path.normpath(ruta)
+        self.exclusiones_usuario = [
+            entrada for entrada in self.exclusiones_usuario if entrada != normalizada
+        ]
+
+    def obtener_exclusiones_usuario(self) -> list[str]:
+        """Devuelve una copia de las exclusiones elegidas por el usuario."""
+        return list(self.exclusiones_usuario)
+
+    def limpiar_exclusiones_usuario(self) -> None:
+        """Elimina todas las exclusiones elegidas por el usuario."""
+        self.exclusiones_usuario = []
 
     def should_exclude_mount(self, mount_point: str) -> bool:
         """Devuelve True si el punto de montaje debe excluirse."""
@@ -2364,7 +2412,8 @@ class RecorridoVolumen:
             except ValueError:
                 relativa = nombre
 
-            excluida = self._debe_excluir(ruta_absoluta)
+            razon = self.contrato.razon_exclusion(ruta_absoluta)
+            excluida = razon is not None
             atributos = _atributos_observados(entrada, stat)
 
             return InventoryEntry(
@@ -2381,7 +2430,7 @@ class RecorridoVolumen:
             accessed_at=self._timestamp_seguro(stat.st_atime),
             attributes=atributos,
             excluded=excluida,
-            exclusion_reason="exclusion_tecnica" if excluida else None,
+            exclusion_reason=razon,
             source="filesystem_scan",
             last_checked_at=ahora,
         )
@@ -3774,3 +3823,363 @@ class PoliticaRefresco:
         """Devuelve la marca de tiempo del último refresco por volumen."""
         with self._lock:
             return dict(self._ultimo_refresco_por_volumen)
+
+
+# ---------------------------------------------------------------------------
+# Coincidencia de exclusiones de usuario (3.8.5.1.4.8.3).
+# ---------------------------------------------------------------------------
+
+def _coincide_alguna_exclusion_ruta(
+    ruta_absoluta: str, exclusiones: list[str]
+) -> bool:
+    """
+    Devuelve True si `ruta_absoluta` coincide con alguna exclusión de usuario.
+
+    Coincide si es igual a la exclusión o se encuentra dentro de la carpeta
+    excluida (prefijo seguido de separador de ruta). La comparación respeta
+    mayúsculas/minúsculas según el sistema de archivos (`os.path.normcase`),
+    de modo que en Windows "C:\\Datos" y "c:\\datos" son la misma ubicación.
+    """
+    if not exclusiones:
+        return False
+    ruta = os.path.normcase(os.path.abspath(ruta_absoluta))
+    for exclusion in exclusiones:
+        if not exclusion:
+            continue
+        normalizada = os.path.normcase(os.path.abspath(exclusion))
+        if ruta == normalizada:
+            return True
+        carpeta = normalizada.rstrip("\\/") + os.sep
+        if ruta.startswith(carpeta):
+            return True
+    return False
+
+
+# ---------------------------------------------------------------------------
+# Resultado de una ejecución de escaneo controlado (3.8.5.1.4.8.3).
+# ---------------------------------------------------------------------------
+
+@dataclass
+class ResultadoEscaneo:
+    """
+    Resultado observable de una ejecución de escaneo controlado.
+
+    Todos los campos provienen de la ejecución real sobre el sistema de
+    archivos y el almacenamiento SQLite: identificador de scan, volumen,
+    ruta escaneada, modo, contadores de entradas, directorios y archivos,
+    errores agrupados por categoría, exclusiones, cobertura y estado de
+    finalización. Nunca se fabrican ni simulan los valores.
+    """
+
+    scan_id: str
+    """Identificador de la ejecución de escaneo en `scan_runs`."""
+    volumen: str
+    """Volumen escaneado."""
+    ruta: str
+    """Ruta raíz escaneada (raíz de volumen o subárbol de ruta)."""
+    modo: str
+    """Modo de escaneo: `"completo"` o `"incremental"`."""
+    entradas_procesadas: int = 0
+    archivos_procesados: int = 0
+    directorios_procesados: int = 0
+    errores: int = 0
+    errores_por_categoria: dict[str, int] = field(default_factory=dict)
+    exclusiones: int = 0
+    cobertura: float = 0.0
+    iniciado_en: str = ""
+    finalizado_en: str = ""
+    resultado: str = "interrumpido"  # "ok", "interrumpido", "error", "parcial"
+    interrumpido: bool = False
+    completado: bool = False
+
+
+def _almacenamiento_predeterminado() -> Any:
+    """
+    Devuelve una instancia de almacenamiento sobre la ruta por defecto.
+
+    La importación es perezosa para evitar la dependencia circular:
+    `system_inventory_storage` importa de `system_inventory`.
+    """
+    from src.hands.system_inventory_storage import SystemInventoryStorage
+
+    return SystemInventoryStorage()
+
+
+class EscanerRutaVolumen:
+    """
+    Motor de escaneo controlado por volumen o por ruta (3.8.5.1.4.8.3).
+
+    Ejecuta un recorrido real de `RecorridoVolumen` sobre la raíz indicada
+    (raíz de un volumen o cualquier subárbol de ruta), registra la ejecución
+    en `scan_runs` con `begin_scan_run`/`end_scan_run`, inserta las entradas
+    en lotes atómicos con `insert_file_entries` y respeta:
+
+    - exclusiones del contrato de inventario (técnicas y de usuario),
+    - callbacks de progreso y control (pausa/cancelar),
+    - límites de recursos (`LimiteRecursos` con `MedidorRecursosSistema`),
+    - aislamiento por equipo (`machine_id`).
+
+    Es no destructivo: cada ejecución genera un `scan_id` nuevo, las entradas
+    de escaneos previos se conservan como historial y el nuevo scan_run queda
+    como el más reciente del volumen o ruta. No borra ni sobrescribe entradas
+    previas ni modifica el contenido de ningún archivo (privacidad, lectura
+    solo de metadatos).
+
+    `storage` es una instancia de `SystemInventoryStorage` inyectada para
+    evitar la dependencia circular con `system_inventory_storage`.
+    """
+
+    def __init__(
+        self,
+        volumen: str,
+        raiz: str,
+        contrato: InventoryContract,
+        maquina_id: str,
+        storage: Any,
+        modo: str = "completo",
+        callback_progreso: Optional[Callable[[ProgresoRecorrido], None]] = None,
+        callback_control: Optional[Callable[[], ControlRecorrido]] = None,
+        limite_recursos: Optional[LimiteRecursos] = None,
+        medidor_recursos: Optional[MedidorRecursosSistema] = None,
+        tamano_lote_entradas: int = 500,
+    ) -> None:
+        if modo not in ("completo", "incremental"):
+            raise ValueError(
+                f"Modo de escaneo no válido: {modo!r}. "
+                "Use 'completo' o 'incremental'."
+            )
+        self.volumen = volumen
+        self.raiz = os.path.abspath(raiz)
+        self.contrato = contrato
+        self.maquina_id = maquina_id
+        self.storage = storage
+        self.modo = modo
+        self.callback_progreso = callback_progreso
+        self.callback_control = callback_control
+        self.limite_recursos = limite_recursos
+        self.medidor_recursos = medidor_recursos or MedidorRecursosSistema()
+        self.tamano_lote_entradas = max(1, int(tamano_lote_entradas))
+
+    def ejecutar(self) -> ResultadoEscaneo:
+        """
+        Ejecuta el escaneo real y retorna su resultado observable.
+
+        Crea el scan_run, recorre la raíz con `RecorridoVolumen`, inserta
+        las entradas en lotes y finaliza el scan_run con `"ok"` o
+        `"interrumpido"` (si se solicitó pausa/cancelar). Libera el bloqueo
+        de concurrencia incluso ante fallos.
+        """
+        from src.hands.system_inventory_storage import (
+            SCAN_RESULT_INTERRUPTED,
+            SCAN_RESULT_OK,
+        )
+
+        scan_id = f"scan-{uuid.uuid4()}"
+        iniciado_en = datetime.now().isoformat()
+        self.storage.connect()
+        self.storage.record_machine(self.maquina_id, created_at=iniciado_en)
+        self.storage.begin_scan_run(
+            scan_id=scan_id,
+            machine_id=self.maquina_id,
+            volume=self.volumen,
+            mode=self.modo,
+            started_at=iniciado_en,
+        )
+
+        recorrido = RecorridoVolumen(
+            volumen=self.volumen,
+            raiz=self.raiz,
+            contrato=self.contrato,
+            maquina_id=self.maquina_id,
+            callback_progreso=self.callback_progreso,
+            callback_control=self.callback_control,
+            limite_recursos=self.limite_recursos,
+            medidor_recursos=self.medidor_recursos,
+        )
+
+        entradas_procesadas = 0
+        archivos_procesados = 0
+        directorios_procesados = 0
+        lote: list[dict] = []
+        interrumpido = False
+
+        try:
+            for entrada in recorrido.recorrer():
+                entradas_procesadas += 1
+                if entrada.entry_type == EntryType.FILE:
+                    archivos_procesados += 1
+                elif entrada.entry_type == EntryType.DIRECTORY:
+                    directorios_procesados += 1
+
+                lote.append(
+                    {
+                        "entry_id": f"e-{uuid.uuid4()}",
+                        "absolute_path": entrada.absolute_path,
+                        "relative_path": entrada.relative_path,
+                        "name": entrada.name,
+                        "extension": entrada.extension,
+                        "entry_type": entrada.entry_type.value,
+                        "size_bytes": entrada.size_bytes,
+                        "modified_at": entrada.modified_at,
+                        "created_at": entrada.created_at,
+                        "accessed_at": entrada.accessed_at,
+                        "attributes": entrada.attributes,
+                        "excluded": entrada.excluded,
+                        "exclusion_reason": entrada.exclusion_reason,
+                        "source": entrada.source,
+                        "last_checked_at": entrada.last_checked_at,
+                    }
+                )
+                if len(lote) >= self.tamano_lote_entradas:
+                    self.storage.insert_file_entries(
+                        scan_id, self.maquina_id, self.volumen, lote
+                    )
+                    lote = []
+
+            if recorrido.ejecucion_parcial:
+                interrumpido = True
+        finally:
+            if lote:
+                self.storage.insert_file_entries(
+                    scan_id, self.maquina_id, self.volumen, lote
+                )
+
+        finalizado_en = datetime.now().isoformat()
+        resultado = SCAN_RESULT_INTERRUPTED if interrumpido else SCAN_RESULT_OK
+        progreso = recorrido.progreso
+        self.storage.end_scan_run(
+            scan_id=scan_id,
+            finished_at=finalizado_en,
+            result=resultado,
+            entries_count=entradas_procesadas,
+            errors_count=progreso.errores,
+            exclusions_count=progreso.exclusiones,
+            coverage_estimate=str(round(progreso.cobertura, 2)),
+        )
+
+        return ResultadoEscaneo(
+            scan_id=scan_id,
+            volumen=self.volumen,
+            ruta=self.raiz,
+            modo=self.modo,
+            entradas_procesadas=entradas_procesadas,
+            archivos_procesados=archivos_procesados,
+            directorios_procesados=directorios_procesados,
+            errores=progreso.errores,
+            errores_por_categoria=progreso.errores_por_categoria,
+            exclusiones=progreso.exclusiones,
+            cobertura=round(progreso.cobertura, 2),
+            iniciado_en=iniciado_en,
+            finalizado_en=finalizado_en,
+            resultado=resultado,
+            interrumpido=interrumpido,
+            completado=not interrumpido,
+        )
+
+
+def escanear_ruta(
+    ruta_absoluta: str,
+    contrato: Optional[InventoryContract] = None,
+    maquina_id: Optional[str] = None,
+    storage: Any = None,
+    modo: str = "completo",
+    **kwargs: Any,
+) -> ResultadoEscaneo:
+    """
+    Escanea un subárbol de ruta concreto (no necesariamente la raíz de un
+    volumen) (3.8.5.1.4.8.3).
+
+    El volumen se deriva de la ruta con `_volumen_de_ruta`. Registra el
+    escaneo en el almacenamiento y retorna un `ResultadoEscaneo` observable.
+
+    Parametros:
+    - `ruta_absoluta`: ruta a escanear (se convierte a absoluta).
+    - `contrato`: `InventoryContract` con alcance, exclusiones técnicas y de
+      usuario, y privacidad. Por defecto, `default_contract()`.
+    - `maquina_id`: identificador del equipo. Por defecto, `generate_machine_id()`.
+    - `storage`: `SystemInventoryStorage` inyectada. Por defecto, instancia
+      sobre la ruta por defecto del inventario.
+    - `modo`: `"completo"` o `"incremental"`.
+    - `kwargs`: argumentos reenviados a `EscanerRutaVolumen`
+      (callbacks, `limite_recursos`, `medidor_recursos`, `tamano_lote_entradas`).
+    """
+    if storage is None:
+        storage = _almacenamiento_predeterminado()
+    if maquina_id is None:
+        maquina_id = generate_machine_id()
+    if contrato is None:
+        contrato = default_contract()
+    volumen = _volumen_de_ruta(ruta_absoluta)
+    return EscanerRutaVolumen(
+        volumen=volumen,
+        raiz=ruta_absoluta,
+        contrato=contrato,
+        maquina_id=maquina_id,
+        storage=storage,
+        modo=modo,
+        **kwargs,
+    ).ejecutar()
+
+
+def escanear_volumen(
+    volumen: str,
+    ruta_raiz: str,
+    contrato: Optional[InventoryContract] = None,
+    maquina_id: Optional[str] = None,
+    storage: Any = None,
+    modo: str = "completo",
+    **kwargs: Any,
+) -> ResultadoEscaneo:
+    """
+    Escanea la raíz de un volumen (o ruta indicada como raíz de volumen)
+    (3.8.5.1.4.8.3).
+
+    Equivalente a `escanear_ruta` con el volumen e identificador de volumen
+    explícitos. Registra el escaneo en el almacenamiento y retorna un
+    `ResultadoEscaneo` observable.
+    """
+    if storage is None:
+        storage = _almacenamiento_predeterminado()
+    if maquina_id is None:
+        maquina_id = generate_machine_id()
+    if contrato is None:
+        contrato = default_contract()
+    return EscanerRutaVolumen(
+        volumen=volumen,
+        raiz=ruta_raiz,
+        contrato=contrato,
+        maquina_id=maquina_id,
+        storage=storage,
+        modo=modo,
+        **kwargs,
+    ).ejecutar()
+
+
+def reconstruir_catalogo(
+    volumen: str,
+    raiz: str,
+    contrato: Optional[InventoryContract] = None,
+    maquina_id: Optional[str] = None,
+    storage: Any = None,
+    **kwargs: Any,
+) -> ResultadoEscaneo:
+    """
+    Reconstrucción controlada del catálogo de un volumen o ruta (3.8.5.1.4.8.3).
+
+    Ejecuta un escaneo completo (`modo="completo"`) sobre el volumen o ruta
+    indicados, respetando exclusiones técnicas y de usuario, límites de
+    recursos, pausa y cancelación. Cada reconstrucción genera un `scan_id`
+    nuevo: las entradas de escaneos previos se conservan como historial y el
+    nuevo scan_run pasa a ser el más reciente del volumen o ruta, sin borrar
+    ni sobrescribir entradas previas (no destructivo).
+    """
+    kwargs.pop("modo", None)
+    return escanear_volumen(
+        volumen=volumen,
+        ruta_raiz=raiz,
+        contrato=contrato,
+        maquina_id=maquina_id,
+        storage=storage,
+        modo="completo",
+        **kwargs,
+    )

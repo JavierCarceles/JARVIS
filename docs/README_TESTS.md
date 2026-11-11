@@ -10921,37 +10921,22 @@ da reconciled=False (coincidencia).
 <a name="hands/test-system_inventory"></a>
 ### `hands\test_system_inventory.py`
 
-**Descripción:** Tests de contrato del inventario persistente del sistema de archivos (unidad 3.8.5.1.4.1). Verifican serialización/deserialización de `InventoryEntry`, generación de identificador local de equipo estable (sin MAC ni serial), controles de privacidad por defecto (sin lectura de contenido, sin rutas completas en logs), exclusiones técnicas de rutas y puntos de montaje, separación entre hechos observados del SO e inferencias, truncamiento seguro de rutas para logs, controles de operación del inventario con aislamiento por equipo, valores por defecto del contrato y serialización para persistencia en JSON. También verifican el contrato común de volumen multiplataforma (`VolumenComun`), su conversión desde `VolumeInfo` sin forzar letras de unidad ni rutas de Windows en otros SO, la enumeración unificada de volúmenes y la diferenciación de estados de volumen: desmontado, inaccesible, permiso denegado, sistema de archivos no soportado y vacío. Además verifican la limitación de recursos del escaneo (CPU, memoria, disco y concurrencia basada en mediciones reales del equipo vía `psutil`, sin umbrales inventados) y el throttling del recorrido cuando un recurso excede su límite.
+**Descripción:** Tests de contrato del inventario persistente del sistema de archivos. Verifican: decisión de cuándo se ejecuta el primer inventario (ningún previo vs. previo completado vs. previo interrumpido); informe de alcance (volúmenes a escanear, exclusiones, privacidad sin lectura de contenido ni rutas completas en logs); ejecución en segundo plano no bloqueante con progreso real y persistencia en SQLite sobre directorio temporal real (`RecorridoVolumen` + `SystemInventoryStorage` de producción); política configurable de refresco (modos `bajo_demanda`, `por_caducidad`, `programada`, `desactivado`; detección de caducidad; refresco de volumen y de ruta bajo demanda; refresco selectivo que evita el escaneo completo de todos los volúmenes); escaneo por volumen o ruta con ciclo de vida real de `scan_run` (`begin_scan_run`/`end_scan_run`/`insert_file_entries`), progreso, pausa/cancelar, límites de recursos y aislamiento por `machine_id`; exclusiones de ubicaciones elegidas por el usuario en `InventoryContract` (`agregar_exclusion_usuario`, `quitar_exclusion_usuario`, `razon_exclusion`) respetadas por el recorrido; reconstrucción controlada del catálogo (`reconstruir_catalogo`): nuevo `scan_id` como más reciente del volumen/ruta sin borrar ni sobrescribir entradas previas; cancelación de escaneo que preserva las entradas ya emitidas; ruta inexistente que registra error sin abortar.
+
+Todos los tests usan directorios temporales (`tmp_path`) y bases de datos temporales; no tocan datos de producción ni rutas de usuario.
 
 **Clases de test:**
 
 | Clase | Descripción |
 |---|---|
-| `TestInventoryEntryRoundTrip` | Serialización/deserialización de `InventoryEntry` sin pérdida de datos. |
-| `TestMachineId` | Identificador de equipo estable y determinista. |
-| `TestPrivacidad` | Controles de privacidad del contrato por defecto y truncamiento seguro de rutas. |
-| `TestExclusiones` | Exclusiones técnicas de rutas y puntos de montaje. |
-| `TestHechosVsInferencias` | Separación entre hechos observados e inferencias. |
-| `TestControlInventario` | Operaciones de control con aislamiento por equipo. |
-| `TestContratoPorDefecto` | Valores por defecto del contrato de inventario. |
-| `TestSerializacionParaPersistencia` | Serialización de entrada como JSON válido para persistencia. |
-| `TestVolumenComun` | Contrato común de volumen: no impone letra de unidad ni rutas Windows en SO no Windows. |
-| `TestVolumenComunDesdeInfo` | Conversión de `VolumeInfo` a `VolumenComun` sin forzar conceptos Windows. |
-| `TestEnumerarVolumenesComun` | Enumeración unificada de volúmenes que devuelve contratos comunes de volumen. |
-| `TestEstadoVolumen` | Enum de estados de volumen: disponible, desmontado, inaccesible, permiso denegado, sistema de archivos no soportado y vacío. |
-| `TestDeterminarEstadoVolumen` | Clasificación de estado de volumen: desmontado, permiso denegado, inaccesible, sistema de archivos no soportado, vacío y disponible. |
-| `TestVolumenComunConEstado` | Campo `estado` en `VolumenComun`: valor por defecto, asignación explícita y serialización en `to_dict`. |
-| `TestVolumenComunDesdeInfoConEstado` | Cálculo de estado en `volumen_comun_desde_info` desde `VolumeInfo`. |
-| `TestEnumerarVolumenesComunConEstado` | `enumerar_volumenes_comun` devuelve volúmenes con estado diferenciado válido. |
-| `TestCoberturaSoportada` | Consulta de la matriz de soporte SO/version sin inferencias: combinacion registrada soportada, no soportada, no registrada, SO desconocido, version no registrada, insensibilidad a mayusculas y filtrado de entradas por SO. |
-| `TestRecorridoVolumenIterativo` | Recorrido iterativo sin recursion, captura de metadatos, tipos observados, rutas Unicode, callback de progreso con contadores y cobertura, control de pausa/cancelar, errores por ruta sin abortar, respeto a exclusiones. |
-| `TestRecorridoVolumenSubdirectoriosProfundos` | Recorrido de arboles de directorios profundamente anidados sin desbordamiento de pila (pila explicita), rutas Unicode en profundidad, archivo bloqueado en ruta profunda que registra error y continua sin abortar. |
-| `TestLimiteRecursos` | Límites configurables de recursos (CPU, memoria, disco, concurrencia, intervalo de medición) con validación de rangos y valores None por defecto sin umbrales inventados. |
-| `TestMedidorRecursosSistema` | Medición real de CPU, memoria y uso de disco vía `psutil`; mockeo determinístico para tests. |
-| `TestRecorridoVolumenLimitesRecursos` | Throttling del recorrido por límites de recursos: CPU excedido espera y reintenta, memoria excedida, disco lleno, recursos dentro de límites sin throttling, límite None equivalente a sin límite, concurrencia máxima válida. |
-| `TestRecursosYCancelacionEjecucionReal` | Verificación de CPU, memoria, lecturas de directorio y cancelación durante ejecución real de RecorridoVolumen sin mocks de psutil: medición real de recursos vía psutil, cancelación real que preserva entradas válidas, throttling con carga de CPU real, lecturas de directorio contra árbol temporal real. |
-
-**Resultados:** 230 tests unitarios, 230 PASSED / 0 FAILED / 8 SKIPPED (symlinks no creables en Windows sin privilegios).
+| `TestDecisionPrimerInventario` | Decisión de cuándo se ejecuta el primer inventario (sin previo, previo completado, previo interrumpido). |
+| `TestAlcanceInventario` | Informe de alcance del primer inventario: volúmenes a escanear, excluidos, privacidad y estructura de `AlcanceInventario`. |
+| `TestEjecucionPrimerInventario` | Ejecución no bloqueante en segundo plano, progreso real por callbacks, persistencia SQLite real, cancelación, doble ejecución, ya completado y control de pausa/reanudar/cancelar. |
+| `TestPoliticaRefrescoConfig` | Configuración de la política de refresco (`ModoRefresco`, `ConfigRefresco`) y devolución de copias independientes. |
+| `TestPoliticaRefrescoDecisionVolumen` | Decisión de refresco por volumen según modo y caducidad de las entradas (`necesita_refresco_volumen`). |
+| `TestPoliticaRefrescoOperaciones` | Operaciones de refresto incremental: `refrescar_volumen_si_necesario`, `refrescar_ruta_bajo_demanda`, `refrescar_incremental_selectivo` y `decidir_volumenes_a_refrescar`; historial de operaciones. |
+| `TestEscanerRutaOVolumen` | Escaneo por ruta y por volumen sobre almacenamiento real: creación de `scan_run` y entradas en SQLite, respeto a exclusiones de usuario, cancelación que preserva entradas emitidas, ruta inexistente sin abortar, aislamiento por `machine_id` y reconstrucción controlada del catálogo (nuevo `scan_id`, historial conservado, último scan actualizado). |
+| `TestExclusionesUsuarioContrato` | Gestión de exclusiones de usuario en `InventoryContract`: agregar, quitar, duplicados, limpiar, detección de carpeta excluida y su contenido, sensibilidad a mayúsculas según el SO, motivos `exclusion_usuario`/`exclusion_tecnica` y respeto del recorrido a la exclusión. |
 
 ---
 

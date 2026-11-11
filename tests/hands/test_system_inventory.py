@@ -16,6 +16,7 @@ temporales; no tocan datos de producción ni rutas de usuario.
 
 from __future__ import annotations
 
+import os
 import time
 import uuid
 from datetime import datetime, timedelta
@@ -30,6 +31,7 @@ from src.hands.system_inventory import (
     EntryType,
     EstadoCaducidad,
     EstadoPrimerInventario,
+    EscanerRutaVolumen,
     GestorPrimerInventario,
     InventoryContract,
     ModoRefresco,
@@ -38,13 +40,15 @@ from src.hands.system_inventory import (
     ProgresoInventario,
     ProgresoRecorrido,
     RecorridoVolumen,
-    ResultadoRefresco,
+    ResultadoEscaneo,
     VolumeInfo,
     VolumeType,
     generate_machine_id,
 )
+from src.hands.system_inventory import escanear_ruta, escanear_volumen, reconstruir_catalogo
 from src.hands.system_inventory_storage import (
     SCAN_MODE_FULL,
+    SCAN_MODE_INCREMENTAL,
     SCAN_RESULT_INTERRUPTED,
     SCAN_RESULT_OK,
     SystemInventoryStorage,
@@ -675,3 +679,382 @@ class TestPoliticaRefrescoOperaciones:
         assert len(politica.historial()) == 2
         ultimo = politica.ultimo_refresco_por_volumen()
         assert "C:" in ultimo
+
+
+# ---------------------------------------------------------------------------
+# Escaneo por volumen o ruta, exclusiones de usuario y reconstruccion
+# controlada del catalogo (unidad 3.8.5.1.4.8.3).
+#
+# Todos los tests usan directorios temporales (tmp_path) y bases de datos
+# temporales; no tocan datos de produccion ni rutas de usuario.
+# ---------------------------------------------------------------------------
+
+def _arbol_temporal(
+    tmp_path: Path, nombre: str = "arbol_scan", nivel_subcarpetas: int = 3
+) -> Path:
+    """Crea un árbol REAL de directorios y archivos bajo tmp_path."""
+    base = tmp_path / nombre
+    base.mkdir(parents=True, exist_ok=True)
+    (base / "raiz.txt").write_text("raiz\n", encoding="utf-8")
+    for i in range(nivel_subcarpetas):
+        sub = base / f"sub{i:02d}"
+        sub.mkdir(parents=True, exist_ok=True)
+        (sub / f"archivo_{i}.txt").write_text(f"contenido {i}\n", encoding="utf-8")
+        profundo = sub / "profundo"
+        profundo.mkdir(parents=True, exist_ok=True)
+        (profundo / f"anidado_{i}.log").write_text(f"anidado {i}\n", encoding="utf-8")
+    (base / "notas.unicode").write_text("caféñ¿\n", encoding="utf-8")
+    return base
+
+
+def _volumen_para_scan(
+    tmp_path: Path, letra: str = "T:", nombre: str = "volumen_scan"
+) -> tuple[VolumeInfo, Path]:
+    base = _arbol_temporal(tmp_path, nombre)
+    return (
+        VolumeInfo(
+            letra=letra,
+            ruta_raiz=str(base),
+            tipo=VolumeType.FIXED,
+            disponible=True,
+            sistema_archivos="NTFS",
+            etiqueta_volumen="scan",
+        ),
+        base,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Escaneo por volumen o ruta
+# ---------------------------------------------------------------------------
+
+class TestEscanerRutaOVolumen:
+    """Verifican escaneo por ruta y por volumen sobre almacenamiento real."""
+
+    def test_escanear_ruta_crea_scan_run_e_entradas_reales(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        storage.initialize()
+        volumen, base = _volumen_para_scan(tmp_path)
+        resultado = escanear_ruta(
+            ruta_absoluta=str(base),
+            contrato=InventoryContract(machine_id=MACHINE_ID),
+            maquina_id=MACHINE_ID,
+            storage=storage,
+        )
+
+        assert isinstance(resultado, ResultadoEscaneo)
+        assert resultado.volumen == os.path.splitdrive(os.path.abspath(str(base)))[0]
+        assert resultado.ruta == os.path.abspath(str(base))
+        assert resultado.modo == SCAN_MODE_FULL
+        assert resultado.resultado == SCAN_RESULT_OK
+        assert resultado.completado is True
+        assert resultado.interrumpido is False
+        assert resultado.entradas_procesadas > 0
+        assert resultado.archivos_procesados > 0
+        assert resultado.directorios_procesados > 0
+        assert resultado.iniciado_en and resultado.finalizado_en
+
+        # Persistencia real: el scan_run y las entradas están en SQLite.
+        scan_run = storage.get_scan_run(resultado.scan_id)
+        assert scan_run is not None
+        assert scan_run["machine_id"] == MACHINE_ID
+        assert scan_run["volume"] == os.path.splitdrive(os.path.abspath(str(base)))[0]
+        assert scan_run["result"] == SCAN_RESULT_OK
+        assert scan_run["entries_count"] == resultado.entradas_procesadas
+        assert storage.count(MACHINE_ID) == resultado.entradas_procesadas
+        assert storage.get_latest_scan(MACHINE_ID)["scan_id"] == resultado.scan_id
+
+        # Las entradas reflejan el árbol real: archivos .txt y .log existen.
+        entradas = storage.obtener_entradas_escaneo(resultado.scan_id)
+        nombres = {e["name"] for e in entradas}
+        assert "raiz.txt" in nombres
+        assert "archivo_0.txt" in nombres
+        assert "anidado_0.log" in nombres
+        assert "notas.unicode" in nombres  # rutas Unicode registradas
+
+    def test_escanear_volumen_por_raiz_de_volumen(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        storage.initialize()
+        volumen, base = _volumen_para_scan(tmp_path, letra="U:")
+        resultado = escanear_volumen(
+            volumen=volumen.letra,
+            ruta_raiz=str(base),
+            contrato=InventoryContract(machine_id=MACHINE_ID),
+            maquina_id=MACHINE_ID,
+            storage=storage,
+        )
+
+        assert resultado.resultado == SCAN_RESULT_OK
+        assert resultado.volumen == "U:"
+        assert resultado.entradas_procesadas > 0
+        assert storage.get_scan_run(resultado.scan_id)["volume"] == "U:"
+
+    def test_scan_por_ruta_respeta_exclusiones_de_usuario(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        storage.initialize()
+        _, base = _volumen_para_scan(tmp_path, letra="V:")
+        excluida = base / "sub00"
+        (excluida / "dentro.txt").write_text("dentro\n", encoding="utf-8")
+
+        contrato = InventoryContract(machine_id=MACHINE_ID)
+        contrato.agregar_exclusion_usuario(str(excluida))
+
+        resultado = escanear_ruta(
+            ruta_absoluta=str(base),
+            contrato=contrato,
+            maquina_id=MACHINE_ID,
+            storage=storage,
+        )
+
+        assert resultado.resultado == SCAN_RESULT_OK
+        assert resultado.exclusiones >= 1
+
+        # Ninguna entrada dentro de la carpeta excluida por el usuario.
+        entradas = storage.obtener_entradas_escaneo(resultado.scan_id)
+        rutas = [e["absolute_path"] for e in entradas]
+        assert not any(
+            r == str(excluida) or r.startswith(str(excluida) + os.sep) for r in rutas
+        )
+        # Las entradas excluidas llevan el motivo de exclusión de usuario.
+        excluidas_db = [e for e in entradas if e["excluded"]]
+        assert all(e["exclusion_reason"] == "exclusion_usuario" for e in excluidas_db)
+        # Fuera de la exclusión las entradas siguen registradas.
+        nombres = {e["name"] for e in entradas}
+        assert "raiz.txt" in nombres
+
+    def test_exclusion_usuario_no_desactiva_exclusiones_tecnicas(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        storage.initialize()
+        _, base = _volumen_para_scan(tmp_path, letra="W:")
+        contrato = InventoryContract(machine_id=MACHINE_ID)
+        contrato.agregar_exclusion_usuario(str(base / "sub00"))
+
+        resultado = escanear_ruta(
+            ruta_absoluta=str(base),
+            contrato=contrato,
+            maquina_id=MACHINE_ID,
+            storage=storage,
+        )
+
+        assert resultado.resultado == SCAN_RESULT_OK
+        # $Recycle.Bin (exclusión técnica) sigue estando fuera si estuviera presente;
+        # aquí verificamos que el contrato sigue exponiendo ambas listas.
+        assert contrato.should_exclude_path(str(base / "sub00" / "dentro.txt"))
+        assert contrato.should_exclude_path("C:\\$Recycle.Bin\\algo")
+        assert contrato.razon_exclusion(str(base / "sub00" / "dentro.txt")) == (
+            "exclusion_usuario"
+        )
+        assert contrato.razon_exclusion("C:\\$Recycle.Bin\\algo") == (
+            "exclusion_tecnica"
+        )
+        assert contrato.razon_exclusion(str(base / "raiz.txt")) is None
+
+    def test_cancelar_escaneo_por_ruta_preserva_entradas_emitidas(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        storage.initialize()
+        # Árbol grande para que el recorrido tarde lo suficiente.
+        base = tmp_path / "volumen_cancelar_ruta"
+        for i in range(30):
+            sub = base / f"sub{i:02d}"
+            sub.mkdir(parents=True, exist_ok=True)
+            for j in range(8):
+                (sub / f"archivo_{j:02d}.txt").write_text(
+                    f"contenido {i}-{j}\n", encoding="utf-8"
+                )
+
+        llamadas = {"n": 0}
+
+        def control() -> ControlRecorrido:
+            llamadas["n"] += 1
+            if llamadas["n"] >= 6:
+                return ControlRecorrido.CANCELAR
+            return ControlRecorrido.CONTINUAR
+
+        resultado = escanear_ruta(
+            ruta_absoluta=str(base),
+            contrato=InventoryContract(machine_id=MACHINE_ID),
+            maquina_id=MACHINE_ID,
+            storage=storage,
+            callback_control=control,
+        )
+
+        # El scan_run se registra con resultado interrumpido y conserva las
+        # entradas emitidas antes de la cancelación (no se descartan).
+        assert resultado.resultado == SCAN_RESULT_INTERRUPTED
+        assert resultado.interrumpido is True
+        assert resultado.completado is False
+        assert resultado.entradas_procesadas > 0
+        scan_run = storage.get_scan_run(resultado.scan_id)
+        assert scan_run["result"] == SCAN_RESULT_INTERRUPTED
+        assert scan_run["entries_count"] == resultado.entradas_procesadas
+
+    def test_ruta_inexistente_no_aborta_y_registra_error(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        storage.initialize()
+        inexistente = str(tmp_path / "no_existe" / "nada")
+
+        resultado = escanear_ruta(
+            ruta_absoluta=inexistente,
+            contrato=InventoryContract(machine_id=MACHINE_ID),
+            maquina_id=MACHINE_ID,
+            storage=storage,
+        )
+
+        assert resultado.resultado == SCAN_RESULT_OK
+        assert resultado.entradas_procesadas == 0
+        assert resultado.errores >= 1
+        assert "ruta_eliminada" in resultado.errores_por_categoria
+
+    def test_aislamiento_por_maquina_no_mezcla_inventarios(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        storage.initialize()
+        _, base = _volumen_para_scan(tmp_path, letra="X:")
+
+        escanear_ruta(
+            ruta_absoluta=str(base),
+            contrato=InventoryContract(machine_id="maquina-a"),
+            maquina_id="maquina-a",
+            storage=storage,
+        )
+
+        # Otra máquina no ve las entradas de la primera.
+        assert storage.count("maquina-a") > 0
+        assert storage.count("maquina-b") == 0
+        assert storage.get_latest_scan("maquina-b") is None
+
+    def test_reconstruir_catalogo_genera_nuevo_scan_run_sin_borrar_historial(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        storage.initialize()
+        _, base = _volumen_para_scan(tmp_path, letra="Y:")
+
+        primera = reconstruir_catalogo(
+            volumen="Y:",
+            raiz=str(base),
+            contrato=InventoryContract(machine_id=MACHINE_ID),
+            maquina_id=MACHINE_ID,
+            storage=storage,
+        )
+        assert primera.resultado == SCAN_RESULT_OK
+        assert primera.completado is True
+
+        # Añadir un archivo y reconstruir de nuevo.
+        (base / "nuevo_despues.txt").write_text("nuevo\n", encoding="utf-8")
+        segunda = reconstruir_catalogo(
+            volumen="Y:",
+            raiz=str(base),
+            contrato=InventoryContract(machine_id=MACHINE_ID),
+            maquina_id=MACHINE_ID,
+            storage=storage,
+        )
+        assert segunda.resultado == SCAN_RESULT_OK
+        assert segunda.scan_id != primera.scan_id
+
+        # Ambos scan_runs existen y conservan sus entradas (no destructivo).
+        run1 = storage.get_scan_run(primera.scan_id)
+        run2 = storage.get_scan_run(segunda.scan_id)
+        assert run1["result"] == SCAN_RESULT_OK
+        assert run2["result"] == SCAN_RESULT_OK
+        assert run2["entries_count"] >= run1["entries_count"]
+
+        # El más reciente es el de la reconstrucción: define el catálogo actual.
+        assert storage.get_latest_scan(MACHINE_ID, "Y:")["scan_id"] == segunda.scan_id
+        entradas_segunda = storage.obtener_entradas_escaneo(segunda.scan_id)
+        nombres = {e["name"] for e in entradas_segunda}
+        assert "nuevo_despues.txt" in nombres
+
+
+# ---------------------------------------------------------------------------
+# Exclusiones de ubicaciones elegidas por el usuario (contrato)
+# ---------------------------------------------------------------------------
+
+class TestExclusionesUsuarioContrato:
+    """Verifican la gestión de exclusiones de usuario en InventoryContract."""
+
+    def test_contrato_inicia_sin_exclusiones_de_usuario(self):
+        contrato = InventoryContract(machine_id=MACHINE_ID)
+        assert contrato.obtener_exclusiones_usuario() == []
+
+    def test_agregar_exclusion_usuario_registra_ruta(self):
+        contrato = InventoryContract(machine_id=MACHINE_ID)
+        contrato.agregar_exclusion_usuario("C:\\Datos del usuario\\Privado")
+        assert "C:\\Datos del usuario\\Privado" in contrato.obtener_exclusiones_usuario()
+
+    def test_agregar_exclusion_duplicada_no_se_repite(self):
+        contrato = InventoryContract(machine_id=MACHINE_ID)
+        ruta = "C:\\Datos del usuario\\Privado"
+        contrato.agregar_exclusion_usuario(ruta)
+        contrato.agregar_exclusion_usuario(ruta)
+        assert contrato.obtener_exclusiones_usuario().count(ruta) == 1
+
+    def test_quitar_exclusion_usuario_elimina_ruta(self):
+        contrato = InventoryContract(machine_id=MACHINE_ID)
+        ruta = "C:\\Datos del usuario\\Privado"
+        contrato.agregar_exclusion_usuario(ruta)
+        contrato.quitar_exclusion_usuario(ruta)
+        assert contrato.obtener_exclusiones_usuario() == []
+
+    def test_limpiar_exclusiones_usuario(self):
+        contrato = InventoryContract(machine_id=MACHINE_ID)
+        contrato.agregar_exclusion_usuario("C:\\Uno")
+        contrato.agregar_exclusion_usuario("C:\\Dos")
+        contrato.limpiar_exclusiones_usuario()
+        assert contrato.obtener_exclusiones_usuario() == []
+
+    def test_should_exclude_path_detecta_carpeta_excluida_y_contenido(self):
+        contrato = InventoryContract(machine_id=MACHINE_ID)
+        contrato.agregar_exclusion_usuario("C:\\Excluida")
+        assert contrato.should_exclude_path("C:\\Excluida")
+        assert contrato.should_exclude_path("C:\\Excluida\\subcarpeta\\archivo.txt")
+        assert contrato.should_exclude_path("C:\\Excluida2\\archivo.txt") is False
+
+    def test_should_exclude_path_respeta_mayusculas_segun_so(self):
+        contrato = InventoryContract(machine_id=MACHINE_ID)
+        contrato.agregar_exclusion_usuario("c:\\excluida")
+        assert contrato.should_exclude_path("C:\\Excluida\\archivo.txt")
+
+    def test_razon_exclusion_devuelve_motivo_usuario_o_tecnica(self):
+        contrato = InventoryContract(machine_id=MACHINE_ID)
+        contrato.agregar_exclusion_usuario("C:\\Privado")
+        assert (
+            contrato.razon_exclusion("C:\\Privado\\archivo.txt") == "exclusion_usuario"
+        )
+        assert (
+            contrato.razon_exclusion("C:\\$Recycle.Bin\\algo") == "exclusion_tecnica"
+        )
+        assert contrato.razon_exclusion("C:\\Público\\archivo.txt") is None
+
+    def test_recorrido_volumen_respeta_exclusion_de_usuario(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        storage.initialize()
+        _, base = _volumen_para_scan(tmp_path, letra="Z:")
+        excluida = base / "sub00"
+        (excluida / "dentro.txt").write_text("dentro\n", encoding="utf-8")
+
+        contrato = InventoryContract(machine_id=MACHINE_ID)
+        contrato.agregar_exclusion_usuario(str(excluida))
+
+        recorrido = RecorridoVolumen(
+            volumen="Z:",
+            raiz=str(base),
+            contrato=contrato,
+            maquina_id=MACHINE_ID,
+        )
+        entradas = list(recorrido.recorrer())
+
+        rutas = [e.absolute_path for e in entradas]
+        assert not any(
+            r == str(excluida) or r.startswith(str(excluida) + os.sep) for r in rutas
+        )
+        assert recorrido.progreso.exclusiones >= 1
+        for e in entradas:
+            if e.excluded:
+                assert e.exclusion_reason == "exclusion_usuario"
