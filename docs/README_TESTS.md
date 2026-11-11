@@ -10938,6 +10938,8 @@ Todos los tests usan directorios temporales (`tmp_path`) y bases de datos tempor
 | `TestEscanerRutaOVolumen` | Escaneo por ruta y por volumen sobre almacenamiento real: creación de `scan_run` y entradas en SQLite, respeto a exclusiones de usuario, cancelación que preserva entradas emitidas, ruta inexistente sin abortar, aislamiento por `machine_id` y reconstrucción controlada del catálogo (nuevo `scan_id`, historial conservado, último scan actualizado). |
 | `TestExclusionesUsuarioContrato` | Gestión de exclusiones de usuario en `InventoryContract`: agregar, quitar, duplicados, limpiar, detección de carpeta excluida y su contenido, sensibilidad a mayúsculas según el SO, motivos `exclusion_usuario`/`exclusion_tecnica` y respeto del recorrido a la exclusión. |
 | `TestLogsSinRutasCompletas` | Logging sin rutas completas ni listados de nombres/rutas: recorrido loguea resumenes (conteos) sin ruta completa, errores agregados por categoria sin ruta fallida, `escanear_ruta` loguea evidencia minima (scan_id, volumen, modo, resultado, conteos), politica de refresco loguea decisiones sin rutas completas, `safe_log_path` acorta rutas largas. |
+| `TestPoliticaRetencion` | `PoliticaRetencion`: valores por defecto (max 5 generaciones, max 3 backups, TTL None, modo seguro y backup previo activos) y validaciones (max_generaciones >= 1, max_backups >= 1, edades positivas o None). |
+| `TestResultadoLimpieza` | `ResultadoLimpieza`: valores por defecto, contadores (generaciones/entradas/backups eliminados, backup creado, generaciones/entradas protegidas, errores), resumen serializable con `total_eliminado`. |
 
 ---
 
@@ -10974,8 +10976,12 @@ Todos los tests usan directorios temporales (`tmp_path`) y bases de datos tempor
 | `TestConcurrenciaEscaneos` | Bloqueo de concurrencia, `ConcurrentScanError`, liberación del bloqueo y modo de journaling WAL. |
 | `TestBackupCorrupcionYRecuperacion` | Copia de seguridad, verificación de integridad (`PRAGMA quick_check` / `integrity_check`) y restauración desde copia sin sobrescribir una base válida con una copia vacía, incompleta o corrupta. |
 | `TestProteccionPermisosYIdentidad` | Protección de permisos de fichero (propietario único 0o600, ACL de Windows con fallback), identidad de equipo (`machine_id` registrado vs equipo actual, bloqueo sin decisión explícita) y no-exposición por red (ruta local vs UNC, SQLite integrado sin servidor). |
+| `TestLimpiezaGeneracionesAntiguas` | `limpiar_generaciones_antiguas`: elimina scan_runs antiguos protegiendo la última completa por volumen y los escaneos activos; elimina por antigüedad o exceso de generaciones; no elimina sin scan_runs. |
+| `TestLimpiezaEntradasObsoletas` | `limpiar_entradas_obsoletas`: elimina entradas OBSOLETO/EXPIRADO según TTL, protege las del último escaneo completo, no elimina sin TTL configurado. |
+| `TestLimpiezaBackupsAntiguos` | `limpiar_backups_antiguos`: conserva solo los `max_backups` .bak más recientes por mtime, no elimina si está dentro del límite, no falla sin backups. |
+| `TestEjecucionLimpiezaRetencion` | `ejecutar_limpieza_retencion`: flujo orquestado (backup previo, limpieza de generaciones, entradas obsoletas y backups antiguos), resultado `ResultadoLimpieza` con contadores reales y resumen serializable. |
 
-**Resultados:** 236 tests unitarios, 236 PASSED / 0 FAILED.
+**Resultados:** 248 tests unitarios, 248 PASSED / 0 FAILED.
 
 ---
 
@@ -11043,6 +11049,25 @@ que decidan el resultado.
 **Clases de test:** ninguna (funciones de test de modulo).
 
 **Resultados:** 7 tests de verificacion en entorno real, 7 PASSED / 0 FAILED.
+
+---
+
+### `hands\verificacion_real_inventario_8_6.py`
+
+**Descripción:** Verificación en el entorno real del equipo (Windows) de
+`SystemInventoryStorage.ejecutar_limpieza_retencion` y los métodos de
+limpieza asociados (3.8.5.1.4.8.6). Usa una base de datos SQLite temporal
+real, crea scan_runs con edades distintas, ejecuta la política de retención
+y comprueba de forma observable: copia de seguridad creada antes de la
+limpieza, generación antigua eliminada, última generación completa
+protegida, entradas de generación eliminada borradas, entradas de última
+completa conservadas y resultado serializable. No usa mocks: cada
+verificación compara contra el estado real de la base de datos y del
+sistema de archivos.
+
+**Clases de test:** ninguna (función de test de módulo).
+
+**Resultados:** 8 pruebas de verificación en entorno real, 8 PASSED / 0 FAILED.
 
 ---
 

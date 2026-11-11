@@ -706,6 +706,127 @@ def clasificar_entradas_por_caducidad(
     return resultados
 
 
+# ---------------------------------------------------------------------------
+# Politica de retencion y limpieza del inventario (3.8.5.1.4.8.6)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class PoliticaRetencion:
+    """
+    Politica de retencion y limpieza del inventario persistente.
+
+    Define cuantas generaciones de escaneo conservar por volumen, la edad
+    maxima de una generacion y de una entrada, cuantas copias de seguridad
+    mantener y los controles de seguridad para no borrar informacion valiosa
+    durante un escaneo parcial o en curso.
+
+    Todos los valores son opcionales con sensatos por defecto. Los umbrales
+    de edad se configuran a partir de mediciones reales del equipo, nunca de
+    umbrales inventados (3.8.5.1.4.5.8).
+    """
+
+    max_generaciones_por_volumen: int = 5
+    """Numero máximo de generaciones de escaneo (scan_runs) a conservar por
+    (machine_id, volumen). None no se aplica: se usa el valor por defecto 5."""
+
+    max_edad_generacion_segundos: Optional[float] = None
+    """Edad máxima en segundos de una generacion de escaneo. Las mas antiguas
+    se eliminan. None = sin limite por edad."""
+
+    max_edad_entrada_segundos: Optional[float] = None
+    """TTL en segundos para entradas de inventario. Las entradas cuyo
+    last_checked_at supere este umbral (según ConfigCaducidad) se consideran
+    obsoletas y candidatas a limpieza. None = sin caducidad por tiempo."""
+
+    max_backups: int = 3
+    """Numero máximo de copias de seguridad (.bak) a conservar junto a la base
+    de datos. Las mas antiguas se eliminan."""
+
+    modo_seguro_escaneo_parcial: bool = True
+    """Si True, no se elimina ninguna generacion que tenga un escaneo activo
+    (has_active_scan) ni se tocan entradas del ultimo escaneo completo del
+    volumen, protegiendo la informacion valiosa durante escaneos parciales."""
+
+    crear_backup_antes_limpieza: bool = True
+    """Si True, se crea una copia de seguridad antes de cualquier eliminacion
+    destructiva de generaciones o entradas obsoletas."""
+
+    def __post_init__(self) -> None:
+        if self.max_generaciones_por_volumen < 1:
+            raise ValueError(
+                f"max_generaciones_por_volumen debe ser >= 1, obtuvo "
+                f"{self.max_generaciones_por_volumen!r}"
+            )
+        if self.max_backups < 1:
+            raise ValueError(
+                f"max_backups debe ser >= 1, obtuvo {self.max_backups!r}"
+            )
+        for campo, valor in (
+            ("max_edad_generacion_segundos", self.max_edad_generacion_segundos),
+            ("max_edad_entrada_segundos", self.max_edad_entrada_segundos),
+        ):
+            if valor is not None and valor <= 0:
+                raise ValueError(
+                    f"{campo} debe ser > 0 o None, obtuvo {valor!r}"
+                )
+
+
+@dataclass
+class ResultadoLimpieza:
+    """Resultado de una operacion de limpieza/retencion del inventario.
+
+    Todos los contadores son reales: generaciones de escaneo eliminadas,
+    entradas de archivo eliminadas, copias de seguridad eliminadas y
+    advertencias de elementos protegidos por seguridad.
+    """
+
+    machine_id: str
+    """Equipo al que pertenece el inventario limpiado."""
+
+    generaciones_eliminadas: int = 0
+    """Numero de scan_runs (y sus file_entries/application_candidates)
+    eliminados por antigüedad o exceso de generaciones."""
+
+    entradas_eliminadas: int = 0
+    """Numero de file_entries eliminadas por caducidad/obsolecencia."""
+
+    backups_eliminados: int = 0
+    """Numero de copias de seguridad (.bak) eliminadas por retención."""
+
+    backup_creado: Optional[str] = None
+    """Ruta de la copia de seguridad creada antes de la limpieza, si procede."""
+
+    generaciones_protegidas: list[str] = field(default_factory=list)
+    """scan_ids de generaciones no eliminadas porque estaban activas o eran
+    la ultima completa del volumen (modo seguro)."""
+
+    entradas_protegidas: int = 0
+    """Numero de entradas no eliminadas porque pertenecen al ultimo escaneo
+    completo o no cumplen criterios de obsolecencia."""
+
+    errores: list[str] = field(default_factory=list)
+    """Errores no fatales ocurridos durante la limpieza."""
+
+    def resumen(self) -> dict[str, object]:
+        """Devuelve un resumen serializable de la limpieza."""
+        return {
+            "machine_id": self.machine_id,
+            "generaciones_eliminadas": self.generaciones_eliminadas,
+            "entradas_eliminadas": self.entradas_eliminadas,
+            "backups_eliminados": self.backups_eliminados,
+            "backup_creado": self.backup_creado,
+            "generaciones_protegidas": list(self.generaciones_protegidas),
+            "entradas_protegidas": self.entradas_protegidas,
+            "errores": list(self.errores),
+            "total_eliminado": (
+                self.generaciones_eliminadas
+                + self.entradas_eliminadas
+                + self.backups_eliminados
+            ),
+        }
+
+
 @dataclass
 class ResultadoValidacionDestino:
     """Resultado de la revalidación de un destino de inventario antes de usarlo.

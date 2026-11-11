@@ -1229,3 +1229,105 @@ class TestLogsSinRutasCompletas:
         # Rutas cortas no se truncan.
         ruta_corta = "C:\\temp.txt"
         assert safe_log_path(ruta_corta) == ruta_corta
+
+
+# ---------------------------------------------------------------------------
+# Politica de retencion y limpieza (3.8.5.1.4.8.6).
+# ---------------------------------------------------------------------------
+
+class TestPoliticaRetencion:
+    """PoliticaRetencion: valores por defecto y validaciones de entrada."""
+
+    def test_valores_por_defecto(self):
+        from src.hands.system_inventory import PoliticaRetencion
+
+        p = PoliticaRetencion()
+        assert p.max_generaciones_por_volumen == 5
+        assert p.max_edad_generacion_segundos is None
+        assert p.max_edad_entrada_segundos is None
+        assert p.max_backups == 3
+        assert p.modo_seguro_escaneo_parcial is True
+        assert p.crear_backup_antes_limpieza is True
+
+    def test_max_generaciones_debe_ser_al_menos_uno(self):
+        from src.hands.system_inventory import PoliticaRetencion
+
+        with pytest.raises(ValueError):
+            PoliticaRetencion(max_generaciones_por_volumen=0)
+        with pytest.raises(ValueError):
+            PoliticaRetencion(max_generaciones_por_volumen=-1)
+
+    def test_max_backups_debe_ser_al_menos_uno(self):
+        from src.hands.system_inventory import PoliticaRetencion
+
+        with pytest.raises(ValueError):
+            PoliticaRetencion(max_backups=0)
+
+    def test_edades_deben_ser_positivas_o_none(self):
+        from src.hands.system_inventory import PoliticaRetencion
+
+        with pytest.raises(ValueError):
+            PoliticaRetencion(max_edad_generacion_segundos=0)
+        with pytest.raises(ValueError):
+            PoliticaRetencion(max_edad_entrada_segundos=-5)
+        # None y positivos son validos.
+        PoliticaRetencion(max_edad_generacion_segundos=None)
+        PoliticaRetencion(max_edad_entrada_segundos=None)
+        PoliticaRetencion(max_edad_generacion_segundos=3600, max_edad_entrada_segundos=7200)
+
+    def test_valores_personalizados(self):
+        from src.hands.system_inventory import PoliticaRetencion
+
+        p = PoliticaRetencion(
+            max_generaciones_por_volumen=2,
+            max_edad_generacion_segundos=86400,
+            max_edad_entrada_segundos=172800,
+            max_backups=1,
+            modo_seguro_escaneo_parcial=False,
+            crear_backup_antes_limpieza=False,
+        )
+        assert p.max_generaciones_por_volumen == 2
+        assert p.max_edad_generacion_segundos == 86400
+        assert p.max_edad_entrada_segundos == 172800
+        assert p.max_backups == 1
+        assert p.modo_seguro_escaneo_parcial is False
+        assert p.crear_backup_antes_limpieza is False
+
+
+class TestResultadoLimpieza:
+    """ResultadoLimpieza: estructura de resumen y contadores."""
+
+    def test_valores_por_defecto(self):
+        from src.hands.system_inventory import ResultadoLimpieza
+
+        r = ResultadoLimpieza(machine_id="maquina-1")
+        assert r.machine_id == "maquina-1"
+        assert r.generaciones_eliminadas == 0
+        assert r.entradas_eliminadas == 0
+        assert r.backups_eliminados == 0
+        assert r.backup_creado is None
+        assert r.generaciones_protegidas == []
+        assert r.entradas_protegidas == 0
+        assert r.errores == []
+
+    def test_resumen_incluye_total_eliminado(self):
+        from src.hands.system_inventory import ResultadoLimpieza
+
+        r = ResultadoLimpieza(machine_id="maquina-1")
+        r.generaciones_eliminadas = 2
+        r.entradas_eliminadas = 5
+        r.backups_eliminados = 1
+        res = r.resumen()
+        assert res["machine_id"] == "maquina-1"
+        assert res["total_eliminado"] == 8
+        assert res["backup_creado"] is None
+        assert res["errores"] == []
+
+    def test_resumen_serializable(self):
+        from src.hands.system_inventory import ResultadoLimpieza
+        import json
+
+        r = ResultadoLimpieza(machine_id="maquina-1")
+        r.generaciones_protegidas = ["scan-1", "scan-2"]
+        r.errores = ["error de ejemplo"]
+        json.dumps(r.resumen())  # no debe lanzar

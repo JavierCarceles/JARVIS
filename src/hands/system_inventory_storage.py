@@ -47,10 +47,13 @@ from src.hands.application_preflight import (
     get_application_preflight,
 )
 from src.hands.system_inventory import (
+    ConfigCaducidad,
     EntryType,
     EstadoCaducidad,
     InventoryEntry,
+    PoliticaRetencion,
     ResultadoCaducidad,
+    ResultadoLimpieza,
     ResultadoValidacionDestino,
     generate_machine_id,
     esta_caducado,
@@ -1015,6 +1018,498 @@ class SystemInventoryStorage:
             ) from None
         # Reabrir la base restaurada.
         self.connect()
+
+    # ------------------------------------------------------------------ #
+    # Limpieza y retencion de generaciones, entradas obsoletas y backups (3.8.5.1.4.8.6).
+    # ------------------------------------------------------------------ #
+    def listar_scan_runs_por_volumen(
+        self, machine_id: str, volume: str
+    ) -> list[dict]:
+        """Devuelve los scan_runs de (machine_id, volumen) ordenados por
+        started_at ascendente (el mas antiguo primero).
+
+        Cada elemento es un dict con las columnas de scan_runs, incluidas
+        scan_id, started_at, finished_at, result y entries_count.
+        """
+        conn = self.connect()
+        cur = conn.execute(
+            """
+            SELECT scan_id, machine_id, volume, mode, started_at, finished_at,
+                   result, entries_count, errors_count, coverage_estimate
+            FROM scan_runs
+            WHERE machine_id = ? AND volume = ?
+            ORDER BY started_at ASC
+            """,
+            (machine_id, volume),
+        )
+        return [dict(row) for row in cur.fetchall()]
+
+    def _obtener_ultimo_scan_completo_por_volumen(
+        self, machine_id: str, volume: str
+    ) -> Optional[dict]:
+        """Devuelve el ultimo scan_run con resultado SCAN_RESULT_OK de
+        (machine_id, volumen), o None si no existe ninguno completo."""
+        conn = self.connect()
+        cur = conn.execute(
+            """
+            SELECT scan_id, started_at, result, entries_count
+            FROM scan_runs
+            WHERE machine_id = ? AND volume = ? AND result = ?
+            ORDER BY started_at DESC
+            LIMIT 1
+            """,
+            (machine_id, volume, SCAN_RESULT_OK),
+        )
+        row = cur.fetchone()
+        return dict(row) if row is not None else None
+
+    def limpiar_generaciones_antiguas(
+        self, machine_id: str, volume: str, politica: PoliticaRetencion
+    ) -> dict[str, object]:
+        """Elimina generaciones de escaneo antiguas de (machine_id, volumen).
+
+        Reglas de seguridad (3.8.5.1.4.8.6, modo seguro):
+        - Nunca se elimina una generacion con escaneo activo
+          (has_active_scan).
+        - Nunca se elimina el ultimo scan_run completo (SCAN_RESULT_OK) del
+          volumen: es la referencia de informacion valiosa.
+        - Las generaciones interrumpidas (SCAN_RESULT_INTERRUPTED) o con
+          error solo se eliminan si superan max_edad_generacion_segundos o
+          exceden max_generaciones_por_volumen y no son la ultima completa.
+        - Se eliminan tambien las file_entries y application_candidates
+          vinculadas a cada scan_id eliminado.
+
+        Retorna un resumen con generaciones_eliminadas, generaciones_protegidas
+        y detalle de scan_ids eliminados.
+        """
+        eliminados: list[str] = []
+        protegidos: list[str] = []
+        errores: list[str] = []
+
+        try:
+            scans = self.listar_scan_runs_por_volumen(machine_id, volume)
+        except Exception as exc:  # pragma: no cover - defensivo
+            errores.append(f"No se pudieron listar scan_runs: {exc}")
+            return {
+                "generaciones_eliminadas": 0,
+                "generaciones_protegidas": protegidos,
+                "scan_ids_eliminados": eliminados,
+                "errores": errores,
+            }
+
+        if not scans:
+            return {
+                "generaciones_eliminadas": 0,
+                "generaciones_protegidas": protegidos,
+                "scan_ids_eliminados": eliminados,
+                "errores": errores,
+            }
+
+        ultimo_completo = self._obtener_ultimo_scan_completo_por_volumen(
+            machine_id, volume
+        )
+        ultimo_completo_id = (
+            ultimo_completo["scan_id"] if ultimo_completo is not None else None
+        )
+
+        ahora = datetime.now(timezone.utc)
+
+        def _es_antiguo_por_edad(scan: dict) -> bool:
+            if politica.max_edad_generacion_segundos is None:
+                return False
+            started_at = scan.get("started_at") or ""
+            if not started_at:
+                return False
+            try:
+                inicio = datetime.fromisoformat(started_at)
+                if inicio.tzinfo is None:
+                    inicio = inicio.replace(tzinfo=timezone.utc)
+                return (ahora - inicio).total_seconds() > (
+                    politica.max_edad_generacion_segundos
+                )
+            except (ValueError, TypeError, OverflowError):
+                return False
+
+        # Candidatos a eliminacion: todos salvo el ultimo completo y salvo
+        # los que tengan escaneo activo.
+        for scan in scans:
+            scan_id = scan["scan_id"]
+
+            # Proteccion: ultimo escaneo completo del volumen (informacion
+            # valiosa de referencia).
+            if scan_id == ultimo_completo_id:
+                protegidos.append(scan_id)
+                continue
+
+            # Proteccion: escaneo activo en curso (no borrar durante
+            # escaneo parcial/en curso).
+            if politica.modo_seguro_escaneo_parcial and self.has_active_scan(
+                machine_id, volume
+            ):
+                # Si este scan_id es el activo, protegerlo. has_active_scan no
+                # dice cual scan_id esta activo, asi que protegemos todos los
+                # que no esten finalizados (finished_at NULL o resultado
+                # interrumpido) cuando hay un activo.
+                if scan.get("finished_at") is None or scan.get(
+                    "result"
+                ) == SCAN_RESULT_INTERRUPTED:
+                    protegidos.append(scan_id)
+                    continue
+
+            # Criterio de edad maxima.
+            es_antiguo = _es_antiguo_por_edad(scan)
+
+            # Contaremos eliminaciones por exceso de generaciones despues de
+            # aplicar edad y protecciones.
+            _ = es_antiguo  # se usa abajo con el conteo por exceso
+
+        # Aplicar exceso de generaciones: conservar las mas recientes hasta
+        # max_generaciones_por_volumen, excluyendo las ya protegidas.
+        candidatos_ordenados = sorted(
+            [s for s in scans if s["scan_id"] not in protegidos],
+            key=lambda s: s.get("started_at") or "",
+        )
+
+        por_eliminar_por_edad: list[str] = []
+        for scan in candidatos_ordenados:
+            if _es_antiguo_por_edad(scan):
+                por_eliminar_por_edad.append(scan["scan_id"])
+
+        # Quitar por edad primero (son candidatos eliminables).
+        ids_por_edad = set(por_eliminar_por_edad)
+        restantes = [
+            s for s in candidatos_ordenados if s["scan_id"] not in ids_por_edad
+        ]
+
+        # Quitar por exceso de generaciones: mantener las mas recientes
+        # max_generaciones_por_volumen entre las restantes.
+        if len(restantes) > politica.max_generaciones_por_volumen:
+            sobrantes = restantes[: len(restantes) - politica.max_generaciones_por_volumen]
+            for scan in sobrantes:
+                ids_por_edad.add(scan["scan_id"])
+
+        # Ejecutar eliminaciones dentro de una transaccion.
+        conn = self.connect()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            for scan_id in sorted(ids_por_edad):
+                try:
+                    # Borrar entradas vinculadas a este scan.
+                    conn.execute(
+                        "DELETE FROM file_entries WHERE scan_id = ?",
+                        (scan_id,),
+                    )
+                    conn.execute(
+                        "DELETE FROM application_candidates WHERE scan_id = ?",
+                        (scan_id,),
+                    )
+                    cur = conn.execute(
+                        "DELETE FROM scan_runs WHERE scan_id = ?",
+                        (scan_id,),
+                    )
+                    if cur.rowcount > 0:
+                        eliminados.append(scan_id)
+                    else:
+                        protegidos.append(scan_id)
+                except Exception as exc:  # no eliminar todo por un fallo aislado
+                    errores.append(f"No se pudo eliminar {scan_id}: {exc}")
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+
+        return {
+            "generaciones_eliminadas": len(eliminados),
+            "generaciones_protegidas": protegidos,
+            "scan_ids_eliminados": eliminados,
+            "errores": errores,
+        }
+
+    def limpiar_entradas_obsoletas(
+        self, machine_id: str, politica: PoliticaRetencion
+    ) -> dict[str, object]:
+        """Elimina file_entries obsoletas segun el TTL de la politica.
+
+        Usa `esta_caducado` con `ConfigCaducidad(ttl_segundos=...)` para
+        clasificar cada entrada. Se eliminan las marcadas OBSOLETO o
+        EXPIRADO, salvo que pertenezcan al ultimo scan_run completo del
+        volumen (proteccion de informacion valiosa, 3.8.5.1.4.8.6).
+
+        Retorna un resumen con entradas_eliminadas, entradas_protegidas y
+        detalle de rutas (acortadas para logs) eliminadas.
+        """
+        if politica.max_edad_entrada_segundos is None:
+            return {
+                "entradas_eliminadas": 0,
+                "entradas_protegidas": 0,
+                "rutas_eliminadas": [],
+                "errores": [],
+            }
+
+        cfg = ConfigCaducidad(
+            ttl_segundos=politica.max_edad_entrada_segundos,
+            usar_last_checked=True,
+        )
+
+        # Identificar el ultimo scan completo por volumen para proteger sus
+        # entradas (no borrar informacion valiosa del escaneo mas reciente).
+        conn = self.connect()
+        cur = conn.execute(
+            "SELECT DISTINCT volume FROM scan_runs WHERE machine_id = ?",
+            (machine_id,),
+        )
+        volumenes = [row[0] for row in cur.fetchall()]
+
+        scan_ids_completos_proteged: set[str] = set()
+        for volume in volumenes:
+            ultimo = self._obtener_ultimo_scan_completo_por_volumen(
+                machine_id, volume
+            )
+            if ultimo is not None:
+                scan_ids_completos_proteged.add(ultimo["scan_id"])
+
+        # Cargar todas las entradas del equipo con su scan_id.
+        cur = conn.execute(
+            """
+            SELECT entry_id, absolute_path, normalized_path, scan_id,
+                   last_checked_at, machine_id, volume
+            FROM file_entries
+            WHERE machine_id = ?
+            """,
+            (machine_id,),
+        )
+        filas = [dict(row) for row in cur.fetchall()]
+
+        eliminadas: list[str] = []
+        protegidas = 0
+        errores: list[str] = []
+        ahora = datetime.now(timezone.utc)
+
+        a_eliminar: list[tuple[str, str]] = []  # (entry_id, absolute_path)
+
+        for fila in filas:
+            scan_id = fila.get("scan_id")
+            # Proteger entradas del ultimo escaneo completo de su volumen.
+            if scan_id in scan_ids_completos_proteged:
+                protegidas += 1
+                continue
+
+            entry = InventoryEntry(
+                machine_id=fila["machine_id"],
+                volume=fila["volume"],
+                absolute_path=fila["absolute_path"],
+                relative_path=fila.get("normalized_path") or "",
+                name=Path(fila["absolute_path"]).name,
+                extension=Path(fila["absolute_path"]).suffix,
+                entry_type=EntryType.FILE,
+                size_bytes=0,
+                modified_at="",
+                created_at="",
+                last_checked_at=fila.get("last_checked_at") or "",
+            )
+            try:
+                resultado = esta_caducado(entry, cfg)
+            except Exception as exc:
+                errores.append(
+                    f"No se pudo evaluar caducidad de {fila['absolute_path']}: {exc}"
+                )
+                continue
+
+            if resultado.estado in (
+                EstadoCaducidad.OBSOLETO,
+                EstadoCaducidad.EXPIRADO,
+            ):
+                a_eliminar.append((fila["entry_id"], fila["absolute_path"]))
+
+        # Ejecutar eliminaciones.
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            for entry_id, absolute_path in a_eliminar:
+                try:
+                    cur = conn.execute(
+                        "DELETE FROM file_entries WHERE entry_id = ?",
+                        (entry_id,),
+                    )
+                    if cur.rowcount > 0:
+                        eliminadas.append(absolute_path)
+                    else:
+                        protegidas += 1
+                except Exception as exc:
+                    errores.append(
+                        f"No se pudo eliminar entrada {entry_id}: {exc}"
+                    )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+
+        return {
+            "entradas_eliminadas": len(eliminadas),
+            "entradas_protegidas": protegidas,
+            "rutas_eliminadas": eliminadas,
+            "errores": errores,
+        }
+
+    def limpiar_backups_antiguos(self, politica: PoliticaRetencion) -> dict[str, object]:
+        """Elimina copias de seguridad (.bak) antiguas sobrelas mas recientes.
+
+        Lista los ficheros con el sufijo DEFAULT_BACKUP_SUFFIX en el directorio
+        de la base de datos, los ordena por fecha de modificacion (el mas
+        antiguo primero) y conserva solo los max_backups mas recientes.
+
+        Retorna un resumen con backups_eliminados y las rutas eliminadas.
+        """
+        db_dir = self.db_path.parent
+        if not db_dir.exists():
+            return {
+                "backups_eliminados": 0,
+                "rutas_eliminadas": [],
+                "errores": [],
+            }
+
+        sufijo = DEFAULT_BACKUP_SUFFIX
+        try:
+            todos_los_bak = sorted(
+                [
+                    p
+                    for p in db_dir.iterdir()
+                    if p.is_file() and p.name.endswith(sufijo)
+                ],
+                key=lambda p: p.stat().st_mtime,
+            )
+        except OSError as exc:
+            return {
+                "backups_eliminados": 0,
+                "rutas_eliminadas": [],
+                "errores": [f"No se pudo listar backups: {exc}"],
+            }
+
+        if len(todos_los_bak) <= politica.max_backups:
+            return {
+                "backups_eliminados": 0,
+                "rutas_eliminadas": [],
+                "errores": [],
+            }
+
+        a_eliminar = todos_los_bak[: len(todos_los_bak) - politica.max_backups]
+        eliminadas: list[str] = []
+        errores: list[str] = []
+
+        for ruta in a_eliminar:
+            try:
+                ruta.unlink()
+                eliminadas.append(str(ruta))
+            except OSError as exc:
+                errores.append(f"No se pudo eliminar backup {ruta}: {exc}")
+
+        return {
+            "backups_eliminados": len(eliminadas),
+            "rutas_eliminadas": eliminadas,
+            "errores": errores,
+        }
+
+    def ejecutar_limpieza_retencion(
+        self, machine_id: str, politica: Optional[PoliticaRetencion] = None
+    ) -> ResultadoLimpieza:
+        """Ejecuta la limpieza/retencion completa del inventario para un equipo.
+
+        Flujo (3.8.5.1.4.8.6):
+        1. Si `crear_backup_antes_limpieza`, crear copia de seguridad antes de
+           cualquier eliminacion destructiva.
+        2. Para cada volumen con scan_runs, limpiar generaciones antiguas
+           (respetando escaneos activos y la ultima completa).
+        3. Limpiar entradas obsoletas segun TTL.
+        4. Limpiar copias de seguridad antiguas segun retención.
+
+        Nunca borra informacion valiosa durante un escaneo parcial: las
+        generaciones activas y el ultimo escaneo completo por volumen quedan
+        protegidas.
+
+        Retorna un `ResultadoLimpieza` con todos los contadores y evidencias.
+        """
+        politica = politica or PoliticaRetencion()
+        resultado = ResultadoLimpieza(machine_id=machine_id)
+
+        # 1. Backup preventivo antes de eliminaciones destructivas.
+        if politica.crear_backup_antes_limpieza:
+            try:
+                ruta_backup = self.create_backup()
+                resultado.backup_creado = str(ruta_backup)
+            except InventoryBackupError as exc:
+                # No es fatal: registrar y continuar sin backup previo.
+                resultado.errores.append(f"No se pudo crear backup previo: {exc}")
+
+        # 2. Obtener todos los volumes con scan_runs de este equipo.
+        # No se cierra la conexion aqui: los sub-metodos (limpiar_generaciones_antiguas,
+        # limpiar_entradas_obsoletas) llaman a self.connect(), que reutiliza la
+        # conexion abierta o crea una nueva si esta cerrada, gestionando su propio
+        # ciclo de vida. Cerrar aqui podria dejar self._conn en estado cerrado
+        # y causar "Cannot operate on a closed database" en los sub-metodos.
+        conn = self.connect()
+        try:
+            cur = conn.execute(
+                "SELECT DISTINCT volume FROM scan_runs WHERE machine_id = ?",
+                (machine_id,),
+            )
+            volumenes = [row[0] for row in cur.fetchall()]
+        finally:
+            pass
+
+        # 3. Limpiar generaciones antiguas por volumen.
+        generaciones_protegidas: list[str] = []
+        for volume in volumenes:
+            try:
+                res = self.limpiar_generaciones_antiguas(
+                    machine_id, volume, politica
+                )
+                resultado.generaciones_eliminadas += int(
+                    res.get("generaciones_eliminadas", 0)
+                )
+                generaciones_protegidas.extend(
+                    res.get("generaciones_protegidas", [])
+                )
+                errores_vol = res.get("errores", [])
+                if errores_vol:
+                    resultado.errores.extend(
+                        f"[{volume}] {e}" for e in errores_vol
+                    )
+            except Exception as exc:
+                resultado.errores.append(
+                    f"[{volume}] error limpiando generaciones: {exc}"
+                )
+
+        resultado.generaciones_protegidas = generaciones_protegidas
+
+        # 4. Limpiar entradas obsoletas.
+        try:
+            res_entradas = self.limpiar_entradas_obsoletas(machine_id, politica)
+            resultado.entradas_eliminadas = int(
+                res_entradas.get("entradas_eliminadas", 0)
+            )
+            resultado.entradas_protegidas = int(
+                res_entradas.get("entradas_protegidas", 0)
+            )
+            if res_entradas.get("errores"):
+                resultado.errores.extend(
+                    f"[entradas] {e}" for e in res_entradas["errores"]
+                )
+        except Exception as exc:
+            resultado.errores.append(f"[entradas] error limpiando obsoletas: {exc}")
+
+        # 5. Limpiar backups antiguos.
+        try:
+            res_backups = self.limpiar_backups_antiguos(politica)
+            resultado.backups_eliminados = int(
+                res_backups.get("backups_eliminados", 0)
+            )
+            if res_backups.get("errores"):
+                resultado.errores.extend(
+                    f"[backups] {e}" for e in res_backups["errores"]
+                )
+        except Exception as exc:
+            resultado.errores.append(f"[backups] error limpiando antiguos: {exc}")
+
+        return resultado
 
     # ------------------------------------------------------------------ #
     # Entidades maestras

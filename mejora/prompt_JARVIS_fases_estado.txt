@@ -8590,3 +8590,26 @@ REGRESION: Ninguna introducida por esta unidad. main.py sigue importando correct
 DISCREPANCIAS: Ninguna afectante a los criterios de aceptacion de esta unidad.
 PENDIENTES: Ninguno para esta unidad. Padre 3.8.5.1.4.8 con hijas .8.1 a .8.10; .8.1, .8.2, .8.3, .8.4 y .8.5 completadas. Siguiente hoja pendiente real: 3.8.5.1.4.8.6 (limpieza/retencion de generaciones antiguas, entradas obsoletas y backups).
 ESTADO FINAL: 3.8.5.1.4.8.5 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.8.5.1.4.8.6
+FECHA: 2026-11-11
+OBJETIVO: Definir limpieza/retención de generaciones antiguas, entradas obsoletas y backups sin borrar información valiosa durante un escaneo parcial (unidad hoja de 3.8.5.1.4.8 Operación, privacidad y mantenimiento del inventario).
+TIPO DE TRABAJO: IMPLEMENTACIÓN + VERIFICACIÓN REAL (PoliticaRetencion/ResultadoLimpieza en system_inventory.py; métodos de limpieza en SystemInventoryStorage de system_inventory_storage.py; tests unitarios y verificación real en entorno Windows).
+CAMBIOS / HALLAZGOS:
+- src/hands/system_inventory.py: adicion de PoliticaRetencion (configuración de retención: max_generaciones_por_volumen, max_edad_generacion_segundos, max_edad_entrada_segundos, max_backups, modo_seguro_escaneo_parcial, crear_backup_antes_limpieza) y ResultadoLimpieza (resultado de limpieza con contadores, resumen serializable y total_eliminado).
+- src/hands/system_inventory_storage.py: adicion de métodos de limpieza en SystemInventoryStorage:
+  * listar_scan_runs_por_volumen: lista scan_runs de un volumen ordenados por started_at.
+  * limpiar_generaciones_antiguas: elimina scan_runs antiguos protegiendo la última completa y escaneos activos; borra file_entries y application_candidates vinculadas.
+  * limpiar_entradas_obsoletas: elimina entradas OBSOLETO/EXPIRADO según TTL, protege entradas del último scan completo.
+  * limpiar_backups_antiguos: conserva solo max_backups copias .bak más recientes.
+  * ejecutar_limpieza_retencion: flujo orquestado con backup preventivo, limpieza de generaciones, entradas obsoletas y backups antiguos; retorna ResultadoLimpieza.
+- tests/hands/test_system_inventory.py: nuevas clases TestPoliticaRetencion (5 tests) y TestResultadoLimpieza (3 tests). Total del archivo: 88 tests (80 preexistentes + 8 nuevos).
+- tests/hands/test_system_inventory_storage.py: nuevas clases TestLimpiezaGeneracionesAntiguas (5 tests), TestLimpiezaEntradasObsoletas (2 tests), TestLimpiezaBackupsAntiguos (3 tests), TestEjecucionLimpiezaRetencion (2 tests). Total del archivo: 248 tests (236 preexistentes + 12 nuevos).
+- tests/hands/verificacion_real_inventario_8_6.py: script de verificación real (no recolectado por pytest) que ejecuta ejecutar_limpieza_retencion sobre base de datos temporal real de Windows y verifica backup creado, generación antigua eliminada, última completa protegida, entradas borradas/conservadas y resultado serializable. 8/8 verificaciones reales pasaron.
+ARCHIVOS MODIFICADOS: PRODUCCIÓN: src/hands/system_inventory.py (+PoliticaRetencion, +ResultadoLimpieza), src/hands/system_inventory_storage.py (+métodos de limpieza y retención). TESTS: tests/hands/test_system_inventory.py (+8 tests), tests/hands/test_system_inventory_storage.py (+12 tests), tests/hands/verificacion_real_inventario_8_6.py (verificación real, no pytest). DOCUMENTACIÓN: docs/README.md (clases PoliticaRetencion/ResultadoLimpieza y métodos de limpieza en tablas), docs/README_TESTS.md (nuevas clases de test, conteo actualizado a 248, nueva entrada de verificación real).
+TESTS Y RESULTADOS: UNITARIOS: 303/303 PASSED en tests/hands/test_system_inventory.py y tests/hands/test_system_inventory_storage.py (8 nuevos en test_system_inventory.py, 12 nuevos en test_system_inventory_storage.py). Sin regresión.
+REAL (entorno): Windows 11, Python 3.14.7 (x64). Base de datos SQLite temporal real en directorio temporal del volumen C: con implementación de producción: 8/8 verificaciones reales pasaron (backup creado antes de limpieza; generación antigua eliminada con sus file_entries; última generación completa protegida con sus entradas; resultado ResultadoLimpieza serializable; sin errores). Recursos temporales de verificación limpiados. Sin interacción gráfica (sin ventanas, monitores ni teclado/ratón).
+REGRESION: Ninguna introducida por esta unidad. 303/303 tests pasan sin regresión. main.py sigue importando correctamente.
+DISCREPANCIAS: Ninguna afectante a los criterios de aceptación de esta unidad.
+PENDIENTES: Ninguno para esta unidad. Padre 3.8.5.1.4.8 con hijas .8.1 a .8.10; .8.1 a .8.6 completadas. Siguiente hoja pendiente real: 3.8.5.1.4.8.7 (medir tiempo, CPU, memoria, lecturas de disco, crecimiento de SQLite y rendimiento de consultas con volúmenes representativos).
+ESTADO FINAL: 3.8.5.1.4.8.6 - IMPLEMENTADA

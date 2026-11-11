@@ -3808,6 +3808,378 @@ class TestInterrupcionReanudacionSistemaReal:
 
 
 # ---------------------------------------------------------------------------
+# Limpieza y retencion de generaciones, entradas obsoletas y backups
+# (3.8.5.1.4.8.6).
+# ---------------------------------------------------------------------------
+
+import sqlite3 as _sqlite3
+
+
+def _setup_maquina_volumen(storage, machine_id="m1", volume="C:"):
+    storage.initialize()
+    storage.record_machine(machine_id)
+    storage.record_volume(f"vol-{volume}", machine_id, volume, "local", "online")
+
+
+def _insert_scan_run_directo(storage, scan_id, machine_id, volume,
+                             started_at, result, entries_count=0):
+    """Inserta un scan_run con started_at arbitrario usando una conexión
+    propia (no toca el ciclo de conexión de storage)."""
+    conn = _sqlite3.connect(str(storage.db_path))
+    try:
+        conn.execute(
+            """
+            INSERT INTO scan_runs(scan_id, machine_id, volume, mode, started_at,
+                                  finished_at, result, entries_count, errors_count)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
+            """,
+            (scan_id, machine_id, volume, "completo", started_at,
+             started_at if result == "ok" else None, result, entries_count),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _insert_entrada(storage, scan_id, machine_id, volume, entry_id,
+                    absolute_path, last_checked_at):
+    """Inserta una file_entry con relative_path relleno (NOT NULL)."""
+    nombre = absolute_path.split("\\")[-1]
+    ruta_relativa = nombre
+    conn = _sqlite3.connect(str(storage.db_path))
+    try:
+        conn.execute(
+            """
+            INSERT INTO file_entries(entry_id, scan_id, machine_id, volume,
+                                     absolute_path, normalized_path,
+                                     relative_path, name, extension,
+                                     entry_type, size_bytes, modified_at,
+                                     created_at, last_checked_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, '', 'file', 0, '', ?, ?)
+            """,
+            (entry_id, scan_id, machine_id, volume, absolute_path,
+             absolute_path, ruta_relativa, nombre,
+             last_checked_at, last_checked_at),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _contar_scan_runs(storage, scan_id):
+    conn = _sqlite3.connect(str(storage.db_path))
+    try:
+        cur = conn.execute("SELECT COUNT(*) FROM scan_runs WHERE scan_id = ?", (scan_id,))
+        return cur.fetchone()[0]
+    finally:
+        conn.close()
+
+
+def _contar_entradas_por_scan(storage, scan_id):
+    conn = _sqlite3.connect(str(storage.db_path))
+    try:
+        cur = conn.execute("SELECT COUNT(*) FROM file_entries WHERE scan_id = ?", (scan_id,))
+        return cur.fetchone()[0]
+    finally:
+        conn.close()
+
+
+def _contar_entrada_ruta(storage, absolute_path):
+    conn = _sqlite3.connect(str(storage.db_path))
+    try:
+        cur = conn.execute("SELECT COUNT(*) FROM file_entries WHERE absolute_path = ?", (absolute_path,))
+        return cur.fetchone()[0]
+    finally:
+        conn.close()
+
+
+class TestLimpiezaGeneracionesAntiguas:
+    """limpiar_generaciones_antiguas: elimina scan_runs antiguos protegiendo
+    la ultima completa y los escaneos activos."""
+
+    def test_elimina_generaciones_antiguas_mantiene_ultima_completa(self, storage, tmp_path):
+        _setup_maquina_volumen(storage)
+        ahora = "2026-01-01T10:00:00+00:00"
+        hace_30_dias = "2025-12-02T10:00:00+00:00"
+        hace_60_dias = "2025-11-02T10:00:00+00:00"
+
+        # Tres generaciones: dos antiguas (interrumpidas) y una reciente completa.
+        _insert_scan_run_directo(storage, "scan-antiguo-1", "m1", "C:",
+                                 hace_60_dias, "interrumpido", 10)
+        _insert_scan_run_directo(storage, "scan-antiguo-2", "m1", "C:",
+                                 hace_30_dias, "interrumpido", 10)
+        _insert_scan_run_directo(storage, "scan-reciente", "m1", "C:",
+                                 ahora, "ok", 100)
+
+        # Entradas vinculadas a las generaciones antiguas y a la reciente.
+        _insert_entrada(storage, "scan-antiguo-1", "m1", "C:", "e1",
+                        "C:\\arch1.txt", hace_60_dias)
+        _insert_entrada(storage, "scan-antiguo-2", "m1", "C:", "e2",
+                        "C:\\arch2.txt", hace_30_dias)
+        _insert_entrada(storage, "scan-reciente", "m1", "C:", "e3",
+                        "C:\\arch3.txt", ahora)
+
+        from src.hands.system_inventory import PoliticaRetencion
+        politica = PoliticaRetencion(
+            max_generaciones_por_volumen=5,
+            max_edad_generacion_segundos=20 * 86400,  # 20 dias
+        )
+        res = storage.limpiar_generaciones_antiguas("m1", "C:", politica)
+
+        # Las dos antiguas se eliminan, la reciente completa se protege.
+        assert res["generaciones_eliminadas"] == 2
+        assert set(res["scan_ids_eliminados"]) == {"scan-antiguo-1", "scan-antiguo-2"}
+        assert "scan-reciente" in res["generaciones_protegidas"]
+
+        # Las entradas vinculadas a scans eliminados tambien se borran.
+        assert _contar_entradas_por_scan(storage, "scan-antiguo-1") == 0
+        assert _contar_entradas_por_scan(storage, "scan-antiguo-2") == 0
+        assert _contar_entradas_por_scan(storage, "scan-reciente") == 1
+
+    def test_no_elimina_ultima_completa_incluso_si_es_antigua(self, storage, tmp_path):
+        _setup_maquina_volumen(storage)
+        hace_100_dias = "2025-09-23T10:00:00+00:00"
+
+        # Unica generacion, completa y antigua: debe protegerse.
+        _insert_scan_run_directo(storage, "scan-unica", "m1", "C:",
+                                 hace_100_dias, "ok", 50)
+        _insert_entrada(storage, "scan-unica", "m1", "C:", "e1",
+                        "C:\\arch.txt", hace_100_dias)
+
+        from src.hands.system_inventory import PoliticaRetencion
+        politica = PoliticaRetencion(
+            max_generaciones_por_volumen=5,
+            max_edad_generacion_segundos=20 * 86400,  # 20 dias -> es antigua
+        )
+        res = storage.limpiar_generaciones_antiguas("m1", "C:", politica)
+
+        assert res["generaciones_eliminadas"] == 0
+        assert "scan-unica" in res["generaciones_protegidas"]
+        assert _contar_scan_runs(storage, "scan-unica") == 1
+
+    def test_no_elimina_generacion_con_escaneo_activo(self, storage, tmp_path):
+        _setup_maquina_volumen(storage)
+
+        # Una generacion interrumpida con escaneo activo: proteger.
+        storage.begin_scan_run("scan-activo", "m1", "C:", "completo")
+        assert storage.has_active_scan("m1", "C:") is True
+
+        from src.hands.system_inventory import PoliticaRetencion
+        politica = PoliticaRetencion(
+            max_generaciones_por_volumen=5,
+            max_edad_generacion_segundos=1,  # cualquier edad -> antigua
+        )
+        res = storage.limpiar_generaciones_antiguas("m1", "C:", politica)
+
+        assert res["generaciones_eliminadas"] == 0
+        assert "scan-activo" in res["generaciones_protegidas"]
+        storage._release_scan_lock("m1", "C:")
+
+    def test_elimina_por_exceso_de_generaciones(self, storage, tmp_path):
+        _setup_maquina_volumen(storage)
+
+        # 8 generaciones, politica maxima 5 y ultima completa (scan-7)
+        # protegida: 7 candidatos, se mantienen los 5 mas recientes, se
+        # eliminan scan-0 y scan-1.
+        for i in range(8):
+            started = f"2026-01-01T10:{i:02d}:00+00:00"
+            result = "ok" if i == 7 else "interrumpido"
+            _insert_scan_run_directo(storage, f"scan-{i}", "m1", "C:",
+                                     started, result, 5)
+
+        from src.hands.system_inventory import PoliticaRetencion
+        politica = PoliticaRetencion(
+            max_generaciones_por_volumen=5,
+            max_edad_generacion_segundos=None,  # sin limite de edad
+        )
+        res = storage.limpiar_generaciones_antiguas("m1", "C:", politica)
+
+        assert res["generaciones_eliminadas"] == 2
+        assert set(res["scan_ids_eliminados"]) == {"scan-0", "scan-1"}
+        assert "scan-7" in res["generaciones_protegidas"]
+
+    def test_sin_scan_runs_no_hace_nada(self, storage, tmp_path):
+        _setup_maquina_volumen(storage)
+        from src.hands.system_inventory import PoliticaRetencion
+        res = storage.limpiar_generaciones_antiguas("m1", "C:", PoliticaRetencion())
+        assert res["generaciones_eliminadas"] == 0
+        assert res["generaciones_protegidas"] == []
+        assert res["errores"] == []
+
+
+class TestLimpiezaEntradasObsoletas:
+    """limpiar_entradas_obsoletas: elimina entradas OBSOLETO/EXPIRADO segun TTL,
+    protegiendo las del ultimo escaneo completo por volumen."""
+
+    def test_elimina_entradas_expiradas_y_obsoletas(self, storage, tmp_path):
+        _setup_maquina_volumen(storage)
+        ahora_iso = "2026-01-01T10:00:00+00:00"
+        hace_mucho = "2025-01-01T10:00:00+00:00"
+        hace_poco = "2026-01-01T09:00:00+00:00"
+
+        _insert_scan_run_directo(storage, "scan-viejo", "m1", "C:",
+                                 "2025-12-01T10:00:00+00:00", "interrumpido", 3)
+        _insert_scan_run_directo(storage, "scan-reciente", "m1", "C:",
+                                 ahora_iso, "ok", 3)
+
+        # Entradas expiradas (sin last_checked_at) y obsoletas (muy antiguas).
+        _insert_entrada(storage, "scan-viejo", "m1", "C:", "e-exp",
+                        "C:\\exp.txt", "")  # sin timestamp -> EXPIRADO
+        _insert_entrada(storage, "scan-viejo", "m1", "C:", "e-obs",
+                        "C:\\obs.txt", hace_mucho)  # muy antiguo -> OBSOLETO
+        # Entrada reciente del ultimo scan completo: proteger.
+        _insert_entrada(storage, "scan-reciente", "m1", "C:", "e-vig",
+                        "C:\\vig.txt", hace_poco)
+
+        from src.hands.system_inventory import PoliticaRetencion, EstadoCaducidad
+        from src.hands.system_inventory import esta_caducado, ConfigCaducidad
+        from src.hands.system_inventory import InventoryEntry, EntryType
+        # Verificar clasificacion previa.
+        e_exp = InventoryEntry(machine_id="m1", volume="C:", absolute_path="C:\\exp.txt",
+                               relative_path="exp.txt", name="exp.txt", extension=".txt",
+                               entry_type=EntryType.FILE, size_bytes=0, modified_at="",
+                               created_at="", last_checked_at="")
+        assert esta_caducado(e_exp, ConfigCaducidad(ttl_segundos=86400)).estado == EstadoCaducidad.EXPIRADO
+        e_obs = InventoryEntry(machine_id="m1", volume="C:", absolute_path="C:\\obs.txt",
+                               relative_path="obs.txt", name="obs.txt", extension=".txt",
+                               entry_type=EntryType.FILE, size_bytes=0, modified_at="",
+                               created_at="", last_checked_at=hace_mucho)
+        assert esta_caducado(e_obs, ConfigCaducidad(ttl_segundos=86400)).estado == EstadoCaducidad.OBSOLETO
+
+        politica = PoliticaRetencion(max_edad_entrada_segundos=86400)  # 1 dia TTL
+        res = storage.limpiar_entradas_obsoletas("m1", politica)
+
+        assert res["entradas_eliminadas"] == 2
+        assert set(res["rutas_eliminadas"]) == {"C:\\exp.txt", "C:\\obs.txt"}
+        # La entrada del ultimo scan completo se protege.
+        assert res["entradas_protegidas"] >= 1
+        assert _contar_entrada_ruta(storage, "C:\\vig.txt") == 1
+
+    def test_sin_ttl_no_elimina_nada(self, storage, tmp_path):
+        _setup_maquina_volumen(storage)
+        _insert_scan_run_directo(storage, "scan-1", "m1", "C:",
+                                 "2025-12-01T10:00:00+00:00", "ok", 1)
+        _insert_entrada(storage, "scan-1", "m1", "C:", "e1",
+                        "C:\\arch.txt", "2025-01-01T10:00:00+00:00")
+
+        from src.hands.system_inventory import PoliticaRetencion
+        politica = PoliticaRetencion()  # max_edad_entrada_segundos = None
+        res = storage.limpiar_entradas_obsoletas("m1", politica)
+        assert res["entradas_eliminadas"] == 0
+        assert res["rutas_eliminadas"] == []
+
+
+class TestLimpiezaBackupsAntiguos:
+    """limpiar_backups_antiguos: conserva solo los max_backups .bak mas
+    recientes."""
+
+    def _crear_backups(self, db_dir, nombres_con_tiempo):
+        """Crea ficheros .bak con mtime dado."""
+        import time
+        ahora = time.time()
+        for nombre, segundos_pasado in nombres_con_tiempo:
+            p = db_dir / nombre
+            p.write_text("backup", encoding="utf-8")
+            import os as _os
+            _os.utime(p, (ahora - segundos_pasado, ahora - segundos_pasado))
+
+    def test_elimina_backups_sobrel_max(self, storage, tmp_path):
+        db_dir = storage.db_path.parent
+        db_dir.mkdir(parents=True, exist_ok=True)
+        # segundos_pasado mayor = mas antiguo. Con max_backups=2 se elimina
+        # el mas antiguo (backup_mas_antiguo.bak, 300s) y se conservan los 2
+        # mas recientes.
+        self._crear_backups(db_dir, [
+            ("backup_mas_reciente.bak", 100),  # mas reciente
+            ("backup_medio.bak", 200),
+            ("backup_mas_antiguo.bak", 300),   # mas antiguo -> se elimina
+        ])
+
+        from src.hands.system_inventory import PoliticaRetencion
+        politica = PoliticaRetencion(max_backups=2)
+        res = storage.limpiar_backups_antiguos(politica)
+
+        assert res["backups_eliminados"] == 1
+        assert any("backup_mas_antiguo.bak" in r for r in res["rutas_eliminadas"])
+        # Quedan los 2 mas recientes.
+        restantes = sorted(p.name for p in db_dir.iterdir()
+                           if p.name.endswith(".bak"))
+        assert len(restantes) == 2
+        assert "backup_mas_antiguo.bak" not in restantes
+
+    def test_no_elimina_si_dentro_del_limite(self, storage, tmp_path):
+        db_dir = storage.db_path.parent
+        db_dir.mkdir(parents=True, exist_ok=True)
+        self._crear_backups(db_dir, [
+            ("backup_reciente.bak", 100),
+            ("backup_medio.bak", 200),
+        ])
+        from src.hands.system_inventory import PoliticaRetencion
+        res = storage.limpiar_backups_antiguos(PoliticaRetencion(max_backups=3))
+        assert res["backups_eliminados"] == 0
+        assert res["rutas_eliminadas"] == []
+
+    def test_sin_backups_no_hace_nada(self, storage, tmp_path):
+        from src.hands.system_inventory import PoliticaRetencion
+        res = storage.limpiar_backups_antiguos(PoliticaRetencion(max_backups=3))
+        assert res["backups_eliminados"] == 0
+
+
+class TestEjecucionLimpiezaRetencion:
+    """ejecutar_limpieza_retencion: flujo orquestado con backup previo."""
+
+    def test_flujo_completo_crea_backup_y_limpia(self, storage, tmp_path):
+        _setup_maquina_volumen(storage)
+        hace_60_dias = "2025-11-02T10:00:00+00:00"
+        ahora = "2026-01-01T10:00:00+00:00"
+
+        _insert_scan_run_directo(storage, "scan-antiguo", "m1", "C:",
+                                 hace_60_dias, "interrumpido", 5)
+        _insert_scan_run_directo(storage, "scan-reciente", "m1", "C:",
+                                 ahora, "ok", 50)
+        _insert_entrada(storage, "scan-antiguo", "m1", "C:", "e1",
+                        "C:\\antiguo.txt", "")
+        _insert_entrada(storage, "scan-reciente", "m1", "C:", "e2",
+                        "C:\\reciente.txt", ahora)
+
+        from src.hands.system_inventory import PoliticaRetencion
+        politica = PoliticaRetencion(
+            max_generaciones_por_volumen=5,
+            max_edad_generacion_segundos=20 * 86400,
+            max_edad_entrada_segundos=86400,
+            max_backups=3,
+            crear_backup_antes_limpieza=True,
+        )
+        res = storage.ejecutar_limpieza_retencion("m1", politica)
+
+        assert res.machine_id == "m1"
+        assert res.generaciones_eliminadas == 1  # scan-antiguo eliminado
+        # e1 ya se borro al eliminar su generacion scan-antiguo, no hay
+        # entradas obsoletas sobrantes que limpiar como entradas sueltas.
+        assert res.entradas_eliminadas == 0
+        assert res.backup_creado is not None
+        assert "scan-reciente" in res.generaciones_protegidas
+
+        # El backup creado existe.
+        from pathlib import Path
+        assert Path(res.backup_creado).exists()
+
+        assert _contar_scan_runs(storage, "scan-antiguo") == 0
+        assert _contar_scan_runs(storage, "scan-reciente") == 1
+
+    def test_resumen_contiene_todos_los_campos(self, storage, tmp_path):
+        _setup_maquina_volumen(storage)
+        from src.hands.system_inventory import PoliticaRetencion, ResultadoLimpieza
+        res = storage.ejecutar_limpieza_retencion("m1", PoliticaRetencion())
+        assert isinstance(res, ResultadoLimpieza)
+        d = res.resumen()
+        for clave in ("machine_id", "generaciones_eliminadas", "entradas_eliminadas",
+                      "backups_eliminados", "backup_creado", "generaciones_protegidas",
+                      "entradas_protegidas", "errores", "total_eliminado"):
+            assert clave in d
+
+
+# ---------------------------------------------------------------------------
 # Refresco bajo demanda y revalidacion de destino (3.8.5.1.4.5.6).
 # ---------------------------------------------------------------------------
 
