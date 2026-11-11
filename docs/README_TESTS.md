@@ -6804,7 +6804,11 @@ la resolución y se actualiza su estado (`disponible=False`, `ultima_comprobacio
 sin intentar la ruta obsoleta; la resolución se repite con fuentes vigentes. Cubre la unidad
 3.8.5.1.4.9.5: vinculación del resultado de resolución con el catálogo global
 (`ApplicationManager` / `ApplicationKnowledge` de `data/memory/entities.json`) mediante contratos
-verificados, sin modificar `entities.json` ni auto-registrar candidatos.
+verificados, sin modificar `entities.json` ni auto-registrar candidatos. Cubre la unidad
+3.8.5.1.4.9.6: pasar los candidatos por `ApplicationPreflight` y las políticas existentes
+(política completa de pre-lanzamiento con `check()`: nombres bloqueados, app IDs bloqueados,
+login requerido, recursos no disponibles, manifest de elevación, uiAccess), sin llamar a
+`CalibrationManager.launch_application` ni depender de verificación proceso/ventana.
 
 **Módulos de origen probados:** src.hands.application_discovery, src.hands.application_preflight,
 src.hands.application_launch_classifier
@@ -6900,6 +6904,25 @@ lanza ninguna aplicacion.
   - Candidato sin entidad en el catálogo: `en_catalogo_global=False` sin lanzar nada.
   - `buscar_por_nombre_con_catalogo` con almacenamiento y catalogo reales, preflight
     real, sin lanzamiento.
+
+- **`TestPreflightPoliticaCompleta`** (línea 1900) — 7 método(s) de test
+  - `test_ejecutar_preflight_uri_admitida_esta_autorizado` (L1912): URI admitida (ms-settings:)
+    pasa el preflight completo con allowed=True.
+  - `test_ejecutar_preflight_bloquea_nombre_administrativo` (L1928): nombres bloqueados
+    (task scheduler, registry editor) producen allowed=False con blocked_by='blocked_name'.
+  - `test_ejecutar_preflight_bloquea_app_id_administrativo` (L1944): app ID bloqueado
+    (services) produce allowed=False con blocked_by='blocked_app_id'.
+  - `test_filtrar_por_preflight_policy_retorna_solo_autorizados` (L1959): filtra candidatos
+    bloqueados, conserva autorizados.
+  - `test_to_dict_incluye_preflight_policy` (L1976): serializa preflight_policy en to_dict.
+  - `test_candidato_sin_destino_tiene_preflight_policy_no_autorizado` (L1991): candidato sin
+    destino tiene preflight_policy con allowed=False.
+
+- **`TestPreflightPoliticaEntornoReal`** (línea 2009) — 2 método(s) de test
+  - `test_buscar_por_nombre_con_preflight_policy_real_notepad` (L2015): notepad.exe real,
+    preflight_policy poblado, sin lanzar nada ni modificar entities.json.
+  - `test_buscar_por_nombre_con_preflight_policy_real_cmd` (L2035): cmd.exe real, preflight_policy
+    poblado, sin lanzar nada.
 
 ---
 

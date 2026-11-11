@@ -788,7 +788,8 @@ del menu Inicio, paquetes AppX, registro de desinstaladores, rutas PATH y
 App Paths del registro de Windows) y (3), solo para destinos faltantes, el
 inventario persistente del sistema de archivos como fuente complementaria.
 Reutiliza `CalibrationManager.discover_applications`, `LaunchClassifier` y
-`ApplicationPreflight.validate_launch_destination` (sin lanzar nada). Es de
+`ApplicationPreflight` (validación de destino con `validate_launch_destination`
+y política completa de pre-lanzamiento con `check()`) sin lanzar nada. Es de
 lectura sola: no lanza aplicaciones, no modifica `data/knowledge/entities.json`
 ni el catalogo conocido, y no persiste capacidades inferidas. Provee
 `registrar_candidatos` para persistir candidatos clasificados en la tabla
@@ -816,6 +817,12 @@ candidatos (el puente de auto-registro corresponde a una unidad posterior).
   evidencia, confianza, nombre comercial, alias, versión/producto).
 - Valida cada destino con `ApplicationPreflight.validate_launch_destination`
   sin lanzar nada.
+- 3.8.5.1.4.9.6: pasa cada candidato por `ApplicationPreflight.check()` (política
+  completa de pre-lanzamiento: nombres bloqueados, app IDs bloqueados, login
+  requerido, recursos no disponibles, manifest de elevación y uiAccess),
+  almacenando el resultado en `preflight_policy` (`allowed`, `blocked_by`,
+  `reason`, `requires_elevation`, etc.). No lanza nada ni verifica procesos/
+  ventanas (eso corresponde a 3.8.5.4-3.8.5.6).
 - Deduplica por identidad y destino real, no solo por nombre; conserva rutas
   candidatas de instalaciones distintas.
 - Resiliente: el fallo de una fuente de descubrimiento no interrumpe las
@@ -841,13 +848,13 @@ candidatos (el puente de auto-registro corresponde a una unidad posterior).
 
 `class DiscoveredCandidate` — Resultado completo de un candidato descubierto, que combina la
 clasificación de lanzamiento con metadatos de descubrimiento (fuente, esta_en_inventario,
-preflight_decision, fuentes_consultadas).
+preflight_decision, preflight_policy, fuentes_consultadas).
 
 Métodos:
 
 | Firma | Docstring |
 |---|---|
-| `def from_classification(clasificacion, fuente, destino_original, preflight_decision, fuentes_consultadas, esta_en_inventario)` | Construye una instancia a partir de una `LaunchClassification` y metadatos de descubrimiento. |
+| `def from_classification(clasificacion, fuente, destino_original, preflight_decision, preflight_policy, fuentes_consultadas, esta_en_inventario)` | Construye una instancia a partir de una `LaunchClassification` y metadatos de descubrimiento, incluyendo el resultado de la política de preflight. |
 | `def to_dict()` | Serializa el resultado a diccionario plano. |
 
 `class ResultadoResolucionCandidatos` — Resultado de resolución de candidatos
@@ -889,6 +896,8 @@ Métodos:
 | `def deduplicar_por_destino_real(candidatos)` | Deduplica una lista de `DiscoveredCandidate` ya clasificados por identidad y destino real (ruta normalizada o URI), conservando el de mayor confianza/evidencia por destino y todas las rutas de instalaciones distintas. |
 | `def vincular_con_catalogo(candidatos)` | Vincula cada `DiscoveredCandidate` con el catálogo global (`ApplicationManager` / `ApplicationKnowledge`) mediante contratos verificados, retornando `CandidatoConCatalogo` por candidato sin modificar `entities.json`. |
 | `def buscar_por_nombre_con_catalogo(nombre, incluir_inventario, limite_por_fuente)` | Resuelve un nombre por fuentes y vincula cada candidato con el catálogo global; retorna `(candidatos, vinculados)` en el mismo orden, sin lanzar nada. |
+| `def ejecutar_preflight_sobre_candidato(candidato_raw, clasificacion)` | Pasa un candidato por `ApplicationPreflight.check()` (política completa de pre-lanzamiento: nombres bloqueados, app IDs bloqueados, login, recursos, manifest de elevación, uiAccess). Retorna el dict estructurado de `PreflightResult.to_dict()`. Sin lanzar nada. |
+| `def filtrar_por_preflight_policy(candidatos)` | Retorna solo candidatos autorizados por el preflight completo (`preflight_policy["allowed"] is True`). Los bloqueados se excluyen; su `preflight_policy` conserva `blocked_by` y `reason`. |
 
 <a name="src-hands-application_launch_classifier-py"></a>
 ### `src/hands/application_launch_classifier.py` [855 líneas] — Clasificador de candidatos por tipo de lanzamiento.

@@ -1891,3 +1891,172 @@ class TestVinculacionCatalogoEntornoReal:
         finally:
             if os.path.exists(ruta_sonda):
                 os.unlink(ruta_sonda)
+
+
+# ---------------------------------------------------------------------------
+# Preflight completo de política (unidad 3.8.5.1.4.9.6)
+# ---------------------------------------------------------------------------
+
+class TestPreflightPoliticaCompleta:
+    """
+    3.8.5.1.4.9.6: pasar los candidatos por ApplicationPreflight y las
+    políticas existentes; no llamar a CalibrationManager.launch_application
+    ni depender de verificación proceso/ventana.
+
+    Estrategia de mocks: solo se mockean las fuentes de datos
+    (CalibrationManager / SystemInventoryStorage). La clasificación y el
+    preflight son REALES (LaunchClassifier + ApplicationPreflight sobre
+    archivos reales del equipo). No se lanza ninguna aplicación.
+    """
+
+    def test_ejecutar_preflight_uri_admitida_esta_autorizado(self):
+        """URI de aplicación admitida (ms-settings:) pasa el preflight completo:
+        allowed=True, sin blocked_by, sin lanzar nada."""
+        descub, _, _ = _discovery_con_mocks(
+            calib_apps=[
+                _app("Configuracion", "ms-settings:", FUENTE_START_MENU),
+            ]
+        )
+        resultado = descub.descubrir_todos(limite_por_fuente=10, incluir_inventario=False)
+        c = next((x for x in resultado if x.name.casefold() == "configuracion"), None)
+        assert c is not None
+        assert c.preflight_policy is not None
+        assert c.preflight_policy.get("allowed") is True
+        assert c.preflight_policy.get("blocked_by") is None
+
+    def test_ejecutar_preflight_bloquea_nombre_administrativo(self):
+        """Nombre con parte bloqueada (ej. 'task scheduler', 'registry editor')
+        produce allowed=False y blocked_by='blocked_name'."""
+        descub, _, _ = _discovery_con_mocks(
+            calib_apps=[
+                _app("Task Scheduler", r"C:\Windows\System32\taskschd.msc",
+                     FUENTE_START_MENU),
+                _app("Registry Editor", r"C:\Windows\regedit.exe",
+                     FUENTE_START_MENU),
+            ]
+        )
+        resultado = descub.descubrir_todos(limite_por_fuente=10, incluir_inventario=False)
+        bloqueados_por_nombre = [
+            c for c in resultado
+            if c.preflight_policy is not None
+            and not c.preflight_policy.get("allowed")
+            and c.preflight_policy.get("blocked_by") == "blocked_name"
+        ]
+        nombres_bloqueados = {c.name for c in bloqueados_por_nombre}
+        assert "Task Scheduler" in nombres_bloqueados or "Registry Editor" in nombres_bloqueados, (
+            f"Esperaba al menos uno bloqueado por nombre, obtenidos: {nombres_bloqueados}"
+        )
+
+    def test_ejecutar_preflight_bloquea_app_id_administrativo(self):
+        """app_id con parte bloqueada produce allowed=False y blocked_by='blocked_app_id'.
+        Usa un nombre NO bloqueado pero destino con 'services' en la ruta
+        (coincide con blocked_app_id). Llama directamente a
+        ejecutar_preflight_sobre_candidato."""
+        descub, _, _ = _discovery_con_mocks()
+        candidato_raw = {
+            "candidate_id": "svc-test",
+            "name": "Utilidad de Sistema",
+            "absolute_path": r"C:\Windows\System32\services.msc",
+            "destination": r"C:\Windows\System32\services.msc",
+            "source": FUENTE_START_MENU,
+            "app_id": "services",
+        }
+        clasificacion = descub.clasificador.classify_candidate(candidato_raw)
+        policy = descub.ejecutar_preflight_sobre_candidato(candidato_raw, clasificacion)
+        assert policy.get("allowed") is False
+        assert policy.get("blocked_by") == "blocked_app_id"
+
+    def test_filtrar_por_preflight_policy_retorna_solo_autorizados(self):
+        """filtrar_por_preflight_policy excluye candidatos con allowed=False
+        y conserva los que tienen allowed=True."""
+        descub, _, _ = _discovery_con_mocks(
+            calib_apps=[
+                _app("Configuracion", "ms-settings:", FUENTE_START_MENU),
+                _app("Task Scheduler", r"C:\Windows\System32\taskschd.msc",
+                     FUENTE_START_MENU),
+            ]
+        )
+        resultado = descub.descubrir_todos(limite_por_fuente=10, incluir_inventario=False)
+        autorizados = descub.filtrar_por_preflight_policy(resultado)
+        nombres_autorizados = {c.name for c in autorizados}
+        assert "Configuracion" in nombres_autorizados
+        assert "Task Scheduler" not in nombres_autorizados
+        for c in autorizados:
+            assert c.preflight_policy.get("allowed") is True
+
+    def test_to_dict_incluye_preflight_policy(self):
+        """DiscoveredCandidate.to_dict serializa preflight_policy cuando está
+        presente y None cuando no lo está."""
+        c_con = DiscoveredCandidate(
+            candidate_id="c1", name="App", destination=r"C:\app.exe",
+            fuente=FUENTE_INVENTARIO,
+            preflight_policy={"allowed": True, "blocked_by": None},
+        )
+        c_sin = DiscoveredCandidate(
+            candidate_id="c2", name="App2", destination=r"C:\app2.exe",
+            fuente=FUENTE_INVENTARIO,
+        )
+        assert c_con.to_dict()["preflight_policy"] == {"allowed": True, "blocked_by": None}
+        assert c_sin.to_dict()["preflight_policy"] is None
+
+    def test_candidato_sin_destino_tiene_preflight_policy_no_autorizado(self):
+        """Candidato sin destino de lanzamiento: preflight_policy con
+        allowed=False y blocked_by indicando el motivo."""
+        descub, _, _ = _discovery_con_mocks(
+            calib_apps=[
+                _app("SinDestino", "", FUENTE_START_MENU),
+            ]
+        )
+        resultado = descub.descubrir_todos(limite_por_fuente=10, incluir_inventario=False)
+        sin_destino = [c for c in resultado if c.name.casefold() == "sindestino"]
+        assert len(sin_destino) >= 1, "Esperaba el candidato SinDestino"
+        for c in sin_destino:
+            assert c.preflight_policy is not None
+            assert c.preflight_policy.get("allowed") is False
+
+
+class TestPreflightPoliticaEntornoReal:
+    """
+    3.8.5.1.4.9.6 en entorno real: componentes de producción sobre archivos
+    reales del equipo, sin lanzar aplicaciones ni modificar entities.json.
+    """
+
+    def test_buscar_por_nombre_con_preflight_policy_real_notepad(self):
+        """buscar_por_nombre sobre notepad.exe real: preflight_policy poblado.
+        El preflight puede devolver allowed=False si resolve_executable no
+        encuentra el ejecutable vía shell:AppsFolder (comportamiento correcto
+        y estricto). Lo importante es que preflight_policy esté presente y no
+        se haya lanzado nada ni modificado entities.json."""
+        notepad = r"C:\Windows\System32\notepad.exe"
+        if not os.path.exists(notepad):
+            pytest.skip("notepad.exe no disponible en este equipo")
+        descub, _, _ = _discovery_con_mocks(
+            calib_apps=[_app("Notepad", notepad, FUENTE_START_MENU)]
+        )
+        resultado = descub.buscar_por_nombre("notepad", incluir_inventario=False)
+        assert len(resultado) >= 1
+        c = next(
+            (x for x in resultado
+             if x.destination and os.path.normcase(x.destination) == os.path.normcase(notepad)),
+            None,
+        )
+        assert c is not None, f"No se encontró candidato con destino {notepad}; candidatos: {[x.destination for x in resultado]}"
+        assert c.preflight_policy is not None
+        assert "allowed" in c.preflight_policy
+        assert "blocked_by" in c.preflight_policy
+
+    def test_buscar_por_nombre_con_preflight_policy_real_cmd(self):
+        """cmd.exe real: preflight_policy poblado (allowed puede ser True o
+        False según resolución vía shell:AppsFolder; comportamiento estricto
+        del preflight)."""
+        cmd = r"C:\Windows\System32\cmd.exe"
+        if not os.path.exists(cmd):
+            pytest.skip("cmd.exe no disponible en este equipo")
+        descub, _, _ = _discovery_con_mocks(
+            calib_apps=[_app("cmd", cmd, FUENTE_START_MENU)]
+        )
+        resultado = descub.buscar_por_nombre("cmd", incluir_inventario=False)
+        c = next((x for x in resultado if x.name.casefold() == "cmd"), None)
+        assert c is not None
+        assert c.preflight_policy is not None
+        assert "allowed" in c.preflight_policy

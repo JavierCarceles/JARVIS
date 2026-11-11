@@ -135,6 +135,7 @@ class DiscoveredCandidate:
     fuentes_consultadas: list[str] = field(default_factory=list)
     esta_en_inventario: bool = False
     preflight_decision: Optional[dict] = None
+    preflight_policy: Optional[dict] = None
     disponible: bool = True
 
     @classmethod
@@ -144,6 +145,7 @@ class DiscoveredCandidate:
         fuente: str,
         destino_original: Optional[str] = None,
         preflight_decision: Optional[dict] = None,
+        preflight_policy: Optional[dict] = None,
         fuentes_consultadas: Optional[list[str]] = None,
         esta_en_inventario: bool = False,
     ) -> "DiscoveredCandidate":
@@ -171,6 +173,7 @@ class DiscoveredCandidate:
             fuentes_consultadas=list(fuentes_consultadas or []),
             esta_en_inventario=esta_en_inventario,
             preflight_decision=dict(preflight_decision) if preflight_decision else None,
+            preflight_policy=dict(preflight_policy) if preflight_policy else None,
         )
 
     def to_dict(self) -> dict:
@@ -198,6 +201,7 @@ class DiscoveredCandidate:
             "fuentes_consultadas": list(self.fuentes_consultadas),
             "esta_en_inventario": self.esta_en_inventario,
             "preflight_decision": self.preflight_decision,
+            "preflight_policy": self.preflight_policy,
             "disponible": self.disponible,
         }
 
@@ -1244,6 +1248,11 @@ class ApplicationDiscovery:
         Clasifica cada candidato con `LaunchClassifier` y valida su destino con
         `ApplicationPreflight.validate_launch_destination` (sin lanzar).
 
+        3.8.5.1.4.9.6: además pasa cada candidato por `ApplicationPreflight.check()`
+        (política completa de pre-lanzamiento: nombres bloqueados, app IDs
+        bloqueados, login requerido, recursos, manifest de elevación y uiAccess),
+        almacenando el resultado en `preflight_policy`. No lanza aplicaciones.
+
         `fuente_defecto` se usa cuando el candidato no trae fuente propia.
         """
         descubiertos: list[DiscoveredCandidate] = []
@@ -1254,7 +1263,7 @@ class ApplicationDiscovery:
 
             clasificacion = self.clasificador.classify_candidate(c)
 
-            # Validacion de destino con preflight (solo lectura, no lanza).
+            # Validación de destino con preflight (solo lectura, no lanza).
             preflight_decision: Optional[dict] = None
             if clasificacion.destination:
                 try:
@@ -1269,17 +1278,100 @@ class ApplicationDiscovery:
                         "reason": "Error al validar destino con preflight",
                     }
 
+            # 3.8.5.1.4.9.6: preflight completo de política sobre el candidato.
+            preflight_policy: Optional[dict] = None
+            try:
+                preflight_policy = self.ejecutar_preflight_sobre_candidato(c, clasificacion)
+            except Exception:
+                preflight_policy = {
+                    "allowed": False,
+                    "reason": "Error al ejecutar preflight completo sobre el candidato",
+                    "confidence": "high",
+                    "blocked_by": "preflight_error",
+                    "availability": "unknown",
+                }
+
             descubiertos.append(
                 DiscoveredCandidate.from_classification(
                     clasificacion,
                     fuente=fuente,
                     destino_original=destino,
                     preflight_decision=preflight_decision,
+                    preflight_policy=preflight_policy,
                     fuentes_consultadas=list(fuentes),
                     esta_en_inventario=bool(c.get("esta_en_inventario", esta_en_inventario)),
                 )
             )
         return descubiertos
+
+    # ------------------------------------------------------------------ #
+    # Preflight completo de política (3.8.5.1.4.9.6)
+    # ------------------------------------------------------------------ #
+
+    def ejecutar_preflight_sobre_candidato(
+        self,
+        candidato_raw: dict[str, Any],
+        clasificacion: LaunchClassification,
+    ) -> dict[str, Any]:
+        """
+        Pasa un candidato por `ApplicationPreflight.check()` (política completa
+        de pre-lanzamiento), sin lanzar la aplicación ni verificar procesos/
+        ventanas (eso corresponde a 3.8.5.4-3.8.5.6).
+
+        Aplica las políticas existentes: nombres bloqueados, app IDs bloqueados,
+        login requerido, recursos no disponibles, manifest de elevación y uiAccess.
+        Retorna el dict estructurado de `PreflightResult.to_dict()` con claves
+        como `allowed`, `blocked_by`, `reason`, `requires_elevation`, etc.
+        """
+        nombre = str(clasificacion.name or candidato_raw.get("name", "")).strip()
+        ejecutable = str(
+            clasificacion.absolute_path
+            or clasificacion.destination
+            or candidato_raw.get("absolute_path")
+            or candidato_raw.get("destination")
+            or ""
+        ).strip()
+
+        # Si el destino es una URI de aplicación admitida, pasarla como url para
+        # que preflight la valide por esquema (no requiere archivo en disco).
+        destino_bruto = str(
+            clasificacion.destination
+            or candidato_raw.get("destination")
+            or ""
+        ).strip()
+        url = (
+            destino_bruto
+            if ApplicationPreflight._uri_scheme(destino_bruto)
+            else ""
+        )
+
+        application = {
+            "name": nombre,
+            "app_id": ejecutable,
+            "login_required": None,
+            "logged_in": None,
+            "resources_available": None,
+            "url": url,
+        }
+        return self.preflight.check(application)
+
+    def filtrar_por_preflight_policy(
+        self, candidatos: list[DiscoveredCandidate]
+    ) -> list[DiscoveredCandidate]:
+        """
+        Retorna solo los candidatos autorizados por el preflight completo
+        (`preflight_policy["allowed"] is True`).
+
+        Los bloqueados por política (`allowed=False`) se excluyen; su
+        `preflight_policy` conserva `blocked_by` y `reason` para consulta.
+        No lanza ninguna aplicación.
+        """
+        return [
+            c
+            for c in candidatos
+            if c.preflight_policy is not None
+            and c.preflight_policy.get("allowed") is True
+        ]
 
     # ------------------------------------------------------------------ #
     # Deduplicacion por identidad y destino real (.7.7)
