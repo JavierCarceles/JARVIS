@@ -242,6 +242,41 @@ class ApplicationKnowledge:
                 result.append(cap)
         return result
 
+    def get_inferred_capabilities(self) -> List["ApplicationCapabilityDef"]:
+        """Devuelve las capacidades inferidas (no confirmadas) almacenadas en
+        ``inferred_data``.
+
+        Estas capacidades NO estan en ``self.capabilities`` y por tanto
+        ``is_capable`` retorna ``False`` para ellas: no se tratan como
+        capacidades confirmadas de la aplicacion. Solo son deducciones no
+        verificadas (tipo por extension, suposicion de capacidad, etc.).
+        """
+        inferred_data = self.get_inferred_data()
+        caps_inferidas = inferred_data.get("capabilities_inferidas") if inferred_data else None
+        if not caps_inferidas:
+            return []
+        result: List["ApplicationCapabilityDef"] = []
+        for cap_dict in caps_inferidas:
+            try:
+                result.append(
+                    ApplicationCapabilityDef(
+                        capability=ApplicationCapability(str(cap_dict.get("capability", ""))),
+                        name=str(cap_dict.get("name", "")),
+                        description=str(cap_dict.get("description", "")),
+                        required_ui_elements=list(cap_dict.get("required_ui_elements") or []),
+                        preconditions=list(cap_dict.get("preconditions") or []),
+                        effects=list(cap_dict.get("effects") or []),
+                        cost=float(cap_dict.get("cost", 0.0)),
+                        timeout=float(cap_dict.get("timeout", 30.0)),
+                        retry_count=int(cap_dict.get("retry_count", 3)),
+                        alternatives=list(cap_dict.get("alternatives") or []),
+                    )
+                )
+            except (ValueError, KeyError, TypeError):
+                # Capacidad inferida mal formada: se omite, no se asume como confirmada.
+                continue
+        return result
+
     def get_ui_element(self, element_name: str) -> Optional[UIElement]:
         """Obtiene un elemento UI por nombre."""
         target = str(element_name).strip().lower()
@@ -557,6 +592,7 @@ class ApplicationManager:
         url: Optional[str] = None,
         observed_facts: Optional[Dict[str, Any]] = None,
         inferred_data: Optional[Dict[str, Any]] = None,
+        inferred_capabilities: Optional[List[ApplicationCapabilityDef]] = None,
         capabilities: Optional[List[ApplicationCapabilityDef]] = None,
         ui_elements: Optional[List[UIElement]] = None,
         states: Optional[List[ApplicationState]] = None,
@@ -580,9 +616,16 @@ class ApplicationManager:
         - ``observed_facts``: datos reales del descubrimiento (ruta del
           ejecutable, ventana detectada, proceso activo, etc.).
         - ``inferred_data``: deducciones no verificadas (tipo por extension,
-          suposicion de capacidad, etc.).
-        - ``capabilities``: capacidades declaradas sin evidencia de
-          ejecutabilidad real en runtime.
+          suposicion de capacidad, capacidades inferidas, etc.).
+        - ``capabilities``: capacidades declaradas/confirmadas del modelo de
+          conocimiento (no son inferencias; solo capacidades observadas o
+          confirmadas).
+        - Las capacidades inferidas (``inferred_capabilities``) NO se
+          persisten como capacidades confirmadas en
+          ``ApplicationKnowledge.capabilities``: se guardan en
+          ``inferred_data`` para mantener el contrato
+          ``observed_facts`` / ``inferred_data`` /
+          ``unverified_capabilities`` de :class:`ApplicationKnowledge`.
 
         Args:
             name: Nombre de la aplicacion descubierta.
@@ -591,7 +634,10 @@ class ApplicationManager:
             url: URL de la aplicacion, si se conocio.
             observed_facts: Hechos observados durante el descubrimiento.
             inferred_data: Datos inferidos / no verificados.
-            capabilities: Capacidades declaradas (no verificadas en runtime).
+            inferred_capabilities: Capacidades inferidas (no confirmadas) que
+              NO se anaden a ``capabilities``; se almacenan en
+              ``inferred_data`` para no tratarlas como confirmadas.
+            capabilities: Capacidades declaradas/confirmadas (no inferidas).
             ui_elements: Elementos UI conocidos (sin calibracion).
             states: Estados conocidos de la aplicacion.
             login_required: Si se requiere login.
@@ -612,6 +658,29 @@ class ApplicationManager:
             discovered_metadata["observed_facts"] = observed_facts
         if inferred_data:
             discovered_metadata["inferred_data"] = inferred_data
+        # Las capacidades inferidas NO se anaden a capabilities (no son
+        # confirmadas): se almacenan en inferred_data para mantener el
+        # contrato observed_facts / inferred_data / unverified_capabilities.
+        if inferred_capabilities:
+            if "inferred_data" not in discovered_metadata:
+                discovered_metadata["inferred_data"] = {}
+            descuberta_inferida = dict(discovered_metadata["inferred_data"])
+            descuberta_inferida["capabilities_inferidas"] = [
+                {
+                    "capability": cap.capability.value,
+                    "name": cap.name,
+                    "description": cap.description,
+                    "required_ui_elements": list(cap.required_ui_elements),
+                    "preconditions": list(cap.preconditions),
+                    "effects": list(cap.effects),
+                    "cost": cap.cost,
+                    "timeout": cap.timeout,
+                    "retry_count": cap.retry_count,
+                    "alternatives": list(cap.alternatives or []),
+                }
+                for cap in inferred_capabilities
+            ]
+            discovered_metadata["inferred_data"] = descuberta_inferida
         if metadata:
             discovered_metadata.update(metadata)
 

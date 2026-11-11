@@ -6764,6 +6764,28 @@ tipo de excepcion.
 
   - **`test_global_manager_puede_registrar_descubierta`** (L278)
 
+- **`TestCapacidadesInferidasNoConfirmadas`** (línea 291) — 8 método(s) de test
+  - .7.9: las capacidades inferidas NO se persisten como capacidades
+    confirmadas en ApplicationKnowledge.capabilities. Se almacenan en
+    inferred_data para mantener el contrato observed_facts /
+    inferred_data / unverified_capabilities.
+
+  - **`test_capacidades_inferidas_van_a_inferred_data_no_a_capabilities`** (L326)
+
+  - **`test_capacidad_confirmada_sigue_en_capabilities`** (L347)
+
+  - **`test_get_inferred_capabilities_retorna_inferidas`** (L358)
+
+  - **`test_get_inferred_capabilities_vacio_sin_inferencias`** (L370)
+
+  - **`test_get_unverified_capabilities_no_incluye_inferidas`** (L378)
+
+  - **`test_observed_facts_y_inferred_data_se_mantienen_separados`** (L397)
+
+  - **`test_inferencia_no_se_trata_como_capacidad_disponible_incluso_si_app_esta_disponible`** (L420)
+
+  - **`test_serializacion_deserializacion_inferidas_conserva_campos`** (L437)
+
 ---
 
 <a name="hands/test-application_discovery"></a>
