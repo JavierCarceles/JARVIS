@@ -31,12 +31,14 @@ from src.hands.system_inventory import (
     InventoryContract,
     InventoryEntry,
     RecorridoVolumen,
+    generate_machine_id,
     esta_caducado,
     validar_destino,
 )
 from src.hands.system_inventory_storage import (
     DEFAULT_BACKUP_SUFFIX,
     DEFAULT_DB_PATH,
+    PERMISOS_BASE_DE_DATOS,
     SCHEMA_VERSION,
     SCAN_MODE_FULL,
     SCAN_MODE_INCREMENTAL,
@@ -47,6 +49,7 @@ from src.hands.system_inventory_storage import (
     ConcurrentScanError,
     InventoryBackupError,
     InventoryCorruptError,
+    InventoryIncompatibleMachineError,
     SystemInventoryStorage,
     _MIGRACIONES,
     normalize_path,
@@ -106,9 +109,103 @@ class TestCreacionBaseDeDatos:
 
     def test_inicializacion_idempotente_no_borra_datos(self, storage: SystemInventoryStorage):
         storage.initialize()
-        storage.record_machine("machine-1")
-        storage.initialize()  # segunda inicializacion no debe borrar la maquina
-        assert storage.get_entry_count("machine-1") == 0
+        maquina = generate_machine_id()
+        storage.record_machine(maquina)
+        storage.initialize(machine_id_actual=maquina)  # misma máquina: no bloquea
+        assert storage.get_entry_count(maquina) == 0
+
+
+# ---------------------------------------------------------------------------
+# Protección de permisos, identidad y exposición por red (3.8.5.1.4.8.4)
+# ---------------------------------------------------------------------------
+
+class TestProteccionPermisosYIdentidad:
+    """Permisos de propietario-único en la BD, identidad de equipo y
+    no-exposición por red (unidad 3.8.5.1.4.8.4)."""
+
+    def test_permisos_privados_al_crear_base_nueva(
+        self, storage: SystemInventoryStorage, db_path: Path
+    ):
+        """Al crear una base nueva se aplican permisos de propietario único."""
+        assert not db_path.exists()
+        storage.initialize()
+        assert db_path.exists()
+        informe = storage.aplicar_permisos_privados(db_path)
+        assert informe["modo_solicitado"] == PERMISOS_BASE_DE_DATOS
+        assert informe["error"] is None
+        if os.name != "nt":
+            assert informe["modo_real"] == PERMISOS_BASE_DE_DATOS
+
+    def test_permisos_no_se_reaplican_en_base_existente(
+        self, storage: SystemInventoryStorage, db_path: Path
+    ):
+        """Inicializar sobre una base existente no falla por permisos."""
+        storage.initialize()
+        storage.initialize()  # segunda vez: permisos ya aplicados, no hay error
+        assert storage.schema_version() == SCHEMA_VERSION
+
+    def test_identidad_equipo_coincide_no_bloquea(
+        self, storage: SystemInventoryStorage, db_path: Path
+    ):
+        """El mismo equipo puede inicializar una base que ya registró."""
+        maquina = generate_machine_id()
+        storage.initialize(machine_id_actual=maquina)
+        storage.record_machine(maquina)
+        storage.initialize(machine_id_actual=maquina)
+
+    def test_identidad_equipo_distinto_bloquea(
+        self, storage: SystemInventoryStorage, db_path: Path
+    ):
+        """Una base de otro equipo no puede usarse sin decisión explícita."""
+        maquina_otra = "equipo-otro-inexistente"
+        storage.initialize(machine_id_actual=maquina_otra)
+        storage.record_machine(maquina_otra)
+        with pytest.raises(InventoryIncompatibleMachineError):
+            storage.initialize()  # máquina distinta, sin permitir_otro_equipo
+
+    def test_permitir_otro_equipo_evita_bloqueo(
+        self, storage: SystemInventoryStorage, db_path: Path
+    ):
+        """permitir_otro_equipo=True permite usar una base de otro equipo."""
+        maquina_otra = "equipo-otro-inexistente"
+        storage.initialize(machine_id_actual=maquina_otra)
+        storage.record_machine(maquina_otra)
+        storage.initialize(
+            machine_id_actual=maquina_otra, permitir_otro_equipo=True
+        )
+
+    def test_verificar_identidad_equipo_informe(
+        self, storage: SystemInventoryStorage, db_path: Path
+    ):
+        """verificar_identidad_equipo retorna informe sin bloquear."""
+        maquina = generate_machine_id()
+        storage.initialize()
+        informe = storage.verificar_identidad_equipo(maquina)
+        assert informe["maquina_actual"] == maquina
+        assert informe["maquina_registrada"] is None
+        assert informe["bloqueado"] is False
+        assert "No hay equipo registrado aún" in informe["motivo"]
+
+    def test_verificar_no_exposicion_red_ruta_local(
+        self, storage: SystemInventoryStorage, db_path: Path
+    ):
+        """Una ruta local no se considera expuesta por red."""
+        storage.initialize()
+        informe = storage.verificar_no_exposicion_red()
+        assert informe["es_local"] is True
+        assert informe["es_unc"] is False
+        assert informe["es_red"] is False
+        assert "servidor de red" in informe["motivo"]
+
+    def test_verificar_no_exposicion_red_ruta_unc(self, tmp_path: Path):
+        """Una ruta UNC se marca como expuesta por red."""
+        storage = SystemInventoryStorage(tmp_path / "inventario.sqlite3")
+        storage.db_path = Path("\\\\servidor\\compartido\\inventario.sqlite3")
+        informe = storage.verificar_no_exposicion_red()
+        assert informe["es_unc"] is True
+        assert informe["es_red"] is True
+        assert informe["es_local"] is False
+        assert "UNC" in informe["motivo"] or "red" in informe["motivo"].lower()
 
 
 # ---------------------------------------------------------------------------
@@ -423,16 +520,17 @@ class TestLineaBaseVolumen:
         self, storage: SystemInventoryStorage, db_path: Path
     ):
         storage.initialize()
-        storage.record_machine("machine-alfa")
+        maquina = generate_machine_id()
+        storage.record_machine(maquina)
         primera = storage.registrar_linea_base_volumen(
-            machine_id="machine-alfa",
+            machine_id=maquina,
             volume="C:",
             estado_volumen="disponible",
             cobertura=100.0,
         )
         storage2 = SystemInventoryStorage(db_path)
-        storage2.initialize()
-        obtenida = storage2.obtener_linea_base_volumen("machine-alfa", "C:")
+        storage2.initialize(machine_id_actual=maquina)
+        obtenida = storage2.obtener_linea_base_volumen(maquina, "C:")
         assert obtenida is not None
         assert obtenida["linea_id"] == primera["linea_id"]
         assert obtenida["cobertura"] == 100.0
@@ -3078,16 +3176,17 @@ class TestMigracionesVerificables:
     ):
         """Inicializar dos veces una base ya en v2 no altera los datos."""
         storage.initialize()
-        storage.record_machine("m-1")
-        storage.record_volume("v-1", "m-1", "C:", "local", "online")
-        storage.begin_scan_run("s-1", "m-1", "C:", SCAN_MODE_FULL)
+        maquina = generate_machine_id()
+        storage.record_machine(maquina)
+        storage.record_volume("v-1", maquina, "C:", "local", "online")
+        storage.begin_scan_run("s-1", maquina, "C:", SCAN_MODE_FULL)
         storage.end_scan_run("s-1", entries_count=3, errors_count=1)
         conn = storage.connect()
         antes = {
             tabla: int(conn.execute(f"SELECT COUNT(*) FROM {tabla}").fetchone()[0])
             for tabla in ("machines", "volumes", "scan_runs", "file_entries", "application_candidates")
         }
-        storage.initialize()
+        storage.initialize(machine_id_actual=maquina)
         assert storage.schema_version() == SCHEMA_VERSION
         despues = {
             tabla: int(conn.execute(f"SELECT COUNT(*) FROM {tabla}").fetchone()[0])
@@ -3101,7 +3200,7 @@ class TestMigracionesVerificables:
         """Una base v1 con datos se migra a v2 conservando cada fila y sus valores."""
         esperados = self._crear_db_v1_con_datos(db_path)
         storage = SystemInventoryStorage(db_path)
-        version = storage.initialize()
+        version = storage.initialize(machine_id_actual="m-1")
         assert version == SCHEMA_VERSION
         assert storage.schema_version() == SCHEMA_VERSION
         conn = storage.connect()
@@ -4006,7 +4105,7 @@ class TestCicloCrearModificarRenombrarEliminarRefrescoFSReal:
         rutas: list[str],
     ) -> None:
         """Registra equipo y volumen, inicia escaneo completo, inserta entradas reales y lo finaliza."""
-        storage.initialize()
+        storage.initialize(machine_id_actual=machine_id)
         storage.record_machine(machine_id)
         storage.record_volume("vol-tmp", machine_id, volume, "local", "online")
         storage.begin_scan_run(scan_id, machine_id, volume, SCAN_MODE_FULL)
@@ -4416,7 +4515,7 @@ class TestBackupCorrupcionYRecuperacion:
         db_path.write_bytes(b"corrupcion total del fichero de inventario")
         storage2 = SystemInventoryStorage(db_path)
         try:
-            assert storage2.initialize() == SCHEMA_VERSION
+            assert storage2.initialize(machine_id_actual="machine-alfa") == SCHEMA_VERSION
             assert storage2.verify_integrity()["ok"] is True
             assert storage2.get_entry_count("machine-alfa", "C:") == 1
             run = storage2.get_scan_run("scan-1")

@@ -36,6 +36,10 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Iterator, Optional
 
+from src.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
 
 class EntryType(Enum):
     """Tipo de entrada del inventario, observado directamente del SO."""
@@ -2333,6 +2337,10 @@ class RecorridoVolumen:
         el contador total y el contador agregado por categoría, de modo que
         una excepción aislada no detiene el escaneo pero queda contabilizada
         (3.8.5.1.4.4.7).
+
+        El log registra solo el conteo agregado por categoría y la ruta
+        acortada mediante safe_log_path, nunca el listado completo de rutas
+        con error (3.8.5.1.4.8.5).
         """
         self._errores.append(
             ErrorRecorrido(
@@ -2345,6 +2353,14 @@ class RecorridoVolumen:
         self._progreso.errores = len(self._errores)
         self._progreso.errores_por_categoria[categoria] = (
             self._progreso.errores_por_categoria.get(categoria, 0) + 1
+        )
+        logger.warning(
+            "Error de recorrido [%s] en volumen %s (categoria=%s, total_errores=%d, ruta=%s)",
+            categoria,
+            self.volumen,
+            categoria,
+            self._progreso.errores,
+            safe_log_path(ruta),
         )
 
     def _calcular_cobertura(self) -> float:
@@ -2531,6 +2547,12 @@ class RecorridoVolumen:
         Genera:
         - `InventoryEntry` para cada archivo, directorio, enlace u otro elemento accesible.
         """
+        logger.info(
+            "Inicio de recorrido de volumen=%s raiz=%s modo=seguir_enlaces=%s",
+            self.volumen,
+            safe_log_path(self.raiz),
+            self._seguir_enlaces,
+        )
         self._progreso = ProgresoRecorrido(volumen=self.volumen, raiz=self.raiz)
         self._errores = []
         self._visitados = set()
@@ -2637,11 +2659,38 @@ class RecorridoVolumen:
                 self._progreso.cobertura = self._calcular_cobertura()
                 self.callback_progreso(self._progreso)
 
+            # Resumen periodico de progreso (cada 50 directorios) sin listar
+            # rutas ni nombres individuales (3.8.5.1.4.8.5).
+            if self._progreso.directorios_procesados % 50 == 0:
+                logger.info(
+                    "Progreso recorrido volumen=%s directorios=%d entradas=%d archivos=%d directorios=%d errores=%d exclusiones=%d cobertura=%.2f%%",
+                    self.volumen,
+                    self._progreso.directorios_procesados,
+                    self._progreso.entradas_procesadas,
+                    self._progreso.archivos_procesados,
+                    self._progreso.directorios_procesados,
+                    self._progreso.errores,
+                    self._progreso.exclusiones,
+                    self._progreso.cobertura,
+                )
+
         self._progreso.completado = True
         self._progreso.interrumpido = False
         self._progreso.cobertura = 100.0
         if self.callback_progreso is not None:
             self.callback_progreso(self._progreso)
+
+        logger.info(
+            "Fin de recorrido volumen=%s directorios=%d entradas=%d archivos=%d errores=%d exclusiones=%d cobertura=%.2f%% interrumpido=%s",
+            self.volumen,
+            self._progreso.directorios_procesados,
+            self._progreso.entradas_procesadas,
+            self._progreso.archivos_procesados,
+            self._progreso.errores,
+            self._progreso.exclusiones,
+            self._progreso.cobertura,
+            self._progreso.interrumpido,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -3034,6 +3083,11 @@ class GestorPrimerInventario:
                 alcance = self.reportar_alcance()
                 volumenes_a_escanear = list(alcance.volumenes_a_escanear)
             total_volumenes = len(volumenes_a_escanear)
+            logger.info(
+                "Inicio primer inventario machine_id=%s total_volumenes=%d",
+                self.machine_id,
+                total_volumenes,
+            )
             ejecucion = EjecucionPrimerInventario(
                 machine_id=self.machine_id,
                 total_volumenes=total_volumenes,
@@ -3210,6 +3264,14 @@ class GestorPrimerInventario:
                 )
                 errores += errores_volumen
                 completados += 1
+                logger.info(
+                    "Volumen completado machine_id=%s volumen=%s entradas=%d errores=%d resultado=%s",
+                    self.machine_id,
+                    safe_log_path(raiz),
+                    contador_volumen,
+                    errores_volumen,
+                    resultado_volumen,
+                )
                 ejecucion._notificar_progreso(
                     volumenes_completados=completados,
                     entradas_procesadas=entradas_procesadas,
@@ -3235,6 +3297,14 @@ class GestorPrimerInventario:
                     "errores": errores,
                     "scan_ids": scan_ids,
                 }
+            )
+            logger.info(
+                "Fin primer inventario machine_id=%s volumenes_completados=%d entradas_procesadas=%d errores_totales=%d scan_ids=%d",
+                self.machine_id,
+                completados,
+                entradas_procesadas,
+                errores,
+                len(scan_ids),
             )
             ejecucion._finalizar(estado_final, resultado_final)
         except Exception as exc:  # no se deja el hilo colgado ni se propaga al llamante
@@ -3657,6 +3727,12 @@ class PoliticaRefresco:
         """
         necesita, motivo, _info = self.necesita_refresco_volumen(volume)
         if not necesita:
+            logger.info(
+                "Refresco no necesario volumen=%s modo=%s motivo=%s",
+                safe_log_path(volume),
+                self._config.modo.value,
+                motivo,
+            )
             return self._resultado_desde_storage(
                 modo=self._config.modo.value,
                 storage_result={
@@ -3680,6 +3756,16 @@ class PoliticaRefresco:
             razon=motivo,
             evitar_escaneo_completo=True,
         )
+        logger.info(
+            "Refresco volumen=%s modo=%s entradas_refrescadas=%d cambios=%d existen=%d no_existen=%d escaneo_completo_evitado=%s",
+            safe_log_path(volume),
+            resultado.modo,
+            resultado.entradas_refrescadas,
+            resultado.cambios_detectados,
+            resultado.existen,
+            resultado.no_existen,
+            resultado.escaneo_completo_evitado,
+        )
         self._registrar(resultado)
         return resultado
 
@@ -3695,6 +3781,11 @@ class PoliticaRefresco:
         almacenamiento (revalidación puntual, sin recorrido completo de volumen).
         """
         if not self._ruta_es_elegible(ruta_absoluta):
+            logger.info(
+                "Ruta excluida por política de refresco volumen=%s ruta=%s",
+                safe_log_path(volume),
+                safe_log_path(ruta_absoluta),
+            )
             return self._resultado_desde_storage(
                 modo=ModoRefresco.BAJO_DEMANDA.value,
                 storage_result={
@@ -3721,6 +3812,13 @@ class PoliticaRefresco:
             ruta=ruta_absoluta,
             razon="Refresco bajo demanda de ruta individual.",
             evitar_escaneo_completo=True,
+        )
+        logger.info(
+            "Refresco ruta bajo demanda volumen=%s ruta=%s entradas_refrescadas=%d cambios=%d",
+            safe_log_path(volume),
+            safe_log_path(ruta_absoluta),
+            resultado.entradas_refrescadas,
+            resultado.cambios_detectados,
         )
         self._registrar(resultado)
         return resultado
@@ -3782,6 +3880,16 @@ class PoliticaRefresco:
                 refrescados += 1
             else:
                 no_necesitaban += 1
+
+        logger.info(
+            "Refresco selectivo modo=%s volumenes_evaluados=%d volumenes_refrescados=%d volumenes_sin_refresco=%d entradas_refrescadas_total=%d cambios_detectados_total=%d",
+            cfg.modo.value,
+            len(volumenes_disponibles),
+            refrescados,
+            no_necesitaban,
+            entradas_total,
+            cambios_total,
+        )
 
         return {
             "machine_id": self.machine_id,
@@ -3976,6 +4084,13 @@ class EscanerRutaVolumen:
 
         scan_id = f"scan-{uuid.uuid4()}"
         iniciado_en = datetime.now().isoformat()
+        logger.info(
+            "Inicio de escaneo scan_id=%s volumen=%s modo=%s raiz=%s",
+            scan_id,
+            self.volumen,
+            self.modo,
+            safe_log_path(self.raiz),
+        )
         self.storage.connect()
         self.storage.record_machine(self.maquina_id, created_at=iniciado_en)
         self.storage.begin_scan_run(
@@ -4055,6 +4170,20 @@ class EscanerRutaVolumen:
             errors_count=progreso.errores,
             exclusions_count=progreso.exclusiones,
             coverage_estimate=str(round(progreso.cobertura, 2)),
+        )
+
+        logger.info(
+            "Fin de escaneo scan_id=%s volumen=%s modo=%s resultado=%s entradas=%d archivos=%d directorios=%d errores=%d exclusiones=%d cobertura=%.2f%%",
+            scan_id,
+            self.volumen,
+            self.modo,
+            resultado,
+            entradas_procesadas,
+            archivos_procesados,
+            directorios_procesados,
+            progreso.errores,
+            progreso.exclusiones,
+            round(progreso.cobertura, 2),
         )
 
         return ResultadoEscaneo(

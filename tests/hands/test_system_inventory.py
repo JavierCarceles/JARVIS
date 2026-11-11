@@ -1058,3 +1058,174 @@ class TestExclusionesUsuarioContrato:
         for e in entradas:
             if e.excluded:
                 assert e.exclusion_reason == "exclusion_usuario"
+
+
+# ---------------------------------------------------------------------------
+# Logs: sin listados completos de nombres/rutas; solo resumenes y errores
+# agregados (unidad 3.8.5.1.4.8.5).
+# ---------------------------------------------------------------------------
+
+class TestLogsSinRutasCompletas:
+    """Verifica que los logs nunca contienen rutas completas ni listados
+    de nombres, sino resumenes agregados y evidencia minima para diagnostico."""
+
+    def _capturar_logs(self, accion):
+        """Ejecuta `accion` capturando los registros emitidos por el logger
+        del modulo y devuelve la lista de mensajes de log."""
+        import logging
+
+        registros = []
+
+        class Capturador(logging.Handler):
+            def emit(self, record):
+                registros.append(record.getMessage())
+
+        logger_mod = logging.getLogger("src.hands.system_inventory")
+        logger_mod.setLevel(logging.INFO)
+        h = Capturador()
+        logger_mod.addHandler(h)
+        try:
+            accion()
+        finally:
+            logger_mod.removeHandler(h)
+        return registros
+
+    def test_recorrido_log_resumen_no_rutas_completas(self, storage, tmp_path):
+        """El recorrido de volumen loguea resumenes (conteos) y nunca la ruta
+        completa de la raiz ni listados de entradas."""
+        storage.initialize()
+        _, base = _volumen_para_scan(tmp_path, letra="L:")
+
+        def accion():
+            contrato = InventoryContract(machine_id=MACHINE_ID)
+            recorrido = RecorridoVolumen(
+                volumen="L:",
+                raiz=str(base),
+                contrato=contrato,
+                maquina_id=MACHINE_ID,
+            )
+            list(recorrido.recorrer())
+
+        registros = self._capturar_logs(accion)
+        texto_logs = "\n".join(registros)
+
+        # Debe haber registros de inicio y fin de recorrido.
+        assert "Inicio de recorrido" in texto_logs or "Fin de recorrido" in texto_logs
+
+        # Nunca debe aparecer la ruta completa de la raiz en los logs.
+        assert str(base) not in texto_logs
+
+        # Debe aparecer el volumen y conteos agregados, no rutas individuales.
+        assert "volumen=L:" in texto_logs
+        assert "directorios=" in texto_logs
+        assert "entradas=" in texto_logs
+        assert "errores=" in texto_logs
+
+    def test_errores_log_agregados_por_categoria_no_ruta_completa(
+        self, storage, tmp_path
+    ):
+        """Los errores se loguean agregados por categoria, nunca con la ruta
+        completa del archivo/directorio que fallo."""
+        storage.initialize()
+        # Ruta inexistente: genera un error de tipo "ruta_eliminada".
+        inexistente = str(tmp_path / "no_existe" / "nada")
+
+        def accion():
+            contrato = InventoryContract(machine_id=MACHINE_ID)
+            escanear_ruta(
+                ruta_absoluta=inexistente,
+                contrato=contrato,
+                maquina_id=MACHINE_ID,
+                storage=storage,
+            )
+
+        registros = self._capturar_logs(accion)
+        texto_logs = "\n".join(registros)
+
+        # Debe haber registro de error agregado por categoria.
+        assert "categoria=" in texto_logs or "Error de recorrido" in texto_logs
+
+        # Nunca la ruta completa inexistente en los logs.
+        assert inexistente not in texto_logs
+
+    def test_escanear_ruta_log_inicio_y_fin_con_evidencia_minima(
+        self, storage, tmp_path
+    ):
+        """escanear_ruta loguea inicio y fin con evidencia minima (scan_id,
+        volumen, modo, resultado, conteos) y nunca rutas completas."""
+        storage.initialize()
+        _, base = _volumen_para_scan(tmp_path, letra="M:")
+
+        def accion():
+            contrato = InventoryContract(machine_id=MACHINE_ID)
+            escanear_ruta(
+                ruta_absoluta=str(base),
+                contrato=contrato,
+                maquina_id=MACHINE_ID,
+                storage=storage,
+            )
+
+        registros = self._capturar_logs(accion)
+        texto_logs = "\n".join(registros)
+
+        # Evidencia minima de diagnostico.
+        assert "scan_id=" in texto_logs
+        assert "volumen=" in texto_logs
+        assert "resultado=" in texto_logs
+        assert "entradas=" in texto_logs
+
+        # Nunca la ruta completa escaneada.
+        assert str(base) not in texto_logs
+
+    def test_politica_refresco_log_resumen_no_rutas(
+        self, storage, tmp_path
+    ):
+        """La politica de refresco loguea resumenes agregados (volumen, modo,
+        entradas_refrescadas, cambios) y nunca rutas completas."""
+        storage.initialize()
+        _, base = _volumen_para_scan(tmp_path, letra="N:")
+
+        # Crear un escaneo previo para que la politica tenga algo que evaluar.
+        escanear_volumen(
+            volumen="N:",
+            ruta_raiz=str(base),
+            contrato=InventoryContract(machine_id=MACHINE_ID),
+            maquina_id=MACHINE_ID,
+            storage=storage,
+            modo="completo",
+        )
+
+        from src.hands.system_inventory import PoliticaRefresco, ModoRefresco, ConfigRefresco
+
+        def accion():
+            politica = PoliticaRefresco(
+                storage=storage,
+                machine_id=MACHINE_ID,
+                config=ConfigRefresco(modo=ModoRefresco.POR_CADUCIDAD, ttl_segundos=1),
+            )
+            politica.refrescar_volumen_si_necesario("N:")
+
+        registros = self._capturar_logs(accion)
+        texto_logs = "\n".join(registros)
+
+        # Debe haber registro de decision de refresco.
+        assert "Refresco no necesario" in texto_logs or "Refresco volumen" in texto_logs
+
+        # Nunca rutas completas en los logs de refresco.
+        assert str(base) not in texto_logs
+
+    def test_safe_log_path_acorta_rutas_largas(self):
+        """safe_log_path devuelve una version acortada de rutas largas para
+        logs, nunca la ruta completa."""
+        from src.hands.system_inventory import safe_log_path
+
+        ruta_larga = "C:\\Usuarios\\Usuario\\Documentos\\Proyectos\\JARVIS\\src\\hands\\system_inventory.py"
+        acortada = safe_log_path(ruta_larga)
+
+        assert acortada != ruta_larga
+        assert len(acortada) < len(ruta_larga)
+        assert "system_inventory.py" in acortada
+
+        # Rutas cortas no se truncan.
+        ruta_corta = "C:\\temp.txt"
+        assert safe_log_path(ruta_corta) == ruta_corta

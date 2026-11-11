@@ -27,6 +27,8 @@ en el proyecto (p. ej. `src/utils/advanced_logger.py`).
 
 from __future__ import annotations
 
+import ctypes
+import ctypes.wintypes
 import json
 import os
 import shutil
@@ -50,6 +52,7 @@ from src.hands.system_inventory import (
     InventoryEntry,
     ResultadoCaducidad,
     ResultadoValidacionDestino,
+    generate_machine_id,
     esta_caducado,
     validar_destino,
 )
@@ -86,6 +89,11 @@ DEFAULT_MANIFEST_PATH = Path("data") / "system_inventory_manifest.json"
 # Sufijo del fichero de copia de seguridad junto a la base de datos.
 DEFAULT_BACKUP_SUFFIX = ".bak"
 
+# Modo de fichero de la base de datos: lectura y escritura solo para el
+# propietario (3.8.5.1.4.8.4). En Windows se complementa con un DACL que
+# restringe el acceso al usuario actual.
+PERMISOS_BASE_DE_DATOS = 0o600
+
 
 class InventoryCorruptError(Exception):
     """La base de datos SQLite del inventario esta corrupta o ilegible y no
@@ -97,6 +105,11 @@ class InventoryBackupError(Exception):
     """Fallo al crear una copia de seguridad del inventario o al restaurarla.
     Nunca se usa para ocultar un fallo: cuando la copia de seguridad no es
     valida, la base actual queda intacta y no se sobrescribe."""
+
+
+class InventoryIncompatibleMachineError(Exception):
+    """La base de datos del inventario pertenece a otro equipo y no puede
+    usarse sin una decisión explícita de revalidación (3.8.5.1.4.8.4)."""
 
 # Valores admitidos para el modo de escaneo (3.8.5.1.4.2.6).
 SCAN_MODE_FULL = "completo"
@@ -454,7 +467,14 @@ class SystemInventoryStorage:
     # Conexion
     # ------------------------------------------------------------------ #
     def connect(self) -> sqlite3.Connection:
-        """Abre (o reutiliza) la conexion SQLite con WAL e integridad."""
+        """Abre (o reutiliza) la conexión SQLite con WAL e integridad.
+
+        Si el fichero de base de datos se acaba de crear, aplica permisos de
+        propietario único (3.8.5.1.4.8.4) para evitar que otros usuarios o
+        procesos del mismo equipo lo lean o escriban. Los ficheros auxiliares
+        WAL/SHM se protegen cuando existen.
+        """
+        archivo_nuevo = not self.db_path.exists()
         if self._conn is None:
             self._conn = sqlite3.connect(str(self.db_path))
             self._conn.row_factory = sqlite3.Row
@@ -462,6 +482,12 @@ class SystemInventoryStorage:
             # seguras; evita bloqueos prolongados en escaneos largos.
             self._conn.execute("PRAGMA journal_mode=WAL")
             self._conn.execute("PRAGMA foreign_keys=ON")
+            if archivo_nuevo:
+                self._aplicar_permisos_privados(self.db_path)
+                for suf in ("-wal", "-shm"):
+                    auxiliar = Path(str(self.db_path) + suf)
+                    if auxiliar.exists():
+                        self._aplicar_permisos_privados(auxiliar)
         return self._conn
 
     def close(self) -> None:
@@ -478,24 +504,230 @@ class SystemInventoryStorage:
         self.close()
 
     # ------------------------------------------------------------------ #
+    # Protección de permisos, identidad y exposición por red (3.8.5.1.4.8.4)
+    # ------------------------------------------------------------------ #
+    def _es_windows(self) -> bool:
+        return os.name == "nt"
+
+    def _obtener_permisos(self, ruta: Path) -> Optional[int]:
+        """Devuelve el modo de permisos (bitos bajos de st_mode) o None si no se puede leer."""
+        try:
+            return os.stat(str(ruta)).st_mode & 0o777
+        except OSError:
+            return None
+
+    def _aplicar_acl_usuario_actual(self, ruta: Path) -> None:
+        """Restringe el DACL de un fichero en Windows al usuario actual.
+
+        Construye un descritor de seguridad SDDL que concede acceso total
+        únicamente al SID del usuario del proceso en curso y lo aplica al
+        fichero mediante `SetFileSecurity`. Si falla, se deja que el llamante
+        recurra a `os.chmod`.
+        """
+        advapi32 = ctypes.windll.advapi32
+        kernel32 = ctypes.windll.kernel32
+
+        h_token = ctypes.wintypes.HANDLE()
+        if not advapi32.OpenProcessToken(
+            kernel32.GetCurrentProcess(), 0x0008, ctypes.byref(h_token)
+        ):  # TOKEN_QUERY
+            raise ctypes.WinError(ctypes.get_last_error())
+        try:
+            cb = ctypes.wintypes.DWORD()
+            advapi32.GetTokenInformation(h_token, 1, None, 0, ctypes.byref(cb))  # TokenUser
+            if ctypes.get_last_error() != 122:  # ERROR_INSUFFICIENT_BUFFER
+                raise ctypes.WinError(ctypes.get_last_error())
+            buf = ctypes.create_string_buffer(cb.value)
+            if not advapi32.GetTokenInformation(
+                h_token, 1, buf, cb.value, ctypes.byref(cb)
+            ):
+                raise ctypes.WinError(ctypes.get_last_error())
+
+            class _SID_AND_ATTRIBUTES(ctypes.Structure):
+                _fields_ = [("Sid", ctypes.c_void_p), ("Attributes", ctypes.wintypes.DWORD)]
+
+            class _TOKEN_USER(ctypes.Structure):
+                _fields_ = [("User", _SID_AND_ATTRIBUTES)]
+
+            token_user = ctypes.cast(buf, ctypes.POINTER(_TOKEN_USER)).contents
+            sid = token_user.User.Sid
+
+            sid_str = ctypes.wintypes.LPWSTR()
+            if not advapi32.ConvertSidToStringSid(sid, ctypes.byref(sid_str)):
+                raise ctypes.WinError(ctypes.get_last_error())
+            try:
+                sddl = f"D:(A;;FA;;;{sid_str.value})"
+                sd = ctypes.c_void_p()
+                sd_size = ctypes.wintypes.DWORD()
+                if not advapi32.ConvertStringSecurityDescriptorToSecurityDescriptor(
+                    sddl, 1, ctypes.byref(sd), ctypes.byref(sd_size)
+                ):
+                    raise ctypes.WinError(ctypes.get_last_error())
+                try:
+                    # DACL_SECURITY_INFORMATION = 1
+                    if not advapi32.SetFileSecurity(str(ruta), 1, sd):
+                        raise ctypes.WinError(ctypes.get_last_error())
+                finally:
+                    advapi32.LocalFree(sd)
+            finally:
+                advapi32.LocalFree(sid_str)
+        finally:
+            kernel32.CloseHandle(h_token)
+
+    def _aplicar_permisos_privados(self, ruta: Path) -> dict:
+        """Establece permisos de propietario único (0o600) en un fichero.
+
+        En POSIX usa `os.chmod(0o600)`. En Windows intenta restringir el DACL
+        al usuario actual mediante `ctypes` y, si falla, recurre a `os.chmod`
+        (que en Windows marca el atributo de solo lectura, el máximo que ofrece
+        el estándar portable sin dependencias).
+
+        Retorna un informe con la ruta, modo solicitado, modo real observado,
+        si se usó ACL de Windows y cualquier error.
+        """
+        informe: dict[str, object] = {
+            "ruta": str(ruta),
+            "modo_solicitado": PERMISOS_BASE_DE_DATOS,
+            "modo_real": None,
+            "uso_windows_acl": False,
+            "error": None,
+        }
+        try:
+            if not ruta.exists():
+                informe["error"] = "El fichero no existe"
+                return informe
+            if self._es_windows():
+                try:
+                    self._aplicar_acl_usuario_actual(ruta)
+                    informe["uso_windows_acl"] = True
+                except Exception as exc_acl:  # fallback portable
+                    os.chmod(str(ruta), PERMISOS_BASE_DE_DATOS)
+                    informe["fallback_os_chmod"] = str(exc_acl)
+            else:
+                os.chmod(str(ruta), PERMISOS_BASE_DE_DATOS)
+            informe["modo_real"] = self._obtener_permisos(ruta)
+        except OSError as exc:
+            informe["error"] = str(exc)
+        return informe
+
+    def aplicar_permisos_privados(self, ruta: Optional[Path] = None) -> dict:
+        """Aplica permisos de propietario único al fichero de base de datos
+        (o a la ruta indicada) y devuelve el informe de protección.
+
+        Útil para volver a proteger la base tras operaciones de copia o
+        restauración (3.8.5.1.4.8.4).
+        """
+        objetivo = Path(ruta) if ruta is not None else self.db_path
+        return self._aplicar_permisos_privados(objetivo)
+
+    def verificar_no_exposicion_red(self) -> dict:
+        """Confirma que la base de datos es un fichero local y no está expuesta
+        por red.
+
+        SQLite es integrado (no hay servidor de red). Este método verifica que
+        la ruta no sea UNC (ruta de red compartida) y que no exista
+        configuración de servidor. Retorna un informe de exposición.
+        No abre ni modifica la base de datos.
+        """
+        informe: dict[str, object] = {
+            "db_path": str(self.db_path),
+            "es_local": False,
+            "es_unc": False,
+            "es_red": False,
+            "servidor_sqlite": False,
+            "motivo": None,
+        }
+        ruta = str(self.db_path)
+        es_unc = ruta.startswith("\\\\") or ruta.startswith("\\\\?\\UNC\\")
+        informe["es_unc"] = es_unc
+        informe["es_red"] = es_unc
+        informe["es_local"] = not es_unc and not bool(informe["servidor_sqlite"])
+        if es_unc:
+            informe["motivo"] = (
+                "La ruta es UNC (red); la base de datos no debe residir en un "
+                "recurso de red."
+            )
+        else:
+            informe["motivo"] = (
+                "Ruta de fichero local; SQLite es integrado (sin servidor de red)."
+            )
+        return informe
+
+    def verificar_identidad_equipo(
+        self, machine_id_actual: Optional[str] = None
+    ) -> dict:
+        """Comprueba si el equipo registrado en la base coincide con el actual.
+
+        No modifica la base de datos. Retorna un informe con
+        `maquina_actual`, `maquina_registrada`, `equipo_coincide`, `bloqueado`
+        y `motivo`. Si no hay equipo registrado aún, no se bloquea.
+        (3.8.5.1.4.8.4)
+        """
+        if machine_id_actual is None:
+            machine_id_actual = generate_machine_id()
+        informe: dict[str, object] = {
+            "maquina_actual": machine_id_actual,
+            "maquina_registrada": None,
+            "equipo_coincide": False,
+            "bloqueado": False,
+            "motivo": None,
+        }
+        if not self.db_path.exists():
+            informe["motivo"] = (
+                "La base de datos no existe; sin identidad registrada aún."
+            )
+            return informe
+        try:
+            conn = self.connect()
+            cur = conn.execute("SELECT machine_id FROM machines LIMIT 1")
+            row = cur.fetchone()
+            if row is None:
+                informe["motivo"] = "No hay equipo registrado aún en la base de datos."
+                return informe
+            maquina_registrada = row["machine_id"]
+            informe["maquina_registrada"] = maquina_registrada
+            informe["equipo_coincide"] = maquina_registrada == machine_id_actual
+            if not informe["equipo_coincide"]:
+                informe["bloqueado"] = True
+                informe["motivo"] = (
+                    f"El inventario pertenece al equipo "
+                    f"{maquina_registrada!r}, no al equipo actual "
+                    f"{machine_id_actual!r}."
+                )
+        except sqlite3.OperationalError as exc:
+            informe["bloqueado"] = True
+            informe["motivo"] = f"No se pudo leer la identidad del equipo: {exc}"
+        return informe
+
+    # ------------------------------------------------------------------ #
     # Esquema
     # ------------------------------------------------------------------ #
-    def initialize(self) -> int:
-        """Crea las tablas e indices si no existen, aplica migraciones pendientes
-        y devuelve la version del esquema.
+    def initialize(
+        self,
+        machine_id_actual: Optional[str] = None,
+        permitir_otro_equipo: bool = False,
+    ) -> int:
+        """Crea las tablas e índices si no existen, aplica migraciones pendientes
+        y devuelve la versión del esquema.
 
         Flujo (3.8.5.1.4.2.8):
         1. Crea tablas (IF NOT EXISTS) con el esquema actual (v2). En bases nuevas
            `file_entries` ya trae `normalized_path`; en bases v1 existentes no.
-        2. Detecta la version actual almacenada (0 si es una base nueva).
-        3. Si la base viene de una version anterior (0 < version < v2), aplica las
+        2. Detecta la versión actual almacenada (0 si es una base nueva).
+        3. Si la base viene de una versión anterior (0 < versión < v2), aplica las
            migraciones registradas en orden: cada una dentro de su propia
-           transaccion, actualizando la version del esquema al terminar. Una
-           base con version superior a la conocida no se degrada ni se le
+           transacción, actualizando la versión del esquema al terminar. Una
+           base con versión superior a la conocida no se degrada ni se le
            reinterpreta el contenido.
-        4. Crea todos los indices (incluido el unico por ruta normalizada), que
+        4. Crea todos los índices (incluido el único por ruta normalizada), que
            requieren que las migraciones ya hayan ejecutado.
-        5. Registra/actualiza la version del esquema sin borrar datos previos.
+        5. Registra/actualiza la versión del esquema sin borrar datos previos.
+
+        (3.8.5.1.4.8.4) Identidad de equipo: si `machine_id_actual` no se
+        proporciona se deriva de `generate_machine_id()`. Cuando la base de
+        datos ya tiene un equipo registrado y no coincide con el actual, se
+        levanta `InventoryIncompatibleMachineError` salvo que
+        `permitir_otro_equipo=True` (decisión explícita de revalidación).
         """
         # (3.8.5.1.4.2.11) Si la base de datos ya existe en disco, verificar su
         # integridad antes de tocarla. Una base corrupta no se inicializa sobre
@@ -544,6 +776,28 @@ class SystemInventoryStorage:
 
         # 4. Crear indices (despues de las migraciones, que pueden agregar columnas).
         conn.executescript(_SCHEMA_INDEXES_SQL)
+
+        # (3.8.5.1.4.8.4) Identidad de equipo: una base existente creada en otro
+        # equipo no debe usarse sin decision explícita.
+        if machine_id_actual is None:
+            machine_id_actual = generate_machine_id()
+        try:
+            cur_maquina = conn.execute("SELECT machine_id FROM machines LIMIT 1")
+            fila_maquina = cur_maquina.fetchone()
+            if fila_maquina is not None:
+                maquina_registrada = fila_maquina["machine_id"]
+                if maquina_registrada != machine_id_actual and not permitir_otro_equipo:
+                    raise InventoryIncompatibleMachineError(
+                        f"La base de datos del inventario pertenece al equipo "
+                        f"{maquina_registrada!r} y el equipo actual es "
+                        f"{machine_id_actual!r}. No se puede usar sin una "
+                        "decisión explícita de revalidación "
+                        "(permitir_otro_equipo=True)."
+                    )
+        except sqlite3.OperationalError:
+            # La tabla machines puede no existir en esquemas previos sin
+            # versionado; no bloquear en ese caso.
+            pass
 
         # 5. Registrar/actualizar version sin borrar datos.
         conn.commit()
