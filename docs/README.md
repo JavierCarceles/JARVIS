@@ -794,7 +794,10 @@ ni el catalogo conocido, y no persiste capacidades inferidas. Provee
 `registrar_candidatos` para persistir candidatos clasificados en la tabla
 `application_candidates` del almacenamiento SQLite (unidad
 3.8.5.1.4.7.6: fuente, ruta/destino, tipo de lanzamiento, version/producto,
-ultima comprobacion, evidencia y nivel de confianza).
+ultima comprobacion, evidencia y nivel de confianza). Cuando existen varias
+coincidencias plausibles para un mismo nombre, no elige silenciosamente una:
+conserva todas las alternativas y expone una señal de ambigüedad para que el
+llamar solicite desambiguación (unidad 3.8.5.1.4.9.3).
 
 **Características:**
 
@@ -814,6 +817,17 @@ ultima comprobacion, evidencia y nivel de confianza).
   candidatas de instalaciones distintas.
 - Resiliente: el fallo de una fuente de descubrimiento no interrumpe las
   demas.
+- Detección de ambigüedad: varias coincidencias plausibles para un mismo
+  nombre no se eligen silenciosamente; se conservan alternativas, se calcula
+  `ambiguo`/`requiere_desambiguacion` con motivo y fuente autoritativa cuando
+  procede (3.8.5.1.4.9.3).
+- Estado vigente de destinos (3.8.5.1.4.9.4): cuando la ruta de un candidato
+  ha cambiado, ha desaparecido o ya no es accesible, se excluye de la
+  resolución y se actualiza su estado (`disponible=False`, `ultima_comprobacion`
+  y evidencia de inaccesibilidad) sin intentar la ruta obsoleta ni validarla
+  con preflight; la resolución se repite con las fuentes vigentes. Los
+  destinos que no son archivos de disco (URI, lanzador, paquete, bundle) no
+  se descartan por falta de archivo.
 - `registrar_candidatos(candidatos, volume, scan_id)` persiste una lista de
   `DiscoveredCandidate` en `application_candidates` mediante el ciclo de
   vida de escaneo (`begin_scan_run` / `end_scan_run`), registrando fuente,
@@ -833,6 +847,17 @@ Métodos:
 | `def from_classification(clasificacion, fuente, destino_original, preflight_decision, fuentes_consultadas, esta_en_inventario)` | Construye una instancia a partir de una `LaunchClassification` y metadatos de descubrimiento. |
 | `def to_dict()` | Serializa el resultado a diccionario plano. |
 
+`class ResultadoResolucionCandidatos` — Resultado de resolución de candidatos
+por nombre con señal de ambigüedad (3.8.5.1.4.9.3): conserva todas las
+alternativas, indica `ambiguo`/`requiere_desambiguacion` con motivo y la
+fuente autoritativa cuando procede, sin lanzar nada.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` | Serializa el resultado (candidatos, alternativas, flags de ambigüedad y fuente autoritativa) a diccionario plano. |
+
 `class ApplicationDiscovery` — Orquestador de descubrimiento que reutiliza primero las fuentes
 existentes del SO y usa el inventario como fuente complementaria para destinos faltantes.
 
@@ -843,6 +868,7 @@ Métodos:
 | `def __init__(preflight, clasificador, storage, calibration, machine_id)` | Crea el orquestador con dependencias inyectables (por defecto instancias reales). |
 | `def descubrir_todos(limite_por_fuente, incluir_inventario)` | Devuelve candidatos descubiertos: fuentes primarias primero y, opcionalmente, el inventario para destinos faltantes. |
 | `def buscar_por_nombre(nombre, incluir_inventario, limite_por_fuente)` | Busca por nombre aplicando el orden de precedencia (aplicación ya abierta > catálogo conocido > fuentes nativas del SO > inventario) y conserva procedencia y confianza de cada candidato. |
+| `def buscar_por_nombre_con_desambiguacion(nombre, incluir_inventario, limite_por_fuente)` | Resuelve por nombre conservando todas las alternativas y señalando ambigüedad cuando la evidencia no permite elegir (3.8.5.1.4.9.3). |
 | `def candidatos_lanzables(limite_por_fuente, incluir_inventario)` | Devuelve solo candidatos clasificados como lanzables tras validar con preflight (sin lanzar). |
 | `def registrar_candidatos(candidatos, volume, scan_id)` | Persiste candidatos clasificados en `application_candidates` con todos los campos de registro (fuente, ruta/destino, tipo de lanzamiento, version/producto, ultima comprobacion, evidencia, confianza). |
 | `def deduplicar_por_destino_real(candidatos)` | Deduplica una lista de `DiscoveredCandidate` ya clasificados por identidad y destino real (ruta normalizada o URI), conservando el de mayor confianza/evidencia por destino y todas las rutas de instalaciones distintas. |

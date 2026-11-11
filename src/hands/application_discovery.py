@@ -86,6 +86,11 @@ _PRECEDENCIA_FUENTE = {
     FUENTE_INVENTARIO: 7,
 }
 
+# Fuentes cuya resolución se considera autoritativa para un nombre: una
+# aplicación ya abierta en el SO o una entrada del catálogo conocido deciden
+# de forma inequívoca y no generan ambigüedad por sí solas (3.8.5.1.4.9.2).
+_FUENTES_AUTORITATIVAS = {FUENTE_APLICACION_ABIERTA, FUENTE_CATALOGO}
+
 # Índice de prioridad legado: menor número = mayor prioridad al dedupar por destino.
 # Se mantiene por compatibilidad; _PRECEDENCIA_FUENTE es la fuente de verdad.
 _PRIORIDAD_FUENTE = {fuente: i for i, fuente in enumerate(FUENTES_PRIMARIAS)}
@@ -130,6 +135,7 @@ class DiscoveredCandidate:
     fuentes_consultadas: list[str] = field(default_factory=list)
     esta_en_inventario: bool = False
     preflight_decision: Optional[dict] = None
+    disponible: bool = True
 
     @classmethod
     def from_classification(
@@ -192,6 +198,40 @@ class DiscoveredCandidate:
             "fuentes_consultadas": list(self.fuentes_consultadas),
             "esta_en_inventario": self.esta_en_inventario,
             "preflight_decision": self.preflight_decision,
+            "disponible": self.disponible,
+        }
+
+
+@dataclass
+class ResultadoResolucionCandidatos:
+    """
+    Resultado de la resolución de candidatos por nombre con señal de ambigüedad
+    (3.8.5.1.4.9.3).
+
+    Cuando existen varias coincidencias plausibles para un mismo nombre y la
+    evidencia no permite elegir una de forma inequívoca, ``ambiguo`` es True,
+    ``requiere_desambiguacion`` es True y ``alternativas`` conserva todos los
+    candidatos para que el llamador solicite desambiguación al usuario en lugar
+    de elegir silenciosamente uno posiblemente incorrecto. Ninguna aplicación
+    se lanza ni se modifica el catálogo conocido como consecuencia de este
+    resultado.
+    """
+
+    candidatos: list[DiscoveredCandidate]
+    ambiguo: bool
+    motivo_ambiguedad: Optional[str]
+    alternativas: list[DiscoveredCandidate]
+    requiere_desambiguacion: bool
+    fuente_autoritaria: Optional[str]
+
+    def to_dict(self) -> dict:
+        return {
+            "candidatos": [c.to_dict() for c in self.candidatos],
+            "ambiguo": self.ambiguo,
+            "motivo_ambiguedad": self.motivo_ambiguedad,
+            "alternativas": [c.to_dict() for c in self.alternativas],
+            "requiere_desambiguacion": self.requiere_desambiguacion,
+            "fuente_autoritaria": self.fuente_autoritaria,
         }
 
 
@@ -223,6 +263,10 @@ class ApplicationDiscovery:
         self.storage = storage or SystemInventoryStorage()
         self.calibration = calibration or CalibrationManager()
         self.machine_id = machine_id or generate_machine_id()
+        # Estado de la última resolución: candidatos cuyo destino dejó de ser
+        # accesible (ruta cambiada, desaparecida o inaccesible); su estado se
+        # actualiza (disponible=False) y su ruta no se intenta ni se devuelve.
+        self._inaccesibles_ultima_resolucion: list[DiscoveredCandidate] = []
 
     # ------------------------------------------------------------------ #
     # API pública
@@ -422,13 +466,123 @@ class ApplicationDiscovery:
 
         # ------------------------------------------------------------------
         # Deduplicar por destino real conservando la fuente de mayor
-        # precedencia, luego clasificar y validar cada candidato.
+        # precedencia.
         # ------------------------------------------------------------------
         unicos = self._dedup_por_destino(crudos)
+
+        # ------------------------------------------------------------------
+        # 3.8.5.1.4.9.4: antes de clasificar/validar, descartar los candidatos
+        # cuyo destino ya no es accesible en el equipo (ruta cambiada,
+        # desaparecida o inaccesible), actualizando su estado. Asi no se
+        # intenta la ruta obsoleta y la resolucion se repite con las fuentes
+        # vigentes.
+        # ------------------------------------------------------------------
+        ahora = _ahora_iso()
+        unicos_vigentes: list[dict[str, Any]] = []
+        inaccesibles: list[DiscoveredCandidate] = []
+        for c in unicos:
+            destino = c.get("absolute_path") or c.get("destination")
+            if self._destino_compruebe_en_disco(destino) and not self._existe_destino_vigente(
+                c, destino
+            ):
+                inaccesibles.append(self._candidato_inaccesible(c, destino, ahora))
+                continue
+            unicos_vigentes.append(c)
+        self._inaccesibles_ultima_resolucion = inaccesibles
+
         return self._clasificar_y_validar(
-            unicos,
+            unicos_vigentes,
             fuente_defecto=FUENTE_INVENTARIO,
             fuentes_consultadas=fuentes_consultadas,
+        )
+
+    def buscar_por_nombre_con_desambiguacion(
+        self,
+        nombre: str,
+        incluir_inventario: bool = True,
+        limite_por_fuente: int = 50,
+    ) -> ResultadoResolucionCandidatos:
+        """
+        Resuelve un nombre por fuentes conservando todas las alternativas y
+        señalando ambigüedad cuando la evidencia no permite elegir una
+        (3.8.5.1.4.9.3).
+
+        `buscar_por_nombre` ya devuelve todos los candidatos encontrados sin
+        elegir uno silenciosamente. Este método añade la señal explícita de
+        ambigüedad: cuando existen varias coincidencias plausibles para el
+        mismo nombre y ninguna fuente autoritativa (aplicación ya abierta o
+        catálogo conocido) resuelve de forma inequívoca, ``ambiguo`` es True,
+        ``requiere_desambiguacion`` es True y ``alternativas`` contiene todos
+        los candidatos para que el llamador solicite desambiguación al usuario.
+
+        No lanza aplicaciones, no modifica el catálogo conocido ni persiste
+        capacidades inferidas.
+        """
+        candidatos = self.buscar_por_nombre(
+            nombre,
+            incluir_inventario=incluir_inventario,
+            limite_por_fuente=limite_por_fuente,
+        )
+        ambiguo, motivo, fuente_autoritaria = self._evaluar_ambiguedad(candidatos)
+        return ResultadoResolucionCandidatos(
+            candidatos=list(candidatos),
+            ambiguo=ambiguo,
+            motivo_ambiguedad=motivo,
+            alternativas=list(candidatos) if ambiguo else [],
+            requiere_desambiguacion=ambiguo,
+            fuente_autoritaria=fuente_autoritaria,
+        )
+
+    def _evaluar_ambiguedad(
+        self, candidatos: list[DiscoveredCandidate]
+    ) -> tuple[bool, Optional[str], Optional[str]]:
+        """
+        Evalúa si una lista de candidatos resuelta para un mismo nombre es
+        ambigua (3.8.5.1.4.9.3).
+
+        Reglas:
+        - 0 o 1 candidato: no hay ambigüedad (no hay nada que elegir).
+        - Si exactamente una fuente autoritativa (aplicación abierta o
+          catálogo conocido) resuelve el nombre, esa fuente decide: no es
+          ambigua.
+        - Si varias fuentes autoritativas resuelven a destinos distintos: la
+          ambigüedad es real aunque sean fuentes autoritativas.
+        - Sin fuente autoritativa y varios candidatos con destinos distintos:
+          la evidencia no permite elegir uno de forma inequívoca; se conservan
+          las alternativas y se requiere desambiguación.
+
+        Retorna (es_ambiguo, motivo_ambiguedad, fuente_autoritaria).
+        """
+        if not candidatos:
+            return False, None, None
+        if len(candidatos) == 1:
+            fuente = str(candidatos[0].fuente or "").strip()
+            return (
+                False,
+                None,
+                fuente if fuente in _FUENTES_AUTORITATIVAS else None,
+            )
+        autoritativas = [
+            c
+            for c in candidatos
+            if str(c.fuente or "").strip() in _FUENTES_AUTORITATIVAS
+        ]
+        if len(autoritativas) == 1:
+            return False, None, str(autoritativas[0].fuente or "").strip()
+        if len(autoritativas) > 1:
+            return (
+                True,
+                "Varias fuentes autoritativas resuelven el mismo nombre a "
+                "destinos distintos; se conservan alternativas y se requiere "
+                "desambiguación",
+                None,
+            )
+        return (
+            True,
+            f"Se encontraron {len(candidatos)} candidatos plausibles para el "
+            "nombre sin evidencia que permita elegir uno de forma inequívoca; "
+            "se conservan alternativas y se requiere desambiguación",
+            None,
         )
 
     def _candidato_desde_catalogo(
@@ -540,6 +694,18 @@ class ApplicationDiscovery:
             if c.es_lanzable
         ]
 
+    @property
+    def candidatos_inaccesibles_ultima_resolucion(self) -> list[DiscoveredCandidate]:
+        """Candidatos de la última resolución cuyo destino ya no es accesible
+        en el equipo (ruta cambiada, desaparecida o inaccesible).
+
+        Su estado fue actualizado (``disponible=False``, ``ultima_comprobacion``
+        y evidencia de inaccesibilidad) y su ruta no se intentó ni se devolvió
+        como resultado de la resolución; la resolución se repite con las fuentes
+        vigentes (3.8.5.1.4.9.4).
+        """
+        return list(self._inaccesibles_ultima_resolucion)
+
     def registrar_candidatos(
         self,
         candidatos: list[DiscoveredCandidate],
@@ -618,6 +784,72 @@ class ApplicationDiscovery:
             except Exception:
                 pass
             raise
+
+    # ------------------------------------------------------------------ #
+    # Estado vigente de destinos (3.8.5.1.4.9.4)
+    # ------------------------------------------------------------------ #
+
+    @staticmethod
+    def _destino_compruebe_en_disco(destino: Optional[str]) -> bool:
+        """True si el destino es una ruta local absoluta cuya existencia y
+        acceso pueden comprobarse directamente en el sistema de archivos.
+
+        Se excluyen las URIs, esquemas no locales y paquetes/bundles, que no
+        resuelven a un archivo de disco comprobable con ``os.path.exists``."""
+        if not destino or not isinstance(destino, str):
+            return False
+        d = destino.strip()
+        if not d:
+            return False
+        if ":" in d and not _es_ruta_windows(d):
+            return False
+        return os.path.isabs(d)
+
+    def _existe_destino_vigente(self, candidato: dict[str, Any], destino: str) -> bool:
+        """Comprueba si el destino sigue siendo accesible en el equipo.
+
+        Para candidatos del inventario persistente, revalida mediante
+        ``SystemInventoryStorage.revalidar_destino_aplicacion``, que realiza
+        la comprobacion real en el sistema de archivos y actualiza
+        ``last_checked_at`` de la entrada (su estado persistido). Para el
+        resto de fuentes se comprueba directamente con ``os.path.exists``.
+        Devuelve False si el destino ya no es accesible.
+        """
+        if not destino:
+            return False
+        if bool(candidato.get("esta_en_inventario", False)) and candidato.get("volume"):
+            try:
+                resultado = self.storage.revalidar_destino_aplicacion(
+                    self.machine_id, str(candidato["volume"]), destino
+                )
+            except Exception:
+                resultado = None
+            if isinstance(resultado, dict) and resultado.get("scan_id") is not None:
+                return bool(resultado.get("valido"))
+        return os.path.exists(destino)
+
+    def _candidato_inaccesible(
+        self, candidato: dict[str, Any], destino: str, ahora: str
+    ) -> DiscoveredCandidate:
+        """Construye el registro de estado actualizado de un candidato cuyo
+        destino ya no es accesible: ``disponible=False``, ultima comprobacion
+        y evidencia de inaccesibilidad. No se intenta su ruta ni se valida
+        con preflight la ruta obsoleta."""
+        return DiscoveredCandidate(
+            candidate_id=str(candidato.get("candidate_id") or destino or ""),
+            name=str(candidato.get("name", "")),
+            absolute_path=destino,
+            destination=destino,
+            fuente=str(candidato.get("source", FUENTE_INVENTARIO) or FUENTE_INVENTARIO),
+            volume=str(candidato.get("volume")) if candidato.get("volume") else None,
+            esta_en_inventario=bool(candidato.get("esta_en_inventario", False)),
+            disponible=False,
+            ultima_comprobacion=ahora,
+            razon="ruta_destino_inaccesible",
+            advertencias=["ruta_destino_inaccesible"],
+            evidencia=[f"ruta_no_accesible_en_disco:{ahora}"],
+            preflight_decision=None,
+        )
 
     # ------------------------------------------------------------------ #
     # Fuentes primarias existentes (reutilizadas)

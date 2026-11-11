@@ -6796,7 +6796,12 @@ tipo de excepcion.
 **Descripción:** Tests unitarios de la unidad 3.8.5.1.4.7.2: descubrimiento de aplicaciones
 reutilizando primero las fuentes existentes del SO (menu de aplicaciones, paquetes, registro,
 accesos directos, PATH, App Paths) y usando el inventario persistente como fuente complementaria
-solo para destinos faltantes.
+solo para destinos faltantes. Cubre también la unidad 3.8.5.1.4.9.3: varias coincidencias
+plausibles para un mismo nombre no se eligen silenciosamente; se conservan alternativas y se
+solicita desambiguación cuando la evidencia no permite decidir. Cubre la unidad 3.8.5.1.4.9.4:
+cuando la ruta de un candidato ha cambiado, ha desaparecido o ya no es accesible, se excluye de
+la resolución y se actualiza su estado (`disponible=False`, `ultima_comprobacion` y evidencia)
+sin intentar la ruta obsoleta; la resolución se repite con fuentes vigentes.
 
 **Módulos de origen probados:** src.hands.application_discovery, src.hands.application_preflight,
 src.hands.application_launch_classifier
@@ -6860,6 +6865,18 @@ lanza ninguna aplicacion.
 
 - **`TestCandidatosLanzables`** (línea 506) — 1 método(s) de test
   - `test_solo_retorna_lanzables` (L406)
+
+- **`TestAmbiguedadDesambiguacion`** (línea 574) — 8 método(s) de test
+  - `test_varios_candidatos_plausibles_no_se_elige_silenciosamente` (L586)
+  - `test_un_solo_candidato_no_es_ambiguo` (L628)
+  - `test_sin_candidatos_no_es_ambiguo` (L643)
+  - `test_evaluar_ambiguedad_varios_inventario_es_ambiguo` (L651)
+  - `test_evaluar_ambiguedad_fuente_autoritaria_unica_no_es_ambigua` (L670)
+  - `test_evaluar_ambiguedad_varias_fuentes_autoritativas_es_ambigua` (L690)
+  - `test_resultado_resolucion_to_dict` (L706)
+
+- **`TestAmbiguedadAlmacenamientoReal`** (línea 728) — 1 método(s) de test
+  - `test_dos_entradas_inventario_mismo_nombre_son_alternativas_ambiguas` (L752)
 
 - **`TestSeparacionCatalogoDinamicoEntitiesJson`** (línea 713) — 3 método(s) de test
   - `test_registrar_candidatos_no_modifica_entities_json` (L725)

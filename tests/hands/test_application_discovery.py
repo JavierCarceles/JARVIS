@@ -41,11 +41,14 @@ from src.hands.application_discovery import (
     DiscoveredCandidate,
     FUENTE_APP_PATHS,
     FUENTE_APPX,
+    FUENTE_APLICACION_ABIERTA,
+    FUENTE_CATALOGO,
     FUENTE_INVENTARIO,
     FUENTE_PATH,
     FUENTE_START_MENU,
     FUENTE_UNINSTALL_REGISTRY,
     FUENTES_PRIMARIAS,
+    ResultadoResolucionCandidatos,
 )
 from src.hands.application_preflight import ApplicationPreflight
 from src.hands.application_launch_classifier import (
@@ -399,8 +402,13 @@ class TestPrioridadFallback:
 
     def test_buscar_por_nombre_faltante_consulta_inventario(self):
         descub, _, storage = _discovery_con_mocks(calib_apps=[])
+        # .9.4: las entradas de inventario cuyo destino ya no es accesible se
+        # excluyen de la resolucion, por eso la entrada apunta a un archivo
+        # real existente del equipo. Se usa notepad.exe (y no sys.executable,
+        # cuyo proceso Python esta en ejecucion durante pytest y elevaria la
+        # fuente a aplicacion_abierta por _elevar_si_abierta).
         storage.search.return_value = [
-            {"absolute_path": r"C:\Program Files\MiApp\miapp.exe", "name": "miapp.exe",
+            {"absolute_path": _notepad(), "name": "miapp.exe",
              "volume": "C:", "entry_type": "file", "last_checked_at": ""}
         ]
         resultado = descub.buscar_por_nombre("miapp", incluir_inventario=True)
@@ -411,6 +419,7 @@ class TestPrioridadFallback:
         assert c.fuente == FUENTE_INVENTARIO
         assert c.esta_en_inventario is True
         assert FUENTE_INVENTARIO in c.fuentes_consultadas
+        assert c.disponible is True
 
     def test_buscar_por_nombre_faltante_sin_inventario_retorna_vacio(self):
         descub, _, storage = _discovery_con_mocks(calib_apps=[])
@@ -562,6 +571,256 @@ class TestCandidatosLanzables:
             assert all(c.es_lanzable is True for c in lanzables)
         finally:
             os.unlink(ruta_no_lanzable)
+
+
+# ---------------------------------------------------------------------------
+# Ambigüedad y desambiguación (unidad 3.8.5.1.4.9.3)
+# ---------------------------------------------------------------------------
+
+class TestAmbiguedadDesambiguacion:
+    """3.8.5.1.4.9.3: varias coincidencias plausibles para un mismo nombre no
+    se eligen silenciosamente; se conservan alternativas y se solicita
+    desambiguación cuando la evidencia no permite decidir.
+
+    Estrategia de mocks: solo se mockean las fuentes de datos
+    (CalibrationManager / SystemInventoryStorage). La clasificación y el
+    preflight son reales (LaunchClassifier + ApplicationPreflight sobre
+    archivos reales del equipo). No se lanza ninguna aplicación y no se
+    modifica entities.json.
+    """
+
+    def test_varios_candidatos_plausibles_no_se_elige_silenciosamente(self):
+        """Dos aplicaciones reales que coinciden con el nombre buscado (y que
+        NO están en el catálogo conocido): ambiguo=True,
+        requiere_desambiguacion=True, alternativas con ambas, preflight real
+        sobre cada una, sin lanzar nada."""
+        notepad = r"C:\Windows\System32\notepad.exe"
+        if not os.path.exists(notepad):
+            pytest.skip("notepad.exe no disponible en este equipo")
+        with tempfile.NamedTemporaryFile(suffix=".exe", delete=False) as f:
+            ruta_sonda = f.name
+            f.write(b"MZ" + b"\x00" * 1024)
+        try:
+            descub, _, _ = _discovery_con_mocks(
+                calib_apps=[
+                    _app("SondaApp", notepad, FUENTE_START_MENU),
+                    _app("SondaAppDos", ruta_sonda, FUENTE_START_MENU),
+                ]
+            )
+            resultado = descub.buscar_por_nombre_con_desambiguacion("sondaapp")
+
+            assert resultado.ambiguo is True
+            assert resultado.requiere_desambiguacion is True
+            assert resultado.motivo_ambiguedad is not None
+            assert len(resultado.candidatos) == 2
+            assert len(resultado.alternativas) == 2
+            assert resultado.fuente_autoritaria is None
+            destinos = {c.destination for c in resultado.alternativas if c.destination}
+            assert notepad in destinos
+            assert ruta_sonda in destinos
+            # Preflight real sobre cada candidato; nada se lanza.
+            for c in resultado.candidatos:
+                assert c.preflight_decision is not None
+                assert "valid" in c.preflight_decision
+                assert "launch_type" in c.preflight_decision
+            # Serialización del resultado.
+            d = resultado.to_dict()
+            assert d["ambiguo"] is True
+            assert d["requiere_desambiguacion"] is True
+            assert len(d["alternativas"]) == 2
+        finally:
+            os.unlink(ruta_sonda)
+
+    def test_un_solo_candidato_no_es_ambiguo(self):
+        notepad = r"C:\Windows\System32\notepad.exe"
+        if not os.path.exists(notepad):
+            pytest.skip("notepad.exe no disponible en este equipo")
+        descub, _, _ = _discovery_con_mocks(
+            calib_apps=[_app("Notepad", notepad, FUENTE_START_MENU)]
+        )
+        resultado = descub.buscar_por_nombre_con_desambiguacion("notepad")
+
+        assert resultado.ambiguo is False
+        assert resultado.requiere_desambiguacion is False
+        assert resultado.motivo_ambiguedad is None
+        assert resultado.alternativas == []
+        assert len(resultado.candidatos) == 1
+
+    def test_sin_candidatos_no_es_ambiguo(self):
+        descub, _, _ = _discovery_con_mocks(calib_apps=[])
+        resultado = descub.buscar_por_nombre_con_desambiguacion("nombreque_noexiste_xyz")
+
+        assert resultado.ambiguo is False
+        assert resultado.requiere_desambiguacion is False
+        assert resultado.candidatos == []
+
+    def test_evaluar_ambiguedad_varios_inventario_es_ambiguo(self):
+        """_evaluar_ambiguedad es lógica pura sobre candidatos: varios del
+        inventario sin fuente autoritativa => ambigüedad."""
+        descub, _, _ = _discovery_con_mocks()
+        c1 = DiscoveredCandidate(
+            candidate_id="a", name="App", destination=r"C:\a\app.exe",
+            fuente=FUENTE_INVENTARIO, confianza="media",
+        )
+        c2 = DiscoveredCandidate(
+            candidate_id="b", name="App2", destination=r"C:\b\app.exe",
+            fuente=FUENTE_INVENTARIO, confianza="media",
+        )
+        ambiguo, motivo, fuente = descub._evaluar_ambiguedad([c1, c2])
+        assert ambiguo is True
+        assert motivo is not None
+        assert fuente is None
+        assert descub._evaluar_ambiguedad([c1]) == (False, None, None)
+        assert descub._evaluar_ambiguedad([]) == (False, None, None)
+
+    def test_evaluar_ambiguedad_fuente_autoritaria_unica_no_es_ambigua(self):
+        """Una fuente autoritativa (catálogo o aplicación abierta) decide:
+        no hay ambigüedad aunque haya otros candidatos de menor precedencia."""
+        descub, _, _ = _discovery_con_mocks()
+        c_cat = DiscoveredCandidate(
+            candidate_id="a", name="App", destination=r"C:\a\app.exe",
+            fuente=FUENTE_CATALOGO, confianza="alta",
+        )
+        c_inv = DiscoveredCandidate(
+            candidate_id="b", name="App2", destination=r"C:\b\app.exe",
+            fuente=FUENTE_INVENTARIO, confianza="media",
+        )
+        c_ab = DiscoveredCandidate(
+            candidate_id="c", name="App3", destination=r"C:\c\app.exe",
+            fuente=FUENTE_APLICACION_ABIERTA, confianza="alta",
+        )
+        assert descub._evaluar_ambiguedad([c_cat]) == (False, None, FUENTE_CATALOGO)
+        assert descub._evaluar_ambiguedad([c_cat, c_inv]) == (False, None, FUENTE_CATALOGO)
+        assert descub._evaluar_ambiguedad([c_ab]) == (False, None, FUENTE_APLICACION_ABIERTA)
+
+    def test_evaluar_ambiguedad_varias_fuentes_autoritativas_es_ambigua(self):
+        """Varias fuentes autoritativas a destinos distintos: ambigüedad real."""
+        descub, _, _ = _discovery_con_mocks()
+        c_cat = DiscoveredCandidate(
+            candidate_id="a", name="App", destination=r"C:\a\app.exe",
+            fuente=FUENTE_CATALOGO, confianza="alta",
+        )
+        c_ab = DiscoveredCandidate(
+            candidate_id="b", name="App2", destination=r"C:\b\app.exe",
+            fuente=FUENTE_APLICACION_ABIERTA, confianza="alta",
+        )
+        ambiguo, motivo, fuente = descub._evaluar_ambiguedad([c_cat, c_ab])
+        assert ambiguo is True
+        assert motivo is not None
+        assert fuente is None
+
+    def test_resultado_resolucion_to_dict(self):
+        descub, _, _ = _discovery_con_mocks()
+        c = DiscoveredCandidate(
+            candidate_id="a", name="App", destination=r"C:\a\app.exe",
+            fuente=FUENTE_INVENTARIO, confianza="baja",
+        )
+        r = ResultadoResolucionCandidatos(
+            candidatos=[c], ambiguo=True, motivo_ambiguedad="varias opciones",
+            alternativas=[c], requiere_desambiguacion=True, fuente_autoritaria=None,
+        )
+        d = r.to_dict()
+        assert d["ambiguo"] is True
+        assert d["requiere_desambiguacion"] is True
+        assert d["motivo_ambiguedad"] == "varias opciones"
+        assert d["fuente_autoritaria"] is None
+        assert len(d["candidatos"]) == 1 and len(d["alternativas"]) == 1
+
+
+# ---------------------------------------------------------------------------
+# Ambigüedad y desambiguación con almacenamiento real (unidad 3.8.5.1.4.9.3)
+# ---------------------------------------------------------------------------
+
+class TestAmbiguedadAlmacenamientoReal:
+    """3.8.5.1.4.9.3 con almacenamiento real (SystemInventoryStorage SQLite,
+    ApplicationPreflight y LaunchClassifier reales): varias entradas del
+    inventario que coinciden con un mismo nombre se devuelven como alternativas
+    ambigüas, sin lanzar nada y sin tocar entities.json."""
+
+    def _una_entrada(self, entry_id: str, ruta: str, nombre: str,
+                     extension: str = ".exe", volume: str = "C:") -> dict:
+        return {
+            "entry_id": entry_id,
+            "absolute_path": ruta,
+            "relative_path": ruta,
+            "name": nombre,
+            "extension": extension,
+            "entry_type": EntryType.FILE.value,
+            "size_bytes": 1024,
+            "modified_at": "2024-01-01T10:00:00",
+            "created_at": "2024-01-01T09:00:00",
+            "attributes": [],
+            "excluded": False,
+            "source": "filesystem_scan",
+            "last_checked_at": "2024-01-03T00:00:00",
+        }
+
+    def test_dos_entradas_inventario_mismo_nombre_son_alternativas_ambiguas(self, tmp_path):
+        notepad = r"C:\Windows\System32\notepad.exe"
+        if not os.path.exists(notepad):
+            pytest.skip("notepad.exe no disponible en este equipo")
+        with tempfile.NamedTemporaryFile(suffix=".exe", delete=False) as f:
+            ruta_sonda = f.name
+            f.write(b"MZ" + b"\x00" * 1024)
+        try:
+            db_path = tmp_path / "test_inventory_93.sqlite3"
+            storage = SystemInventoryStorage(db_path=db_path)
+            storage.initialize()
+            storage.record_machine("maquina-integracion-93")
+            storage.record_volume("vol-c:", "maquina-integracion-93", "C:", "local", "online")
+            storage.begin_scan_run(
+                "scan-integracion-93", "maquina-integracion-93",
+                "C:", SCAN_MODE_FULL, "2024-01-03T00:00:00",
+            )
+            storage.insert_file_entries(
+                "scan-integracion-93", "maquina-integracion-93", "C:",
+                [
+                    self._una_entrada("e-sonda-1", notepad, "sondapp.exe"),
+                    self._una_entrada("e-sonda-2", ruta_sonda, "sondapp2.exe"),
+                ],
+            )
+            storage.end_scan_run(
+                "scan-integracion-93", "2024-01-03T01:00:00",
+                SCAN_RESULT_OK, 2, 0, 0, 100.0,
+            )
+
+            preflight = ApplicationPreflight()
+            clasificador = LaunchClassifier(preflight=preflight)
+            calib = MagicMock()
+            calib.discover_applications.return_value = []
+            discovery = ApplicationDiscovery(
+                preflight=preflight,
+                clasificador=clasificador,
+                storage=storage,
+                calibration=calib,
+                machine_id="maquina-integracion-93",
+            )
+
+            hash_antes = _hash_entities_json()
+            resultado = discovery.buscar_por_nombre_con_desambiguacion("sondapp")
+            hash_despues = _hash_entities_json()
+            assert hash_despues == hash_antes, "entities.json no debe modificarse"
+
+            assert resultado.ambiguo is True
+            assert resultado.requiere_desambiguacion is True
+            assert resultado.motivo_ambiguedad is not None
+            assert len(resultado.candidatos) == 2
+            assert len(resultado.alternativas) == 2
+            assert resultado.fuente_autoritaria is None
+            nombres = {c.name for c in resultado.alternativas}
+            assert "sondapp.exe" in nombres
+            assert "sondapp2.exe" in nombres
+            for c in resultado.alternativas:
+                assert c.fuente == FUENTE_INVENTARIO
+                assert c.esta_en_inventario is True
+                assert c.preflight_decision is not None
+                assert "valid" in c.preflight_decision
+                assert "launch_type" in c.preflight_decision
+            d = resultado.to_dict()
+            assert d["ambiguo"] is True
+            assert d["requiere_desambiguacion"] is True
+        finally:
+            os.unlink(ruta_sonda)
 
 
 # ---------------------------------------------------------------------------
@@ -933,3 +1192,235 @@ class TestInventarioComplementoAlmacenamientoReal:
                 # Notepad es un .exe real existente: preflight debe validar el destino
                 assert c.preflight_decision["valid"] is True
                 assert c.preflight_decision["launch_type"] == "ejecutable"
+
+
+# ---------------------------------------------------------------------------
+# Estado vigente de rutas de candidatos (unidad 3.8.5.1.4.9.4)
+# ---------------------------------------------------------------------------
+
+class TestEstadoVigenteRutasInaccesibles:
+    """3.8.5.1.4.9.4: si la ruta de un candidato ha cambiado, ha desaparecido
+    o ya no es accesible, se actualiza su estado y la resolución se repite
+    con fuentes vigentes; no se intenta la ruta obsoleta.
+
+    Estrategia de mocks: solo se mockean las fuentes de datos
+    (CalibrationManager.discover_applications y SystemInventoryStorage). La
+    clasificacion y el preflight son REALES (LaunchClassifier +
+    ApplicationPreflight sobre archivos reales del equipo), por lo que ningún
+    mock decide el resultado de la validacion. No se lanza ninguna aplicacion
+    y no se modifica entities.json.
+    """
+
+    def _una_entrada(self, entry_id: str, ruta: str, nombre: str,
+                     extension: str = ".exe", volume: str = "C:") -> dict:
+        return {
+            "entry_id": entry_id,
+            "absolute_path": ruta,
+            "relative_path": ruta,
+            "name": nombre,
+            "extension": extension,
+            "entry_type": EntryType.FILE.value,
+            "size_bytes": 1024,
+            "modified_at": "2024-01-01T10:00:00",
+            "created_at": "2024-01-01T09:00:00",
+            "attributes": [],
+            "excluded": False,
+            "source": "filesystem_scan",
+            "last_checked_at": "2024-01-03T00:00:00",
+        }
+
+    # ------ Unitarios: fuentes de datos mockeadas, clasificacion/preflight reales ------
+
+    def test_excluye_candidato_inventario_ruta_eliminada_y_actualiza_estado(self):
+        """Entrada de inventario cuyo archivo ya no existe: excluida de la
+        resolucion, disponible=False, ultima comprobacion y evidencia
+        registradas. No se intenta la ruta obsoleta."""
+        descub, _, storage = _discovery_con_mocks(calib_apps=[])
+        with tempfile.NamedTemporaryFile(suffix=".exe", delete=False) as f:
+            ruta_eliminada = f.name
+        os.unlink(ruta_eliminada)
+        try:
+            storage.search.return_value = [
+                {
+                    "absolute_path": ruta_eliminada,
+                    "name": "borradoapp.exe",
+                    "volume": "C:",
+                    "entry_type": "file",
+                    "last_checked_at": "2024-01-03T00:00:00",
+                }
+            ]
+            resultado = descub.buscar_por_nombre("borradoapp", incluir_inventario=True)
+
+            assert resultado == []
+            inaccesibles = descub.candidatos_inaccesibles_ultima_resolucion
+            assert len(inaccesibles) == 1
+            assert inaccesibles[0].disponible is False
+            assert inaccesibles[0].ultima_comprobacion != ""
+            assert any("inaccesible" in advertencia
+                       for advertencia in inaccesibles[0].advertencias)
+            assert any("ruta_no_accesible_en_disco" in evidencia
+                       for evidencia in inaccesibles[0].evidencia)
+            assert inaccesibles[0].preflight_decision is None
+        finally:
+            if os.path.exists(ruta_eliminada):
+                os.unlink(ruta_eliminada)
+
+    def test_ruta_vigente_se_devuelve_con_disponible_true(self):
+        """Entrada de inventario con ruta existente: se devuelve y su estado
+        sigue disponible=True."""
+        descub, _, storage = _discovery_con_mocks(calib_apps=[])
+        storage.search.return_value = [
+            {
+                "absolute_path": sys.executable,
+                "name": "miapp.exe",
+                "volume": "C:",
+                "entry_type": "file",
+                "last_checked_at": "",
+            }
+        ]
+        resultado = descub.buscar_por_nombre("miapp", incluir_inventario=True)
+
+        assert len(resultado) == 1
+        assert resultado[0].name.casefold() == "miapp.exe"
+        assert resultado[0].disponible is True
+
+    def test_ruta_uri_no_se_descarta_por_no_existir_como_archivo(self):
+        """Un destino URI (no es archivo de disco) no se descarta por no
+        existir en el sistema de archivos."""
+        descub, _, storage = _discovery_con_mocks(calib_apps=[])
+        storage.search.return_value = [
+            {
+                "absolute_path": "ms-settings:",
+                "name": "configuracion.exe",
+                "volume": None,
+                "entry_type": "file",
+                "last_checked_at": "",
+            }
+        ]
+        resultado = descub.buscar_por_nombre("configuracion", incluir_inventario=True)
+
+        assert len(resultado) == 1
+        assert resultado[0].destination == "ms-settings:"
+        assert resultado[0].disponible is True
+
+    def test_re_resolucion_con_fuentes_vigentes_descarta_la_obsoleta(self):
+        """Mismo nombre con una ruta eliminada y otra vigente: solo se
+        devuelve la vigente; la obsoleta queda registrada como inaccesible."""
+        descub, _, storage = _discovery_con_mocks(calib_apps=[])
+        with tempfile.NamedTemporaryFile(suffix=".exe", delete=False) as f:
+            ruta_eliminada = f.name
+        os.unlink(ruta_eliminada)
+        try:
+            storage.search.return_value = [
+                {
+                    "absolute_path": ruta_eliminada,
+                    "name": "dualapp.exe",
+                    "volume": "C:",
+                    "entry_type": "file",
+                    "last_checked_at": "2024-01-03T00:00:00",
+                },
+                {
+                    "absolute_path": sys.executable,
+                    "name": "dualapp.exe",
+                    "volume": "C:",
+                    "entry_type": "file",
+                    "last_checked_at": "",
+                },
+            ]
+            resultado = descub.buscar_por_nombre("dualapp", incluir_inventario=True)
+
+            assert len(resultado) == 1
+            assert resultado[0].destination == sys.executable
+            assert resultado[0].disponible is True
+            inaccesibles = descub.candidatos_inaccesibles_ultima_resolucion
+            assert len(inaccesibles) == 1
+            assert inaccesibles[0].destination == ruta_eliminada
+            assert inaccesibles[0].disponible is False
+        finally:
+            if os.path.exists(ruta_eliminada):
+                os.unlink(ruta_eliminada)
+
+    # ------ Integracion con almacenamiento real (SQLite, preflight y
+    # revalidacion de destino reales) ------
+
+    def test_inventario_real_ruta_eliminada_excluida_estado_persistido(self, tmp_path):
+        """Almacenamiento SQLite real, preflight real y revalidacion de
+        destino real: la entrada cuya ruta se elimino no se resuelve, su
+        estado se persiste (last_checked_at actualizado) y no se lanza nada.
+        entities.json no se modifica."""
+        notepad = r"C:\Windows\System32\notepad.exe"
+        if not os.path.exists(notepad):
+            pytest.skip("notepad.exe no disponible en este equipo")
+
+        with tempfile.NamedTemporaryFile(suffix=".exe", delete=False) as f:
+            ruta_inaccesible = f.name
+        os.unlink(ruta_inaccesible)
+        try:
+            db_path = tmp_path / "test_inventory_94.sqlite3"
+            storage = SystemInventoryStorage(db_path=db_path)
+            storage.initialize()
+            storage.record_machine("maquina-integracion-94")
+            storage.record_volume("vol-c:", "maquina-integracion-94", "C:",
+                                  "local", "online")
+            storage.begin_scan_run("scan-integracion-94", "maquina-integracion-94",
+                                   "C:", SCAN_MODE_FULL, "2024-01-03T00:00:00")
+            storage.insert_file_entries("scan-integracion-94", "maquina-integracion-94",
+                                        "C:", [
+                                            self._una_entrada("e-borrado-94",
+                                                              ruta_inaccesible,
+                                                              "borradoapp94.exe"),
+                                            self._una_entrada("e-notepad-94",
+                                                              notepad,
+                                                              "notepad.exe"),
+                                        ])
+            storage.end_scan_run("scan-integracion-94", "2024-01-03T01:00:00",
+                                 SCAN_RESULT_OK, 2, 0, 0, 100.0)
+
+            preflight = ApplicationPreflight()
+            clasificador = LaunchClassifier(preflight=preflight)
+            calib = MagicMock()
+            calib.discover_applications.return_value = []
+            discovery = ApplicationDiscovery(
+                preflight=preflight,
+                clasificador=clasificador,
+                storage=storage,
+                calibration=calib,
+                machine_id="maquina-integracion-94",
+            )
+
+            hash_antes = _hash_entities_json()
+
+            # Ruta eliminada: excluida de la resolucion y su estado actualizado.
+            resultado = discovery.buscar_por_nombre("borradoapp94",
+                                                    incluir_inventario=True)
+            assert resultado == []
+            inaccesibles = discovery.candidatos_inaccesibles_ultima_resolucion
+            assert len(inaccesibles) == 1
+            assert inaccesibles[0].disponible is False
+            assert inaccesibles[0].ultima_comprobacion != ""
+            assert any("inaccesible" in advertencia
+                       for advertencia in inaccesibles[0].advertencias)
+
+            # Estado persistido: last_checked_at de la entrada se actualizo en
+            # el almacenamiento real mediante la revalidacion de destino.
+            filas = storage.search("maquina-integracion-94", extension=".exe",
+                                   tipo=EntryType.FILE.value,
+                                   solo_volumes_montados=True)
+            fila_borrado = [f for f in filas
+                            if str(f.get("absolute_path", "")) == ruta_inaccesible]
+            assert len(fila_borrado) == 1
+            assert fila_borrado[0]["last_checked_at"] != "2024-01-03T00:00:00"
+
+            # Fuente vigente (notepad) sigue resolviéndose.
+            resultado_notepad = discovery.buscar_por_nombre("notepad",
+                                                            incluir_inventario=True)
+            assert len(resultado_notepad) >= 1
+            assert any(str(c.destination or "").casefold() == notepad.casefold()
+                       for c in resultado_notepad)
+            assert all(c.disponible is True for c in resultado_notepad)
+
+            hash_despues = _hash_entities_json()
+            assert hash_despues == hash_antes, "entities.json no debe modificarse"
+        finally:
+            if os.path.exists(ruta_inaccesible):
+                os.unlink(ruta_inaccesible)
