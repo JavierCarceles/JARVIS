@@ -842,7 +842,9 @@ aplicación GUI lanzable.
 - Lectura real de metadatos de versión de Windows mediante `version.dll` a través de `ctypes`
   (nombre comercial, producto, versión), sin dependencias externas.
 - Nivel de confianza y evidencia registrada por clasificación; lanzabilidad requiere evidencia
-  real del sistema (archivo existente, versión leída, acceso directo resuelto, URI admitida).
+  real del sistema (archivo existente, versión leída, encabezado PE válido, acceso directo
+  resuelto, URI admitida); un archivo con extensión `.exe` pero sin evidencia de sistema no se
+  asume lanzable (requisito 3.8.5.1.4.7.4).
 - Nombre comercial y aliases independientes del nombre del ejecutable; conserva todas las rutas
   cuando existen varias instalaciones.
 - Deduplicación por identidad y destino real, no solo por nombre, sin fusionar instalaciones distintas.

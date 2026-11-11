@@ -178,6 +178,44 @@ class TestTipoLanzamientoExecutable:
             os.unlink(path)
 
 
+class TestPEValidoComoEvidenciaLanzabilidad:
+    """.7.4: un .exe con encabezado PE valido pero sin recursos de version
+    es lanzable con confianza baja (evidencia de sistema, no solo extension).
+    Un .exe que no es PE valido sigue sin ser lanzable."""
+
+    @patch('src.hands.application_launch_classifier._leer_subsistema_pe')
+    def test_exe_con_pe_valido_sin_version_es_lanzable_confianza_baja(self, mock_pe):
+        mock_pe.return_value = IMAGE_SUBSYSTEM_GUI
+        clasificador = LaunchClassifier()
+        with tempfile.NamedTemporaryFile(suffix=".exe", delete=False) as f:
+            path = f.name
+        try:
+            c = clasificador.classify_candidate(_candidato("peapp", path))
+            assert c.launch_type == "ejecutable"
+            assert c.es_lanzable is True, f"{path} con PE valido deberia ser lanzable"
+            assert c.confianza == CONFIANZA_BAJA
+            assert "encabezado_pel_valido" in c.evidencia
+            assert c.version is None
+        finally:
+            os.unlink(path)
+
+    @patch('src.hands.application_launch_classifier._leer_subsistema_pe')
+    def test_exe_sin_pe_y_sin_version_no_es_lanzable(self, mock_pe):
+        mock_pe.return_value = None
+        clasificador = LaunchClassifier()
+        with tempfile.NamedTemporaryFile(suffix=".exe", delete=False) as f:
+            path = f.name
+        try:
+            c = clasificador.classify_candidate(_candidato("nope", path))
+            assert c.es_lanzable is False, f"{path} sin PE valido no es lanzable"
+            assert c.confianza == CONFIANZA_BAJA
+            assert any(
+                "solo_extension" in e for e in c.advertencias + c.evidencia
+            )
+        finally:
+            os.unlink(path)
+
+
 class TestTipoLanzamientoAccesoDirecto:
     def test_lnk_existente_tipo_acceso_directo(self):
         clasificador = LaunchClassifier()

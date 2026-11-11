@@ -703,6 +703,13 @@ class LaunchClassifier:
                 if version_info and self._parece_ubicacion_instalada(destino):
                     return True, CONFIANZA_ALTA, evidencia, advertencias
                 return True, CONFIANZA_MEDIA, evidencia, advertencias
+            # .7.4: sin recursos de version, validar el encabezado PE como
+            # evidencia adicional del sistema de que el archivo es un
+            # ejecutable real, no solo un cambio de extension.
+            subsistema_pe = _leer_subsistema_pe(destino)
+            if subsistema_pe is not None:
+                evidencia.append("encabezado_pel_valido")
+                return True, CONFIANZA_BAJA, evidencia, advertencias
             # Solo extension .exe sin mas evidencia: NO se asume lanzable (.7.1, .7.4).
             advertencias.append("solo_extension_ejecutable_sin_evidencia")
             return False, CONFIANZA_BAJA, ["solo_extension_ejecutable"], advertencias

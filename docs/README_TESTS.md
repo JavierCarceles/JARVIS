@@ -8132,6 +8132,7 @@ basada en evidencia real, deduplicación por destino real e integración con pre
 - **`TestNombreComercialYAliases`** (línea 266) — 2 método(s) de test
 - **`TestDeduplicacion`** (línea 287) — 3 método(s) de test
 - **`TestEntradaInventoryEntry`** (línea 326) — 1 método(s) de test
+- **`TestPEValidoComoEvidenciaLanzabilidad`** (línea 247) — 2 método(s) de test
 - **`TestLeerSubsistemaPe`** (línea 402) — 6 método(s) de test
 - **`TestDiferenciacionGuiCliPorSubsistemaPe`** (línea 417) — 3 método(s) de test
 - **`TestIntegracionPreflight`** (línea 441) — 2 método(s) de test

@@ -8315,3 +8315,18 @@ VERIFICACIÓN: SINTAXIS: OK (ast.parse + pytest sin errores); MAIN.PY: NA (no se
 DISCREPANCIAS: NINGUNA
 PENDIENTES: Ninguno para esta unidad. Padre 3.8.5.1.4.7 con hijas .7.1, .7.2 y .7.3 completadas. Siguiente hoja pendiente real: 3.8.5.1.4.7.4 (No clasificar como aplicación lanzable un archivo solo por su extensión; requerir evidencia adicional del sistema).
 ESTADO FINAL: 3.8.5.1.4.7.3 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.8.5.1.4.7.4
+FECHA: 2026-11-11
+OBJETIVO: No clasificar como aplicación lanzable un archivo solo por su extensión; requerir evidencia adicional del sistema, paquete, acceso directo, registro o metadatos verificables. No lanza aplicaciones, no modifica entities.json ni persiste capacidades inferidas.
+TIPO DE TRABAJO: IMPLEMENTACIÓN + VERIFICACIÓN REAL
+CAMBIOS / HALLAZGOS:
+- En `src/hands/application_launch_classifier._evaluar_lanzabilidad()`: para ejecutables `.exe` sin recursos de versión, se valida el encabezado PE mediante `_leer_subsistema_pe()` (disponible desde la unidad .7.3). Si el encabezado PE es válido (subsistema legible), se agrega la evidencia `encabezado_pel_valido` y el candidato se clasifica como lanzable con confianza `BAJA`. Si no es un PE válido, sigue sin clasificarse como lanzable (requisito .7.4: extensión sola no basta).
+- Un `.exe` con versión de producto sigue siendo lanzable con confianza MEDIA o ALTA (según ubicación de instalación); un `.exe` sin versión y sin PE válido sigue sin ser lanzable.
+- No se lanza ninguna aplicación, no se modifica `data/knowledge/entities.json` ni su esquema, no se persiste capacidad inferida.
+ARCHIVOS MODIFICADOS: PRODUCCIÓN: `src/hands/application_launch_classifier.py` (validación de encabezado PE como evidencia de lanzabilidad en `_evaluar_lanzabilidad`); TESTS: `tests/hands/test_application_launch_classifier.py` (nueva clase `TestPEValidoComoEvidenciaLanzabilidad` con 2 tests: PE válido sin versión → lanzable/baja; sin PE válido → no lanzable); DOCUMENTACIÓN: `docs/README.md` (evidencia de lanzabilidad incluye encabezado PE válido y requisito .7.4); `docs/README_TESTS.md` (nueva clase de test).
+TESTS Y RESULTADOS: UNITARIOS: 54 PASSED / 54 TOTAL (`test_application_launch_classifier.py`, incluidos 2 tests nuevos de .7.4); ENTORNO REAL: 15 PASSED / 15 TOTAL (`test_clasificacion_candidatos_lanzamiento_entorno_real.py`, incluidos tests de .7.4: archivo .exe vacío sin evidencia no asume GUI, ejecutables reales del sistema); REGRESIÓN: `test_application_discovery.py` (22 PASSED), tests previos de .7.1, .7.2 y .7.3 siguen en verde.
+VERIFICACIÓN: SINTAXIS: OK (ast.parse + pytest sin errores); MAIN.PY: NA (no se modifica main.py); COMPORTAMIENTO / INTEGRACIÓN REAL: Evidencia real en Windows 11, Python 3.14.7 sobre implementación de producción: `python.exe` (versión, lanzable), `notepad.exe` (PE GUI + versión, lanzable ALTA), `cmd.exe`/`ping.exe` (PE CLI + versión, lanzable), archivo .exe vacío (sin PE válido, no lanzable). La unidad no requiere interacción gráfica (sin ventanas, monitores ni entrada de teclado/ratón).
+DISCREPANCIAS: NINGUNA
+PENDIENTES: Ninguno para esta unidad. Padre 3.8.5.1.4.7 con hijas .7.1 a .7.4 completadas. Siguiente hoja pendiente real: 3.8.5.1.4.7.5 (Resolver el nombre comercial y los alias sin asumir que coinciden con el nombre del ejecutable).
+ESTADO FINAL: 3.8.5.1.4.7.4 - IMPLEMENTADA
