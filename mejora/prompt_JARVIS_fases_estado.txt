@@ -8451,3 +8451,27 @@ VERIFICACIÓN: SINTAXIS: OK (ast.parse + pytest sin errores en suites afectadas)
 DISCREPANCIAS: Ninguna afectante a los criterios de aceptación de esta unidad. Los 4 fallos de registro de aplicaciones son preexistentes y ajenos (persistencia entities.json).
 PENDIENTES: Ninguno para esta unidad. Padre 3.8.5.1.4.7 con hijas .7.1 a .7.10 completadas. Siguiente hoja pendiente real: 3.8.5.1.4.7.11 (Probar candidatos reales de aplicaciones conocidas, aplicaciones no registradas, herramientas CLI, instaladores, accesos directos rotos, paquetes y falsos positivos).
 ESTADO FINAL: 3.8.5.1.4.7.10 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.8.5.1.4.7.11
+FECHA: 2026-11-11
+OBJETIVO: Probar candidatos reales de aplicaciones conocidas, aplicaciones no registradas, herramientas CLI, instaladores, accesos directos rotos, paquetes y falsos positivos a través del pipeline completo ApplicationDiscovery + LaunchClassifier + ApplicationPreflight (sin lanzar aplicaciones).
+TIPO DE TRABAJO: VERIFICACIÓN REAL (tests de entorno real contra componentes reales de Windows; no se lanza ninguna aplicación, no se modifican datos de usuario).
+CAMBIOS / HALLAZGOS:
+- tests/hands/test_candidatos_reales_entorno_real.py: nuevo archivo con 20 tests de verificación real (19 PASSED, 1 SKIPPED por ausencia de paquetes .appx/.msix en el equipo).
+  * TestAplicacionesConocidas: notepad.exe, calc.exe, python.exe con pipeline completo (descubrimiento + clasificación + preflight).
+  * TestAplicacionesNoRegistradas: tasklist.exe (no en entities.json) clasificado y validado con todos los campos .7.6.
+  * TestHerramientasCLI: cmd.exe, ping.exe, powershell.exe clasificadas como HERRAMIENTA_CLI con pipeline completo.
+  * TestInstaladores: msiexec.exe clasificado como INSTALADOR y validado por preflight (si existe en el sistema).
+  * TestAccesosDirectosRotos: .lnk sin target válido clasificado como ACCESO_DIRECTO pero no lanzable; preflight admite el archivo .lnk existente, clasificación decide no lanzarlo.
+  * TestPaquetes: .appx/.msix si existen en el sistema (SKIPPED si no hay paquetes).
+  * TestFalsosPositivos: kernel32.dll (biblioteca), archivo .txt, directorio C:\Windows y ejecutable inexistente rechazados como no lanzables.
+  * TestPipelineCompletoDescubrimiento: descubrir_todos() con decisión de preflight en cada candidato; candidatos_lanzables() solo lanzables; no duplicación de destinos reales; buscar_por_nombre() con preflight.
+  * TestRegistroCampos76Pipeline: verifica fuente, ruta/destino, tipo de lanzamiento, versión/producto, última comprobación, evidencia y nivel de confianza en pipeline completo.
+ARCHIVOS MODIFICADOS: TESTS: tests/hands/test_candidatos_reales_entorno_real.py (nuevo, 20 tests). DOCUMENTACION: docs/README_TESTS.md (entrada de índice y sección detallada para test_candidatos_reales_entorno_real.py).
+TESTS Y RESULTADOS: UNITARIOS: 19 PASSED, 1 SKIPPED en tests/hands/test_candidatos_reales_entorno_real.py (paquete .appx/.msix no encontrado en el equipo, prueba saltada sin fallar).
+REAL (entorno): Windows 11, Python 3.14.7. notepad.exe, calc.exe, python.exe (sys.executable), cmd.exe, ping.exe, powershell.exe, tasklist.exe, msiexec.exe validados como ejecutables reales del sistema. URIs ms-settings: y https:// admitidas como destinos de lanzamiento. kernel32.dll rechazado como biblioteca no lanzable. Archivo .txt temporal, directorio C:\Windows y ejecutable inexistente rechazados por preflight. .lnk roto clasificado como acceso directo pero no lanzable. No se lanza ninguna aplicación durante las pruebas; solo validación estática de destinos.
+REGRESION: Ninguna. Todas las suites relacionadas pasan sin regresión: test_clasificacion_candidatos_lanzamiento_entorno_real.py, test_preflight_gatekeeper_entorno_real.py, test_descubrimiento_fuentes_existentes_entorno_real.py, test_application_launch_classifier.py (114 PASSED, 1 SKIPPED en conjunto con la nueva suite).
+VERIFICACIÓN: SINTAXIS: OK (ast.parse + pytest sin errores en suites afectadas). MAIN.PY: NA (no se modifica main.py). COMPORTAMIENTO / INTEGRACIÓN REAL: ApplicationDiscovery descubre candidatos reales de fuentes primarias del SO (menú de aplicaciones, PATH, App Paths, registro); LaunchClassifier clasifica con tipo de lanzamiento, subtipo de rol, nombre comercial, aliases, confianza y evidencia; ApplicationPreflight valida destinos como gatekeeper sin lanzar. Cada candidato probado individualmente, sin ejecución en lote de candidatos descubiertos. La unidad no requiere interacción gráfica (sin ventanas, monitores ni entrada de teclado/ratón).
+DISCREPANCIAS: Ninguna afectante a los criterios de aceptación de esta unidad.
+PENDIENTES: Ninguno para esta unidad. Padre 3.8.5.1.4.7 con hijas .7.1 a .7.11 completadas. No hay siguiente hoja pendiente en 3.8.5.1.4.7.
+ESTADO FINAL: 3.8.5.1.4.7.11 - IMPLEMENTADA

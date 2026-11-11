@@ -81,6 +81,7 @@
 - [`hands\test_calibration_manager.py`](#hands/test-calibration_manager)
 - [`hands\test_calibration_requirements.py`](#hands/test-calibration_requirements)
 - [`hands\test_calibrator.py`](#hands/test-calibrator)
+- [`hands\test_candidatos_reales_entorno_real.py`](#hands/test-candidatos_reales_entorno_real)
 - [`hands\test_capability_absent_verification.py`](#hands/test-capability_absent_verification)
 - [`hands\test_capability_availability_distinction.py`](#hands/test-capability_availability_distinction)
 - [`hands\test_capability_query_contract.py`](#hands/test-capability_query_contract)
@@ -8252,6 +8253,35 @@ del nombre del ejecutable. No lanza ninguna aplicación ni modifica datos de usu
   - `test_dos_ejecutables_reales_distintos_se_conservan` (L351)
   - `test_uri_real_ms_settings_deduplicada` (L366)
   - `test_lanzador_uri_steam_deduplicada` (L379)
+
+---
+
+<a name="hands/test-candidatos_reales_entorno_real"></a>
+### `hands\test_candidatos_reales_entorno_real.py`
+
+**Descripción:** Verificación en entorno real de la unidad 3.8.5.1.4.7.11. Ejecuta
+`ApplicationDiscovery` sobre el equipo Windows real y valida cada candidato
+descubierto a través del pipeline completo: descubrimiento de fuentes del SO,
+clasificación con `LaunchClassifier` (tipo, subtipo, lanzabilidad, nombre
+comercial, aliases, confianza, evidencia) y validación de destino con
+`ApplicationPreflight.validate_launch_destination` (gatekeeper, sin lanzar nada).
+Tipos probados: aplicaciones conocidas, aplicaciones no registradas, herramientas
+CLI, instaladores, accesos directos rotos, paquetes y falsos positivos.
+
+**Módulos de origen probados:** src.hands.application_discovery,
+src.hands.application_preflight, src.hands.application_launch_classifier
+
+**Clases de test:**
+
+- **`TestAplicacionesConocidas`** (línea 62) — 3 método(s) de test
+- **`TestAplicacionesNoRegistradas`** (línea 90) — 2 método(s) de test
+- **`TestHerramientasCLI`** (línea 109) — 3 método(s) de test
+- **`TestInstaladores`** (línea 140) — 1 método(s) de test
+- **`TestAccesosDirectosRotos`** (línea 166) — 1 método(s) de test
+- **`TestPaquetes`** (línea 186) — 1 método(s) de test
+- **`TestFalsosPositivos`** (línea 205) — 4 método(s) de test
+- **`TestPipelineCompletoDescubrimiento`** (línea 242) — 4 método(s) de test
+- **`TestRegistroCampos76Pipeline`** (línea 292) — 1 método(s) de test
 
 ---
 
