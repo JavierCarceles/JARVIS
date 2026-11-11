@@ -55,7 +55,12 @@ from src.hands.application_launch_classifier import (
     CONFIANZA_NINGUNA,
     LaunchClassifier,
 )
-from src.hands.system_inventory_storage import SystemInventoryStorage
+from src.hands.system_inventory import EntryType
+from src.hands.system_inventory_storage import (
+    SCAN_MODE_FULL,
+    SCAN_RESULT_OK,
+    SystemInventoryStorage,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -818,3 +823,100 @@ class TestSeparacionCatalogoDinamicoEntitiesJson:
         assert len(ids) == 7, f"Se esperaban 7 entidades, se encontraron {len(ids)}"
         for eid in ENTIDADES_ORIGINALES:
             assert eid in ids
+
+
+# ---------------------------------------------------------------------------
+# Integración con almacenamiento real (unidad 3.8.5.1.4.9.1)
+# ---------------------------------------------------------------------------
+
+class TestInventarioComplementoAlmacenamientoReal:
+    """
+    Pruebas de integración con almacenamiento real para verificar que la
+    consulta al inventario como fuente complementaria de 3.8.1-3.8.3 funciona
+    con SystemInventoryStorage real y ApplicationPreflight real (sin lanzar
+    aplicaciones).
+
+    Unidad: 3.8.5.1.4.9.1 — Integrar la consulta al inventario como fuente
+    complementaria de 3.8.1-3.8.3; solo descubre/resuelve candidatos y los
+    entrega a preflight, no lanza aplicaciones.
+    """
+
+    def _una_entrada(self, entry_id: str, ruta: str, nombre: str,
+                     extension: str = ".exe", volume: str = "C:") -> dict:
+        return {
+            "entry_id": entry_id,
+            "absolute_path": ruta,
+            "relative_path": ruta,
+            "name": nombre,
+            "extension": extension,
+            "entry_type": EntryType.FILE.value,
+            "size_bytes": 1024,
+            "modified_at": "2024-01-01T10:00:00",
+            "created_at": "2024-01-01T09:00:00",
+            "attributes": [],
+            "excluded": False,
+            "source": "filesystem_scan",
+            "last_checked_at": "2024-01-03T00:00:00",
+        }
+
+    def test_buscar_por_nombre_con_inventario_real_encuentra_candidatos(self, tmp_path):
+        """Con almacenamiento real y preflight real, buscar_por_nombre
+        encuentra candidatos en el inventario cuando primarias no tienen
+        coincidencia. No lanza aplicaciones: solo descubre/resuelve y valida
+        con preflight (verificación real de unidad 3.8.5.1.4.9.1)."""
+        notepad = r"C:\Windows\System32\notepad.exe"
+        if not os.path.exists(notepad):
+            pytest.skip("notepad.exe no disponible en este equipo")
+
+        db_path = tmp_path / "test_inventory_91.sqlite3"
+        storage = SystemInventoryStorage(db_path=db_path)
+        storage.initialize()
+        storage.record_machine("maquina-integracion-91")
+        storage.record_volume("vol-c:", "maquina-integracion-91", "C:",
+                              "local", "online")
+        storage.begin_scan_run("scan-integracion-91", "maquina-integracion-91",
+                               "C:", SCAN_MODE_FULL, "2024-01-03T00:00:00")
+
+        # Insertar entrada apuntando a archivo real del sistema
+        storage.insert_file_entries("scan-integracion-91", "maquina-integracion-91",
+                                    "C:", [self._una_entrada("e-notepad", notepad,
+                                                             "notepad.exe")])
+        storage.end_scan_run("scan-integracion-91", "2024-01-03T01:00:00",
+                             SCAN_RESULT_OK, 1, 0, 0, 100.0)
+
+        # Discovery con almacenamiento REAL y calibración mockeada (sin
+        # resultados primarios, para forzar fallback al inventario como
+        # fuente complementaria).
+        preflight = ApplicationPreflight()
+        clasificador = LaunchClassifier(preflight=preflight)
+        calib = MagicMock()
+        calib.discover_applications.return_value = []
+
+        discovery = ApplicationDiscovery(
+            preflight=preflight,
+            clasificador=clasificador,
+            storage=storage,
+            calibration=calib,
+            machine_id="maquina-integracion-91",
+        )
+
+        # buscar_por_nombre: primarias vacías → consulta inventario como complemento
+        resultado = discovery.buscar_por_nombre("notepad", incluir_inventario=True)
+
+        assert len(resultado) >= 1
+        assert any(c.name.casefold() == "notepad.exe" for c in resultado)
+        assert any(c.fuente == FUENTE_INVENTARIO for c in resultado)
+        assert any(c.esta_en_inventario is True for c in resultado)
+        assert any(FUENTE_INVENTARIO in c.fuentes_consultadas
+                   for c in resultado)
+
+        # Los candidatos deben tener preflight_decision de validación real
+        # (sin lanzar la aplicación).
+        for c in resultado:
+            if c.destination:
+                assert c.preflight_decision is not None
+                assert "valid" in c.preflight_decision
+                assert "launch_type" in c.preflight_decision
+                # Notepad es un .exe real existente: preflight debe validar el destino
+                assert c.preflight_decision["valid"] is True
+                assert c.preflight_decision["launch_type"] == "ejecutable"

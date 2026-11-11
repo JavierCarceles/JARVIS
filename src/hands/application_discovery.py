@@ -312,7 +312,6 @@ class ApplicationDiscovery:
             self.storage.connect()
             entradas = self.storage.search(
                 machine_id=self.machine_id,
-                name=nombre,
                 extension=".exe",
                 tipo=EntryType.FILE.value,
                 disponible=True,
@@ -332,6 +331,18 @@ class ApplicationDiscovery:
         if not entradas:
             return []
 
+        # Filtrar por nombre en Python (coincidencia case-insensitive de
+        # subcadena), consistente con _complemento_inventario que no usa
+        # el filtro exacto de name en storage.search.
+        nombre_lower = nombre.casefold()
+        entradas_filtradas = [
+            e for e in entradas
+            if nombre_lower in str(e.get("name", "")).casefold()
+        ]
+
+        if not entradas_filtradas:
+            return []
+
         candidatos = [
             {
                 "candidate_id": str(e.get("absolute_path", "")),
@@ -341,7 +352,7 @@ class ApplicationDiscovery:
                 "volume": str(e.get("volume", "")) or None,
                 "last_checked_at": str(e.get("last_checked_at", "")),
             }
-            for e in entradas
+            for e in entradas_filtradas
         ]
         return self._clasificar_y_validar(
             candidatos,

@@ -940,7 +940,7 @@ Nota de alcance: 3.8.5.1.1-3.8.5.1.3 implementan y verifican la puerta real de p
 3.8.5.1.4.8.8 Verificar que JARVIS puede seguir respondiendo y ejecutar acciones mientras un escaneo esta pausado, limitado o ejecutandose en segundo plano controlado. [HIJA de 3.8.5.1.4.8]
 3.8.5.1.4.8.9 Probar permisos de acceso al inventario, exclusion de rutas, cancelacion, reanudacion y recuperacion ante cierre inesperado con el sistema operativo real y recursos temporales controlados. [HIJA de 3.8.5.1.4.8]
 3.8.5.1.4.8.10 Verificar en el equipo real que el escaneo no bloquea el uso normal de JARVIS ni provoca una carga que impida seguir utilizando el ordenador; registrar mediciones y limitaciones. [HIJA de 3.8.5.1.4.8]
-3.8.5.1.4.9 ? INTEGRACION DEL INVENTARIO CON RESOLUCION Y PREFLIGHT (SIN LANZAMIENTO)
+3.8.5.1.4.9 ? CONSUMO DEL INVENTARIO POR RESOLUCION, CLASIFICADOR Y PREFLIGHT SIN LANZAMIENTO
 3.8.5.1.4.9.1 Integrar la consulta al inventario como fuente complementaria de 3.8.1-3.8.3, sin duplicar los mecanismos de descubrimiento que ya funcionan; esta integracion solo descubre/resuelve candidatos y los entrega a preflight, no lanza aplicaciones. [HIJA de 3.8.5.1.4.9]
 3.8.5.1.4.9.2 Definir orden de precedencia entre aplicacion ya abierta, catalogo conocido, fuentes nativas instaladas y candidatos del inventario; conservar procedencia y confianza. [HIJA de 3.8.5.1.4.9]
 3.8.5.1.4.9.3 Si existen varias coincidencias plausibles, no elegir silenciosamente: conservar alternativas y solicitar desambiguacion cuando la evidencia no permita decidir. [HIJA de 3.8.5.1.4.9]
@@ -951,8 +951,8 @@ Nota de alcance: 3.8.5.1.1-3.8.5.1.3 implementan y verifican la puerta real de p
 3.8.5.1.4.9.8 Verificar integracion con el flujo de aplicaciones ya registradas y descubiertas sin crear rutas paralelas Brain/Planner/Executor. [HIJA de 3.8.5.1.4.9]
 3.8.5.1.4.9.9 Ejecutar en el equipo real la ruta de consulta/resolucion con una aplicacion inocua conocida y otra localizada por el inventario que no estuviera registrada previamente; utilizar el almacenamiento, consulta y ApplicationPreflight reales, y comprobar el resultado de preflight sin lanzar ninguna aplicacion. La apertura se probará en 3.8.5.4-3.8.5.6. [HIJA de 3.8.5.1.4.9]
 3.8.5.1.4.9.10 Comprobar en el flujo real que una ruta obsoleta, un volumen desmontado y una coincidencia ambigua se bloquean, se revalidan o se devuelven para aclaracion de forma segura; no invocar el lanzador ni probar apertura en esta unidad. [HIJA de 3.8.5.1.4.9]
-3.8.5.1.4.10 ? VERIFICACION REAL, REGRESION Y CIERRE
-3.8.5.1.4.10.1 Crear tests unitarios del contrato y almacenamiento usando bases temporales; no tocar los ficheros reales de datos del proyecto. [HIJA de 3.8.5.1.4.10]
+3.8.5.1.4.10 ? PRUEBA INTEGRAL DEL INVENTARIO REAL POR VOLUMEN, COBERTURA, SEGURIDAD Y REGRESION. La suite actual `tests/hands/test_inventario_volumen_significativo_entorno_real.py` crea 3000 archivos reales en un directorio temporal: acredita consulta/paginacion/rendimiento en esa escala, pero NO acredita el escaneo completo de todos los volumenes. `tests/hands/test_volumes_montados_entorno_real.py` verifica filtros de volumen montado en C:, no un recorrido completo de cada volumen.
+3.8.5.1.4.10.1 Ejecutar y ampliar, solo si falta cobertura, `tests/hands/test_system_inventory.py` para primer inventario, alcance, progreso, pausa/reanudacion/cancelacion, escaneo por ruta/volumen, exclusiones, politica de refresco, retencion, recursos y logs; ejecutar `tests/hands/test_system_inventory_storage.py` para creacion/versionado SQLite, aislamiento por `machine_id`, `scan_runs`, insercion atomica, busqueda/paginacion, linea base, altas/cambios/desapariciones, reanudacion, concurrencia, backup/corrupcion/recuperacion y retencion. Mantener `tmp_path` y SQLite temporales; estos tests no sustituyen el escaneo global del equipo. [HIJA de 3.8.5.1.4.10]
 3.8.5.1.4.10.2 Verificar persistencia real en disco y recuperacion desde una nueva instancia, incluyendo migracion de esquema y base corrupta/ausente. [HIJA de 3.8.5.1.4.10]
 3.8.5.1.4.10.3 Ejecutar el escáner de producción en el equipo real donde corre JARVIS y recorrer todos los volúmenes locales montados que el adaptador detecte y que estén dentro del alcance aprobado. Registrar por volumen SO/versión/arquitectura, identificador, tipo, entradas y directorios encontrados, errores, exclusiones, permisos, duración, CPU, memoria, lecturas y cobertura. La ejecución debe ser de solo lectura sobre los archivos originales; no sustituirla por fixtures, mocks ni por el mero resultado de ejecutar pytest. [HIJA de 3.8.5.1.4.10]
     3.8.5.1.4.10.3.1 Contrastar la enumeración de volúmenes con una consulta independiente al sistema operativo y explicar toda diferencia. [HIJA de 3.8.5.1.4.10.3]
@@ -966,10 +966,12 @@ Nota de alcance: 3.8.5.1.1-3.8.5.1.3 implementan y verifican la puerta real de p
 3.8.5.1.4.10.8 Desde el inventario real, localizar una aplicacion inocua no registrada previamente, comprobar que el candidato contiene un destino y evidencia suficientes y pasarlo por ApplicationPreflight; registrar el destino autorizado sin lanzarlo. La apertura real se verifica posteriormente en 3.8.5.4.2.6. [HIJA de 3.8.5.1.4.10]
 3.8.5.1.4.10.9 Comprobar que los candidatos identificados cubren los tipos de lanzamiento que el adaptador del SO declara soportar y clasificar cada tipo como disponible, no verificado o no soportado. No ejecutar aun los lanzamientos: la prueba real corresponde a 3.8.5.4.2.6; nunca ejecutar en lote candidatos ni aplicaciones sensibles. [HIJA de 3.8.5.1.4.10]
 3.8.5.1.4.10.10 Verificar la matriz de sistemas operativos y declarar como NO SOPORTADO/NO VERIFICADO cualquier adaptador o tipo de lanzamiento sin pruebas nativas satisfactorias. [HIJA de 3.8.5.1.4.10]
-3.8.5.1.4.10.11 Ejecutar las suites de no regresion de ApplicationPreflight, ApplicationManager, CalibrationManager, MemoryManager, EntityResolver y las integraciones Brain/Planner/Executor afectadas. [HIJA de 3.8.5.1.4.10]
+3.8.5.1.4.10.11 Ejecutar la no regresion directa de `tests/hands/test_application_preflight.py`, `tests/hands/test_application_preflight_availability.py`, `tests/hands/test_application_preflight_launch_destination.py`, `tests/hands/test_application_preflight_resolve_executable.py`, `tests/hands/test_application_discovery.py`, `tests/hands/test_application_launch_classifier.py`, `tests/hands/test_applications_core.py`, `tests/hands/test_calibration_manager.py`, `tests/hands/test_system_inventory.py`, `tests/hands/test_system_inventory_storage.py`, `tests/memory/test_memory_entities_json_estado_inicial.py`, `tests/memory/test_memory_save_entity_persist_bug.py`, `tests/brain/test_llm.py`, `tests/brain/test_htn_integration.py`, `tests/hands/planner/test_task_executor.py` y `tests/hands/test_executor.py`; anotar por separado suites no existentes o bloqueadas. [HIJA de 3.8.5.1.4.10]
 3.8.5.1.4.10.12 Inspeccionar primero la documentacion de datos existente. Actualizar `README_DATA.md` si existe y es el documento canonico para estos datos; si no existe, determinar si el proyecto requiere crearlo y justificarlo antes de añadirlo. Documentar rutas, formato SQLite/JSON, tablas, campos, responsables de lectura/escritura, flujo, versionado y estado real de integridad. Actualizar `README.md` solo si cambian modulos de `src/`, describiendo comportamiento implementado y verificado sin referencias a fases. [HIJA de 3.8.5.1.4.10]
 3.8.5.1.4.10.13 Consolidar la matriz de cobertura por volumen, tipo de entrada, estado de acceso, consulta, persistencia, actualización incremental, mantenimiento e integración con preflight; enumerar explícitamente todos los escenarios pendientes, parciales o bloqueados. [HIJA de 3.8.5.1.4.10]
-    3.8.5.1.4.10.14 Comparar una muestra estratificada del inventario real por volumen y tipo de entrada con consultas directas del sistema operativo; incluir directorios raíz, subdirectorios profundos, ocultos, del sistema, Unicode y zonas con permisos restringidos. Registrar falsos positivos, omisiones y causas. [HIJA de 3.8.5.1.4.10]
+    3.8.5.1.4.10.14 Comparar una muestra estratificada del inventario real por volumen y tipo de entrada con consultas directas del sistema operativo; incluir directorios raiz, subdirectorios profundos, ocultos, del sistema, Unicode y zonas con permisos restringidos. Registrar falsos positivos, omisiones y causas. [HIJA de 3.8.5.1.4.10]
+    3.8.5.1.4.10.14.1 CREAR `tests/hands/test_escaneo_volumenes_locales_completo_entorno_real.py` como prueba opt-in de sistema real: enumerar con el adaptador de produccion todos los volumenes locales montados admitidos, recorrerlos uno por uno con `RecorridoVolumen` y persistir en SQLite real; exigir autorizacion explicita antes de la primera ejecucion global, operar en solo lectura de metadatos y no incluir unidades de red/extraibles salvo consentimiento expreso. No ejecutar esta prueba en la suite normal ni al arrancar JARVIS. [HIJA de 3.8.5.1.4.10.14]
+    3.8.5.1.4.10.14.2 En la prueba global, registrar por volumen: identificador, tipo, punto de montaje, entradas detectadas, exclusiones tecnicas/usuario, denegaciones, errores, cobertura no recorrida, duracion, CPU, memoria y E/S; contrastar una muestra independiente con enumeracion directa del SO y comprobar que una interrupcion no convierte el scan en completo. [HIJA de 3.8.5.1.4.10.14]
     3.8.5.1.4.10.15 Verificar que la ejecución completa no altera los archivos originales, los datos persistentes protegidos ni la configuración de pantalla/ventanas del usuario. [HIJA de 3.8.5.1.4.10]
     3.8.5.1.4.10.16 Cerrar esta unidad solo cuando el escaneo real de todos los volúmenes locales dentro del alcance, las consultas, la persistencia, la operación controlada, la integración con preflight, la seguridad, la privacidad, las comprobaciones independientes de cobertura y la no regresión tengan evidencia registrada. La apertura real de aplicaciones queda reservada para 3.8.5.4; los volúmenes/escenarios no probados permanecen explícitamente pendientes o bloqueados. [HIJA de 3.8.5.1.4.10]
 
@@ -1003,13 +1005,16 @@ Nota de alcance: 3.8.5.1.1-3.8.5.1.3 implementan y verifican la puerta real de p
     3.8.5.5.5 Comprobar la estabilidad minima del proceso/ventana durante un intervalo definido para evitar declarar exito a un proceso que se cierra inmediatamente. [HIJA de 3.8.5.5]
     3.8.5.5.6 Representar por separado los estados ABRIENDO, PROCESO_INICIADO, VENTANA_DETECTADA, ABIERTA_VERIFICADA, ABIERTA_SIN_VENTANA, FALLO y TIMEOUT, solo si el contrato real permite esos estados. [HIJA de 3.8.5.5]
     3.8.5.5.7 Guardar evidencia tecnica minima del resultado (tipo de destino, fuente, ruta/identificador validado, PID o identificador equivalente, ventana y tiempos), sin registrar contenido privado ni argumentos que puedan contener secretos. [HIJA de 3.8.5.5]
-3.8.5.6 Tests de preflight rechazado, aplicacion abierta/cerrada, fallo de lanzamiento y proteccion de ventanas existentes.
+3.8.5.6 ? TESTS DE PREFLIGHT, LANZAMIENTO, IDENTIDAD DE PROCESO/VENTANA Y PRESERVACION DE SESION. Suites existentes de preflight/clasificacion no lanzan aplicaciones; la apertura GUI real se añade en 3.8.5.6.7-3.8.5.6.9.
     3.8.5.6.1 Mantener tests unitarios para decisiones puras y contratos, pero no utilizarlos como prueba suficiente de que una aplicacion real se abre. [HIJA de 3.8.5.6]
     3.8.5.6.2 Ejecutar pruebas de integracion reales con aplicaciones GUI inocuas de la allowlist del equipo, sin mockear la API de lanzamiento, la enumeracion de procesos ni la identificacion de ventanas que se estan verificando. [HIJA de 3.8.5.6]
     3.8.5.6.3 Comprobar los casos aplicacion ya abierta, aplicacion cerrada, apertura correcta, proceso que termina, ausencia de ventana, permiso denegado, ruta obsoleta y timeout. [HIJA de 3.8.5.6]
     3.8.5.6.4 Comparar antes y despues los procesos y ventanas ajenos a la prueba y demostrar que permanecen intactos. [HIJA de 3.8.5.6]
     3.8.5.6.5 Registrar por separado resultados simulados, pruebas unitarias con mocks, pruebas de integración del sistema operativo y aperturas GUI verificadas visualmente; nunca mezclar sus conteos. [HIJA de 3.8.5.6]
     3.8.5.6.6 Ejecutar al menos un ciclo real de abrir -> detectar proceso -> detectar ventana -> verificar estado -> cerrar solo la ventana/proceso creado por la prueba en la segunda pantalla. Comprobar que Visual Studio Code y las ventanas preexistentes permanecen intactos. [HIJA de 3.8.5.6]
+    3.8.5.6.7 CREAR `tests/hands/test_apertura_aplicaciones_inocuas_entorno_real.py`: comprobar primero mediante fuentes reales que `notepad.exe` existe y pasa `ApplicationPreflight`; después lanzarlo por `CalibrationManager.launch_application`/ruta de produccion y verificar PID/propietario/HWND/ventana visible. No introducir texto ni guardar archivos. Si Notepad ya estaba abierto y la API no puede crear una instancia propiedad de la prueba, no cerrarlo: registrar ese escenario como reutilizacion o BLOQUEADO para prueba de propiedad exclusiva. [HIJA de 3.8.5.6]
+    3.8.5.6.8 En la misma suite, probar `calc.exe` solo si el equipo lo descubre y el preflight real lo admite; verificar activacion/proceso/ventana por el identificador real de paquete o proceso. Si no esta instalado o el SO impide una instancia controlable, registrar NO VERIFICADO con causa, sin sustituirlo por un mock. [HIJA de 3.8.5.6]
+    3.8.5.6.9 Incluir controles negativos reales de destino inexistente, ruta obsoleta entre preflight y lanzamiento, ejecutable desconocido y permiso denegado; confirmar que no aparece un proceso nuevo ni se modifica ninguna ventana previa. Reutilizar `tests/hands/test_preflight_gatekeeper_entorno_real.py`, `tests/hands/test_clasificacion_candidatos_lanzamiento_entorno_real.py` y `tests/hands/test_candidatos_reales_entorno_real.py` para las partes que ya cubren; esas suites no sustituyen la apertura GUI real. [HIJA de 3.8.5.6]
 3.8.6 ? CALIBRACION DE APLICACIONES DESCUBIERTAS
 3.8.6.1 Conectar el descubrimiento con el requisito de calibracion de 3.5 y el CalibrationManager/UniversalVisualCalibrator existentes.
     3.8.6.1.1 Delimitar el alcance: 3.8.6 reutiliza CalibrationManager, UniversalVisualCalibrator y CoordinateManager tal como existen hoy, con sus mecanismos de identificacion de ventana y monitor; el contrato de la capability calibrate, la calibracion multipantalla completa y la seguridad operativa se definen en FASE 12 y no se anticipan aqui. Registrar como limitaciones conocidas lo que 3.8.6 no cubra. [HIJA de 3.8.6.1]
@@ -1022,7 +1027,7 @@ Nota de alcance: 3.8.5.1.1-3.8.5.1.3 implementan y verifican la puerta real de p
 3.8.6.4 Rechazar o detenerse ante politicas de bloqueo, pantalla inaccesible, deteccion insuficiente o confianza inadecuada.
 3.8.6.5 Verificar que las coordenadas/resultados pertenecen a la ventana y monitor correctos.
 3.8.6.6 Persistir la calibracion solo mediante el mecanismo existente y tras validar el resultado.
-3.8.6.7 Tests de calibración válida, interfaz no reconocida, confianza insuficiente, monitor incorrecto y política de bloqueo.
+3.8.6.7 Tests de calibracion valida, UI desconocida, confianza insuficiente, monitor incorrecto, politica de bloqueo y persistencia controlada; suites existentes: `tests/hands/test_calibration_manager.py`, `tests/hands/test_calibrator.py`, `tests/hands/test_calibration_requirements.py`, `tests/eyes/test_vision_calibration_integration.py`. CREAR `tests/hands/test_calibracion_notepad_entorno_real.py` para calibrar una ventana Notepad abierta por la prueba, con captura/vision reales y sin usar imagen prefabricada como evidencia.
 3.8.6.8 Verificar en el escritorio real la calibración de una aplicación inocua en la segunda pantalla, usando captura y coordenadas reales; confirmar que el elemento detectado pertenece a la ventana y monitor correctos y no a Visual Studio Code ni a la primera pantalla.
 3.8.7 ? CAPACIDADES DISPONIBLES PARA PLANIFICACION
 3.8.7.1 Exponer al Planner solo capacidades sustentadas por acciones reales registradas.
@@ -1043,121 +1048,130 @@ Nota de alcance: 3.8.5.1.1-3.8.5.1.3 implementan y verifican la puerta real de p
 3.8.9.2 Verificar el flujo completo de la rama de aplicacion conocida dentro del alcance de 3.8: resolucion, fuente de descubrimiento, preflight, apertura real ya implementada, proceso/ventana y calibracion cuando proceda; no presentarlo como flujo universal de voz a tarea.
 3.8.9.3 Verificar el mismo flujo de aplicacion con una aplicacion inocua instalada que inicialmente no este registrada, descubierta por las fuentes reales y abierta solo tras preflight correcto; no presentarlo como flujo universal de voz a tarea.
 3.8.9.4 Verificar aplicacion no instalada, ejecutable no localizable, aplicacion bloqueada y UI no calibrable.
-3.8.9.5 Ejecutar tests unitarios, integracion, regresion y verificacion real permitida.
+3.8.9.5 Ejecutar suites existentes `tests/hands/test_application_discovery.py`, `tests/hands/test_candidatos_reales_entorno_real.py`, `tests/hands/test_preflight_gatekeeper_entorno_real.py`, `tests/hands/test_calibration_manager.py` y `tests/hands/test_calibrator.py`; añadir la suite de apertura inocua de 3.8.5.6.7-3.8.5.6.9 y registrar por separado descubrimiento/preflight sin lanzamiento frente a apertura/proceso/ventana reales.
 3.8.9.6 Actualizar README unicamente con comportamiento implementado y verificado.
 3.8.9.7 Cerrar la rama solo con evidencia de que no altera entities.json ni rompe capacidades existentes.
 
 3.7.3.4 Cerrar FASE 3 solo con todas las hojas completadas, incluidas todas las hojas de 3.8.
-FASE 4 ? GOAL + TASK/HTN
 
-4.1 ? GOAL
-4.1.1 ? Inspeccion del Goal real
+CONVENCION DE ESPECIFICIDAD Y TRAZABILIDAD DE TESTS PARA TODAS LAS UNIDADES FUTURAS
+- No utilizar titulos aislados como "Tests", "Regresion" o "Verificacion". Cada grupo debe nombrar expresamente los comportamientos que comprobara: entradas validas/invalidas, limites, estados, persistencia, integraciones y efectos observables que correspondan a esa unidad.
+- Antes de implementar una hoja, contrastar los ficheros de test con el README_TESTS vigente y abrir las suites relevantes. Las rutas citadas como EXISTENTES en este roadmap se corresponden con la documentacion adjunta a esta revision; volver a verificarlas antes de ejecutarlas porque el README puede haber cambiado.
+- Toda ruta que aparezca precedida por "CREAR" es una suite futura propuesta, no un fichero que se afirme que ya existe. No crear archivos de test duplicados si una suite actual ya cubre el mismo comportamiento de forma valida.
+- En cada hoja registrar por separado: suites existentes ejecutadas; tests nuevos creados; tests unitarios/contrato; integraciones con dependencias reales; pruebas de sistema real; y pruebas GUI/aplicacion real. Un test con tmp_path y SQLite reales es integracion del sistema de archivos en un ambito temporal, no un escaneo del volumen completo.
+- Un mock puede aislar una frontera externa o inyectar un fallo, pero no puede decidir el resultado del escaner, enumerador de volumenes, SQLite, preflight, clasificador, autorizador, lanzador, proceso, ventana, captura o entrada de usuario cuya conducta se declara probada. Si el comportamiento no esta cubierto por una suite real existente, especificar el escenario y crear una prueba real separada.
+- No se inventaran nombres de clases o metodos de test. Primero se inspeccionara el test real; los nombres de fichero nuevos se marcaran como CREAR y su contenido se definira a partir de las APIs de produccion efectivamente encontradas.
+
+FASE 4 ? GOALS, TASKS, DESCOMPOSICION HTN Y EJECUCION DE TAREAS HOJA
+
+4.1 ? MODELO, VALIDACION Y CONSTRUCCION DE GOAL
+4.1.1 ? INSPECCION DE LA ESTRUCTURA REAL DE GOAL Y SUS CONSUMIDORES
 4.1.1.1 Localizar clase/estructura Goal existente.
 4.1.1.2 Localizar goal_type.
 4.1.1.3 Localizar target.
 4.1.1.4 Localizar description/priority/constraints.
 4.1.1.5 Registrar compatibilidades existentes.
-4.1.2 ? Contrato
+4.1.2 ? CONTRATO DE CAMPOS OBLIGATORIOS, RESTRICCIONES Y SERIALIZACION DE GOAL
 4.1.2.1 Definir campos minimos.
 4.1.2.2 Definir validacion de Goal.
 4.1.2.3 Definir representacion de restricciones.
 4.1.2.4 Verificar serializacion si existe.
-4.1.3 ? Creacion
+4.1.3 ? CREACION DE GOAL DESDE INTENCION O ENTIDAD CON FALLBACK LEGACY
 4.1.3.1 Crear Goal desde una intencion estructurada.
 4.1.3.2 Crear Goal desde una entidad cuando corresponda.
 4.1.3.3 Mantener fallback legacy.
-4.1.4 ? Tests
+4.1.4 ? TESTS DE GOAL VALIDO, CAMPOS OBLIGATORIOS, RESTRICCIONES, SERIALIZACION Y CONSUMIDORES. Suites existentes: `tests/hands/planner/test_node.py`, `tests/brain/test_htn_integration.py`, `tests/brain/test_llm.py`; ampliar solo donde la inspeccion revele huecos.
 4.1.4.1 Goal valido.
 4.1.4.2 Goal incompleto.
 4.1.4.3 Goal incompatible.
 4.1.4.4 Compatibilidad con consumidores actuales.
-4.2 ? TASK
-4.2.1 ? Modelo
+4.2 ? MODELO, ESTADOS Y RELACIONES ENTRE GOAL, TASK Y ACTION
+4.2.1 ? INSPECCION DEL MODELO TASK Y SUS RELACIONES CON GOAL/ACTION
 4.2.1.1 Inspeccionar Task real.
 4.2.1.2 Verificar relacion Goal -> Task.
 4.2.1.3 Verificar relacion Task -> Action.
-4.2.2 ? Contrato
+4.2.2 ? CONTRATO DE IDENTIDAD, ESTADO Y DEPENDENCIAS DE TASK
 4.2.2.1 Definir datos minimos de Task.
 4.2.2.2 Definir estado de Task.
 4.2.2.3 Definir dependencias cuando existan.
-4.2.3 ? Ejecucion
+4.2.3 ? CREACION Y TRANSICION DE ESTADO DE TASK CON PROPAGACION AL GOAL
 4.2.3.1 Crear Task desde un metodo HTN.
 4.2.3.2 Marcar Task como pendiente/en ejecucion/completada/fallida si el modelo lo soporta.
 4.2.3.3 Propagar resultado al Goal.
-4.2.4 ? Tests
+4.2.4 ? TESTS DE CREACION DE TASK, ESTADOS PENDIENTE/EN EJECUCION/COMPLETADA/FALLIDA, DEPENDENCIAS Y PROPAGACION DE RESULTADOS. Suites existentes: `tests/hands/planner/test_node.py`, `tests/hands/planner/test_task_executor.py`.
 4.2.4.1 Creacion.
 4.2.4.2 Cambio de estado.
 4.2.4.3 Dependencia.
 4.2.4.4 Resultado.
-4.3 ? DESCOMPOSICION HTN
-4.3.1 ? Inspeccion
+4.3 ? DESCOMPOSICION JERARQUICA DE GOALS MEDIANTE HTNMANAGER Y TASKEXECUTOR
+4.3.1 ? INSPECCION DE HTNMANAGER, TASKEXECUTOR Y METODOS DE DESCOMPOSICION
 4.3.1.1 Localizar HTNManager.
 4.3.1.2 Localizar TaskExecutor.
 4.3.1.3 Localizar metodos de descomposicion existentes.
 4.3.1.4 Localizar condiciones de aplicacion de metodos.
-4.3.2 ? Seleccion de metodo
+4.3.2 ? SELECCION DE METODO HTN SEGUN CONDICIONES REALES Y FALTA DE METODO
 4.3.2.1 Definir como se identifica un metodo aplicable.
 4.3.2.2 Verificar condiciones.
 4.3.2.3 Manejar ausencia de metodo.
-4.3.3 ? Descomposicion de un Goal
+4.3.3 ? DESCOMPOSICION DE GOAL SIMPLE Y MULTITAREA CON ORDEN Y RESTRICCIONES
 4.3.3.1 Descomponer un Goal simple en una Task.
 4.3.3.2 Descomponer un Goal en varias Tasks.
 4.3.3.3 Mantener orden cuando exista dependencia.
 4.3.3.4 Propagar restricciones.
-4.3.4 ? Descomposicion recursiva
+4.3.4 ? DESCOMPOSICION RECURSIVA HASTA TASK HOJA CON PROTECCION ANTI-BUCLE
 4.3.4.1 Detectar Task compuesta.
 4.3.4.2 Descomponer un nivel.
 4.3.4.3 Repetir solo hasta condicion de hoja.
 4.3.4.4 Evitar bucles de descomposicion.
-4.3.5 ? Resultados
+4.3.5 ? PROPAGACION DE RESULTADOS Y LOCALIZACION DE LA TASK QUE FALLA
 4.3.5.1 Propagar exito.
 4.3.5.2 Propagar fallo.
 4.3.5.3 Identificar Task responsable del fallo.
-4.3.6 ? Tests
+4.3.6 ? TESTS HTN DE GOAL SIMPLE/MULTITAREA, METODO NO APLICABLE, RECURSION, CICLO, ORDEN Y FALLO DE TASK HOJA. Suites existentes: `tests/brain/test_htn_integration.py`, `tests/hands/planner/test_task_executor.py`, `tests/hands/planner/test_node.py`.
 4.3.6.1 Goal simple.
 4.3.6.2 Goal multi-task.
 4.3.6.3 Sin metodo aplicable.
 4.3.6.4 Fallo de una hoja.
-4.3.6.5 No regresion.
-4.4 ? SECUENCIAL / CONDICIONAL
-4.4.1 ? Secuencias
+4.3.6.5 No regresion: volver a ejecutar `tests/brain/test_htn_integration.py`, `tests/hands/planner/test_task_executor.py` y `tests/hands/planner/test_node.py`, comprobando que una Task compuesta conserva el orden, un fallo de hoja no marca Goal como completado y el resultado no se propaga dos veces.
+4.4 ? EJECUCION DE JERARQUIAS HTN SECUENCIALES, CONDICIONALES Y DEPENDIENTES
+4.4.1 ? EJECUCION ORDENADA DE SECUENCIAS HTN Y DETENCION TRAS FALLO
 4.4.1.1 Verificar representacion real.
 4.4.1.2 Ejecutar primer paso.
 4.4.1.3 Ejecutar siguiente paso solo tras resultado valido.
 4.4.1.4 Propagar fallo.
-4.4.2 ? Condiciones
+4.4.2 ? EVALUACION DE CONDICIONES Y SELECCION EXCLUSIVA DE LA RAMA APLICABLE
 4.4.2.1 Evaluar precondicion real.
 4.4.2.2 Seleccionar rama aplicable.
 4.4.2.3 Evitar ejecutar ramas no validas.
 4.4.2.4 Registrar la decision.
-4.4.3 ? Dependencias
+4.4.3 ? RESOLUCION DE DEPENDENCIAS Y BLOQUEO DE TASKS FUERA DE ORDEN
 4.4.3.1 Resolver dependencia directa.
 4.4.3.2 Detectar dependencia no satisfecha.
 4.4.3.3 Evitar ejecucion fuera de orden.
-4.4.4 ? Tests
+4.4.4 ? TESTS DE EJECUCION SECUENCIAL, CONDICION VERDADERA/FALSA, RAMA NO ELEGIDA, DEPENDENCIA INCUMPLIDA Y DETENCION TRAS FALLO. Suite existente: `tests/hands/planner/test_task_executor.py`; ampliar si no cubre la semantica real de HTN.
 4.4.4.1 Secuencia valida.
 4.4.4.2 Condicion verdadera.
 4.4.4.3 Condicion falsa.
 4.4.4.4 Dependencia incumplida.
-4.5 ? BRAIN
-4.5.1 ? Intent -> Goal
+4.5 ? INTEGRACION DE BRAIN CON INTENT, ENTITY, GOAL Y HTN
+4.5.1 ? TRANSFORMACION DE INTENCION INTERPRETADA A GOAL ESTRUCTURADO
 4.5.1.1 Verificar interpret_intent.
 4.5.1.2 Verificar think.
 4.5.1.3 Verificar parse_model_response.
 4.5.1.4 Verificar deteccion de accion directa.
-4.5.2 ? Entidades
+4.5.2 ? EXTRACCION Y RESOLUCION DE ENTIDADES PARA CONSTRUIR EL GOAL
 4.5.2.1 Verificar extraccion.
 4.5.2.2 Verificar resolucion.
 4.5.2.3 Crear Goal con entidad cuando corresponda.
-4.5.3 ? HTN
+4.5.3 ? DELEGACION DE GOAL A HTN Y PROPAGACION DEL RESULTADO DE DESCOMPOSICION
 4.5.3.1 Verificar integracion con htn_integration.
 4.5.3.2 Verificar paso de Goal.
 4.5.3.3 Verificar recepcion de resultados.
-4.5.4 ? Imagen
+4.5.4 ? TRATAMIENTO DE ENTRADA VISUAL Y SU VINCULACION CON EL GOAL CUANDO PROCEDA
 4.5.4.1 Verificar think_with_image.
 4.5.4.2 Verificar analyze_image.
 4.5.4.3 No confundir percepcion con decision.
-4.5.5 ? Tests
+4.5.5 ? TESTS DE INTERPRETACION DE INTENT, PARSEO DE RESPUESTA LLM, RESOLUCION DE ENTIDAD, DELEGACION HTN, ENTRADA VISUAL Y FALLBACK LEGACY. Suites existentes: `tests/brain/test_llm.py`, `tests/brain/test_htn_integration.py`, `tests/eyes/test_vision.py`; CREAR tests de integracion especificos si la ruta real no queda cubierta.
 4.5.5.1 Interpretacion simple.
 4.5.5.2 Goal.
 4.5.5.3 Entidad -> Goal.
@@ -1189,49 +1203,49 @@ Objetivo: un unico canal reutilizable para pedir aclaracion o confirmacion al us
 4.5.7.5 Interpretar la respuesta del usuario (elegir candidato, si, no, cancelar, silencio, respuesta ambigua o fuera de contexto) reutilizando el vocabulario de confirmacion existente; ante duda no ejecutar y volver a preguntar con un limite de intentos.
 4.5.7.6 Reanudar el Goal con la respuesta validada sin doble ejecucion ni repeticion de pasos ya realizados.
 4.5.7.7 Tests: aclaracion con candidatos, confirmacion aceptada y rechazada, silencio, respuesta ambigua, peticion que reemplaza a la pendiente, caducidad y no ejecucion mientras se espera; separar los tests deterministas de la prueba con voz real cuando exista.
-4.6 ? STATE
-4.6.1 ? Entrada al HTN
+4.6 ? SINCRONIZACION DEL STATE REAL CON EL CICLO DE VIDA HTN
+4.6.1 ? CAPTURA DEL STATE DISPONIBLE ANTES DE ENTRAR EN HTN
 4.6.1.1 Obtener estado actual.
 4.6.1.2 Verificar que sea el estado real disponible.
-4.6.2 ? Cambios
+4.6.2 ? APLICACION DE CAMBIOS CONFIRMADOS Y REGISTRO DEL RESULTADO HTN
 4.6.2.1 Propagar cambios de ejecucion.
 4.6.2.2 Evitar mutaciones inventadas.
 4.6.2.3 Registrar resultado.
-4.6.3 ? Compatibilidad
+4.6.3 ? COMPATIBILIDAD DE API Y SERIALIZACION DEL STATE CON HTN
 4.6.3.1 Verificar API de State.
 4.6.3.2 Verificar serializacion si existe.
-4.6.4 ? Tests
+4.6.4 ? TESTS DE CAPTURA STATE->HTN, PROPAGACION RESULTADO->STATE, SERIALIZACION, AUSENCIA DE MUTACION SIN EVIDENCIA Y NO REGRESION. Suites existentes: `tests/hands/planner/test_node.py`, `tests/hands/test_executor_state.py`, `tests/hands/planner/test_task_executor.py`.
 4.6.4.1 State -> HTN.
 4.6.4.2 Resultado -> State.
-4.6.4.3 No regresion.
-4.7 ? EXECUTOR
-4.7.1 ? Entrada
+4.6.4.3 No regresion de sincronizacion: ejecutar `tests/hands/test_executor_state.py`, `tests/hands/planner/test_node.py` y `tests/hands/planner/test_task_executor.py`; confirmar que State solo cambia con resultados de ejecucion/verificacion confirmados y que un fallo no se convierte en estado exitoso.
+4.7 ? EJECUCION DE TASKS HOJA MEDIANTE ACTIONREGISTRY Y EXECUTOR
+4.7.1 ? RECEPCION, VALIDACION Y DESPACHO DE TASK HOJA A LA ACCION REAL
 4.7.1.1 Recibir Task hoja.
 4.7.1.2 Validar accion.
 4.7.1.3 Ejecutar mediante registro/Executor real.
-4.7.2 ? Resultados
+4.7.2 ? PROPAGACION DE EXITO, FALLO Y DATOS NECESARIOS PARA STATE
 4.7.2.1 Propagar exito.
 4.7.2.2 Propagar fallo.
 4.7.2.3 Propagar datos necesarios para State.
-4.7.3 ? Cancelacion
+4.7.3 ? CANCELACION DE TASK Y LIBERACION SEGURA DE RECURSOS PROPIOS
 4.7.3.1 Respetar cancelacion existente.
 4.7.3.2 Liberar recursos cuando corresponda.
-4.7.4 ? Tests
+4.7.4 ? TESTS DE DESPACHO DE TASK HOJA, ACCION NO REGISTRADA, FALLO DE ACCION, CANCELACION, LIMPIEZA Y RESULTADO HACIA STATE. Suites existentes: `tests/hands/planner/test_task_executor.py`, `tests/hands/test_executor.py`, `tests/hands/test_executor_state.py`, `tests/hands/test_action_registry.py`.
 4.7.4.1 Ejecucion correcta.
 4.7.4.2 Accion invalida.
 4.7.4.3 Fallo real.
 4.7.4.4 Cancelacion.
-4.8 ? REGRESION Y CIERRE
-4.8.1 Ejecutar tests pertinentes.
+4.8 ? REGRESION HTN, FLUJO REAL GOAL-TASK-ACTION-STATE Y CIERRE
+4.8.1 Ejecutar `tests/brain/test_htn_integration.py`, `tests/hands/planner/test_task_executor.py`, `tests/hands/planner/test_node.py`, `tests/hands/test_action_registry.py`, `tests/hands/test_executor.py` y `tests/hands/test_executor_state.py`; comprobar descomposición HTN, orden y estado de Tasks, despacho de acción registrada, propagación de éxito/fallo y actualización de State.
 4.8.2 Corregir fallos de implementacion.
 4.8.3 Verificar compatibilidad legacy.
 4.8.4 Verificar main.py.
 4.8.5 Actualizar README/estado cuando corresponda.
-4.8.6 Ejecutar en el equipo real un flujo mínimo Goal -> HTN -> Task hoja -> ActionRegistry/Executor -> State, con una acción inocua disponible y comprobación del efecto externo; si no hay una acción segura real, registrar el bloqueo y no cerrar.
+4.8.6 Ejecutar en el equipo real Goal -> HTNManager -> TaskExecutor -> ActionRegistry/Executor -> State con una accion inocua ya registrada (por ejemplo `verify_target_monitor` sobre el monitor enumerado realmente); comprobar el resultado contra la API del SO, no solo contra el objeto devuelto. Si el flujo HTN no llega a la accion real o no existe una accion inocua registrable, documentar el bloqueo y no cerrar. CREAR `tests/brain/test_goal_htn_executor_entorno_real.py` si no hay una prueba opt-in equivalente.
 4.8.7 Cerrar FASE 4 solo con evidencia de ejecución real aplicable y no regresión.
-FASE 5 ? DOMAIN MEMORY
+FASE 5 ? DOMAIN MEMORY: ENTIDADES, RESOLUCION, URLS, PREFERENCIAS Y APRENDIZAJE
 
-5.1 ? ENTIDADES
+5.1 ? MODELO Y CICLO DE VIDA PERSISTENTE DE ENTIDADES
 5.1.1 Inspeccionar Entity real.
 5.1.2 Verificar tipos de entidad existentes.
 5.1.3 Verificar properties.
@@ -1245,8 +1259,8 @@ FASE 5 ? DOMAIN MEMORY
 5.1.6 Verificar creacion.
 5.1.7 Verificar actualizacion.
 5.1.8 Verificar eliminacion solo si existe contrato real.
-5.1.9 Tests unitarios de cada operacion.
-5.2 ? RESOLUCION
+5.1.9 Tests de alta, lectura, actualizacion, recuperacion tras reinicio y eliminacion solo si existe API real. Suites existentes: `tests/memory/test_memory_entities_json_estado_inicial.py`, `tests/memory/test_memory_save_entity_persist_bug.py`, `tests/hands/test_application_read.py`, `tests/hands/test_entities_json_preservation_discovery.py`; usar directorios temporales y conservar intactos los JSON originales.
+5.2 ? RESOLUCION DE ENTIDADES POR NOMBRE, ALIAS, CONTEXTO Y AMBIGUEDAD
 5.2.1 Inspeccionar EntityResolver.
 5.2.2 Inspeccionar ResolutionContext.
 5.2.3 Inspeccionar EntityResolutionResult.
@@ -1255,20 +1269,20 @@ FASE 5 ? DOMAIN MEMORY
 5.2.6 Resolver con contexto.
 5.2.7 Manejar ambiguedad sin inventar.
 5.2.8 Propagar ausencia de resolucion.
-5.2.9 Tests de resolucion exacta.
-5.2.10 Tests de alias.
-5.2.11 Tests de ambiguedad.
-5.2.12 Tests sin resultado.
-5.3 ? URLS
+5.2.9 Tests de EntityResolver con nombre exacto, normalizacion de mayusculas/espacios y entidad unica; CREAR `tests/memory/test_entity_resolver_runtime.py` si no existe una suite directa que lo cubra.
+5.2.10 Tests de alias registrado, alias normalizado, colision entre alias/nombre y alias inexistente; reutilizar `tests/hands/test_application_alias_resolution.py` y `tests/hands/test_application_name_resolution.py` para ApplicationManager, sin presentarlos como cobertura completa de EntityResolver.
+5.2.11 Tests de dos o mas entidades candidatas, evidencia contextual suficiente/insuficiente y rechazo de seleccion arbitraria; CREAR casos directos de EntityResolver en `tests/memory/test_entity_resolver_runtime.py` si faltan.
+5.2.12 Tests de entidad inexistente, tipo incompatible y resultado vacio, comprobando que no se crea un Goal accionable por defecto; CREAR/AMPLIAR la suite directa de EntityResolver.
+5.3 ? RELACION Y RECUPERACION DE URLS ASOCIADAS A ENTIDADES
 5.3.1 Localizar almacenamiento real de URLs.
 5.3.2 Definir relacion entidad -> URL si ya existe.
 5.3.3 Normalizar solo segun reglas existentes.
 5.3.4 Verificar URLs invalidas.
 5.3.5 Verificar recuperacion.
 5.3.6 Verificar integracion con Goal de navegacion.
-5.3.7 Tests unitarios.
-5.3.8 Tests de integracion.
-5.4 ? PREFERENCIAS / ATRIBUTOS
+5.3.7 Tests unitarios de URL valida, URL malformada, normalizacion permitida, URL ausente y recuperacion tras reinicio; CREAR `tests/memory/test_entity_url_resolution.py` si no existe cobertura directa.
+5.3.8 Tests de integracion EntityResolver->URL->Goal de navegacion, comprobando que una URL no verificada no se abre; CREAR `tests/memory/test_entity_url_resolution.py` o ampliar la suite real de Brain cuando proceda.
+5.4 ? LECTURA, ACTUALIZACION Y PERSISTENCIA DE PREFERENCIAS DEL USUARIO
 5.4.1 Inspeccionar user_preferences.json.
 5.4.2 Separar preferencias de hechos sobre entidades.
 5.4.3 Leer preferencias.
@@ -1276,8 +1290,8 @@ FASE 5 ? DOMAIN MEMORY
 5.4.5 Persistir.
 5.4.6 Recuperar tras reinicio.
 5.4.7 Evitar sobrescrituras accidentales.
-5.4.8 Tests de persistencia.
-5.5 ? ENTITY -> GOAL
+5.4.8 Tests de lectura, actualizacion, escritura atomica, recuperacion tras reinicio, preferencias ausentes/corruptas y preservacion de datos no relacionados; CREAR suite directa de preferencias si no existe en `tests/`.
+5.5 ? TRANSFORMACION DE ENTIDAD RESUELTA EN GOAL ACCIONABLE
 5.5.1 Localizar flujo actual Entity -> Goal.
 5.5.2 Verificar tipos de Goal generados.
 5.5.3 Verificar target.
@@ -1285,20 +1299,20 @@ FASE 5 ? DOMAIN MEMORY
 5.5.5 Verificar ausencia de Goal cuando la entidad no sea accionable.
 5.5.6 Verificar integracion con Brain.
 5.5.7 Verificar integracion con Planner.
-5.5.8 Tests.
-5.6 ? VERIFICACION / APRENDIZAJE ADAPTATIVO
+5.5.8 Tests de Entity->Goal para entidad accionable/no accionable, tipo de Goal, target, restricciones, contexto y rechazo de entidad ambigua; integrar con `tests/brain/test_llm.py` y `tests/brain/test_htn_integration.py`, creando casos directos cuando falten.
+5.6 ? REGISTRO DE RESULTADOS Y APRENDIZAJE ADAPTATIVO SIN CONTAMINAR MEMORIA
 5.6.1 Registrar resultado de resolucion.
 5.6.2 Registrar contexto utilizado.
 5.6.3 Separar aprendizaje de simple persistencia.
 5.6.4 Reutilizar mecanismos existentes de aprendizaje.
 5.6.5 Ajustar confianza solo cuando exista evidencia.
 5.6.6 Verificar que una mala resolucion no contamine permanentemente la memoria.
-5.6.7 Tests de aprendizaje.
-5.6.8 Tests de no regresion.
-5.6.9 Verificar en runtime con almacenamiento temporal real la carga, resolución, escritura permitida y recuperación tras reinicio; leer la fuente real de entidades solo en modo lectura y demostrar que los archivos persistentes originales no cambian.
-FASE 6 ? ACTION GRAPH
+5.6.7 Tests de registro de resultado, evidencia minima, confianza, muestra insuficiente, aprendizaje solo tras resultado observado y persistencia del aprendizaje; reutilizar `tests/utils/contextual_adaptation_engine/` unicamente para contratos que realmente compartan.
+5.6.8 Tests de no regresion de EntityResolver, DomainMemory, MemoryManager y consumidores Brain/Planner, incluyendo preservacion de `entities.json`; suites existentes: `tests/memory/test_memory_entities_json_estado_inicial.py`, `tests/memory/test_memory_save_entity_persist_bug.py`, `tests/brain/test_llm.py`.
+5.6.9 Verificar en runtime con almacenamiento temporal real la carga, resolucion, escritura permitida y recuperacion tras reinicio; leer la fuente real de entidades solo en modo lectura y demostrar que los JSON originales no cambian. Ejecutar las suites de `tests/memory/` y `tests/hands/test_entities_json_preservation_discovery.py`; no confundir conocimiento descubierto temporal con entidades persistidas del catalogo.
+FASE 6 ? ACTION GRAPH: TRANSICIONES, ESTADOS, GRAPHBUILDER E INTEGRACION CON PLANNER
 
-6.1 ? TRANSICIONES
+6.1 ? CONTRATO DE TRANSICION: ESTADO ORIGEN, ACCION, DESTINO, PRECONDICIONES Y COSTE
 6.1.1 Inspeccionar representacion real de transicion.
 6.1.2 Definir origen.
 6.1.3 Definir accion.
@@ -1306,17 +1320,17 @@ FASE 6 ? ACTION GRAPH
 6.1.5 Anadir precondiciones si existen.
 6.1.6 Anadir efectos si existen.
 6.1.7 Anadir coste solo donde el modelo real lo soporte.
-6.1.8 Tests de transicion valida.
-6.1.9 Tests de transicion invalida.
-6.2 ? CONSTRUCCION
+6.1.8 Tests de transicion valida: origen/destino existentes, accion registrada, precondicion satisfecha y coste conforme al contrato; suite existente: `tests/hands/planner/test_graph_edge.py`.
+6.1.9 Tests de transicion invalida: nodo ausente, accion no registrada, precondicion incumplida, efecto malformado y coste invalido; suites existentes: `tests/hands/planner/test_graph_edge.py`, `tests/hands/planner/test_graph_helpers.py`.
+6.2 ? CONSTRUCCION DE GRAPH SIN NODOS NI EDGES DUPLICADOS
 6.2.1 Identificar fuentes de nodos.
 6.2.2 Identificar fuentes de edges.
 6.2.3 Construir Graph minimo.
 6.2.4 Evitar nodos duplicados.
 6.2.5 Evitar edges duplicadas.
 6.2.6 Verificar consistencia.
-6.2.7 Tests de construccion.
-6.3 ? PRECONDICIONES / EFECTOS BASICOS
+6.2.7 Tests de construccion: grafo vacio/minimo, fuentes de nodos/edges, deduplicacion, referencias colgantes y consistencia; suites existentes: `tests/hands/planner/test_graph_node.py`, `tests/hands/planner/test_graph_edge.py`, `tests/hands/planner/test_graph_helpers.py`.
+6.3 ? LECTURA Y APLICACION DE PRECONDICIONES/EFECTOS BASICOS SOBRE STATE
 6.3.1 Leer precondiciones reales.
     6.3.1.1 Inventariar el vocabulario real de atomos de estado en sus capas: los dos Enum llamados ApplicationState (el de `src/eyes/screen.py` tiene 5 miembros y el de `src/hands/applications_core.py` tiene 8, con solo 3 comunes: D-STATE-TWO-ENUMS, D-STATE-ENUM-DIVERGENCE), los flags de `data/knowledge/applications.json` (open, active, maximized, focused, playing, streaming, recording: D-STATE-DATA-ONLY), required_state y effects de `data/knowledge/capabilities.json`, y las claves que produce GraphBuilder en `src/hands/planner/graph.py` (chrome_open, address_bar_focused, url_typed y otras: D-STATE-GRAPH-DATA-GAP, D-EFFECTS-NO-APP-FLAGS). Solo lectura. [HIJA de 6.3.1]
     6.3.1.2 Con esa evidencia y sin crear vocabulario nuevo, definir la equivalencia entre los atomos de GraphBuilder y los de capabilities.json, incluida la sensibilidad a mayusculas de `_goal_achieved` (D-STATE-CASE-SENSITIVITY), y registrar los atomos sin equivalente como huecos conocidos. [HIJA de 6.3.1]
@@ -1326,39 +1340,39 @@ FASE 6 ? ACTION GRAPH
 6.3.4 Aplicar efecto simple.
 6.3.5 Verificar actualizacion de State.
 6.3.6 Evitar mutaciones parciales.
-6.3.7 Tests.
-6.4 ? VALIDACION / CAPACIDADES AVANZADAS
+6.3.7 Tests de lectura/evaluacion de precondiciones, aplicacion de efectos, atomo desconocido, estado sucesor, rechazo de mutacion parcial y equivalencia entre flags y datos; suites existentes: `tests/hands/planner/test_state_graph.py`, `tests/hands/planner/test_advanced_state_graph.py`, `tests/hands/planner/test_graph_builder.py`; crear tests directos si falta cobertura del contrato.
+6.4 ? VALIDACION DE TRANSICIONES CONTRA CAPABILITIES, RECURSOS Y ESTADO DE APLICACION
 6.4.1 Validar edges contra capabilities.
 6.4.2 Validar acciones incompatibles.
 6.4.3 Validar recursos requeridos.
 6.4.4 Validar estados de aplicacion/ventana.
 6.4.5 Registrar diagnostico.
-6.4.6 Tests de rechazo.
-6.4.7 Tests de aceptacion.
-6.5 ? CONTRATO E INTEGRACION PRELIMINAR GRAPH <-> PLANNER
-6.5.1 ? Contrato
+6.4.6 Tests de rechazo de edge con capability ausente, accion incompatible, recurso no disponible y estado de aplicacion/ventana incorrecto; suites existentes: `tests/hands/planner/test_planner_action_verification.py`, `tests/hands/planner/test_planner_find_nodes_for_capability.py`.
+6.4.7 Tests de aceptacion de edge compatible con capability registrada, precondicion satisfecha y recursos disponibles, verificando que el Graph conserva el contrato real; suites existentes: `tests/hands/planner/test_graph_builder.py`, `tests/hands/test_action_registry.py`.
+6.5 ? CONTRATO Y PRIMER FLUJO GRAPH-PLANNER-EXECUTOR CON GRAPH CONTROLADO
+6.5.1 ? CONTRATO DE ENTRADAS, SALIDAS Y ERRORES DE LA FRONTERA GRAPH/PLANNER
 6.5.1.1 Definir entrada Goal.
 6.5.1.2 Definir entrada State.
 6.5.1.3 Definir salida de Graph.
 6.5.1.4 Definir errores.
-6.5.2 ? Goal/State -> Graph
+6.5.2 ? MAPEO DE GOAL Y STATE A RESTRICCIONES Y NODO INICIAL DEL GRAPH
 6.5.2.1 Transformar Goal a restricciones de busqueda.
 6.5.2.2 Transformar State a nodo inicial.
 6.5.2.3 Verificar que no se pierda contexto relevante.
-6.5.3 ? Ruta / Plan
+6.5.3 ? BUSQUEDA DE RUTA Y RECHAZO DE RUTAS QUE NO ALCANZAN EL GOAL
 6.5.3.1 Obtener una ruta valida.
 6.5.3.2 Verificar que la ruta alcance el objetivo.
 6.5.3.3 Rechazar rutas invalidas.
-6.5.4 ? Ruta -> Plan
+6.5.4 ? CONVERSION ORDENADA DE EDGES DE RUTA A STEPS DE PLAN
 6.5.4.1 Convertir primer edge a step.
 6.5.4.2 Convertir todos los edges a steps.
 6.5.4.3 Conservar orden.
 6.5.4.4 Conservar trazabilidad origen/destino.
-6.5.5 ? Plan -> Executor
+6.5.5 ? ENTREGA DEL PLAN AL EXECUTOR Y PROPAGACION DEL RESULTADO
 6.5.5.1 Verificar contrato de Plan.
 6.5.5.2 Entregar steps al Executor.
 6.5.5.3 Propagar resultados.
-6.5.6 ? Flujo preliminar con un Graph construido de forma controlada
+6.5.6 ? EJECUCION PRELIMINAR CON GOAL, STATE, GRAPH, PLAN Y EXECUTOR REALES
 6.5.6.1 Goal real.
 6.5.6.2 State real.
 6.5.6.3 Graph real ya disponible, sin presuponer todavía la integración del GraphBuilder.
@@ -1366,372 +1380,372 @@ FASE 6 ? ACTION GRAPH
 6.5.6.5 Executor real cuando el contrato lo permita.
 6.5.6.6 State actualizado y contrastado con la evidencia observable.
 6.5.6.7 Reservar la integración definitiva del GraphBuilder para 6.9, una vez cerrada 6.7.
-6.5.7 ? Regresion
-6.5.7.1 Legacy.
-6.5.7.2 Acciones directas.
-6.5.7.3 Goals simples.
-6.5.7.4 Fallos.
-6.5.8 ? Cierre
-6.5.8.1 Tests completos.
+6.5.7 ? NO REGRESION DE LEGACY, ACCIONES DIRECTAS, GOALS SIMPLES Y FALLOS
+6.5.7.1 Compatibilidad de la entrada legacy: comprobar firmas, argumentos, resultados y fallback mediante `tests/hands/test_consumer_api_compatibility.py`, `tests/brain/test_llm.py` y `tests/brain/test_htn_integration.py`; conservar la ruta anterior sin duplicar la ejecución.
+6.5.7.2 Compatibilidad de acciones directas: verificar que una acción registrada se sigue despachando una sola vez por ActionRegistry/Executor y que las llamadas directas existentes mantienen su resultado; usar `tests/hands/test_action_registry.py`, `tests/hands/test_executor.py` y `tests/hands/test_consumer_api_compatibility.py`.
+6.5.7.3 Compatibilidad de Goals simples: comprobar que un Goal de una sola Task se descompone, planifica y completa sin exigir una jerarquía artificial; usar `tests/brain/test_htn_integration.py`, `tests/hands/planner/test_task_executor.py` y `tests/hands/planner/test_node.py`.
+6.5.7.4 Propagación de fallos sin falso éxito: comprobar acción no registrada, precondición incumplida, Task fallida, ruta inexistente y preservación de State; usar `tests/hands/planner/test_task_executor.py`, `tests/hands/planner/test_planner_action_verification.py`, `tests/hands/test_executor.py` y `tests/hands/test_executor_state.py`.
+6.5.8 ? CIERRE DEL CONTRATO PRELIMINAR GRAPH-PLANNER ANTES DE GRAPHBUILDER
+6.5.8.1 Ejecutar las suites `tests/hands/planner/test_graph_builder.py`, `tests/hands/planner/test_graph_edge.py`, `tests/hands/planner/test_graph_node.py`, `tests/hands/planner/test_state_graph.py`, `tests/hands/planner/test_task_executor.py`, `tests/brain/test_htn_integration.py`, `tests/hands/test_action_registry.py`, `tests/hands/test_executor.py` y `tests/hands/test_executor_state.py`; comprobar contrato Graph/Planner preliminar, trazabilidad de ruta a steps, compatibilidad y propagación del resultado.
 6.5.8.2 README.
 6.5.8.3 main.py.
-6.6 ? API / ESTABILIDAD
-6.6.1 ? API
+6.6 ? ESTABILIDAD DE API, IMPORTACIONES Y CONTRATOS PUBLICOS DE GRAPH
+6.6.1 ? INVENTARIO DE API PUBLICA Y COMPATIBILIDAD DE FIRMAS
 6.6.1.1 Enumerar APIs publicas existentes.
 6.6.1.2 Verificar imports actuales.
 6.6.1.3 Mantener firmas compatibles cuando corresponda.
-6.6.2 ? Imports
+6.6.2 ? IMPORTACION DIRECTA, IMPORTACION DE PAQUETE E INICIALIZACION
 6.6.2.1 Verificar imports directos.
 6.6.2.2 Verificar imports de paquetes.
 6.6.2.3 Verificar inicializacion.
-6.6.3 ? Errores / contratos
+6.6.3 ? ERRORES DE INPUT, NODO/RUTA AUSENTE Y DIAGNOSTICO DE CONTRATO
 6.6.3.1 Error por input invalido.
 6.6.3.2 Error por nodo inexistente.
 6.6.3.3 Error por ruta inexistente.
 6.6.3.4 Mensajes de diagnostico.
-6.6.4 ? Tests
+6.6.4 ? TESTS DE IMPORTS, API PUBLICA, ERRORES Y COMPATIBILIDAD DE GRAPH
 6.6.4.1 Imports.
 6.6.4.2 API.
 6.6.4.3 Errores.
 6.6.4.4 Compatibilidad.
-6.7 ? GRAPHBUILDER
-6.7.1 ? Navegacion
+6.7 ? GRAPHBUILDER: CONSTRUCCION DESDE FUENTES REALES DE NAVEGACION Y APLICACIONES
+6.7.1 ? REGISTRO DE NODOS Y TRANSICIONES DE NAVEGACION SOPORTADOS
 6.7.1.1 Registrar nodos de navegacion soportados.
 6.7.1.2 Registrar transiciones de navegacion existentes.
 6.7.1.3 Verificar rutas.
-6.7.2 ? Aplicaciones
+6.7.2 ? REGISTRO DE APLICACIONES, CAPABILITIES Y TRANSICIONES DISPONIBLES
 6.7.2.1 Registrar aplicaciones reales.
 6.7.2.2 Registrar capabilities reales.
 6.7.2.3 Registrar transiciones de apertura/cierre cuando existan.
-6.7.3 ? Extensibilidad
+6.7.3 ? SEPARACION DE CONSTRUCTORES POR DOMINIO CON UNA ENTRADA COMUN
 6.7.3.1 Separar construccion de cada dominio.
 6.7.3.2 Evitar codigo duplicado.
 6.7.3.3 Mantener una entrada comun.
-6.7.4 ? Verificacion
+6.7.4 ? VERIFICACION DE GRAPH VACIO, MINIMO, MULTIDOMINIO Y NO REGRESION
 6.7.4.1 Graph vacio.
 6.7.4.2 Graph minimo.
 6.7.4.3 Graph con varios dominios.
-6.7.4.4 No regresion.
-6.8 ? OBSERVABILIDAD / ERRORES
-6.8.1 ? Diagnostico
+6.7.4.4 No regresion de Graph/GraphBuilder: ejecutar `tests/hands/planner/test_graph_builder.py`, `tests/hands/planner/test_graph_helpers.py`, `tests/hands/planner/test_graph_edge.py`, `tests/hands/planner/test_graph_node.py` y `tests/hands/planner/test_state_graph.py`; comprobar nodos/transiciones reales disponibles, ausencia de duplicados y conservacion de rutas previas.
+6.8 ? OBSERVABILIDAD DEL GRAPH: DIAGNOSTICOS, METRICAS Y RECUPERACION DE FALLOS
+6.8.1 ? REGISTRO DE INICIO, DECISIONES Y FALLOS DE CONSTRUCCION
 6.8.1.1 Registrar inicio de construccion.
 6.8.1.2 Registrar decisiones relevantes.
 6.8.1.3 Registrar fallos.
 6.8.1.4 Evitar ruido innecesario.
-6.8.2 ? Metricas
+6.8.2 ? MEDICION DE METRICAS EXISTENTES CON CONSUMIDOR IDENTIFICADO
 6.8.2.1 Identificar metricas ya existentes.
 6.8.2.2 Medir solo datos utiles.
 6.8.2.3 Evitar metricas inventadas sin consumidor.
-6.8.3 ? Fallos / recuperacion
+6.8.3 ? PRESERVACION DE ESTADO, REINTENTO SEGURO Y PROPAGACION DE FALLO
 6.8.3.1 Identificar fallo.
 6.8.3.2 Preservar estado.
 6.8.3.3 Permitir reintento seguro cuando proceda.
 6.8.3.4 Propagar fallo si no puede recuperarse.
-6.8.4 ? Tests
+6.8.4 ? TESTS DE DIAGNOSTICO, METRICAS, FALLOS Y RECUPERACION
 6.8.4.1 Diagnostico.
 6.8.4.2 Metricas.
 6.8.4.3 Fallos.
 6.8.4.4 Recuperacion.
-6.9 ? INTEGRACION FINAL, REGRESION Y CIERRE
+6.9 ? INTEGRACION DEFINITIVA GRAPHBUILDER-GRAPH-PLANNER-EXECUTOR, REGRESION Y CIERRE
 6.9.1 Integrar el Graph producido por GraphBuilder (6.7) con el contrato Graph/Planner preparado en 6.5; no consumir grafos de prueba como sustituto de la fuente real.
 6.9.2 Verificar que el Planner recibe las aplicaciones, capabilities y transiciones que el GraphBuilder obtiene de las fuentes reales disponibles.
-6.9.3 Ejecutar una ruta real de la arquitectura con GraphBuilder, Planner y State; verificar el resultado observable sin ejecutar acciones destructivas.
+6.9.3 Ejecutar una ruta real de la arquitectura con `GraphBuilder`, `Planner` y `State` usando las fuentes de aplicaciones/capabilities reales disponibles; verificar el resultado observable con una accion inocua registrada y sin ejecutar acciones destructivas.
 6.9.4 Ejecutar también las rutas puramente algorítmicas con el código de producción, GraphBuilder, Graph y State reales del proyecto; reservar NO APLICA únicamente para una comprobación específica de sistema operativo que no forme parte de esa ruta. Verificar en el equipo real las integraciones que sí dependan del sistema operativo.
-6.9.5 Regresion completa de Graph, GraphBuilder, Planner y consumidores afectados.
+6.9.5 No regresión de integración: ejecutar `tests/hands/planner/test_graph_builder.py`, `tests/hands/planner/test_state_graph.py`, `tests/hands/planner/test_planner_action_verification.py`, `tests/hands/planner/test_planner_find_nodes_for_capability.py`, `tests/hands/planner/test_task_executor.py`, `tests/hands/test_action_registry.py`, `tests/hands/test_executor.py` y `tests/hands/test_executor_state.py`; repetir además la ruta real inocua de 6.9.3.
 6.9.6 README y main.py cuando corresponda.
 6.9.7 Marcar FASE 6 solo si todas las hojas estan IMPLEMENTADA y las verificaciones reales aplicables tienen evidencia.
-FASE 7 ? DETERMINISTIC PLANNER
+FASE 7 ? DETERMINISTIC PLANNER: GENERACION, VALIDACION, REPRESENTACION Y EJECUCION DE PLANES
 
-7.1 ? CONTRATO
-7.1.1 ? Interfaz
+7.1 ? CONTRATO DE ENTRADA STATE/GOAL Y SALIDA PLAN DEL PLANNER DETERMINISTA
+7.1.1 ? API DEL PLANNER: INTERFAZ, PARAMETROS, RESULTADOS Y ERRORES
 7.1.1.1 Localizar interfaz real del Planner.
 7.1.1.2 Identificar entradas.
 7.1.1.3 Identificar salida.
 7.1.1.4 Identificar errores.
-7.1.2 ? State / Goal
+7.1.2 ? CONVERSION DE STATE Y GOAL A LA ENTRADA DE PLANIFICACION
 7.1.2.1 Convertir State a entrada de planificacion.
 7.1.2.2 Convertir Goal a restriccion de destino.
 7.1.2.3 Verificar compatibilidad.
-7.1.3 ? Plan
+7.1.3 ? ESTRUCTURA DEL PLAN Y TRAZABILIDAD DE CADA STEP
 7.1.3.1 Definir estructura de step usando el modelo real.
 7.1.3.2 Conservar accion.
 7.1.3.3 Conservar parametros.
 7.1.3.4 Conservar orden.
 7.1.3.5 Conservar trazabilidad.
-7.2 ? GENERACION
-7.2.1 ? Seleccion
+7.2 ? GENERACION DETERMINISTA DE RUTAS A PARTIR DE ACCIONES/EDGES APLICABLES
+7.2.1 ? SELECCION DETERMINISTA DE TRANSICIONES COMPATIBLES
 7.2.1.1 Obtener acciones/edges aplicables.
 7.2.1.2 Filtrar acciones incompatibles.
 7.2.1.3 Seleccionar siguiente transicion de forma determinista.
-7.2.2 ? Expansion
+7.2.2 ? EXPANSION DE NODOS CON CONTROL DE CICLOS Y LIMITES
 7.2.2.1 Expandir nodo inicial.
 7.2.2.2 Expandir nodos posteriores.
 7.2.2.3 Evitar ciclos simples.
 7.2.2.4 Respetar limites existentes.
-7.2.3 ? Ruta
+7.2.3 ? CONSTRUCCION DE RUTA HASTA GOAL O DIAGNOSTICO DE NO ALCANZABILIDAD
 7.2.3.1 Detectar llegada al Goal.
 7.2.3.2 Construir ruta.
 7.2.3.3 Detectar ausencia de ruta.
 7.2.3.4 Registrar diagnostico.
-7.2.4 ? Tests
+7.2.4 ? TESTS DEL PLANNER DETERMINISTA: GOAL ALCANZABLE/INALCANZABLE, EXPANSION, CICLOS, LIMITES Y DIAGNOSTICO. Suites existentes: `tests/hands/planner/test_state_graph.py`, `tests/hands/planner/test_graph_builder.py`, `tests/hands/planner/test_graph_helpers.py`.
 7.2.4.1 Goal alcanzable.
 7.2.4.2 Goal no alcanzable.
 7.2.4.3 Grafo minimo.
 7.2.4.4 Ciclo.
 7.2.4.5 Limite.
-7.3 ? VALIDACION
-7.3.1 ? Precondiciones
+7.3 ? VALIDACION DE PRECONDICIONES, DEPENDENCIAS Y ESTADO FINAL DEL PLAN
+7.3.1 ? COMPROBACION DE PRECONDICIONES ANTES DE ACEPTAR CADA STEP
 7.3.1.1 Verificar precondicion antes de aceptar step.
 7.3.1.2 Rechazar step incompatible.
-7.3.2 ? Dependencias
+7.3.2 ? VALIDACION DE ORDEN, RECURSOS Y ESTADO INTERMEDIO ENTRE STEPS
 7.3.2.1 Verificar orden.
 7.3.2.2 Verificar recursos dependientes.
 7.3.2.3 Verificar estado intermedio.
-7.3.3 ? Estado final
+7.3.3 ? VERIFICACION DE ALCANZABILIDAD Y ESTADO FINAL COMPATIBLE CON GOAL
 7.3.3.1 Simular o verificar efecto segun arquitectura real.
 7.3.3.2 Verificar alcanzabilidad del Goal.
 7.3.3.3 Rechazar plan que no alcance el objetivo.
-7.3.4 ? Tests
+7.3.4 ? TESTS DE PRECONDICIONES VALIDAS/INVALIDAS, ORDEN DE DEPENDENCIAS, ESTADO INTERMEDIO Y GOAL FINAL NO ALCANZADO. Suites existentes: `tests/hands/planner/test_planner_action_verification.py`, `tests/hands/planner/test_state_graph.py`, `tests/hands/planner/test_node.py`.
 7.3.4.1 Precondicion valida.
 7.3.4.2 Precondicion invalida.
 7.3.4.3 Dependencia invalida.
 7.3.4.4 Estado final incorrecto.
-7.4 ? REPRESENTACION
-7.4.1 ? Steps
+7.4 ? REPRESENTACION SERIALIZABLE Y TRAZABLE DE STEPS, COSTES Y RESULTADOS
+7.4.1 ? CAMPOS DE STEP: ACCION, PARAMETROS Y RESULTADO ESPERADO SOPORTADO
 7.4.1.1 Estructura minima.
 7.4.1.2 Accion.
 7.4.1.3 Parametros.
 7.4.1.4 Resultado esperado si el contrato real lo contempla.
-7.4.2 ? Costes
+7.4.2 ? CONSUMO DE COSTES EXISTENTES Y COMPARABILIDAD ENTRE STEPS
 7.4.2.1 Consumir coste existente.
 7.4.2.2 No inventar formulas de coste.
 7.4.2.3 Mantener coste comparable entre steps.
-7.4.3 ? Trazabilidad
+7.4.3 ? TRAZABILIDAD STEP-EDGE-GOAL-RESULTADO
 7.4.3.1 Relacionar step con edge.
 7.4.3.2 Relacionar step con Goal.
 7.4.3.3 Relacionar resultado con step.
-7.4.4 ? Tests
+7.4.4 ? TESTS DE SERIALIZACION DEL PLAN, ORDEN DE STEPS, PARAMETROS, COSTES Y TRAZABILIDAD EDGE/GOAL/RESULTADO. Suites existentes: `tests/hands/planner/test_node.py`, `tests/hands/planner/test_route_result.py`, `tests/hands/test_executor.py`.
 7.4.4.1 Serializacion si existe.
 7.4.4.2 Orden.
 7.4.4.3 Coste.
 7.4.4.4 Trazabilidad
-7.5 ? BRAIN / GOAL
-7.5.1 ? Intent -> Goal
+7.5 ? INTEGRACION DE BRAIN/GOAL CON EL PLANNER Y COMPATIBILIDAD LEGACY
+7.5.1 ? TRANSFORMACION DE INTENT A GOAL SIN PERDER PARAMETROS NI AMBIGUEDAD
 7.5.1.1 Verificar transformacion.
 7.5.1.2 Verificar parametros.
 7.5.1.3 Verificar ambiguedad.
-7.5.2 ? Goal -> Planner
+7.5.2 ? ENTREGA DEL GOAL Y STATE AL PLANNER Y RECEPCION DEL PLAN
 7.5.2.1 Entregar Goal correcto.
 7.5.2.2 Entregar State correcto.
 7.5.2.3 Recibir Plan.
-7.5.3 ? Compatibilidad
+7.5.3 ? COMPATIBILIDAD DE ACCIONES LEGACY Y PREVENCION DE DOBLE EJECUCION
 7.5.3.1 Mantener acciones legacy.
 7.5.3.2 Mantener accion directa donde sea necesario.
 7.5.3.3 Evitar doble ejecucion.
-7.5.4 ? Tests
+7.5.4 ? TESTS DE INTENT->GOAL, PARAMETROS, AMBIGUEDAD, ENTREGA DE GOAL/STATE Y COMPATIBILIDAD LEGACY. Suites existentes: `tests/brain/test_llm.py`, `tests/brain/test_htn_integration.py`, `tests/hands/planner/test_application_integration.py` cuando corresponda.
 7.5.4.1 Intent -> Goal valido.
 7.5.4.2 Goal ambiguo o incompleto.
 7.5.4.3 Goal y State entregados al Planner real.
 7.5.4.4 Compatibilidad legacy.
-7.6 ? EJECUCION
-7.6.1 ? Executor
+7.6 ? EJECUCION ORDENADA DEL PLAN Y PROPAGACION DE RESULTADOS POR STEP
+7.6.1 ? ENTREGA DEL PLAN AL EXECUTOR Y EJECUCION DEL PRIMER STEP
 7.6.1.1 Entregar Plan.
 7.6.1.2 Ejecutar primer step.
 7.6.1.3 Propagar resultado.
-7.6.2 ? Secuencia
+7.6.2 ? SECUENCIA ORDENADA, DETENCION ANTE FALLO Y ACTUALIZACION DE STATE
 7.6.2.1 Ejecutar steps en orden.
 7.6.2.2 Detener ante fallo no recuperable.
 7.6.2.3 Actualizar State cuando corresponda.
-7.6.3 ? Resultado
+7.6.3 ? RESULTADO INDIVIDUAL Y TOTAL CON DISTINCION DE EXITO PARCIAL
 7.6.3.1 Resultado por step.
 7.6.3.2 Resultado total.
 7.6.3.3 Diferenciar exito parcial de exito total.
-7.6.4 ? Tests
+7.6.4 ? TESTS DE PLAN DE UN STEP/MULTISTEP, ORDEN, FALLO INTERMEDIO, DETENCION Y STATE ACTUALIZADO. Suites existentes: `tests/hands/test_executor.py`, `tests/hands/test_executor_state.py`, `tests/hands/planner/test_task_executor.py`.
 7.6.4.1 Plan de un step.
 7.6.4.2 Plan multi-step.
 7.6.4.3 Fallo intermedio.
 7.6.4.4 Estado actualizado.
 7.6.4.5 Ejecutar al menos un escenario inocuo con las dependencias reales disponibles en el equipo; si implica GUI, utilizar la segunda pantalla y el arnes seguro de 3.8.5.4.
-7.7 ? VERIFICACION
-7.7.1 ? Comprobacion
+7.7 ? VERIFICACION DEL EFECTO EXTERNO Y RECONCILIACION DEL STATE
+7.7.1 ? COMPROBACION DEL RESULTADO OBSERVABLE DE CADA STEP Y DEL GOAL
 7.7.1.1 Verificar resultado real de cada step cuando sea necesario.
 7.7.1.2 Verificar cumplimiento del objetivo.
-7.7.2 ? State
+7.7.2 ? ACTUALIZACION DE STATE SOLO CON EVIDENCIA CONFIRMADA
 7.7.2.1 Actualizar solo con evidencia.
 7.7.2.2 Registrar cambios relevantes.
 7.7.2.3 Mantener coherencia.
-7.7.3 ? Errores
+7.7.3 ? TRATAMIENTO DE ERROR DE EJECUCION, VERIFICACION Y DIVERGENCIA DE STATE
 7.7.3.1 Error de ejecucion.
 7.7.3.2 Error de verificacion.
 7.7.3.3 Divergencia entre resultado y State.
-7.7.4 ? Tests
+7.7.4 ? TESTS DE EFECTO VERIFICADO/NO VERIFICADO, STATE DESACTUALIZADO Y DIVERGENCIA CON EL SO; no sustituir la observacion real por el valor retornado por Executor. Suites existentes: `tests/hands/test_executor_state.py`, `tests/hands/planner/test_planner_action_verification.py`; CREAR integracion de sistema real cuando falte.
 7.7.4.1 Verificacion correcta.
 7.7.4.2 Verificacion fallida.
 7.7.4.3 Divergencia.
 7.7.4.4 Contrastar el resultado con el estado del sistema real, no solo con el objeto State devuelto.
-7.8 ? CIERRE
-7.8.1 Tests unitarios pertinentes.
-7.8.2 Tests de integracion con contratos y dependencias reales.
-7.8.3 No regresion.
+7.8 ? REGRESION Y CIERRE DEL PLANNER DETERMINISTA CON FLUJO REAL BRAIN-GOAL-EXECUTOR
+7.8.1 Tests unitarios de generacion de rutas alcanzables/no alcanzables, ciclos/limites, precondiciones, orden de steps, serializacion de Plan y reconstruccion de resultados; suites existentes: `tests/hands/planner/test_state_graph.py`, `tests/hands/planner/test_graph_builder.py`, `tests/hands/planner/test_node.py`, `tests/hands/planner/test_route_result.py` y `tests/hands/planner/test_planner_action_verification.py`.
+7.8.2 Tests de integracion Brain->Goal->Planner->Executor, propagacion de fallo, actualizacion de State y compatibilidad de ActionRegistry; suites existentes: `tests/brain/test_llm.py`, `tests/brain/test_htn_integration.py`, `tests/hands/planner/test_task_executor.py`, `tests/hands/test_action_registry.py`, `tests/hands/test_executor.py` y `tests/hands/test_executor_state.py`.
+7.8.3 No regresion de ruta determinista: repetir las suites anteriores y `tests/hands/planner/test_graph_builder.py`; comparar salida, orden de acciones y coste con la linea base, y confirmar que el fallback legacy no ejecuta dos veces el mismo step.
 7.8.4 Verificacion real de la ruta Brain -> Goal -> Planner -> Executor -> verificacion en el equipo, para una accion inocua soportada.
 7.8.5 main.py.
 7.8.6 Documentacion.
 7.8.7 Cerrar FASE 7 solo cuando los resultados reales aplicables esten registrados.
-FASE 8 ? A*
+FASE 8 ? A*: BUSQUEDA INFORMADA, STATEGRAPH, COSTES Y FALLBACK DETERMINISTA
 
-8.1 ? COSTES
-8.1.1 ? Coste base
+8.1 ? CALCULO DE COSTE DE TRANSICION Y COSTE ACUMULADO g(n)
+8.1.1 ? LECTURA Y NORMALIZACION DEL COSTE BASE DE ACCION/TRANSICION
 8.1.1.1 Localizar coste real de transicion/accion.
 8.1.1.2 Verificar valor por defecto si existe.
 8.1.1.3 Verificar costes invalidos.
-8.1.2 ? Coste acumulado
+8.1.2 ? ACUMULACION g(n) Y CONSERVACION DEL MEJOR COSTE CONOCIDO
 8.1.2.1 Inicializar g(n).
 8.1.2.2 Sumar coste de transicion.
 8.1.2.3 Mantener mejor coste conocido.
-8.1.2.4 Tests.
-8.2 ? HEURISTICA
-8.2.1 ? h(n)
+8.1.2.4 Tests de g(n): coste cero/positivo, suma de transiciones, actualizacion cuando aparece una ruta mas barata y rechazo de coste invalido; suites existentes: `tests/hands/planner/test_state_graph.py`, `tests/hands/planner/test_route_result.py`.
+8.2 ? HEURISTICA h(n), CONFIGURACION Y COMPARACION CON EL PLANNER DETERMINISTA
+8.2.1 ? CALCULO DE h(n) SOLO CON INFORMACION DISPONIBLE Y SOPORTADA
 8.2.1.1 Definir entrada real disponible.
 8.2.1.2 Implementar calculo solo con informacion soportada.
 8.2.1.3 Verificar casos sin informacion.
-8.2.2 ? Configuracion
+8.2.2 ? LECTURA DE CONFIGURACION Y ACTIVACION/DESACTIVACION DE HEURISTICA
 8.2.2.1 Localizar configuracion existente.
 8.2.2.2 Verificar activacion/desactivacion.
 8.2.2.3 Evitar parametros sin consumidor.
-8.2.3 ? Verificacion
+8.2.3 ? VERIFICACION DE ESTABILIDAD Y COMPARACION OBJETIVA CON FALLBACK
 8.2.3.1 Verificar estabilidad.
 8.2.3.2 Comparar con fallback determinista.
-8.2.3.3 Tests.
-8.3 ? STATEGRAPH
-8.3.1 ? Estados
+8.2.3.3 Tests de estabilidad de h(n), ausencia de datos, consistencia de estimaciones y comparacion de resultado con fallback determinista; suite existente: `tests/hands/planner/test_state_graph.py`; crear tests directos de Heuristic si no cubre el contrato.
+8.3 ? STATEGRAPH: ESTADOS EQUIVALENTES, TRANSICIONES Y COSTES SUCESORES
+8.3.1 ? REPRESENTACION, COMPARACION Y DETECCION DE ESTADOS EQUIVALENTES
 8.3.1.1 Representar estado minimo.
 8.3.1.2 Comparar estados.
 8.3.1.3 Detectar estado equivalente.
-8.3.2 ? Transiciones
+8.3.2 ? APLICACION DE TRANSICION Y CALCULO DE ESTADO SUCESOR
 8.3.2.1 Aplicar transicion.
 8.3.2.2 Verificar precondicion.
 8.3.2.3 Calcular estado sucesor.
-8.3.3 ? Costes
+8.3.3 ? OBTENCION Y ACUMULACION DE COSTES SIN ALTERAR COSTES OBSERVADOS
 8.3.3.1 Obtener coste.
 8.3.3.2 Mantener coste acumulado.
 8.3.3.3 No modificar coste real sin evidencia.
-8.3.4 ? Tests
+8.3.4 ? TESTS DE STATEGRAPH: ESTADO INICIAL, EQUIVALENCIA, ESTADO SUCESOR, COSTE Y TRANSICION INVALIDA. Suites existentes: `tests/hands/planner/test_state_graph.py`, `tests/hands/planner/test_advanced_state_graph.py`.
 8.3.4.1 Estado inicial.
 8.3.4.2 Estado sucesor.
 8.3.4.3 Equivalencia y transicion invalida.
-8.4 ? NUCLEO A*
-8.4.1 ? Open / Closed
+8.4 ? NUCLEO A*: OPEN/CLOSED, g/h/f, EXPANSION Y CRITERIOS DE TERMINACION
+8.4.1 ? GESTION DE OPEN/CLOSED Y EXTRACCION DEL MEJOR CANDIDATO
 8.4.1.1 Inicializar open.
 8.4.1.2 Inicializar closed.
 8.4.1.3 Extraer mejor candidato.
 8.4.1.4 Marcar procesado.
-8.4.2 ? g / h / f
+8.4.2 ? CALCULO Y COMPARACION DE g(n), h(n) Y f(n)
 8.4.2.1 Calcular g.
 8.4.2.2 Calcular h.
 8.4.2.3 Calcular f.
 8.4.2.4 Comparar candidatos.
-8.4.3 ? Expansion
+8.4.3 ? EXPANSION DE VECINOS, FILTRADO Y ACTUALIZACION DE OPEN
 8.4.3.1 Obtener vecinos.
 8.4.3.2 Filtrar invalidos.
 8.4.3.3 Actualizar mejor coste.
 8.4.3.4 Insertar/actualizar open.
 8.4.3.5 Terminar por Goal.
-8.4.4 ? Tests
+8.4.4 ? TESTS DEL NUCLEO A*: OPEN/CLOSED, g/h/f, GRAFO LINEAL, RUTA OPTIMA ENTRE ALTERNATIVAS, SIN RUTA, CICLOS Y LIMITES. Suites existentes: `tests/hands/planner/test_state_graph.py`, `tests/hands/planner/test_advanced_state_graph.py`.
 8.4.4.1 Grafo lineal.
 8.4.4.2 Varias rutas.
 8.4.4.3 Sin ruta.
 8.4.4.4 Ciclos.
 8.4.4.5 Limites.
-8.5 ? RECONSTRUCCION DE RUTA
-8.5.1 ? Predecesores
+8.5 ? RECONSTRUCCION DE RUTA A PARTIR DE PREDECESORES Y GOAL
+8.5.1 ? REGISTRO Y ACTUALIZACION DEL PREDECESOR CUANDO MEJORA EL COSTE
 8.5.1.1 Registrar predecessor.
 8.5.1.2 Actualizar predecessor cuando mejora coste.
-8.5.2 ? Final
+8.5.2 ? RECONSTRUCCION INVERSA Y VALIDACION DE CONTINUIDAD DE LA RUTA
 8.5.2.1 Reconstruir desde Goal.
 8.5.2.2 Invertir ruta.
 8.5.2.3 Verificar continuidad.
-8.5.3 ? Tests
+8.5.3 ? TESTS DE RECONSTRUCCION: RUTA SIMPLE, MULTISALTO, PREDECESOR ACTUALIZADO, CONTINUIDAD Y AUSENCIA DE RUTA. Suites existentes: `tests/hands/planner/test_route_result.py`, `tests/hands/planner/test_state_graph.py`.
 8.5.3.1 Ruta simple.
 8.5.3.2 Ruta con varios saltos.
 8.5.3.3 Ruta inexistente.
-8.6 ? PLANNER
-8.6.1 ? Seleccion
+8.6 ? SELECCION DE A* Y CONVERSION A PLAN CON FALLBACK DETERMINISTA
+8.6.1 ? SELECCION DE ALGORITMO SEGUN DISPONIBILIDAD Y CONDICIONES REALES
 8.6.1.1 Seleccionar A* cuando este disponible y proceda.
 8.6.1.2 Seleccionar determinista cuando corresponda.
-8.6.2 ? Plan
+8.6.2 ? CONVERSION DE RUTA A* A PLAN CON TRAZABILIDAD CONSERVADA
 8.6.2.1 Convertir ruta A* a Plan.
 8.6.2.2 Conservar trazabilidad.
-8.6.3 ? Fallback
+8.6.3 ? ACTIVACION DEL FALLBACK ANTE FALLO A* SIN REPETIR EJECUCIONES
 8.6.3.1 Detectar fallo de A*.
 8.6.3.2 Volver al planner determinista.
 8.6.3.3 Registrar fallback.
 8.6.3.4 No duplicar ejecucion.
-8.6.4 ? Tests
+8.6.4 ? TESTS DE CONVERSION A*-PLAN, SELECCION DEL ALGORITMO, FALLBACK POR FALLO Y EJECUCION UNICA. Suites existentes: `tests/hands/planner/test_state_graph.py`, `tests/hands/test_executor.py`, `tests/hands/planner/test_task_executor.py`.
 8.6.4.1 Ruta A* a Plan.
 8.6.4.2 Fallback determinista.
 8.6.4.3 No doble ejecucion.
-8.7 ? REGRESION Y VERIFICACION
-8.7.1 ? Correccion
+8.7 ? COMPARACION FUNCIONAL Y DE RENDIMIENTO A* FRENTE A PLANNER DETERMINISTA
+8.7.1 ? CORRECCION DE RUTAS, COSTES Y FALLBACK
 8.7.1.1 Tests de ruta.
 8.7.1.2 Tests de coste.
 8.7.1.3 Tests de fallback.
-8.7.2 ? Rendimiento
+8.7.2 ? MEDICION DE TIEMPO, ITERACIONES, MEMORIA Y LIMITES CON DATOS REPRESENTATIVOS
 8.7.2.1 Medir antes/despues con datos representativos cuando exista mecanismo de medicion.
 8.7.2.2 Verificar limites.
 8.7.2.3 Evitar regresiones evidentes.
-8.7.3 ? No regresion
+8.7.3 ? NO REGRESION DE PLANNER DETERMINISTA, GRAPH/GRAPHBUILDER Y EXECUTOR
 8.7.3.1 Planner determinista.
 8.7.3.2 Graph/GraphBuilder.
 8.7.3.3 Executor.
 8.7.3.4 main.py cuando corresponda.
 8.7.4 Ejecutar el Planner real sobre un Graph y State reales de la aplicación disponible, contrastando la ruta y el resultado sin ejecutar acciones destructivas.
 8.7.5 Registrar la comparacion A* vs fallback con la misma entrada y resultado observable; no declarar mejora solo por un menor coste interno.
-FASE 9 ? REPLANNING
+FASE 9 ? REPLANNING: CHECKPOINTS, DIAGNOSTICO DE FALLO, LIMITES, RECALCULO Y CONTINUACION
 
-9.1 ? CHECKPOINTS
+9.1 ? CAPTURA Y RECUPERACION DE CHECKPOINTS DE EJECUCION
 9.1.1 Definir que resultado puede actuar como checkpoint.
 9.1.2 Identificar donde se captura.
 9.1.3 Persistir checkpoint solo si el sistema ya requiere persistencia.
 9.1.4 Verificar recuperacion del checkpoint.
-9.1.5 Tests.
-9.2 ? FALLO
+9.1.5 Tests de captura, persistencia cuando exista, recuperacion tras reinicio y rechazo de checkpoint parcial o de otra ejecucion; suites existentes: `tests/hands/test_executor_state.py`, `tests/hands/test_executor.py`; crear casos directos de checkpoint si la API actual los soporta y no estan cubiertos.
+9.2 ? CLASIFICACION DE FALLOS Y ACTUALIZACION DE STATE CON DATOS CONFIRMADOS
 9.2.1 Detectar fallo de ejecucion.
 9.2.2 Diferenciar fallo de accion y fallo de verificacion.
 9.2.3 Registrar fallo.
 9.2.4 Actualizar State con informacion confirmada.
 9.2.5 Evitar marcar como correcto un estado no verificado.
-9.2.6 Tests.
-9.3 ? LIMITES Y ANTI-BUCLE
+9.2.6 Tests de fallo de accion frente a fallo de verificacion, actualizacion solo con evidencia, conservacion de State y propagacion del error; suites existentes: `tests/hands/test_executor.py`, `tests/hands/test_executor_state.py`, `tests/hands/planner/test_task_executor.py`.
+9.3 ? LIMITES DE REPLAN/REINTENTO Y DETECCION DE BUCLES O ACCIONES REPETIDAS
 9.3.1 Contador de replan.
 9.3.2 Contador de reintentos por step.
 9.3.3 Deteccion de repeticion.
 9.3.4 Anti-bucle.
 9.3.5 Resultado al alcanzar limite.
-9.3.6 Tests de limites y repeticion.
-9.4 ? RECALCULO
+9.3.6 Tests de maximo de replanes, maximo de reintentos por step, deteccion de accion repetida, limite agotado y salida anti-bucle; ampliar `tests/hands/test_executor.py` y `tests/hands/planner/test_task_executor.py` con casos que ejerciten la implementacion real.
+9.4 ? RECALCULO DE RUTA DESDE STATE CONFIRMADO Y GOAL VIGENTE
 9.4.1 Construir nuevo estado desde evidencia confirmada.
 9.4.2 Revisar Goal todavia vigente.
 9.4.3 Solicitar nueva ruta.
 9.4.4 Respetar limites establecidos en 9.3.
 9.4.5 Verificar que la nueva ruta no repita el mismo fallo sin cambio de contexto.
-9.4.6 Tests.
-9.5 ? FALLBACKS
+9.4.6 Tests de recálculo desde State confirmado, Goal cancelado/obsoleto, ruta alternativa y repeticion del mismo fallo sin cambio de contexto; suites existentes: `tests/hands/planner/test_state_graph.py`, `tests/hands/test_executor.py`.
+9.5 ? SELECCION DE FALLBACKS VALIDOS Y PROPAGACION DE FALLO SIN ALTERNATIVA
 9.5.1 Identificar alternativas existentes.
 9.5.2 Elegir alternativa solo si es valida para State/Goal.
 9.5.3 Permitir accion segura de recuperacion.
 9.5.4 Registrar la alternativa usada.
 9.5.5 Propagar fallo si no existe alternativa valida.
-9.5.6 Tests.
-9.6 ? EXECUTOR
+9.5.6 Tests de alternativa valida, alternativa incompatible, recuperacion segura y ausencia de fallback; suites existentes: `tests/hands/test_executor.py`, `tests/hands/planner/test_task_executor.py`.
+9.6 ? ORQUESTACION DE INTERRUPCION, NUEVO PLAN Y CONTINUACION EN EXECUTOR
 9.6.1 Interrumpir de forma segura.
 9.6.2 Preservar recursos necesarios.
 9.6.3 Entregar State actualizado al Planner.
 9.6.4 Recibir nuevo Plan.
 9.6.5 Continuar ejecucion desde punto valido.
 9.6.6 No ejecutar steps obsoletos.
-9.6.7 Tests.
+9.6.7 Tests de interrupcion, preservacion de recursos, nuevo State/Plan, continuacion y exclusion de steps obsoletos; suites existentes: `tests/hands/test_executor.py`, `tests/hands/test_executor_state.py`, `tests/hands/planner/test_task_executor.py`.
 9.6.8 Verificar un replanning real con una tarea inocua y un fallo recuperable controlado, comprobando que no se repiten acciones ya completadas ni se alteran recursos ajenos.
-9.7 ? CIERRE
+9.7 ? TESTS DE REPLANNING RECUPERABLE/NO RECUPERABLE, ANTI-BUCLE Y FLUJO REAL
 9.7.1 Tests de fallos recuperables.
 9.7.2 Tests de fallos no recuperables.
 9.7.3 Tests anti-bucle.
@@ -1739,137 +1753,137 @@ FASE 9 ? REPLANNING
 9.7.5 main.py cuando corresponda.
 9.7.6 Verificacion real de la secuencia fallo -> State confirmado -> limites -> recálculo/fallback -> resultado.
 9.7.7 Cerrar FASE 9 solo con evidencia de las rutas reales aplicables.
-FASE 10 ? PRECONDITIONS/EFFECTS
+FASE 10 ? PRECONDITIONS/EFFECTS: CONTRATO COMUN ENTRE ACTIONREGISTRY, GRAPH, PLANNER, EXECUTOR Y STATE
 
-10.1 ? TIPOS
+10.1 ? MODELO DE TIPOS DE CONDICION Y EVALUACION DE PRECONDICIONES
 10.1.1 Inspeccionar modelo real.
 10.1.2 Enumerar tipos ya existentes.
 10.1.3 Representar una condicion minima.
 10.1.4 Evaluar condicion minima.
 10.1.5 Manejar condicion ausente/no soportada.
-10.1.6 Tests.
-10.2 ? EFECTOS
+10.1.6 Tests de tipo de condicion, comparacion, operador soportado, dato ausente, tipo invalido y atomo desconocido; suites relacionadas existentes: `tests/hands/test_action_registry.py`, `tests/hands/planner/test_state_graph.py`; CREAR `tests/hands/planner/test_preconditions_effects_contract.py` para el contrato transversal si no existe cobertura directa.
+10.2 ? MODELO DE EFECTOS Y ACTUALIZACION VERIFICADA DEL STATE
 10.2.1 Inspeccionar modelo real.
 10.2.2 Representar un efecto minimo.
 10.2.3 Aplicar efecto.
 10.2.4 Verificar State posterior.
 10.2.5 Manejar efecto no soportado.
-10.2.6 Tests.
-10.3 ? ACTIONS
+10.2.6 Tests de efecto valido, efecto no soportado, actualizacion de State, ausencia de mutacion ante fallo y atomicidad de cambios; suites relacionadas existentes: `tests/hands/test_action_registry.py`, `tests/hands/test_executor_state.py`; CREAR/AMPLIAR `tests/hands/planner/test_preconditions_effects_contract.py`.
+10.3 ? CONEXION DE PRECONDICIONES/EFECTOS CON ACTIONINFO Y ACCIONES LEGACY
 10.3.1 Contrato de precondiciones.
 10.3.2 Contrato de efectos.
 10.3.3 Validacion antes de ejecucion.
 10.3.4 Compatibilidad con Action Registry.
 10.3.5 Compatibilidad con acciones legacy.
-10.3.6 Tests.
-10.4 ? VALIDACION
+10.3.6 Tests de ActionInfo con precondiciones/efectos, ejecucion protegida, compatibilidad legacy y rechazo antes de ejecutar; suites existentes: `tests/hands/test_action_registry.py`, `tests/hands/test_executor.py`; ampliar test de contrato directo si falta.
+10.4 ? PROPAGACION DE ERRORES DE VALIDACION A PLANNER Y EXECUTOR
 10.4.1 Error por condicion invalida.
 10.4.2 Error por estado incompatible.
 10.4.3 Mensaje diagnostico.
 10.4.4 Propagacion al Planner.
 10.4.5 Propagacion al Executor.
-10.4.6 Tests.
-10.5 ? GRAPH
+10.4.6 Tests de diagnostico para condicion malformada, State incompatible, error propagado a Planner y bloqueo de Executor; suites existentes: `tests/hands/test_action_registry.py`, `tests/hands/test_executor.py`, `tests/hands/planner/test_planner_action_verification.py`.
+10.5 ? CONSUMO DE PRECONDICIONES/EFECTOS EN EDGES DEL GRAPH
 10.5.1 Anadir precondicion al edge solo donde corresponda.
 10.5.2 Anadir efectos al edge solo donde corresponda.
 10.5.3 Rechazar transicion invalida.
 10.5.4 Verificar estado sucesor.
-10.5.5 Tests.
-10.6 ? PLANNER
+10.5.5 Tests de edge con precondicion/efecto, transicion aceptada/rechazada y State sucesor consistente; suites existentes: `tests/hands/planner/test_graph_edge.py`, `tests/hands/planner/test_state_graph.py`, `tests/hands/planner/test_graph_builder.py`.
+10.6 ? FILTRADO DE RUTAS DEL PLANNER POR PRECONDICIONES Y EFECTOS
 10.6.1 Filtrar por precondiciones.
 10.6.2 Considerar efectos.
 10.6.3 Excluir rutas invalidas.
 10.6.4 Mantener fallback determinista.
-10.6.5 Tests.
-10.7 ? STATE
+10.6.5 Tests de filtrado de acciones/rutas por precondicion, efecto alcanzable, ruta alternativa y fallback determinista; suites existentes: `tests/hands/planner/test_state_graph.py`, `tests/hands/planner/test_planner_action_verification.py`.
+10.7 ? MUTACION DE STATE SOLO TRAS EJECUCION Y VERIFICACION CONFIRMADAS
 10.7.1 Aplicar mutacion confirmada.
 10.7.2 Evitar mutacion si la accion falla.
 10.7.3 Evitar mutacion si la verificacion falla.
 10.7.4 Verificar consistencia.
-10.7.5 Tests.
-10.8 ? CIERRE
-10.8.1 Tests unitarios.
-10.8.2 Tests de integracion.
-10.8.3 Tests de no regresion.
+10.7.5 Tests de actualizacion solo tras accion exitosa y verificada, sin mutacion ante fallo, timeout o verificacion negativa; suites existentes: `tests/hands/test_executor_state.py`, `tests/hands/test_executor.py`.
+10.8 ? TESTS DE CONTRATO, INTEGRACION GRAPH-PLANNER-EXECUTOR-STATE Y CIERRE
+10.8.1 Tests unitarios del contrato compartido: operadores de comparacion, atomos conocidos/desconocidos, tipo invalido, dato ausente, precondicion verdadera/falsa, efecto admitido/no admitido, estado sucesor y ausencia de mutacion parcial; suites existentes: `tests/hands/test_action_registry.py`, `tests/hands/planner/test_state_graph.py`, `tests/hands/planner/test_graph_edge.py`, `tests/hands/test_executor_state.py`; CREAR `tests/hands/planner/test_preconditions_effects_contract.py` para los casos transversales no cubiertos.
+10.8.2 Tests de integracion Graph->Planner->Executor: descartar rutas cuyas precondiciones no se cumplen, ejecutar una accion registrada solo tras preflight/validacion, aplicar efectos unicamente tras verificacion positiva y conservar State ante fallo; suites existentes: `tests/hands/planner/test_planner_action_verification.py`, `tests/hands/planner/test_state_graph.py`, `tests/hands/test_executor.py`, `tests/hands/test_executor_state.py`; CREAR prueba de integracion con accion inocua real si no existe cobertura del flujo completo.
+10.8.3 No regresion especifica de Graph, Planner, Executor y State: `tests/hands/planner/test_graph_edge.py`, `tests/hands/planner/test_state_graph.py`, `tests/hands/planner/test_planner_action_verification.py`, `tests/hands/test_action_registry.py`, `tests/hands/test_executor.py` y `tests/hands/test_executor_state.py`.
 10.8.4 main.py.
 10.8.5 Documentacion.
 10.8.6 Ejecutar una operación inocua que atraviese precondición -> acción real -> verificación del efecto -> actualización confirmada de State; contrastar el efecto con el recurso real y no solo con el estado en memoria.
-FASE 11 ? PREFLIGHT/LOGIN
+FASE 11 ? PREFLIGHT GENERAL: DISPONIBILIDAD, LOGIN, RECURSOS Y GATEKEEPER ANTES DE EJECUTAR
 
-11.1 ? CONTRATO
+11.1 ? CONTRATO DE PREFLIGHTRESULT, MOTIVOS DE BLOQUEO Y DIAGNOSTICO
 11.1.1 API de preflight.
 11.1.2 Resultado de preflight.
 11.1.3 Motivo de bloqueo.
 11.1.4 Diagnostico.
-11.1.5 Tests.
-11.2 ? DISPONIBILIDAD
+11.1.5 Tests de PreflightResult aprobado/bloqueado, motivo estable, serializacion y diagnostico; suites existentes: `tests/hands/test_application_preflight.py`, `tests/hands/test_application_preflight_launch_destination.py`.
+11.2 ? VERIFICACION DE DISPONIBILIDAD REAL DE APLICACION, PROCESO, VENTANA Y MONITOR
 11.2.1 Comprobar aplicacion.
 11.2.2 Comprobar proceso/ventana.
 11.2.3 Comprobar monitor.
 11.2.4 Comprobar estado necesario.
 11.2.5 Distinguir no disponible de no preparada.
-11.2.6 Tests.
-11.3 ? LOGIN
+11.2.6 Tests de aplicacion instalada/no instalada, proceso presente/ausente, ventana identificada/no identificada, monitor existente/inexistente y estado no preparado; suites existentes: `tests/hands/test_application_preflight_availability.py`, `tests/hands/windows/test_window_verification.py`.
+11.3 ? DETECCION DE REQUISITO DE LOGIN SIN MANEJO NI ALMACENAMIENTO DE CREDENCIALES
 11.3.1 Identificar si la tarea depende de login.
 11.3.2 Detectar estado de login solo con mecanismos reales disponibles.
 11.3.3 Representar login requerido.
 11.3.4 Bloquear ejecucion si falta una condicion necesaria.
 11.3.5 No introducir automatizacion de credenciales no existente.
-11.3.6 Tests.
-11.4 ? RECURSOS / UI / CALIBRACION
+11.3.6 Tests de tarea sin login, login requerido detectable, login no detectable y bloqueo sin credenciales; no simular un login correcto como evidencia. Suites relacionadas: `tests/hands/test_application_preflight.py`; CREAR integracion con backend real solo si existe proveedor de estado de login.
+11.4 ? COMPROBACION DE RECURSOS, ELEMENTOS UI Y CALIBRACION NECESARIA
 11.4.1 Comprobar recursos requeridos.
 11.4.2 Comprobar UI requerida.
 11.4.3 Comprobar calibracion requerida.
 11.4.4 Preparar sin destruir estado del usuario.
 11.4.5 Verificar preparacion.
-11.4.6 Tests.
-11.5 ? INTERRUPCION SEGURA
+11.4.6 Tests de recursos disponibles/ausentes, UI requerida/no reconocida, calibracion valida/obsoleta y preservacion de ventana original; suites existentes: `tests/hands/test_application_preflight.py`, `tests/hands/test_calibration_requirements.py`, `tests/hands/test_restore_window_state.py`.
+11.5 ? CANCELACION SEGURA Y LIMPIEZA DE RECURSOS PROPIOS DEL PREFLIGHT
 11.5.1 Detectar cancelacion.
 11.5.2 Detener pasos nuevos.
 11.5.3 Limpiar recursos creados por JARVIS.
 11.5.4 Restaurar ventanas reutilizadas cuando corresponda.
 11.5.5 Registrar limpieza.
-11.5.6 Tests.
-11.6 ? PLANNER
+11.5.6 Tests de cancelacion antes/durante preflight, detencion de pasos siguientes, limpieza de recursos propios y preservacion de procesos/ventanas previos; ampliar `tests/hands/test_executor.py` y `tests/hands/test_calibration_manager.py`.
+11.6 ? BLOQUEO/REANUDACION DEL GOAL POR RESULTADO DE PREFLIGHT EN PLANNER
 11.6.1 Bloquear Goal cuando falta preflight.
 11.6.2 Informar que condicion falta.
 11.6.3 Permitir preparar la condicion cuando exista capacidad valida.
 11.6.4 Reanudar planificacion tras preflight correcto.
-11.6.5 Tests.
-11.7 ? EXECUTOR
+11.6.5 Tests de Goal bloqueado, motivo propagado, preparacion permitida y reanudacion despues de preflight aprobado; suites existentes: `tests/hands/test_executor.py`, `tests/hands/planner/test_task_executor.py`; CREAR integracion Planner-Preflight si falta.
+11.7 ? EJECUCION DEL GATEKEEPER ANTES DE CADA ACCION PROTEGIDA
 11.7.1 Ejecutar preflight antes de la accion protegida.
 11.7.2 No ejecutar accion si preflight falla.
 11.7.3 Propagar resultado.
-11.7.4 Tests.
-11.8 ? CIERRE
-11.8.1 Regresion.
+11.7.4 Tests de que preflight se ejecuta antes de la accion, que un rechazo impide el dispatch y que un resultado aprobado permite una unica ejecucion; suites existentes: `tests/hands/test_action_registry.py`, `tests/hands/test_executor.py`, `tests/hands/test_application_preflight.py`.
+11.8 ? TESTS DE PREFLIGHT POSITIVO/NEGATIVO, BLOQUEO REAL Y NO REGRESION
+11.8.1 Regresion de disponibilidad, resolucion de ejecutable, URI admitida/rechazada y motivo de bloqueo: ejecutar `tests/hands/test_application_preflight.py`, `tests/hands/test_application_preflight_availability.py`, `tests/hands/test_application_preflight_launch_destination.py` y `tests/hands/test_application_preflight_resolve_executable.py`.
 11.8.2 main.py.
 11.8.3 README.
-11.8.4 Verificar en el equipo real el preflight positivo y negativo sobre una aplicación inocua instalada, incluyendo disponibilidad/proceso/ventana/monitor y bloqueo seguro cuando falte una condición; no introducir credenciales ni automatizar el login.
+11.8.4 Verificar en el equipo real el preflight positivo y negativo con `notepad.exe` (y `calc.exe` solo si esta instalada): comprobar disponibilidad, proceso, ventana, monitor, requisito de login cuando exista proveedor y bloqueo previo al dispatch cuando falte una condicion. Suites existentes: `tests/hands/test_application_preflight.py`, `tests/hands/test_application_preflight_availability.py`, `tests/hands/test_application_preflight_launch_destination.py`, `tests/hands/test_preflight_gatekeeper_entorno_real.py`; la apertura real se cubre en 3.8.5.6.7-3.8.5.6.9. No introducir credenciales ni automatizar el login.
 11.8.5 Cerrar FASE 11 solo con el flujo real de preflight antes de una acción y evidencia de que un bloqueo impide esa acción.
-FASE 12 ? CALIBRATION CAPABILITY
+FASE 12 ? CALIBRATION CAPABILITY: COORDENADAS, VISION, SEGURIDAD MULTIMONITOR E INTEGRACION EN PLANNER
 
-12.1 ? CALIBRATE
+12.1 ? CONTRATO DE LA CAPABILITY CALIBRATE Y DISTINCION ENTRE NECESIDAD Y EJECUCION
 12.1.1 Localizar contrato real.
 12.1.2 Definir entrada.
 12.1.3 Definir resultado.
 12.1.4 Diferenciar calibracion necesaria de calibracion ejecutada.
-12.1.5 Tests.
-12.2 ? SEGURIDAD
+12.1.5 Tests de entrada/salida de calibrate, requerida vs ejecutada, resultado fallido y ausencia de calibracion; suites existentes: `tests/hands/test_calibration_manager.py`, `tests/hands/test_calibration_requirements.py`.
+12.2 ? AUTORIZACION, DENEGACION, SESION Y CANCELACION SEGURA DE CALIBRACION
 12.2.1 allow/deny real.
 12.2.2 Comprobar hardware/configuracion solo si existe soporte.
 12.2.3 Comprobar sesion.
 12.2.4 Evitar acciones destructivas.
 12.2.5 Definir cancelacion.
-12.2.6 Tests positivos y negativos.
-12.3 ? COORDINATEMANAGER
+12.2.6 Tests de allow/deny, sesion no disponible, hardware/configuracion no soportados, cancelacion y ausencia de acciones destructivas; suites existentes: `tests/hands/test_calibration_requirements.py`, `tests/hands/test_calibration_manager.py`.
+12.3 ? RESOLUCION DE COORDENADAS Y MONITOR MEDIANTE COORDINATEMANAGER REAL
 12.3.1 Localizar CoordinateManager/get_coords real.
 12.3.2 Resolver coordenada calibrada.
 12.3.3 Resolver monitor.
 12.3.4 Manejar ausencia de coordenada.
 12.3.5 Fallback permitido por codigo real.
-12.3.6 Tests con el CoordinateManager real.
-12.4 ? MULTIPANTALLA
+12.3.6 Tests de coordenada existente/ausente, monitor resuelto/inexistente, fallback documentado y CoordinateManager real; suites existentes: `tests/hands/test_calibration_manager.py`, `tests/hands/test_calibrator.py`, `tests/eyes/test_vision_calibration_integration.py`.
+12.4 ? VERIFICACION MULTIMONITOR DE GEOMETRIA, DPI, RESOLUCIONES Y ESTADOS DE VENTANA
 12.4.1 Un monitor.
 12.4.2 Dos monitores.
 12.4.3 Mas de dos si el codigo lo soporta.
@@ -1878,88 +1892,88 @@ FASE 12 ? CALIBRATION CAPABILITY
 12.4.6 DPI/escalado.
 12.4.7 Ventana en segundo plano.
 12.4.8 Maximizada/restaurada.
-12.4.9 Tests por escenario soportado.
-12.4.10 Verificar en el equipo real del usuario el escenario de dos pantallas: enumerar ambas, confirmar cual es la secundaria, ubicar una ventana inocua de prueba en la segunda y comprobar coordenadas/DPI/monitor. Visual Studio Code permanece intacto en esa pantalla y no se envian entradas a su ventana; la primera pantalla no debe recibir interacciones de prueba.
+12.4.9 Tests por escenario de monitor: uno/dos/mas de dos si soportado, intercambio, resoluciones distintas, DPI, ventana secundaria y maximizada/restaurada. Suite existente: `tests/hands/test_calibration_manager.py`; CREAR prueba GUI real cuando falte el escenario de hardware correspondiente.
+12.4.10 Verificar en el equipo real el escenario de dos pantallas: enumerar monitores mediante API real, confirmar geometria/escala/DPI y ubicar una ventana Notepad propiedad de la prueba en la segunda pantalla. Comprobar coordenadas y monitor resultante. Visual Studio Code permanece intacto y no recibe entradas/capturas; la primera pantalla no recibe interacciones de prueba.
 12.4.11 Si una prueba necesita cambiar temporalmente la disposicion o resolucion, no hacerlo en el equipo de uso normal; marcar ese escenario como BLOQUEADO y diseñar una prueba controlada separada.
-12.5 ? VISION
+12.5 ? CAPTURA REAL, DETECCION VISUAL Y PERSISTENCIA DE ELEMENTOS CALIBRADOS
 12.5.1 Capturar monitor/ventana correcto.
 12.5.2 Detectar elemento visible.
 12.5.3 Obtener punto de interaccion.
 12.5.4 Persistir resultado real.
 12.5.5 Verificar que la vision no decide la estrategia.
 12.5.6 Integrar con flujo universal de calibracion.
-12.5.7 Tests con captura real de ventana/monitor, sin sustituir el objetivo visual por una imagen prefabricada cuando se afirma que se ha validado la captura.
-12.6 ? SEGURIDAD OPERATIVA
+12.5.7 Tests de captura de ventana/monitor, deteccion de UIElement, coordenadas y verificacion del resultado; suites existentes: `tests/eyes/test_screen_capture.py`, `tests/eyes/test_vision.py`, `tests/eyes/test_vision_calibration_integration.py`; CREAR prueba real de ventana controlada si no existe.
+12.6 ? PROTECCION DE PROCESOS, VENTANAS, FOCO Y RECURSOS AJENOS DURANTE CALIBRACION
 12.6.1 Identificar ventana correcta antes de interactuar.
 12.6.2 Identificar aplicacion/proceso correcto.
 12.6.3 No usar offsets fijos.
 12.6.4 No cerrar ventanas no creadas por JARVIS.
 12.6.5 Restaurar estado original cuando corresponda.
 12.6.6 Comprobar antes/despues que Visual Studio Code, las ventanas previas y la primera pantalla no han sido alterados por las pruebas.
-12.6.7 Tests de seguridad operativa con comprobaciones de estado antes/despues y sin mockear la seleccion de objetivo que se pretende validar.
+12.6.7 Tests de proteccion con PID/HWND, foco, propiedad de ventana, estado anterior/posterior y limpieza exclusiva; suites existentes: `tests/hands/test_restore_window_state.py`, `tests/hands/windows/test_window_verification.py`, `tests/hands/test_calibration_manager.py`.
 12.6.8 Verificar que las pruebas gráficas pueden aislarse en la segunda pantalla sin cubrir ni tomar control de Visual Studio Code; si no, BLOQUEADO/NO VERIFICADO.
-12.7 ? PLANNER
+12.7 ? INSERCION CONDICIONAL DE CALIBRATE EN PLANES QUE REALMENTE LA NECESITAN
 12.7.1 Exponer capability calibrate solo despues de cerrar 12.1-12.6.
 12.7.2 Detectar requisito de calibracion.
 12.7.3 Insertar calibracion antes de la accion dependiente.
 12.7.4 No insertar calibracion innecesaria.
-12.7.5 Tests.
+12.7.5 Tests de calibracion insertada cuando falta, omitida cuando ya es valida, fallo de calibracion y bloqueo de accion dependiente; suites existentes: `tests/hands/test_calibration_requirements.py`, `tests/hands/test_executor.py`.
 12.7.6 Verificar en una tarea GUI inocua que el Planner inserta y ejecuta calibracion real solo cuando falta una calibracion valida.
-12.8 ? CIERRE
-12.8.1 Tests unitarios pertinentes.
-12.8.2 Tests de integracion.
-12.8.3 Verificacion real multipantalla en el equipo.
-12.8.4 Regresion multipantalla.
-12.8.5 Regresion de calibradores existentes.
+12.8 ? TESTS DE CALIBRACION UNITARIA, INTEGRACION VISION-COORDINATES Y GUI MULTIMONITOR
+12.8.1 Tests unitarios de entrada/salida de calibrate, requisitos de calibración, allow/deny, resultado correcto/fallido, coordenada y monitor ausentes, restauración de ventana y no mutación ante fallo; suites existentes: `tests/hands/test_calibration_requirements.py`, `tests/hands/test_calibration_manager.py`, `tests/hands/test_calibrator.py`, `tests/hands/test_restore_window_state.py` y `tests/hands/windows/test_window_verification.py`.
+12.8.2 Tests de integración Vision->UniversalVisualCalibrator->CoordinateManager->capability calibrate: comprobar consumo de la captura real entregada, esquema de elementos, asociación de coordenadas al monitor correcto, rechazo por baja confianza y entrega al Planner solo cuando la calibración sea necesaria; suites existentes: `tests/eyes/test_vision_calibration_integration.py`, `tests/eyes/test_vision.py`, `tests/hands/test_calibration_requirements.py` y `tests/hands/test_calibration_manager.py`. La GUI real de Notepad se comprueba separadamente en 12.8.3.
+12.8.3 Verificacion GUI real con Notepad en la segunda pantalla, captura/vision y coordenadas obtenidas en runtime, sin cubrir VS Code ni enviar entradas a la primera pantalla.
+12.8.4 Regresión de selección de monitor, geometría, HWND y estado de ventana: ejecutar `tests/hands/test_calibration_manager.py`, `tests/hands/test_restore_window_state.py` y `tests/hands/windows/test_window_verification.py`; completar con el escenario real de dos monitores de 12.8.3, sin inferir cobertura multipantalla a partir de tests unitarios.
+12.8.5 Regresión de los calibradores registrados y sus consumidores: ejecutar `tests/hands/test_calibrator.py`, `tests/hands/test_calibration_manager.py`, `tests/hands/test_calibration_requirements.py`, `tests/eyes/test_vision_calibration_integration.py` y `tests/hands/test_consumer_api_compatibility.py`; verificar que los calibradores existentes conservan sus entradas/salidas y que el flujo universal no los invoca dos veces.
 12.8.6 main.py.
 12.8.7 README.
 12.8.8 Cerrar FASE 12 solo con la capability integrada despues de sus dependencias y evidencia real aplicable.
-FASE 13 ? MACROS_COORDS COMO UI KNOWLEDGE
+FASE 13 ? MACROS_COORDS COMO CONOCIMIENTO UI: SCHEMA, NORMALIZACION, MIGRACION Y CONSISTENCIA
 Dependencia con FASE 12: esta fase completa la validacion/migracion del conocimiento persistente de UI que FASE 12 consume. FASE 12 puede reutilizar los formatos existentes y verificar sus APIs, pero no debe asumir que la migracion de todos los formatos coexistentes o la consistencia global ya esta completada hasta cerrar 13.3 y 13.4.
 
-13.1 ? LECTURA / SCHEMA / VALIDACION
+13.1 ? LECTURA Y VALIDACION DEL SCHEMA REAL DE macros_coords.json
 13.1.1 Localizar macros_coords.json real.
 13.1.2 Identificar estructura real.
 13.1.3 Validar formato.
 13.1.4 Validar campos obligatorios.
 13.1.5 Rechazar datos corruptos.
-13.1.6 Tests.
-13.2 ? COORDINATEMANAGER / UI / MONITOR
+13.1.6 Tests de JSON valido, campos requeridos, campos opcionales, esquema corrupto, entradas desconocidas y lectura sin reescritura; CREAR `tests/hands/test_macros_coords_schema_migration.py` si no existe suite directa.
+13.2 ? RESOLUCION DE UIELEMENT, APLICACION Y MONITOR DESDE COORDINATEMANAGER
 13.2.1 Cargar conocimiento UI.
 13.2.2 Resolver elemento.
 13.2.3 Asociar monitor.
 13.2.4 Asociar aplicacion.
 13.2.5 Diferenciar elemento desconocido.
 13.2.6 Integrar con vision.
-13.2.7 Tests.
-13.3 ? MIGRACION / COMPATIBILIDAD
+13.2.7 Tests de carga de ui_knowledge, resolucion de elemento, asociacion a aplicacion/monitor, elemento desconocido e integracion Vision; suites existentes: `tests/hands/test_calibration_manager.py`, `tests/hands/test_calibration_requirements.py`, `tests/eyes/test_vision_calibration_integration.py`.
+13.3 ? MIGRACION COMPATIBLE DE FORMATOS UI LEGACY SIN PERDIDA DE DATOS
 13.3.1 Identificar consumidores actuales.
 13.3.2 Adaptar lectura sin romper APIs.
     13.3.2.1 Inventariar los formatos de ui_elements que coexisten (diccionario de type y description por nombre en `data/knowledge/applications.json`, List[UIElement] de `src/hands/applications_core.py`, UIElementData de `src/utils/ui_element_model.py` y el formato de `data/macros_coords.json`: D-UI-MULTI-FORMAT, D-UI-FORMAT-MISMATCH) y el consumidor de cada uno. Solo lectura. [HIJA de 13.3.2]
     13.3.2.2 Adaptar lectura sin romper APIs: definir conversiones de lectura reutilizando UIElementData y hacer que `_reconstruct_ui_elements` registre el rechazo en lugar de devolver [] en silencio ante un formato distinto; sin migrar ni reescribir datos reales. [HIJA de 13.3.2]
 13.3.3 Mantener formato compatible cuando sea necesario.
 13.3.4 Eliminar duplicacion solo cuando este verificada.
-13.3.5 Tests de migracion.
-13.4 ? CONSISTENCIA / CIERRE
+13.3.5 Tests de lectura de cada formato legacy, conversion sin perdida, compatibilidad de APIs y no reescritura de los JSON originales; suites existentes relacionadas: `tests/eyes/test_ui_elements_structure.py`, `tests/eyes/test_ui_element_type_description.py`, `tests/hands/test_calibration_manager.py`; CREAR suite de migracion directa si falta.
+13.4 ? AUDITORIA DE COHERENCIA, OBSOLESCENCIA Y VALIDACION REAL DE CALIBRACIONES
 13.4.1 Comparar conocimiento con calibraciones reales.
 13.4.2 Detectar entradas obsoletas.
 13.4.3 No borrar automaticamente sin contrato explicito.
-13.4.4 Tests.
+13.4.4 Tests de calibracion persistida vigente/obsoleta, monitor correcto/incorrecto, UI eliminada y preservacion de datos reales; suites existentes: `tests/hands/test_calibration_manager.py`, `tests/hands/test_calibrator.py`, `tests/hands/test_restore_window_state.py`.
 13.4.5 main.py.
 13.4.6 README.
-13.4.7 Contrastar en el equipo real una entrada de UI/calibración persistida con la aplicación y el monitor reales; utilizar la segunda pantalla sin cubrir ni controlar Visual Studio Code, y no reescribir los datos reales para fabricar el escenario.
-FASE 14 ? ACCIONES PRIMITIVAS REUTILIZABLES
+13.4.7 Contrastar en el equipo real una entrada persistida de `macros_coords.json` con la ventana Notepad y monitor reales; comparar elemento, tipo, coordenadas y geometria observada con el registro sin reescribir los datos de produccion para fabricar el escenario.
+FASE 14 ? ACCIONES PRIMITIVAS REUTILIZABLES: VENTANAS, UI, NAVEGADOR, CAPTURA, ARCHIVOS Y CHAT
 Alcance y dependencia: esta fase consolida, normaliza y expone acciones primitivas ya presentes en el codigo; no vuelve a implementar desde cero las acciones que Graph/Planner/Executor ya consumen en FASES 6-9. La integracion de 14.8 debe reutilizar ActionRegistry/Executor y demostrar compatibilidad, sin crear un segundo canal de ejecucion.
 
-14.1 ? VENTANAS / APPS
+14.1 ? PRIMITIVAS DE VENTANA Y APLICACION: ABRIR, CERRAR, ACTIVAR, MOVER Y MAXIMIZAR
 14.1.1 Identificar accion de abrir.
 14.1.2 Identificar accion de cerrar.
 14.1.3 Identificar accion de activar.
 14.1.4 Identificar accion de mover.
 14.1.5 Identificar accion de maximizar/restaurar cuando exista.
 14.1.6 Verificar identificacion de ventana.
-14.1.7 Tests.
-14.2 ? UI
+14.1.7 Tests de abrir/cerrar/activar/mover/maximizar, ventana no identificada y no cierre de ventanas ajenas; suites existentes: `tests/hands/test_calibration_manager.py`, `tests/hands/windows/test_window_verification.py`; la apertura real se cubre aparte en 3.8.5.6.
+14.2 ? PRIMITIVAS DE RATON Y UI: MOVER, CLICK, DOBLE CLICK, HOVER, DRAG Y SCROLL
 14.2.1 Mover raton.
 14.2.2 Click.
 14.2.3 Double click.
@@ -1968,92 +1982,92 @@ Alcance y dependencia: esta fase consolida, normaliza y expone acciones primitiv
 14.2.6 Drag.
 14.2.7 Scroll.
 14.2.8 Click sobre elemento detectado.
-14.2.9 Tests.
-14.3 ? BROWSER
+14.2.9 Tests de movimiento, click, doble click, click derecho, hover, drag, scroll y aborto si el foco no pertenece al objetivo; CREAR suite GUI real aislada por accion que el codigo registre, sin enviar entrada a VS Code.
+14.3 ? PRIMITIVAS DE NAVEGADOR: PESTAÑAS, NAVEGACION Y VERIFICACION DE URL/VENTANA
 14.3.1 Nueva pestana.
 14.3.2 Cerrar pestana creada por JARVIS.
 14.3.3 Navegar.
 14.3.4 Cambiar pestana cuando exista.
 14.3.5 Verificar ventana correcta.
 14.3.6 Verificar estado tras navegacion.
-14.3.7 Tests.
-14.4 ? WAIT / CAPTURE / ANALYSIS
+14.3.7 Tests de pestana nueva, cierre exclusivo de pestana temporal, navegacion, cambio de pestana, URL final y preservacion de otras ventanas; suites existentes de navegador donde correspondan (`tests/hands/test_calibration_manager.py`); CREAR integracion real por navegador soportado.
+14.4 ? PRIMITIVAS DE ESPERA, CAPTURA DE PANTALLA/VENTANA Y ANALISIS VISUAL
 14.4.1 Esperar condicion temporal real.
 14.4.2 Capturar pantalla.
 14.4.3 Capturar ventana activa.
 14.4.4 Capturar region.
 14.4.5 Analizar elementos.
 14.4.6 Verificar resultado.
-14.4.7 Tests.
-14.5 ? ARCHIVOS / PROMPT
+14.4.7 Tests de espera por condicion, captura de pantalla/ventana/region, analisis de elementos y rechazo de captura vacia; suites existentes: `tests/eyes/test_screen_capture.py`, `tests/eyes/test_vision.py`, `tests/eyes/test_vision_only.py`.
+14.5 ? PRIMITIVAS DE LECTURA/ESCRITURA DE ARCHIVOS Y GESTION SEGURA DE PROMPTS
 14.5.1 Leer archivo necesario.
 14.5.2 Escribir archivo necesario.
 14.5.3 Gestionar prompt.
 14.5.4 Verificar ruta.
 14.5.5 Evitar escritura accidental fuera de alcance.
-14.5.6 Tests.
-14.6 ? CHAT CONTROL
+14.5.6 Tests de lectura, escritura atomica, ruta inexistente, ruta fuera de alcance, encoding y proteccion frente a sobrescritura accidental; CREAR/AMPLIAR suite de herramientas de archivo tras localizar sus APIs reales.
+14.6 ? PRIMITIVAS DE CONTROL DEL CHAT QUE YA ESTEN SOPORTADAS POR EL ENTORNO
 14.6.1 Identificar acciones existentes de control del chat.
 14.6.2 Ejecutar una accion.
 14.6.3 Verificar resultado.
 14.6.4 Manejar fallo.
-14.6.5 Tests.
-14.7 ? CONTRATOS / COMPOSICION
+14.6.5 Tests de cada accion de control de chat que este implementada: entrada, envio, cancelacion, resultado y fallo; no crear tests para acciones que no existan ni simular el proveedor como prueba de integracion.
+14.7 ? CONTRATO UNIFORME, RESULTADOS, ERRORES Y COMPOSICION DE ACCIONES PRIMITIVAS
 14.7.1 Definir contrato uniforme.
 14.7.2 Normalizar resultado.
 14.7.3 Propagar errores.
 14.7.4 Permitir composicion.
 14.7.5 Evitar wrappers duplicados.
-14.7.6 Tests.
-14.8 ? PLANNER / EXECUTOR
+14.7.6 Tests de contrato comun, normalizacion de resultados, excepciones, composicion y ausencia de wrappers/dispatch duplicados; suites existentes: `tests/hands/test_action_registry.py`, `tests/hands/test_executor.py`.
+14.8 ? REGISTRO DE PRIMITIVAS Y CONSUMO DESDE PLANNER/EXECUTOR SIN SEGUNDO DISPATCH
 14.8.1 Registrar primitivas.
 14.8.2 Exponer capabilities.
 14.8.3 Crear Plan con primitivas.
 14.8.4 Ejecutar mediante Executor.
 14.8.5 Verificar resultado.
 14.8.6 Actualizar State.
-14.8.7 Tests.
-14.9 ? REGRESION / CIERRE
-14.9.1 Tests unitarios.
-14.9.2 Tests de integracion.
-14.9.3 Legacy.
+14.8.7 Tests de registro de primitiva, capability visible, planificacion, dispatch unico, resultado verificado y actualizacion de State; suites existentes: `tests/hands/test_action_registry.py`, `tests/hands/test_executor.py`, `tests/hands/test_executor_state.py`.
+14.9 ? TESTS POR FAMILIA DE ACCION, COMPATIBILIDAD LEGACY Y VERIFICACION REAL
+14.9.1 Tests unitarios por familia: registro/nombre/parámetros/errores de acciones (`tests/hands/test_action_registry.py`); ejecucion, timeout, cancelacion y resultado (`tests/hands/test_executor.py`, `tests/hands/test_executor_state.py`); ventanas y estado de ventana (`tests/hands/test_restore_window_state.py`, `tests/hands/windows/test_window_verification.py`); API de aplicaciones (`tests/hands/test_applications_core.py`); UI/vision (`tests/eyes/test_ui_elements_structure.py`, `tests/eyes/test_vision.py`). No reutilizar un test unitario para afirmar que hubo entrada real de teclado/raton.
+14.9.2 Tests de integracion y sistema: combinar las primitivas registradas con Planner/Executor, verificar procesos/ventanas y comprobar captura/acción sobre una ventana Notepad propiedad de la prueba; suites existentes relacionadas: `tests/hands/test_executor.py`, `tests/hands/test_restore_window_state.py`, `tests/eyes/test_vision_calibration_integration.py`; CREAR `tests/hands/test_acciones_primitivas_notepad_entorno_real.py` para entrada/captura GUI real controlada, sin mocks de teclado, raton, captura ni ventana objetivo.
+14.9.3 Compatibilidad legacy por familia de acción: ejecutar `tests/hands/test_consumer_api_compatibility.py`, `tests/hands/test_application_contract_no_duplication.py`, `tests/hands/test_action_registry.py`, `tests/hands/test_applications_core.py` y `tests/hands/test_executor.py`; comprobar firmas, aliases, argumentos, resultados y que el camino nuevo y el adaptador legacy no despachan dos veces la misma acción.
 14.9.4 main.py.
 14.9.5 README.
-14.9.6 Ejecutar en el equipo real al menos una primitiva no destructiva por cada familia que tenga efecto externo (ventana/UI/navegador/captura/archivo/chat), usando el destino inocuo correspondiente; para GUI, segunda pantalla y arnés aislado. Las familias sin capacidad real disponible se marcan NO VERIFICADAS.
+14.9.6 Ejecutar en el equipo real una primitiva no destructiva por familia realmente implementada: ventana (abrir/verificar Notepad), UI (interaccion inocua en ventana controlada), navegador (pestana temporal en navegador disponible), captura (captura de esa ventana), archivo (leer/escribir y borrar solo un archivo temporal propio) y chat (solo si existe una API real disponible). Para GUI usar segunda pantalla y arnes aislado. Las familias no implementadas o sin proveedor real quedan NO VERIFICADAS, no simuladas.
 14.9.7 Cerrar FASE 14 solo con resultados reales por familia y compatibilidad con ActionRegistry/Executor.
-FASE 15 ? HIGH LEVEL GOALS
+FASE 15 ? HIGH LEVEL GOALS: FLUJO COMPLETO DESDE INTENCION NORMALIZADA HASTA EFECTO VERIFICADO
 
-15.1 ? CONTRATO / PRECONDICIONES
+15.1 ? CONTRATO DE GOAL, PRECONDICIONES Y RESULTADO OBSERVABLE
 15.1.1 Definir Goal valido reutilizando el contrato consolidado de FASE 4.
 15.1.2 Definir precondiciones y restricciones reutilizando FASE 10; no crear un segundo modelo.
 15.1.3 Definir resultado esperado verificable.
 15.1.4 Rechazar Goal incompleto, contradictorio o no soportado.
 15.1.5 Verificar compatibilidad con Goal, State, Planner y Executor existentes.
-15.1.6 Tests positivos y negativos del contrato.
-15.2 ? INTENT -> GOAL
+15.1.6 Tests de Goal valido, incompleto, contradictorio, no soportado, precondiciones y resultado verificable; suites existentes: `tests/hands/planner/test_node.py`, `tests/hands/planner/test_planner_action_verification.py`; ampliar con nuevos casos solo donde falten.
+15.2 ? MAPEO DE INTENCIONES SOPORTADAS A GOAL_TYPE, TARGET Y PARAMETROS
 15.2.1 Identificar intenciones soportadas.
 15.2.2 Mapear intencion a goal_type.
 15.2.3 Mapear target.
 15.2.4 Mapear parametros.
 15.2.5 Mapear restricciones.
 15.2.6 Manejar intencion ambigua.
-15.2.7 Tests.
-15.3 ? ENTIDADES / URL
+15.2.7 Tests de cada intent soportado, target ausente, parametro, restriccion, ambiguedad y entrada malformada; suites existentes: `tests/brain/test_llm.py`, `tests/hands/planner/test_node.py`.
+15.3 ? RESOLUCION DE ENTIDADES Y URLS PARA GOALS DE APLICACION/NAVEGACION
 15.3.1 Resolver entidad.
 15.3.2 Obtener datos asociados.
 15.3.3 Resolver URL existente.
 15.3.4 Construir Goal de navegacion.
 15.3.5 Verificar ausencia de URL.
-15.3.6 Tests.
-15.4 ? NAVEGACION / BROWSER STATE
+15.3.6 Tests de entidad resuelta/no resuelta, URL presente/ausente, URL invalida y construccion de Goal de navegacion; suites existentes: `tests/brain/test_llm.py`, suites de resolucion de aplicaciones; crear prueba directa de EntityResolver/URL si no existe.
+15.4 ? SELECCION DEL NAVEGADOR, VENTANA, PESTAÑA Y ESTADO DE NAVEGACION
 15.4.1 Detectar navegador adecuado.
 15.4.2 Detectar si ya esta abierto.
 15.4.3 Detectar ventana correcta.
 15.4.4 Decidir uso de pestana existente/temporal segun contrato real.
 15.4.5 Navegar.
 15.4.6 Verificar URL/estado.
-15.4.7 Tests.
-15.5 ? MULTIPASO / DEPENDENCIAS
+15.4.7 Tests de navegador instalado/no instalado, ventana existente/ausente, seleccion de pestana, navegacion, URL final y no interferencia con ventanas previas; CREAR integracion GUI real por navegador instalado.
+15.5 ? DESCOMPOSICION MULTIPASO, DEPENDENCIAS, VALIDACION Y EJECUCION DEL PLAN
 15.5.1 Separar objetivo en pasos.
 15.5.2 Identificar dependencias.
 15.5.3 Ordenar.
@@ -2061,16 +2075,16 @@ FASE 15 ? HIGH LEVEL GOALS
 15.5.5 Generar Plan.
 15.5.6 Ejecutar.
 15.5.7 Verificar.
-15.5.8 Tests.
-15.6 ? BRAIN
+15.5.8 Tests de descomposicion multipaso, grafo de dependencias, orden invalido, precondicion fallida, ejecucion parcial y verificacion final; suites existentes: `tests/hands/planner/test_task_executor.py`, `tests/hands/planner/test_graph_builder.py`, `tests/hands/test_executor.py`.
+15.6 ? INTEGRACION DE BRAIN: INTERPRETACION, PARSEO, ENTIDADES, IMAGEN Y FALLBACK
 15.6.1 Interpretacion.
 15.6.2 Parseo estructurado.
 15.6.3 Extraccion de entidades.
 15.6.4 Creacion de Goal.
 15.6.5 Gestion de imagen cuando proceda.
 15.6.6 Fallback legacy.
-15.6.7 Tests.
-15.7 ? PLANNER / EXECUTOR
+15.6.7 Tests de interpretacion/parsing, extraccion de entidad, creacion de Goal, imagen cuando el proveedor este disponible y fallback legacy; suites existentes: `tests/brain/test_llm.py`, `tests/brain/test_htn_integration.py`, `tests/eyes/test_vision.py`.
+15.7 ? INTEGRACION E2E GOAL-PLANNER-EXECUTOR-VERIFICATION-STATE Y ACLARACIONES
 15.7.1 Goal -> Planner.
 15.7.2 Plan -> Executor.
 15.7.3 Executor -> Verification.
@@ -2094,9 +2108,9 @@ FASE 15 ? HIGH LEVEL GOALS
 15.7.21 Comprobar que no se repiten aperturas, clics, envios o acciones con efectos externos tras un timeout o replanificacion.
 15.7.22 Verificar integracion real entre transcripcion normalizada, deteccion de aplicacion, preflight, calibracion, Planner, Executor y verificacion del resultado, usando las dependencias de produccion y distinguiendo cualquier componente que no haya podido probarse.
 15.7.23 Traducir el resultado final del flujo (exito verificado, exito parcial, detenido con motivo, aclaracion pendiente, confirmacion pendiente) en la respuesta que el bucle de `main.py` entrega a Mouth o al modo texto, reutilizando el canal de 4.5.7; Planner, Executor y Verification no llaman a Mouth directamente y ninguna respuesta declara exito sin verificacion.
-15.7.24 Ejecutar un flujo end-to-end inocuo en el equipo real. Si abre o manipula una GUI, la ventana de prueba debe ir a la segunda pantalla; comprobar que Visual Studio Code y la primera pantalla permanecen intactos.
-15.7.25 Conservar evidencia del estado del sistema antes y despues, incluyendo proceso/ventana/resultado, y cerrar solo recursos creados por la prueba.
-15.8 ? REGRESION / LEGACY
+15.7.24 Ejecutar un flujo end-to-end inocuo en el equipo real usando una peticion normalizada para abrir Notepad, resolverlo desde el conocimiento/descubrimiento real, pasar preflight, crear Goal/Plan, lanzar, identificar proceso/HWND, calibrar solo si la tarea lo exige y verificar el estado final. La ventana de prueba debe ir a la segunda pantalla; VS Code y la primera pantalla permanecen intactos.
+15.7.25 Conservar evidencia antes/despues: transcripcion original/normalizada, entidad/Goal, ruta y tipo de lanzamiento, decision de preflight, Plan/steps, PID/HWND, monitor, resultado observable y tiempos. Cerrar solo el proceso/ventana creados y cuya propiedad exclusiva se haya demostrado.
+15.8 ? TESTS END-TO-END REALES, NO REGRESION LEGACY Y CIERRE. Suites existentes: `tests/brain/test_llm.py`, `tests/brain/test_htn_integration.py`, `tests/hands/planner/test_graph_builder.py`, `tests/hands/planner/test_state_graph.py`, `tests/hands/planner/test_task_executor.py`, `tests/hands/test_executor.py`; CREAR `tests/brain/test_flujo_e2e_goal_a_ventana_entorno_real.py` para la integracion real completa.
 15.8.1 Comando existente.
 15.8.2 Accion legacy.
 15.8.3 Goal nuevo.
@@ -2104,209 +2118,209 @@ FASE 15 ? HIGH LEVEL GOALS
 15.8.5 Verificacion real de compatibilidad en los flujos que puedan ejecutarse de forma segura.
 15.8.6 main.py.
 15.8.7 Cierre FASE 15 solo con evidencia end-to-end real aplicable.
-FASE 16 ? LEGACY COMPATIBILITY
+FASE 16 ? LEGACY COMPATIBILITY: ADAPTACION GRADUAL SIN DOBLE EJECUCION NI ROTURA DE APIS
 
-16.1 ? LEGACY -> GOAL
+16.1 ? ADAPTACION DE CADA ACCION LEGACY A GOAL Y CONTRATO NUEVO
 16.1.1 Enumerar acciones legacy realmente usadas.
 16.1.2 Identificar equivalente Goal.
 16.1.3 Crear adaptacion individual.
 16.1.4 Verificar parametros.
 16.1.5 Verificar resultado.
-16.1.6 Tests por accion.
-16.2 ? EXECUTOR DISPATCH / FALLBACK
+16.1.6 Tests por cada accion legacy mapeada: equivalencia de parametros, resultado, error y ausencia de doble ejecucion. Suites existentes: `tests/hands/test_executor.py`, `tests/hands/test_action_registry.py`, `tests/brain/test_llm.py`; crear casos por familia legacy no cubierta.
+16.2 ? DISPATCH EXCLUSIVO ENTRE RUTA NUEVA Y FALLBACK LEGACY
 16.2.1 Identificar dispatch actual.
 16.2.2 Priorizar ruta nueva cuando este verificada.
 16.2.3 Mantener fallback legacy.
 16.2.4 Evitar ejecutar ambas rutas.
 16.2.5 Propagar errores.
-16.2.6 Tests.
-16.3 ? MIGRACION PROGRESIVA
+16.2.6 Tests de dispatch a ruta nueva, fallback legacy, ruta nueva bloqueada, error y garantia de que solo se ejecuta una ruta; suites existentes: `tests/hands/test_executor.py`, `tests/hands/test_consumer_api_compatibility.py`.
+16.3 ? MIGRACION PROGRESIVA POR FAMILIA DE ACCIONES CON REGRESION ENTRE PASOS
 16.3.1 Migrar una familia de acciones.
-16.3.2 Ejecutar tests.
-16.3.3 Verificar consumidores.
+16.3.2 Ejecutar, para la familia migrada, los tests concretos de equivalencia de argumentos/resultados, dispatch unico y fallback: `tests/hands/test_executor.py`, `tests/hands/test_action_registry.py`, `tests/hands/test_consumer_api_compatibility.py` y la suite de Brain/Planner que consuma esa accion; CREAR casos directos para cualquier familia sin consumidor cubierto.
+16.3.3 Verificar consumidores reales que importan o despachan la familia migrada: `main.py`, `src/tools/executor.py`, `src/hands/executor.py` y los consumidores concretos hallados mediante inspeccion; comprobar firmas, imports y que no se dispara simultaneamente el adaptador nuevo y el legacy.
 16.3.4 Migrar siguiente familia solo tras cierre anterior.
 16.3.5 Registrar compatibilidad.
-16.4 ? APIS LEGACY
+16.4 ? COMPATIBILIDAD DE APIS PUBLICAS LEGACY Y DEPRECACION SOLO SI EXISTE SOPORTE
 16.4.1 Identificar APIs publicas legacy.
 16.4.2 Verificar consumidores.
 16.4.3 Mantener wrappers solo donde aporten compatibilidad real.
 16.4.4 Marcar rutas antiguas deprecadas solo si el codigo ya soporta ese concepto.
-16.4.5 Tests de compatibilidad.
-16.5 ? REGRESION
-16.5.1 Tests legacy.
-16.5.2 Tests nuevos.
-16.5.3 Tests cruzados.
+16.4.5 Tests de firmas/imports publicos, wrappers necesarios, argumentos antiguos y comportamiento deprecado solo si existe contrato; suites existentes: `tests/hands/test_consumer_api_compatibility.py`, `tests/hands/test_application_contract_no_duplication.py`.
+16.5 ? REGRESION CRUZADA ENTRE COMANDOS LEGACY, GOALS NUEVOS Y EJECUTOR
+16.5.1 Tests de comandos y dispatch legacy existentes, con resultados exactos y sin duplicar ejecucion; suites existentes: `tests/brain/test_llm.py`, `tests/hands/test_executor.py`.
+16.5.2 Tests de contratos nuevos Goal/Planner/Executor y resultados estructurados; suites existentes: `tests/brain/test_htn_integration.py`, `tests/hands/planner/test_task_executor.py`, `tests/hands/test_executor.py`.
+16.5.3 Tests cruzados legacy->Goal->Planner->Executor, fallback y ausencia de doble dispatch; CREAR integracion cruzada si no esta cubierta por las suites anteriores.
 16.5.4 Verificar comportamiento real.
 16.5.5 Corregir regresiones.
-16.6 ? CIERRE / DOCUMENTACION
+16.6 ? DOCUMENTACION Y VERIFICACION REAL DE EQUIVALENCIA LEGACY/NUEVO
 16.6.1 Actualizar README.
 16.6.2 Documentar rutas compatibles.
 16.6.3 Verificar main.py.
 16.6.4 Verificar en el equipo real al menos una ruta legacy y su equivalente nueva con una acción inocua; comprobar que se ejecuta exactamente una ruta y comparar el efecto observable.
 16.6.5 Cerrar FASE 16 solo con compatibilidad real demostrada para las rutas declaradas soportadas.
-FASE 17 ? OPTIMIZATION
+FASE 17 ? OPTIMIZATION: REDUCCION MEDIDA DE REDUNDANCIAS, CACHE, COSTE Y LATENCIA
 
-17.1 ? REDUNDANCIAS
+17.1 ? DETECCION Y ELIMINACION CONTROLADA DE TRABAJO DUPLICADO DEMOSTRADO
 17.1.1 Identificar trabajo repetido existente.
 17.1.2 Confirmar que la repeticion es real.
 17.1.3 Eliminar una sola redundancia.
-17.1.4 Ejecutar tests.
+17.1.4 Ejecutar tests de equivalencia funcional, orden de llamadas, numero de operaciones y regresion en la ruta optimizada; suites existentes segun modulo: `tests/hands/planner/test_cache_performance.py`, `tests/utils/test_performance_optimizer.py`.
 17.1.5 Repetir por unidad hoja.
-17.2 ? CACHE
+17.2 ? CACHE DE DATOS REUTILIZABLES CON TTL E INVALIDACION POR CAMBIOS REALES
 17.2.1 Identificar datos candidatos a cache.
 17.2.2 Verificar validez temporal.
 17.2.3 Anadir lectura de cache.
 17.2.4 Anadir invalidacion necesaria.
 17.2.5 Evitar cachear estado cambiante sin control.
-17.2.6 Tests.
-17.3 ? COSTES
+17.2.6 Tests de hit/miss, TTL, invalidacion por cambio de State, datos obsoletos y aislamiento de claves; suites existentes: `tests/hands/planner/test_cache_performance.py`, `tests/utils/test_performance_optimizer.py`.
+17.3 ? OPTIMIZACION DEL CALCULO DE COSTES SIN CAMBIAR SU SIGNIFICADO
 17.3.1 Localizar calculo actual.
 17.3.2 Eliminar recalculo innecesario.
 17.3.3 Conservar significado del coste.
 17.3.4 Verificar Planner.
-17.3.5 Tests.
-17.4 ? CONTEXTO
+17.3.5 Tests de coste original/optimizado, equivalencia de ranking y ruta elegida, evitando cambiar significado o resultado; suites existentes: `tests/hands/planner/test_state_graph.py`, `tests/hands/planner/test_route_result.py`.
+17.4 ? REUTILIZACION SEGURA DE CONTEXTO CON INVALIDACION AL CAMBIAR STATE
 17.4.1 Identificar contexto repetidamente calculado.
 17.4.2 Reutilizar contexto cuando sea seguro.
 17.4.3 Invalidar cuando cambie State.
 17.4.4 Verificar consistencia.
-17.4.5 Tests.
-17.5 ? EJECUCION
+17.4.5 Tests de reutilizacion de contexto, invalidacion al cambiar State, aislamiento entre usuarios/sesiones y consistencia; suite existente: `tests/utils/test_performance_optimizer.py`; añadir cobertura directa solo tras localizar el consumidor real.
+17.5 ? REDUCCION DE PASOS Y ESPERAS REDUNDANTES SIN ELIMINAR VERIFICACIONES
 17.5.1 Identificar paso redundante.
 17.5.2 Identificar espera innecesaria solo con evidencia.
 17.5.3 Mantener verificaciones necesarias.
 17.5.4 No eliminar seguridad por rendimiento.
-17.5.5 Tests.
-17.6 ? NO REGRESION
-17.6.1 Tests funcionales.
-17.6.2 Tests de planificacion.
-17.6.3 Tests de ejecucion.
-17.6.4 Tests de multipantalla cuando apliquen.
+17.5.5 Tests de pasos redundantes confirmados, esperas innecesarias medibles y conservacion de verificaciones de seguridad; suites existentes: `tests/hands/test_executor.py`, `tests/hands/planner/test_task_executor.py`.
+17.6 ? NO REGRESION DE PLANIFICACION, EJECUCION, UI Y MULTIMONITOR
+17.6.1 Tests de resultado funcional de Graph/Planner y cumplimiento de Goal antes/despues de optimizar; suites existentes: `tests/hands/planner/test_graph_builder.py`, `tests/hands/planner/test_state_graph.py`, `tests/hands/planner/test_node.py`.
+17.6.2 Tests de coste, ruta seleccionada, cache, fallback y límites del Planner; suites existentes: `tests/hands/planner/test_cache_performance.py`, `tests/hands/planner/test_advanced_state_graph.py`.
+17.6.3 Tests de ejecucion por step, verificacion del efecto y no doble ejecucion tras optimizacion; suites existentes: `tests/hands/test_executor.py`, `tests/hands/test_executor_state.py`.
+17.6.4 Tests de seleccion de monitor, geometria y no interferencia cuando la optimizacion toque GUI; suites existentes: `tests/hands/test_calibration_manager.py`, `tests/hands/windows/test_window_verification.py`.
 17.6.5 main.py.
-17.7 ? METRICAS / VERIFICACION
+17.7 ? MEDICION ANTES/DESPUES DE LATENCIA, CPU, MEMORIA Y RESULTADO FUNCIONAL
 17.7.1 Reutilizar metricas existentes.
 17.7.2 Medir antes/despues solo cuando sea posible.
 17.7.3 No declarar mejora sin medicion o evidencia disponible.
 17.7.4 Documentar resultado real.
 17.7.5 Ejecutar mediciones antes/después en runtime real con una tarea inocua representativa, mismas condiciones y recursos; registrar carga, latencia, uso de memoria/CPU y resultado funcional, sin declarar mejora por métricas internas aisladas.
 17.7.6 Cerrar FASE 17 solo si la mejora se demuestra sin degradar el resultado funcional, la seguridad ni la respuesta del equipo.
-FASE 18 ? LEARNING COSTS
+FASE 18 ? LEARNING COSTS: APRENDIZAJE DE COSTES DESDE RESULTADOS REALES PERSISTIDOS
 
-18.1 ? RESULTADOS
+18.1 ? CAPTURA DE EXITO, FALLO, DURACION Y CONTEXTO POR ACCION EJECUTADA
 18.1.1 Capturar resultado por accion.
 18.1.2 Capturar exito/fallo real.
 18.1.3 Capturar duracion solo si existe soporte.
 18.1.4 Asociar resultado con contexto.
-18.1.5 Tests.
-18.2 ? PERSISTENCIA
+18.1.5 Tests de captura de resultado real, duracion, contexto, fallo y ausencia de dato cuando una accion no se completa; suites relacionadas existentes: `tests/hands/test_executor.py`, `tests/hands/test_executor_state.py`.
+18.2 ? PERSISTENCIA Y RECUPERACION DE RESULTADOS DE EJECUCION TRAS REINICIO
 18.2.1 Localizar almacenamiento real.
 18.2.2 Persistir un resultado.
 18.2.3 Recuperar un resultado.
 18.2.4 Manejar corrupcion/ausencia.
 18.2.5 Evitar duplicados incorrectos.
-18.2.6 Tests.
-18.3 ? TIEMPOS / COSTES
+18.2.6 Tests de escritura, recarga con nueva instancia, corrupcion, ausencia, duplicados e integridad de historial; suites existentes: `tests/utils/test_meta_learning_system.py`, `tests/utils/adaptive_learning_engine/test_goal_adaptation_learning_loop.py`; adaptar al almacenamiento real de costes.
+18.3 ? CALCULO DE ESTADISTICAS DE TIEMPO/COSTE CON MUESTRAS SUFICIENTES
 18.3.1 Obtener datos historicos disponibles.
 18.3.2 Calcular estadistica minima soportada.
 18.3.3 Integrar coste aprendido solo donde proceda.
 18.3.4 Evitar aprendizaje con muestras insuficientes.
-18.3.5 Tests.
-18.4 ? AJUSTE CONTROLADO
+18.3.5 Tests de muestra insuficiente/suficiente, estadistica minima, coste aprendido y rechazo de registros inconsistentes; suites existentes: `tests/utils/test_meta_learning_system.py`, `tests/utils/test_performance_optimizer.py`.
+18.4 ? AJUSTE PEQUEÑO Y REVERSIBLE DE PARAMETROS DE COSTE EXISTENTES
 18.4.1 Definir parametro ajustable existente.
 18.4.2 Aplicar ajuste pequeno.
 18.4.3 Respetar limites.
 18.4.4 Persistir cambio cuando proceda.
 18.4.5 Permitir reversion.
-18.4.6 Tests.
-18.5 ? CONTEXTO
+18.4.6 Tests de ajuste dentro/fuera de limites, persistencia, rollback real y no mutacion cuando la validacion falla; suites existentes: `tests/utils/test_meta_learning_system.py`, `tests/utils/test_performance_optimizer.py`.
+18.5 ? SEPARACION DE COSTES POR CONTEXTO Y TRANSFERENCIA SOLO ENTRE CONTEXTOS COMPATIBLES
 18.5.1 Separar costes por contexto solo si existe informacion suficiente.
 18.5.2 Verificar equivalencia de contextos.
 18.5.3 No transferir datos sin compatibilidad.
 18.5.4 Integrar con Domain Memory/ContextualAdaptation cuando corresponda.
-18.5.5 Tests.
-18.6 ? VERIFICACION
+18.5.5 Tests de contextos equivalentes/incompatibles, aislamiento de muestras y rechazo de transferencia no sustentada; suites existentes: `tests/utils/contextual_adaptation_engine/test_context_compatibility.py`, `tests/utils/contextual_adaptation_engine/test_cross_context_knowledge_transfer.py`.
+18.6 ? CONTRASTE DEL COSTE APRENDIDO CON RESULTADOS EXTERNOS OBSERVABLES
 18.6.1 Comparar resultado aprendido con resultado real.
 18.6.2 Detectar mejora o degradacion solo con evidencia.
 18.6.3 Rechazar actualizacion por datos inconsistentes.
-18.6.4 Tests.
-18.7 ? ESTABILIDAD
+18.6.4 Tests de mejora real, degradacion, resultado no comparable y datos inconsistentes, contrastando el estado externo con el coste aprendido; ampliar las suites de `tests/utils/test_meta_learning_system.py`.
+18.7 ? ESTABILIDAD DEL APRENDIZAJE: FRECUENCIA, OSCILACION, LIMITES Y TRAZABILIDAD
 18.7.1 Evitar cambios demasiado frecuentes.
 18.7.2 Evitar oscilaciones simples.
 18.7.3 Respetar limites.
 18.7.4 Registrar cambios.
-18.7.5 Tests.
-18.8 ? CIERRE / MAIN
-18.8.1 Regresion.
-18.8.2 Verificacion.
-18.8.3 README.
+18.7.5 Tests de frecuencia maxima, oscilacion, limite, trazabilidad y recuperacion del valor anterior; ampliar `tests/utils/test_meta_learning_system.py` y `tests/utils/test_performance_optimizer.py`.
+18.8 ? REGRESION, MAIN.PY Y VALIDACION REAL DEL CICLO DE APRENDIZAJE DE COSTES
+18.8.1 Regresion de calculo y persistencia de costes: ejecutar `tests/hands/planner/test_cache_performance.py`, `tests/utils/test_meta_learning_system.py`, `tests/utils/test_performance_optimizer.py`, `tests/utils/adaptive_learning_engine/test_goal_adaptation_learning_loop.py` y `tests/utils/contextual_adaptation_engine/test_goal_adaptation_persistence_real.py` si esta presente en el README_TESTS vigente; separar los contratos de rendimiento de la validacion de resultados reales.
+18.8.2 Verificacion del aprendizaje con acciones inocuas reales repetibles y resultado observable: CREAR `tests/utils/test_learning_costs_entorno_real.py` para registrar el tiempo/resultado real de `verify_target_monitor` y, cuando corresponda, de abrir/verificar Notepad; persistir en almacenamiento temporal, reiniciar el componente y comprobar recuperacion, limites y ausencia de contaminacion de produccion. No fabricar duraciones ni exitos con mocks.
+18.8.3 Actualizar el README de codigo solo si cambian APIs/comportamiento de `src/`; documentar el origen de las muestras, persistencia y limites comprobados, sin anotar fases ni resultados temporales como comportamiento permanente.
 18.8.4 main.py.
-18.8.5 Verificar con ejecuciones inocuas reales que los resultados capturados reflejan el efecto y duración observables; persistir/aprender inicialmente en almacenamiento temporal y comprobar reinicio, límites y ausencia de contaminación de datos de producción.
+18.8.5 Ejecutar acciones inocuas reales repetibles (por ejemplo `verify_target_monitor` y apertura/verificacion de Notepad cuando este cubierta), comparar duracion medida con tiempos reales, persistir primero en almacenamiento temporal, reiniciar la instancia para recuperar las muestras y comprobar limites/no contaminacion de produccion.
 18.8.6 Cerrar FASE 18 solo cuando el coste aprendido se contraste con resultados reales suficientes y no degrade el comportamiento.
-FASE 19 ? AUTOMEJORA
+FASE 19 ? AUTOMEJORA ASISTIDA: CONTINUIDAD, CONTEXTO, PROPUESTA, VALIDACION Y APLICACION AISLADA
 
-19.1 ? DETECTAR "MEJORATE"
+19.1 ? DETECCION SEGURA DE LA ORDEN EXPLICITA «MEJORATE»
 19.1.1 Localizar deteccion actual.
 19.1.2 Verificar condicion de activacion.
 19.1.3 Evitar activacion accidental.
-19.1.4 Tests con entrada real del bucle cuando sea posible.
-19.2 ? READY / EXECUTING
+19.1.4 Tests de activacion solo con la orden exacta/intencion configurada, falsos positivos, texto similar y activacion desde el bucle real; suites existentes: `tests/utils/test_auto_improvement_system.py`, `tests/utils/test_self_improvement_system.py`; CREAR integracion del punto de entrada real si falta.
+19.2 ? MAQUINA DE ESTADOS READY/EXECUTING/COMPLETED/ERROR Y PREVENCION DE DOBLE ENVIO
 19.2.1 Modelar READY.
 19.2.2 Modelar EXECUTING.
 19.2.3 Modelar finalizacion.
 19.2.4 Manejar transicion inesperada.
 19.2.5 Evitar doble envio.
 19.2.6 Verificar estados con el mecanismo real de Supercomplete/VS Code cuando exista; no simular su estado y darlo por comprobado.
-19.3 ? UNA HOJA POR CHAT
+19.3 ? EJECUCION SERIALIZADA DE UNA SOLA UNIDAD DE TRABAJO POR CHAT
 19.3.1 Obtener hoja activa desde el estado persistente.
 19.3.2 No enviar la siguiente hoja antes de cerrar la actual.
 19.3.3 Cerrar la hoja activa antes de continuar.
 19.3.4 Registrar resultado.
-19.3.5 Tests de continuidad y de no adelanto.
-19.4 ? TOKENS / CONTEXTO
+19.3.5 Tests de una sola hoja activa, rechazo de salto, no duplicacion, cierre y transicion a PENDIENTE; CREAR `tests/utils/test_automejora_continuidad_estado.py` si no existe cobertura directa.
+19.4 ? MEDICION Y CONSERVACION DEL PRESUPUESTO DE TOKENS Y CONTEXTO
 19.4.1 Detectar contexto disponible.
 19.4.2 Detectar riesgo de agotamiento.
 19.4.3 Reducir contexto sin perder requisitos.
 19.4.4 Decidir NEED_NEW_CHAT.
 19.4.5 Guardar estado antes del cambio.
 19.4.6 Verificar con los limites reales del proveedor/interfaz cuando sean observables; no fingir mediciones de tokens.
-19.5 ? CONTINUIDAD
+19.5 ? RECUPERACION DEL PUNTERO PERSISTENTE Y REANUDACION TRAS NUEVA SESION
 19.5.1 Leer prompt al iniciar.
 19.5.2 Resolver posicion desde estado persistente.
 19.5.3 Reanudar hoja correcta.
 19.5.4 No usar memoria del chat anterior como fuente de estado.
-19.5.5 Tests de reinicio/reanudacion.
+19.5.5 Tests de reinicio, recuperacion desde los cuatro campos persistentes, reanudacion de la misma hoja y ausencia de dependencia del historial de chat; CREAR/AMPLIAR `tests/utils/test_automejora_continuidad_estado.py`.
 19.5.6 Verificar en una nueva sesion real que se reanuda la misma hoja sin saltar ni duplicar trabajo.
-19.6 ? README COMPLETO
+19.6 ? LECTURA COMPLETA Y VALIDACION DE README ANTES DE PREPARAR CONTEXTO
 19.6.1 Leer README completo.
 19.6.2 Identificar estructura relevante.
 19.6.3 Preparar contexto sin inventar datos.
 19.6.4 Verificar tamano/contexto.
 19.6.5 Contrastar la documentacion con el codigo y el comportamiento actual antes de enviarla como fuente a ChatGPT.
-19.7 ? MODO PENSAR
+19.7 ? DETECCION, ACTIVACION Y FALLBACK DEL MODO DE RAZONAMIENTO REAL DEL PROVEEDOR
 19.7.1 Identificar mecanismo real disponible.
 19.7.2 Activarlo de manera explicita cuando la interfaz/proveedor lo permita.
 19.7.3 Verificar que el resultado recibido esta completo.
 19.7.4 Manejar indisponibilidad.
-19.7.5 Tests del control/fallback; no afirmar que se activo un modo que la API no expone.
-19.8 ? CHATGPT
+19.7.5 Tests de modo disponible, activacion confirmada, proveedor sin soporte, timeout y fallback; CREAR suite del adaptador real del proveedor. Una respuesta mas larga no prueba que el modo se haya activado.
+19.8 ? INTERCAMBIO CON CHATGPT: CONTEXTO PERMITIDO, RESPUESTA COMPLETA Y ERRORES
 19.8.1 Definir peticion de analisis.
 19.8.2 Enviar contexto permitido.
 19.8.3 Recibir respuesta.
 19.8.4 Detectar respuesta incompleta.
-19.8.5 Tests de contrato y una prueba real con el proveedor configurado cuando exista acceso.
-19.9 ? SOLICITAR MEJORA
+19.8.5 Tests de formato/contexto permitido, respuesta completa/incompleta, timeout y fallo de proveedor; ejecutar una llamada real solo con credenciales/configuracion presentes, sin mock como evidencia de integracion.
+19.9 ? CONSTRUCCION DE SOLICITUD DE MEJORA CON ESTADO, README Y REGLAS VIGENTES
 19.9.1 Construir solicitud.
 19.9.2 Incluir estado actual.
 19.9.3 Incluir README relevante.
 19.9.4 Incluir restricciones del prompt.
 19.9.5 Evitar pedir cambios no relacionados.
-19.10 ? OBTENER PROMPT
+19.10 ? RECEPCION Y EXTRACCION DEL PROMPT PROPUESTO SIN PERDER SU ESTRUCTURA
 19.10.1 Recibir propuesta.
 19.10.2 Extraer prompt.
 19.10.3 Preservar reglas maestras.
 19.10.4 Detectar cambios estructurales.
-19.10.5 Tests de extraccion.
-19.11 ? VALIDAR PROMPT
+19.10.5 Tests de extraccion de bloque completo, delimitadores, truncamiento, texto adicional y conservacion de todas las reglas; CREAR suite de parser de prompt si no existe.
+19.11 ? VALIDACION ESTRUCTURAL Y SEMANTICA DEL PROMPT CONTRA ESTADO Y REGLAS
 19.11.1 Verificar que conserva la posicion actual.
 19.11.2 Verificar que conserva reglas.
 19.11.3 Verificar que no adelanta hojas.
@@ -2314,7 +2328,7 @@ FASE 19 ? AUTOMEJORA
 19.11.5 Verificar formato.
 19.11.6 Rechazar prompt invalido.
 19.11.7 Comparar de forma estructural la propuesta con el estado y las reglas reales, sin usar Git ni depender de historial Git.
-19.12 ? ERRORES Y RECUPERACION
+19.12 ? RECUPERACION SEGURA ANTE FALLO DE GENERACION, ESCRITURA O VERIFICACION
 19.12.1 Detectar error de generacion.
 19.12.2 Detectar error de aplicacion.
 19.12.3 Detectar error de verificacion.
@@ -2322,7 +2336,7 @@ FASE 19 ? AUTOMEJORA
 19.12.5 Registrar causa.
 19.12.6 Evitar repetir una operacion destructiva.
 19.12.7 Probar recuperacion con copias temporales y verificar el archivo real antes de sustituirlo.
-19.13 ? VS CODE
+19.13 ? AUTOMATIZACION DE VS CODE EN INSTANCIA, PERFIL Y WORKSPACE AISLADOS
 19.13.1 Identificar mecanismo real de interaccion.
 19.13.2 Abrir/seleccionar archivo necesario.
 19.13.3 Aplicar un cambio controlado.
@@ -2330,15 +2344,15 @@ FASE 19 ? AUTOMEJORA
 19.13.5 Evitar modificar otro archivo.
 19.13.6 Verificar en el equipo real el resultado del archivo escrito, no solo la accion de escritura.
 19.13.7 Toda prueba de interfaz de VS Code se realiza en la segunda pantalla y sobre una instancia/ventana de prueba separada, con perfil y workspace temporales o copiados cuando corresponda. No enviar entradas, abrir archivos, cambiar foco ni modificar configuracion en la ventana de trabajo que el usuario mantiene abierta. No cubrirla ni moverla; si no puede aislarse la instancia de prueba, registrar BLOQUEADO/NO VERIFICADO.
-19.14 ? SUPERCOMPLETE
+19.14 ? ORQUESTACION DE SUPERCOMPLETE CON ESTADOS REALES Y UNA SOLA OPERACION ACTIVA
 19.14.1 Detectar estado READY/EXECUTING segun senales reales.
 19.14.2 Iniciar una sola operacion.
 19.14.3 Esperar mientras EXECUTING.
 19.14.4 Detectar finalizacion.
 19.14.5 Detectar necesidad de nuevo chat.
-19.14.6 Tests de estados.
+19.14.6 Tests de READY, EXECUTING, finalizado, error, timeout, cancelacion y prevencion de segunda operacion; CREAR suite de integracion del adaptador Supercomplete, sin simular el estado para afirmar que se verifico la extension real.
 19.14.7 Prueba real de una operacion no destructiva, comprobando que no se inicia una segunda ejecucion ni se modifica un archivo distinto.
-19.15 ? CAMBIO DE CHAT
+19.15 ? CAMBIO DE CHAT CON GUARDADO, APERTURA DE SESION Y REANUDACION EXACTA
 19.15.1 Finalizar operacion segura.
 19.15.2 Guardar codigo.
 19.15.3 Guardar estado.
@@ -2347,52 +2361,52 @@ FASE 19 ? AUTOMEJORA
 19.15.6 Reanudar la misma hoja.
 19.15.7 No depender del chat anterior.
 19.15.8 Verificar el cambio de sesion real sin perder ni adelantar la unidad activa.
-19.16 ? ACTUALIZAR PROMPT / README
+19.16 ? ACTUALIZACION COHERENTE DE PUNTERO, PROMPTS, README, TESTS Y EVIDENCIA
 19.16.1 Actualizar estado minimo.
 19.16.2 Actualizar archivos modificados.
-19.16.3 Actualizar tests.
+19.16.3 Actualizar unicamente las suites que prueban los contratos realmente modificados: continuidad/automejora (`tests/utils/test_auto_improvement_system.py`, `tests/utils/test_self_improvement_system.py`, `tests/utils/test_architectural_evolution_manager.py`), integracion Brain/Executor o persistencia segun el cambio; crear pruebas nuevas solo para comportamiento no cubierto y conservar las aserciones originales.
 19.16.4 Actualizar verificacion.
 19.16.5 Actualizar pendientes.
 19.16.6 Sustituir la referencia obsoleta de NEXT_DOCUMENTED_UNIT por los cuatro campos persistentes vigentes de `prompt_mejoraActual.txt` (`CURRENT_PHASE`, `CURRENT_WORK_UNIT`, `CURRENT_WORK_STATUS`, `LAST_COMPLETED_UNIT`) y aplicar la transicion vigente de `prompt_JARVIS_reglas.txt` seccion 5: al cerrar una hoja el puntero queda PENDIENTE y solo pasa a EN PROCESO cuando empieza su chat dedicado.
 19.16.7 Modificar README solo cuando corresponda y describir el comportamiento implementado actualmente, sin anotaciones de fase.
 19.16.8 Verificar que los ficheros actualizados pueden volver a leerse y reanudar el trabajo real.
-19.17 ? MULTIPANTALLA
+19.17 ? VERIFICACION MULTIMONITOR DE LA AUTOMATIZACION SIN INTERFERIR EN LA SESION PERSONAL
 19.17.1 Verificar que la automejora identifica los monitores reales.
 19.17.2 Verificar ventanas de prueba en la segunda pantalla.
 19.17.3 Verificar DPI/escalado.
 19.17.4 Evitar offsets fijos.
 19.17.5 No mover, cerrar ni enviar entradas a Visual Studio Code; no interferir en la primera pantalla.
-19.17.6 Tests cuando exista interaccion grafica.
+19.17.6 Tests de GUI solo cuando el cambio incluya interacción gráfica: mantener pruebas de contrato separadas y utilizar `tests/hands/windows/test_window_verification.py` y `tests/hands/test_restore_window_state.py` para la parte de ventana; CREAR una prueba de sistema real para el flujo concreto si esas suites no interactúan con la instancia aislada de VS Code que se está validando.
 19.17.7 Prueba real con una ventana inocua creada por la prueba y comprobacion del estado de ambas pantallas.
-19.18 ? VERIFICACION
+19.18 ? PRUEBA REAL DEL CICLO DE AUTOMEJORA EN ENTORNO AISLADO
 19.18.1 Verificar archivo objetivo.
 19.18.2 Verificar sintaxis.
-19.18.3 Ejecutar tests pertinentes.
+19.18.3 Ejecutar `tests/utils/test_architectural_evolution_manager.py`, `tests/utils/test_auto_improvement_system.py` y `tests/utils/test_self_improvement_system.py`; comprobar propuesta, validación, aplicación/reversión, estados de la operación y propagación de errores. Añadir pruebas directas solo para operaciones de archivos o VS Code que estas suites no cubran.
 19.18.4 Verificar comportamiento real en el sistema con la ruta de produccion.
 19.18.5 Verificar main.py cuando corresponda.
 19.18.6 No declarar mejora sin evidencia.
 19.18.7 Comprobar que la primera pantalla, Visual Studio Code y los recursos preexistentes no han sido alterados.
-19.19 ? REGRESION
-19.19.1 Tests de automejora.
-19.19.2 Tests de edicion.
-19.19.3 Tests de continuidad.
-19.19.4 Tests de seguridad.
-19.19.5 Tests de no regresion del sistema.
+19.19 ? REGRESION DE AUTOMEJORA, CONTINUIDAD Y PROTECCION DE ARCHIVOS DEL USUARIO
+19.19.1 Tests de propuesta, validación, aplicación y rechazo de cambios de automejora: ejecutar `tests/utils/test_architectural_evolution_manager.py`, `tests/utils/test_auto_improvement_system.py` y `tests/utils/test_self_improvement_system.py`; comprobar que no se aplica una propuesta no validada ni se confunde propuesta con cambio realizado.
+19.19.2 Tests de edición aislada: CREAR `tests/utils/test_edicion_aislada_y_reversion_entorno_real.py` para comprobar que el cambio afecta solo al archivo autorizado dentro de una copia/workspace temporal, que conserva el resto de archivos, que puede verificarse y revertirse, y que nunca escribe en el perfil/workspace personal de VS Code. Reutilizar `tests/utils/test_architectural_evolution_manager.py` para los contratos ya cubiertos; no asumir que esa suite prueba el editor gráfico real.
+19.19.3 Tests de continuidad y recuperación: ejecutar `tests/utils/test_auto_improvement_system.py` y `tests/utils/test_self_improvement_system.py`; CREAR `tests/utils/test_automejora_continuidad_estado.py` para comprobar persistencia tras reinicio, recuperación de operación interrumpida, reanudación en la misma unidad y ausencia de saltos o duplicados.
+19.19.4 Tests de protección del usuario: CREAR `tests/utils/test_proteccion_workspace_usuario.py` para demostrar que las rutas protegidas quedan fuera de escritura, que una ruta objetivo ambigua/inexistente se rechaza, que una propuesta sin autorización no se aplica y que rollback solo afecta a archivos creados/modificados por la prueba; realizar la comprobación real sobre una copia aislada.
+19.19.5 No regresión del sistema tras automejora: ejecutar `tests/utils/test_architectural_evolution_manager.py`, `tests/utils/test_auto_improvement_system.py`, `tests/utils/test_self_improvement_system.py`, `tests/brain/test_llm.py`, `tests/hands/test_executor.py` y `tests/hands/test_executor_state.py`; comprobar imports, arranque real de `main.py`, persistencia previa y comportamiento de los consumidores modificados.
 19.19.6 Prueba real del flujo completo de automejora con un cambio inocuo, reversible y previamente validado.
-19.20 ? CIERRE
-19.20.1 Verificar todo el flujo.
+19.20 ? CIERRE DEL CICLO DE AUTOMEJORA CON ESTADO Y EVIDENCIA REPRODUCIBLE
+19.20.1 Ejecutar el ciclo completo en un workspace/perfil aislado: solicitud explicita -> lectura de reglas/estado/README -> propuesta -> validacion -> aplicacion reversible -> pruebas -> verificacion GUI real cuando corresponda -> informe -> actualizacion persistente del puntero, comprobando que la sesion personal queda intacta.
 19.20.2 Verificar README.
 19.20.3 Verificar main.py.
 19.20.4 Verificar estado.
 19.20.5 Cerrar FASE 19 solo con todas las hojas completadas y las pruebas reales aplicables documentadas.
-FASE 20 ? AUTOMEJORA CONTINUA
+FASE 20 ? AUTOMEJORA CONTINUA: REPETICION CONTROLADA DE CICLOS Y CONTINUIDAD PERSISTENTE
 
-20.1 ? FIN DE CICLO
+20.1 ? CIERRE DEL CICLO ACTUAL Y VALIDACION DEL RESULTADO ENTREGADO
 20.1.1 Detectar finalizacion real del ciclo.
 20.1.2 Verificar que no queden hojas pendientes del ciclo.
-20.1.3 Registrar resultado.
-20.1.4 Tests.
-20.2 ? TODAS LAS FASES
+20.1.3 Registrar resultado, unidad cerrada, evidencia, fallos, recursos modificados y siguiente unidad pendiente, manteniendo separados los estados IMPLEMENTADA, BLOQUEADA y NO VERIFICADA.
+20.1.4 Tests de cierre de ciclo: resultado COMPLETED solo tras validacion, rechazo de cierre con hojas pendientes/fallidas, conservacion de evidencia, estado persistente coherente y ausencia de repeticion; reutilizar `tests/utils/test_auto_improvement_system.py`, `tests/utils/test_self_improvement_system.py` y CREAR `tests/utils/test_automejora_continuidad_estado.py` si el contrato de puntero/hoja activa no dispone de cobertura directa.
+20.2 ? AUDITORIA DEL ESTADO DE TODAS LAS FASES SIN ALTERAR EL PUNTERO ACTIVO
 20.2.1 Verificar estado de FASE 0.
 20.2.2 Verificar estado de FASE 1.
 20.2.3 Verificar estado de FASE 2.
@@ -2414,77 +2428,77 @@ FASE 20 ? AUTOMEJORA CONTINUA
 20.2.19 Verificar estado de FASE 18.
 20.2.20 Verificar estado de FASE 19.
 20.2.21 No inferir completitud por documentacion.
-20.3 ? MAIN.PY OK
+20.3 ? VERIFICACION DEL ARRANQUE Y DEL BUCLE PRINCIPAL DE MAIN.PY
 20.3.1 Ejecutar main.py o comprobacion equivalente disponible.
 20.3.2 Detectar error.
 20.3.3 Corregir solo el error perteneciente al ciclo.
 20.3.4 Repetir verificacion.
 20.3.5 Registrar resultado real.
-20.4 ? README
+20.4 ? ACTUALIZACION DEL README DESDE EL CODIGO REAL Y SIN RESULTADOS INVENTADOS
 20.4.1 Verificar README completo.
 20.4.2 Actualizar componentes realmente implementados.
 20.4.3 Actualizar flujo arquitectonico cuando corresponda.
 20.4.4 No documentar capacidades no verificadas.
 20.4.5 Registrar discrepancias pendientes.
-20.5 ? CHATGPT
+20.5 ? SOLICITUD DE REVISION EXTERNA Y VALIDACION DE LA RESPUESTA RECIBIDA
 20.5.1 Construir contexto.
 20.5.2 Solicitar analisis de mejora.
 20.5.3 Recibir propuesta.
 20.5.4 Separar hechos de propuestas.
 20.5.5 No aplicar propuestas automaticamente sin validacion.
-20.6 ? PENSAR
+20.6 ? USO VERIFICABLE DEL MODO DE RAZONAMIENTO DISPONIBLE
 20.6.1 Activar mecanismo disponible.
 20.6.2 Analizar la propuesta.
 20.6.3 Comparar con arquitectura real.
 20.6.4 Detectar dependencias.
-20.6.5 Detectar riesgo de regresion.
-20.7 ? NUEVA FUNCIONALIDAD
+20.6.5 Evaluar riesgo de regresion antes de aplicar una propuesta: enumerar consumidores/importaciones, firmas publicas, contratos JSON/SQLite, estados persistentes, rutas de ejecucion, recursos del usuario y dependencias afectadas; exigir pruebas directas y de integracion para cada contrato que pueda cambiar, y rechazar o subdividir la propuesta cuando no exista una verificacion segura.
+20.7 ? INCORPORACION DE NUEVA FUNCIONALIDAD SOLO TRAS ANALISIS DE DEPENDENCIAS
 20.7.1 Identificar una unica mejora solicitada.
 20.7.2 Definir objetivo verificable.
 20.7.3 Identificar archivos necesarios solo despues de inspeccion.
 20.7.4 Dividir en hojas.
 20.7.5 No iniciar implementacion todavia.
-20.8 ? NUEVO PROMPT
+20.8 ? GENERACION DEL NUEVO PROMPT CONSERVANDO REGLAS, ESTADO Y REGISTROS
 20.8.1 Generar propuesta.
 20.8.2 Conservar reglas maestras.
 20.8.3 Conservar historial relevante.
 20.8.4 Anadir unicamente cambios justificados.
 20.8.5 Dividir hojas grandes.
-20.9 ? VALIDACION
+20.9 ? VALIDACION DEL PROMPT Y DEL ESTADO ANTES DE INICIAR EL NUEVO CICLO
 20.9.1 Validar sintaxis/formato.
 20.9.2 Validar estado.
 20.9.3 Validar IDs.
 20.9.4 Validar trazabilidad padre -> hijas.
 20.9.5 Validar que solo una hoja pueda estar EN PROCESO.
-20.10 ? SUSTITUCION CONSERVADORA
+20.10 ? SUSTITUCION CONSERVADORA DE ARCHIVOS CON COMPROBACION Y RECUPERACION
 20.10.1 Mantener reglas maestras.
 20.10.2 Mantener version.
 20.10.3 Mantener historial relevante.
 20.10.4 Sustituir solo contenido validado.
 20.10.5 Guardar version anterior cuando el sistema lo soporte.
 20.10.6 Verificar que el nuevo prompt puede reanudar el trabajo.
-20.11 ? NUEVO CICLO
+20.11 ? ASIGNACION PERSISTENTE DE LA SIGUIENTE UNIDAD SIN SALTOS
 20.11.1 Registrar nueva version.
 20.11.2 Definir primera hoja.
 20.11.3 Marcar solo esa hoja como EN PROCESO.
 20.11.4 No saltar fases.
-20.11.5 Tests.
+20.11.5 Tests de puntero siguiente, estado PENDIENTE, unica hoja EN PROCESO, no salto y no repeticion; reutilizar `tests/utils/test_auto_improvement_system.py` y crear pruebas de estado persistente si faltan.
 20.11.6 Reconciliar 20.11.3 con el protocolo vigente: la primera hoja del nuevo ciclo queda PENDIENTE y pasa a EN PROCESO solo al empezar su chat dedicado (`prompt_JARVIS_reglas.txt`, seccion 5); en todo momento solo una hoja puede estar EN PROCESO.
-20.12 ? NUEVO CHAT
+20.12 ? APERTURA DE NUEVO CHAT Y REANUDACION DE LA UNIDAD PENDIENTE
 20.12.1 Cerrar operacion anterior.
 20.12.2 Persistir estado.
 20.12.3 Abrir nuevo chat.
 20.12.4 Leer prompt.
 20.12.5 Leer README.
 20.12.6 Reanudar misma hoja.
-20.13 ? REPETICION CONTROLADA
+20.13 ? REPETICION CONTROLADA DEL CICLO COMPLETO CON EVIDENCIA DE CONTINUIDAD
 20.13.1 Ejecutar siguiente hoja solo tras cierre anterior.
 20.13.2 Actualizar estado tras cada hoja.
 20.13.3 Detectar errores y volver a la hoja activa cuando corresponda.
 20.13.4 Nunca iniciar otro ciclo sin solicitud explicita del usuario.
 20.13.5 Mantener trazabilidad completa.
 20.13.6 Ejecutar una repeticion real y controlada del ciclo completo, verificando los estados persistentes, la continuidad y que no se adelantan hojas.
-20.13.7 Cerrar FASE 20 unicamente cuando el ciclo completo este verificado con evidencia real y las pruebas automatizadas pertinentes.
+20.13.7 Ejecutar y registrar tests del ciclo completo: cierre de hoja, persistencia de estado, construccion de nuevo prompt, inicio de nuevo chat y reanudacion de la hoja correcta. CREAR prueba de sistema real sobre una copia de trabajo aislada; cerrar FASE 20 solo con evidencia y sin saltos ni duplicados.
 
 FASE 21 ? AUDITORIA, DEPURACION Y LIMPIEZA GLOBAL DEL PROYECTO JARVIS
 Objetivo: localizar, justificar y retirar de forma controlada archivos realmente innecesarios, obsoletos, desactualizados o redundantes, sin perder codigo, conocimiento, datos persistentes, configuracion, compatibilidad ni evidencia util. La ausencia de referencias directas o una fecha antigua no demuestra por si sola que un archivo sea prescindible. Mantener esta fase pendiente hasta que el puntero operativo autorice comenzarla.
@@ -2710,6 +2724,88 @@ Alcance obligatorio: esta unidad inventaria exclusivamente el arbol del proyecto
 21.18.11 Marcar FASE 21 como completada unicamente cuando la auditoria, las retiradas justificadas y todas las verificaciones aplicables dispongan de evidencia real del equipo y no queden escenarios seguros sin ejecutar.
 21.18.12 Eliminar las copias de cuarentena solo cuando la retirada haya quedado validada, no exista regresion atribuible y la copia ya no sea necesaria para recuperar el estado previo; verificar la ruta exacta antes de eliminarlas.
 21.18.13 No borrar copias de recuperacion dudosas ni material ajeno a los candidatos inventariados; documentar cualquier cuarentena que deba conservarse.
+
+
+FASE 22 ? INSTALACION LIMPIA, PORTABILIDAD Y VALIDACION EN EQUIPOS NUEVOS
+Objetivo: demostrar que una copia limpia de JARVIS puede configurarse y arrancar sin depender de rutas, datos, caches, modelos, permisos o estado privado de la maquina de desarrollo. "Cualquier ordenador" no se considerara una garantia literal: el soporte se limita a combinaciones de SO/version/arquitectura/dependencias que se hayan implementado y probado realmente. El README actual identifica dependencias Windows-only para teclado/raton, ventanas y registro; no declarar Linux/macOS soportados hasta disponer de adaptadores y pruebas reales equivalentes.
+
+22.1 ? MATRIZ EXPLICITA DE SISTEMAS OPERATIVOS Y REQUISITOS DE HARDWARE/SOFTWARE
+22.1.1 Inspeccionar los imports, APIs del SO y dependencias de `requirements.txt`, `jarvis_requirements.bat` y configuracion para localizar restricciones Windows-only, rutas absolutas y binarios externos.
+22.1.2 Clasificar cada capacidad como multiplataforma, Windows-only, Linux-only, macOS-only, dependiente de proveedor/modelo o no soportada.
+22.1.3 Definir versiones minimas reales de Python, arquitectura, memoria, almacenamiento, GPU cuando sea obligatoria, API de voz, proveedor LLM/TTS y herramientas externas.
+22.1.4 No convertir una dependencia opcional (TTS, GPU, modelo local, watchdog, navegador) en requisito obligatorio si el codigo tiene un fallback real; verificar ese fallback en runtime.
+22.1.5 Mantener una matriz de combinaciones soportadas, probadas, bloqueadas y no soportadas; no inferir compatibilidad por que el modulo importe correctamente.
+22.1.6 Tests de deteccion de SO/version/arquitectura y de rechazo claro ante entorno no soportado; suites relacionadas existentes: `tests/hands/test_system_inventory.py`, `tests/hands/test_system_inventory_storage.py`, `tests/hands/test_application_preflight.py`; crear tests de adaptador por plataforma solo cuando el adaptador exista.
+
+22.2 ? PREPARACION DE UNA INSTANCIA LIMPIA SIN DATOS NI CONFIGURACION DEL EQUIPO DE DESARROLLO
+22.2.1 Preparar una VM o equipo de pruebas limpio con instalacion del SO soportado, usuario estandar y sin carpeta `data/`, `venv/`, caches, modelos ni configuracion previa de JARVIS.
+22.2.2 Copiar el proyecto desde una distribucion limpia del codigo, sin copiar memoria, credenciales, entidades privadas, SQLite de inventario, logs, calibraciones ni datos del usuario de desarrollo. No usar Git ni herramientas/historial Git.
+22.2.3 Registrar SO/version/arquitectura, usuario/permisos, resolucion/DPI/monitores, Python, espacio disponible y dependencias preinstaladas antes de instalar JARVIS.
+22.2.4 No reutilizar rutas absolutas, nombres de usuario, letras de unidad, IDs de equipo, coordenadas, PID/HWND ni endpoints locales pertenecientes a la maquina de desarrollo.
+22.2.5 Mantener snapshot/restauracion de la VM para repetir pruebas sin contaminar el estado limpio.
+22.2.6 CREAR `tests/deployment/test_clean_environment_preconditions.py` para verificar ausencia de datos heredados, deteccion de entorno y separacion entre instalacion limpia y estado de usuario.
+
+22.3 ? INSTALACION DE PYTHON Y DEPENDENCIAS DESDE LOS MANIFESTS REALES
+22.3.1 Instalar la version de Python declarada como soportada en la VM limpia y comprobar `python --version`, arquitectura y entorno virtual recien creado.
+22.3.2 Instalar dependencias usando el mecanismo de instalacion documentado y `requirements.txt`; comprobar que `jarvis_requirements.bat` no depende de rutas personales ni instala paquetes no declarados.
+22.3.3 Verificar por separado dependencias obligatorias y opcionales, imports nativos, DLLs, permisos, PATH y herramientas externas requeridas.
+22.3.4 Comprobar instalacion sin privilegios de administrador cuando la arquitectura lo permita; si una dependencia exige elevacion, identificarla y documentar el motivo.
+22.3.5 Verificar que los fallos de instalacion producen un diagnostico concreto y no dejan una configuracion parcial declarada como lista.
+22.3.6 CREAR `tests/deployment/test_dependency_bootstrap_clean_environment.py` para instalar/validar dependencias en entorno aislado y comprobar versiones/faltantes sin mockear el gestor de paquetes en la prueba de sistema real.
+
+22.4 ? CREACION DE DATA, CONFIGURACION Y ALMACENAMIENTOS EN PRIMER ARRANQUE
+22.4.1 Arrancar con directorios de datos ausentes y comprobar que cada componente crea unicamente los archivos/directorios que su contrato necesita.
+22.4.2 Verificar inicializacion de configuracion, memoria, knowledge, calibraciones, inventario SQLite y logs sin escribir datos de prueba de desarrollo.
+22.4.3 Comprobar que `entities.json` ausente/vacio conserva su esquema esperado y que las siete entidades de desarrollo no se copian de forma implicita a la instancia nueva.
+22.4.4 Comprobar inicializacion SQLite, versionado, claves de maquina nuevas y aislamiento de cualquier inventario perteneciente a otro equipo.
+22.4.5 Verificar permisos de los directorios de datos, archivos privados y bases de datos en el SO real, sin exponer credenciales o rutas privadas en logs.
+22.4.6 CREAR `tests/deployment/test_first_run_storage_initialization.py` para JSON ausente/vacio, SQLite nueva, reinicio y recuperacion; reutilizar contratos de `tests/hands/test_system_inventory_storage.py` y `tests/memory/` sin afirmar que esas suites prueban el bootstrap completo.
+
+22.5 ? ARRANQUE VIRGEN DE MAIN.PY Y MODOS DEGRADADOS REALES
+22.5.1 Ejecutar `python main.py` en la instancia limpia con configuracion por defecto y comprobar inicializacion real de Ear, Brain, UnifiedExecutor, Memory y Mouth segun las dependencias instaladas.
+22.5.2 Verificar el modo texto cuando TTS/microfono no este disponible y el mensaje concreto cuando falte un servicio/modelo requerido.
+22.5.3 Verificar que un modelo Ollama/proveedor ausente se detecta de forma explicita y que no se sustituye por una respuesta mock declarada como funcionamiento real.
+22.5.4 Comprobar que JARVIS puede iniciar, detenerse limpiamente y volver a iniciar sin datos heredados ni excepciones de imports/rutas.
+22.5.5 Verificar primer inventario con consentimiento explicito, progreso, pausa, reanudacion y cancelacion en la instancia nueva; no iniciar un escaneo global silencioso.
+22.5.6 CREAR `tests/deployment/test_main_clean_start_entorno_real.py` como prueba opt-in que arranque y detenga el proceso real en una VM limpia; conservar logs saneados y evidencia de procesos/recursos.
+
+22.6 ? DESCUBRIMIENTO, PREFLIGHT Y APERTURA DE APLICACIONES DEL SO LIMPIO
+22.6.1 Descubrir aplicaciones que realmente existan en la VM mediante las fuentes nativas del SO; no copiar `applications.json`, calibraciones ni inventario de otro equipo como si fueran instalados.
+22.6.2 Ejecutar ApplicationPreflight real sobre `notepad.exe` y `calc.exe` solo cuando el SO los proporcione; en otras plataformas elegir un equivalente inocuo instalado y anotar su identidad exacta.
+22.6.3 Abrir al menos una aplicacion GUI inocua mediante la ruta de produccion y verificar proceso, ventana, estado y limpieza de recursos propios; no mockear lanzador/proceso/ventana.
+22.6.4 Probar destino no instalado, ejecutable eliminado, permiso denegado, URI/paquete no soportado y resultado ambiguo; confirmar rechazo antes del lanzamiento.
+22.6.5 Comprobar que el descubrimiento no convierte herramientas CLI, instaladores, controladores o librerias en aplicaciones GUI lanzables.
+22.6.6 CREAR `tests/deployment/test_application_discovery_launch_clean_environment.py`; reutilizar `tests/hands/test_candidatos_reales_entorno_real.py` y `tests/hands/test_preflight_gatekeeper_entorno_real.py` para sus alcances, sin confundir clasificacion/preflight sin lanzar con apertura GUI.
+
+22.7 ? CALIBRACION Y MULTIMONITOR EN HARDWARE/SESION LIMPIOS
+22.7.1 Ejecutar la enumeracion real de monitores en el entorno limpio y comprobar geometria, DPI, escala y monitor principal/secundario.
+22.7.2 Calibrar la ventana inocua creada por la prueba usando Vision/captura reales y guardar la calibracion en el almacenamiento de la instancia nueva.
+22.7.3 Reiniciar JARVIS y comprobar recuperacion de la calibracion, revalidacion frente a la geometria actual y rechazo si el monitor/elemento ya no coincide.
+22.7.4 Probar un solo monitor y dos monitores cuando el entorno virtual/fisico los soporte; no declarar cobertura multipantalla a partir de una VM con un solo monitor.
+22.7.5 CREAR `tests/deployment/test_calibration_clean_environment_entorno_real.py`; reutilizar `tests/hands/test_calibration_manager.py`, `tests/hands/test_calibration_requirements.py`, `tests/eyes/test_vision_calibration_integration.py` y `tests/hands/windows/test_window_verification.py` como regresion de contrato.
+
+22.8 ? PORTABILIDAD DE RUTAS, IDENTIDAD Y DATOS ENTRE DOS EQUIPOS LIMPIOS
+22.8.1 Preparar dos instancias limpias independientes del mismo SO soportado con `machine_id` diferentes y almacenamiento separado.
+22.8.2 Verificar que el inventario, rutas absolutas, volumenes, ventanas, PID/HWND, calibraciones y preferencias de una instancia no se aceptan como datos actuales de la otra.
+22.8.3 Comprobar que la copia del codigo sin datos de usuario no depende del contenido local de la primera instancia.
+22.8.4 Comprobar que importar una configuracion portable solo transfiere los campos permitidos y que no transfiere credenciales, inventario local, identificadores privados ni coordenadas invalidadas.
+22.8.5 CREAR `tests/deployment/test_machine_isolation_clean_environments.py` con dos bases SQLite reales y dos directorios de datos aislados; contrastar ambas identidades contra el SO y el almacenamiento.
+
+22.9 ? VALIDACION REAL POR SISTEMA OPERATIVO ADICIONAL
+22.9.1 Solo si se pretende declarar Linux soportado, ejecutar instalacion limpia en VM Linux y probar adaptador de volumen, recorrido, permisos, persistencia, descubrimiento, lanzamiento, ventana y teclado/raton reales.
+22.9.2 Solo si se pretende declarar macOS soportado, ejecutar instalacion limpia en VM/equipo macOS y probar equivalentes nativos para volumenes, permisos, bundles/URI, lanzamiento, ventana y UI.
+22.9.3 No sustituir pruebas en Linux/macOS por tests de contrato ejecutados en Windows ni por mocks de sus APIs.
+22.9.4 Registrar por SO y version cada capacidad implementada, probada, bloqueada y no soportada; no declarar portabilidad universal mientras haya capacidades esenciales sin adaptador.
+22.9.5 CREAR pruebas de sistema real bajo `tests/deployment/` por plataforma solo despues de disponer de runner/VM real de ese SO; si no hay runner, dejar esa plataforma BLOQUEADA/NO VERIFICADA.
+
+22.10 ? REGRESION DE INSTALACION LIMPIA Y CRITERIOS DE CIERRE
+22.10.1 Ejecutar coleccion y suites pertinentes tras la instalacion limpia: `tests/brain/`, `tests/ear/`, `tests/eyes/`, `tests/hands/`, `tests/hands/planner/`, `tests/memory/` y `tests/tools/` segun dependencias y alcance real; registrar fallos preexistentes y suites no ejecutables.
+22.10.2 Ejecutar pruebas reales de arranque, primer inventario, consulta, descubrimiento, preflight, apertura inocua, calibracion y persistencia tras reinicio en la instancia limpia.
+22.10.3 Verificar que no se requiere copiar manualmente datos, calibraciones, rutas, caches o archivos privados desde el equipo de desarrollo para que el flujo declarado soportado funcione.
+22.10.4 Comprobar reinstalacion sobre una segunda instancia limpia y actualizacion sobre una instancia con datos generados por JARVIS, separando preservacion de datos de usuario de recreacion del entorno.
+22.10.5 Actualizar README/guia de instalacion unicamente con requisitos y capacidades realmente comprobados; documentar claramente dependencias opcionales y plataformas no soportadas.
+22.10.6 Marcar FASE 22 IMPLEMENTADA solo cuando exista al menos una instalacion limpia reproducible por cada plataforma declarada soportada y todas las rutas esenciales de esa plataforma hayan funcionado con dependencias reales. Una plataforma sin prueba real queda BLOQUEADA/NO VERIFICADA; no cerrar por una ejecucion satisfactoria en la maquina de desarrollo.
+
 
 --- FIN DEL ROADMAP ENUMERADO / INICIO DE LA DOCUMENTACION DETALLADA ---
 
@@ -8685,3 +8781,19 @@ REGRESION: Ninguna introducida por esta unidad. 326/326 tests pasan sin regresi�
 DISCREPANCIAS: Ninguna afectante a los criterios de aceptación de esta unidad.
 PENDIENTES: Ninguno para esta unidad. Padre 3.8.5.1.4.8 con hijas .8.1 a .8.10; .8.1 a .8.10 completadas. No hay siguiente hoja pendiente en 3.8.5.1.4.8.
 ESTADO FINAL: 3.8.5.1.4.8.10 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.8.5.1.4.9.1
+FECHA: 2026-11-11
+OBJETIVO: Integrar la consulta al inventario como fuente complementaria de 3.8.1-3.8.3, sin duplicar los mecanismos de descubrimiento que ya funcionan; esta integracion solo descubre/resuelve candidatos y los entrega a preflight, no lanza aplicaciones (unidad hoja de 3.8.5.1.4.9 Integracion del inventario con resolucion y preflight sin lanzamiento).
+TIPO DE TRABAJO: IMPLEMENTACION (correccion de bug) + VERIFICACION REAL
+CAMBIOS / HALLAZGOS:
+- Corregido `buscar_por_nombre` en `src/hands/application_discovery.py`: eliminada la pasada de `name=nombre` a `storage.search` (que usaba coincidencia exacta `lower(name) = lower(?)` en SQL y no encontraba entradas como "notepad.exe" al buscar "notepad"); reemplazado por filtrado de nombre en Python (coincidencia case-insensitive de subcadena), consistente con `_complemento_inventario` que ya no usa el filtro exacto de `name`.
+- Añadida prueba de integración con almacenamiento real en `tests/hands/test_application_discovery.py` (clase `TestInventarioComplementoAlmacenamientoReal`) que usa `SystemInventoryStorage` real (base de datos SQLite temporal) y `ApplicationPreflight` real para verificar que `buscar_por_nombre("notepad")` encuentra candidatos del inventario cuando las fuentes primarias no tienen coincidencia, validando el destino con preflight sin lanzar la aplicacion.
+- Verificada integracion con 3.8.1 (fuentes de descubrimiento: `buscar_por_nombre` consulta primarias primero, luego inventario como complemento), 3.8.2 (resolucion por nombre/alias), y 3.8.3 (descubrimiento del ejecutable: validacion de destino con `ApplicationPreflight.validate_launch_destination`, sin lanzamiento).
+- Se confirmo que no se lanza ninguna aplicacion, no se modifica `data/knowledge/entities.json`, no se persisten capacidades inferidas, y el almacenamiento esta aislado por equipo/volumen.
+ARCHIVOS MODIFICADOS: PRODUCCION: `src/hands/application_discovery.py` (correccion de filtro de nombre en `buscar_por_nombre`); TESTS: `tests/hands/test_application_discovery.py` (nueva clase `TestInventarioComplementoAlmacenamientoReal` con 1 prueba de integracion con almacenamiento real). No se modifico documentacion (no hay cambios de contrato publico: el comportamiento de `buscar_por_nombre` sigue siendo el mismo: devuelve candidatos del inventario como complemento cuando primarias no tienen coincidencia).
+TESTS Y RESULTADOS: UNITARIOS: 36 PASSED / 36 TOTAL (test_application_discovery.py, incluida la nueva prueba de integracion con almacenamiento real); ENTORNO REAL: verificacion real en Windows 11, Python 3.14.7 (x64), equipo DESKTOP-OUA1CIO: base de datos SQLite temporal real en %TEMP% con entrada para `C:\Windows\System32\notepad.exe`, `buscar_por_nombre("notepad")` con calibracion mockeada (sin resultados primarios) encuentra el candidato con `fuente="inventario"`, `esta_en_inventario=True`, `preflight_decision={"valid": True, "launch_type": "ejecutable", ...}` sin lanzar la aplicacion. Recursos temporales de verificacion limpiados. Sin interaccion grafica (sin ventanas, monitores ni teclado/raton).
+REGRESION: Ninguna introducida por esta unidad. 478/478 tests pasan sin regresion en test_application_preflight, test_application_preflight_availability, test_application_preflight_launch_destination, test_application_preflight_resolve_executable, test_application_launch_classifier, test_system_inventory y test_system_inventory_storage. main.py sigue importando correctamente.
+DISCREPANCIAS: Bug preexistente corregido: `buscar_por_nombre` pasaba `name=nombre` a `storage.search` (coincidencia exacta en SQL) lo que impedía encontrar entradas cuando el nombre buscado era subcadena del nombre almacenado (ej. "notepad" no coincidía con "notepad.exe"). Corregido filtrando por nombre en Python tras la consulta por extension, consistente con `_complemento_inventario`.
+PENDIENTES: Ninguno para esta unidad. Padre 3.8.5.1.4.9 con hijas .9.1 a .9.10; .9.1 completada. Siguiente hoja pendiente real: 3.8.5.1.4.9.2 (Definir orden de precedencia entre aplicacion ya abierta, catalogo conocido, fuentes nativas instaladas y candidatos del inventario; conservar procedencia y confianza).
+ESTADO FINAL: 3.8.5.1.4.9.1 - IMPLEMENTADA
