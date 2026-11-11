@@ -6801,7 +6801,10 @@ plausibles para un mismo nombre no se eligen silenciosamente; se conservan alter
 solicita desambiguación cuando la evidencia no permite decidir. Cubre la unidad 3.8.5.1.4.9.4:
 cuando la ruta de un candidato ha cambiado, ha desaparecido o ya no es accesible, se excluye de
 la resolución y se actualiza su estado (`disponible=False`, `ultima_comprobacion` y evidencia)
-sin intentar la ruta obsoleta; la resolución se repite con fuentes vigentes.
+sin intentar la ruta obsoleta; la resolución se repite con fuentes vigentes. Cubre la unidad
+3.8.5.1.4.9.5: vinculación del resultado de resolución con el catálogo global
+(`ApplicationManager` / `ApplicationKnowledge` de `data/memory/entities.json`) mediante contratos
+verificados, sin modificar `entities.json` ni auto-registrar candidatos.
 
 **Módulos de origen probados:** src.hands.application_discovery, src.hands.application_preflight,
 src.hands.application_launch_classifier
@@ -6882,6 +6885,21 @@ lanza ninguna aplicacion.
   - `test_registrar_candidatos_no_modifica_entities_json` (L725)
   - `test_flujo_descubrir_y_registrar_respeta_entidades_originales` (L772)
   - `test_esquema_entities_json_invariante_siete_entidades` (L814)
+
+- **`TestVinculacionCatalogo`** (línea 1515) — 6 método(s) de test
+  - Vinculación de candidato del inventario con entidad del catálogo por nombre.
+  - Candidato desconocido no se vincula a ningún ApplicationKnowledge.
+  - Preservación de la fuente autoritativa (aplicación abierta / catálogo conocido).
+  - Coincidencia por stem del ejecutable sin extensión.
+  - `vincular_con_catalogo` solo lee `data/memory/entities.json` (huella invariante).
+  - `buscar_por_nombre_con_catalogo` devuelve tupla ordenada con preflight real.
+
+- **`TestVinculacionCatalogoEntornoReal`** (línea 1736) — 3 método(s) de test
+  - Candidato de inventario (notepad.exe) vinculado a la entidad global real y su
+    `ApplicationKnowledge`; `entities.json` sin modificar.
+  - Candidato sin entidad en el catálogo: `en_catalogo_global=False` sin lanzar nada.
+  - `buscar_por_nombre_con_catalogo` con almacenamiento y catalogo reales, preflight
+    real, sin lanzamiento.
 
 ---
 

@@ -792,12 +792,15 @@ Reutiliza `CalibrationManager.discover_applications`, `LaunchClassifier` y
 lectura sola: no lanza aplicaciones, no modifica `data/knowledge/entities.json`
 ni el catalogo conocido, y no persiste capacidades inferidas. Provee
 `registrar_candidatos` para persistir candidatos clasificados en la tabla
-`application_candidates` del almacenamiento SQLite (unidad
-3.8.5.1.4.7.6: fuente, ruta/destino, tipo de lanzamiento, version/producto,
-ultima comprobacion, evidencia y nivel de confianza). Cuando existen varias
-coincidencias plausibles para un mismo nombre, no elige silenciosamente una:
-conserva todas las alternativas y expone una señal de ambigüedad para que el
-llamar solicite desambiguación (unidad 3.8.5.1.4.9.3).
+`application_candidates` del almacenamiento SQLite (fuente, ruta/destino,
+tipo de lanzamiento, version/producto, ultima comprobacion, evidencia y
+nivel de confianza). Cuando existen varias coincidencias plausibles para un
+mismo nombre, no elige silenciosamente una: conserva todas las alternativas
+y expone una señal de ambigüedad para que el llamador solicite
+desambiguación. Vincula el resultado de la resolución con el catálogo global
+de aplicaciones (`ApplicationManager` / `ApplicationKnowledge`) mediante
+contratos verificados, sin modificar `entities.json` ni auto-registrar
+candidatos (el puente de auto-registro corresponde a una unidad posterior).
 
 **Características:**
 
@@ -858,6 +861,18 @@ Métodos:
 |---|---|
 | `def to_dict()` | Serializa el resultado (candidatos, alternativas, flags de ambigüedad y fuente autoritativa) a diccionario plano. |
 
+`class CandidatoConCatalogo` — Resultado de vincular un `DiscoveredCandidate`
+con el catálogo global de aplicaciones (`ApplicationManager` /
+`ApplicationKnowledge`): indica si el candidato existe en el catálogo global,
+expone su `ApplicationKnowledge` cuando procede y la fuente autoritativa.
+Solo lectura: no modifica `entities.json` ni registra candidatos.
+
+Métodos:
+
+| Firma | Docstring |
+|---|---|
+| `def to_dict()` | Serializa el candidato, el vínculo con el catálogo y el conocimiento asociado a diccionario plano. |
+
 `class ApplicationDiscovery` — Orquestador de descubrimiento que reutiliza primero las fuentes
 existentes del SO y usa el inventario como fuente complementaria para destinos faltantes.
 
@@ -872,6 +887,8 @@ Métodos:
 | `def candidatos_lanzables(limite_por_fuente, incluir_inventario)` | Devuelve solo candidatos clasificados como lanzables tras validar con preflight (sin lanzar). |
 | `def registrar_candidatos(candidatos, volume, scan_id)` | Persiste candidatos clasificados en `application_candidates` con todos los campos de registro (fuente, ruta/destino, tipo de lanzamiento, version/producto, ultima comprobacion, evidencia, confianza). |
 | `def deduplicar_por_destino_real(candidatos)` | Deduplica una lista de `DiscoveredCandidate` ya clasificados por identidad y destino real (ruta normalizada o URI), conservando el de mayor confianza/evidencia por destino y todas las rutas de instalaciones distintas. |
+| `def vincular_con_catalogo(candidatos)` | Vincula cada `DiscoveredCandidate` con el catálogo global (`ApplicationManager` / `ApplicationKnowledge`) mediante contratos verificados, retornando `CandidatoConCatalogo` por candidato sin modificar `entities.json`. |
+| `def buscar_por_nombre_con_catalogo(nombre, incluir_inventario, limite_por_fuente)` | Resuelve un nombre por fuentes y vincula cada candidato con el catálogo global; retorna `(candidatos, vinculados)` en el mismo orden, sin lanzar nada. |
 
 <a name="src-hands-application_launch_classifier-py"></a>
 ### `src/hands/application_launch_classifier.py` [855 líneas] — Clasificador de candidatos por tipo de lanzamiento.

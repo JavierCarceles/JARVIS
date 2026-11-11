@@ -235,6 +235,49 @@ class ResultadoResolucionCandidatos:
         }
 
 
+@dataclass
+class CandidatoConCatalogo:
+    """
+    Resultado de vincular un `DiscoveredCandidate` con el catálogo global de
+    aplicaciones (`ApplicationManager` / `data/memory/entities.json`) sin
+    modificarlo.
+
+    Mantiene separados los conceptos de la unidad 3.8.5.1.4.9.5: el archivo
+    inventariado (origen del candidato), el propio candidato descubierto, la
+    entidad global del catálogo (si existe) y su `ApplicationKnowledge`, y el
+    destino autorizado (validado por `ApplicationPreflight`, sin lanzar). No
+    lanza aplicaciones, no escribe en `entities.json` ni registra ni
+    auto-registra candidatos (el puente de auto-registro corresponde a
+    3.8.5.1.4.11) y no crea rutas paralelas de Brain/Planner/Executor.
+    """
+
+    candidato: DiscoveredCandidate
+    en_catalogo_global: bool
+    conocimiento: Optional[Any]
+    fuente_autoritaria: Optional[str]
+
+    def to_dict(self) -> dict:
+        conocimiento = None
+        if self.conocimiento is not None:
+            conocimiento = {
+                "name": self.conocimiento.name,
+                "type": self.conocimiento.type,
+                "executable": self.conocimiento.executable,
+                "url": self.conocimiento.url,
+                "login_required": self.conocimiento.login_required,
+                "default_state": self.conocimiento.default_state.value,
+                "capabilities": [
+                    cap.capability.value for cap in (self.conocimiento.capabilities or [])
+                ],
+            }
+        return {
+            "candidato": self.candidato.to_dict(),
+            "en_catalogo_global": self.en_catalogo_global,
+            "conocimiento": conocimiento,
+            "fuente_autoritaria": self.fuente_autoritaria,
+        }
+
+
 # ---------------------------------------------------------------------------
 # Orquestador de descubrimiento
 # ---------------------------------------------------------------------------
@@ -256,6 +299,7 @@ class ApplicationDiscovery:
         storage: Optional[SystemInventoryStorage] = None,
         calibration: Optional[CalibrationManager] = None,
         machine_id: Optional[str] = None,
+        app_manager: Optional[Any] = None,
     ) -> None:
         self.preflight = preflight or ApplicationPreflight()
         # El clasificador ya valida con preflight internamente (.7.10).
@@ -263,6 +307,11 @@ class ApplicationDiscovery:
         self.storage = storage or SystemInventoryStorage()
         self.calibration = calibration or CalibrationManager()
         self.machine_id = machine_id or generate_machine_id()
+        # Gestor del catálogo global (ApplicationManager / entities.json).
+        # Inyectable para pruebas; por defecto la instancia singleton real.
+        from src.hands.applications_core import get_application_manager
+
+        self.app_manager = app_manager or get_application_manager()
         # Estado de la última resolución: candidatos cuyo destino dejó de ser
         # accesible (ruta cambiada, desaparecida o inaccesible); su estado se
         # actualiza (disponible=False) y su ruta no se intenta ni se devuelve.
@@ -532,6 +581,102 @@ class ApplicationDiscovery:
             requiere_desambiguacion=ambiguo,
             fuente_autoritaria=fuente_autoritaria,
         )
+
+    # ------------------------------------------------------------------ #
+    # Conexión con el catálogo global (ApplicationManager / ApplicationKnowledge)
+    # (unidad 3.8.5.1.4.9.5)
+    # ------------------------------------------------------------------ #
+
+    def _conocimiento_para_candidato(
+        self, candidato: DiscoveredCandidate
+    ) -> Optional[Any]:
+        """
+        Resuelve el candidato contra el catálogo global probando, en orden:
+        (1) el nombre del candidato tal cual; (2) el nombre del ejecutable sin
+        extensión (ej. "notepad.exe" -> "notepad"); (3) el nombre comercial
+        observado. Solo usa `ApplicationManager.get_application` (contrato
+        verificado); nunca escribe ni registra en el catálogo.
+        """
+        nombres_a_probar: list[str] = []
+        nombre = str(candidato.nombre_comercial or candidato.name or "").strip()
+        if nombre:
+            nombres_a_probar.append(nombre)
+        ruta = str(candidato.absolute_path or candidato.destination or "").strip()
+        if ruta:
+            try:
+                stem = Path(ruta).stem
+            except (OSError, ValueError):
+                stem = ""
+            if stem and stem.casefold() != nombre.casefold():
+                nombres_a_probar.append(stem)
+        for nombre_probar in dict.fromkeys(nombres_a_probar):
+            app = self.app_manager.get_application(nombre_probar)
+            if app is not None:
+                return app
+        return None
+
+    def vincular_con_catalogo(
+        self, candidatos: list[DiscoveredCandidate]
+    ) -> list[CandidatoConCatalogo]:
+        """
+        Vincula cada candidato resuelto con el catálogo global de aplicaciones
+        (`ApplicationManager` / `data/memory/entities.json`) mediante contratos
+        verificados: `get_application_manager()` y
+        `ApplicationManager.get_application(nombre)`.
+
+        Cuando un candidato se encuentra en el catálogo se devuelve su
+        `ApplicationKnowledge` con `en_catalogo_global=True`; si no, se devuelve
+        `en_catalogo_global=False` y `conocimiento=None`. La fuente autoritativa
+        se preserva cuando el candidato ya proviene de una fuente autoritativa
+        (aplicación ya abierta o catálogo conocido).
+
+        No lanza aplicaciones, no modifica `entities.json`, no registra ni
+        auto-registra candidatos (el puente de auto-registro corresponde a
+        3.8.5.1.4.11) y no crea rutas paralelas de Brain/Planner/Executor.
+        """
+        vinculados: list[CandidatoConCatalogo] = []
+        for c in candidatos:
+            conocimiento = self._conocimiento_para_candidato(c)
+            en_catalogo = conocimiento is not None
+            fuente_prop = str(c.fuente or "").strip()
+            if fuente_prop in _FUENTES_AUTORITATIVAS:
+                fuente_autoritaria = fuente_prop
+            elif en_catalogo:
+                fuente_autoritaria = FUENTE_CATALOGO
+            else:
+                fuente_autoritaria = None
+            vinculados.append(
+                CandidatoConCatalogo(
+                    candidato=c,
+                    en_catalogo_global=en_catalogo,
+                    conocimiento=conocimiento,
+                    fuente_autoritaria=fuente_autoritaria,
+                )
+            )
+        return vinculados
+
+    def buscar_por_nombre_con_catalogo(
+        self,
+        nombre: str,
+        incluir_inventario: bool = True,
+        limite_por_fuente: int = 50,
+    ) -> tuple[list[DiscoveredCandidate], list[CandidatoConCatalogo]]:
+        """
+        Resuelve un nombre por fuentes (como `buscar_por_nombre`) y vincula cada
+        candidato resuelto con el catálogo global de aplicaciones.
+
+        Retorna `(candidatos, vinculados)` con el mismo orden: `candidatos` es
+        la lista de `DiscoveredCandidate` y `vinculado[i]` es la vinculación de
+        `candidatos[i]` con `ApplicationManager`/`ApplicationKnowledge`. No
+        lanza aplicaciones ni modifica `entities.json`.
+        """
+        candidatos = self.buscar_por_nombre(
+            nombre,
+            incluir_inventario=incluir_inventario,
+            limite_por_fuente=limite_por_fuente,
+        )
+        vinculados = self.vincular_con_catalogo(candidatos)
+        return candidatos, vinculados
 
     def _evaluar_ambiguedad(
         self, candidatos: list[DiscoveredCandidate]

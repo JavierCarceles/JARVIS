@@ -38,6 +38,7 @@ import pytest
 
 from src.hands.application_discovery import (
     ApplicationDiscovery,
+    CandidatoConCatalogo,
     DiscoveredCandidate,
     FUENTE_APP_PATHS,
     FUENTE_APPX,
@@ -51,6 +52,11 @@ from src.hands.application_discovery import (
     ResultadoResolucionCandidatos,
 )
 from src.hands.application_preflight import ApplicationPreflight
+from src.hands.applications_core import (
+    ApplicationCapability,
+    ApplicationCapabilityDef,
+    ApplicationKnowledge,
+)
 from src.hands.application_launch_classifier import (
     CONFIANZA_ALTA,
     CONFIANZA_BAJA,
@@ -1424,3 +1430,464 @@ class TestEstadoVigenteRutasInaccesibles:
         finally:
             if os.path.exists(ruta_inaccesible):
                 os.unlink(ruta_inaccesible)
+
+
+# ---------------------------------------------------------------------------
+# Unidad 3.8.5.1.4.9.5: conexion del resultado de resolucion con
+# ApplicationManager / ApplicationKnowledge (catalogo global entities.json)
+# ---------------------------------------------------------------------------
+
+
+class _AppManagerFake:
+    """Doble ligero de ApplicationManager con get_application controlado por
+    prueba. Solo lectura: nunca escribe entities.json."""
+
+    def __init__(self, apps_por_nombre: Optional[dict] = None) -> None:
+        self._apps = {str(k).strip().lower(): v for k, v in (apps_por_nombre or {}).items()}
+        self.llamadas: list[str] = []
+
+    def get_application(self, app_name: str):
+        self.llamadas.append(str(app_name))
+        return self._apps.get(str(app_name).strip().lower())
+
+
+def _conocimiento_prueba(
+    nombre: str = "Notepad", executable: str = "notepad.exe", tipo: str = "application"
+) -> ApplicationKnowledge:
+    return ApplicationKnowledge(
+        name=nombre,
+        type=tipo,
+        executable=executable,
+        capabilities=[
+            ApplicationCapabilityDef(
+                capability=ApplicationCapability.OPEN,
+                name="open_" + nombre.strip().lower().replace(" ", "_"),
+                description=f"Abre {nombre}",
+                required_ui_elements=[],
+                preconditions=[],
+                effects=[],
+                cost=5.0,
+            )
+        ],
+    )
+
+
+def _ruta_entities_json_memoria() -> Path:
+    """Ruta absoluta a data/memory/entities.json (catalogo global)."""
+    return Path(__file__).resolve().parents[2] / "data" / "memory" / "entities.json"
+
+
+def _hash_archivo(ruta: Path) -> str:
+    """Huella SHA-256 de un archivo; solo lectura, nunca escritura."""
+    h = hashlib.sha256()
+    with open(ruta, "rb") as f:
+        for bloque in iter(lambda: f.read(65536), b""):
+            h.update(bloque)
+    return h.hexdigest()
+
+
+def _discovery_con_manager_y_storage(
+    app_manager,
+    storage_entries: Optional[list] = None,
+    machine_id: str = "maquina-vincula",
+    calib_apps: Optional[list] = None,
+):
+    """ApplicationDiscovery con preflight/clasificador REALES, storage mockeado
+    y application_manager inyectado."""
+    preflight = ApplicationPreflight()
+    clasificador = LaunchClassifier(preflight=preflight)
+    storage = MagicMock()
+    storage.connect.return_value = None
+    storage.close.return_value = None
+    storage.search.return_value = storage_entries or []
+    calib = MagicMock()
+    calib.discover_applications.return_value = calib_apps or []
+    return ApplicationDiscovery(
+        preflight=preflight,
+        clasificador=clasificador,
+        storage=storage,
+        calibration=calib,
+        machine_id=machine_id,
+        app_manager=app_manager,
+    )
+
+
+class TestVinculacionCatalogo:
+    """Unidad 3.8.5.1.4.9.5: vincular candidatos con ApplicationManager /
+    ApplicationKnowledge solo mediante contratos verificados, sin modificar
+    entities.json, sin lanzar aplicaciones y sin auto-registro."""
+
+    def test_vinculacion_encuentra_conocimiento_por_nombre_tal_cual(self):
+        """Candidato del inventario cuyo nombre coincide con una entidad del
+        catalogo global: se vincula su ApplicationKnowledge."""
+        manager = _AppManagerFake(
+            {"bloc de notas": _conocimiento_prueba("Bloc de notas", "notepad.exe")}
+        )
+        discovery = _discovery_con_manager_y_storage(manager)
+        candidato = DiscoveredCandidate(
+            candidate_id="inv-1",
+            name="bloc de notas",
+            absolute_path=r"C:\Windows\System32\notepad.exe",
+            destination=r"C:\Windows\System32\notepad.exe",
+            fuente=FUENTE_INVENTARIO,
+            esta_en_inventario=True,
+            disponible=True,
+        )
+        vinculados = discovery.vincular_con_catalogo([candidato])
+        assert len(vinculados) == 1
+        v = vinculados[0]
+        assert v.candidato is candidato
+        assert v.en_catalogo_global is True
+        assert v.conocimiento is not None
+        assert v.conocimiento.name == "Bloc de notas"
+        assert v.conocimiento.executable == "notepad.exe"
+        # fuente inventario no es autoritativa; el catalogo decide la identidad
+        assert v.fuente_autoritaria == FUENTE_CATALOGO
+        d = v.to_dict()
+        assert d["en_catalogo_global"] is True
+        assert d["conocimiento"]["name"] == "Bloc de notas"
+        assert d["conocimiento"]["executable"] == "notepad.exe"
+
+    def test_vinculacion_no_encuentra_conocimiento_desconocido(self):
+        """Candidato del inventario sin entidad en el catalogo: no se vincula
+        a ningun ApplicationKnowledge."""
+        manager = _AppManagerFake({})
+        discovery = _discovery_con_manager_y_storage(manager)
+        with tempfile.NamedTemporaryFile(suffix=".exe", delete=False) as f:
+            ruta_sonda = f.name
+        try:
+            candidato = DiscoveredCandidate(
+                candidate_id="inv-sonda",
+                name="sondapp.exe",
+                absolute_path=ruta_sonda,
+                destination=ruta_sonda,
+                fuente=FUENTE_INVENTARIO,
+                esta_en_inventario=True,
+                disponible=True,
+            )
+            vinculados = discovery.vincular_con_catalogo([candidato])
+            assert len(vinculados) == 1
+            v = vinculados[0]
+            assert v.en_catalogo_global is False
+            assert v.conocimiento is None
+            assert v.fuente_autoritaria is None
+        finally:
+            if os.path.exists(ruta_sonda):
+                os.unlink(ruta_sonda)
+
+    def test_vinculacion_preserva_fuente_autoritaria(self):
+        """La fuente autoritativa (aplicacion abierta / catalogo conocido) se
+        preserva; un candidato del inventario vinculado al catalogo pasa a
+        catalogo_conocido y uno no encontrado queda sin fuente autoritativa."""
+        app = _conocimiento_prueba("App", "app.exe")
+        manager = _AppManagerFake({"app": app})
+        discovery = _discovery_con_manager_y_storage(manager)
+
+        abierta = DiscoveredCandidate(
+            candidate_id="a", name="app.exe", absolute_path=r"C:\app.exe",
+            destination=r"C:\app.exe", fuente=FUENTE_APLICACION_ABIERTA, disponible=True,
+        )
+        catalogo = DiscoveredCandidate(
+            candidate_id="b", name="app.exe", absolute_path=r"C:\app.exe",
+            destination=r"C:\app.exe", fuente=FUENTE_CATALOGO, disponible=True,
+        )
+        inventario_encontrado = DiscoveredCandidate(
+            candidate_id="c", name="app.exe", absolute_path=r"C:\app.exe",
+            destination=r"C:\app.exe", fuente=FUENTE_INVENTARIO, disponible=True,
+        )
+        inventario_no_encontrado = DiscoveredCandidate(
+            candidate_id="d", name="otro.exe", absolute_path=r"C:\otro.exe",
+            destination=r"C:\otro.exe", fuente=FUENTE_INVENTARIO, disponible=True,
+        )
+        vinculados = discovery.vincular_con_catalogo(
+            [abierta, catalogo, inventario_encontrado, inventario_no_encontrado]
+        )
+        assert [v.fuente_autoritaria for v in vinculados] == [
+            FUENTE_APLICACION_ABIERTA,
+            FUENTE_CATALOGO,
+            FUENTE_CATALOGO,
+            None,
+        ]
+        assert [v.en_catalogo_global for v in vinculados] == [True, True, True, False]
+
+    def test_vinculacion_coincide_por_stem_ejecutivo_sin_extension(self):
+        """El nombre del ejecutable sin extension permite vincular con el
+        catalogo cuando el nombre del archivo difiere (p.ej. instalador)."""
+        manager = _AppManagerFake(
+            {"discord": _conocimiento_prueba("Discord", "Discord.exe")}
+        )
+        discovery = _discovery_con_manager_y_storage(manager)
+        candidato = DiscoveredCandidate(
+            candidate_id="inv-discord",
+            name="DiscordInstalador.exe",
+            absolute_path=r"C:\Program Files\Discord\Discord.exe",
+            destination=r"C:\Program Files\Discord\Discord.exe",
+            fuente=FUENTE_INVENTARIO,
+            esta_en_inventario=True,
+            disponible=True,
+        )
+        vinculados = discovery.vincular_con_catalogo([candidato])
+        assert len(vinculados) == 1
+        v = vinculados[0]
+        assert v.en_catalogo_global is True
+        assert v.conocimiento is not None
+        assert v.conocimiento.name == "Discord"
+        assert v.fuente_autoritaria == FUENTE_CATALOGO
+
+    def test_vinculacion_no_modifica_entities_json_memoria(self):
+        """Con el ApplicationManager real (catalogo entities.json), vincular
+        solo lee: la huella de data/memory/entities.json no cambia."""
+        discovery = ApplicationDiscovery(machine_id="maquina-vincula-real")
+        hash_antes = _hash_archivo(_ruta_entities_json_memoria())
+
+        conocidos = [
+            DiscoveredCandidate(
+                candidate_id="r1",
+                name="bloc de notas",
+                absolute_path=r"C:\Windows\System32\notepad.exe",
+                destination=r"C:\Windows\System32\notepad.exe",
+                fuente=FUENTE_INVENTARIO,
+                esta_en_inventario=True,
+                disponible=True,
+            ),
+            DiscoveredCandidate(
+                candidate_id="r2",
+                name="sondapp-no-existe.exe",
+                absolute_path=r"C:\no\existe\sondapp.exe",
+                destination=r"C:\no\existe\sondapp.exe",
+                fuente=FUENTE_INVENTARIO,
+                esta_en_inventario=True,
+                disponible=True,
+            ),
+        ]
+        vinculados = discovery.vincular_con_catalogo(conocidos)
+        assert len(vinculados) == 2
+        assert vinculados[0].en_catalogo_global is True
+        assert vinculados[0].conocimiento is not None
+        assert vinculados[0].conocimiento.name == "Bloc de notas"
+        assert vinculados[0].conocimiento.executable == "notepad.exe"
+        assert vinculados[1].en_catalogo_global is False
+        assert vinculados[1].conocimiento is None
+
+        hash_despues = _hash_archivo(_ruta_entities_json_memoria())
+        assert hash_despues == hash_antes, (
+            "vincular_con_catalogo no debe escribir data/memory/entities.json"
+        )
+
+    def test_buscar_por_nombre_con_catalogo_devuelve_tupla_ordenada(self):
+        """Flujo combinado: buscar_por_nombre + vincular_con_catalogo con
+        preflight/clasificador reales sobre un archivo real. Nombre sin entidad
+        en el catalogo devuelve candidato de inventario sin vinculo."""
+        with tempfile.NamedTemporaryFile(suffix=".exe", delete=False) as f:
+            ruta_sonda = f.name
+            f.write(b"MZ" + b"\x00" * 64)
+        try:
+            manager = _AppManagerFake({})
+            storage = MagicMock()
+            storage.connect.return_value = None
+            storage.close.return_value = None
+            storage.search.return_value = [
+                {
+                    "entry_id": "e-sonda",
+                    "absolute_path": ruta_sonda,
+                    "relative_path": ruta_sonda,
+                    "name": "sondapp.exe",
+                    "extension": ".exe",
+                    "entry_type": EntryType.FILE.value,
+                    "size_bytes": 1024,
+                    "modified_at": "2024-01-01T10:00:00",
+                    "created_at": "2024-01-01T09:00:00",
+                    "attributes": [],
+                    "excluded": False,
+                    "source": "filesystem_scan",
+                    "last_checked_at": "2024-01-03T00:00:00",
+                    "volume": "C:",
+                }
+            ]
+            preflight = ApplicationPreflight()
+            clasificador = LaunchClassifier(preflight=preflight)
+            calib = MagicMock()
+            calib.discover_applications.return_value = []
+            discovery = ApplicationDiscovery(
+                preflight=preflight,
+                clasificador=clasificador,
+                storage=storage,
+                calibration=calib,
+                machine_id="maquina-vincula-tupla",
+                app_manager=manager,
+            )
+            candidatos, vinculados = discovery.buscar_por_nombre_con_catalogo("sondapp")
+            assert len(candidatos) == len(vinculados) == 1
+            assert vinculados[0].candidato is candidatos[0]
+            assert candidatos[0].fuente == FUENTE_INVENTARIO
+            assert candidatos[0].preflight_decision is not None
+            assert "valid" in candidatos[0].preflight_decision
+            assert vinculados[0].en_catalogo_global is False
+            assert vinculados[0].conocimiento is None
+            assert vinculados[0].fuente_autoritaria is None
+            # Se uso realmente el contrato del catalogo (consulta por nombre y
+            # por stem del ejecutable).
+            assert "sondapp.exe" in manager.llamadas
+        finally:
+            if os.path.exists(ruta_sonda):
+                os.unlink(ruta_sonda)
+
+
+class TestVinculacionCatalogoEntornoReal:
+    """Unidad 3.8.5.1.4.9.5 con componentes reales: ApplicationManager real
+    (catalogo data/memory/entities.json), almacenamiento SQLite temporal real,
+    LaunchClassifier y ApplicationPreflight reales. Solo lectura: no lanza nada
+    ni modifica entities.json."""
+
+    def _almacenamiento_con_entrada(
+        self, tmp_path, entry_id: str, ruta: str, nombre: str, machine_id: str
+    ) -> SystemInventoryStorage:
+        db_path = tmp_path / "test_inventory_vincula.sqlite3"
+        storage = SystemInventoryStorage(db_path=db_path)
+        storage.initialize()
+        storage.record_machine(machine_id)
+        storage.record_volume("vol-c:", machine_id, "C:", "local", "online")
+        storage.begin_scan_run(
+            "scan-vincula", machine_id, "C:", SCAN_MODE_FULL, "2024-01-03T00:00:00",
+        )
+        storage.insert_file_entries(
+            "scan-vincula",
+            machine_id,
+            "C:",
+            [
+                {
+                    "entry_id": entry_id,
+                    "absolute_path": ruta,
+                    "relative_path": ruta,
+                    "name": nombre,
+                    "extension": ".exe",
+                    "entry_type": EntryType.FILE.value,
+                    "size_bytes": 1024,
+                    "modified_at": "2024-01-01T10:00:00",
+                    "created_at": "2024-01-01T09:00:00",
+                    "attributes": [],
+                    "excluded": False,
+                    "source": "filesystem_scan",
+                    "last_checked_at": "2024-01-03T00:00:00",
+                    "volume": "C:",
+                }
+            ],
+        )
+        storage.end_scan_run("scan-vincula", "2024-01-03T01:00:00", SCAN_RESULT_OK, 1, 0, 0, 100.0)
+        return storage
+
+    def test_catalogo_real_reconoce_notepad_desde_inventario(self, tmp_path):
+        """Candidato del inventario (notepad.exe) se vincula con la entidad
+        global real del catalogo y su ApplicationKnowledge; entities.json no
+        se modifica."""
+        notepad = r"C:\Windows\System32\notepad.exe"
+        if not os.path.exists(notepad):
+            pytest.skip("notepad.exe no disponible en este equipo")
+        storage = self._almacenamiento_con_entrada(
+            tmp_path, "e-notepad-real", notepad, "notepad.exe", "maquina-vincula-real"
+        )
+        calib = MagicMock()
+        calib.discover_applications.return_value = []
+        discovery = ApplicationDiscovery(
+            preflight=ApplicationPreflight(),
+            clasificador=LaunchClassifier(preflight=ApplicationPreflight()),
+            storage=storage,
+            calibration=calib,
+            machine_id="maquina-vincula-real",
+        )
+        hash_antes = _hash_archivo(_ruta_entities_json_memoria())
+
+        candidato = DiscoveredCandidate(
+            candidate_id="inv-notepad",
+            name="bloc de notas",
+            absolute_path=notepad,
+            destination=notepad,
+            fuente=FUENTE_INVENTARIO,
+            esta_en_inventario=True,
+            disponible=True,
+        )
+        vinculados = discovery.vincular_con_catalogo([candidato])
+        assert len(vinculados) == 1
+        v = vinculados[0]
+        assert v.en_catalogo_global is True
+        assert v.conocimiento is not None
+        assert v.conocimiento.name == "Bloc de notas"
+        assert v.conocimiento.executable == "notepad.exe"
+        assert v.fuente_autoritaria == FUENTE_CATALOGO
+
+        hash_despues = _hash_archivo(_ruta_entities_json_memoria())
+        assert hash_despues == hash_antes, (
+            "vincular_con_catalogo no debe escribir data/memory/entities.json"
+        )
+
+    def test_catalogo_real_no_encuentra_desconocido(self, tmp_path):
+        """Candidato del inventario sin entidad en el catalogo: en_catalogo_global
+        False y conocimiento None, sin lanzar nada."""
+        with tempfile.NamedTemporaryFile(suffix=".exe", delete=False) as f:
+            ruta_sonda = f.name
+            f.write(b"MZ" + b"\x00" * 64)
+        try:
+            storage = self._almacenamiento_con_entrada(
+                tmp_path, "e-sonda-real", ruta_sonda, "sondapp95.exe", "maquina-vincula-real-b"
+            )
+            calib = MagicMock()
+            calib.discover_applications.return_value = []
+            discovery = ApplicationDiscovery(
+                preflight=ApplicationPreflight(),
+                clasificador=LaunchClassifier(preflight=ApplicationPreflight()),
+                storage=storage,
+                calibration=calib,
+                machine_id="maquina-vincula-real-b",
+            )
+            hash_antes = _hash_archivo(_ruta_entities_json_memoria())
+            candidato = DiscoveredCandidate(
+                candidate_id="inv-sonda",
+                name="sondapp95.exe",
+                absolute_path=ruta_sonda,
+                destination=ruta_sonda,
+                fuente=FUENTE_INVENTARIO,
+                esta_en_inventario=True,
+                disponible=True,
+            )
+            vinculados = discovery.vincular_con_catalogo([candidato])
+            assert len(vinculados) == 1
+            assert vinculados[0].en_catalogo_global is False
+            assert vinculados[0].conocimiento is None
+            assert vinculados[0].fuente_autoritaria is None
+            hash_despues = _hash_archivo(_ruta_entities_json_memoria())
+            assert hash_despues == hash_antes
+        finally:
+            if os.path.exists(ruta_sonda):
+                os.unlink(ruta_sonda)
+
+    def test_buscar_por_nombre_con_catalogo_flujo_real(self, tmp_path):
+        """buscar_por_nombre_con_catalogo con almacenamiento real y catalogo real:
+        nombre sin entidad en el catalogo devuelve candidato de inventario sin
+        vinculo al catalogo; preflight real ejecutado sin lanzar."""
+        with tempfile.NamedTemporaryFile(suffix=".exe", delete=False) as f:
+            ruta_sonda = f.name
+            f.write(b"MZ" + b"\x00" * 64)
+        try:
+            storage = self._almacenamiento_con_entrada(
+                tmp_path, "e-flujo-real", ruta_sonda, "sondapp96.exe", "maquina-vincula-real-c"
+            )
+            calib = MagicMock()
+            calib.discover_applications.return_value = []
+            discovery = ApplicationDiscovery(
+                preflight=ApplicationPreflight(),
+                clasificador=LaunchClassifier(preflight=ApplicationPreflight()),
+                storage=storage,
+                calibration=calib,
+                machine_id="maquina-vincula-real-c",
+            )
+            candidatos, vinculados = discovery.buscar_por_nombre_con_catalogo("sondapp96")
+            assert len(candidatos) == len(vinculados) == 1
+            assert candidatos[0].fuente == FUENTE_INVENTARIO
+            assert candidatos[0].preflight_decision is not None
+            assert "valid" in candidatos[0].preflight_decision
+            assert vinculados[0].en_catalogo_global is False
+            assert vinculados[0].conocimiento is None
+            assert vinculados[0].fuente_autoritaria is None
+        finally:
+            if os.path.exists(ruta_sonda):
+                os.unlink(ruta_sonda)
