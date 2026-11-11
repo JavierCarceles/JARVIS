@@ -578,6 +578,31 @@ class TestDeduplicacion:
         finally:
             os.unlink(bare)
 
+    def test_mismo_uri_lanzador_dos_candidatos_queda_uno(self):
+        """Dos URIs de lanzador iguales (mismo destino real) se deduplican a uno."""
+        clasificador = LaunchClassifier()
+        uri = "steam://rungameid/12345"
+        candidatos = [
+            _candidato("steam_a", uri, source="start_menu"),
+            _candidato("steam_b", uri, source="appx"),
+        ]
+        resultado = clasificador.classify_candidates(candidatos)
+        assert len(resultado) == 1, f"Se esperaba 1 resultado, se obtuvieron {len(resultado)}"
+        assert resultado[0].destination == uri
+        assert resultado[0].launch_type == "lanzador"
+
+    def test_uris_lanzador_distintas_se_conservan_todas(self):
+        """URIs de lanzador distintas son destinos diferentes: se conservan todas."""
+        clasificador = LaunchClassifier()
+        candidatos = [
+            _candidato("steam_a", "steam://rungameid/100", source="start_menu"),
+            _candidato("epic_b", "epic://launch/200", source="appx"),
+        ]
+        resultado = clasificador.classify_candidates(candidatos)
+        assert len(resultado) == 2, f"Se esperaban 2 resultados, se obtuvieron {len(resultado)}"
+        destinos = {c.destination for c in resultado}
+        assert destinos == {"steam://rungameid/100", "epic://launch/200"}
+
 
 def _puntos(confianza: str) -> int:
     return {"alta": 3, "media": 2, "baja": 1, "ninguna": 0}.get(confianza, 0)

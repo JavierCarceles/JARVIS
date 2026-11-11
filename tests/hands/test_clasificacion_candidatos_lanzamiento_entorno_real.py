@@ -329,3 +329,62 @@ class TestRegistroCampos76EntornoReal:
         )
         assert c.fuente == "menu_inicio"
         assert c.to_dict()["fuente"] == "menu_inicio"
+
+
+# ---------------------------------------------------------------------------
+class TestDeduplicacionEntornoReal:
+    """.7.7: deduplicacion por identidad y destino real en entorno real,
+    sin lanzar aplicaciones."""
+
+    def test_mismo_ejecutable_real_dos_candidatos_queda_uno(self, clasificador):
+        """python.exe real desde dos candidatos: se deduplica a uno por destino real."""
+        ruta = sys.executable
+        candidatos = [
+            {"name": "python_a", "absolute_path": ruta, "source": "start_menu"},
+            {"name": "python_b", "absolute_path": ruta, "source": "appx"},
+        ]
+        resultado = clasificador.classify_candidates(candidatos)
+        assert len(resultado) == 1, f"Se esperaba 1, se obtuvieron {len(resultado)}"
+        assert resultado[0].destination == os.path.abspath(ruta)
+
+    def test_dos_ejecutables_reales_distintos_se_conservan(self, clasificador):
+        """Dos ejecutables reales distintos (python.exe y notepad.exe): se conservan ambos."""
+        rutas = [sys.executable]
+        ruta_notepad = r"C:\Windows\System32\notepad.exe"
+        if os.path.exists(ruta_notepad):
+            rutas.append(ruta_notepad)
+        else:
+            pytest.skip("notepad.exe no disponible en este equipo")
+        candidatos = [
+            {"name": "python", "absolute_path": rutas[0], "source": "start_menu"},
+            {"name": "notepad", "absolute_path": rutas[1], "source": "appx"},
+        ]
+        resultado = clasificador.classify_candidates(candidatos)
+        assert len(resultado) == 2
+        destinos = {c.destination for c in resultado}
+        assert os.path.abspath(rutas[0]) in destinos
+        assert os.path.abspath(rutas[1]) in destinos
+
+    def test_uri_real_ms_settings_deduplicada(self, clasificador):
+        """URI real ms-settings: duplicada: se deduplica a uno."""
+        uri = "ms-settings:"
+        candidatos = [
+            {"name": "config_a", "absolute_path": uri, "source": "start_menu"},
+            {"name": "config_b", "absolute_path": uri, "source": "appx"},
+        ]
+        resultado = clasificador.classify_candidates(candidatos)
+        assert len(resultado) == 1
+        assert resultado[0].destination == uri
+        assert resultado[0].launch_type == "uri_aplicacion"
+
+    def test_lanzador_uri_steam_deduplicada(self, clasificador):
+        """URI de lanzador steam:// duplicada: se deduplica a uno (.7.7 incluye LANZADOR)."""
+        uri = "steam://rungameid/12345"
+        candidatos = [
+            {"name": "steam_a", "absolute_path": uri, "source": "start_menu"},
+            {"name": "steam_b", "absolute_path": uri, "source": "appx"},
+        ]
+        resultado = clasificador.classify_candidates(candidatos)
+        assert len(resultado) == 1
+        assert resultado[0].destination == uri
+        assert resultado[0].launch_type == "lanzador"

@@ -26,6 +26,7 @@ from src.hands.application_launch_classifier import (
     CONFIANZA_NINGUNA,
     LaunchClassification,
     LaunchClassifier,
+    LaunchType,
 )
 from src.hands.application_preflight import ApplicationPreflight
 from src.hands.calibration_manager import CalibrationManager
@@ -729,6 +730,85 @@ class ApplicationDiscovery:
                 )
             )
         return descubiertos
+
+    # ------------------------------------------------------------------ #
+    # Deduplicacion por identidad y destino real (.7.7)
+    # ------------------------------------------------------------------ #
+
+    def _clave_destino_candidato(self, c: DiscoveredCandidate) -> Optional[str]:
+        """Clave de deduplicacion para un candidato ya clasificado:
+        ruta normalizada si existe en disco, o la URI para tipos sin archivo."""
+        destino = c.destination
+        launch_type = c.launch_type
+        if not destino or not isinstance(destino, str):
+            return None
+        d = destino.strip()
+        if not d:
+            return None
+        if launch_type in (
+            LaunchType.URI_APLICACION.value,
+            LaunchType.LANZADOR.value,
+        ):
+            return d.casefold()
+        if ":" in d and not _es_ruta_windows(d):
+            return d.casefold()
+        if not os.path.exists(d):
+            return None
+        try:
+            return os.path.normcase(os.path.abspath(d))
+        except (OSError, ValueError):
+            return None
+
+    @staticmethod
+    def _puntos_confianza(confianza: str) -> int:
+        return {
+            "alta": 3,
+            "media": 2,
+            "baja": 1,
+            "ninguna": 0,
+        }.get(confianza or "ninguna", 0)
+
+    def deduplicar_por_destino_real(
+        self, candidatos: list[DiscoveredCandidate]
+    ) -> list[DiscoveredCandidate]:
+        """
+        Deduplica una lista de `DiscoveredCandidate` ya clasificados por
+        identidad y destino real, no solo por nombre (.7.7).
+
+        Requisitos:
+        - Mismo destino real (ruta normalizada o URI): se conserva el
+          candidato con mayor confianza y, en caso de empate, mayor evidencia.
+          No se fusionan instalaciones distintas.
+        - Rutas distintas (instalaciones distintas): se conservan todas.
+        - Candidatos sin destino identificable se conservan como sueltos.
+        - El resultado queda ordenado por confianza descendente y evidencia.
+        """
+        grupos: dict[str, list[DiscoveredCandidate]] = {}
+        sueltos: list[DiscoveredCandidate] = []
+        for c in candidatos:
+            clave = self._clave_destino_candidato(c)
+            if clave is None:
+                sueltos.append(c)
+            else:
+                grupos.setdefault(clave, []).append(c)
+
+        resultado: list[DiscoveredCandidate] = []
+        for clave, grupo in grupos.items():
+            mejor = max(
+                grupo,
+                key=lambda c: (self._puntos_confianza(c.confianza), len(c.evidencia)),
+            )
+            resultado.append(mejor)
+        resultado.extend(sueltos)
+
+        resultado.sort(
+            key=lambda c: (
+                self._puntos_confianza(c.confianza),
+                len(c.evidencia),
+            ),
+            reverse=True,
+        )
+        return resultado
 
     # ------------------------------------------------------------------ #
     # Utilidades

@@ -24,7 +24,7 @@
 - [`src/hands/__init__.py` (30 líneas)](#src-hands-_init_-py)
 - [`src/hands/action_registry.py` (1272 líneas)](#src-hands-action_registry-py)
 - [`src/hands/application_discovery.py` (684 líneas)](#src-hands-application_discovery-py)
-- [`src/hands/application_launch_classifier.py` (777 líneas)](#src-hands-application_launch_classifier-py)
+- [`src/hands/application_launch_classifier.py` (855 líneas)](#src-hands-application_launch_classifier-py)
 - [`src/hands/application_preflight.py` (894 líneas)](#src-hands-application_preflight-py)
 - [`src/hands/applications_core.py` (1357 líneas)](#src-hands-applications_core-py)
 - [`src/hands/calibration_manager.py` (2343 líneas)](#src-hands-calibration_manager-py)
@@ -776,7 +776,7 @@ Funciones a nivel módulo:
 | `def register_module(module_path)`  (L1258) | Registra acciones decoradas que se encuentren en el módulo indicado. |
 
 <a name="src-hands-application_discovery-py"></a>
-### `src/hands/application_discovery.py` [684+ líneas] — Descubrimiento de aplicaciones reutilizando fuentes existentes del SO.
+### `src/hands/application_discovery.py` [776+ líneas] — Descubrimiento de aplicaciones reutilizando fuentes existentes del SO.
 
 **Descripción:** Descubre destinos de aplicaciones consultando, en orden, (1) las fuentes de
 descubrimiento ya existentes del SO (menu de aplicaciones/Get-StartApps, accesos directos .lnk
@@ -832,9 +832,10 @@ Métodos:
 | `def buscar_por_nombre(nombre, incluir_inventario, limite_por_fuente)` | Busca por nombre en fuentes primarias y, solo si no hay coincidencia, en el inventario. |
 | `def candidatos_lanzables(limite_por_fuente, incluir_inventario)` | Devuelve solo candidatos clasificados como lanzables tras validar con preflight (sin lanzar). |
 | `def registrar_candidatos(candidatos, volume, scan_id)` | Persiste candidatos clasificados en `application_candidates` con todos los campos de registro (fuente, ruta/destino, tipo de lanzamiento, version/producto, ultima comprobacion, evidencia, confianza). |
+| `def deduplicar_por_destino_real(candidatos)` | Deduplica una lista de `DiscoveredCandidate` ya clasificados por identidad y destino real (ruta normalizada o URI), conservando el de mayor confianza/evidencia por destino y todas las rutas de instalaciones distintas. |
 
 <a name="src-hands-application_launch_classifier-py"></a>
-### `src/hands/application_launch_classifier.py` [777 líneas] — Clasificador de candidatos por tipo de lanzamiento.
+### `src/hands/application_launch_classifier.py` [855 líneas] — Clasificador de candidatos por tipo de lanzamiento.
 
 **Descripción:** Clasifica candidatos de inventario por tipo de lanzamiento propio de cada SO
 (ejecutable, acceso directo, URI de aplicación, paquete, bundle, lanzador) y por rol real

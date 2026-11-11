@@ -826,16 +826,21 @@ class LaunchClassifier:
 def _normalizar_destino_agrupamiento(
     destino: Optional[str], launch_type: Optional[str]
 ) -> Optional[str]:
-    """Clave de agrupamiento: ruta normalizada si existe en disco, else None."""
+    """Clave de agrupamiento: ruta normalizada si existe en disco, o la URI para
+    tipos de lanzamiento sin archivo en disco (URI aplicacion y lanzador)."""
     if not destino or launch_type not in (
         LaunchType.EJECUTABLE.value,
         LaunchType.ACCESO_DIRECTO.value,
         LaunchType.PAQUETE.value,
         LaunchType.BUNDLE.value,
         LaunchType.URI_APLICACION.value,
+        LaunchType.LANZADOR.value,
     ):
         return None
-    if launch_type == LaunchType.URI_APLICACION.value:
+    if launch_type in (
+        LaunchType.URI_APLICACION.value,
+        LaunchType.LANZADOR.value,
+    ):
         return destino.strip().casefold()
     if not os.path.exists(destino):
         return None

@@ -549,3 +549,127 @@ class TestCandidatosLanzables:
             assert all(c.es_lanzable is True for c in lanzables)
         finally:
             os.unlink(ruta_no_lanzable)
+
+
+# ---------------------------------------------------------------------------
+# Deduplicacion por identidad y destino real (.7.7)
+# ---------------------------------------------------------------------------
+
+class TestDeduplicarPorDestinoReal:
+    """Pruebas de `ApplicationDiscovery.deduplicar_por_destino_real` sobre
+    `DiscoveredCandidate` ya clasificados."""
+
+    def _candidato_discovered(self, name, destination, fuente=FUENTE_START_MENU,
+                              confianza="media", launch_type="ejecutivo", evidencia=None):
+        return DiscoveredCandidate(
+            candidate_id=destination or name,
+            name=name,
+            absolute_path=destination,
+            destination=destination,
+            launch_type=launch_type,
+            confianza=confianza,
+            evidencia=list(evidencia or []),
+            fuente=fuente,
+        )
+
+    def test_mismo_destino_ruta_queda_uno(self):
+        """Misma ruta real: se conserva solo el candidato con mayor confianza."""
+        descub, _, _ = _discovery_con_mocks()
+        ruta = sys.executable
+        candidatos = [
+            self._candidato_discovered("python_a", ruta, confianza="baja", evidencia=["a"]),
+            self._candidato_discovered("python_b", ruta, confianza="alta", evidencia=["b", "c"]),
+        ]
+        resultado = descub.deduplicar_por_destino_real(candidatos)
+        assert len(resultado) == 1
+        assert resultado[0].destination == ruta
+        assert resultado[0].confianza == "alta"
+
+    def test_rutas_distintas_se_conservan_todas(self):
+        """Rutas distintas son instalaciones diferentes: se conservan todas."""
+        descub, _, _ = _discovery_con_mocks()
+        ruta1 = sys.executable
+        with tempfile.NamedTemporaryFile(suffix=".exe", delete=False) as f:
+            ruta2 = f.name
+        try:
+            candidatos = [
+                self._candidato_discovered("app_a", ruta1, confianza="alta"),
+                self._candidato_discovered("app_b", ruta2, confianza="alta"),
+            ]
+            resultado = descub.deduplicar_por_destino_real(candidatos)
+            assert len(resultado) == 2
+            destinos = {c.destination for c in resultado}
+            assert destinos == {ruta1, ruta2}
+        finally:
+            os.unlink(ruta2)
+
+    def test_mismo_uri_se_deduplica(self):
+        """Misma URI (misma identidad de destino): se deduplica a uno."""
+        descub, _, _ = _discovery_con_mocks()
+        uri = "ms-settings:"
+        candidatos = [
+            self._candidato_discovered("config_a", uri, launch_type="uri_aplicacion", confianza="baja"),
+            self._candidato_discovered("config_b", uri, launch_type="uri_aplicacion", confianza="alta"),
+        ]
+        resultado = descub.deduplicar_por_destino_real(candidatos)
+        assert len(resultado) == 1
+        assert resultado[0].destination == uri
+        assert resultado[0].confianza == "alta"
+
+    def test_mismo_uri_lanzador_se_deduplica(self):
+        """Misma URI de lanzador: se deduplica a uno (.7.7 incluye LANZADOR)."""
+        descub, _, _ = _discovery_con_mocks()
+        uri = "steam://rungameid/12345"
+        candidatos = [
+            self._candidato_discovered("steam_a", uri, launch_type="lanzador", confianza="baja"),
+            self._candidato_discovered("steam_b", uri, launch_type="lanzador", confianza="alta"),
+        ]
+        resultado = descub.deduplicar_por_destino_real(candidatos)
+        assert len(resultado) == 1
+        assert resultado[0].destination == uri
+        assert resultado[0].launch_type == "lanzador"
+        assert resultado[0].confianza == "alta"
+
+    def test_uris_lanzador_distintas_se_conservan(self):
+        """URIs de lanzador distintas: se conservan todas."""
+        descub, _, _ = _discovery_con_mocks()
+        candidatos = [
+            self._candidato_discovered("steam", "steam://rungameid/100", launch_type="lanzador"),
+            self._candidato_discovered("epic", "epic://launch/200", launch_type="lanzador"),
+        ]
+        resultado = descub.deduplicar_por_destino_real(candidatos)
+        assert len(resultado) == 2
+        destinos = {c.destination for c in resultado}
+        assert destinos == {"steam://rungameid/100", "epic://launch/200"}
+
+    def test_sin_destino_va_a_sueltos(self):
+        """Candidato sin destino identificable se conserva como suelto."""
+        descub, _, _ = _discovery_con_mocks()
+        candidatos = [
+            self._candidato_discovered("fantasma", None),
+        ]
+        resultado = descub.deduplicar_por_destino_real(candidatos)
+        assert len(resultado) == 1
+        assert resultado[0].destination is None
+
+    def test_ordena_por_confianza_descendente(self):
+        """Resultado ordenado por confianza descendente."""
+        descub, _, _ = _discovery_con_mocks()
+        ruta1 = sys.executable
+        with tempfile.NamedTemporaryFile(suffix=".exe", delete=False) as f:
+            ruta2 = f.name
+        try:
+            candidatos = [
+                self._candidato_discovered("baja", ruta1, confianza="baja"),
+                self._candidato_discovered("alta", ruta2, confianza="alta"),
+                self._candidato_discovered("media", ruta1, confianza="media"),  # mismo destino que baja, se descarta
+            ]
+            resultado = descub.deduplicar_por_destino_real(candidatos)
+            assert len(resultado) == 2
+            assert _puntos_confianza(resultado[0].confianza) >= _puntos_confianza(resultado[1].confianza)
+        finally:
+            os.unlink(ruta2)
+
+
+def _puntos_confianza(confianza: str) -> int:
+    return {"alta": 3, "media": 2, "baja": 1, "ninguna": 0}.get(confianza or "ninguna", 0)

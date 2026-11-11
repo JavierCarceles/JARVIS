@@ -6825,7 +6825,16 @@ lanza ninguna aplicacion.
   - `test_mismo_destino_dos_fuentes_queda_uno_con_mayor_prioridad` (L371)
   - `test_rutas_distintas_se_conservan_todas` (L385)
 
-- **`TestCandidatosLanzables`** (línea 403) — 1 método(s) de test
+- **`TestDeduplicarPorDestinoReal`** (línea 417) — 7 método(s) de test
+  - `test_mismo_destino_ruta_queda_uno` (L420)
+  - `test_rutas_distintas_se_conservan_todas` (L433)
+  - `test_mismo_uri_se_deduplica` (L447)
+  - `test_mismo_uri_lanzador_se_deduplica` (L460)
+  - `test_uris_lanzador_distintas_se_conservan` (L473)
+  - `test_sin_destino_va_a_sueltos` (L483)
+  - `test_ordena_por_confianza_descendente` (L493)
+
+- **`TestCandidatosLanzables`** (línea 506) — 1 método(s) de test
   - `test_solo_retorna_lanzables` (L406)
 
 ---
@@ -8141,7 +8150,7 @@ integración con preflight sin lanzar nada.
 - **`TestNombreComercialYAliases`** (línea 345) — 2 método(s) de test
 - **`TestNombreComercialNoAsumidoDelEjecutable`** (línea 368) — 3 método(s) de test
 - **`TestVariasInstalacionesMismaApp`** (línea 432) — 1 método(s) de test
-- **`TestDeduplicacion`** (línea 464) — 3 método(s) de test
+- **`TestDeduplicacion`** (línea 481) — 5 método(s) de test
 - **`TestEntradaInventoryEntry`** (línea 514) — 1 método(s) de test
 - **`TestLeerSubsistemaPe`** (línea 539) — 6 método(s) de test
 - **`TestDiferenciacionGuiCliPorSubsistemaPe`** (línea 574) — 3 método(s) de test
@@ -8181,6 +8190,12 @@ del nombre del ejecutable. No lanza ninguna aplicación ni modifica datos de usu
   - `test_cmd_real_registra_todos_los_campos_76` (L279)
   - `test_uri_real_registra_todos_los_campos_76` (L292)
   - `test_registro_con_fuente_personalizada` (L305)
+
+- **`TestDeduplicacionEntornoReal`** (línea 334) — 4 método(s) de test
+  - `test_mismo_ejecutable_real_dos_candidatos_queda_uno` (L337)
+  - `test_dos_ejecutables_reales_distintos_se_conservan` (L351)
+  - `test_uri_real_ms_settings_deduplicada` (L366)
+  - `test_lanzador_uri_steam_deduplicada` (L379)
 
 ---
 
