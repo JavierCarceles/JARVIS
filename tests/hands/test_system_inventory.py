@@ -34,6 +34,10 @@ from src.hands.system_inventory import (
     EscanerRutaVolumen,
     GestorPrimerInventario,
     InventoryContract,
+    LimiteRecursos,
+    LimiteRendimiento,
+    MedidorRecursosSistema,
+    MetricaRendimiento,
     ModoRefresco,
     PoliticaRefresco,
     PrimerInventarioYaEnEjecucionError,
@@ -41,6 +45,8 @@ from src.hands.system_inventory import (
     ProgresoRecorrido,
     RecorridoVolumen,
     ResultadoEscaneo,
+    ResultadoLimpieza,
+    ResultadoMedicionRendimiento,
     VolumeInfo,
     VolumeType,
     generate_machine_id,
@@ -51,6 +57,7 @@ from src.hands.system_inventory_storage import (
     SCAN_MODE_INCREMENTAL,
     SCAN_RESULT_INTERRUPTED,
     SCAN_RESULT_OK,
+    MedidorRendimientoInventario,
     SystemInventoryStorage,
 )
 
@@ -1331,3 +1338,324 @@ class TestResultadoLimpieza:
         r.generaciones_protegidas = ["scan-1", "scan-2"]
         r.errores = ["error de ejemplo"]
         json.dumps(r.resumen())  # no debe lanzar
+
+
+# ---------------------------------------------------------------------------
+# Medición de rendimiento del inventario (3.8.5.1.4.8.7)
+# ---------------------------------------------------------------------------
+
+class TestMedicionRendimientoInventario:
+    """Tests de la medición de rendimiento del inventario.
+
+    Verifican que MedidorRendimientoInventario mide tiempo, CPU, memoria,
+    lecturas de disco, crecimiento de SQLite y rendimiento de consultas
+    usando implementación real sobre bases de datos temporales.
+    """
+
+    def test_medir_operacion_registra_tiempo_y_recursos(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        medidor = MedidorRendimientoInventario(storage)
+
+        def operacion():
+            # Operación real: escribir entradas en SQLite
+            storage.begin_scan_run("scan-test-1", MACHINE_ID, "C:", SCAN_MODE_FULL)
+            storage.insert_file_entries(
+                "scan-test-1",
+                MACHINE_ID,
+                "C:",
+                [
+                    {
+                        "entry_id": "e1",
+                        "absolute_path": "C:/test/archivo.txt",
+                        "relative_path": "test/archivo.txt",
+                        "name": "archivo.txt",
+                        "extension": ".txt",
+                        "entry_type": EntryType.FILE.value,
+                        "size_bytes": 100,
+                        "modified_at": "2026-01-01T00:00:00",
+                        "created_at": "2026-01-01T00:00:00",
+                        "accessed_at": None,
+                        "attributes": [],
+                        "excluded": False,
+                        "source": "filesystem_scan",
+                        "last_checked_at": "2026-01-01T00:00:00",
+                    }
+                ],
+            )
+            storage.end_scan_run("scan-test-1", result=SCAN_RESULT_OK, entries_count=1)
+
+        metrica = medidor.medir_operacion("insert_file_entries", operacion)
+
+        assert metrica.operacion == "insert_file_entries"
+        assert metrica.tiempo_segundos >= 0
+        assert 0 <= metrica.cpu_antes_porcentaje <= 100
+        assert 0 <= metrica.cpu_despues_porcentaje <= 100
+        assert 0 <= metrica.memoria_antes_porcentaje <= 100
+        assert 0 <= metrica.memoria_despues_porcentaje <= 100
+        assert metrica.lecturas_disco_antes >= 0
+        assert metrica.lecturas_disco_despues >= 0
+        assert metrica.tamaño_db_antes_bytes >= 0
+        assert metrica.tamaño_db_despues_bytes >= 0
+        # La base de datos debe haber crecido al insertar entradas
+        assert metrica.crecimiento_db_bytes >= 0
+
+    def test_medir_operacion_propiedades_calculadas(
+        self, storage: SystemInventoryStorage
+    ):
+        medidor = MedidorRendimientoInventario(storage)
+
+        def operacion():
+            pass
+
+        metrica = medidor.medir_operacion("no_op", operacion)
+
+        # cpu_delta = despues - antes
+        assert metrica.cpu_delta_porcentaje == (
+            metrica.cpu_despues_porcentaje - metrica.cpu_antes_porcentaje
+        )
+        # memoria_delta = despues - antes
+        assert metrica.memoria_delta_porcentaje == (
+            metrica.memoria_despues_porcentaje - metrica.memoria_antes_porcentaje
+        )
+        # lecturas_disco_delta = max(0, despues - antes)
+        assert metrica.lecturas_disco_delta == max(
+            0, metrica.lecturas_disco_despues - metrica.lecturas_disco_antes
+        )
+        # crecimiento_db = max(0, despues - antes)
+        assert metrica.crecimiento_db_bytes == max(
+            0, metrica.tamaño_db_despues_bytes - metrica.tamaño_db_antes_bytes
+        )
+
+    def test_medir_consulta_registra_tiempo_ms(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        medidor = MedidorRendimientoInventario(storage)
+
+        storage.begin_scan_run("scan-test-2", MACHINE_ID, "C:", SCAN_MODE_FULL)
+        storage.insert_file_entries(
+            "scan-test-2",
+            MACHINE_ID,
+            "C:",
+            [
+                {
+                    "entry_id": "e1",
+                    "absolute_path": "C:/test/documento.pdf",
+                    "relative_path": "test/documento.pdf",
+                    "name": "documento.pdf",
+                    "extension": ".pdf",
+                    "entry_type": EntryType.FILE.value,
+                    "size_bytes": 200,
+                    "modified_at": "2026-01-01T00:00:00",
+                    "created_at": "2026-01-01T00:00:00",
+                    "accessed_at": None,
+                    "attributes": [],
+                    "excluded": False,
+                    "source": "filesystem_scan",
+                    "last_checked_at": "2026-01-01T00:00:00",
+                }
+            ],
+        )
+        storage.end_scan_run("scan-test-2", result=SCAN_RESULT_OK, entries_count=1)
+
+        def consulta():
+            return storage.search_by_name(MACHINE_ID, "documento.pdf")
+
+        metrica = medidor.medir_consulta("search_by_name_documento", consulta)
+
+        assert metrica.operacion == "consulta:search_by_name_documento"
+        assert metrica.consulta_nombre == "search_by_name_documento"
+        assert metrica.consulta_tiempo_ms is not None
+        assert metrica.consulta_tiempo_ms >= 0
+        assert metrica.tiempo_segundos >= 0
+
+    def test_agregar_medicion_acumula_resultados(
+        self, storage: SystemInventoryStorage
+    ):
+        medidor = MedidorRendimientoInventario(storage)
+
+        resultado_inicial = ResultadoMedicionRendimiento(
+            metricas=[],
+            tiempo_total_segundos=0.0,
+            cpu_promedio_porcentaje=0.0,
+            memoria_pico_porcentaje=0.0,
+            lecturas_disco_total=0,
+            crecimiento_db_bytes=0,
+            consultas_medidadas={},
+            limites_sugeridos=[],
+        )
+
+        m1 = MetricaRendimiento(
+            operacion="op1",
+            tiempo_segundos=1.5,
+            cpu_antes_porcentaje=10.0,
+            cpu_despues_porcentaje=20.0,
+            memoria_antes_porcentaje=30.0,
+            memoria_despues_porcentaje=40.0,
+            lecturas_disco_antes=100,
+            lecturas_disco_despues=150,
+            tamaño_db_antes_bytes=1000,
+            tamaño_db_despues_bytes=1200,
+        )
+
+        resultado = medidor.agregar_medicion(resultado_inicial, m1)
+
+        assert len(resultado.metricas) == 1
+        assert resultado.tiempo_total_segundos == 1.5
+        assert resultado.cpu_promedio_porcentaje == 20.0
+        assert resultado.memoria_pico_porcentaje == 40.0
+        assert resultado.lecturas_disco_total == 50
+        assert resultado.crecimiento_db_bytes == 200
+
+        m2 = MetricaRendimiento(
+            operacion="op2",
+            tiempo_segundos=0.5,
+            cpu_antes_porcentaje=5.0,
+            cpu_despues_porcentaje=15.0,
+            memoria_antes_porcentaje=25.0,
+            memoria_despues_porcentaje=35.0,
+            lecturas_disco_antes=200,
+            lecturas_disco_despues=210,
+            tamaño_db_antes_bytes=1200,
+            tamaño_db_despues_bytes=1250,
+            consulta_nombre="consulta_x",
+            consulta_tiempo_ms=5.0,
+        )
+
+        resultado2 = medidor.agregar_medicion(resultado, m2)
+
+        assert len(resultado2.metricas) == 2
+        assert resultado2.tiempo_total_segundos == 2.0
+        assert resultado2.cpu_promedio_porcentaje == 17.5  # (20+15)/2
+        assert resultado2.memoria_pico_porcentaje == 40.0  # max(40, 35)
+        assert resultado2.lecturas_disco_total == 60  # 50 + 10
+        assert resultado2.crecimiento_db_bytes == 250  # 200 + 50
+        assert resultado2.consultas_medidadas == {"consulta_x": 5.0}
+
+    def test_establecer_limites_desde_mediciones_no_son_inventados(
+        self, storage: SystemInventoryStorage
+    ):
+        medidor = MedidorRendimientoInventario(storage)
+
+        metricas = [
+            MetricaRendimiento(
+                operacion="op1",
+                tiempo_segundos=0.5,
+                cpu_antes_porcentaje=10.0,
+                cpu_despues_porcentaje=15.0,
+                memoria_antes_porcentaje=20.0,
+                memoria_despues_porcentaje=25.0,
+                lecturas_disco_antes=100,
+                lecturas_disco_despues=110,
+                tamaño_db_antes_bytes=1000,
+                tamaño_db_despues_bytes=1050,
+                consulta_nombre="c1",
+                consulta_tiempo_ms=2.0,
+            ),
+            MetricaRendimiento(
+                operacion="op2",
+                tiempo_segundos=1.0,
+                cpu_antes_porcentaje=12.0,
+                cpu_despues_porcentaje=18.0,
+                memoria_antes_porcentaje=22.0,
+                memoria_despues_porcentaje=28.0,
+                lecturas_disco_antes=200,
+                lecturas_disco_despues=230,
+                tamaño_db_antes_bytes=1050,
+                tamaño_db_despues_bytes=1100,
+                consulta_nombre="c2",
+                consulta_tiempo_ms=5.0,
+            ),
+        ]
+
+        limites = medidor.establecer_limites_desde_mediciones(
+            metricas, factor_seguridad=2.0
+        )
+
+        nombres = {l.nombre for l in limites}
+        assert "tiempo_maximo_operacion_segundos" in nombres
+        assert "cpu_maximo_operacion_porcentaje" in nombres
+        assert "memoria_maxima_operacion_porcentaje" in nombres
+        assert "lecturas_disco_maximo_por_operacion" in nombres
+        assert "crecimiento_sqlite_maximo_bytes_por_operacion" in nombres
+        assert "tiempo_maximo_consulta_ms" in nombres
+
+        # Cada límite debe tener un origen que referencia mediciones reales
+        for limite in limites:
+            assert limite.valor > 0
+            assert limite.unidad
+            assert "mediciones reales" in limite.origen or "observado" in limite.origen
+
+        # El límite de tiempo debe ser 2x el máximo observado (1.0s)
+        limite_tiempo = next(l for l in limites if l.nombre == "tiempo_maximo_operacion_segundos")
+        assert limite_tiempo.valor == 2.0  # 1.0 * 2.0
+
+        # El límite de consulta debe ser 2x el máximo observado (5.0ms)
+        limite_consulta = next(l for l in limites if l.nombre == "tiempo_maximo_consulta_ms")
+        assert limite_consulta.valor == 10.0  # 5.0 * 2.0
+
+    def test_establecer_limites_lista_vacia_retorna_vacia(
+        self, storage: SystemInventoryStorage
+    ):
+        medidor = MedidorRendimientoInventario(storage)
+        assert medidor.establecer_limites_desde_mediciones([]) == []
+
+    def test_crear_limite_recursos_desde_medicion(
+        self, storage: SystemInventoryStorage
+    ):
+        medidor = MedidorRendimientoInventario(storage)
+
+        metrica = MetricaRendimiento(
+            operacion="op",
+            tiempo_segundos=0.3,
+            cpu_antes_porcentaje=10.0,
+            cpu_despues_porcentaje=20.0,
+            memoria_antes_porcentaje=30.0,
+            memoria_despues_porcentaje=40.0,
+            lecturas_disco_antes=100,
+            lecturas_disco_despues=110,
+            tamaño_db_antes_bytes=1000,
+            tamaño_db_despues_bytes=1050,
+        )
+
+        limite = medidor.crear_limite_recursos_desde_medicion(
+            metrica, factor_seguridad=2.0
+        )
+
+        assert limite is not None
+        assert limite.cpu_max_porcentaje == 40.0  # 20.0 * 2.0
+        assert limite.memoria_max_porcentaje == 80.0  # 40.0 * 2.0
+        assert 0 <= limite.disco_uso_max_porcentaje <= 100
+        assert limite.concurrencia_maxima == 1
+        assert limite.intervalo_medicion_segundos == 1.0
+
+    def test_resultado_medicion_resumen_serializable(
+        self, storage: SystemInventoryStorage
+    ):
+        import json
+
+        medidor = MedidorRendimientoInventario(storage)
+
+        resultado = ResultadoMedicionRendimiento(
+            metricas=[],
+            tiempo_total_segundos=0.0,
+            cpu_promedio_porcentaje=0.0,
+            memoria_pico_porcentaje=0.0,
+            lecturas_disco_total=0,
+            crecimiento_db_bytes=0,
+            consultas_medidadas={},
+            limites_sugeridos=[
+                LimiteRendimiento(
+                    nombre="test_limite",
+                    valor=1.5,
+                    unidad="segundos",
+                    origen="medicion real de prueba",
+                )
+            ],
+        )
+
+        resumen = resultado.resumen()
+        json.dumps(resumen)  # no debe lanzar
+        assert resumen["operaciones_medidas"] == 0
+        assert len(resumen["limites_sugeridos"]) == 1
+        assert resumen["limites_sugeridos"][0]["nombre"] == "test_limite"

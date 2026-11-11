@@ -10940,6 +10940,7 @@ Todos los tests usan directorios temporales (`tmp_path`) y bases de datos tempor
 | `TestLogsSinRutasCompletas` | Logging sin rutas completas ni listados de nombres/rutas: recorrido loguea resumenes (conteos) sin ruta completa, errores agregados por categoria sin ruta fallida, `escanear_ruta` loguea evidencia minima (scan_id, volumen, modo, resultado, conteos), politica de refresco loguea decisiones sin rutas completas, `safe_log_path` acorta rutas largas. |
 | `TestPoliticaRetencion` | `PoliticaRetencion`: valores por defecto (max 5 generaciones, max 3 backups, TTL None, modo seguro y backup previo activos) y validaciones (max_generaciones >= 1, max_backups >= 1, edades positivas o None). |
 | `TestResultadoLimpieza` | `ResultadoLimpieza`: valores por defecto, contadores (generaciones/entradas/backups eliminados, backup creado, generaciones/entradas protegidas, errores), resumen serializable con `total_eliminado`. |
+| `TestMedicionRendimientoInventario` | Medición de rendimiento del inventario (`MedidorRendimientoInventario`): medir operación (tiempo, CPU, memoria, lecturas de disco, crecimiento de SQLite), medir consulta (tiempo en ms), agregación de mediciones, límites desde mediciones reales sin umbrales inventados (`establecer_limites_desde_mediciones`), `LimiteRecursos` desde medición y resumen serializable. |
 
 ---
 

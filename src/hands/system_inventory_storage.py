@@ -34,6 +34,7 @@ import os
 import shutil
 import sqlite3
 import threading
+import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -51,9 +52,14 @@ from src.hands.system_inventory import (
     EntryType,
     EstadoCaducidad,
     InventoryEntry,
+    LimiteRecursos,
+    MedidorRecursosSistema,
+    MetricaRendimiento,
+    LimiteRendimiento,
     PoliticaRetencion,
     ResultadoCaducidad,
     ResultadoLimpieza,
+    ResultadoMedicionRendimiento,
     ResultadoValidacionDestino,
     generate_machine_id,
     esta_caducado,
@@ -4302,3 +4308,318 @@ class SystemInventoryStorage:
 def _now_iso() -> str:
     """Devuelve la fecha y hora actual en ISO 8601 (UTC)."""
     return datetime.now(timezone.utc).isoformat()
+
+
+# ---------------------------------------------------------------------------
+# Medición de rendimiento del inventario (3.8.5.1.4.8.7)
+# ---------------------------------------------------------------------------
+
+class MedidorRendimientoInventario:
+    """
+    Mide el rendimiento real de operaciones del inventario: tiempo, CPU,
+    memoria, lecturas de disco, crecimiento de SQLite y rendimiento de
+    consultas, usando el equipo real y volúmenes representativos.
+
+    Los límites se fijan a partir de mediciones reales, nunca de umbrales
+    inventados (3.8.5.1.4.8.7).
+    """
+
+    def __init__(self, storage: "SystemInventoryStorage") -> None:
+        self.storage = storage
+
+    # ----- lecturas de recursos del equipo real -----
+
+    @staticmethod
+    def _lecturas_disco_sistema() -> int:
+        """Devuelve el contador total de lecturas de disco del sistema (psutil).
+
+        Retorna 0 si no es posible leerlo (no bloquea la medición).
+        """
+        try:
+            contadores = psutil.disk_io_counters()
+            if contadores is not None:
+                return int(contadores.read_count)
+        except OSError:
+            pass
+        return 0
+
+    def _tamaño_db_bytes(self) -> int:
+        """Devuelve el tamaño actual del fichero de base de datos SQLite en bytes."""
+        try:
+            return int(self.storage.db_path.stat().st_size)
+        except OSError:
+            return 0
+
+    def _capturar_recursos(self) -> dict[str, object]:
+        """Captura una instantánea de CPU, memoria y lecturas de disco."""
+        return {
+            "cpu": MedidorRecursosSistema.cpu_porcentaje(),
+            "memoria": MedidorRecursosSistema.memoria_porcentaje(),
+            "lecturas_disco": self._lecturas_disco_sistema(),
+        }
+
+    # ----- medición de operaciones -----
+
+    def medir_operacion(
+        self,
+        operacion: str,
+        func: Callable,
+        *args,
+        **kwargs,
+    ) -> MetricaRendimiento:
+        """
+        Ejecuta `func(*args, **kwargs)` midiendo tiempo, CPU, memoria,
+        lecturas de disco y crecimiento de la base de datos SQLite.
+
+        Todos los valores son observables en el equipo real. No se usan
+        umbrales inventados; los límites deben calcularse después con
+        `establecer_limites_desde_mediciones`.
+        """
+        antes = self._capturar_recursos()
+        tamaño_db_antes = self._tamaño_db_bytes()
+        inicio = time.perf_counter()
+
+        try:
+            func(*args, **kwargs)
+        except Exception:
+            despues = self._capturar_recursos()
+            tamaño_db_despues = self._tamaño_db_bytes()
+            fin = time.perf_counter()
+            raise
+        else:
+            despues = self._capturar_recursos()
+            tamaño_db_despues = self._tamaño_db_bytes()
+            fin = time.perf_counter()
+
+        return MetricaRendimiento(
+            operacion=operacion,
+            tiempo_segundos=fin - inicio,
+            cpu_antes_porcentaje=antes["cpu"],
+            cpu_despues_porcentaje=despues["cpu"],
+            memoria_antes_porcentaje=antes["memoria"],
+            memoria_despues_porcentaje=despues["memoria"],
+            lecturas_disco_antes=antes["lecturas_disco"],
+            lecturas_disco_despues=despues["lecturas_disco"],
+            tamaño_db_antes_bytes=tamaño_db_antes,
+            tamaño_db_despues_bytes=tamaño_db_despues,
+        )
+
+    def medir_consulta(
+        self,
+        nombre_consulta: str,
+        func: Callable,
+        *args,
+        **kwargs,
+    ) -> MetricaRendimiento:
+        """
+        Mide el tiempo de ejecución de una consulta de inventario.
+
+        La medición incluye tiempo de consulta en ms y recursos asociados.
+        """
+        antes = self._capturar_recursos()
+        tamaño_db_antes = self._tamaño_db_bytes()
+        inicio = time.perf_counter()
+
+        try:
+            func(*args, **kwargs)
+        except Exception:
+            despues = self._capturar_recursos()
+            tamaño_db_despues = self._tamaño_db_bytes()
+            fin = time.perf_counter()
+            raise
+        else:
+            despues = self._capturar_recursos()
+            tamaño_db_despues = self._tamaño_db_bytes()
+            fin = time.perf_counter()
+
+        return MetricaRendimiento(
+            operacion=f"consulta:{nombre_consulta}",
+            tiempo_segundos=fin - inicio,
+            cpu_antes_porcentaje=antes["cpu"],
+            cpu_despues_porcentaje=despues["cpu"],
+            memoria_antes_porcentaje=antes["memoria"],
+            memoria_despues_porcentaje=despues["memoria"],
+            lecturas_disco_antes=antes["lecturas_disco"],
+            lecturas_disco_despues=despues["lecturas_disco"],
+            tamaño_db_antes_bytes=tamaño_db_antes,
+            tamaño_db_despues_bytes=tamaño_db_despues,
+            consulta_nombre=nombre_consulta,
+            consulta_tiempo_ms=(fin - inicio) * 1000.0,
+        )
+
+    # ----- agregación de mediciones -----
+
+    def agregar_medicion(
+        self,
+        resultado: ResultadoMedicionRendimiento,
+        metrica: MetricaRendimiento,
+    ) -> ResultadoMedicionRendimiento:
+        """Añade una metrica al resultado y recalcula el agregado."""
+        metricas = list(resultado.metricas) + [metrica]
+        consultas = dict(resultado.consultas_medidadas)
+        if metrica.consulta_tiempo_ms is not None and metrica.consulta_nombre:
+            consultas[metrica.consulta_nombre] = metrica.consulta_tiempo_ms
+
+        return ResultadoMedicionRendimiento(
+            metricas=metricas,
+            tiempo_total_segundos=sum(m.tiempo_segundos for m in metricas),
+            cpu_promedio_porcentaje=(
+                sum(m.cpu_despues_porcentaje for m in metricas) / len(metricas)
+            ),
+            memoria_pico_porcentaje=max(
+                m.memoria_despues_porcentaje for m in metricas
+            ),
+            lecturas_disco_total=sum(m.lecturas_disco_delta for m in metricas),
+            crecimiento_db_bytes=sum(m.crecimiento_db_bytes for m in metricas),
+            consultas_medidadas=consultas,
+            limites_sugeridos=list(resultado.limites_sugeridos),
+        )
+
+    # ----- límites a partir de mediciones (no inventados) -----
+
+    def establecer_limites_desde_mediciones(
+        self,
+        metricas: list[MetricaRendimiento],
+        factor_seguridad: float = 2.0,
+    ) -> list[LimiteRendimiento]:
+        """
+        Calcula límites de rendimiento a partir de mediciones reales observadas.
+
+        Ningún límite es un umbral inventado: cada valor se deriva de lo
+        medido en el equipo real, aplicando un factor de seguridad sobre
+        el máximo observado (por defecto 2x).
+
+        Parámetros:
+        - metricas: lista de mediciones reales observadas.
+        - factor_seguridad: multiplicador aplicado al máximo observado para
+          obtener el límite sugerido (por defecto 2.0).
+
+        Retorna una lista de `LimiteRendimiento`, uno por dimensión medida.
+        """
+        if not metricas:
+            return []
+
+        tiempos = [m.tiempo_segundos for m in metricas]
+        cpu_valores = [m.cpu_despues_porcentaje for m in metricas]
+        memoria_valores = [m.memoria_despues_porcentaje for m in metricas]
+        lecturas_disco = [m.lecturas_disco_delta for m in metricas]
+        crecimientos_db = [m.crecimiento_db_bytes for m in metricas]
+        consultas_ms = [
+            m.consulta_tiempo_ms
+            for m in metricas
+            if m.consulta_tiempo_ms is not None
+        ]
+
+        limites: list[LimiteRendimiento] = []
+
+        tiempo_max = max(tiempos)
+        limites.append(
+            LimiteRendimiento(
+                nombre="tiempo_maximo_operacion_segundos",
+                valor=round(tiempo_max * factor_seguridad, 4),
+                unidad="segundos",
+                origen=(
+                    f"máximo de {len(tiempos)} mediciones reales "
+                    f"({tiempo_max:.4f}s) x {factor_seguridad}"
+                ),
+            )
+        )
+
+        cpu_max = max(cpu_valores)
+        limites.append(
+            LimiteRendimiento(
+                nombre="cpu_maximo_operacion_porcentaje",
+                valor=round(min(100.0, cpu_max * factor_seguridad), 2),
+                unidad="porcentaje",
+                origen=(
+                    f"máximo CPU observado ({cpu_max:.2f}%) x {factor_seguridad}"
+                ),
+            )
+        )
+
+        memoria_max = max(memoria_valores)
+        limites.append(
+            LimiteRendimiento(
+                nombre="memoria_maxima_operacion_porcentaje",
+                valor=round(min(100.0, memoria_max * factor_seguridad), 2),
+                unidad="porcentaje",
+                origen=(
+                    f"máximo memoria observado ({memoria_max:.2f}%) x {factor_seguridad}"
+                ),
+            )
+        )
+
+        lecturas_max = max(lecturas_disco) if lecturas_disco else 0
+        limites.append(
+            LimiteRendimiento(
+                nombre="lecturas_disco_maximo_por_operacion",
+                valor=float(lecturas_max * factor_seguridad),
+                unidad="lecturas",
+                origen=(
+                    f"máximo de lecturas de disco observado ({lecturas_max}) "
+                    f"x {factor_seguridad}"
+                ),
+            )
+        )
+
+        crecimiento_max = max(crecimientos_db) if crecimientos_db else 0
+        limites.append(
+            LimiteRendimiento(
+                nombre="crecimiento_sqlite_maximo_bytes_por_operacion",
+                valor=float(crecimiento_max * factor_seguridad),
+                unidad="bytes",
+                origen=(
+                    f"máximo crecimiento SQLite observado ({crecimiento_max} bytes) "
+                    f"x {factor_seguridad}"
+                ),
+            )
+        )
+
+        if consultas_ms:
+            consulta_max = max(consultas_ms)
+            limites.append(
+                LimiteRendimiento(
+                    nombre="tiempo_maximo_consulta_ms",
+                    valor=round(consulta_max * factor_seguridad, 2),
+                    unidad="milisegundos",
+                    origen=(
+                        f"máximo tiempo de consulta observado "
+                        f"({consulta_max:.2f}ms) x {factor_seguridad}"
+                    ),
+                )
+            )
+
+        return limites
+
+    def crear_limite_recursos_desde_medicion(
+        self,
+        metrica: MetricaRendimiento,
+        factor_seguridad: float = 2.0,
+    ) -> Optional[LimiteRecursos]:
+        """
+        Crea un `LimiteRecursos` a partir de una medición real, sin
+        umbrales inventados. Los límites de CPU/memoria/disco se derivan
+        del valor observado multiplicado por un factor de seguridad.
+
+        Retorna None si no hay una medición base usable.
+        """
+        cpu_limite = min(100.0, metrica.cpu_despues_porcentaje * factor_seguridad)
+        memoria_limite = min(
+            100.0, metrica.memoria_despues_porcentaje * factor_seguridad
+        )
+
+        # Disco: usar el porcentaje de uso actual del volumen como
+        # referencia, no el delta de lecturas (que es un contador,
+        # no un porcentaje).
+        disco_uso = MedidorRecursosSistema.disco_uso_porcentaje(
+            str(self.storage.db_path.parent)
+        )
+        disco_limite = min(100.0, disco_uso * factor_seguridad)
+
+        return LimiteRecursos(
+            cpu_max_porcentaje=cpu_limite,
+            memoria_max_porcentaje=memoria_limite,
+            disco_uso_max_porcentaje=disco_limite,
+            concurrencia_maxima=1,
+            intervalo_medicion_segundos=1.0,
+        )

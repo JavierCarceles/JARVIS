@@ -544,6 +544,155 @@ class MedidorRecursosSistema:
 
 
 # ---------------------------------------------------------------------------
+# Medición de rendimiento del inventario (3.8.5.1.4.8.7)
+# ---------------------------------------------------------------------------
+
+@dataclass
+class MetricaRendimiento:
+    """
+    Una sola medición de rendimiento de una operación del inventario.
+
+    Registra tiempo de ejecución, CPU, memoria, lecturas de disco y
+    crecimiento de la base de datos SQLite antes y después de la operación,
+    además del tiempo de una consulta opcional. Todos los valores son
+    observables en el equipo real; no se usan umbrales inventados.
+    """
+
+    operacion: str
+    """Nombre de la operación medida (ej. "insert_file_entries", "search_by_name")."""
+
+    tiempo_segundos: float
+    """Tiempo de ejecución de la operación en segundos."""
+
+    cpu_antes_porcentaje: float
+    """Porcentaje de CPU del sistema antes de la operación (0-100)."""
+
+    cpu_despues_porcentaje: float
+    """Porcentaje de CPU del sistema después de la operación (0-100)."""
+
+    memoria_antes_porcentaje: float
+    """Porcentaje de memoria RAM usada antes de la operación (0-100)."""
+
+    memoria_despues_porcentaje: float
+    """Porcentaje de memoria RAM usada después de la operación (0-100)."""
+
+    lecturas_disco_antes: int
+    """Contador de lecturas de disco del sistema antes de la operación."""
+
+    lecturas_disco_despues: int
+    """Contador de lecturas de disco del sistema después de la operación."""
+
+    tamaño_db_antes_bytes: int
+    """Tamaño del fichero de base de datos SQLite antes, en bytes."""
+
+    tamaño_db_despues_bytes: int
+    """Tamaño del fichero de base de datos SQLite después, en bytes."""
+
+    consulta_nombre: Optional[str] = None
+    """Nombre de la consulta SQL medida, si la operación fue una consulta."""
+
+    consulta_tiempo_ms: Optional[float] = None
+    """Tiempo de la consulta en milisegundos, si procede."""
+
+    @property
+    def cpu_delta_porcentaje(self) -> float:
+        """Diferencia de CPU antes/después (puede variar por carga del sistema)."""
+        return self.cpu_despues_porcentaje - self.cpu_antes_porcentaje
+
+    @property
+    def memoria_delta_porcentaje(self) -> float:
+        """Diferencia de memoria antes/después."""
+        return self.memoria_despues_porcentaje - self.memoria_antes_porcentaje
+
+    @property
+    def lecturas_disco_delta(self) -> int:
+        """Lecturas de disco realizadas durante la operación (0 si el contador bajó)."""
+        return max(0, self.lecturas_disco_despues - self.lecturas_disco_antes)
+
+    @property
+    def crecimiento_db_bytes(self) -> int:
+        """Crecimiento de la base de datos SQLite en bytes (0 si no creció)."""
+        return max(0, self.tamaño_db_despues_bytes - self.tamaño_db_antes_bytes)
+
+
+@dataclass
+class LimiteRendimiento:
+    """
+    Un límite de rendimiento derivado de mediciones reales, nunca inventado.
+
+    Cada límite registra su valor, unidad y el origen (qué medición lo
+    motivó), para que quede trazable que no es un umbral arbitrario.
+    """
+
+    nombre: str
+    """Nombre del límite (ej. "tiempo_maximo_operacion_segundos")."""
+
+    valor: float
+    """Valor del límite, calculado a partir de mediciones reales."""
+
+    unidad: str
+    """Unidad de medida (ej. "segundos", "porcentaje", "bytes")."""
+
+    origen: str
+    """Descripción de la medición real de la que se deriva este límite."""
+
+
+@dataclass
+class ResultadoMedicionRendimiento:
+    """
+    Resultado agregado de una o varias mediciones de rendimiento del inventario.
+
+    Incluye las métricas individuales, resumen global y límites sugeridos
+    calculados a partir de las mediciones observadas.
+    """
+
+    metricas: list[MetricaRendimiento]
+    """Lista de mediciones individuales."""
+
+    tiempo_total_segundos: float
+    """Suma de tiempos de todas las operaciones medidas."""
+
+    cpu_promedio_porcentaje: float
+    """Promedio de CPU observado durante las mediciones."""
+
+    memoria_pico_porcentaje: float
+    """Valor máximo de memoria observado durante las mediciones."""
+
+    lecturas_disco_total: int
+    """Total de lecturas de disco acumuladas."""
+
+    crecimiento_db_bytes: int
+    """Crecimiento total de la base de datos SQLite en bytes."""
+
+    consultas_medidadas: dict[str, float]
+    """Diccionario nombre_consulta -> tiempo_ms de cada consulta medida."""
+
+    limites_sugeridos: list[LimiteRendimiento]
+    """Límites de rendimiento calculados a partir de las mediciones reales."""
+
+    def resumen(self) -> dict[str, object]:
+        """Devuelve un resumen serializable del resultado de medición."""
+        return {
+            "operaciones_medidas": len(self.metricas),
+            "tiempo_total_segundos": self.tiempo_total_segundos,
+            "cpu_promedio_porcentaje": self.cpu_promedio_porcentaje,
+            "memoria_pico_porcentaje": self.memoria_pico_porcentaje,
+            "lecturas_disco_total": self.lecturas_disco_total,
+            "crecimiento_db_bytes": self.crecimiento_db_bytes,
+            "consultas_medidadas": dict(self.consultas_medidadas),
+            "limites_sugeridos": [
+                {
+                    "nombre": l.nombre,
+                    "valor": l.valor,
+                    "unidad": l.unidad,
+                    "origen": l.origen,
+                }
+                for l in self.limites_sugeridos
+            ],
+        }
+
+
+# ---------------------------------------------------------------------------
 # Caducidad y detección de inventario obsoleto (3.8.5.1.4.5.9)
 # ---------------------------------------------------------------------------
 
