@@ -6837,6 +6837,11 @@ lanza ninguna aplicacion.
 - **`TestCandidatosLanzables`** (línea 506) — 1 método(s) de test
   - `test_solo_retorna_lanzables` (L406)
 
+- **`TestSeparacionCatalogoDinamicoEntitiesJson`** (línea 713) — 3 método(s) de test
+  - `test_registrar_candidatos_no_modifica_entities_json` (L725)
+  - `test_flujo_descubrir_y_registrar_respeta_entidades_originales` (L772)
+  - `test_esquema_entities_json_invariante_siete_entidades` (L814)
+
 ---
 
 <a name="hands/test-application_discovery_no_recursive_disk_search"></a>

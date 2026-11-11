@@ -26,6 +26,8 @@ aplicación y no se modifica `entities.json`.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import sys
 import tempfile
@@ -673,3 +675,146 @@ class TestDeduplicarPorDestinoReal:
 
 def _puntos_confianza(confianza: str) -> int:
     return {"alta": 3, "media": 2, "baja": 1, "ninguna": 0}.get(confianza or "ninguna", 0)
+
+
+# ---------------------------------------------------------------------------
+# Separacion catalogo dinamico vs entities.json (.7.8)
+# ---------------------------------------------------------------------------
+
+# Las siete entidades originales de data/knowledge/entities.json (documentadas
+# en docs/README_DATA.md seccion 4.1) nunca deben verse alteradas por el flujo
+# de descubrimiento y registro de candidatos.
+ENTIDADES_ORIGINALES = (
+    "nissaxter", "shroud", "pokimane",
+    "youtube", "spotify", "github", "twitch",
+)
+
+
+def _ruta_entities_json() -> Path:
+    """Ruta absoluta (según __file__) a data/knowledge/entities.json del repo."""
+    return Path(__file__).resolve().parents[2] / "data" / "knowledge" / "entities.json"
+
+
+def _hash_entities_json() -> str:
+    """Huella SHA-256 de entities.json; solo lectura, nunca escritura."""
+    h = hashlib.sha256()
+    with open(_ruta_entities_json(), "rb") as f:
+        for bloque in iter(lambda: f.read(65536), b""):
+            h.update(bloque)
+    return h.hexdigest()
+
+
+def _leer_ids_entidades() -> list[str]:
+    with open(_ruta_entities_json(), "r", encoding="utf-8") as f:
+        datos = json.load(f)
+    return [str(e.get("id", "")) for e in datos]
+
+
+class TestSeparacionCatalogoDinamicoEntitiesJson:
+    """.7.8: verificar que los candidatos descubiertos se mantienen en el
+    catalogo dinamico separado (tabla SQLite `application_candidates` vía
+    `ApplicationDiscovery.registrar_candidatos`) y que
+    `data/knowledge/entities.json`, su esquema y las siete entidades originales
+    no se modifican durante el flujo de descubrimiento y registro.
+
+    Ninguna prueba de esta clase escribe en entities.json ni en el inventario
+    de produccion: el almacenamiento SQLite se apunta a un fichero temporal y
+    entities.json solo se lee para calcular su huella y leer sus ids.
+    """
+
+    def test_registrar_candidatos_no_modifica_entities_json(self, tmp_path):
+        """registrar_candidatos persiste en application_candidates (catalogo
+        separado) y deja entities.json con la misma huella y las mismas 7
+        entidades."""
+        db_path = tmp_path / "test_inventory.sqlite3"
+        storage = SystemInventoryStorage(db_path=db_path)
+        storage.initialize()
+        discovery = ApplicationDiscovery(storage=storage, machine_id="maquina-test-78")
+
+        hash_antes = _hash_entities_json()
+        ids_antes = _leer_ids_entidades()
+
+        ruta = sys.executable
+        candidatos = [
+            DiscoveredCandidate(
+                candidate_id="c-78-1", name="Python",
+                absolute_path=ruta, destination=ruta,
+                launch_type="ejecutivo",
+                confianza=CONFIANZA_ALTA,
+                evidencia=["archivo_ejecutivo_existente", "version_recurso_leida"],
+                version="3.14.7", producto="Python",
+                fuente=FUENTE_INVENTARIO,
+                ultima_comprobacion="2024-01-03T00:00:00+00:00",
+            )
+        ]
+
+        insertados = discovery.registrar_candidatos(candidatos, volume="C:")
+        assert insertados == 1
+
+        # Los candidatos se recuperan del catalogo separado (SQLite application_candidates),
+        # nunca de entities.json.
+        recuperados = storage.buscar_candidatos_registrados("maquina-test-78")
+        assert len(recuperados) == 1
+        assert recuperados[0]["candidate_id"] == "c-78-1"
+        assert recuperados[0]["name"] == "Python"
+        assert recuperados[0]["fuente"] == FUENTE_INVENTARIO
+
+        # entities.json no se modifico durante el registro.
+        hash_despues = _hash_entities_json()
+        assert hash_despues == hash_antes, (
+            "entities.json fue modificado durante el registro de candidatos"
+        )
+        ids_despues = _leer_ids_entidades()
+        assert ids_despues == ids_antes
+        for eid in ENTIDADES_ORIGINALES:
+            assert eid in ids_despues, f"La entidad original {eid} desaparecio de entities.json"
+
+    def test_flujo_descubrir_y_registrar_respeta_entidades_originales(self, tmp_path):
+        """Flujo completo: descubrimiento (clasificacion/preflight reales sobre
+        archivos del sistema) + registro en catalogo separado, sin tocar
+        entities.json."""
+        db_path = tmp_path / "test_inventory.sqlite3"
+        storage = SystemInventoryStorage(db_path=db_path)
+        storage.initialize()
+        preflight = ApplicationPreflight()
+        clasificador = LaunchClassifier(preflight=preflight)
+        calib = MagicMock()
+        ruta = _notepad()
+        if not ruta:
+            pytest.skip("notepad.exe no disponible en este equipo")
+        calib.discover_applications.return_value = [
+            _app("Notepad", ruta, FUENTE_START_MENU)
+        ]
+        discovery = ApplicationDiscovery(
+            preflight=preflight, clasificador=clasificador,
+            storage=storage, calibration=calib, machine_id="maquina-test-78b",
+        )
+
+        hash_antes = _hash_entities_json()
+        ids_antes = _leer_ids_entidades()
+
+        descubiertos = discovery.descubrir_todos(
+            limite_por_fuente=10, incluir_inventario=False
+        )
+        assert len(descubiertos) >= 1
+        insertados = discovery.registrar_candidatos(descubiertos, volume="C:")
+        assert insertados >= 1
+
+        recuperados = storage.buscar_candidatos_registrados("maquina-test-78b")
+        assert len(recuperados) >= 1
+        assert any(r["name"].casefold() == "notepad" for r in recuperados)
+
+        hash_despues = _hash_entities_json()
+        assert hash_despues == hash_antes
+        ids_despues = _leer_ids_entidades()
+        assert ids_despues == ids_antes
+        for eid in ENTIDADES_ORIGINALES:
+            assert eid in ids_despues
+
+    def test_esquema_entities_json_invariante_siete_entidades(self):
+        """El esquema de entities.json conserva exactamente las siete entidades
+        originales con sus ids conocidos."""
+        ids = _leer_ids_entidades()
+        assert len(ids) == 7, f"Se esperaban 7 entidades, se encontraron {len(ids)}"
+        for eid in ENTIDADES_ORIGINALES:
+            assert eid in ids
