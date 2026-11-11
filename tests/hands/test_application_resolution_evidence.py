@@ -21,7 +21,13 @@ from src.hands.applications_core import (
 
 
 def _registrar_app(manager: ApplicationManager, name: str, aliases=None):
-    """Registra una aplicación de prueba con nombre y aliases distintivos."""
+    """Registra una aplicación de prueba con nombre y aliases distintivos.
+
+    Si la aplicación ya existe en el catálogo (cargada de entities.json o
+    dejada por una ejecución previa), se recupera la entrada existente y se
+    actualizan sus aliases para que el test sea idempotente y no dependa del
+    estado previo del catálogo.
+    """
     app = ApplicationKnowledge(
         name=name,
         type="test",
@@ -44,8 +50,15 @@ def _registrar_app(manager: ApplicationManager, name: str, aliases=None):
         states=[ApplicationState.CLOSED, ApplicationState.OPEN],
         metadata={"aliases": aliases or []},
     )
-    assert manager.register_application(app) is True
-    return app
+    if manager.register_application(app) is True:
+        return app
+    # Ya existe: recuperar y actualizar aliases para el test.
+    existing = manager.get_application(name)
+    if existing is not None and aliases is not None:
+        if existing.metadata is None:
+            existing.metadata = {}
+        existing.metadata["aliases"] = list(aliases)
+    return existing
 
 
 class TestCalculateResolutionEvidence:

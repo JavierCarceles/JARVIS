@@ -778,34 +778,47 @@ Funciones a nivel módulo:
 <a name="src-hands-application_discovery-py"></a>
 ### `src/hands/application_discovery.py` [776+ líneas] — Descubrimiento de aplicaciones reutilizando fuentes existentes del SO.
 
-**Descripción:** Descubre destinos de aplicaciones consultando, en orden, (1) las fuentes de
-descubrimiento ya existentes del SO (menu de aplicaciones/Get-StartApps, accesos directos .lnk
-del menu Inicio, paquetes AppX, registro de desinstaladores, rutas PATH y App Paths del registro
-de Windows) y (2), solo para destinos faltantes, el inventario persistente del sistema de
-archivos como fuente complementaria. Reutiliza `CalibrationManager.discover_applications`,
-`LaunchClassifier` y `ApplicationPreflight.validate_launch_destination` (sin lanzar nada). Es de
-lectura sola: no lanza aplicaciones, no modifica `data/knowledge/entities.json` ni el catalogo
-conocido, y no persiste capacidades inferidas. Provee `registrar_candidatos` para persistir
-candidatos clasificados en la tabla `application_candidates` del almacenamiento SQLite (unidad
-3.8.5.1.4.7.6: fuente, ruta/destino, tipo de lanzamiento, version/producto, ultima comprobacion,
-evidencia y nivel de confianza).
+**Descripción:** Descubre destinos de aplicaciones aplicando el orden de
+precedencia de fuentes (aplicación ya abierta > catálogo conocido >
+fuentes nativas del SO > inventario persistente). Consulta, en orden, (1)
+el catálogo conocido (`ApplicationManager`) y las aplicaciones ya abiertas
+(proceso en ejecución detectado en el SO), (2) las fuentes de descubrimiento
+existentes del SO (menu de aplicaciones/Get-StartApps, accesos directos .lnk
+del menu Inicio, paquetes AppX, registro de desinstaladores, rutas PATH y
+App Paths del registro de Windows) y (3), solo para destinos faltantes, el
+inventario persistente del sistema de archivos como fuente complementaria.
+Reutiliza `CalibrationManager.discover_applications`, `LaunchClassifier` y
+`ApplicationPreflight.validate_launch_destination` (sin lanzar nada). Es de
+lectura sola: no lanza aplicaciones, no modifica `data/knowledge/entities.json`
+ni el catalogo conocido, y no persiste capacidades inferidas. Provee
+`registrar_candidatos` para persistir candidatos clasificados en la tabla
+`application_candidates` del almacenamiento SQLite (unidad
+3.8.5.1.4.7.6: fuente, ruta/destino, tipo de lanzamiento, version/producto,
+ultima comprobacion, evidencia y nivel de confianza).
 
 **Características:**
 
-- Consulta primero las fuentes existentes del SO (menu de aplicaciones, paquetes, registro,
-  accesos directos, PATH, App Paths) antes que el inventario persistente.
-- El inventario (`SystemInventoryStorage`) solo se consulta como fuente complementaria para
-  localizar destinos que no aparecieron en las fuentes primarias.
-- Clasifica cada candidato con `LaunchClassifier` (tipo de lanzamiento, rol, evidencia,
-  confianza, nombre comercial, alias, versión/producto).
-- Valida cada destino con `ApplicationPreflight.validate_launch_destination` sin lanzar nada.
-- Deduplica por identidad y destino real, no solo por nombre; conserva rutas candidatas de
-  instalaciones distintas.
-- Resiliente: el fallo de una fuente de descubrimiento no interrumpe las demas.
+- Orden de precedencia de fuentes: aplicación ya abierta (máxima), catálogo
+  conocido, fuentes nativas instaladas (menu de aplicaciones, paquetes,
+  registro, accesos directos, PATH, App Paths) y, por último, el inventario
+  persistente (mínima); conserva procedencia (`fuente`) y confianza
+  (`confianza`) de cada candidato.
+- El inventario (`SystemInventoryStorage`) solo se consulta como fuente
+  complementaria para localizar destinos que no aparecieron en el catálogo
+  conocido ni en las fuentes primarias del SO.
+- Clasifica cada candidato con `LaunchClassifier` (tipo de lanzamiento, rol,
+  evidencia, confianza, nombre comercial, alias, versión/producto).
+- Valida cada destino con `ApplicationPreflight.validate_launch_destination`
+  sin lanzar nada.
+- Deduplica por identidad y destino real, no solo por nombre; conserva rutas
+  candidatas de instalaciones distintas.
+- Resiliente: el fallo de una fuente de descubrimiento no interrumpe las
+  demas.
 - `registrar_candidatos(candidatos, volume, scan_id)` persiste una lista de
-  `DiscoveredCandidate` en `application_candidates` mediante el ciclo de vida de escaneo
-  (`begin_scan_run` / `end_scan_run`), registrando fuente, ruta/destino, tipo de lanzamiento,
-  version/producto, ultima comprobacion, evidencia y nivel de confianza.
+  `DiscoveredCandidate` en `application_candidates` mediante el ciclo de
+  vida de escaneo (`begin_scan_run` / `end_scan_run`), registrando fuente,
+  ruta/destino, tipo de lanzamiento, version/producto, ultima comprobacion,
+  evidencia y nivel de confianza.
 
 **Importaciones:** 10.
 
@@ -829,7 +842,7 @@ Métodos:
 |---|---|
 | `def __init__(preflight, clasificador, storage, calibration, machine_id)` | Crea el orquestador con dependencias inyectables (por defecto instancias reales). |
 | `def descubrir_todos(limite_por_fuente, incluir_inventario)` | Devuelve candidatos descubiertos: fuentes primarias primero y, opcionalmente, el inventario para destinos faltantes. |
-| `def buscar_por_nombre(nombre, incluir_inventario, limite_por_fuente)` | Busca por nombre en fuentes primarias y, solo si no hay coincidencia, en el inventario. |
+| `def buscar_por_nombre(nombre, incluir_inventario, limite_por_fuente)` | Busca por nombre aplicando el orden de precedencia (aplicación ya abierta > catálogo conocido > fuentes nativas del SO > inventario) y conserva procedencia y confianza de cada candidato. |
 | `def candidatos_lanzables(limite_por_fuente, incluir_inventario)` | Devuelve solo candidatos clasificados como lanzables tras validar con preflight (sin lanzar). |
 | `def registrar_candidatos(candidatos, volume, scan_id)` | Persiste candidatos clasificados en `application_candidates` con todos los campos de registro (fuente, ruta/destino, tipo de lanzamiento, version/producto, ultima comprobacion, evidencia, confianza). |
 | `def deduplicar_por_destino_real(candidatos)` | Deduplica una lista de `DiscoveredCandidate` ya clasificados por identidad y destino real (ruta normalizada o URI), conservando el de mayor confianza/evidencia por destino y todas las rutas de instalaciones distintas. |

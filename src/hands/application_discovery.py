@@ -16,6 +16,7 @@ lectura sola sobre el equipo.
 from __future__ import annotations
 
 import os
+import shutil
 import sqlite3
 import uuid
 from dataclasses import dataclass, field
@@ -56,6 +57,11 @@ FUENTE_PATH = "path"
 FUENTE_APP_PATHS = "app_paths"
 FUENTE_INVENTARIO = "inventario"
 
+# Fuentes de resolución de mayor precedencia (no duplican mecanismos existentes;
+# se reutilizan ApplicationManager y la detección de procesos del SO).
+FUENTE_CATALOGO = "catalogo_conocido"          # ApplicationManager / conocimiento estructurado
+FUENTE_APLICACION_ABIERTA = "aplicacion_abierta"  # proceso ya en ejecución detectado en el SO
+
 # Fuentes primarias (se consultan primero, en este orden de prioridad).
 FUENTES_PRIMARIAS = (
     FUENTE_START_MENU,
@@ -65,7 +71,23 @@ FUENTES_PRIMARIAS = (
     FUENTE_APP_PATHS,
 )
 
-# Índice de prioridad: menor número = mayor prioridad al dedupar por destino.
+# Orden de precedencia de fuentes para resolución por nombre (3.8.5.1.4.9.2).
+# Menor número = mayor precedencia. Una aplicación ya abierta tiene la máxima
+# precedencia, seguida del catálogo conocido, luego las fuentes nativas
+# instaladas y, por último, los candidatos del inventario.
+_PRECEDENCIA_FUENTE = {
+    FUENTE_APLICACION_ABIERTA: 0,
+    FUENTE_CATALOGO: 1,
+    FUENTE_START_MENU: 2,
+    FUENTE_APPX: 3,
+    FUENTE_UNINSTALL_REGISTRY: 4,
+    FUENTE_PATH: 5,
+    FUENTE_APP_PATHS: 6,
+    FUENTE_INVENTARIO: 7,
+}
+
+# Índice de prioridad legado: menor número = mayor prioridad al dedupar por destino.
+# Se mantiene por compatibilidad; _PRECEDENCIA_FUENTE es la fuente de verdad.
 _PRIORIDAD_FUENTE = {fuente: i for i, fuente in enumerate(FUENTES_PRIMARIAS)}
 _PRIORIDAD_FUENTE[FUENTE_INVENTARIO] = len(FUENTES_PRIMARIAS)
 
@@ -274,9 +296,17 @@ class ApplicationDiscovery:
         limite_por_fuente: int = 50,
     ) -> list[DiscoveredCandidate]:
         """
-        Busca candidatos por nombre. Consulta primero las fuentes primarias y,
-        solo si no hay coincidencias, el inventario como fuente complementaria
-        para localizar destinos faltantes (.7.2).
+        Busca candidatos por nombre aplicando el orden de precedencia de
+        fuentes (3.8.5.1.4.9.2):
+
+        1. Aplicación ya abierta (proceso en ejecución detectado en el SO).
+        2. Catálogo conocido (ApplicationManager / conocimiento estructurado).
+        3. Fuentes nativas instaladas (menú, paquetes, registro, PATH, App Paths).
+        4. Candidatos del inventario persistente (fuente complementaria).
+
+        Se conserva la procedencia (`fuente`) y la confianza (`confianza`) de
+        cada candidato, y se deduplica por destino real conservando la fuente
+        de mayor precedencia. No lanza aplicaciones ni modifica el catálogo.
         """
         if not nombre or not isinstance(nombre, str):
             return []
@@ -286,7 +316,19 @@ class ApplicationDiscovery:
 
         nombre_lower = nombre.casefold()
         fuentes_consultadas: list[str] = []
+        crudos: list[dict[str, Any]] = []
 
+        # ------------------------------------------------------------------
+        # Paso 1: catálogo conocido (ApplicationManager) — alta precedencia.
+        # ------------------------------------------------------------------
+        catalogo = self._candidato_desde_catalogo(nombre)
+        if catalogo is not None:
+            fuentes_consultadas.append(catalogo["source"])
+            crudos.append(catalogo)
+
+        # ------------------------------------------------------------------
+        # Paso 2: fuentes nativas instaladas (FUENTES_PRIMARIAS).
+        # ------------------------------------------------------------------
         primarios = self._fuentes_primarias(limite_por_fuente)
         for fuente in FUENTES_PRIMARIAS:
             if any(str(p.get("source", "")).casefold() == fuente for p in primarios):
@@ -297,69 +339,187 @@ class ApplicationDiscovery:
             for p in primarios
             if nombre_lower in str(p.get("name", "")).casefold()
         ]
-        if coincidencias:
-            coincidencias_unicas = self._dedup_por_destino(coincidencias)
-            return self._clasificar_y_validar(
-                coincidencias_unicas, fuentes_consultadas=fuentes_consultadas
+        for c in coincidencias:
+            crudos.append(
+                {
+                    **c,
+                    "source": str(c.get("source", "")).strip(),
+                    "fuentes_consultadas": list(fuentes_consultadas),
+                }
             )
 
-        if not incluir_inventario:
-            return []
-
-        # Fuentes primarias sin coincidencia: el inventario es la fuente
-        # complementaria para localizar el destino faltante.
-        try:
-            self.storage.connect()
-            entradas = self.storage.search(
-                machine_id=self.machine_id,
-                extension=".exe",
-                tipo=EntryType.FILE.value,
-                disponible=True,
-                limit=limite_por_fuente,
-                solo_volumes_montados=True,
-            )
-        except (OSError, PermissionError, sqlite3.Error):
-            return []
-        except Exception:
-            return []
-        finally:
+        # ------------------------------------------------------------------
+        # Paso 3: inventario persistente como fuente complementaria solo si
+        # el nombre no quedó resuelto por catálogo ni fuentes nativas.
+        # ------------------------------------------------------------------
+        nombres_resueltos = {
+            str(c.get("name", "")).casefold() for c in crudos if c.get("name")
+        }
+        destinos_resueltos = {
+            str(c.get("destination") or c.get("absolute_path", "")).casefold()
+            for c in crudos
+            if c.get("destination") or c.get("absolute_path")
+        }
+        if incluir_inventario and (
+            not crudos or nombre_lower not in nombres_resueltos
+        ):
             try:
-                self.storage.close()
+                self.storage.connect()
+                entradas = self.storage.search(
+                    machine_id=self.machine_id,
+                    extension=".exe",
+                    tipo=EntryType.FILE.value,
+                    disponible=True,
+                    limit=limite_por_fuente,
+                    solo_volumes_montados=True,
+                )
+            except (OSError, PermissionError, sqlite3.Error):
+                entradas = []
             except Exception:
-                pass
+                entradas = []
+            finally:
+                try:
+                    self.storage.close()
+                except Exception:
+                    pass
 
-        if not entradas:
+            if entradas:
+                fuentes_consultadas.append(FUENTE_INVENTARIO)
+                # Filtrar por nombre en Python (coincidencia case-insensitive de
+                # subcadena), consistente con _complemento_inventario que no usa
+                # el filtro exacto de name en storage.search.
+                entradas_filtradas = [
+                    e
+                    for e in entradas
+                    if nombre_lower in str(e.get("name", "")).casefold()
+                    and str(e.get("name", "")).casefold() not in nombres_resueltos
+                    and str(e.get("absolute_path", "")).casefold()
+                    not in destinos_resueltos
+                ]
+                for e in entradas_filtradas:
+                    crudos.append(
+                        {
+                            "candidate_id": str(e.get("absolute_path", "")),
+                            "name": str(e.get("name", "")),
+                            "absolute_path": str(e.get("absolute_path", "")),
+                            "destination": str(e.get("absolute_path", "")),
+                            "source": FUENTE_INVENTARIO,
+                            "volume": str(e.get("volume", "")) or None,
+                            "last_checked_at": str(e.get("last_checked_at", "")),
+                            "fuentes_consultadas": list(fuentes_consultadas),
+                            "esta_en_inventario": True,
+                        }
+                    )
+
+        if not crudos:
             return []
 
-        # Filtrar por nombre en Python (coincidencia case-insensitive de
-        # subcadena), consistente con _complemento_inventario que no usa
-        # el filtro exacto de name en storage.search.
-        nombre_lower = nombre.casefold()
-        entradas_filtradas = [
-            e for e in entradas
-            if nombre_lower in str(e.get("name", "")).casefold()
-        ]
+        # ------------------------------------------------------------------
+        # Marcar como "aplicación ya abierta" los candidatos cuyo proceso
+        # esté en ejecución: elevan su fuente a la máxima precedencia.
+        # ------------------------------------------------------------------
+        crudos = self._elevar_si_abierta(crudos)
 
-        if not entradas_filtradas:
-            return []
-
-        candidatos = [
-            {
-                "candidate_id": str(e.get("absolute_path", "")),
-                "name": str(e.get("name", "")),
-                "absolute_path": str(e.get("absolute_path", "")),
-                "source": FUENTE_INVENTARIO,
-                "volume": str(e.get("volume", "")) or None,
-                "last_checked_at": str(e.get("last_checked_at", "")),
-            }
-            for e in entradas_filtradas
-        ]
+        # ------------------------------------------------------------------
+        # Deduplicar por destino real conservando la fuente de mayor
+        # precedencia, luego clasificar y validar cada candidato.
+        # ------------------------------------------------------------------
+        unicos = self._dedup_por_destino(crudos)
         return self._clasificar_y_validar(
-            candidatos,
+            unicos,
             fuente_defecto=FUENTE_INVENTARIO,
-            fuentes_consultadas=list(fuentes_consultadas) + [FUENTE_INVENTARIO],
-            esta_en_inventario=True,
+            fuentes_consultadas=fuentes_consultadas,
         )
+
+    def _candidato_desde_catalogo(
+        self, nombre: str
+    ) -> Optional[dict[str, Any]]:
+        """
+        Resuelve el nombre contra ApplicationManager (catálogo conocido).
+
+        Devuelve un dict de candidato crudo con fuente
+        ``catalogo_conocido``, o ``None`` si no existe en el catálogo. Si el
+        proceso ya está en ejecución, eleva la fuente a
+        ``aplicacion_abierta``. No lanza nada ni modifica el catálogo.
+        """
+        from src.hands.applications_core import (
+            _is_process_running,
+            get_application_manager,
+        )
+
+        app_manager = get_application_manager()
+        app = app_manager.get_application(nombre)
+        if app is None:
+            return None
+
+        fuente = FUENTE_CATALOGO
+        ejecutable = str(getattr(app, "executable", None) or "").strip()
+        # Resolver nombres bare (ej. "notepad.exe") a su ruta absoluta real
+        # mediante PATH/App Paths, igual que _check_application_available, para
+        # que preflight pueda validar el destino existente.
+        ruta_absoluta: Optional[str] = None
+        if ejecutable:
+            if os.path.isabs(ejecutable) or any(
+                sep in ejecutable for sep in ("/", "\\")
+            ):
+                ruta_absoluta = ejecutable if os.path.isfile(ejecutable) else None
+            else:
+                resuelto = shutil.which(ejecutable)
+                ruta_absoluta = resuelto if resuelto else None
+        if ejecutable and ruta_absoluta and _is_process_running(
+            os.path.basename(ruta_absoluta)
+        ):
+            fuente = FUENTE_APLICACION_ABIERTA
+
+        return {
+            "candidate_id": ruta_absoluta or ejecutable or nombre,
+            "name": app.name,
+            "absolute_path": ruta_absoluta,
+            "destination": ruta_absoluta or getattr(app, "url", None) or None,
+            "source": fuente,
+            "volume": self._volumen_de(ruta_absoluta) if ruta_absoluta else None,
+            "last_checked_at": "",
+            "fuentes_consultadas": [fuente],
+        }
+
+    def _elevar_si_abierta(
+        self, candidatos: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        """
+        Eleva a ``aplicacion_abierta`` la fuente de los candidatos cuyo proceso
+        ya esté en ejecución en el sistema operativo.
+
+        La detección usa ``_is_process_running`` sobre el ejecutable del
+        candidato (lectura sola del SO, no lanza nada). Cuando se eleva, la
+        fuente pasa a la máxima precedencia del orden de 3.8.5.1.4.9.2.
+        """
+        from src.hands.applications_core import _is_process_running
+
+        resultado: list[dict[str, Any]] = []
+        for c in candidatos:
+            fuente = str(c.get("source", "")).strip()
+            ruta = c.get("absolute_path") or c.get("destination")
+            nombre = str(c.get("name", "")).strip()
+            es_abierta = False
+            if ruta and os.path.isfile(ruta):
+                exe = os.path.basename(ruta)
+                if _is_process_running(exe):
+                    es_abierta = True
+            elif nombre:
+                if _is_process_running(nombre):
+                    es_abierta = True
+            if es_abierta:
+                c = dict(c)
+                c["source"] = FUENTE_APLICACION_ABIERTA
+                consultadas = list(
+                    dict.fromkeys(
+                        c.get("fuentes_consultadas", [])
+                        + [FUENTE_APLICACION_ABIERTA]
+                    )
+                )
+                c["fuentes_consultadas"] = consultadas
+            resultado.append(c)
+        return resultado
 
     def candidatos_lanzables(
         self,
@@ -593,8 +753,10 @@ class ApplicationDiscovery:
     ) -> list[dict[str, Any]]:
         """
         Deduplica candidatos por destino real (ruta normalizada o URI), no solo
-        por nombre. Para cada destino conserva la fuente de mayor prioridad.
-        Las instalaciones distintas con rutas distintas se conservan todas.
+        por nombre. Para cada destino conserva la fuente de mayor precedencia
+        según ``_PRECEDENCIA_FUENTE`` (3.8.5.1.4.9.2: abierta > catálogo >
+        nativas > inventario). Las instalaciones distintas con rutas distintas
+        se conservan todas.
         """
         mejores: dict[str, dict[str, Any]] = {}
         sueltos: list[dict[str, Any]] = []
@@ -609,8 +771,8 @@ class ApplicationDiscovery:
             if existente is None:
                 mejores[clave] = c
             else:
-                prioridad_nueva = _PRIORIDAD_FUENTE.get(fuente, 99)
-                prioridad_vieja = _PRIORIDAD_FUENTE.get(
+                prioridad_nueva = _PRECEDENCIA_FUENTE.get(fuente, 99)
+                prioridad_vieja = _PRECEDENCIA_FUENTE.get(
                     str(existente.get("source", "")).strip(), 99
                 )
                 if prioridad_nueva < prioridad_vieja:
@@ -737,7 +899,7 @@ class ApplicationDiscovery:
                     destino_original=destino,
                     preflight_decision=preflight_decision,
                     fuentes_consultadas=list(fuentes),
-                    esta_en_inventario=esta_en_inventario,
+                    esta_en_inventario=bool(c.get("esta_en_inventario", esta_en_inventario)),
                 )
             )
         return descubiertos

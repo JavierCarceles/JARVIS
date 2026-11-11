@@ -389,7 +389,13 @@ class TestPrioridadFallback:
         resultado = descub.buscar_por_nombre("notepad", incluir_inventario=True)
         assert storage.search.call_count == 0
         assert len(resultado) >= 1
-        assert any(c.name.casefold() == "notepad" for c in resultado)
+        # El catálogo conocido tiene precedencia (unidad 3.8.5.1.4.9.2) y
+        # devuelve el nombre canónico de la aplicación ("Bloc de notas"),
+        # mientras que las primarias devolverían el nombre consultado ("notepad").
+        assert any(
+            c.name.casefold() in ("notepad", "bloc de notas")
+            for c in resultado
+        )
 
     def test_buscar_por_nombre_faltante_consulta_inventario(self):
         descub, _, storage = _discovery_con_mocks(calib_apps=[])
@@ -863,7 +869,12 @@ class TestInventarioComplementoAlmacenamientoReal:
         """Con almacenamiento real y preflight real, buscar_por_nombre
         encuentra candidatos en el inventario cuando primarias no tienen
         coincidencia. No lanza aplicaciones: solo descubre/resuelve y valida
-        con preflight (verificación real de unidad 3.8.5.1.4.9.1)."""
+        con preflight (verificación real de unidad 3.8.5.1.4.9.1).
+
+        Nota: se usa un nombre que NO está en el catálogo conocido para
+        forzar el camino del inventario como fuente complementaria, ya que
+        el catálogo conocido tiene mayor precedencia (unidad 3.8.5.1.4.9.2).
+        """
         notepad = r"C:\Windows\System32\notepad.exe"
         if not os.path.exists(notepad):
             pytest.skip("notepad.exe no disponible en este equipo")
@@ -877,10 +888,12 @@ class TestInventarioComplementoAlmacenamientoReal:
         storage.begin_scan_run("scan-integracion-91", "maquina-integracion-91",
                                "C:", SCAN_MODE_FULL, "2024-01-03T00:00:00")
 
-        # Insertar entrada apuntando a archivo real del sistema
+        # Insertar entrada apuntando a archivo real del sistema con un nombre
+        # que no pertenece al catálogo conocido (para forzar fallback al
+        # inventario).
         storage.insert_file_entries("scan-integracion-91", "maquina-integracion-91",
-                                    "C:", [self._una_entrada("e-notepad", notepad,
-                                                             "notepad.exe")])
+                                    "C:", [self._una_entrada("e-miapp", notepad,
+                                                             "miapp.exe")])
         storage.end_scan_run("scan-integracion-91", "2024-01-03T01:00:00",
                              SCAN_RESULT_OK, 1, 0, 0, 100.0)
 
@@ -901,10 +914,10 @@ class TestInventarioComplementoAlmacenamientoReal:
         )
 
         # buscar_por_nombre: primarias vacías → consulta inventario como complemento
-        resultado = discovery.buscar_por_nombre("notepad", incluir_inventario=True)
+        resultado = discovery.buscar_por_nombre("miapp", incluir_inventario=True)
 
         assert len(resultado) >= 1
-        assert any(c.name.casefold() == "notepad.exe" for c in resultado)
+        assert any(c.name.casefold() == "miapp.exe" for c in resultado)
         assert any(c.fuente == FUENTE_INVENTARIO for c in resultado)
         assert any(c.esta_en_inventario is True for c in resultado)
         assert any(FUENTE_INVENTARIO in c.fuentes_consultadas
