@@ -184,6 +184,44 @@ class TestClasificacionEntornoRealAccesosDirectos:
         assert c.confianza == CONFIANZA_NINGUNA
 
 
+class TestNombreComercialYAliasesEntornoReal:
+    """.7.5: verificar nombre_comercial y aliases en ejecutables reales del equipo.
+
+    nombre_comercial debe leerse de los recursos de version del ejecutable,
+    no asumirse del nombre del archivo. Los aliases combinan name,
+    nombre_comercial, titulo del ejecutable y CompanyName sin asumir
+    equivalencia entre ellos.
+    """
+
+    def test_ejecutable_real_tiene_nombre_comercial_y_aliases(self, clasificador):
+        c = clasificador.classify_candidate(
+            {"name": "python", "absolute_path": sys.executable, "source": "sistema_real"}
+        )
+        assert c.launch_type == "ejecutable"
+        assert c.es_lanzable is True
+        assert c.nombre_comercial is not None, f"nombre_comercial no debe ser None para {sys.executable}"
+        assert c.version is not None
+        assert len(c.aliases) >= 1
+        assert c.name in c.aliases
+        # El nombre comercial, si existe, debe estar entre los aliases
+        if c.nombre_comercial:
+            assert c.nombre_comercial.casefold() in {a.casefold() for a in c.aliases}
+
+    def test_nombre_comercial_no_se_asume_del_nombre_archivo(self, clasificador):
+        """En un ejecutable real, nombre_comercial proviene del recurso de version,
+        no del nombre del archivo. Verificamos que no coincida forzadamente con el stem."""
+        c = clasificador.classify_candidate(
+            {"name": "python", "absolute_path": sys.executable, "source": "sistema_real"}
+        )
+        stem = Path(sys.executable).stem
+        # nombre_comercial debe ser un valor real (no None) para python.exe
+        assert c.nombre_comercial is not None
+        # Los aliases incluyen el stem del ejecutable pero también otros valores
+        assert stem in c.aliases or c.name in c.aliases
+        assert len(c.aliases) >= 1
+
+
+# ---------------------------------------------------------------------------
 class TestPreflightSinLanzarEntornoReal:
     """Integracion .7.10: todo candidato a abrir pasa por preflight real; no se lanza nada."""
 

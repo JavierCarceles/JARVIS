@@ -8330,3 +8330,22 @@ VERIFICACIÓN: SINTAXIS: OK (ast.parse + pytest sin errores); MAIN.PY: NA (no se
 DISCREPANCIAS: NINGUNA
 PENDIENTES: Ninguno para esta unidad. Padre 3.8.5.1.4.7 con hijas .7.1 a .7.4 completadas. Siguiente hoja pendiente real: 3.8.5.1.4.7.5 (Resolver el nombre comercial y los alias sin asumir que coinciden con el nombre del ejecutable).
 ESTADO FINAL: 3.8.5.1.4.7.4 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.8.5.1.4.7.5
+FECHA: 2026-11-11
+OBJETIVO: Resolver el nombre comercial y los alias sin asumir que coinciden con el nombre del ejecutable; conservar todas las rutas candidatas cuando haya varias instalaciones.
+TIPO DE TRABAJO: IMPLEMENTACIÓN + VERIFICACIÓN REAL
+CAMBIOS / HALLAZGOS:
+- La capacidad de nombre_comercial y aliases ya estaba implementada desde la unidad .7.1 (leer_version_archivo_windows lee ProductName del recurso de version de Windows; _construir_aliases combina name, nombre_comercial, stem del ejecutable y CompanyName sin asumir equivalencia entre ellos; classify_candidates conserva rutas distintas por destino real). La unidad .7.5 cubre la verificacion y las pruebas de este comportamiento como hoja independiente.
+- No se modifico codigo de produccion de src/: la capacidad ya estaba operativa y verificada.
+- Añadidas pruebas unitarias en tests/hands/test_application_launch_classifier.py:
+  * TestNombreComercialNoAsumidoDelEjecutable (3 tests): sin recursos de version nombre_comercial es None (no se asume del nombre del archivo); nombre_comercial proviene de ProductName y no del name del candidato; sin version los aliases no inventan un nombre comercial.
+  * TestVariasInstalacionesMismaApp (1 test): misma app en dos rutas distintas se conservan como 2 resultados separados, cada uno con su propio nombre_comercial.
+- Añadidas pruebas de entorno real en tests/hands/test_clasificacion_candidatos_lanzamiento_entorno_real.py:
+  * TestNombreComercialYAliasesEntornoReal (2 tests): nombre_comercial y aliases en python.exe real; nombre_comercial no se asume del nombre del archivo.
+ARCHIVOS MODIFICADOS: TESTS: tests/hands/test_application_launch_classifier.py (4 pruebas nuevas); tests/hands/test_clasificacion_candidatos_lanzamiento_entorno_real.py (2 pruebas nuevas); DOCUMENTACION: docs/README_TESTS.md (secciones y indices actualizados para las nuevas clases). No se modificaron archivos de src/ ni docs/README.md.
+TESTS Y RESULTADOS: UNITARIOS: 42 PASSED / 42 TOTAL (test_application_launch_classifier.py, incluidos tests nuevos de .7.5); ENTORNO REAL: 18 PASSED / 18 TOTAL (test_clasificacion_candidatos_lanzamiento_entorno_real.py, incluidos tests nuevos de .7.5); REGRESION: application_discovery (22 PASSED), application_preflight (110 PASSED), application_classification (todos PASSED) siguen en verde. Total 183 PASSED / 183 TOTAL en los 5 ficheros relacionados.
+VERIFICACION: SINTAXIS: OK (ast.parse + pytest sin errores); MAIN.PY: NA (no se modifica main.py); COMPORTAMIENTO / INTEGRACION REAL: Evidencia real en Windows 11, Python 3.14.7 sobre implementacion de produccion: python.exe tiene nombre_comercial='Python' (leido del recurso de version, no del nombre del archivo) y aliases=['python', 'Python Software Foundation']; dos instalaciones temporales de 'MiApp' en rutas distintas se conservan como 2 resultados separados. No se lanza ninguna aplicacion. No se modifican datos de usuario. La unidad no requiere interaccion grafica (sin ventanas, monitores ni entrada de teclado/raton).
+DISCREPANCIAS: NINGUNA
+PENDIENTES: Ninguno para esta unidad. Padre 3.8.5.1.4.7 con hijas .7.1 a .7.5 completadas. Siguiente hoja pendiente real: 3.8.5.1.4.7.6 (Registrar fuente, ruta/destino, tipo de lanzamiento, version/producto si existe, ultima comprobacion, evidencia y nivel de confianza).
+ESTADO FINAL: 3.8.5.1.4.7.5 - IMPLEMENTADA

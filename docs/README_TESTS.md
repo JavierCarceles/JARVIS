@@ -8114,28 +8114,31 @@ required_capability son opcionales.
 <a name="hands/test-application_launch_classifier"></a>
 ### `hands\test_application_launch_classifier.py`
 
-**Descripción:** Tests unitarios de `src.hands.application_launch_classifier` (unidad 3.8.5.1.4.7.1):
-clasificación de candidatos por tipo de lanzamiento propio de cada SO, subtipos de rol, lanzabilidad
-basada en evidencia real, deduplicación por destino real e integración con preflight sin lanzar nada.
+**Descripción:** Tests unitarios de `src.hands.application_launch_classifier`: clasificación de candidatos
+por tipo de lanzamiento propio de cada SO, subtipos de rol, lanzabilidad basada en evidencia real,
+nombre comercial y aliases independientes del nombre del ejecutable, deduplicación por destino real e
+integración con preflight sin lanzar nada.
 
 **Módulos de origen probados:** src.hands.application_launch_classifier, src.hands.application_preflight, src.hands.system_inventory
 
 **Clases de test:**
 
-- **`TestLeerVersionArchivoWindows`** (línea 43) — 3 método(s) de test
-- **`TestLaunchClassification`** (línea 103) — 2 método(s) de test
-- **`TestTipoLanzamientoExecutable`** (línea 116) — 4 método(s) de test
-- **`TestTipoLanzamientoAccesoDirecto`** (línea 137) — 2 método(s) de test
-- **`TestTipoLanzamientoURI`** (línea 163) — 3 método(s) de test
-- **`TestTipoLanzamientoVacio`** (línea 201) — 2 método(s) de test
-- **`TestSubtipoRol`** (línea 222) — 5 método(s) de test
-- **`TestNombreComercialYAliases`** (línea 266) — 2 método(s) de test
-- **`TestDeduplicacion`** (línea 287) — 3 método(s) de test
-- **`TestEntradaInventoryEntry`** (línea 326) — 1 método(s) de test
-- **`TestPEValidoComoEvidenciaLanzabilidad`** (línea 247) — 2 método(s) de test
-- **`TestLeerSubsistemaPe`** (línea 402) — 6 método(s) de test
-- **`TestDiferenciacionGuiCliPorSubsistemaPe`** (línea 417) — 3 método(s) de test
-- **`TestIntegracionPreflight`** (línea 441) — 2 método(s) de test
+- **`TestLeerVersionArchivoWindows`** (línea 75) — 3 método(s) de test
+- **`TestLaunchClassification`** (línea 93) — 2 método(s) de test
+- **`TestTipoLanzamientoExecutable`** (línea 125) — 4 método(s) de test
+- **`TestPEValidoComoEvidenciaLanzabilidad`** (línea 181) — 2 método(s) de test
+- **`TestTipoLanzamientoAccesoDirecto`** (línea 219) — 2 método(s) de test
+- **`TestTipoLanzamientoURI`** (línea 240) — 3 método(s) de test
+- **`TestTipoLanzamientoVacio`** (línea 263) — 2 método(s) de test
+- **`TestSubtipoRol`** (línea 282) — 5 método(s) de test
+- **`TestNombreComercialYAliases`** (línea 345) — 2 método(s) de test
+- **`TestNombreComercialNoAsumidoDelEjecutable`** (línea 368) — 3 método(s) de test
+- **`TestVariasInstalacionesMismaApp`** (línea 432) — 1 método(s) de test
+- **`TestDeduplicacion`** (línea 464) — 3 método(s) de test
+- **`TestEntradaInventoryEntry`** (línea 514) — 1 método(s) de test
+- **`TestLeerSubsistemaPe`** (línea 539) — 6 método(s) de test
+- **`TestDiferenciacionGuiCliPorSubsistemaPe`** (línea 574) — 3 método(s) de test
+- **`TestIntegracionPreflight`** (línea 611) — 2 método(s) de test
 
 ---
 
@@ -8144,17 +8147,19 @@ basada en evidencia real, deduplicación por destino real e integración con pre
 
 **Descripción:** Verificación en entorno real de `src.hands.application_launch_classifier` sobre elementos
 reales de Windows (ejecutables del sistema, herramientas CLI, URI de aplicación, accesos directos rotos,
-archivos con extensión engañosa). No lanza ninguna aplicación ni modifica datos de usuario.
+archivos con extensión engañosa). Incluye verificación de nombre comercial y aliases independientes
+del nombre del ejecutable. No lanza ninguna aplicación ni modifica datos de usuario.
 
 **Módulos de origen probados:** src.hands.application_launch_classifier, src.hands.application_preflight
 
 **Clases de test:**
 
-- **`TestClasificacionEntornoRealEjecutablesSistema`** (línea 43) — 5 método(s) de test
+- **`TestClasificacionEntornoRealEjecutablesSistema`** (línea 41) — 5 método(s) de test
 - **`TestDiferenciacionGuiCliSubsistemaPeEntornoReal`** (línea 107) — 2 método(s) de test
-- **`TestClasificacionEntornoRealURI`** (línea 79) — 3 método(s) de test
-- **`TestClasificacionEntornoRealAccesosDirectos`** (línea 102) — 2 método(s) de test
-- **`TestPreflightSinLanzarEntornoReal`** (línea 116) — 3 método(s) de test
+- **`TestClasificacionEntornoRealURI`** (línea 139) — 3 método(s) de test
+- **`TestClasificacionEntornoRealAccesosDirectos`** (línea 165) — 2 método(s) de test
+- **`TestNombreComercialYAliasesEntornoReal`** (línea 187) — 2 método(s) de test
+- **`TestPreflightSinLanzarEntornoReal`** (línea 225) — 3 método(s) de test
 
 ---
 

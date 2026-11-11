@@ -362,6 +362,102 @@ class TestNombreComercialYAliases:
 
 
 # ---------------------------------------------------------------------------
+# Nombre comercial y aliases NO asumidos del nombre del ejecutable (.7.5)
+# ---------------------------------------------------------------------------
+
+class TestNombreComercialNoAsumidoDelEjecutable:
+    """.7.5: nombre_comercial y aliases no se asumen del nombre del archivo ejecutable."""
+
+    def test_sin_recursos_de_version_nombre_comercial_es_none(self):
+        """Ejecutable sin recursos de version: nombre_comercial no se asume del nombre del archivo."""
+        clasificador = LaunchClassifier()
+        with tempfile.NamedTemporaryFile(suffix=".exe", delete=False) as f:
+            path = f.name
+        try:
+            c = clasificador.classify_candidate(_candidato("xyztool", path))
+            assert c.nombre_comercial is None, f"nombre_comercial no debe asumirse del nombre del ejecutable, obtuvo {c.nombre_comercial!r}"
+            assert c.name == "xyztool"
+            assert c.es_lanzable is False  # .7.4: solo extension no basta
+        finally:
+            os.unlink(path)
+
+    @patch('src.hands.application_launch_classifier.leer_version_archivo_windows')
+    def test_nombre_comercial_proviene_de_version_no_del_name_candidato(self, mock_version):
+        """Si hay version info con ProductName distinto, nombre_comercial es el ProductName, no el name del candidato."""
+        mock_version.return_value = {
+            "ProductName": "Mi Aplicacion Comercial",
+            "ProductVersion": "2.0.0",
+            "FileVersion": "2.0.0.1",
+            "CompanyName": "Mi Empresa S.A.",
+        }
+        clasificador = LaunchClassifier()
+        with tempfile.NamedTemporaryFile(suffix=".exe", delete=False) as f:
+            path = f.name
+        try:
+            c = clasificador.classify_candidate(_candidato("xyztool", path))
+            assert c.nombre_comercial == "Mi Aplicacion Comercial"
+            assert c.nombre_comercial != c.name
+            assert c.version == "2.0.0"
+            # Los aliases incluyen name, nombre_comercial, stem y CompanyName sin asumir equivalencia
+            assert "xyztool" in c.aliases
+            assert "Mi Aplicacion Comercial" in c.aliases
+            assert "Mi Empresa S.A." in c.aliases
+            assert Path(path).stem in c.aliases
+        finally:
+            os.unlink(path)
+
+    @patch('src.hands.application_launch_classifier.leer_version_archivo_windows')
+    def test_sin_version_aliases_no_asumen_nombre_comercial(self, mock_version):
+        """Sin version info, nombre_comercial es None y los aliases no asumen que el nombre del archivo sea comercial."""
+        mock_version.return_value = None
+        clasificador = LaunchClassifier()
+        with tempfile.NamedTemporaryFile(suffix=".exe", delete=False) as f:
+            path = f.name
+        try:
+            c = clasificador.classify_candidate(_candidato("MiApp", path))
+            assert c.nombre_comercial is None
+            assert c.version is None
+            assert "MiApp" in c.aliases
+            assert Path(path).stem in c.aliases
+            # No debe haber un nombre comercial inventado a partir del nombre del archivo
+            assert all(a.casefold() != "miapp comercial" for a in c.aliases)
+        finally:
+            os.unlink(path)
+
+
+# ---------------------------------------------------------------------------
+# Varias instalaciones de la misma app: conservar todas las rutas (.7.5)
+# ---------------------------------------------------------------------------
+
+class TestVariasInstalacionesMismaApp:
+    """.7.5: conservar todas las rutas candidatas cuando hay varias instalaciones."""
+
+    def test_misma_app_en_rutas_distintas_se_conservan_todas(self):
+        """Dos rutas diferentes (misma app instalada dos veces): se conservan ambas."""
+        clasificador = LaunchClassifier()
+        caminos = []
+        for _ in range(2):
+            with tempfile.NamedTemporaryFile(suffix=".exe", delete=False) as f:
+                caminos.append(f.name)
+        try:
+            candidatos = [
+                _candidato("MiApp", caminos[0]),
+                _candidato("MiApp", caminos[1]),
+            ]
+            resultado = clasificador.classify_candidates(candidatos)
+            assert len(resultado) == 2, f"Se esperaban 2 rutas conservadas, se obtuvieron {len(resultado)}"
+            destinos = {c.destination for c in resultado}
+            assert destinos == set(caminos)
+            # Cada ruta mantiene su propio nombre_comercial (None, sin version)
+            for c in resultado:
+                assert c.nombre_comercial is None
+        finally:
+            for ruta in caminos:
+                if os.path.exists(ruta):
+                    os.unlink(ruta)
+
+
+# ---------------------------------------------------------------------------
 # Deduplicacion por destino real (.7.7)
 # ---------------------------------------------------------------------------
 
