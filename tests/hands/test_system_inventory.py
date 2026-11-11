@@ -34,6 +34,7 @@ from src.hands.system_inventory import (
     EscanerRutaVolumen,
     GestorPrimerInventario,
     InventoryContract,
+    InventoryEntry,
     LimiteRecursos,
     LimiteRendimiento,
     MedidorRecursosSistema,
@@ -47,9 +48,11 @@ from src.hands.system_inventory import (
     ResultadoEscaneo,
     ResultadoLimpieza,
     ResultadoMedicionRendimiento,
+    ResultadoValidacionDestino,
     VolumeInfo,
     VolumeType,
     generate_machine_id,
+    validar_destino,
 )
 from src.hands.system_inventory import escanear_ruta, escanear_volumen, reconstruir_catalogo
 from src.hands.system_inventory_storage import (
@@ -1838,3 +1841,384 @@ class TestAccionRespuestaDuranteEscaneo:
 
         ejecucion.esperar(timeout=60.0)
         assert ejecucion.finalizado is True
+
+
+# ---------------------------------------------------------------------------
+# Permisos de acceso al inventario (3.8.5.1.4.8.9).
+# ---------------------------------------------------------------------------
+
+class TestPermisosAccesoInventario:
+    """Verifican que el inventario gestiona correctamente los permisos de acceso
+    del sistema operativo sobre rutas del inventario (3.8.5.1.4.8.9)."""
+
+    def test_validar_destino_ruta_accesible_reporta_ok(self, tmp_path: Path):
+        """Una ruta existente y accesible pasa todas las comprobaciones de
+        validar_destino (existencia, tipo, volumen, identidad, accesibilidad)."""
+        base = tmp_path / "accesible"
+        base.mkdir()
+        volumen_real = Path(str(base)).drive or str(Path(str(base)).anchor)
+        entry = InventoryEntry(
+            machine_id=MACHINE_ID,
+            volume=volumen_real,
+            absolute_path=str(base),
+            relative_path="",
+            name=base.name,
+            extension="",
+            entry_type=EntryType.DIRECTORY,
+            size_bytes=0,
+            modified_at="",
+            created_at="",
+            last_checked_at="",
+        )
+        resultado = validar_destino(entry, machine_id_actual=MACHINE_ID)
+        assert isinstance(resultado, ResultadoValidacionDestino)
+        assert resultado.existencia_ok is True
+        assert resultado.tipo_ok is True
+        assert resultado.volumen_ok is True
+        assert resultado.identidad_ok is True
+        assert resultado.accesible_ok is True
+        assert resultado.valido is True
+        assert resultado.errores == []
+
+    def test_validar_destino_ruta_inexistente_reporta_existencia_falsa(self):
+        """Una ruta inexistente falla la comprobación de existencia y no es válida."""
+        entry = InventoryEntry(
+            machine_id=MACHINE_ID,
+            volume="T:",
+            absolute_path="C:\\Ruta\\Que\\No\\Existe",
+            relative_path="",
+            name="NoExiste",
+            extension="",
+            entry_type=EntryType.DIRECTORY,
+            size_bytes=0,
+            modified_at="",
+            created_at="",
+            last_checked_at="",
+        )
+        resultado = validar_destino(entry, machine_id_actual=MACHINE_ID)
+        assert resultado.existencia_ok is False
+        assert resultado.valido is False
+        assert len(resultado.errores) >= 1
+
+    def test_validar_destino_permiso_denegado_reporta_accesible_falso(self, tmp_path: Path):
+        """Un PermissionError al leer metadatos se traduce en accesible_ok=False
+        y valido=False, sin abortar la validación."""
+        from unittest.mock import patch
+
+        base = tmp_path / "sin_permisos"
+        base.mkdir()
+        volumen_real = Path(str(base)).drive or str(Path(str(base)).anchor)
+        entry = InventoryEntry(
+            machine_id=MACHINE_ID,
+            volume=volumen_real,
+            absolute_path=str(base),
+            relative_path="",
+            name=base.name,
+            extension="",
+            entry_type=EntryType.DIRECTORY,
+            size_bytes=0,
+            modified_at="",
+            created_at="",
+            last_checked_at="",
+        )
+        with patch("os.scandir", side_effect=PermissionError("Acceso denegado")):
+            resultado = validar_destino(entry, machine_id_actual=MACHINE_ID)
+        assert resultado.accesible_ok is False
+        assert resultado.valido is False
+        assert any("Permiso denegado" in e for e in resultado.errores)
+
+    def test_validar_destino_oserror_reporta_accesible_falso(self, tmp_path: Path):
+        """Un OSError al leer metadatos se traduce en accesible_ok=False
+        y valido=False."""
+        from unittest.mock import patch
+
+        base = tmp_path / "error_e_s"
+        base.mkdir()
+        volumen_real = Path(str(base)).drive or str(Path(str(base)).anchor)
+        entry = InventoryEntry(
+            machine_id=MACHINE_ID,
+            volume=volumen_real,
+            absolute_path=str(base),
+            relative_path="",
+            name=base.name,
+            extension="",
+            entry_type=EntryType.DIRECTORY,
+            size_bytes=0,
+            modified_at="",
+            created_at="",
+            last_checked_at="",
+        )
+        with patch("os.scandir", side_effect=OSError("Error de E/S")):
+            resultado = validar_destino(entry, machine_id_actual=MACHINE_ID)
+        assert resultado.accesible_ok is False
+        assert resultado.valido is False
+        assert any("No se puede acceder" in e for e in resultado.errores)
+
+
+# ---------------------------------------------------------------------------
+# Exclusión de rutas (3.8.5.1.4.8.9).
+# ---------------------------------------------------------------------------
+
+class TestExclusionRutasInventario:
+    """Verifican que las exclusiones de rutas (usuario y técnicas) se aplican
+    correctamente en un escaneo real con almacenamiento (3.8.5.1.4.8.9)."""
+
+    def test_exclusion_usuario_no_aparece_en_entradas_escaneo(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        """Las rutas excluidas por el usuario no aparecen entre las entradas
+        del escaneo y llevan exclusion_reason='exclusion_usuario'."""
+        storage.initialize()
+        _, base = _volumen_para_scan(tmp_path, letra="V:")
+        excluida = base / "sub00"
+        (excluida / "dentro.txt").write_text("dentro\n", encoding="utf-8")
+
+        contrato = InventoryContract(machine_id=MACHINE_ID)
+        contrato.agregar_exclusion_usuario(str(excluida))
+
+        resultado = escanear_ruta(
+            ruta_absoluta=str(base),
+            contrato=contrato,
+            maquina_id=MACHINE_ID,
+            storage=storage,
+        )
+
+        assert resultado.resultado == SCAN_RESULT_OK
+        assert resultado.exclusiones >= 1
+
+        entradas = storage.obtener_entradas_escaneo(resultado.scan_id)
+        rutas = [e["absolute_path"] for e in entradas]
+        assert not any(
+            r == str(excluida) or r.startswith(str(excluida) + os.sep) for r in rutas
+        )
+        excluidas_db = [e for e in entradas if e["excluded"]]
+        assert all(e["exclusion_reason"] == "exclusion_usuario" for e in excluidas_db)
+
+    def test_exclusion_tecnica_path_no_aparece_en_escaneo(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        """Las rutas excluidas técnicamente (excluded_paths) no se escanean."""
+        storage.initialize()
+        _, base = _volumen_para_scan(tmp_path, letra="W:")
+
+        contrato = InventoryContract(machine_id=MACHINE_ID)
+        contrato.excluded_paths.append(str(base))
+
+        resultado = escanear_ruta(
+            ruta_absoluta=str(base),
+            contrato=contrato,
+            maquina_id=MACHINE_ID,
+            storage=storage,
+        )
+
+        assert resultado.resultado == SCAN_RESULT_OK
+        entradas = storage.obtener_entradas_escaneo(resultado.scan_id)
+        assert all(
+            not r.startswith(str(base) + os.sep) and r != str(base)
+            for r in (e["absolute_path"] for e in entradas)
+        )
+
+
+# ---------------------------------------------------------------------------
+# Cancelación y reanudación de escaneos (3.8.5.1.4.8.9).
+# ---------------------------------------------------------------------------
+
+class TestCancelacionYReanudacionInventario:
+    """Verifican cancelación y reanudación de escaneos con el gestor de
+    primer inventario en segundo plano (3.8.5.1.4.8.9)."""
+
+    def test_cancelar_gestor_marca_cancelacion_y_control_retorna_cancelar(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        """Verificar que solicitar_cancelar establece la bandera y que
+        control() retorna CANCELAR (mecanismo de cancelación de 3.8.5.1.4.8.9)."""
+        storage.initialize()
+        base = tmp_path / "volumen_cancelar_light"
+        base.mkdir(parents=True, exist_ok=True)
+        (base / "archivo.txt").write_text("contenido\n", encoding="utf-8")
+
+        volumen = VolumeInfo(
+            letra="T:", ruta_raiz=str(base), tipo=VolumeType.FIXED,
+            disponible=True,
+        )
+        gestor = GestorPrimerInventario(MACHINE_ID, storage)
+        ejecucion = gestor.ejecutar_primera_vez(volumenes=[volumen])
+
+        # Ejecutar y esperar a que termine (árbol pequeño, termina rápido).
+        ejecucion.esperar(timeout=60.0)
+        assert ejecucion.finalizado is True
+
+        # Tras finalizar, solicitar cancelar no tiene efecto sobre un scan ya
+        # terminado, pero la API de control sigue siendo consistente.
+        ejecucion.solicitar_cancelar()
+        assert ejecucion.solicitado_cancelar is True
+        assert ejecucion.control() == ControlRecorrido.CANCELAR
+
+    def test_pausa_y_reanudar_gestor(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        """Pausar y reanudar un escaneo en segundo plano funciona sin perder
+        el control del escaneo."""
+        storage.initialize()
+        base = tmp_path / "volumen_pausa"
+        for i in range(15):
+            sub = base / f"sub{i:02d}"
+            sub.mkdir(parents=True, exist_ok=True)
+            for j in range(4):
+                (sub / f"archivo_{j:02d}.txt").write_text(
+                    f"contenido {i}-{j}\n", encoding="utf-8"
+                )
+
+        volumen = VolumeInfo(
+            letra="T:", ruta_raiz=str(base), tipo=VolumeType.FIXED,
+            disponible=True,
+        )
+        gestor = GestorPrimerInventario(MACHINE_ID, storage)
+        ejecucion = gestor.ejecutar_primera_vez(volumenes=[volumen])
+
+        time.sleep(0.1)
+        if ejecucion.esta_en_ejecucion:
+            ejecucion.solicitar_pausa()
+            assert ejecucion.solicitado_pausa is True
+            assert ejecucion.control() == ControlRecorrido.PAUSAR
+
+            ejecucion.solicitar_reanudar()
+            assert ejecucion.solicitado_pausa is False
+            assert ejecucion.control() == ControlRecorrido.CONTINUAR
+
+        ejecucion.esperar(timeout=60.0)
+        assert ejecucion.finalizado is True
+
+
+# ---------------------------------------------------------------------------
+# Recuperación ante cierre inesperado de escaneos (3.8.5.1.4.8.9).
+# ---------------------------------------------------------------------------
+
+class TestRecuperacionCierreInesperado:
+    """Verifican la recuperación de escaneos interrumpidos por cierre
+    inesperado: tras un cierre inesperado el bloqueo de concurrencia queda
+    liberado por el SO y `begin_scan_run` marca scans previos sin finalizar
+    como interrumpidos; `reanudar_scan` reactiva un scan interrumpido."""
+
+    def test_begin_scan_run_marca_scan_previo_como_interrumpido(
+        self, storage: SystemInventoryStorage
+    ):
+        """Un scan_run iniciado pero nunca finalizado (finished_at NULL) se
+        marca como interrumpido cuando se inicia un nuevo escaneo para el
+        mismo equipo y volumen tras liberar el bloqueo (recuperación tras
+        cierre inesperado donde el SO libera el hilo y el bloqueo)."""
+        storage.initialize()
+        storage.record_machine(MACHINE_ID)
+        storage.record_volume("vol-T:", MACHINE_ID, "T:", "local", "online")
+
+        scan_id_previo = "scan-previo-sin-finalizar"
+        storage.begin_scan_run(
+            scan_id=scan_id_previo,
+            machine_id=MACHINE_ID,
+            volume="T:",
+            mode=SCAN_MODE_FULL,
+            started_at="2024-01-01T00:00:00",
+        )
+
+        run_antes = storage.get_scan_run(scan_id_previo)
+        assert run_antes is not None
+        assert run_antes["finished_at"] is None
+        assert run_antes["result"] == SCAN_RESULT_INTERRUPTED
+        # El bloqueo de concurrencia está activo (scan en curso).
+        assert SystemInventoryStorage.has_active_scan(MACHINE_ID, "T:") is True
+
+        # Simular cierre inesperado: el proceso muere y el SO libera el
+        # bloqueo de concurrencia, pero el scan_run queda sin finalizar.
+        SystemInventoryStorage._release_scan_lock(MACHINE_ID, "T:")
+        assert SystemInventoryStorage.has_active_scan(MACHINE_ID, "T:") is False
+
+        # Iniciar nuevo escaneo: begin_scan_run adquiere el bloqueo ahora libre
+        # y marca el scan previo como interrumpido.
+        scan_id_nuevo = "scan-nuevo"
+        storage.begin_scan_run(
+            scan_id=scan_id_nuevo,
+            machine_id=MACHINE_ID,
+            volume="T:",
+            mode=SCAN_MODE_FULL,
+            started_at="2024-01-01T00:00:01",
+        )
+
+        run_previo_despues = storage.get_scan_run(scan_id_previo)
+        assert run_previo_despues["finished_at"] is not None
+        assert run_previo_despues["result"] == SCAN_RESULT_INTERRUPTED
+
+        run_nuevo = storage.get_scan_run(scan_id_nuevo)
+        assert run_nuevo["finished_at"] is None
+        assert run_nuevo["result"] == SCAN_RESULT_INTERRUPTED
+
+        storage.end_scan_run(
+            scan_id=scan_id_nuevo,
+            finished_at="2024-01-01T00:00:02",
+            result=SCAN_RESULT_OK,
+            entries_count=5,
+        )
+        run_nuevo_final = storage.get_scan_run(scan_id_nuevo)
+        assert run_nuevo_final["result"] == SCAN_RESULT_OK
+
+    def test_reanudar_scan_interrumpido(self, storage: SystemInventoryStorage):
+        """reanudar_scan recupera un escaneo interrumpido sin finalizar y
+        permite seguir insertando entradas antes de finalizarlo con
+        end_scan_run (recuperación tras cierre inesperado)."""
+        storage.initialize()
+        storage.record_machine(MACHINE_ID)
+        storage.record_volume("vol-T:", MACHINE_ID, "T:", "local", "online")
+
+        scan_id = "scan-interrumpido-cierre"
+        storage.begin_scan_run(
+            scan_id=scan_id,
+            machine_id=MACHINE_ID,
+            volume="T:",
+            mode=SCAN_MODE_FULL,
+            started_at="2024-01-01T00:00:00",
+        )
+
+        run = storage.get_scan_run(scan_id)
+        assert run["finished_at"] is None
+        assert run["result"] == SCAN_RESULT_INTERRUPTED
+
+        # Recuperación tras cierre inesperado: reanudar el scan sin finalizar.
+        reanudado = storage.reanudar_scan(scan_id, MACHINE_ID, "T:")
+        assert reanudado["scan_id"] == scan_id
+        assert reanudado["machine_id"] == MACHINE_ID
+        assert reanudado["volume"] == "T:"
+        assert reanudado["finished_at"] is None
+        assert reanudado["result"] == SCAN_RESULT_INTERRUPTED
+
+        storage.end_scan_run(
+            scan_id=scan_id,
+            finished_at="2024-01-01T00:00:01",
+            result=SCAN_RESULT_OK,
+            entries_count=10,
+        )
+        run_final = storage.get_scan_run(scan_id)
+        assert run_final["result"] == SCAN_RESULT_OK
+        assert run_final["finished_at"] is not None
+
+    def test_reanudar_scan_finalizado_levanta_error(self, storage: SystemInventoryStorage):
+        """No se puede reanudar un scan ya finalizado."""
+        storage.initialize()
+        storage.record_machine(MACHINE_ID)
+        storage.record_volume("vol-T:", MACHINE_ID, "T:", "local", "online")
+
+        scan_id = "scan-ya-finalizado"
+        storage.begin_scan_run(
+            scan_id=scan_id,
+            machine_id=MACHINE_ID,
+            volume="T:",
+            mode=SCAN_MODE_FULL,
+            started_at="2024-01-01T00:00:00",
+        )
+        storage.end_scan_run(
+            scan_id=scan_id,
+            finished_at="2024-01-01T00:00:01",
+            result=SCAN_RESULT_OK,
+            entries_count=3,
+        )
+
+        with pytest.raises(ValueError, match="ya está finalizado"):
+            storage.reanudar_scan(scan_id, MACHINE_ID, "T:")

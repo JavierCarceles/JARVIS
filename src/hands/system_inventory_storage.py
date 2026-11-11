@@ -1791,7 +1791,7 @@ class SystemInventoryStorage:
             )
         if row_dict["finished_at"] is not None:
             raise ValueError(
-                f"El scan {scan_id!r} ya esta finalizado (resultado "
+                f"El scan {scan_id!r} ya está finalizado (resultado "
                 f"{row_dict['result']!r}) y no se puede reanudar. "
                 "Solo un escaneo interrumpido sin finalizar se puede reanudar."
             )
