@@ -13,6 +13,8 @@ Cubre `src.hands.application_discovery`:
 - Fallback al inventario solo para destinos faltantes (no buscados en primarias)
 - Deduplicacion por destino real, no solo por nombre
 - Clasificacion y validacion con preflight (sin lanzar ninguna aplicacion)
+- Registro y persistencia de candidatos (`registrar_candidatos`) con todos
+  los campos de registro .7.6 en `application_candidates`.
 
 Estrategia de mocks: solo se mockean las fuentes de DATOS
 (`CalibrationManager.discover_applications` y `SystemInventoryStorage`). La
@@ -48,8 +50,10 @@ from src.hands.application_launch_classifier import (
     CONFIANZA_ALTA,
     CONFIANZA_BAJA,
     CONFIANZA_MEDIA,
+    CONFIANZA_NINGUNA,
     LaunchClassifier,
 )
+from src.hands.system_inventory_storage import SystemInventoryStorage
 
 
 # ---------------------------------------------------------------------------
@@ -145,6 +149,130 @@ class TestDiscoveredCandidate:
         assert d["esta_en_inventario"] is True
         assert d["fuentes_consultadas"] == [FUENTE_START_MENU, FUENTE_INVENTARIO]
         assert d["preflight_decision"] == {"valid": False}
+
+
+class TestDiscoveredCandidateCampos76:
+    """.7.6: verificar que DiscoveredCandidate registra todos los campos de
+    registro: fuente, ruta/destino, tipo de lanzamiento, version/producto si
+    existe, ultima comprobacion, evidencia y nivel de confianza."""
+
+    def test_from_classification_mapea_todos_los_campos_76(self):
+        clasificador = LaunchClassifier(ApplicationPreflight())
+        ruta = _notepad()
+        if not ruta:
+            pytest.skip("notepad.exe no disponible en este equipo")
+        c = clasificador.classify_candidate({"name": "Notepad", "absolute_path": ruta, "source": "start_menu"})
+        dc = DiscoveredCandidate.from_classification(
+            c, fuente=FUENTE_START_MENU, destino_original=ruta,
+            preflight_decision={"valid": True, "launch_type": "ejecutable"},
+            fuentes_consultadas=[FUENTE_START_MENU],
+            esta_en_inventario=False,
+        )
+        # Fuente de registro
+        assert dc.fuente == FUENTE_START_MENU
+        # Ruta/destino
+        assert dc.absolute_path == ruta
+        assert dc.destination == ruta
+        # Tipo de lanzamiento
+        assert dc.launch_type == c.launch_type
+        # Version/producto si existen
+        assert dc.version == c.version
+        assert dc.producto == c.producto
+        # Ultima comprobacion
+        assert dc.ultima_comprobacion != ""
+        assert dc.ultima_comprobacion == c.ultima_comprobacion
+        # Evidencia
+        assert isinstance(dc.evidencia, list)
+        assert dc.evidencia == c.evidencia
+        # Nivel de confianza
+        assert dc.confianza == c.confianza
+        assert dc.confianza in (CONFIANZA_NINGUNA, CONFIANZA_BAJA, CONFIANZA_MEDIA, CONFIANZA_ALTA)
+
+    def test_to_dict_serializa_todos_los_campos_76(self):
+        dc = DiscoveredCandidate(
+            candidate_id="c1", name="App", fuente=FUENTE_START_MENU,
+            absolute_path=r"C:\Windows\notepad.exe",
+            destination=r"C:\Windows\notepad.exe",
+            launch_type="ejecutable",
+            confianza=CONFIANZA_ALTA,
+            evidencia=["archivo_ejecutable_existente"],
+            version="10.0.19041",
+            producto="Microsoft Windows",
+            ultima_comprobacion="2024-01-03T00:00:00+00:00",
+        )
+        d = dc.to_dict()
+        assert d["fuente"] == FUENTE_START_MENU
+        assert d["absolute_path"] == r"C:\Windows\notepad.exe"
+        assert d["destination"] == r"C:\Windows\notepad.exe"
+        assert d["launch_type"] == "ejecutable"
+        assert d["version"] == "10.0.19041"
+        assert d["producto"] == "Microsoft Windows"
+        assert d["ultima_comprobacion"] == "2024-01-03T00:00:00+00:00"
+        assert d["evidencia"] == ["archivo_ejecutable_existente"]
+        assert d["confianza"] == CONFIANZA_ALTA
+
+
+class TestRegistrarCandidatos:
+    """.7.6: verificar que `registrar_candidatos` persiste todos los campos de
+    registro en `application_candidates` y que `buscar_candidatos_registrados`
+    los recupera."""
+
+    def test_registra_y_recupera_candidatos(self, tmp_path):
+        db_path = tmp_path / "test_inventory.sqlite3"
+        storage = SystemInventoryStorage(db_path=db_path)
+        storage.initialize()
+        discovery = ApplicationDiscovery(storage=storage, machine_id="maquina-test")
+
+        candidatos = [
+            DiscoveredCandidate(
+                candidate_id="c-1", name="Chrome",
+                absolute_path="C:/Program Files/Google/Chrome/Application/chrome.exe",
+                destination="C:/Program Files/Google/Chrome/Application/chrome.exe",
+                launch_type="ejecutable",
+                confianza=CONFIANZA_ALTA,
+                evidencia=["archivo_ejecutable_existente", "version_recurso_leida"],
+                version="120.0.0.0",
+                producto="Google Chrome",
+                fuente=FUENTE_START_MENU,
+                ultima_comprobacion="2024-01-03T00:00:00+00:00",
+            ),
+            DiscoveredCandidate(
+                candidate_id="c-2", name="Settings",
+                absolute_path="ms-settings:",
+                destination="ms-settings:",
+                launch_type="uri_aplicacion",
+                confianza=CONFIANZA_ALTA,
+                evidencia=["uri_admitida_validada"],
+                version=None,
+                producto=None,
+                fuente=FUENTE_INVENTARIO,
+                ultima_comprobacion="2024-01-03T01:00:00+00:00",
+            ),
+        ]
+
+        insertados = discovery.registrar_candidatos(candidatos, volume="C:")
+        assert insertados == 2
+
+        # Recuperar y verificar todos los campos de registro .7.6
+        recuperados = storage.buscar_candidatos_registrados("maquina-test")
+        assert len(recuperados) == 2
+
+        chrome = [r for r in recuperados if r["candidate_id"] == "c-1"][0]
+        assert chrome["fuente"] == FUENTE_START_MENU
+        assert chrome["absolute_path"] == "C:/Program Files/Google/Chrome/Application/chrome.exe"
+        assert chrome["launch_type"] == "ejecutable"
+        assert chrome["version"] == "120.0.0.0"
+        assert chrome["producto"] == "Google Chrome"
+        assert isinstance(chrome["evidencia"], list)
+        assert "archivo_ejecutable_existente" in chrome["evidencia"]
+        assert chrome["confianza"] == CONFIANZA_ALTA
+        assert chrome["ultima_comprobacion"] == "2024-01-03T00:00:00+00:00"
+
+        settings = [r for r in recuperados if r["candidate_id"] == "c-2"][0]
+        assert settings["fuente"] == FUENTE_INVENTARIO
+        assert settings["launch_type"] == "uri_aplicacion"
+        assert settings["version"] is None
+        assert settings["producto"] is None
 
 
 # ---------------------------------------------------------------------------

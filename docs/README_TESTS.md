@@ -6789,6 +6789,13 @@ lanza ninguna aplicacion.
   - `test_from_classification_mapea_campos` (L119)
   - `test_to_dict_contiene_metadatos_descubrimiento` (L145)
 
+- **`TestDiscoveredCandidateCampos76`** (línea 149) — 2 método(s) de test
+  - `test_from_classification_mapea_todos_los_campos_76` (L152)
+  - `test_to_dict_serializa_todos_los_campos_76` (L190)
+
+- **`TestRegistrarCandidatos`** (línea 214) — 1 método(s) de test
+  - `test_registra_y_recupera_candidatos` (L217)
+
 - **`TestApplicationDiscoveryInit`** (línea 154) — 2 método(s) de test
   - `test_crea_instancias_reales_por_defecto` (L157)
   - `test_acepta_dependencias_inyectadas` (L172)
@@ -8139,6 +8146,14 @@ integración con preflight sin lanzar nada.
 - **`TestLeerSubsistemaPe`** (línea 539) — 6 método(s) de test
 - **`TestDiferenciacionGuiCliPorSubsistemaPe`** (línea 574) — 3 método(s) de test
 - **`TestIntegracionPreflight`** (línea 611) — 2 método(s) de test
+- **`TestRegistroCampos76`** (línea 119) — 7 método(s) de test
+  - `test_registra_fuente_ruta_tipo_lanzamiento` (L122)
+  - `test_registra_version_y_producto_si_existen` (L133)
+  - `test_registra_ultima_comprobacion` (L139)
+  - `test_registra_evidencia` (L146)
+  - `test_registra_nivel_confianza_valido` (L153)
+  - `test_to_dict_serializa_todos_los_campos_76` (L160)
+  - `test_registro_sin_destino_tiene_confianza_ninguna` (L173)
 
 ---
 
@@ -8160,6 +8175,12 @@ del nombre del ejecutable. No lanza ninguna aplicación ni modifica datos de usu
 - **`TestClasificacionEntornoRealAccesosDirectos`** (línea 165) — 2 método(s) de test
 - **`TestNombreComercialYAliasesEntornoReal`** (línea 187) — 2 método(s) de test
 - **`TestPreflightSinLanzarEntornoReal`** (línea 225) — 3 método(s) de test
+- **`TestRegistroCampos76EntornoReal`** (línea 249) — 5 método(s) de test
+  - `test_ejecutable_real_registra_todos_los_campos_76` (L252)
+  - `test_notepad_real_registra_todos_los_campos_76` (L266)
+  - `test_cmd_real_registra_todos_los_campos_76` (L279)
+  - `test_uri_real_registra_todos_los_campos_76` (L292)
+  - `test_registro_con_fuente_personalizada` (L305)
 
 ---
 
@@ -10845,7 +10866,7 @@ da reconciled=False (coincidencia).
 | `TestCreacionBaseDeDatos` | Creación del fichero SQLite en la ruta dada, ruta por defecto y versionado del esquema. |
 | `TestMaquinasYVolumenes` | Registro de equipos y volumenes con aislamiento por `machine_id`. |
 | `TestScanRuns` | Inicio y finalización de ejecuciones de escaneo, resultados permitidos y última ejecución. |
-| `TestInsercionAtomica` | Inserción por lotes atómica, lote vacío y ausencia de entradas parciales tras fallo. |
+| `TestInsercionAtomica` | Inserción por lotes atómica, lote vacío y ausencia de entradas parciales tras fallo. Incluye inserción de candidatos de aplicación con campos `.7.6` (version, producto, evidencia) y consulta `buscar_candidatos_registrados` con filtros por tipo de lanzamiento y fuente. |
 | `TestConsultasIndexadas` | Búsquedas por nombre, extensión y prefijo de ruta con paginación y aislamiento por equipo, búsqueda unificada `search` por múltiples criterios (nombre, ruta, extensión, tipo, volumen, disponibilidad), `count` para total sin cargar filas en memoria, y `search_paginated` con paginación por offset y por cursor (3.8.5.1.4.6.2). |
 | `TestContexto` | Uso como gestor de contexto, cierre de conexión, WAL y claves foráneas. |
 | `TestClaveUnicaRutaNormalizada` | Clave unica `(machine_id, volumen, ruta normalizada)` y ausencia de duplicados. |

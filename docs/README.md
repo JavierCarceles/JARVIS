@@ -776,7 +776,7 @@ Funciones a nivel módulo:
 | `def register_module(module_path)`  (L1258) | Registra acciones decoradas que se encuentren en el módulo indicado. |
 
 <a name="src-hands-application_discovery-py"></a>
-### `src/hands/application_discovery.py` [684 líneas] — Descubrimiento de aplicaciones reutilizando fuentes existentes del SO.
+### `src/hands/application_discovery.py` [684+ líneas] — Descubrimiento de aplicaciones reutilizando fuentes existentes del SO.
 
 **Descripción:** Descubre destinos de aplicaciones consultando, en orden, (1) las fuentes de
 descubrimiento ya existentes del SO (menu de aplicaciones/Get-StartApps, accesos directos .lnk
@@ -785,7 +785,10 @@ de Windows) y (2), solo para destinos faltantes, el inventario persistente del s
 archivos como fuente complementaria. Reutiliza `CalibrationManager.discover_applications`,
 `LaunchClassifier` y `ApplicationPreflight.validate_launch_destination` (sin lanzar nada). Es de
 lectura sola: no lanza aplicaciones, no modifica `data/knowledge/entities.json` ni el catalogo
-conocido, y no persiste capacidades inferidas.
+conocido, y no persiste capacidades inferidas. Provee `registrar_candidatos` para persistir
+candidatos clasificados en la tabla `application_candidates` del almacenamiento SQLite (unidad
+3.8.5.1.4.7.6: fuente, ruta/destino, tipo de lanzamiento, version/producto, ultima comprobacion,
+evidencia y nivel de confianza).
 
 **Características:**
 
@@ -799,6 +802,10 @@ conocido, y no persiste capacidades inferidas.
 - Deduplica por identidad y destino real, no solo por nombre; conserva rutas candidatas de
   instalaciones distintas.
 - Resiliente: el fallo de una fuente de descubrimiento no interrumpe las demas.
+- `registrar_candidatos(candidatos, volume, scan_id)` persiste una lista de
+  `DiscoveredCandidate` en `application_candidates` mediante el ciclo de vida de escaneo
+  (`begin_scan_run` / `end_scan_run`), registrando fuente, ruta/destino, tipo de lanzamiento,
+  version/producto, ultima comprobacion, evidencia y nivel de confianza.
 
 **Importaciones:** 10.
 
@@ -824,6 +831,7 @@ Métodos:
 | `def descubrir_todos(limite_por_fuente, incluir_inventario)` | Devuelve candidatos descubiertos: fuentes primarias primero y, opcionalmente, el inventario para destinos faltantes. |
 | `def buscar_por_nombre(nombre, incluir_inventario, limite_por_fuente)` | Busca por nombre en fuentes primarias y, solo si no hay coincidencia, en el inventario. |
 | `def candidatos_lanzables(limite_por_fuente, incluir_inventario)` | Devuelve solo candidatos clasificados como lanzables tras validar con preflight (sin lanzar). |
+| `def registrar_candidatos(candidatos, volume, scan_id)` | Persiste candidatos clasificados en `application_candidates` con todos los campos de registro (fuente, ruta/destino, tipo de lanzamiento, version/producto, ultima comprobacion, evidencia, confianza). |
 
 <a name="src-hands-application_launch_classifier-py"></a>
 ### `src/hands/application_launch_classifier.py` [777 líneas] — Clasificador de candidatos por tipo de lanzamiento.
@@ -1972,9 +1980,9 @@ Funciones a nivel módulo:
 **Características:**
 
 - Creación de `data/system_inventory.sqlite3` como almacenamiento canonico del índice persistente.
-- Esquema versionado con tabla `schema_version` (versión 4).
-- Migraciones de esquema verificables: `initialize()` aplica las migraciones registradas en orden (actual: v1 a v4), cada una dentro de su propia transacción, y comprueba que no se pierdan ni se reinterpreten datos de versiones previas antes de avanzar la versión. Incluye la migración v2 a v3 que crea la tabla `lineas_base` y la migración v3 a v4 que extiende la clave única de `file_entries` para incluir `scan_id`, permitiendo que la misma ruta exista en diferentes escaneos (línea base e incremental) para la detección de cambios incrementales (3.8.5.1.4.5.2).
-- Tablas `machines`, `volumes`, `scan_runs`, `file_entries`, `application_candidates` (candidatos de aplicación separados de los registros genéricos de archivo) y `lineas_base` (primera instantánea completa o línea base por volumen). La clave única de `file_entries` es `(machine_id, volumen, ruta normalizada, scan_id)`.
+- Esquema versionado con tabla `schema_version` (versión 5).
+- Migraciones de esquema verificables: `initialize()` aplica las migraciones registradas en orden (actual: v1 a v5), cada una dentro de su propia transacción, y comprueba que no se pierdan ni se reinterpreten datos de versiones previas antes de avanzar la versión. Incluye la migración v2 a v3 que crea la tabla `lineas_base`, la migración v3 a v4 que extiende la clave única de `file_entries` para incluir `scan_id`, y la migración v4 a v5 que agrega las columnas `version`, `producto` e `evidencia` a la tabla `application_candidates` para registrar, por cada candidato de aplicación, la versión/producto si existe, la evidencia de clasificación y el nivel de confianza (unidad 3.8.5.1.4.7.6).
+- Tablas `machines`, `volumes`, `scan_runs`, `file_entries`, `application_candidates` (candidatos de aplicación separados de los registros genéricos de archivo; columnas `version`, `producto`, `evidencia` añadidas en esquema v5) y `lineas_base` (primera instantánea completa o línea base por volumen). La clave única de `file_entries` es `(machine_id, volumen, ruta normalizada, scan_id)`.
 - Escritura por lotes en transacción atómica (`BEGIN IMMEDIATE`/`COMMIT` con `ROLLBACK` ante fallo): un escaneo interrumpido no deja media base presentada como inventario completo.
 - Control de concurrencia: `begin_scan_run` adquiere un bloqueo no bloqueante por `(machine_id, volumen)` y levanta `ConcurrentScanError` si otro escaneo está en curso para la misma clave; `end_scan_run` libera el bloqueo al terminar, incluso si la validación falla.
 - Consultas indexadas paginadas por nombre, extensión y prefijo de ruta absoluta; contador de entradas y recuperación de la última ejecución por equipo/volumen.
@@ -2025,6 +2033,7 @@ Métodos de `SystemInventoryStorage`:
 | `def reanudar_scan(scan_id, machine_id, volume)` | Reanuda un escaneo interrumpido usando el mismo `scan_id` (misma generación) sin mezclar resultados de escaneos distintos ni degradar la última instantánea completa. Valida que el scan exista, pertenezca al equipo y volumen, y esté sin finalizar; adquiere el bloqueo de concurrencia solo si no está ya retenido por `begin_scan_run`. Retorna los datos del scan reanudado para seguir insertando entradas con el mismo `scan_id` antes de finalizar con `end_scan_run`. (3.8.5.1.4.5.5) |
 | `def insert_file_entries(scan_id, machine_id, volume, entries)` | Inserta una lista de entradas de archivo en una transacción atómica. |
 | `def insert_application_candidates(scan_id, machine_id, volume, candidates)` | Inserta candidatos de aplicación en una transacción atómica (tabla separada). |
+| `def buscar_candidatos_registrados(machine_id, launch_type, fuente, limite, offset)` | Busca candidatos de aplicación registrados en `application_candidates` con todos los campos de registro (fuente, ruta/destino, tipo de lanzamiento, version/producto, ultima comprobacion, evidencia, nivel de confianza), con filtros opcionales por tipo de lanzamiento y fuente, y paginación. |
 | `def search_by_name(machine_id, name, limit, offset)` | Busca entradas de archivo por nombre normalizado (paginado). |
 | `def search_by_extension(machine_id, extension, limit, offset)` | Busca entradas de archivo por extensión (paginado). |
 | `def search_by_path_prefix(machine_id, path_prefix, limit, offset)` | Busca entradas de archivo por prefijo de ruta absoluta (paginado). |

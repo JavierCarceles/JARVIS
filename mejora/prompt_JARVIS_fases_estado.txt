@@ -8349,3 +8349,30 @@ VERIFICACION: SINTAXIS: OK (ast.parse + pytest sin errores); MAIN.PY: NA (no se 
 DISCREPANCIAS: NINGUNA
 PENDIENTES: Ninguno para esta unidad. Padre 3.8.5.1.4.7 con hijas .7.1 a .7.5 completadas. Siguiente hoja pendiente real: 3.8.5.1.4.7.6 (Registrar fuente, ruta/destino, tipo de lanzamiento, version/producto si existe, ultima comprobacion, evidencia y nivel de confianza).
 ESTADO FINAL: 3.8.5.1.4.7.5 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.8.5.1.4.7.6
+FECHA: 2026-11-11
+OBJETIVO: Registrar fuente, ruta/destino, tipo de lanzamiento, version/producto si existe, ultima comprobacion, evidencia y nivel de confianza para cada candidato de aplicacion descubierto y clasificado, tanto en el modelo de datos en memoria (LaunchClassification / DiscoveredCandidate) como en el almacenamiento duradero (tabla application_candidates de SQLite).
+TIPO DE TRABAJO: IMPLEMENTACIÓN + VERIFICACIÓN REAL
+CAMBIOS / HALLAZGOS:
+- `src/hands/system_inventory_storage.py`:
+  - Bump SCHEMA_VERSION de 4 a 5.
+  - Nueva migración `_migracion_v4_a_v5`: agrega columnas `version` (TEXT), `producto` (TEXT) e `evidencia` (TEXT NOT NULL DEFAULT '[]') a la tabla `application_candidates`, operacion aditiva que conserva filas existentes con NULL en las nuevas columnas.
+  - Actualizado `_SCHEMA_TABLES_SQL` para que nuevas bases de datos creen la tabla con las columnas nuevas.
+  - Actualizado `insert_application_candidates` para aceptar y almacenar `version`, `producto` e `evidencia` (serializada en JSON).
+  - Nuevo método `buscar_candidatos_registrados(machine_id, launch_type, fuente, limite, offset)` que consulta `application_candidates` con alias `source AS fuente`, `confidence AS confianza`, `last_checked_at AS ultima_comprobacion` y deserializa `evidencia` de JSON a lista.
+- `src/hands/application_discovery.py`:
+  - Nuevo método `registrar_candidatos(candidatos, volume, scan_id)` que persiste una lista de `DiscoveredCandidate` en `application_candidates` mediante el ciclo de vida de escaneo (`record_machine`, `begin_scan_run`, `insert_application_candidates`, `end_scan_run`), con liberación del bloqueo de concurrencia incluso ante fallo.
+  - Añadida función local `_ahora_iso()` y importaciones `uuid`, `SCAN_MODE_FULL`, `SCAN_RESULT_OK`, `SCAN_RESULT_INTERRUPTED`.
+- Tests:
+  - `tests/hands/test_application_launch_classifier.py`: nueva clase `TestRegistroCampos76` con 7 tests unitarios que verifican que `LaunchClassification` registra fuente, ruta/destino, tipo de lanzamiento, version/producto, ultima comprobacion, evidencia y nivel de confianza.
+  - `tests/hands/test_application_discovery.py`: nueva clase `TestDiscoveredCandidateCampos76` (2 tests) que verifica que `from_classification`/`to_dict` mapean y serializan todos los campos .7.6; nueva clase `TestRegistrarCandidatos` (1 test de integracion) que verifica persistencia y recuperacion en SQLite temporal.
+  - `tests/hands/test_clasificacion_candidatos_lanzamiento_entorno_real.py`: nueva clase `TestRegistroCampos76EntornoReal` con 5 tests de entorno real sobre ejecutables reales del sistema (python.exe, notepad.exe, cmd.exe, URI ms-settings:) que verifican todos los campos de registro .7.6.
+  - `tests/hands/test_system_inventory_storage.py`: 5 tests nuevos en `TestInsercionAtomica` para las nuevas columnas, la consulta `buscar_candidatos_registrados` y sus filtros.
+- Documentación: `docs/README.md` (secciones application_discovery.py y system_inventory_storage.py actualizadas con nuevos métodos, columnas y esquema v5); `docs/README_TESTS.md` (secciones y índices actualizados para las nuevas clases de test).
+ARCHIVOS MODIFICADOS: PRODUCCIÓN: `src/hands/system_inventory_storage.py` (esquema v5, migración v4→v5, columnas version/producto/evidencia, insert_application_candidates actualizada, buscar_candidatos_registrados); `src/hands/application_discovery.py` (registrar_candidatos, _ahora_iso, nuevas importaciones); TESTS: tests/hands/test_application_launch_classifier.py (+7 tests), tests/hands/test_application_discovery.py (+3 tests), tests/hands/test_clasificacion_candidatos_lanzamiento_entorno_real.py (+5 tests), tests/hands/test_system_inventory_storage.py (+5 tests); DOCUMENTACIÓN: docs/README.md, docs/README_TESTS.md.
+TESTS Y RESULTADOS: UNITARIOS: 112 PASSED / 112 TOTAL en los ficheros directamente relacionados (incluidos 20 tests nuevos de .7.6); ENTORNO REAL: 28 PASSED / 28 TOTAL en test_clasificacion_candidatos_lanzamiento_entorno_real.py (incluidos 5 tests nuevos de .7.6); REGRESION: tests de application_discovery, application_preflight, application_launch_classifier siguen en verde. No se modifica `data/knowledge/entities.json` ni su esquema. No se lanza ninguna aplicacion.
+VERIFICACION: SINTAXIS: OK (ast.parse + pytest sin errores); MAIN.PY: NA (no se modifica main.py); COMPORTAMIENTO / INTEGRACION REAL: Evidencia real en Windows 11, Python 3.14.7 sobre implementacion de produccion: python.exe registra fuente='sistema_real', destination=absoluta, launch_type='ejecutable', version/producto reales, ultima_comprobacion, evidencia y confianza; notepad.exe y cmd.exe registran todos los campos; URI ms-settings: registra launch_type='uri_aplicacion' con version/producto None (sin archivo en disco); persistencia SQLite temporal verificada con insercion atomica y recuperacion por filtros. La unidad no requiere interaccion grafica (sin ventanas, monitores ni entrada de teclado/raton).
+DISCREPANCIAS: NINGUNA
+PENDIENTES: Ninguno para esta unidad. Padre 3.8.5.1.4.7 con hijas .7.1 a .7.6 completadas. Siguiente hoja pendiente real: 3.8.5.1.4.7.7 (Deduplicar por identidad y destino real, no solo por nombre; no fusionar instalaciones distintas ni escoger una ruta arbitrariamente).
+ESTADO FINAL: 3.8.5.1.4.7.6 - IMPLEMENTADA

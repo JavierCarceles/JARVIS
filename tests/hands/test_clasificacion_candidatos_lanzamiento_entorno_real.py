@@ -246,3 +246,86 @@ class TestPreflightSinLanzarEntornoReal:
             assert decision["launch_type"] is None
         finally:
             os.unlink(ruta)
+
+
+class TestRegistroCampos76EntornoReal:
+    """.7.6: verificar en entorno real que la clasificacion registra todos los
+    campos: fuente, ruta/destino, tipo de lanzamiento, version/producto si
+    existe, ultima comprobacion, evidencia y nivel de confianza."""
+
+    def test_ejecutable_real_registra_todos_los_campos_76(self, clasificador):
+        """python.exe real: fuente, destination, launch_type, version, producto,
+        ultima_comprobacion, evidencia, confianza."""
+        c = clasificador.classify_candidate(
+            {"name": "python", "absolute_path": sys.executable, "source": "sistema_real"}
+        )
+        assert c.fuente == "sistema_real"
+        assert c.absolute_path == os.path.abspath(sys.executable)
+        assert c.destination == os.path.abspath(sys.executable)
+        assert c.launch_type == "ejecutable"
+        assert c.version is not None, "version debe leerse de recursos de version reales"
+        assert c.producto is not None, "producto debe leerse de recursos de version reales"
+        assert c.ultima_comprobacion != ""
+        assert isinstance(c.evidencia, list)
+        assert len(c.evidencia) >= 1
+        assert c.confianza in (CONFIANZA_NINGUNA, CONFIANZA_BAJA, CONFIANZA_MEDIA, CONFIANZA_ALTA)
+        assert c.to_dict()["fuente"] == "sistema_real"
+        assert c.to_dict()["launch_type"] == "ejecutable"
+        assert c.to_dict()["evidencia"] == c.evidencia
+
+    def test_notepad_real_registra_todos_los_campos_76(self, clasificador):
+        """notepad.exe real: mismo conjunto de campos de registro."""
+        ruta = r"C:\Windows\System32\notepad.exe"
+        if not os.path.exists(ruta):
+            pytest.skip("notepad.exe no disponible en este equipo")
+        c = clasificador.classify_candidate(
+            {"name": "notepad", "absolute_path": ruta, "source": "sistema_real"}
+        )
+        assert c.fuente == "sistema_real"
+        assert c.destination == ruta
+        assert c.launch_type == "ejecutable"
+        assert c.version is not None
+        assert c.producto is not None
+        assert c.ultima_comprobacion != ""
+        assert isinstance(c.evidencia, list)
+        assert len(c.evidencia) >= 1
+        assert c.confianza in (CONFIANZA_NINGUNA, CONFIANZA_BAJA, CONFIANZA_MEDIA, CONFIANZA_ALTA)
+
+    def test_cmd_real_registra_todos_los_campos_76(self, clasificador):
+        """cmd.exe real (herramienta CLI): campos de registro completos."""
+        ruta = r"C:\Windows\System32\cmd.exe"
+        if not os.path.exists(ruta):
+            pytest.skip("cmd.exe no disponible en este equipo")
+        c = clasificador.classify_candidate(
+            {"name": "cmd", "absolute_path": ruta, "source": "sistema_real"}
+        )
+        assert c.fuente == "sistema_real"
+        assert c.destination == ruta
+        assert c.launch_type == "ejecutable"
+        assert c.version is not None
+        assert c.ultima_comprobacion != ""
+        assert isinstance(c.evidencia, list)
+        assert c.confianza in (CONFIANZA_NINGUNA, CONFIANZA_BAJA, CONFIANZA_MEDIA, CONFIANZA_ALTA)
+
+    def test_uri_real_registra_todos_los_campos_76(self, clasificador):
+        """URI real: campos de registro con launch_type uri_aplicacion."""
+        c = clasificador.classify_candidate(
+            {"name": "Configuracion", "absolute_path": "ms-settings:", "source": "sistema_real"}
+        )
+        assert c.fuente == "sistema_real"
+        assert c.destination == "ms-settings:"
+        assert c.launch_type == "uri_aplicacion"
+        # URI no tiene archivo en disco: version/producto son None
+        assert c.version is None
+        assert c.producto is None
+        assert c.ultima_comprobacion != ""
+        assert isinstance(c.evidencia, list)
+        assert c.confianza == CONFIANZA_ALTA
+
+    def test_registro_con_fuente_personalizada(self, clasificador):
+        """La fuente de registro se conserva tal cual se proporciona."""
+        c = clasificador.classify_candidate(
+            {"name": "App", "absolute_path": sys.executable, "source": "menu_inicio"}
+        )
+        assert c.fuente == "menu_inicio"
+        assert c.to_dict()["fuente"] == "menu_inicio"

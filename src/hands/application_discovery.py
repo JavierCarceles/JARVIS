@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import os
 import sqlite3
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
@@ -29,7 +30,18 @@ from src.hands.application_launch_classifier import (
 from src.hands.application_preflight import ApplicationPreflight
 from src.hands.calibration_manager import CalibrationManager
 from src.hands.system_inventory import EntryType, generate_machine_id
-from src.hands.system_inventory_storage import SystemInventoryStorage
+from src.hands.system_inventory_storage import (
+    SCAN_MODE_FULL,
+    SCAN_RESULT_INTERRUPTED,
+    SCAN_RESULT_OK,
+    SystemInventoryStorage,
+)
+
+
+def _ahora_iso() -> str:
+    from datetime import datetime, timezone
+
+    return datetime.now(timezone.utc).isoformat()
 
 
 # ---------------------------------------------------------------------------
@@ -355,6 +367,85 @@ class ApplicationDiscovery:
             )
             if c.es_lanzable
         ]
+
+    def registrar_candidatos(
+        self,
+        candidatos: list[DiscoveredCandidate],
+        volume: str,
+        scan_id: Optional[str] = None,
+    ) -> int:
+        """Persiste una lista de candidatos clasificados en `application_candidates`.
+
+        Registra de forma duradera, por cada candidato: fuente, ruta/destino,
+        tipo de lanzamiento, version/producto si existe, ultima comprobacion,
+        evidencia y nivel de confianza (unidad 3.8.5.1.4.7.6).
+
+        Gestiona el ciclo de vida del escaneo (begin_scan_run / end_scan_run)
+        para que la insercion sea atomica y el bloqueo de concurrencia se
+        libere al finalizar.
+
+        Parametros:
+        - candidatos: lista de `DiscoveredCandidate` a registrar.
+        - volume: volumen de destino para el escaneo de registro.
+        - scan_id: identificador de escaneo opcional; si no se proporciona,
+          se genera uno nuevo.
+
+        Retorna:
+        Numero de candidatos insertados.
+        """
+        if not candidatos:
+            return 0
+        self.storage.connect()
+        self.storage.record_machine(self.machine_id)
+        scan = scan_id or f"registro-{uuid.uuid4()}"
+        ahora = _ahora_iso()
+        try:
+            self.storage.begin_scan_run(
+                scan_id=scan,
+                machine_id=self.machine_id,
+                volume=volume,
+                mode=SCAN_MODE_FULL,
+                started_at=ahora,
+            )
+            filas = [
+                {
+                    "candidate_id": c.candidate_id,
+                    "name": c.name,
+                    "absolute_path": c.absolute_path,
+                    "launch_type": c.launch_type,
+                    "confidence": c.confianza,
+                    "version": c.version,
+                    "producto": c.producto,
+                    "evidencia": c.evidencia,
+                    "source": c.fuente,
+                    "last_checked_at": c.ultima_comprobacion,
+                }
+                for c in candidatos
+            ]
+            insertados = self.storage.insert_application_candidates(
+                scan_id=scan,
+                machine_id=self.machine_id,
+                volume=volume,
+                candidates=filas,
+            )
+            self.storage.end_scan_run(
+                scan_id=scan,
+                finished_at=ahora,
+                result=SCAN_RESULT_OK,
+                entries_count=insertados,
+            )
+            return insertados
+        except Exception:
+            try:
+                self.storage.end_scan_run(
+                    scan_id=scan,
+                    finished_at=_ahora_iso(),
+                    result=SCAN_RESULT_INTERRUPTED,
+                    entries_count=0,
+                )
+            except Exception:
+                pass
+            raise
 
     # ------------------------------------------------------------------ #
     # Fuentes primarias existentes (reutilizadas)

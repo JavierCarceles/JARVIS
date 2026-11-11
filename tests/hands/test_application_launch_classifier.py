@@ -118,6 +118,82 @@ class TestLaunchClassification:
         assert d["version"] == "1.0.0"
 
 
+class TestRegistroCampos76:
+    """.7.6: verificar que LaunchClassification registra todos los campos de
+    registro: fuente, ruta/destino, tipo de lanzamiento, version/producto si
+    existe, ultima comprobacion, evidencia y nivel de confianza."""
+
+    def test_registra_fuente_ruta_tipo_lanzamiento(self):
+        clasificador = LaunchClassifier()
+        c = clasificador.classify_candidate(
+            {"name": "Notepad", "absolute_path": r"C:\Windows\System32\notepad.exe",
+             "source": "start_menu", "volume": "C:"}
+        )
+        # Fuente de registro
+        assert c.fuente == "start_menu"
+        # Ruta/destino
+        assert c.absolute_path == r"C:\Windows\System32\notepad.exe"
+        assert c.destination == r"C:\Windows\System32\notepad.exe"
+        # Tipo de lanzamiento
+        assert c.launch_type == "ejecutable"
+
+    def test_registra_version_y_producto_si_existen(self):
+        clasificador = LaunchClassifier()
+        c = clasificador.classify_candidate({"name": "python", "absolute_path": sys.executable})
+        assert c.version is not None, f"version no registrada para {sys.executable}"
+        assert c.producto is not None, f"producto no registrado para {sys.executable}"
+
+    def test_registra_ultima_comprobacion(self):
+        clasificador = LaunchClassifier()
+        c = clasificador.classify_candidate({"name": "App", "absolute_path": sys.executable})
+        assert c.ultima_comprobacion != "", "ultima_comprobacion no debe estar vacia"
+        # Debe ser un timestamp ISO 8601 parseable
+        from datetime import datetime
+        datetime.fromisoformat(c.ultima_comprobacion)
+
+    def test_registra_evidencia(self):
+        clasificador = LaunchClassifier()
+        c = clasificador.classify_candidate({"name": "python", "absolute_path": sys.executable})
+        assert isinstance(c.evidencia, list)
+        assert len(c.evidencia) >= 1, "debe haber al menos una evidencia registrada"
+        assert "archivo_ejecutable_existente" in c.evidencia
+
+    def test_registra_nivel_confianza_valido(self):
+        clasificador = LaunchClassifier()
+        c = clasificador.classify_candidate({"name": "python", "absolute_path": sys.executable})
+        assert c.confianza in (CONFIANZA_NINGUNA, CONFIANZA_BAJA, CONFIANZA_MEDIA, CONFIANZA_ALTA)
+
+    def test_to_dict_serializa_todos_los_campos_76(self):
+        clasificador = LaunchClassifier()
+        c = clasificador.classify_candidate(
+            {"name": "Notepad", "absolute_path": r"C:\Windows\System32\notepad.exe",
+             "source": "start_menu", "volume": "C:"}
+        )
+        d = c.to_dict()
+        # Todos los campos de .7.6 deben estar serializados
+        assert d["fuente"] == "start_menu"
+        assert d["absolute_path"] == r"C:\Windows\System32\notepad.exe"
+        assert d["destination"] == r"C:\Windows\System32\notepad.exe"
+        assert d["launch_type"] == "ejecutable"
+        assert d["ultima_comprobacion"] != ""
+        assert isinstance(d["evidencia"], list)
+        assert d["confianza"] in (CONFIANZA_NINGUNA, CONFIANZA_BAJA, CONFIANZA_MEDIA, CONFIANZA_ALTA)
+        # version y producto pueden ser None si no hay recursos de version
+        assert "version" in d
+        assert "producto" in d
+
+    def test_registro_sin_destino_tiene_confianza_ninguna(self):
+        """Un candidato sin destino debe registrar confianza ninguna y sin tipo."""
+        clasificador = LaunchClassifier()
+        c = clasificador.classify_candidate({"name": "fantasma", "absolute_path": None})
+        assert c.fuente == "inventario"  # fuente por defecto
+        assert c.absolute_path is None
+        assert c.destination is None
+        assert c.launch_type is None
+        assert c.confianza == CONFIANZA_NINGUNA
+        assert c.ultima_comprobacion != ""
+
+
 # ---------------------------------------------------------------------------
 # Clasificacion por tipo de lanzamiento
 # ---------------------------------------------------------------------------

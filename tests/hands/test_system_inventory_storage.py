@@ -1483,6 +1483,144 @@ class TestInsercionAtomica:
         # Los candidatos no cuentan como entradas genericas de archivo.
         assert storage.get_entry_count("machine-alfa", "C:") == 0
 
+    def test_insert_application_candidates_con_campos_76(self, storage: SystemInventoryStorage):
+        """.7.6: insertar candidatos con version, producto e evidencia."""
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        storage.begin_scan_run("scan-1", "machine-alfa", "C:", SCAN_MODE_FULL)
+        candidatos = [
+            {
+                "candidate_id": "c-1",
+                "name": "Google Chrome",
+                "absolute_path": "C:/Program Files/Google/Chrome/Application/chrome.exe",
+                "launch_type": "ejecutable",
+                "confidence": 0.95,
+                "version": "120.0.0.0",
+                "producto": "Google Chrome",
+                "evidencia": ["archivo_ejecutable_existente", "version_recurso_leida", "ubicacion_de_instalacion_real"],
+                "source": "start_menu",
+                "last_checked_at": "2024-01-03T00:00:00",
+            },
+            {
+                "candidate_id": "c-2",
+                "name": "App sin version",
+                "absolute_path": "C:/Tools/app.exe",
+                "launch_type": "ejecutable",
+                "confidence": 0.33,
+                "version": None,
+                "producto": None,
+                "evidencia": ["archivo_ejecutable_existente"],
+                "source": "inventario",
+                "last_checked_at": "2024-01-03T01:00:00",
+            },
+        ]
+        insertados = storage.insert_application_candidates("scan-1", "machine-alfa", "C:", candidatos)
+        assert insertados == 2
+        storage.end_scan_run("scan-1", result=SCAN_RESULT_OK, entries_count=2)
+
+    def test_buscar_candidatos_registrados(self, storage: SystemInventoryStorage):
+        """.7.6: consultar candidatos registrados con todos los campos de registro."""
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        storage.begin_scan_run("scan-1", "machine-alfa", "C:", SCAN_MODE_FULL)
+        candidatos = [
+            {
+                "candidate_id": "c-1",
+                "name": "Google Chrome",
+                "absolute_path": "C:/Program Files/Google/Chrome/Application/chrome.exe",
+                "launch_type": "ejecutable",
+                "confidence": 0.95,
+                "version": "120.0.0.0",
+                "producto": "Google Chrome",
+                "evidencia": ["archivo_ejecutable_existente", "version_recurso_leida"],
+                "source": "start_menu",
+                "last_checked_at": "2024-01-03T00:00:00",
+            },
+        ]
+        storage.insert_application_candidates("scan-1", "machine-alfa", "C:", candidatos)
+        storage.end_scan_run("scan-1", result=SCAN_RESULT_OK, entries_count=1)
+
+        resultados = storage.buscar_candidatos_registrados("machine-alfa")
+        assert len(resultados) == 1
+        r = resultados[0]
+        assert r["candidate_id"] == "c-1"
+        assert r["name"] == "Google Chrome"
+        assert r["absolute_path"] == "C:/Program Files/Google/Chrome/Application/chrome.exe"
+        assert r["launch_type"] == "ejecutable"
+        assert r["confianza"] == 0.95
+        assert r["version"] == "120.0.0.0"
+        assert r["producto"] == "Google Chrome"
+        assert isinstance(r["evidencia"], list)
+        assert "archivo_ejecutable_existente" in r["evidencia"]
+        assert r["fuente"] == "start_menu"
+        assert r["ultima_comprobacion"] == "2024-01-03T00:00:00"
+
+    def test_buscar_candidatos_filtro_launch_type(self, storage: SystemInventoryStorage):
+        """.7.6: filtro por tipo de lanzamiento en consulta de candidatos registrados."""
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        storage.begin_scan_run("scan-1", "machine-alfa", "C:", SCAN_MODE_FULL)
+        candidatos = [
+            {
+                "candidate_id": "c-1", "name": "Chrome", "absolute_path": "C:/chrome.exe",
+                "launch_type": "ejecutable", "confidence": 0.9, "source": "start_menu",
+                "last_checked_at": "2024-01-03T00:00:00",
+            },
+            {
+                "candidate_id": "c-2", "name": "Settings", "absolute_path": "ms-settings:",
+                "launch_type": "uri_aplicacion", "confidence": 0.9, "source": "inventario",
+                "last_checked_at": "2024-01-03T00:00:00",
+            },
+        ]
+        storage.insert_application_candidates("scan-1", "machine-alfa", "C:", candidatos)
+        storage.end_scan_run("scan-1", result=SCAN_RESULT_OK, entries_count=2)
+
+        ejecutables = storage.buscar_candidatos_registrados("machine-alfa", launch_type="ejecutable")
+        assert len(ejecutables) == 1
+        assert ejecutables[0]["launch_type"] == "ejecutable"
+
+        uris = storage.buscar_candidatos_registrados("machine-alfa", launch_type="uri_aplicacion")
+        assert len(uris) == 1
+        assert uris[0]["launch_type"] == "uri_aplicacion"
+
+    def test_buscar_candidatos_filtro_fuente(self, storage: SystemInventoryStorage):
+        """.7.6: filtro por fuente en consulta de candidatos registrados."""
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        storage.begin_scan_run("scan-1", "machine-alfa", "C:", SCAN_MODE_FULL)
+        candidatos = [
+            {
+                "candidate_id": "c-1", "name": "Chrome", "absolute_path": "C:/chrome.exe",
+                "launch_type": "ejecutable", "confidence": 0.9, "source": "start_menu",
+                "last_checked_at": "2024-01-03T00:00:00",
+            },
+            {
+                "candidate_id": "c-2", "name": "AppX", "absolute_path": "C:/appx.exe",
+                "launch_type": "ejecutable", "confidence": 0.8, "source": "appx",
+                "last_checked_at": "2024-01-03T00:00:00",
+            },
+        ]
+        storage.insert_application_candidates("scan-1", "machine-alfa", "C:", candidatos)
+        storage.end_scan_run("scan-1", result=SCAN_RESULT_OK, entries_count=2)
+
+        start_menu = storage.buscar_candidatos_registrados("machine-alfa", fuente="start_menu")
+        assert len(start_menu) == 1
+        assert start_menu[0]["fuente"] == "start_menu"
+
+        appx = storage.buscar_candidatos_registrados("machine-alfa", fuente="appx")
+        assert len(appx) == 1
+        assert appx[0]["fuente"] == "appx"
+
+    def test_esquema_tiene_version_producto_evidencia(self, storage: SystemInventoryStorage):
+        """.7.6: verificar que la tabla application_candidates tiene las columnas nuevas."""
+        storage.initialize()
+        conn = storage.connect()
+        cur = conn.execute("PRAGMA table_info(application_candidates)")
+        columnas = {row["name"] for row in cur.fetchall()}
+        assert "version" in columnas
+        assert "producto" in columnas
+        assert "evidencia" in columnas
+
 
 # ---------------------------------------------------------------------------
 # Consultas indexadas y paginadas

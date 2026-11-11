@@ -9730,5 +9730,100 @@
     "confidence": 1.0,
     "execution_time": 0.0,
     "success": null
+  },
+  {
+    "id": "conv_1794356850.834578",
+    "message": "abre chrome",
+    "response": "Objetivo creado: Abrir aplicación Google Chrome",
+    "timestamp": "2026-11-11T01:27:30.834584",
+    "context": {
+      "goal_id": "open_application_google_chrome_1794356850",
+      "parameters": {},
+      "confidence": 0.7,
+      "resolution_method": "fallback"
+    },
+    "intent": "open_application",
+    "entities": [
+      "google_chrome"
+    ],
+    "confidence": 1.0,
+    "execution_time": 0.0,
+    "success": null
+  },
+  {
+    "id": "conv_1794356851.276048",
+    "message": "abre chrome",
+    "response": "Objetivo creado: Abrir aplicación Google Chrome",
+    "timestamp": "2026-11-11T01:27:31.276051",
+    "context": {
+      "goal_id": "open_application_google_chrome_1794356851",
+      "parameters": {},
+      "confidence": 0.7058823529411765,
+      "resolution_method": "context_disambiguation"
+    },
+    "intent": "open_application",
+    "entities": [
+      "google_chrome"
+    ],
+    "confidence": 1.0,
+    "execution_time": 0.0,
+    "success": null
+  },
+  {
+    "id": "conv_1794356851.2922",
+    "message": "abre chrome",
+    "response": "Objetivo creado: Abrir aplicación Chrome",
+    "timestamp": "2026-11-11T01:27:31.292204",
+    "context": {
+      "goal_id": "open_application_app_chrome_1794356851",
+      "parameters": {},
+      "confidence": 0.7,
+      "resolution_method": "fallback"
+    },
+    "intent": "open_application",
+    "entities": [
+      "app_chrome"
+    ],
+    "confidence": 1.0,
+    "execution_time": 0.0,
+    "success": null
+  },
+  {
+    "id": "conv_1794356851.318234",
+    "message": "abre chrome",
+    "response": "Objetivo creado: Abrir aplicación Google Chrome",
+    "timestamp": "2026-11-11T01:27:31.318236",
+    "context": {
+      "goal_id": "open_application_google_chrome_1794356851",
+      "parameters": {},
+      "confidence": 0.7058823529411765,
+      "resolution_method": "context_disambiguation"
+    },
+    "intent": "open_application",
+    "entities": [
+      "google_chrome"
+    ],
+    "confidence": 1.0,
+    "execution_time": 0.0,
+    "success": null
+  },
+  {
+    "id": "conv_1794356851.332077",
+    "message": "abre chrome",
+    "response": "Objetivo creado: Abrir aplicación Chrome",
+    "timestamp": "2026-11-11T01:27:31.332082",
+    "context": {
+      "goal_id": "open_application_app_chrome_1794356851",
+      "parameters": {},
+      "confidence": 0.7,
+      "resolution_method": "fallback"
+    },
+    "intent": "open_application",
+    "entities": [
+      "app_chrome"
+    ],
+    "confidence": 1.0,
+    "execution_time": 0.0,
+    "success": null
   }
 ]

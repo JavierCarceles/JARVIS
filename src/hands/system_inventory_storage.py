@@ -55,7 +55,7 @@ from src.hands.system_inventory import (
 )
 
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 # Detectar si el sistema de archivos es sensible a mayusculas y minusculas.
 # Windows y macOS (por defecto) son insensibles; Linux y la mayoria de Unix son sensibles.
@@ -202,11 +202,44 @@ def _migracion_v3_a_v4(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migracion_v4_a_v5(conn: sqlite3.Connection) -> None:
+    """Migracion v4 -> v5: agrega columnas `version`, `producto` e `evidencia`
+    a la tabla `application_candidates`.
+
+    Estas columnas son necesarias para registrar, por cada candidato de
+    aplicacion descubierto y clasificado (unidad 3.8.5.1.4.7.6):
+    - version: version del producto leida de los recursos de version del
+      archivo (cuando existe).
+    - producto: nombre del producto / empresa leido de los recursos de
+      version.
+    - evidencia: lista serializada en JSON de las evidencias de clasificacion
+      (archivo existente, encabezado PE valido, acceso directo resuelto,
+      URI admitida, etc.).
+
+    Es una operacion aditiva: conserva todas las filas existentes y les
+    asigna NULL en las nuevas columnas. No elimina, ni reinterpreta, datos
+    de inventarios de version anterior.
+    """
+    for columna, definicion in (
+        ("version", "TEXT"),
+        ("producto", "TEXT"),
+        ("evidencia", "TEXT NOT NULL DEFAULT '[]'"),
+    ):
+        try:
+            conn.execute(
+                f"ALTER TABLE application_candidates ADD COLUMN {columna} {definicion}"
+            )
+        except sqlite3.OperationalError:
+            # La columna ya existe (base creada ya en esquema v5): nada que migrar.
+            pass
+
+
 # (version_origen, version_destino, nombre, funcion_de_migracion)
 _MIGRACIONES: list[tuple[int, int, str, Callable[[sqlite3.Connection], None]]] = [
     (1, 2, "agregar normalized_path a file_entries", _migracion_v1_a_v2),
     (2, 3, "crear tabla lineas_base", _migracion_v2_a_v3),
     (3, 4, "clave unica de file_entries incluye scan_id", _migracion_v3_a_v4),
+    (4, 5, "agregar version/producto/evidencia a application_candidates", _migracion_v4_a_v5),
 ]
 
 
@@ -338,6 +371,9 @@ CREATE TABLE IF NOT EXISTS application_candidates (
     absolute_path TEXT NOT NULL,
     launch_type TEXT,
     confidence REAL,
+    version TEXT,
+    producto TEXT,
+    evidencia TEXT NOT NULL DEFAULT '[]',
     source TEXT NOT NULL DEFAULT 'inventory',
     last_checked_at TEXT NOT NULL,
     FOREIGN KEY (scan_id) REFERENCES scan_runs(scan_id),
@@ -2178,6 +2214,12 @@ class SystemInventoryStorage:
 
         Los candidatos de aplicacion se almacenan en su propia tabla,
         separados de los registros genericos de archivos (3.8.5.1.4.2.4).
+
+        Cada candidato puede incluir opcionalmente `version`, `producto` e
+        `evidencia` (lista serializada en JSON) para registrar de forma
+        duradera el tipo de lanzamiento, la ruta/destino, la fuente, la
+        ultima comprobacion, la version/producto si existe, la evidencia y
+        el nivel de confianza (unidad 3.8.5.1.4.7.6).
         """
         if not candidates:
             return 0
@@ -2188,8 +2230,9 @@ class SystemInventoryStorage:
                 """
                 INSERT INTO application_candidates(
                     candidate_id, scan_id, machine_id, volume, name,
-                    absolute_path, launch_type, confidence, source, last_checked_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    absolute_path, launch_type, confidence, version, producto,
+                    evidencia, source, last_checked_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 [
                     (
@@ -2201,6 +2244,10 @@ class SystemInventoryStorage:
                         c.get("absolute_path"),
                         c.get("launch_type"),
                         c.get("confidence"),
+                        c.get("version"),
+                        c.get("producto"),
+                        c.get("evidencia", "[]") if isinstance(c.get("evidencia"), str)
+                        else json.dumps(c.get("evidencia", []), ensure_ascii=False),
                         c.get("source", "inventory"),
                         c.get("last_checked_at"),
                     )
@@ -2212,6 +2259,64 @@ class SystemInventoryStorage:
             conn.rollback()
             raise
         return len(candidates)
+
+    def buscar_candidatos_registrados(
+        self,
+        machine_id: str,
+        launch_type: Optional[str] = None,
+        fuente: Optional[str] = None,
+        limite: int = 50,
+        offset: int = 0,
+    ) -> list[dict]:
+        """Busca candidatos de aplicacion registrados en `application_candidates`.
+
+        Permite consultar los candidatos que han sido persistidos con su
+        registro completo (fuente, ruta/destino, tipo de lanzamiento,
+        version/producto, ultima comprobacion, evidencia y nivel de
+        confianza, unidad 3.8.5.1.4.7.6).
+
+        Parametros:
+        - machine_id: identificador del equipo (aislamiento por equipo).
+        - launch_type: filtro opcional por tipo de lanzamiento.
+        - fuente: filtro opcional por fuente de descubrimiento.
+        - limite: numero maximo de resultados (paginado).
+        - offset: desplazamiento para paginacion.
+
+        Retorna:
+        Lista de diccionarios con todos los campos de registro de cada
+        candidato, incluida `evidencia` deserializada de JSON a lista.
+        """
+        conn = self.connect()
+        condiciones = ["machine_id = ?"]
+        parametros: list[object] = [machine_id]
+        if launch_type is not None:
+            condiciones.append("launch_type = ?")
+            parametros.append(launch_type)
+        if fuente is not None:
+            condiciones.append("source = ?")
+            parametros.append(fuente)
+        where = " AND ".join(condiciones)
+        cur = conn.execute(
+            f"""
+            SELECT candidate_id, scan_id, machine_id, volume, name,
+                   absolute_path, launch_type, confidence AS confianza, version, producto,
+                   evidencia, source AS fuente, last_checked_at AS ultima_comprobacion
+            FROM application_candidates
+            WHERE {where}
+            ORDER BY confidence DESC, last_checked_at DESC
+            LIMIT ? OFFSET ?
+            """,
+            (*parametros, limite, offset),
+        )
+        resultados: list[dict] = []
+        for r in cur.fetchall():
+            d = dict(r)
+            try:
+                d["evidencia"] = json.loads(d.get("evidencia") or "[]")
+            except (json.JSONDecodeError, TypeError):
+                d["evidencia"] = []
+            resultados.append(d)
+        return resultados
 
     # ------------------------------------------------------------------ #
     # Consultas indexadas
