@@ -1973,6 +1973,11 @@ Funciones a nivel módulo:
 | `property errores_por_categoria` | Devuelve una copia del conteo de errores agrupado por categoría. |
 | `property entradas_validas` | Devuelve una copia de las entradas emitidas hasta el momento (último inventario válido), incluidas las emitidas antes de una interrupción (3.8.5.1.4.4.9). |
 | `property ejecucion_parcial` | Devuelve True si la última ejecución de `recorrer()` fue interrumpida (cancelada o pausada) antes de completar; el volumen o subárbol no terminó de escanearse (3.8.5.1.4.4.9). |
+| `class EstadoPrimerInventario(Enum)` | Estado del ciclo de vida del primer inventario de un equipo: `pendiente`, `ejecutandose`, `completado`, `interrumpido`. |
+| `class AlcanceInventario` | Informe de alcance del primer inventario: máquina, SO, modo, volúmenes a escanear, excluidos, exclusiones de ruta, privacidad y motivo de ejecución (sin ejecutar el escaneo). |
+| `class ProgresoInventario` | Progreso agregado del primer inventario en todos los volúmenes: volumen actual, completados, entradas/directorios/archivos procesados, errores, cobertura global (0-100) y estados de inicio/finalización. |
+| `class EjecucionPrimerInventario` | Manejo de una ejecución de primer inventario en segundo plano (hilo daemon). Devuelto inmediatamente sin bloquear el llamante; permite consultar `progreso`, `esta_en_ejecucion`, `finalizado`, solicitar pausa/reanudar/cancelar mediante `control()`, esperar con `esperar()` y obtener el `resultado()`. |
+| `class GestorPrimerInventario` | Gestiona el primer inventario del equipo: decide si debe ejecutarse (`debe_ejecutar_primer_inventario`), informa su alcance (`reportar_alcance`) y lo ejecuta en segundo plano sin bloquear el arranque ni la conversación de JARVIS (`ejecutar_primera_vez`), reutilizando `RecorridoVolumen` por volumen y `SystemInventoryStorage` para la persistencia. |
 
 ### `src/hands/system_inventory_storage.py` — Almacenamiento canonico SQLite del indice de inventario persistente del sistema de archivos.
 

@@ -8475,3 +8475,22 @@ VERIFICACIÓN: SINTAXIS: OK (ast.parse + pytest sin errores en suites afectadas)
 DISCREPANCIAS: Ninguna afectante a los criterios de aceptación de esta unidad.
 PENDIENTES: Ninguno para esta unidad. Padre 3.8.5.1.4.7 con hijas .7.1 a .7.11 completadas. No hay siguiente hoja pendiente en 3.8.5.1.4.7.
 ESTADO FINAL: 3.8.5.1.4.7.11 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.8.5.1.4.8.1
+FECHA: 2026-11-11
+OBJETIVO: Definir cuándo se realiza el primer inventario, cómo se informa de su alcance y cómo se muestra el progreso sin bloquear el arranque ni la conversación de JARVIS (unidad hoja de 3.8.5.1.4.8 Operación, privacidad y mantenimiento del inventario).
+TIPO DE TRABAJO: IMPLEMENTACIÓN + VERIFICACIÓN REAL (componente de producción, tests unitarios y verificación en entorno real de Windows).
+CAMBIOS / HALLAZGOS:
+- src/hands/system_inventory.py: nuevas clases públicas EstadoPrimerInventario, AlcanceInventario, ProgresoInventario, EjecucionPrimerInventario y GestorPrimerInventario; importes threading y Any.
+  * debe_ejecutar_primer_inventario(): devuelve (True, motivo) si no existe scan_run con resultado "ok" para el equipo; (False, motivo) si ya hay uno completado.
+  * reportar_alcance(): enumera volúmenes reales del SO, aplica exclusiones del contrato y devuelve AlcanceInventario (volúmenes a escanear, excluidos, leer_contenido_archivos=False por privacidad).
+  * ejecutar_primera_vez(): lanza RecorridoVolumen por volumen en un hilo daemon (no bloqueante), persiste entradas por lotes con insert_file_entries, abre/finaliza scan_run, soporta pausa/cancelar vía EjecucionPrimerInventario.control() y reporta ProgresoInventario por callback. Crea su propia instancia de SystemInventoryStorage en el hilo (misma BD, WAL) para evitar compartir conexión SQLite entre hilos.
+- main.py: al arranque, instancia GestorPrimerInventario con el contrato por defecto, informa el alcance y lanza el primer inventario en segundo plano si es necesario, todo dentro de try/except para no bloquear ni fallar el arranque ni la conversación.
+- tests/hands/test_system_inventory.py: nuevo archivo con 9 tests (decisión de cuándo ejecutar, alcance y privacidad, ejecución no bloqueante con progreso real y persistencia SQLite, cancelación, doble ejecución, ya completado, control de pausa/cancelar).
+ARCHIVOS MODIFICADOS: PRODUCCION: src/hands/system_inventory.py (nuevas clases del primer inventario), main.py (arranque no bloqueante del primer inventario). TESTS: tests/hands/test_system_inventory.py (nuevo, 9 tests). DOCUMENTACION: docs/README.md (entradas de EstadoPrimerInventario, AlcanceInventario, ProgresoInventario, EjecucionPrimerInventario, GestorPrimerInventario).
+TESTS Y RESULTADOS: UNITARIOS: 9/9 PASSED en tests/hands/test_system_inventory.py. Sin regresión introducida en tests/hands/test_system_inventory_storage.py (221 PASSED; 7 fallos preexistentes por schema_version 5 vs 4 esperada en tests, ajenos a esta unidad).
+REAL (entorno): Windows 11, Python 3.14.7. Volumen real C: (fixed, NTFS) detectado y reportado en alcance. Primera ejecución sobre directorio temporal real del volumen del sistema: lanzamiento no bloqueante (0.0007s), hilo en ejecución tras lanzar, esperar() OK, estado COMPLETADO, cobertura 100%, 5 entradas procesadas, 6 callbacks de progreso reales, persistencia SQLite real (5 entradas, scan result "ok"). Recursos temporales de verificación limpiados. Sin interacción gráfica (sin ventanas, monitores ni teclado/ratón).
+REGRESION: Ninguna introducida por esta unidad. main.py sigue importando correctamente.
+DISCREPANCIAS: Ninguna afectante a los criterios de aceptación de esta unidad.
+PENDIENTES: Ninguno para esta unidad. Padre 3.8.5.1.4.8 con hijas .8.1 a .8.10; .8.1 completada. Siguiente hoja pendiente real: 3.8.5.1.4.8.2 (actualizaciones incrementales bajo demanda y política de refresco).
+ESTADO FINAL: 3.8.5.1.4.8.1 - IMPLEMENTADA

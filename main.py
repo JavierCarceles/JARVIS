@@ -133,6 +133,68 @@ def main():
         jarvis_executor = get_executor()
         jarvis_memory = Memory()
 
+        # ------------------------------------------------------------------
+        # Primer inventario del sistema de archivos (3.8.5.1.4.8.1).
+        # Se decide si es necesario, se informa su alcance y se ejecuta en
+        # segundo plano sin bloquear el arranque ni la conversación de JARVIS.
+        # ------------------------------------------------------------------
+        try:
+            from src.hands.system_inventory import (
+                GestorPrimerInventario,
+                default_contract,
+                generate_machine_id,
+            )
+            from src.hands.system_inventory_storage import SystemInventoryStorage
+
+            _jarvis_machine_id = generate_machine_id()
+            _jarvis_inventory_storage = SystemInventoryStorage()
+            _jarvis_inventory_storage.initialize()
+            _jarvis_gestor_inventario = GestorPrimerInventario(
+                machine_id=_jarvis_machine_id,
+                storage=_jarvis_inventory_storage,
+                contrato=default_contract(),
+            )
+            _debe_inventario, _motivo_inventario = (
+                _jarvis_gestor_inventario.debe_ejecutar_primer_inventario()
+            )
+            if _debe_inventario:
+                _alcance_inventario = _jarvis_gestor_inventario.reportar_alcance()
+                log_jarvis_info(
+                    "Primer inventario del sistema de archivos: %s. "
+                    "Alcance: %d volumen(es) a escanear (%s).",
+                    _motivo_inventario,
+                    _alcance_inventario.total_volumenes,
+                    _alcance_inventario.sistema_operativo,
+                )
+
+                def _reportar_progreso_inventario(progreso):
+                    log_jarvis_info(
+                        "Progreso inventario: %.1f%% (%d entradas, %d/%d volúmenes)",
+                        progreso.cobertura_global,
+                        progreso.entradas_procesadas,
+                        progreso.volumenes_completados,
+                        progreso.total_volumenes,
+                    )
+
+                _jarvis_ejecucion_inventario = (
+                    _jarvis_gestor_inventario.ejecutar_primera_vez(
+                        callback_progreso=_reportar_progreso_inventario
+                    )
+                )
+                log_jarvis_info(
+                    "Primer inventario iniciado en segundo plano (no bloqueante)."
+                )
+            else:
+                log_jarvis_info(
+                    "Inventario del sistema de archivos no requerido: %s",
+                    _motivo_inventario,
+                )
+        except Exception as e:
+            log_jarvis_warning(
+                "No se pudo programar el primer inventario del sistema de archivos: %s",
+                e,
+            )
+
         calibration_path = get_project_root() / "macros_coords.json"
         calibration_exists = calibration_path.exists()
 

@@ -26,6 +26,7 @@ import os
 import platform
 import psutil
 import subprocess
+import threading
 import time
 import unicodedata
 import uuid
@@ -33,7 +34,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Callable, Iterator, Optional
+from typing import Any, Callable, Iterator, Optional
 
 
 class EntryType(Enum):
@@ -2592,3 +2593,606 @@ class RecorridoVolumen:
         self._progreso.cobertura = 100.0
         if self.callback_progreso is not None:
             self.callback_progreso(self._progreso)
+
+
+# ---------------------------------------------------------------------------
+# Primer inventario del equipo: cuándo se ejecuta, alcance y progreso sin
+# bloqueo del arranque ni de la conversación de JARVIS (3.8.5.1.4.8.1).
+# ---------------------------------------------------------------------------
+
+class PrimerInventarioYaEnEjecucionError(Exception):
+    """Ya hay una ejecución de primer inventario en curso para este equipo."""
+
+
+class EstadoPrimerInventario(Enum):
+    """Estado del ciclo de vida del primer inventario de un equipo."""
+
+    PENDIENTE = "pendiente"        # No existe ningún escaneo previo registrado.
+    EJECUTANDOSE = "ejecutandose"  # Ejecución en curso en segundo plano.
+    COMPLETADO = "completado"      # Al menos un escaneo previo finalizó con éxito.
+    INTERRUMPIDO = "interrumpido"  # La última ejecución se interrumpió (pausa/cancelar/error).
+
+
+@dataclass
+class AlcanceInventario:
+    """Informe de alcance del primer inventario (qué se escaneará y por qué)."""
+
+    machine_id: str
+    sistema_operativo: str
+    modo: str                      # "completo" (SCAN_MODE_FULL del almacenamiento).
+    volumenes_a_escanear: list[VolumeInfo]
+    total_volumenes: int
+    volumenes_excluidos: list[str]
+    exclusiones_rutas: list[str]
+    incluir_ocultos: bool
+    incluir_sistema: bool
+    leer_contenido_archivos: bool  # Siempre False por privacidad (3.8.5.1.4.1.9).
+    es_primer_inventario: bool
+    motivo: str                    # Por qué se ejecuta o no el primer inventario.
+    generado_en: str
+
+
+@dataclass
+class ProgresoInventario:
+    """Progreso agregado del primer inventario en todos los volúmenes."""
+
+    machine_id: str
+    estado: EstadoPrimerInventario
+    volumen_actual: str
+    volumenes_completados: int
+    total_volumenes: int
+    entradas_procesadas: int
+    directorios_procesados: int
+    archivos_procesados: int
+    errores: int
+    errores_por_categoria: dict[str, int]
+    cobertura_global: float        # 0.0 - 100.0.
+    entrada_actual: str
+    completado: bool
+    interrumpido: bool
+    started_at: Optional[str] = None
+    finished_at: Optional[str] = None
+    scan_ids: list[str] = field(default_factory=list)
+
+
+class EjecucionPrimerInventario:
+    """Manejo de una ejecución de primer inventario en segundo plano.
+
+    Se devuelve inmediatamente al llamante sin bloquear el arranque ni la
+    conversación de JARVIS. Permite consultar el progreso, solicitar pausa /
+    cancelación y esperar la finalización. El hilo de escaneo es daemon.
+    """
+
+    def __init__(
+        self,
+        machine_id: str,
+        total_volumenes: int,
+        callback_progreso: Optional[Callable[[ProgresoInventario], None]] = None,
+    ) -> None:
+        self._machine_id = machine_id
+        self._total_volumenes = max(0, int(total_volumenes))
+        self._callback_progreso = callback_progreso
+        self._lock = threading.Lock()
+        self._solicitar_pausa = False
+        self._solicitar_cancelar = False
+        self._finalizado = threading.Event()
+        self._hilo: Optional[threading.Thread] = None
+        self._resultado: Optional[dict] = None
+        started = datetime.now().isoformat()
+        self._progreso = ProgresoInventario(
+            machine_id=machine_id,
+            estado=EstadoPrimerInventario.EJECUTANDOSE,
+            volumen_actual="",
+            volumenes_completados=0,
+            total_volumenes=self._total_volumenes,
+            entradas_procesadas=0,
+            directorios_procesados=0,
+            archivos_procesados=0,
+            errores=0,
+            errores_por_categoria={},
+            cobertura_global=0.0,
+            entrada_actual="",
+            completado=False,
+            interrumpido=False,
+            started_at=started,
+        )
+
+    @property
+    def hilo(self) -> Optional[threading.Thread]:
+        return self._hilo
+
+    @hilo.setter
+    def hilo(self, valor: Optional[threading.Thread]) -> None:
+        self._hilo = valor
+
+    @property
+    def progreso(self) -> ProgresoInventario:
+        """Devuelve una copia del progreso actual."""
+        with self._lock:
+            p = self._progreso
+            return ProgresoInventario(
+                machine_id=p.machine_id,
+                estado=p.estado,
+                volumen_actual=p.volumen_actual,
+                volumenes_completados=p.volumenes_completados,
+                total_volumenes=p.total_volumenes,
+                entradas_procesadas=p.entradas_procesadas,
+                directorios_procesados=p.directorios_procesados,
+                archivos_procesados=p.archivos_procesados,
+                errores=p.errores,
+                errores_por_categoria=dict(p.errores_por_categoria),
+                cobertura_global=p.cobertura_global,
+                entrada_actual=p.entrada_actual,
+                completado=p.completado,
+                interrumpido=p.interrumpido,
+                started_at=p.started_at,
+                finished_at=p.finished_at,
+                scan_ids=list(p.scan_ids),
+            )
+
+    @property
+    def esta_en_ejecucion(self) -> bool:
+        """True mientras el hilo de escaneo esté vivo y no finalizado."""
+        if self._finalizado.is_set():
+            return False
+        hilo = self._hilo
+        return hilo is not None and hilo.is_alive()
+
+    @property
+    def finalizado(self) -> bool:
+        return self._finalizado.is_set()
+
+    @property
+    def solicitado_pausa(self) -> bool:
+        with self._lock:
+            return self._solicitar_pausa
+
+    @property
+    def solicitado_cancelar(self) -> bool:
+        with self._lock:
+            return self._solicitar_cancelar
+
+    def solicitar_pausa(self) -> None:
+        """Pide pausar el escaneo al procesar el siguiente directorio."""
+        with self._lock:
+            if not self._solicitar_cancelar:
+                self._solicitar_pausa = True
+
+    def solicitar_reanudar(self) -> None:
+        """Reanuda un escaneo pausado."""
+        with self._lock:
+            self._solicitar_pausa = False
+
+    def solicitar_cancelar(self) -> None:
+        """Pide cancelar el escaneo lo antes posible."""
+        with self._lock:
+            self._solicitar_cancelar = True
+            self._solicitar_pausa = False
+
+    def control(self) -> ControlRecorrido:
+        """Devuelve la decisión de control para `RecorridoVolumen` (pausa/cancelar)."""
+        with self._lock:
+            if self._solicitar_cancelar:
+                return ControlRecorrido.CANCELAR
+            if self._solicitar_pausa:
+                return ControlRecorrido.PAUSAR
+        return ControlRecorrido.CONTINUAR
+
+    def esperar(self, timeout: Optional[float] = None) -> bool:
+        """Espera a que finalice la ejecución. Retorna True si finalizó."""
+        return self._finalizado.wait(timeout)
+
+    def resultado(self) -> Optional[dict]:
+        """Devuelve el resumen de la ejecución una vez finalizada."""
+        with self._lock:
+            return None if self._resultado is None else dict(self._resultado)
+
+    def _snapshot(self) -> ProgresoInventario:
+        p = self._progreso
+        return ProgresoInventario(
+            machine_id=p.machine_id,
+            estado=p.estado,
+            volumen_actual=p.volumen_actual,
+            volumenes_completados=p.volumenes_completados,
+            total_volumenes=p.total_volumenes,
+            entradas_procesadas=p.entradas_procesadas,
+            directorios_procesados=p.directorios_procesados,
+            archivos_procesados=p.archivos_procesados,
+            errores=p.errores,
+            errores_por_categoria=dict(p.errores_por_categoria),
+            cobertura_global=p.cobertura_global,
+            entrada_actual=p.entrada_actual,
+            completado=p.completado,
+            interrumpido=p.interrumpido,
+            started_at=p.started_at,
+            finished_at=p.finished_at,
+            scan_ids=list(p.scan_ids),
+        )
+
+    def _notificar_progreso(self, **cambios) -> None:
+        """Aplica cambios al progreso e invoca el callback de progreso.
+
+        El callback nunca debe interrumpir el escaneo: si falla, se ignora.
+        """
+        with self._lock:
+            p = self._progreso
+            for clave, valor in cambios.items():
+                if hasattr(p, clave):
+                    setattr(p, clave, valor)
+            snapshot = self._snapshot()
+        if self._callback_progreso is not None:
+            try:
+                self._callback_progreso(snapshot)
+            except Exception:
+                pass
+
+    def _finalizar(self, estado: EstadoPrimerInventario, resultado: dict) -> None:
+        with self._lock:
+            self._progreso.estado = estado
+            self._progreso.completado = estado == EstadoPrimerInventario.COMPLETADO
+            self._progreso.interrumpido = estado == EstadoPrimerInventario.INTERRUMPIDO
+            self._progreso.finished_at = datetime.now().isoformat()
+            self._resultado = resultado
+            snapshot = self._snapshot()
+        self._finalizado.set()
+        if self._callback_progreso is not None:
+            try:
+                self._callback_progreso(snapshot)
+            except Exception:
+                pass
+
+
+class GestorPrimerInventario:
+    """
+    Gestiona el primer inventario del equipo (unidad 3.8.5.1.4.8.1).
+
+    Responsabilidades:
+    1. Decidir si el primer inventario debe ejecutarse: se ejecuta cuando no
+       existe ningún escaneo previo con resultado "ok" para este equipo en
+       el almacenamiento.
+    2. Informar el alcance del inventario (volúmenes a escanear, exclusiones,
+       contrato de privacidad) sin ejecutarlo.
+    3. Ejecutar el primer inventario en segundo plano (hilo daemon) usando
+       `RecorridoVolumen` por volumen y `SystemInventoryStorage` para la
+       persistencia, sin bloquear el arranque ni la conversación de JARVIS.
+
+    `storage` es una instancia de `SystemInventoryStorage` inyectada para
+    evitar la dependencia circular entre `system_inventory` y
+    `system_inventory_storage`.
+    """
+
+    def __init__(
+        self,
+        machine_id: str,
+        storage: Any,
+        contrato: Optional[InventoryContract] = None,
+        medidor: Optional[MedidorRecursosSistema] = None,
+        tamano_lote_entradas: int = 500,
+    ) -> None:
+        self.machine_id = machine_id
+        self.storage = storage
+        self.contrato = contrato or default_contract()
+        self.medidor = medidor or MedidorRecursosSistema()
+        self.tamano_lote_entradas = max(1, int(tamano_lote_entradas))
+        self._ejecucion_actual: Optional[EjecucionPrimerInventario] = None
+        self._lock = threading.Lock()
+
+    def debe_ejecutar_primer_inventario(self) -> tuple[bool, str]:
+        """Decide si debe ejecutarse el primer inventario.
+
+        Retorna `(True, motivo)` cuando no existe ningún `scan_run` con
+        resultado `"ok"` para este equipo en el almacenamiento. Retorna
+        `(False, motivo)` cuando ya existe al menos un inventario previo
+        completado.
+        """
+        try:
+            ultimo = self.storage.get_latest_scan(self.machine_id)
+        except Exception:
+            ultimo = None
+        if ultimo is None:
+            return (
+                True,
+                "No existe ningún escaneo previo registrado para este equipo.",
+            )
+        resultado = str(ultimo.get("result", "") or "")
+        scan_id = ultimo.get("scan_id")
+        if resultado == "ok":
+            return (
+                False,
+                f"Ya existe un inventario previo completado (scan {scan_id}).",
+            )
+        return (
+            True,
+            f"El último escaneo previo finalizó con resultado '{resultado}' "
+            f"o sin finalizar (scan {scan_id}); se ejecuta el primer inventario.",
+        )
+
+    def reportar_alcance(self) -> AlcanceInventario:
+        """Informa el alcance del primer inventario sin ejecutarlo.
+
+        Enumera los volúmenes reales del sistema operativo, aplica las
+        exclusiones del contrato de inventario y devuelve qué volúmenes se
+        escanearían, cuántos, cuáles quedan excluidos y por qué.
+        """
+        debe, motivo = self.debe_ejecutar_primer_inventario()
+        sistema = detectar_sistema()
+        volumenes_reales = self._volumenes_reales(sistema)
+        a_escanear: list[VolumeInfo] = []
+        excluidos: list[str] = []
+        for volumen in volumenes_reales:
+            raiz = volumen.ruta_raiz or volumen.letra
+            if not volumen.disponible:
+                excluidos.append(raiz)
+                continue
+            if self.contrato.should_exclude_mount(raiz):
+                excluidos.append(raiz)
+                continue
+            a_escanear.append(volumen)
+        return AlcanceInventario(
+            machine_id=self.machine_id,
+            sistema_operativo=sistema.sistema_operativo,
+            modo="completo",
+            volumenes_a_escanear=a_escanear,
+            total_volumenes=len(a_escanear),
+            volumenes_excluidos=excluidos,
+            exclusiones_rutas=list(self.contrato.excluded_paths),
+            incluir_ocultos=self.contrato.include_hidden,
+            incluir_sistema=self.contrato.include_system,
+            leer_contenido_archivos=self.contrato.read_file_content,
+            es_primer_inventario=debe,
+            motivo=motivo,
+            generado_en=datetime.now().isoformat(),
+        )
+
+    def ejecutar_primera_vez(
+        self,
+        callback_progreso: Optional[Callable[[ProgresoInventario], None]] = None,
+        volumenes: Optional[list[VolumeInfo]] = None,
+    ) -> EjecucionPrimerInventario:
+        """
+        Ejecuta el primer inventario en segundo plano y devuelve el manejo
+        inmediatamente (no bloqueante).
+
+        `volumenes` permite inyectar la lista de volúmenes a escanear para
+        pruebas; si no se proporciona, se enumeran los volúmenes reales del
+        sistema operativo.
+        """
+        with self._lock:
+            if (
+                self._ejecucion_actual is not None
+                and self._ejecucion_actual.esta_en_ejecucion
+            ):
+                raise PrimerInventarioYaEnEjecucionError(
+                    "Ya hay una ejecución de primer inventario en curso para "
+                    f"el equipo {self.machine_id!r}."
+                )
+            debe, motivo = self.debe_ejecutar_primer_inventario()
+            if not debe:
+                raise RuntimeError(
+                    "El primer inventario ya se ha ejecutado previamente para "
+                    f"el equipo {self.machine_id!r}: {motivo}"
+                )
+            if volumenes is not None:
+                volumenes_a_escanear = [
+                    volumen
+                    for volumen in volumenes
+                    if volumen.disponible
+                    and not self.contrato.should_exclude_mount(
+                        volumen.ruta_raiz or volumen.letra
+                    )
+                ]
+            else:
+                alcance = self.reportar_alcance()
+                volumenes_a_escanear = list(alcance.volumenes_a_escanear)
+            total_volumenes = len(volumenes_a_escanear)
+            ejecucion = EjecucionPrimerInventario(
+                machine_id=self.machine_id,
+                total_volumenes=total_volumenes,
+                callback_progreso=callback_progreso,
+            )
+            hilo = threading.Thread(
+                target=self._bucle_escaneo,
+                args=(ejecucion, list(volumenes_a_escanear)),
+                daemon=True,
+                name="jarvis-primer-inventario",
+            )
+            ejecucion.hilo = hilo
+            self._ejecucion_actual = ejecucion
+            hilo.start()
+        return ejecucion
+
+    def _volumenes_reales(self, sistema: InfoSistema) -> list[VolumeInfo]:
+        """Enumera los volúmenes reales del sistema operativo."""
+        so = sistema.sistema_operativo
+        if so == "Windows":
+            return enumerar_volumenes_windows()
+        if so == "Linux":
+            return enumerar_volumenes_linux()
+        if so == "Darwin":
+            return enumerar_volumenes_macos()
+        return []
+
+    def _bucle_escaneo(
+        self,
+        ejecucion: EjecucionPrimerInventario,
+        volumenes_a_escanear: list[VolumeInfo],
+    ) -> None:
+        """Cuerpo de la ejecución en segundo plano (hilo daemon).
+
+        Crea su propia instancia de `SystemInventoryStorage` sobre la misma
+        base de datos para que la conexión SQLite se abra en este hilo (SQLite
+        no permite compartir una conexión creada en otro hilo). El modo WAL
+        permite que varias conexiones lean/escriban la misma base de forma
+        segura sin modificar `system_inventory_storage` (unidad cerrada).
+        La importación es perezosa para evitar la dependencia circular con
+        `system_inventory_storage` (que importa de `system_inventory`).
+        """
+        from src.hands.system_inventory_storage import SystemInventoryStorage
+
+        almacenamiento = SystemInventoryStorage(self.storage.db_path)
+        resultado_final: dict = {
+            "volumenes_planificados": len(volumenes_a_escanear),
+            "volumenes_completados": 0,
+            "entradas_procesadas": 0,
+            "errores": 0,
+            "scan_ids": [],
+            "interrumpido": False,
+        }
+        try:
+            total = len(volumenes_a_escanear)
+            completados = 0
+            scan_ids: list[str] = []
+            entradas_procesadas = 0
+            errores = 0
+
+            for volumen in volumenes_a_escanear:
+                if ejecucion.solicitado_cancelar:
+                    break
+                raiz = volumen.ruta_raiz or volumen.letra
+                # Esperar mientras esté pausado y no se cancele.
+                while ejecucion.solicitado_pausa and not ejecucion.solicitado_cancelar:
+                    time.sleep(0.25)
+
+                scan_id = f"primero-{uuid.uuid4()}"
+                started_at = datetime.now().isoformat()
+                scan_ids.append(scan_id)
+
+                almacenamiento.begin_scan_run(
+                    scan_id=scan_id,
+                    machine_id=self.machine_id,
+                    volume=raiz,
+                    mode="completo",
+                    started_at=started_at,
+                )
+
+                ejecucion._notificar_progreso(
+                    volumen_actual=raiz,
+                    volumenes_completados=completados,
+                    scan_ids=list(scan_ids),
+                    cobertura_global=(
+                        round(completados / total * 100.0, 2) if total > 0 else 0.0
+                    ),
+                )
+
+                contador_volumen = 0
+                lote: list[dict] = []
+                errores_volumen = 0
+
+                def progreso_volumen(progreso_vol: ProgresoRecorrido) -> None:
+                    nonlocal errores_volumen
+                    errores_volumen = progreso_vol.errores
+                    avance_actual = (
+                        progreso_vol.cobertura / 100.0 if total > 0 else 0.0
+                    )
+                    cobertura_global = (
+                        (completados + avance_actual) / total * 100.0
+                        if total > 0
+                        else 0.0
+                    )
+                    ejecucion._notificar_progreso(
+                        volumen_actual=raiz,
+                        volumenes_completados=completados,
+                        entradas_procesadas=entradas_procesadas
+                        + progreso_vol.entradas_procesadas,
+                        archivos_procesados=progreso_vol.archivos_procesados,
+                        errores=errores + progreso_vol.errores,
+                        errores_por_categoria=dict(
+                            progreso_vol.errores_por_categoria
+                        ),
+                        cobertura_global=round(cobertura_global, 2),
+                        entrada_actual=progreso_vol.entrada_actual,
+                        scan_ids=list(scan_ids),
+                    )
+
+                try:
+                    for entrada in RecorridoVolumen(
+                        volumen=raiz,
+                        raiz=raiz,
+                        contrato=self.contrato,
+                        maquina_id=self.machine_id,
+                        callback_progreso=progreso_volumen,
+                        callback_control=ejecucion.control,
+                        limite_recursos=None,
+                        medidor_recursos=self.medidor,
+                    ).recorrer():
+                        if ejecucion.solicitado_cancelar:
+                            break
+                        lote.append(
+                            {
+                                "entry_id": f"e-{uuid.uuid4()}",
+                                "absolute_path": entrada.absolute_path,
+                                "relative_path": entrada.relative_path,
+                                "name": entrada.name,
+                                "extension": entrada.extension,
+                                "entry_type": entrada.entry_type.value,
+                                "size_bytes": entrada.size_bytes,
+                                "modified_at": entrada.modified_at,
+                                "created_at": entrada.created_at,
+                                "accessed_at": entrada.accessed_at,
+                                "attributes": entrada.attributes,
+                                "excluded": entrada.excluded,
+                                "source": entrada.source,
+                                "last_checked_at": entrada.last_checked_at,
+                            }
+                        )
+                        contador_volumen += 1
+                        if len(lote) >= self.tamano_lote_entradas:
+                            almacenamiento.insert_file_entries(
+                                scan_id, self.machine_id, raiz, lote
+                            )
+                            entradas_procesadas += len(lote)
+                            lote = []
+                finally:
+                    if lote:
+                        almacenamiento.insert_file_entries(
+                            scan_id, self.machine_id, raiz, lote
+                        )
+                        entradas_procesadas += len(lote)
+
+                resultado_volumen = (
+                    "interrumpido" if ejecucion.solicitado_cancelar else "ok"
+                )
+                almacenamiento.end_scan_run(
+                    scan_id=scan_id,
+                    finished_at=datetime.now().isoformat(),
+                    result=resultado_volumen,
+                    entries_count=contador_volumen,
+                    errors_count=errores_volumen,
+                )
+                errores += errores_volumen
+                completados += 1
+                ejecucion._notificar_progreso(
+                    volumenes_completados=completados,
+                    entradas_procesadas=entradas_procesadas,
+                    errores=errores,
+                    scan_ids=list(scan_ids),
+                    cobertura_global=(
+                        round(completados / total * 100.0, 2) if total > 0 else 0.0
+                    ),
+                )
+                if ejecucion.solicitado_cancelar:
+                    break
+
+            if ejecucion.solicitado_cancelar:
+                estado_final = EstadoPrimerInventario.INTERRUMPIDO
+                resultado_final["interrumpido"] = True
+            else:
+                estado_final = EstadoPrimerInventario.COMPLETADO
+
+            resultado_final.update(
+                {
+                    "volumenes_completados": completados,
+                    "entradas_procesadas": entradas_procesadas,
+                    "errores": errores,
+                    "scan_ids": scan_ids,
+                }
+            )
+            ejecucion._finalizar(estado_final, resultado_final)
+        except Exception as exc:  # no se deja el hilo colgado ni se propaga al llamante
+            resultado_final["error"] = str(exc)
+            ejecucion._finalizar(EstadoPrimerInventario.INTERRUMPIDO, resultado_final)
+
+    def ejecucion_actual(self) -> Optional[EjecucionPrimerInventario]:
+        """Devuelve la ejecución en curso, si la hay."""
+        with self._lock:
+            return self._ejecucion_actual
