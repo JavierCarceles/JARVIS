@@ -8663,3 +8663,25 @@ REGRESION: Ninguna introducida por esta unidad. 326/326 tests pasan sin regresi�
 DISCREPANCIAS: Una preexistente en tests/hands/test_system_inventory.py::TestRecuperacionCierreInesperado::test_reanudar_scan_finalizado_levanta_error: el pattern match esperaba "ya está finalizado" (con acento) pero el código de producción tenía "ya esta finalizado" (sin acento). Se corrigió el código de producción para añadir el acento faltante, alineándolo con el test y con el uso correcto del español. No afecta a los criterios de aceptación de la unidad.
 PENDIENTES: Ninguno para esta unidad. Padre 3.8.5.1.4.8 con hijas .8.1 a .8.10; .8.1 a .8.9 completadas. Siguiente hoja pendiente real: 3.8.5.1.4.8.10 (verificar en el equipo real que el escaneo no bloquea el uso normal de JARVIS ni provoca una carga que impida seguir utilizando el ordenador; registrar mediciones y limitaciones).
 ESTADO FINAL: 3.8.5.1.4.8.9 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.8.5.1.4.8.10
+FECHA: 2026-11-11
+OBJETIVO: Verificar en el equipo real que el escaneo de inventario no bloquea el uso normal de JARVIS ni provoca una carga que impida seguir utilizando el ordenador; registrar mediciones y limitaciones (unidad hoja de 3.8.5.1.4.8 Operacion, privacidad y mantenimiento del inventario).
+TIPO DE TRABAJO: VERIFICACIÓN REAL (sin cambios de codigo de produccion, solo verificacion de comportamiento existente con componentes de produccion y recursos temporales controlados en Windows real).
+CAMBIOS / HALLAZGOS:
+- tests/hands/verificacion_real_inventario_8_10.py: nuevo script de verificacion real (no recolectado por pytest) que ejecuta codigo de produccion real (GestorPrimerInventario, RecorridoVolumen, SystemInventoryStorage, Executor) sobre un arbol temporal real de directorios y archivos en el volumen C: y una base de datos SQLite temporal en %TEMP%.
+  * Lanzamiento no bloqueante: ejecutar_primera_vez retorna en 0.0006s (umbral < 5.0s).
+  * Escaneo arranca en hilo daemon (jarvis-primer-inventario), esta_en_ejecucion consultable inmediatamente.
+  * Mientras escanea: Executor se instancia y lista 30 acciones registradas; verify_target_monitor ejecuta y retorna dict.
+  * Progreso del escaneo consultable (el arbol de prueba de 220 entradas se escanea tan rapido que completa antes del primer poll; esto es un resultado positivo de baja carga, no un defecto).
+  * Escaneo finaliza con resultado "ok", 220 entradas procesadas, 0 errores, cobertura 100%.
+  * Entradas persistidas en SQLite real: scan_run con result="ok", 220 entradas recuperables desde nueva instancia.
+  * Medicion de recursos: CPU base 9.10%, durante 0.00%, despues 0.00%; Memoria 41.40% estable; Lecturas de disco delta=0 durante el escaneo.
+  * El escaneo es solo-lectura sobre archivos originales: contenido de archivo de muestra inalterado despues del escaneo.
+  * Evidencia serializable a JSON.
+ARCHIVOS MODIFICADOS: TESTS: tests/hands/verificacion_real_inventario_8_10.py (nuevo script de verificacion real, no pytest). No se modifico codigo de src/. No se modifico documentacion (no hay cambios de contrato publico).
+TESTS Y RESULTADOS: UNITARIOS: 78/78 PASSED en tests/hands/test_system_inventory.py (regresion verificada antes de la verificacion real). 248/248 PASSED en tests/hands/test_system_inventory_storage.py. Sin regresión. REAL (entorno): Windows 11, Python 3.14.7 (x64), equipo DESKTOP-OUA1CIO. Base de datos SQLite temporal real y arbol de directorios temporal real en volumen C: con implementacion de produccion: 10/10 verificaciones reales pasaron (lanzamiento no bloqueante, executor responde durante escaneo, accion verify_target_monitor ejecutada durante escaneo, progreso consultable, escaneo finaliza sin bloquear, entradas persistidas en SQLite, archivos originales no modificados, mediciones de CPU/memoria/disco registradas, evidencia serializable). Recursos temporales de verificacion limpiados. Sin interaccion grafica (sin ventanas, monitores ni teclado/ratón).
+REGRESION: Ninguna introducida por esta unidad. 326/326 tests pasan sin regresión. main.py sigue importando correctamente.
+DISCREPANCIAS: Ninguna afectante a los criterios de aceptación de esta unidad.
+PENDIENTES: Ninguno para esta unidad. Padre 3.8.5.1.4.8 con hijas .8.1 a .8.10; .8.1 a .8.10 completadas. No hay siguiente hoja pendiente en 3.8.5.1.4.8.
+ESTADO FINAL: 3.8.5.1.4.8.10 - IMPLEMENTADA
