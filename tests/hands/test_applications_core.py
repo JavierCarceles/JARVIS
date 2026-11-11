@@ -714,11 +714,15 @@ class TestOpenApplication:
         # Bypass register_application (save_entity may fail in sandbox)
         fake_manager.applications["testopen"] = app
         with patch("src.hands.applications_core.get_application_manager", return_value=fake_manager):
-            with patch("src.hands.applications_core.subprocess.Popen") as mock_popen:
-                mock_popen.return_value = MagicMock()
-                result = open_application("testopen")
-                assert "exitosamente" in result
-                mock_popen.assert_called_once()
+            with patch("src.hands.applications_core.get_application_preflight") as mock_preflight:
+                mock_preflight.return_value.check.return_value = {
+                    "allowed": True, "reason": "ok", "blocked_by": None,
+                }
+                with patch("src.hands.applications_core.subprocess.Popen") as mock_popen:
+                    mock_popen.return_value = MagicMock()
+                    result = open_application("testopen")
+                    assert "exitosamente" in result
+                    mock_popen.assert_called_once()
 
     def test_open_via_url(self):
         fake_manager = ApplicationManager()
@@ -729,9 +733,13 @@ class TestOpenApplication:
         )
         fake_manager.applications["testurl"] = app
         with patch("src.hands.applications_core.get_application_manager", return_value=fake_manager):
-            with patch("src.hands.applications_core.webbrowser.open", return_value=True):
-                result = open_application("testurl")
-                assert "exitosamente" in result
+            with patch("src.hands.applications_core.get_application_preflight") as mock_preflight:
+                mock_preflight.return_value.check.return_value = {
+                    "allowed": True, "reason": "ok", "blocked_by": None,
+                }
+                with patch("src.hands.applications_core.webbrowser.open", return_value=True):
+                    result = open_application("testurl")
+                    assert "exitosamente" in result
 
     def test_open_not_found(self):
         fake_manager = ApplicationManager()
@@ -747,9 +755,46 @@ class TestOpenApplication:
         )
         fake_manager.applications["unavailableapp"] = app
         with patch("src.hands.applications_core.get_application_manager", return_value=fake_manager):
-            with patch("src.hands.applications_core._check_application_available", return_value=False):
-                with pytest.raises(RuntimeError, match="no está disponible"):
-                    open_application("unavailableapp")
+            with patch("src.hands.applications_core.get_application_preflight") as mock_preflight:
+                mock_preflight.return_value.check.return_value = {
+                    "allowed": True, "reason": "ok", "blocked_by": None,
+                }
+                with patch("src.hands.applications_core._check_application_available", return_value=False):
+                    with pytest.raises(RuntimeError, match="no está disponible"):
+                        open_application("unavailableapp")
+
+    def test_open_rechazado_por_preflight_nombre_bloqueado(self):
+        """3.8.5.1.4.7.10: open_application rechaza apps con nombre bloqueado (ej. Task Scheduler)."""
+        fake_manager = ApplicationManager()
+        app = ApplicationKnowledge(
+            name="Task Scheduler", type="system", executable="taskschd.exe",
+        )
+        fake_manager.applications["task scheduler"] = app
+        with patch("src.hands.applications_core.get_application_manager", return_value=fake_manager):
+            with pytest.raises(RuntimeError, match="no pasó el preflight"):
+                open_application("task scheduler")
+
+    def test_open_rechazado_por_preflight_ejecutable_no_resuelto(self):
+        """3.8.5.1.4.7.10: open_application rechaza apps cuyo ejecutable no se resuelve."""
+        fake_manager = ApplicationManager()
+        app = ApplicationKnowledge(
+            name="UnknownApp", type="utility", executable="nonexistent_xyz.exe",
+        )
+        fake_manager.applications["unknownapp"] = app
+        with patch("src.hands.applications_core.get_application_manager", return_value=fake_manager):
+            with pytest.raises(RuntimeError, match="no pasó el preflight"):
+                open_application("unknownapp")
+
+    def test_open_rechazado_por_preflight_destino_manipulado(self):
+        """3.8.5.1.4.7.10: open_application rechaza destinos que son directorios o rutas inexistentes."""
+        fake_manager = ApplicationManager()
+        app = ApplicationKnowledge(
+            name="DirApp", type="utility", executable=r"C:\Windows",
+        )
+        fake_manager.applications["dirapp"] = app
+        with patch("src.hands.applications_core.get_application_manager", return_value=fake_manager):
+            with pytest.raises(RuntimeError, match="no pasó el preflight"):
+                open_application("dirapp")
 
 
 class TestCloseApplication:

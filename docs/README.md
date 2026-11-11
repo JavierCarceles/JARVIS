@@ -1044,7 +1044,7 @@ Funciones a nivel módulo:
 | `def _reconstruct_metadata(entity)`  (L197) | Construye el dict de metadata para una ApplicationKnowledge reconstruida. |
 | `def _serialize_ui_element(element)`  (L212) | Serializa un :class:`UIElement` a un dict JSON-friendly, incluyendo siempre el campo ``description``. |
 | `def get_application_manager()`  (L754) | Obtiene la instancia global del gestor de aplicaciones. |
-| `def open_application(app_name)`  (L785) | Abre una aplicación conocida y valida su disponibilidad. |
+| `def open_application(app_name)`  (L785) | Abre una aplicación conocida y valida su disponibilidad mediante ApplicationPreflight y las políticas existentes antes de lanzar. |
 | `def close_application(app_name)`  (L831) | Cierra una aplicación por proceso sin tocar otras aplicaciones. |
 | `def wait_for_application_state(app_name, target_state, timeout)`  (L889) | Espera un estado de aplicación conocido. |
 | `def calibrate_application_ui(app_name, elements, screen)`  (L941) | Calibra una aplicación específica mediante CalibrationManager. |

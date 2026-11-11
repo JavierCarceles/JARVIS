@@ -1401,13 +1401,49 @@ def get_application_manager() -> ApplicationManager:
     capability="open_application",
     planner_enabled=True,
 )
+def _app_knowledge_to_preflight_dict(app: ApplicationKnowledge) -> Dict[str, Any]:
+    """Convierte un ApplicationKnowledge a un dict compatible con ApplicationPreflight.check().
+
+    Incluye los campos que el preflight evalúa: nombre, app_id, login_required,
+    logged_in, resources_available y url. Los campos app_id, logged_in y
+    resources_available se leen de metadata cuando existen; de lo contrario se
+    dejan en sus valores por defecto (cadena vacía / None).
+    """
+    metadata = app.metadata or {}
+    return {
+        "name": app.name,
+        "app_id": str(metadata.get("app_id", "") or ""),
+        "login_required": app.login_required,
+        "logged_in": metadata.get("logged_in", None),
+        "resources_available": metadata.get("resources_available", None),
+        "url": app.url,
+    }
+
+
 def open_application(app_name: str) -> str:
-    """Abre una aplicación conocida y valida su disponibilidad."""
+    """Abre una aplicación conocida y valida su disponibilidad.
+
+    Antes de lanzar, pasa al candidato por ApplicationPreflight y las
+    políticas existentes (unidad 3.8.5.1.4.7.10). Se rechazan ejecutables
+    desconocidos, destinos ambiguos y rutas manipuladas.
+    """
     app_manager = get_application_manager()
     app = app_manager.get_application(app_name)
 
     if not app:
         raise ValueError(f"Aplicación no encontrada: {app_name}")
+
+    # 3.8.5.1.4.7.10: todo candidato que se pretenda abrir debe pasar por
+    # ApplicationPreflight y las políticas existentes antes de lanzarse.
+    # Se rechazan ejecutables desconocidos, destinos ambiguos y rutas manipuladas.
+    preflight = get_application_preflight()
+    preflight_result = preflight.check(_app_knowledge_to_preflight_dict(app))
+    if not preflight_result.get("allowed", False):
+        raise RuntimeError(
+            f"La aplicación {app.name} no pasó el preflight: "
+            f"{preflight_result.get('reason', 'sin motivo')} "
+            f"(bloqueado por: {preflight_result.get('blocked_by', 'desconocido')})"
+        )
 
     if "application_available" in app.preflight_requirements and not _check_application_available(app):
         raise RuntimeError(f"La aplicación {app.name} no está disponible")

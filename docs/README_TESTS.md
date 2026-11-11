@@ -69,6 +69,7 @@
 - [`hands\test_application_preflight_availability.py`](#hands/test-application_preflight_availability)
 - [`hands\test_application_preflight_launch_destination.py`](#hands/test-application_preflight_launch_destination)
 - [`hands\test_application_preflight_resolve_executable.py`](#hands/test-application_preflight_resolve_executable)
+- [`hands\test_preflight_gatekeeper_entorno_real.py`](#hands/test-preflight_gatekeeper_entorno_real)
 - [`hands\test_application_read.py`](#hands/test-application_read)
 - [`hands\test_application_register_duplicates.py`](#hands/test-application_register_duplicates)
 - [`hands\test_application_register_in_memory.py`](#hands/test-application_register_in_memory)
@@ -8151,6 +8152,34 @@ required_capability son opcionales.
   - **`test_clear_cache_removes_executable_entry`** (L147)
 
   Métodos auxiliares (no test): setup_method
+
+---
+
+<a name="hands/test-preflight_gatekeeper_entorno_real"></a>
+### `hands\test_preflight_gatekeeper_entorno_real.py`
+
+**Descripción:** Verificacion en entorno real de la unidad 3.8.5.1.4.7.10. Valida que todo candidato que se pretenda abrir pase por ApplicationPreflight y las politicas existentes, rechazando ejecutables desconocidos, destinos ambiguos y rutas manipuladas. Valida destinos reales del sistema (URIs admitidas, ejecutables reales via validate_launch_destination) sin lanzar ninguna aplicacion.
+
+**Módulos de origen probados:** src.hands.application_preflight, src.hands.applications_core
+
+**Clases de test:**
+
+- **`TestPreflightGatekeeperEntornoReal`** (línea 23) — 8 método(s) de test
+
+  - **`test_uri_ms_settings_es_admitida`** (L28) — URI ms-settings admitida como destino.
+  - **`test_uri_https_es_admitida`** (L35) — URI https admitida como destino.
+  - **`test_ejecutable_inexistente_es_rechazado`** (L42) — Ejecutable inexistente rechazado con blocked_by=executable_not_resolved.
+  - **`test_nombre_bloqueado_es_rechazado`** (L49) — Nombre administrativo/bloqueado rechazado con blocked_by=blocked_name.
+  - **`test_directorio_no_es_lanzable`** (L56) — Directorio no es destino de lanzamiento valido.
+  - **`test_ruta_inexistente_no_es_lanzable`** (L63) — Ruta inexistente rechazada.
+  - **`test_archivo_txt_no_es_lanzable`** (L70) — Archivo .txt no es ejecutable valido para lanzamiento.
+  - **`test_notepad_real_es_lanzable`** (L77) — notepad.exe real es ejecutable valido.
+  - **`test_calc_real_es_lanzable`** (L85) — calc.exe real es ejecutable valido.
+
+- **`TestAppKnowledgeToPreflightDictEntornoReal`** (línea 95) — 2 método(s) de test
+
+  - **`test_conversion_app_conocida`** (L98) — Conversion de ApplicationKnowledge registrado a dict de preflight.
+  - **`test_conversion_app_inesistente`** (L107) — App con nombre vacio produce dict con nombre vacio.
 
 ---
 
