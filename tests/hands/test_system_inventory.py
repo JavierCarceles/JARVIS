@@ -1659,3 +1659,182 @@ class TestMedicionRendimientoInventario:
         assert resumen["operaciones_medidas"] == 0
         assert len(resumen["limites_sugeridos"]) == 1
         assert resumen["limites_sugeridos"][0]["nombre"] == "test_limite"
+
+
+# ---------------------------------------------------------------------------
+# Responsividad y ejecucion de acciones durante un escaneo (unidad 3.8.5.1.4.8.8).
+#
+# Verifica que JARVIS puede seguir respondiendo y ejecutar acciones mientras
+# un escaneo esta pausado, limitado o ejecutandose en segundo plano controlado.
+# Todos los tests usan directorios temporales y bases de datos temporales;
+# no tocan datos de produccion ni rutas de usuario.
+# ---------------------------------------------------------------------------
+
+class TestAccionRespuestaDuranteEscaneo:
+    """JARVIS sigue respondiendo durante un escaneo de inventario."""
+
+    def test_escaneo_segundo_plano_permite_consultas_estado(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        """Mientras un escaneo corre en segundo plano (hilo daemon, no bloqueante),
+        se puede consultar progreso, control y estado sin bloquear."""
+        volumen = _volumen_temporal(tmp_path)
+        gestor = GestorPrimerInventario(MACHINE_ID, storage)
+
+        ejecucion = gestor.ejecutar_primera_vez(volumenes=[volumen])
+        assert ejecucion.esta_en_ejecucion is True
+
+        # Mientras el escaneo corre, JARVIS puede consultar estado repetidamente.
+        consultas = 0
+        for _ in range(50):
+            if not ejecucion.esta_en_ejecucion:
+                break
+            prog = ejecucion.progreso
+            ctrl = ejecucion.control()
+            assert ctrl in (
+                ControlRecorrido.CONTINUAR,
+                ControlRecorrido.PAUSAR,
+                ControlRecorrido.CANCELAR,
+            )
+            assert prog.estado == EstadoPrimerInventario.EJECUTANDOSE
+            consultas += 1
+            time.sleep(0.02)
+
+        assert consultas > 0, "No se pudo consultar estado durante el escaneo en segundo plano"
+
+        ejecucion.esperar(timeout=60.0)
+        assert ejecucion.finalizado is True
+        assert ejecucion.progreso.completado is True
+
+    def test_pausa_reanudar_durante_escaneo_permite_responder(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        """Con el escaneo pausado, JARVIS sigue respondiendo (consultas y control);
+        al reanudar, el escaneo continua."""
+        base = tmp_path / "volumen_pausa"
+        for i in range(8):
+            sub = base / f"sub{i:02d}"
+            sub.mkdir(parents=True, exist_ok=True)
+            for j in range(3):
+                (sub / f"archivo_{j:02d}.txt").write_text(
+                    f"contenido {i}-{j}\n", encoding="utf-8"
+                )
+        volumen = VolumeInfo(
+            letra="P:", ruta_raiz=str(base), tipo=VolumeType.FIXED, disponible=True
+        )
+        gestor = GestorPrimerInventario(MACHINE_ID, storage)
+
+        ejecucion = gestor.ejecutar_primera_vez(volumenes=[volumen])
+        assert ejecucion.esta_en_ejecucion is True
+
+        # Pausar el escaneo.
+        ejecucion.solicitar_pausa()
+        assert ejecucion.solicitado_pausa is True
+        assert ejecucion.control() == ControlRecorrido.PAUSAR
+
+        # Mientras esta pausado, sigue respondiendo a consultas de estado.
+        consultas_pausado = 0
+        for _ in range(20):
+            prog = ejecucion.progreso
+            ctrl = ejecucion.control()
+            assert ctrl == ControlRecorrido.PAUSAR
+            assert prog.estado == EstadoPrimerInventario.EJECUTANDOSE
+            consultas_pausado += 1
+            time.sleep(0.02)
+        assert consultas_pausado > 0
+
+        # Reanudar y verificar que continua.
+        ejecucion.solicitar_reanudar()
+        assert ejecucion.solicitado_pausa is False
+        assert ejecucion.control() == ControlRecorrido.CONTINUAR
+
+        ejecucion.esperar(timeout=60.0)
+        assert ejecucion.finalizado is True
+
+    def test_recorrido_volumen_con_limite_recursos_completa_recorrido(
+        self, tmp_path: Path
+    ):
+        """RecorridoVolumen acepta un LimiteRecursos y completa el recorrido
+        sobre un directorio temporal real, permitiendo consultar progreso."""
+        from src.hands.system_inventory import (
+            ControlRecorrido,
+            InventoryContract,
+            LimiteRecursos,
+            MedidorRecursosSistema,
+            RecorridoVolumen,
+            generate_machine_id,
+        )
+
+        base = tmp_path / "volumen_limite"
+        for i in range(4):
+            sub = base / f"sub{i:02d}"
+            sub.mkdir(parents=True, exist_ok=True)
+            (sub / f"archivo_{i:02d}.txt").write_text(f"contenido {i}\n")
+
+        contrato = InventoryContract(machine_id=generate_machine_id())
+        maquina_id = generate_machine_id()
+        limite = LimiteRecursos(
+            cpu_max_porcentaje=None,
+            memoria_max_porcentaje=None,
+            disco_uso_max_porcentaje=None,
+            concurrencia_maxima=1,
+            intervalo_medicion_segundos=0.05,
+        )
+
+        decisiones_control: list[ControlRecorrido] = []
+
+        def callback_control() -> ControlRecorrido:
+            decisiones_control.append(ControlRecorrido.CONTINUAR)
+            return ControlRecorrido.CONTINUAR
+
+        progresos: list = []
+
+        def callback_progreso(progreso) -> None:
+            progresos.append(progreso)
+
+        recorrido = RecorridoVolumen(
+            volumen="C:",
+            raiz=str(base),
+            contrato=contrato,
+            maquina_id=maquina_id,
+            callback_progreso=callback_progreso,
+            callback_control=callback_control,
+            limite_recursos=limite,
+            medidor_recursos=MedidorRecursosSistema(),
+        )
+
+        entradas = list(recorrido.recorrer())
+        assert len(entradas) > 0
+        assert recorrido.progreso.completado is True
+        assert recorrido.progreso.interrumpido is False
+        assert len(decisiones_control) > 0, "El callback de control se invoco durante el recorrido"
+        assert len(progresos) > 0, "Se recibio progreso durante el recorrido"
+
+    def test_ejecutor_responde_durante_escaneo_segundo_plano(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        """Mientras un escaneo corre en segundo plano, el Executor puede
+        crearse y responder consultas (listar acciones) sin bloqueo."""
+        from src.hands.executor import Executor
+
+        volumen = _volumen_temporal(tmp_path)
+        gestor = GestorPrimerInventario(MACHINE_ID, storage)
+
+        ejecucion = gestor.ejecutar_primera_vez(volumenes=[volumen])
+        assert ejecucion.esta_en_ejecucion is True
+
+        # Mientras el escaneo corre, crear un Executor y consultar acciones
+        # disponibles demuestra que JARVIS sigue respondiendo.
+        executor = Executor()
+        acciones = executor.action_registry.list_actions()
+        assert isinstance(acciones, list)
+        assert len(acciones) > 0
+
+        # El ejecutor puede consultar si una acción existe sin ejecutarla.
+        nombre = acciones[0]
+        info = executor.action_registry.get_action(nombre)
+        assert info is not None
+        assert info.name == nombre
+
+        ejecucion.esperar(timeout=60.0)
+        assert ejecucion.finalizado is True

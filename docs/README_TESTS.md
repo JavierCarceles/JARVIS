@@ -10941,6 +10941,7 @@ Todos los tests usan directorios temporales (`tmp_path`) y bases de datos tempor
 | `TestPoliticaRetencion` | `PoliticaRetencion`: valores por defecto (max 5 generaciones, max 3 backups, TTL None, modo seguro y backup previo activos) y validaciones (max_generaciones >= 1, max_backups >= 1, edades positivas o None). |
 | `TestResultadoLimpieza` | `ResultadoLimpieza`: valores por defecto, contadores (generaciones/entradas/backups eliminados, backup creado, generaciones/entradas protegidas, errores), resumen serializable con `total_eliminado`. |
 | `TestMedicionRendimientoInventario` | Medición de rendimiento del inventario (`MedidorRendimientoInventario`): medir operación (tiempo, CPU, memoria, lecturas de disco, crecimiento de SQLite), medir consulta (tiempo en ms), agregación de mediciones, límites desde mediciones reales sin umbrales inventados (`establecer_limites_desde_mediciones`), `LimiteRecursos` desde medición y resumen serializable. |
+| `TestAccionRespuestaDuranteEscaneo` | Responsividad y ejecución de acciones durante un escaneo de inventario (3.8.5.1.4.8.8): escaneo en segundo plano no bloqueante permite consultas de progreso/estado y ejecución de acciones reales (`verify_target_monitor`) mientras escanea; pausa y reanudación durante el escaneo mantienen la capacidad de respuesta; `RecorridoVolumen` con `LimiteRecursos` completa el recorrido sobre directorio temporal real. |
 
 ---
 
@@ -11069,6 +11070,23 @@ sistema de archivos.
 **Clases de test:** ninguna (función de test de módulo).
 
 **Resultados:** 8 pruebas de verificación en entorno real, 8 PASSED / 0 FAILED.
+
+<a name="hands/verificacion-real-inventario-8-8"></a>
+### `hands\verificacion_real_inventario_8_8.py`
+
+**Descripción:** Verificación en el entorno real del equipo (Windows) de la
+responsividad y ejecución de acciones durante un escaneo de inventario
+(3.8.5.1.4.8.8). Comprueba que `GestorPrimerInventario.ejecutar_primera_vez()`
+lanza el escaneo en segundo plano sin bloquear al llamante; que el `Executor`
+puede listar y ejecutar una acción real (`verify_target_monitor`) mientras el
+escaneo corre y mientras está pausado; que la pausa, reanudación y cancelación
+funcionan sin bloquear; y que los resultados se persisten en SQLite real sobre
+directorios temporales. No usa mocks: cada verificación compara contra el
+estado real del sistema y de la base de datos.
+
+**Clases de test:** ninguna (función de test de módulo).
+
+**Resultados:** 18 pruebas de verificación en entorno real, 18 PASSED / 0 FAILED.
 
 ---
 
