@@ -3196,3 +3196,581 @@ class GestorPrimerInventario:
         """Devuelve la ejecución en curso, si la hay."""
         with self._lock:
             return self._ejecucion_actual
+
+
+# ---------------------------------------------------------------------------
+# Política configurable de refresco y actualizaciones incrementales bajo
+# demanda del inventario (3.8.5.1.4.8.2).
+#
+# Capa de decisión sobre cuándo y qué refrescar de forma incremental, sin
+# volver a escanear los volúmenes completos en cada petición. Reutiliza los
+# mecanismos de refresco del almacenamiento
+# (`SystemInventoryStorage.refrescar_entrada_por_ruta`,
+# `refrescar_volumen`, `refrescar_incremental_global`) y clasifica las entradas
+# por caducidad (`ConfigCaducidad` / `esta_caducado`, unidad 3.8.5.1.4.5.9).
+# ---------------------------------------------------------------------------
+
+class ModoRefresco(Enum):
+    """Modos de la política de refresco del inventario.
+
+    `BAJO_DEMANDA`: solo se refresca cuando se solicita explícitamente.
+    `POR_CADUCIDAD`: se refresca cuando las entradas del volumen están caducadas
+        u obsoletas según el TTL configurado.
+    `PROGRAMADA`: se refresca cuando ha transcurrido el intervalo configurado
+        desde el último refresco de ese volumen.
+    `DESACTIVADO`: no se refresca automáticamente (solo bajo demanda explícita).
+    """
+
+    BAJO_DEMANDA = "bajo_demanda"
+    POR_CADUCIDAD = "por_caducidad"
+    PROGRAMADA = "programada"
+    DESACTIVADO = "desactivado"
+
+
+@dataclass
+class ConfigRefresco:
+    """Configuración de la política de refresco del inventario.
+
+    Todos los valores son opcionales y `None` significa "sin restricción". Los
+    umbrales de tiempo se configuran a partir de mediciones reales del equipo
+    o necesidades del consumidor, nunca por inferencia.
+    """
+
+    modo: ModoRefresco = ModoRefresco.BAJO_DEMANDA
+    """Modo de refresco activo."""
+
+    ttl_segundos: Optional[float] = None
+    """Tiempo máximo de vida en segundos de una entrada antes de considerarla
+    caducada (solo modo `POR_CADUCIDAD`). `None` = sin caducidad por tiempo."""
+
+    intervalo_segundos: Optional[float] = None
+    """Intervalo mínimo en segundos entre refrescos automáticos de un mismo
+    volumen (solo modo `PROGRAMADA`). `None` = sin intervalo."""
+
+    volumenes_incluir: Optional[list[str]] = None
+    """Volúmenes que se consideran para refresco automático. `None` =
+    todos los detectados. Lista vacía = ninguno."""
+
+    volumenes_excluir: list[str] = field(default_factory=list)
+    """Volúmenes excluidos del refresco automático."""
+
+    rutas_incluir: Optional[list[str]] = None
+    """Rutas candidatas a refresco bajo demanda explícito. `None` = cualquier
+    ruta registrada en el último escaneo del volumen."""
+
+    rutas_excluir: list[str] = field(default_factory=list)
+    """Rutas excluidas del refresco bajo demanda."""
+
+    max_entradas_por_refresco: Optional[int] = None
+    """Límite de seguridad de entradas a refrescar en una operación.
+    `None` = sin límite."""
+
+    refrescar_solo_caducadas: bool = True
+    """Si `True`, el refresco automático solo toca volúmenes con entradas
+    caducadas u obsoletas."""
+
+
+@dataclass
+class ResultadoRefresco:
+    """Resultado de una operación de refresco incremental."""
+
+    modo: str
+    """Modo de refresco aplicado."""
+
+    volume: Optional[str]
+    """Volumen refrescado (`None` si fue una ruta individual)."""
+
+    ruta: Optional[str]
+    """Ruta refrescada (`None` si fue un volumen)."""
+
+    entradas_refrescadas: int
+    """Número de entradas cuya `last_checked_at` se actualizó."""
+
+    cambios_detectados: int
+    """Número de entradas cuyo tamaño cambió respecto a lo almacenado."""
+
+    existen: int
+    """Entradas que siguen existiendo en el sistema de archivos."""
+
+    no_existen: int
+    """Entradas que ya no existen en el sistema de archivos."""
+
+    last_checked_at: Optional[str]
+    """Marca de tiempo de la última comprobación."""
+
+    escaneo_completo_evitado: bool
+    """`True` si la operación usó refresco incremental y no un recorrido
+    completo de volumen (`RecorridoVolumen`). Siempre `True` en esta política."""
+
+    razon: Optional[str]
+    """Explicación legible del resultado (por qué se refrescó o no)."""
+
+    detalle: dict
+    """Resultado crudo devuelto por el almacenamiento."""
+
+
+class PoliticaRefresco:
+    """
+    Política configurable de refresco del inventario de archivos.
+
+    Decide cuándo y qué refrescar de forma incremental, sin volver a escanear
+    los volúmenes completos en cada petición. Reutiliza los mecanismos de
+    refresco del almacenamiento y clasifica las entradas por caducidad.
+
+    `storage` es una instancia de `SystemInventoryStorage` inyectada para
+    evitar la dependencia circular entre `system_inventory` y
+    `system_inventory_storage`.
+
+    Responsabilidades:
+    1. Decidir si un volumen necesita refresco según el modo y la caducidad de
+       sus entradas (`necesita_refresco_volumen`).
+    2. Refrescar un volumen solo si lo necesita
+       (`refrescar_volumen_si_necesario`), sin recorrido completo de volumen.
+    3. Refrescar bajo demanda una ruta individual (`refrescar_ruta_bajo_demanda`).
+    4. Refrescar selectivamente solo los volúmenes que lo necesitan
+       (`refrescar_incremental_selectivo`), nunca todos los volúmenes
+       completos en cada petición.
+    5. Registrar el historial de refrescos para decisiones programadas.
+    """
+
+    def __init__(
+        self,
+        storage: Any,
+        machine_id: str,
+        config: Optional[ConfigRefresco] = None,
+        medidor: Optional[MedidorRecursosSistema] = None,
+    ) -> None:
+        self.storage = storage
+        self.machine_id = machine_id
+        self._config = config or ConfigRefresco()
+        self.medidor = medidor or MedidorRecursosSistema()
+        self._lock = threading.Lock()
+        self._historial: list[ResultadoRefresco] = []
+        self._ultimo_refresco_por_volumen: dict[str, str] = {}
+
+    # ------------------------------------------------------------------ #
+    # Configuración
+    # ------------------------------------------------------------------ #
+    def configurar(self, config: ConfigRefresco) -> None:
+        """Reemplaza la configuración de la política de refresco."""
+        with self._lock:
+            self._config = config
+
+    def config_actual(self) -> ConfigRefresco:
+        """Devuelve una copia de la configuración vigente."""
+        with self._lock:
+            cfg = self._config
+            return ConfigRefresco(
+                modo=cfg.modo,
+                ttl_segundos=cfg.ttl_segundos,
+                intervalo_segundos=cfg.intervalo_segundos,
+                volumenes_incluir=(
+                    list(cfg.volumenes_incluir)
+                    if cfg.volumenes_incluir is not None
+                    else None
+                ),
+                volumenes_excluir=list(cfg.volumenes_excluir),
+                rutas_incluir=(
+                    list(cfg.rutas_incluir)
+                    if cfg.rutas_incluir is not None
+                    else None
+                ),
+                rutas_excluir=list(cfg.rutas_excluir),
+                max_entradas_por_refresco=cfg.max_entradas_por_refresco,
+                refrescar_solo_caducadas=cfg.refrescar_solo_caducadas,
+            )
+
+    # ------------------------------------------------------------------ #
+    # Filtros de elegibilidad
+    # ------------------------------------------------------------------ #
+    def _volumen_es_elegible(self, volume: str) -> bool:
+        """Devuelve `True` si el volumen está incluido y no excluido."""
+        cfg = self._config
+        if cfg.volumenes_incluir is not None and volume not in cfg.volumenes_incluir:
+            return False
+        if volume in cfg.volumenes_excluir:
+            return False
+        return True
+
+    def _ruta_es_elegible(self, ruta_absoluta: str) -> bool:
+        """Devuelve `True` si la ruta está incluida y no excluida."""
+        cfg = self._config
+        if cfg.rutas_incluir is not None and ruta_absoluta not in cfg.rutas_incluir:
+            return False
+        if ruta_absoluta in cfg.rutas_excluir:
+            return False
+        return True
+
+    # ------------------------------------------------------------------ #
+    # Decisión de refresco por volumen (caducidad de las entradas)
+    # ------------------------------------------------------------------ #
+    def necesita_refresco_volumen(
+        self, volume: str
+    ) -> tuple[bool, str, dict]:
+        """
+        Decide si un volumen necesita un refresco incremental.
+
+        Retorna `(necesita, motivo, info)` donde `info` contiene:
+        `entradas_totales`, `entradas_caducadas`, `scan_id`,
+        `edad_maxima_segundos` y `modo`.
+
+        Lógica:
+        - Modo `DESACTIVADO`: nunca necesita refresco automático.
+        - Sin escaneo previo: no hay nada que refrescar incrementalmente.
+        - Modo `POR_CADUCIDAD`: necesita refresco si alguna entrada del último
+          escaneo está caducada u obsoleta según el TTL.
+        - Modo `PROGRAMADA`: necesita refresco si ha transcurrido el intervalo
+          configurado desde el último refresco de ese volumen.
+        - Modo `BAJO_DEMANDA`: nunca necesita refresco automático (solo bajo
+          demanda explícita).
+        """
+        cfg = self._config
+        info: dict = {
+            "volume": volume,
+            "entradas_totales": 0,
+            "entradas_caducadas": 0,
+            "scan_id": None,
+            "edad_maxima_segundos": None,
+            "modo": cfg.modo.value,
+        }
+
+        if cfg.modo == ModoRefresco.DESACTIVADO:
+            info["razon"] = "Modo de refresco desactivado."
+            return False, "Refresco automático desactivado por política.", info
+
+        if not self._volumen_es_elegible(volume):
+            info["razon"] = "Volumen no elegible por política (excluido o no incluido)."
+            return False, "Volumen no elegible para refresco automático.", info
+
+        scan = self.storage.get_latest_scan(self.machine_id, volume)
+        if scan is None:
+            info["razon"] = "No hay escaneo previo para este equipo y volumen."
+            return (
+                False,
+                "No hay escaneo previo del volumen para refrescar.",
+                info,
+            )
+
+        info["scan_id"] = scan.get("scan_id")
+
+        # Modo PROGRAMADA: decidir por intervalo transcurrido desde el último refresco.
+        if cfg.modo == ModoRefresco.PROGRAMADA:
+            intervalo = cfg.intervalo_segundos
+            if intervalo is None:
+                info["razon"] = "Modo programado sin intervalo configurado."
+                return False, "Modo programado sin intervalo de refresco.", info
+            ultimo = self._ultimo_refresco_por_volumen.get(volume)
+            scan_started = scan.get("started_at") or ""
+            referencia = ultimo or scan_started
+            edad: Optional[float] = None
+            if referencia:
+                try:
+                    t0 = datetime.fromisoformat(referencia)
+                    t1 = datetime.now()
+                    if t0.tzinfo is not None:
+                        t1 = t1.astimezone()
+                    edad = max(0.0, (t1 - t0).total_seconds())
+                except (ValueError, TypeError, OverflowError):
+                    edad = None
+            if edad is not None and edad < intervalo:
+                info["razon"] = (
+                    f"Intervalo de refresco no transcurrido "
+                    f"({edad:.1f}s < {intervalo:.1f}s)."
+                )
+                return (
+                    False,
+                    f"Intervalo de refresco no transcurrido para {volume}.",
+                    info,
+                )
+            info["razon"] = (
+                "Intervalo de refresco transcurrido o sin previo refresco."
+            )
+            return True, f"Volumen {volume} listo para refresco programado.", info
+
+        # Modo POR_CADUCIDAD (y BAJO_DEMANDA, solo para informar caducidad):
+        # evaluar caducidad de las entradas del último escaneo.
+        try:
+            entradas = self.storage.obtener_entradas_escaneo(scan["scan_id"])
+        except AttributeError:
+            # Almacenamiento sin acceso público a entradas: no se puede
+            # evaluar caducidad por entrada.
+            info["razon"] = (
+                "El almacenamiento no expone las entradas del escaneo; no se "
+                "puede evaluar caducidad por entrada."
+            )
+            return False, "No se pueden leer las entradas del escaneo.", info
+
+        info["entradas_totales"] = len(entradas)
+
+        umbral = ConfigCaducidad(ttl_segundos=cfg.ttl_segundos)
+        caducadas = 0
+        edad_maxima: Optional[float] = None
+        for e in entradas:
+            entrada = InventoryEntry(
+                machine_id=e.get("machine_id", self.machine_id),
+                volume=e.get("volume", volume),
+                absolute_path=e.get("absolute_path", ""),
+                relative_path=e.get("relative_path", ""),
+                name=e.get("name", ""),
+                extension=e.get("extension", ""),
+                entry_type=EntryType(
+                    e.get("entry_type", EntryType.OTHER.value)
+                ),
+                size_bytes=int(e.get("size_bytes", 0) or 0),
+                modified_at=e.get("modified_at", "") or "",
+                created_at=e.get("created_at", "") or "",
+                accessed_at=e.get("accessed_at"),
+                attributes=list(e.get("attributes", []) or []),
+                excluded=bool(e.get("excluded", False)),
+                exclusion_reason=e.get("exclusion_reason"),
+                source=e.get("source", "filesystem_scan"),
+                last_checked_at=e.get("last_checked_at", "") or "",
+            )
+            resultado = esta_caducado(entrada, umbral)
+            if resultado.estado in (
+                EstadoCaducidad.OBSOLETO,
+                EstadoCaducidad.EXPIRADO,
+            ):
+                caducadas += 1
+            edad = resultado.edad_segundos
+            if edad is not None and (edad_maxima is None or edad > edad_maxima):
+                edad_maxima = edad
+
+        info["entradas_caducadas"] = caducadas
+        info["edad_maxima_segundos"] = edad_maxima
+
+        if cfg.modo == ModoRefresco.BAJO_DEMANDA:
+            info["razon"] = (
+                f"{caducadas}/{info['entradas_totales']} entradas caducadas; "
+                "refresco solo bajo demanda explícita."
+            )
+            return False, "Modo bajo demanda: no hay refresco automático.", info
+
+        # POR_CADUCIDAD: refrescar si hay entradas caducadas.
+        if caducadas > 0:
+            info["razon"] = (
+                f"{caducadas} entradas caducadas u obsoletas de "
+                f"{info['entradas_totales']}; se requiere refresco incremental."
+            )
+            return True, f"Volumen {volume} tiene entradas caducadas.", info
+
+        info["razon"] = (
+            f"Todas las {info['entradas_totales']} entradas están vigentes; "
+            "no se requiere refresco."
+        )
+        return False, "No hay entradas caducadas; refresco innecesario.", info
+
+    # ------------------------------------------------------------------ #
+    # Operaciones de refresco incremental
+    # ------------------------------------------------------------------ #
+    def _registrar(self, resultado: ResultadoRefresco) -> None:
+        with self._lock:
+            self._historial.append(resultado)
+            if resultado.volume and resultado.last_checked_at:
+                self._ultimo_refresco_por_volumen[resultado.volume] = (
+                    resultado.last_checked_at
+                )
+
+    def _resultado_desde_storage(
+        self,
+        modo: str,
+        storage_result: dict,
+        volume: Optional[str] = None,
+        ruta: Optional[str] = None,
+        razon: Optional[str] = None,
+        evitar_escaneo_completo: bool = True,
+    ) -> ResultadoRefresco:
+        return ResultadoRefresco(
+            modo=modo,
+            volume=volume,
+            ruta=ruta,
+            entradas_refrescadas=int(
+                storage_result.get("entradas_refrescadas", 0)
+            ),
+            cambios_detectados=int(storage_result.get("cambios_detectados", 0)),
+            existen=int(storage_result.get("existentes", 0)),
+            no_existen=int(storage_result.get("no_existentes", 0)),
+            last_checked_at=storage_result.get("last_checked_at"),
+            escaneo_completo_evitado=evitar_escaneo_completo,
+            razon=razon or storage_result.get("razon"),
+            detalle=storage_result,
+        )
+
+    def refrescar_volumen_si_necesario(self, volume: str) -> ResultadoRefresco:
+        """
+        Refresca un volumen solo si la política lo indica.
+
+        Usa `refrescar_volumen` del almacenamiento (revalidación puntual de
+        las entradas existentes: existencia y tamaño), nunca un recorrido
+        completo de volumen (`RecorridoVolumen`). Si el volumen no necesita
+        refresco, retorna un resultado con `entradas_refrescadas == 0` y la
+        razón, sin tocar el almacenamiento.
+        """
+        necesita, motivo, _info = self.necesita_refresco_volumen(volume)
+        if not necesita:
+            return self._resultado_desde_storage(
+                modo=self._config.modo.value,
+                storage_result={
+                    "entradas_refrescadas": 0,
+                    "cambios_detectados": 0,
+                    "existentes": 0,
+                    "no_existentes": 0,
+                    "last_checked_at": None,
+                    "razon": motivo,
+                },
+                volume=volume,
+                razon=motivo,
+                evitar_escaneo_completo=True,
+            )
+
+        storage_result = self.storage.refrescar_volumen(self.machine_id, volume)
+        resultado = self._resultado_desde_storage(
+            modo=self._config.modo.value,
+            storage_result=storage_result,
+            volume=volume,
+            razon=motivo,
+            evitar_escaneo_completo=True,
+        )
+        self._registrar(resultado)
+        return resultado
+
+    def refrescar_ruta_bajo_demanda(
+        self, ruta_absoluta: str, volume: str
+    ) -> ResultadoRefresco:
+        """
+        Refresco incremental bajo demanda de una única ruta.
+
+        Se ejecuta siempre que se solicite explícitamente, independientemente
+        del modo automático, siempre que la ruta sea elegible según la política
+        de inclusión/exclusión de rutas. Usa `refrescar_entrada_por_ruta` del
+        almacenamiento (revalidación puntual, sin recorrido completo de volumen).
+        """
+        if not self._ruta_es_elegible(ruta_absoluta):
+            return self._resultado_desde_storage(
+                modo=ModoRefresco.BAJO_DEMANDA.value,
+                storage_result={
+                    "entradas_refrescadas": 0,
+                    "cambios_detectados": 0,
+                    "existentes": 0,
+                    "no_existentes": 0,
+                    "last_checked_at": None,
+                    "razon": "Ruta excluida por política de refresco.",
+                },
+                volume=volume,
+                ruta=ruta_absoluta,
+                razon="Ruta excluida por política de rutas (no incluida o excluida).",
+                evitar_escaneo_completo=True,
+            )
+
+        storage_result = self.storage.refrescar_entrada_por_ruta(
+            self.machine_id, volume, ruta_absoluta
+        )
+        resultado = self._resultado_desde_storage(
+            modo=ModoRefresco.BAJO_DEMANDA.value,
+            storage_result=storage_result,
+            volume=volume,
+            ruta=ruta_absoluta,
+            razon="Refresco bajo demanda de ruta individual.",
+            evitar_escaneo_completo=True,
+        )
+        self._registrar(resultado)
+        return resultado
+
+    def refrescar_incremental_selectivo(
+        self, volumenes_disponibles: list[str]
+    ) -> dict:
+        """
+        Refresca solo los volúmenes que lo necesitan según la política.
+
+        Nunca refresca todos los volúmenes completos en cada petición: evalúa
+        cada volumen disponible y solo aplica
+        `refrescar_volumen_si_necesario` a los que la política marca como
+        necesarios.
+
+        Retorna un resumen agregado con `por_volumen` y totales.
+        """
+        cfg = self._config
+        if cfg.modo == ModoRefresco.DESACTIVADO:
+            return {
+                "machine_id": self.machine_id,
+                "modo": cfg.modo.value,
+                "total_volumenes_evaluados": len(volumenes_disponibles),
+                "volumenes_refrescados": 0,
+                "volumenes_no_necesitaban_refresco": len(
+                    volumenes_disponibles
+                ),
+                "entradas_refrescadas_total": 0,
+                "cambios_detectados_total": 0,
+                "por_volumen": [],
+                "razon": "Refresco automático desactivado por política.",
+            }
+
+        por_volumen: list[dict] = []
+        entradas_total = 0
+        cambios_total = 0
+        refrescados = 0
+        no_necesitaban = 0
+
+        for volume in volumenes_disponibles:
+            if not self._volumen_es_elegible(volume):
+                continue
+            resultado = self.refrescar_volumen_si_necesario(volume)
+            entrada = {
+                "volume": resultado.volume,
+                "modo": resultado.modo,
+                "entradas_refrescadas": resultado.entradas_refrescadas,
+                "cambios_detectados": resultado.cambios_detectados,
+                "existen": resultado.existen,
+                "no_existen": resultado.no_existen,
+                "last_checked_at": resultado.last_checked_at,
+                "razon": resultado.razon,
+                "escaneo_completo_evitado": resultado.escaneo_completo_evitado,
+            }
+            por_volumen.append(entrada)
+            entradas_total += resultado.entradas_refrescadas
+            cambios_total += resultado.cambios_detectados
+            if resultado.entradas_refrescadas > 0:
+                refrescados += 1
+            else:
+                no_necesitaban += 1
+
+        return {
+            "machine_id": self.machine_id,
+            "modo": cfg.modo.value,
+            "total_volumenes_evaluados": len(volumenes_disponibles),
+            "volumenes_refrescados": refrescados,
+            "volumenes_no_necesitaban_refresco": no_necesitaban,
+            "entradas_refrescadas_total": entradas_total,
+            "cambios_detectados_total": cambios_total,
+            "por_volumen": por_volumen,
+            "razon": None,
+        }
+
+    def decidir_volumenes_a_refrescar(
+        self, volumenes_disponibles: list[str]
+    ) -> list[str]:
+        """
+        Devuelve los volúmenes que necesitan refresco según la política,
+        sin ejecutar el refresco. Útil para planificar antes de actuar.
+        """
+        a_refrescar: list[str] = []
+        for volume in volumenes_disponibles:
+            if not self._volumen_es_elegible(volume):
+                continue
+            necesita, _, _ = self.necesita_refresco_volumen(volume)
+            if necesita:
+                a_refrescar.append(volume)
+        return a_refrescar
+
+    # ------------------------------------------------------------------ #
+    # Historial y observabilidad
+    # ------------------------------------------------------------------ #
+    def historial(self) -> list[ResultadoRefresco]:
+        """Devuelve una copia del historial de operaciones de refresco."""
+        with self._lock:
+            return list(self._historial)
+
+    def ultimo_refresco_por_volumen(self) -> dict[str, str]:
+        """Devuelve la marca de tiempo del último refresco por volumen."""
+        with self._lock:
+            return dict(self._ultimo_refresco_por_volumen)

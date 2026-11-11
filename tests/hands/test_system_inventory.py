@@ -18,21 +18,27 @@ from __future__ import annotations
 
 import time
 import uuid
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
 
 from src.hands.system_inventory import (
     AlcanceInventario,
+    ConfigRefresco,
     ControlRecorrido,
     EntryType,
+    EstadoCaducidad,
     EstadoPrimerInventario,
     GestorPrimerInventario,
     InventoryContract,
+    ModoRefresco,
+    PoliticaRefresco,
     PrimerInventarioYaEnEjecucionError,
     ProgresoInventario,
     ProgresoRecorrido,
     RecorridoVolumen,
+    ResultadoRefresco,
     VolumeInfo,
     VolumeType,
     generate_machine_id,
@@ -311,3 +317,361 @@ class TestEjecucionPrimerInventario:
         ejecucion.solicitar_cancelar()
         assert ejecucion.control() == ControlRecorrido.CANCELAR
         ejecucion.esperar(timeout=30.0)
+
+
+# ---------------------------------------------------------------------------
+# Política configurable de refresco y actualizaciones incrementales bajo
+# demanda del inventario (unidad 3.8.5.1.4.8.2).
+#
+# Todos los tests usan bases de datos temporales y rutas reales bajo tmp_path;
+# no tocan datos de producción ni rutas de usuario.
+# ---------------------------------------------------------------------------
+
+def _entrada_archivo(
+    indice: int, ruta_absoluta: str, last_checked_at: str, size_bytes: int = 100
+) -> dict:
+    return {
+        "entry_id": f"e-{indice}-{uuid.uuid4().hex[:8]}",
+        "absolute_path": ruta_absoluta,
+        "relative_path": Path(ruta_absoluta).name,
+        "name": Path(ruta_absoluta).name,
+        "extension": Path(ruta_absoluta).suffix,
+        "entry_type": EntryType.FILE.value,
+        "size_bytes": size_bytes,
+        "modified_at": datetime.now().isoformat(),
+        "created_at": datetime.now().isoformat(),
+        "accessed_at": datetime.now().isoformat(),
+        "attributes": [],
+        "excluded": False,
+        "exclusion_reason": None,
+        "source": "filesystem_scan",
+        "last_checked_at": last_checked_at,
+    }
+
+
+def _crear_scan_con_entradas(
+    storage: SystemInventoryStorage,
+    machine_id: str,
+    volume: str,
+    scan_id: str,
+    entradas: list[dict],
+) -> None:
+    storage.begin_scan_run(scan_id, machine_id, volume, SCAN_MODE_FULL)
+    storage.insert_file_entries(scan_id, machine_id, volume, entradas)
+    storage.end_scan_run(
+        scan_id,
+        result=SCAN_RESULT_OK,
+        entries_count=len(entradas),
+        errors_count=0,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Configuración de la política
+# ---------------------------------------------------------------------------
+
+class TestPoliticaRefrescoConfig:
+    def test_config_por_defecto_es_bajo_demanda(self, storage: SystemInventoryStorage):
+        politica = PoliticaRefresco(storage, MACHINE_ID)
+        cfg = politica.config_actual()
+        assert cfg.modo == ModoRefresco.BAJO_DEMANDA
+        assert cfg.ttl_segundos is None
+        assert cfg.intervalo_segundos is None
+        assert cfg.volumenes_incluir is None
+        assert cfg.volumenes_excluir == []
+        assert cfg.rutas_incluir is None
+        assert cfg.rutas_excluir == []
+        assert cfg.max_entradas_por_refresco is None
+        assert cfg.refrescar_solo_caducadas is True
+
+    def test_configurar_actualiza_modo_y_ttl(
+        self, storage: SystemInventoryStorage
+    ):
+        politica = PoliticaRefresco(storage, MACHINE_ID)
+        politica.configurar(
+            ConfigRefresco(modo=ModoRefresco.POR_CADUCIDAD, ttl_segundos=7200.0)
+        )
+        cfg = politica.config_actual()
+        assert cfg.modo == ModoRefresco.POR_CADUCIDAD
+        assert cfg.ttl_segundos == 7200.0
+
+    def test_config_actual_retorna_copia_independiente(
+        self, storage: SystemInventoryStorage
+    ):
+        politica = PoliticaRefresco(storage, MACHINE_ID)
+        cfg = politica.config_actual()
+        cfg.modo = ModoRefresco.DESACTIVADO  # mutar la copia devuelta
+        assert politica.config_actual().modo == ModoRefresco.BAJO_DEMANDA
+
+
+# ---------------------------------------------------------------------------
+# Decisión de refresco por volumen
+# ---------------------------------------------------------------------------
+
+class TestPoliticaRefrescoDecisionVolumen:
+    def test_modo_desactivado_nunca_refresca(
+        self, storage: SystemInventoryStorage
+    ):
+        politica = PoliticaRefresco(
+            storage, MACHINE_ID, ConfigRefresco(modo=ModoRefresco.DESACTIVADO)
+        )
+        necesita, motivo, info = politica.necesita_refresco_volumen("C:")
+        assert necesita is False
+        assert "desactivado" in motivo.lower()
+        assert info["modo"] == ModoRefresco.DESACTIVADO.value
+
+    def test_sin_escaneo_previo_no_refresca(
+        self, storage: SystemInventoryStorage
+    ):
+        politica = PoliticaRefresco(storage, MACHINE_ID)
+        necesita, motivo, info = politica.necesita_refresco_volumen("C:")
+        assert necesita is False
+        assert "No hay escaneo previo" in motivo
+
+    def test_volumen_excluido_no_es_elegible(
+        self, storage: SystemInventoryStorage
+    ):
+        politica = PoliticaRefresco(
+            storage, MACHINE_ID, ConfigRefresco(volumenes_excluir=["D:"])
+        )
+        necesita, motivo, info = politica.necesita_refresco_volumen("D:")
+        assert necesita is False
+        assert "no elegible" in motivo.lower()
+
+    def test_modo_bajo_demanda_nunca_refresca_automaticamente(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        base = tmp_path / "vol_bd"
+        base.mkdir()
+        (base / "a.txt").write_text("x\n", encoding="utf-8")
+        viejo = (datetime.now() - timedelta(seconds=200)).isoformat()
+        entradas = [_entrada_archivo(0, str(base / "a.txt"), viejo)]
+        _crear_scan_con_entradas(storage, MACHINE_ID, "C:", "scan-bd", entradas)
+
+        politica = PoliticaRefresco(
+            storage,
+            MACHINE_ID,
+            ConfigRefresco(modo=ModoRefresco.BAJO_DEMANDA, ttl_segundos=60.0),
+        )
+        necesita, motivo, info = politica.necesita_refresco_volumen("C:")
+        assert necesita is False
+        assert "bajo demanda" in motivo.lower()
+        assert info["entradas_caducadas"] == 1  # caducidad detectada, pero sin disparar
+
+    def test_por_caducidad_con_entradas_caducadas_refresca(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        base = tmp_path / "vol_cad"
+        base.mkdir()
+        (base / "a.txt").write_text("x\n", encoding="utf-8")
+        ttl = 60.0
+        viejo = (datetime.now() - timedelta(seconds=ttl * 2)).isoformat()
+        entradas = [_entrada_archivo(0, str(base / "a.txt"), viejo)]
+        _crear_scan_con_entradas(storage, MACHINE_ID, "C:", "scan-cad", entradas)
+
+        politica = PoliticaRefresco(
+            storage,
+            MACHINE_ID,
+            ConfigRefresco(modo=ModoRefresco.POR_CADUCIDAD, ttl_segundos=ttl),
+        )
+        necesita, motivo, info = politica.necesita_refresco_volumen("C:")
+        assert necesita is True
+        assert info["entradas_caducadas"] == 1
+        assert info["entradas_totales"] == 1
+
+    def test_por_caducidad_con_entradas_vigentes_no_refresca(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        base = tmp_path / "vol_vig"
+        base.mkdir()
+        (base / "a.txt").write_text("x\n", encoding="utf-8")
+        ttl = 60.0
+        reciente = datetime.now().isoformat()
+        entradas = [_entrada_archivo(0, str(base / "a.txt"), reciente)]
+        _crear_scan_con_entradas(storage, MACHINE_ID, "C:", "scan-vig", entradas)
+
+        politica = PoliticaRefresco(
+            storage,
+            MACHINE_ID,
+            ConfigRefresco(modo=ModoRefresco.POR_CADUCIDAD, ttl_segundos=ttl),
+        )
+        necesita, motivo, info = politica.necesita_refresco_volumen("C:")
+        assert necesita is False
+        assert info["entradas_caducadas"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Operaciones de refresco incremental
+# ---------------------------------------------------------------------------
+
+class TestPoliticaRefrescoOperaciones:
+    def test_refrescar_volumen_si_necesario_no_toca_storage_bajo_demanda(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        base = tmp_path / "vol_nod"
+        base.mkdir()
+        (base / "a.txt").write_text("x\n", encoding="utf-8")
+        recientes = datetime.now().isoformat()
+        entradas = [_entrada_archivo(0, str(base / "a.txt"), recientes)]
+        _crear_scan_con_entradas(storage, MACHINE_ID, "C:", "scan-nod", entradas)
+
+        politica = PoliticaRefresco(
+            storage, MACHINE_ID, ConfigRefresco(modo=ModoRefresco.BAJO_DEMANDA)
+        )
+        resultado = politica.refrescar_volumen_si_necesario("C:")
+        assert resultado.modo == ModoRefresco.BAJO_DEMANDA.value
+        assert resultado.entradas_refrescadas == 0
+        assert resultado.escaneo_completo_evitado is True
+        assert resultado.volume == "C:"
+
+    def test_refrescar_volumen_si_necesario_por_caducidad_actualiza(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        base = tmp_path / "vol_act"
+        base.mkdir()
+        (base / "a.txt").write_text("x\n", encoding="utf-8")
+        ttl = 60.0
+        viejo = (datetime.now() - timedelta(seconds=ttl * 2)).isoformat()
+        entradas = [_entrada_archivo(0, str(base / "a.txt"), viejo)]
+        _crear_scan_con_entradas(storage, MACHINE_ID, "C:", "scan-act", entradas)
+
+        politica = PoliticaRefresco(
+            storage,
+            MACHINE_ID,
+            ConfigRefresco(modo=ModoRefresco.POR_CADUCIDAD, ttl_segundos=ttl),
+        )
+        resultado = politica.refrescar_volumen_si_necesario("C:")
+        assert resultado.modo == ModoRefresco.POR_CADUCIDAD.value
+        assert resultado.entradas_refrescadas == 1
+        assert resultado.escaneo_completo_evitado is True
+        assert resultado.last_checked_at is not None
+        assert len(politica.historial()) == 1
+
+        # Tras el refresco las entradas están vigentes: no hay que refrescar de nuevo.
+        necesita, _, _ = politica.necesita_refresco_volumen("C:")
+        assert necesita is False
+
+    def test_refrescar_ruta_bajo_demanda_actualiza_una_ruta(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        base = tmp_path / "vol_ruta"
+        base.mkdir()
+        ruta = str(base / "a.txt")
+        (base / "a.txt").write_text("x\n", encoding="utf-8")
+        viejo = (datetime.now() - timedelta(seconds=200)).isoformat()
+        entradas = [_entrada_archivo(0, ruta, viejo)]
+        _crear_scan_con_entradas(storage, MACHINE_ID, "C:", "scan-ruta", entradas)
+
+        politica = PoliticaRefresco(storage, MACHINE_ID)
+        resultado = politica.refrescar_ruta_bajo_demanda(ruta, "C:")
+        assert resultado.modo == ModoRefresco.BAJO_DEMANDA.value
+        assert resultado.ruta == ruta
+        assert resultado.volume == "C:"
+        assert resultado.entradas_refrescadas == 1
+        assert resultado.escaneo_completo_evitado is True
+        assert resultado.detalle.get("existe_ahora") is True  # el archivo real existe
+        assert len(politica.historial()) == 1
+
+    def test_refrescar_ruta_excluida_no_refresca(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        base = tmp_path / "vol_excl"
+        base.mkdir()
+        ruta = str(base / "a.txt")
+        (base / "a.txt").write_text("x\n", encoding="utf-8")
+        entradas = [
+            _entrada_archivo(0, ruta, datetime.now().isoformat())
+        ]
+        _crear_scan_con_entradas(storage, MACHINE_ID, "C:", "scan-excl", entradas)
+
+        politica = PoliticaRefresco(
+            storage, MACHINE_ID, ConfigRefresco(rutas_excluir=[ruta])
+        )
+        resultado = politica.refrescar_ruta_bajo_demanda(ruta, "C:")
+        assert resultado.entradas_refrescadas == 0
+        assert "excluida" in (resultado.razon or "").lower()
+
+    def test_refrescar_incremental_selectivo_no_refresca_todos_bajo_demanda(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        for letra, nombre_carpeta in (("C:", "vol_c"), ("D:", "vol_d")):
+            base = tmp_path / nombre_carpeta
+            base.mkdir()
+            (base / "a.txt").write_text("x\n", encoding="utf-8")
+            entradas = [
+                _entrada_archivo(
+                    0, str(base / "a.txt"), datetime.now().isoformat()
+                )
+            ]
+            _crear_scan_con_entradas(storage, MACHINE_ID, letra, f"scan-{letra}", entradas)
+
+        politica = PoliticaRefresco(storage, MACHINE_ID)
+        resumen = politica.refrescar_incremental_selectivo(["C:", "D:"])
+        assert resumen["modo"] == ModoRefresco.BAJO_DEMANDA.value
+        assert resumen["total_volumenes_evaluados"] == 2
+        assert resumen["volumenes_refrescados"] == 0
+        assert resumen["volumenes_no_necesitaban_refresco"] == 2
+        assert resumen["entradas_refrescadas_total"] == 0
+        for entrada in resumen["por_volumen"]:
+            assert entrada["escaneo_completo_evitado"] is True
+
+    def test_decidir_volumenes_a_refrescar_solo_caducados(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        base_c = tmp_path / "vol_c"
+        base_c.mkdir()
+        (base_c / "a.txt").write_text("x\n", encoding="utf-8")
+        viejo = (datetime.now() - timedelta(seconds=200)).isoformat()
+        _crear_scan_con_entradas(
+            storage,
+            MACHINE_ID,
+            "C:",
+            "scan-c",
+            [_entrada_archivo(0, str(base_c / "a.txt"), viejo)],
+        )
+        base_d = tmp_path / "vol_d"
+        base_d.mkdir()
+        (base_d / "a.txt").write_text("x\n", encoding="utf-8")
+        _crear_scan_con_entradas(
+            storage,
+            MACHINE_ID,
+            "D:",
+            "scan-d",
+            [_entrada_archivo(0, str(base_d / "a.txt"), datetime.now().isoformat())],
+        )
+
+        politica = PoliticaRefresco(
+            storage,
+            MACHINE_ID,
+            ConfigRefresco(modo=ModoRefresco.POR_CADUCIDAD, ttl_segundos=60.0),
+        )
+        a_refrescar = politica.decidir_volumenes_a_refrescar(["C:", "D:"])
+        assert a_refrescar == ["C:"]
+
+    def test_historial_registra_operaciones(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        base = tmp_path / "vol_hist"
+        base.mkdir()
+        (base / "a.txt").write_text("x\n", encoding="utf-8")
+        viejo = (datetime.now() - timedelta(seconds=200)).isoformat()
+        _crear_scan_con_entradas(
+            storage,
+            MACHINE_ID,
+            "C:",
+            "scan-h",
+            [_entrada_archivo(0, str(base / "a.txt"), viejo)],
+        )
+
+        politica = PoliticaRefresco(
+            storage,
+            MACHINE_ID,
+            ConfigRefresco(modo=ModoRefresco.POR_CADUCIDAD, ttl_segundos=60.0),
+        )
+        assert len(politica.historial()) == 0
+        politica.refrescar_volumen_si_necesario("C:")
+        assert len(politica.historial()) == 1
+        politica.refrescar_ruta_bajo_demanda(str(base / "a.txt"), "C:")
+        assert len(politica.historial()) == 2
+        ultimo = politica.ultimo_refresco_por_volumen()
+        assert "C:" in ultimo

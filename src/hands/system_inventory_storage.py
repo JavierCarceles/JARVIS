@@ -977,6 +977,17 @@ class SystemInventoryStorage:
         row = cur.fetchone()
         return dict(row) if row is not None else None
 
+    def obtener_entradas_escaneo(self, scan_id: str) -> list[dict]:
+        """Devuelve todas las entradas de archivo de una ejecución de escaneo dada.
+
+        Expone de forma pública las entradas de un escaneo (mismo contenido que
+        el método privado `_obtener_entradas_escaneo`) para que capas de
+        decisión superiores —como la política de refresco (3.8.5.1.4.8.2)—
+        puedan inspeccionar la última comprobación de cada entrada (por ejemplo,
+        su `last_checked_at`) sin recurrir a miembros privados del almacenamiento.
+        """
+        return self._obtener_entradas_escaneo(scan_id)
+
     # ------------------------------------------------------------------ #
     # Reanudacion de escaneo interrumpido (3.8.5.1.4.5.5).
     # ------------------------------------------------------------------ #

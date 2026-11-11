@@ -8494,3 +8494,27 @@ REGRESION: Ninguna introducida por esta unidad. main.py sigue importando correct
 DISCREPANCIAS: Ninguna afectante a los criterios de aceptación de esta unidad.
 PENDIENTES: Ninguno para esta unidad. Padre 3.8.5.1.4.8 con hijas .8.1 a .8.10; .8.1 completada. Siguiente hoja pendiente real: 3.8.5.1.4.8.2 (actualizaciones incrementales bajo demanda y política de refresco).
 ESTADO FINAL: 3.8.5.1.4.8.1 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.8.5.1.4.8.2
+FECHA: 2026-11-11
+OBJETIVO: Definir actualizaciones incrementales bajo demanda y una política configurable de refresco; no escanear todos los volumenes completos en cada petición (unidad hoja de 3.8.5.1.4.8 Operación, privacidad y mantenimiento del inventario).
+TIPO DE TRABAJO: IMPLEMENTACIÓN + VERIFICACIÓN REAL (clases de política de refresco, tests unitarios y verificación en entorno real de Windows).
+CAMBIOS / HALLAZGOS:
+- src/hands/system_inventory.py: nuevas clases públicas ModoRefresco, ConfigRefresco, ResultadoRefresco y PoliticaRefresco.
+  * `PoliticaRefresco(storage, machine_id, config, medidor)` con `storage` (`SystemInventoryStorage`) inyectado para evitar la dependencia circular con `system_inventory_storage`.
+  * `necesita_refresco_volumen(volume)`: decide si un volumen necesita refresco según el modo y la caducidad de sus entradas del último escaneo (`esta_caducado` / `ConfigCaducidad`, unidad 3.8.5.1.4.5.9). Modo DESACTIVADO nunca refresca automáticamente; BAJO_DEMANDA informa caducidad pero no dispara; POR_CADUCIDAD refresca si hay entradas caducadas/obsoletas; PROGRAMADA refresca si transcurrió el intervalo desde el último refresco del volumen.
+  * `refrescar_volumen_si_necesario(volume)`: refresca solo si la política lo indica, usando `refrescar_volumen` del almacenamiento (revalidación puntual: existencia y tamaño), nunca un recorrido completo de volumen (`RecorridoVolumen`).
+  * `refrescar_ruta_bajo_demanda(ruta_absoluta, volume)`: refresco bajo demanda de una ruta individual usando `refrescar_entrada_por_ruta`, siempre que la ruta sea elegible (incluida/excluida).
+  * `refrescar_incremental_selectivo(volumenes_disponibles)`: evalúa cada volumen disponible y refresca solo los que lo necesitan; nunca refresca todos los volúmenes completos en cada petición.
+  * `decidir_volumenes_a_refrescar(volumenes)`: planea los volúmenes a refrescar sin ejecutar el refresco.
+  * Historial de operaciones y última marca de refresco por volumen (observabilidad).
+- src/hands/system_inventory_storage.py: nuevo método público `obtener_entradas_escaneo(scan_id)` para que la política inspeccione las entradas del último escaneo sin usar miembros privados.
+- tests/hands/test_system_inventory.py: 16 tests nuevos (clases TestPoliticaRefrescoConfig, TestPoliticaRefrescoDecisionVolumen, TestPoliticaRefrescoOperaciones). Total del archivo: 25 tests.
+- docs/README.md: entradas de ModoRefresco, ConfigRefresco, ResultadoRefresco y PoliticaRefresco en la sección de `src/hands/system_inventory.py`.
+ARCHIVOS MODIFICADOS: PRODUCCION: src/hands/system_inventory.py (nuevas clases de política de refresco), src/hands/system_inventory_storage.py (método público obtener_entradas_escaneo). TESTS: tests/hands/test_system_inventory.py (+16 tests). DOCUMENTACIÓN: docs/README.md (cuatro nuevas clases públicas).
+TESTS Y RESULTADOS: UNITARIOS: 25/25 PASSED en tests/hands/test_system_inventory.py. Sin regresión introducida en tests/hands/test_system_inventory_storage.py (221 PASSED; 7 fallos preexistentes por schema_version 5 vs 4 esperada en tests, ajenos a esta unidad).
+REAL (entorno): Windows 11, Python 3.14.7. Escaneo real de un directorio temporal real sobre el volumen C: con `RecorridoVolumen` + `SystemInventoryStorage` reales y base de datos SQLite temporal (no la de producción). Política POR_CADUCIDAD (TTL 60 s): entradas recién escaneadas vigentes => no refresca; tras backdate de `last_checked_at`, detecta 3 entradas caducadas y `refrescar_volumen_si_necesario` las refresca (3 entradas, `last_checked_at` actualizado, mismo `scan_id` => no hubo rescaneo completo de volumen, `escaneo_completo_evitado=True`); tras el refresco, el volumen ya no necesita refresco (idempotente). Refresco bajo demanda de una ruta real revalida su existencia (`existe_ahora=True`). Refresco selectivo sobre los volúmenes reales detectados del equipo: solo refresca los que lo necesitan y evita escaneo completo en todos (`escaneo_completo_evitado=True`). Recursos temporales de verificación limpiados. Sin interacción gráfica (sin ventanas, monitores ni teclado/ratón).
+REGRESION: Ninguna introducida por esta unidad.
+DISCREPANCIAS: Ninguna afectante a los criterios de aceptación de esta unidad.
+PENDIENTES: Ninguno para esta unidad. Padre 3.8.5.1.4.8 con hijas .8.1 a .8.10; .8.1 y .8.2 completadas. Siguiente hoja pendiente real: 3.8.5.1.4.8.3 (escaneo por volumen o ruta, exclusiones y reconstrucción controlada del catálogo).
+ESTADO FINAL: 3.8.5.1.4.8.2 - IMPLEMENTADA
