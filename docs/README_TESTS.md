@@ -6817,7 +6817,12 @@ Cubre la unidad 3.8.5.1.4.9.8: verificación de la integración entre aplicacion
 registradas (catálogo global / `ApplicationManager`) y descubiertas (inventario / fuentes
 primarias), pasando todas las candidatas por `ApplicationPreflight`, vinculando al catálogo
 global (`en_catalogo_global`, `fuente_autoritaria`) sin modificar `entities.json`, sin lanzar
-ninguna aplicación y sin crear rutas paralelas Brain/Planner/Executor.
+ninguna aplicación y sin crear rutas paralelas Brain/Planner/Executor. Cubre tambien la
+unidad 3.8.5.1.4.9.9: ejecucion en el equipo real de la ruta de consulta/resolucion con una
+aplicacion inocua conocida (bloc de notas, catalogo global) y otra localizada por el
+inventario y no registrada previamente, usando almacenamiento SQLite real, consulta
+(ApplicationDiscovery) y ApplicationPreflight reales, comprobando el resultado de preflight
+sin lanzar ninguna aplicacion ni modificar entities.json.
 
 **Módulos de origen probados:** src.hands.application_discovery, src.hands.application_preflight,
 src.hands.application_launch_classifier, src.hands.system_inventory_storage
@@ -6954,6 +6959,17 @@ lanza ninguna aplicacion.
     Executor (sin rutas paralelas en el flujo de resolución de aplicaciones).
   - Verifica que `vincular_con_catalogo` solo consulta `ApplicationManager.get_application`
     (lectura, sin registro ni auto-registro) y usa `ApplicationPreflight`.
+- **`TestResolucionPreflightEntornoReal`** — 2 método(s) de test
+  - Unidad 3.8.5.1.4.9.9: bloc de notas (registrado en el catalogo global) se resuelve, vincula
+    su `ApplicationKnowledge` y pasa preflight real (`preflight_policy` con `allowed` y
+    `blocked_by`, `preflight_decision` poblado) sin lanzar ninguna aplicacion y sin modificar
+    `entities.json`.
+  - Unidad 3.8.5.1.4.9.9: aplicacion localizada solo por el inventario y no registrada se
+    resuelve con fuente `FUENTE_INVENTARIO`, sin vinculo al catalogo (`en_catalogo_global=False`),
+    con preflight real poblado y sin lanzamiento; `entities.json` sin modificar.
+  - Usa almacenamiento SQLite real y temporal, `ApplicationPreflight` y `LaunchClassifier`
+    reales, `ApplicationManager` real sobre `data/memory/entities.json`; captura evidencia de
+    entorno real (`machine_id`, SO, equipo). Ningun mock decide el resultado.
 
 ---
 

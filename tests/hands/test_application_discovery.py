@@ -29,9 +29,12 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import platform
 import shutil
+import subprocess
 import sys
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -2488,3 +2491,251 @@ class TestSinRutasParalelasPlannerExecutor:
         # auto-registro: el puente de auto-registro corresponde a 3.8.5.1.4.11.
         assert manager.llamadas == ["bloc de notas"]
         assert v.fuente_autoritaria == FUENTE_CATALOGO
+
+
+# ---------------------------------------------------------------------------
+# Unidad 3.8.5.1.4.9.9: consulta y resolucion reales en el equipo (sin
+# lanzamiento, sin modificacion de entities.json)
+# ---------------------------------------------------------------------------
+
+class TestResolucionPreflightEntornoReal:
+    """
+    Unidad 3.8.5.1.4.9.9: ejecuta en el equipo real la ruta de consulta y
+    resolucion de aplicaciones con (1) una aplicacion inocua conocida
+    (bloc de notas / notepad, registrada en el catalogo global
+    data/memory/entities.json) y (2) otra aplicacion localizada por el
+    inventario y no registrada previamente, usando almacenamiento
+    (SystemInventoryStorage sobre SQLite real y temporal), consulta
+    (ApplicationDiscovery.buscar_por_nombre_con_catalogo) y
+    ApplicationPreflight reales, sin lanzar ninguna aplicacion ni modificar
+    entities.json. La apertura real de aplicaciones queda para 3.8.5.4-3.8.5.6.
+
+    Ningun mock decide el resultado de clasificacion, preflight ni resolucion:
+    se usan LaunchClassifier, ApplicationPreflight y ApplicationManager
+    reales sobre archivos reales del equipo. El almacenamiento de inventario
+    es una base SQLite real y temporal (nunca la base de produccion).
+    """
+
+    def _marca_entorno_real(self) -> dict:
+        """Captura evidencia de entorno real (equipo, SO y machine_id)."""
+        import sys
+
+        return {
+            "machine_id": generate_machine_id(),
+            "sistema": platform.system(),
+            "release": platform.release(),
+            "version": platform.version(),
+            "equipo": platform.node(),
+            "python": sys.version,
+        }
+
+    def _almacenamiento_inventario_real(
+        self, tmp_path, machine_id: str, entry_id: str, ruta: str, nombre: str,
+        volume: str = "C:",
+    ) -> SystemInventoryStorage:
+        """Crea almacenamiento SQLite real y temporal con una entrada de archivo
+        para el equipo actual, respetando el aislamiento por machine_id."""
+        ahora = datetime.now(timezone.utc).isoformat()
+        storage = SystemInventoryStorage(db_path=tmp_path / f"test_inventory_99_{entry_id}.sqlite3")
+        storage.initialize()
+        storage.record_machine(machine_id)
+        storage.record_volume(f"vol-{volume}", machine_id, volume, "local", "online")
+        storage.begin_scan_run(
+            f"scan-99-{entry_id}", machine_id, volume, SCAN_MODE_FULL, ahora,
+        )
+        storage.insert_file_entries(
+            f"scan-99-{entry_id}",
+            machine_id,
+            volume,
+            [{
+                "entry_id": entry_id,
+                "absolute_path": ruta,
+                "relative_path": ruta,
+                "name": nombre,
+                "extension": ".exe",
+                "entry_type": EntryType.FILE.value,
+                "size_bytes": 1024,
+                "modified_at": "2024-01-01T10:00:00",
+                "created_at": "2024-01-01T09:00:00",
+                "accessed_at": "2024-01-01T09:00:00",
+                "attributes": [],
+                "excluded": False,
+                "source": "filesystem_scan",
+                "last_checked_at": ahora,
+                "volume": volume,
+            }],
+        )
+        storage.end_scan_run(
+            f"scan-99-{entry_id}", ahora, SCAN_RESULT_OK, 1, 0, 0, None,
+        )
+        return storage
+
+    def _procesos_con_nombre(self, nombre_ejecutable: str) -> set[str]:
+        """Instantanea real de procesos con ese nombre (tasklist del SO)."""
+        nombre_ejecutable = str(nombre_ejecutable or "").lower()
+        if not nombre_ejecutable:
+            return set()
+        try:
+            resultado = subprocess.run(
+                [
+                    "tasklist", "/FO", "CSV", "/NH",
+                    "/FI", f"IMAGENAME eq {nombre_ejecutable}",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return set()
+        procesos: set[str] = set()
+        for linea in resultado.stdout.splitlines():
+            if not linea.strip():
+                continue
+            partes = [p.strip('"') for p in linea.split(",")]
+            if partes and partes[0].lower() == nombre_ejecutable:
+                procesos.add(partes[0])
+        return procesos
+
+    # ------------------------------------------------------------------ #
+    # Caso 1: aplicacion inocua conocida (catalogo global)
+    # ------------------------------------------------------------------ #
+
+    def test_aplicacion_conocida_resolucion_preflight_entorno_real(self, tmp_path):
+        """bloc de notas (registrado en el catalogo global) se resuelve,
+        vincula su ApplicationKnowledge y pasa preflight real, sin lanzar."""
+        notepad = r"C:\Windows\System32\notepad.exe"
+        if not os.path.exists(notepad):
+            pytest.skip("notepad.exe no disponible en este equipo")
+        entorno = self._marca_entorno_real()
+        assert entorno["machine_id"], "machine_id no debe estar vacia en equipo real"
+        assert entorno["sistema"], "el SO real debe identificarse"
+        machine_id = entorno["machine_id"]
+
+        storage = self._almacenamiento_inventario_real(
+            tmp_path, machine_id, "e-notepad-99", notepad, "notepad.exe",
+        )
+        calib = MagicMock()
+        calib.discover_applications.return_value = []
+        discovery = ApplicationDiscovery(
+            preflight=ApplicationPreflight(),
+            clasificador=LaunchClassifier(preflight=ApplicationPreflight()),
+            storage=storage,
+            calibration=calib,
+            machine_id=machine_id,
+        )
+
+        ruta_entities = _ruta_entities_json_memoria()
+        hash_antes = _hash_archivo(ruta_entities)
+
+        procesos_antes = self._procesos_con_nombre("notepad.exe")
+
+        candidatos, vinculados = discovery.buscar_por_nombre_con_catalogo(
+            "bloc de notas", incluir_inventario=True,
+        )
+
+        procesos_despues = self._procesos_con_nombre("notepad.exe")
+        assert procesos_despues == procesos_antes, (
+            "No se debe lanzar ninguna aplicacion durante la consulta/resolucion"
+        )
+
+        assert len(candidatos) == len(vinculados) >= 1
+        vinculado_notepad = next(
+            (
+                v
+                for v in vinculados
+                if v.conocimiento is not None
+                and str(v.conocimiento.name).casefold() == "bloc de notas"
+            ),
+            None,
+        )
+        assert vinculado_notepad is not None, (
+            "No se vinculo notepad al catalogo global; vinculados: "
+            f"{[v.candidato.name for v in vinculados]}"
+        )
+        assert vinculado_notepad.en_catalogo_global is True
+        assert vinculado_notepad.conocimiento is not None
+        assert vinculado_notepad.conocimiento.executable == "notepad.exe"
+        assert vinculado_notepad.fuente_autoritaria is not None
+        assert vinculado_notepad.candidato.preflight_policy is not None
+        policy = vinculado_notepad.candidato.preflight_policy
+        assert "allowed" in policy
+        assert "blocked_by" in policy
+        # La decision de destino de lanzamiento debe estar poblada para que el
+        # flujo decida sin lanzar nada.
+        assert vinculado_notepad.candidato.preflight_decision is not None
+        assert "valid" in vinculado_notepad.candidato.preflight_decision
+
+        hash_despues = _hash_archivo(ruta_entities)
+        assert hash_despues == hash_antes, (
+            "la consulta/resolucion con preflight real no debe modificar entities.json"
+        )
+
+    # ------------------------------------------------------------------ #
+    # Caso 2: aplicacion localizada por el inventario, no registrada
+    # ------------------------------------------------------------------ #
+
+    def test_aplicacion_inventario_no_registrada_resolucion_preflight_entorno_real(
+        self, tmp_path
+    ):
+        """Una aplicacion localizada solo por el inventario (no registrada en
+        el catalogo global) se resuelve con fuente FUENTE_INVENTARIO, sin
+        vinculo al catalogo, con preflight real poblado y sin lanzamiento."""
+        entorno = self._marca_entorno_real()
+        machine_id = entorno["machine_id"]
+
+        # Ejecutable inocuo real en disco, no registrado en el catalogo.
+        with tempfile.NamedTemporaryFile(
+            suffix=".exe", delete=False, dir=str(tmp_path)
+        ) as f:
+            ruta_sonda = f.name
+            f.write(b"MZ" + b"\x00" * 64)
+        try:
+            nombre_sonda = "AppInventarioPrueba99.exe"
+            storage = self._almacenamiento_inventario_real(
+                tmp_path, machine_id, "e-sonda-99", ruta_sonda, nombre_sonda,
+            )
+            calib = MagicMock()
+            calib.discover_applications.return_value = []
+            discovery = ApplicationDiscovery(
+                preflight=ApplicationPreflight(),
+                clasificador=LaunchClassifier(preflight=ApplicationPreflight()),
+                storage=storage,
+                calibration=calib,
+                machine_id=machine_id,
+            )
+            ruta_entities = _ruta_entities_json_memoria()
+            hash_antes = _hash_archivo(ruta_entities)
+
+            procesos_antes = self._procesos_con_nombre(os.path.basename(ruta_sonda))
+
+            candidatos, vinculados = discovery.buscar_por_nombre_con_catalogo(
+                "AppInventarioPrueba99", incluir_inventario=True,
+            )
+
+            procesos_despues = self._procesos_con_nombre(os.path.basename(ruta_sonda))
+            assert procesos_despues == procesos_antes, (
+                "No se debe lanzar ninguna aplicacion durante la consulta/resolucion"
+            )
+
+            assert len(candidatos) == len(vinculados) == 1
+            c = candidatos[0]
+            assert c.fuente == FUENTE_INVENTARIO
+            assert c.esta_en_inventario is True
+            assert c.preflight_decision is not None
+            assert "valid" in c.preflight_decision
+            v = vinculados[0]
+            assert v.en_catalogo_global is False
+            assert v.conocimiento is None
+            assert v.fuente_autoritaria is None
+            assert v.candidato.preflight_policy is not None
+            policy = v.candidato.preflight_policy
+            assert "allowed" in policy
+            assert "blocked_by" in policy
+
+            hash_despues = _hash_archivo(ruta_entities)
+            assert hash_despues == hash_antes, (
+                "la consulta de inventario no registrada no debe modificar entities.json"
+            )
+        finally:
+            if os.path.exists(ruta_sonda):
+                os.unlink(ruta_sonda)
