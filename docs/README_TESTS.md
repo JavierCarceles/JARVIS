@@ -94,6 +94,7 @@
 - [`hands\test_restore_window_state.py`](#hands/test-restore_window_state)
 - [`hands\test_system_inventory.py`](#hands/test-system_inventory)
 - [`hands\test_system_inventory_storage.py`](#hands/test-system_inventory_storage)
+- [`hands\test_persistencia_recuperacion_inventario_entorno_real.py`](#hands/test-persistencia_recuperacion_inventario_entorno_real)
 - [`hands\test_diferenciacion_estado_acceso_entorno_real.py`](#hands/test-diferenciacion_estado_acceso_entorno_real)
 - [`hands\test_revalidar_destino_aplicacion_entorno_real.py`](#hands/test-revalidar_destino_aplicacion_entorno_real)
 - [`hands\test_volumes_montados_entorno_real.py`](#hands/test-volumes_montados_entorno_real)
@@ -11110,6 +11111,40 @@ Todos los tests usan directorios temporales (`tmp_path`) y bases de datos tempor
 | `TestEjecucionLimpiezaRetencion` | `ejecutar_limpieza_retencion`: flujo orquestado (backup previo, limpieza de generaciones, entradas obsoletas y backups antiguos), resultado `ResultadoLimpieza` con contadores reales y resumen serializable. |
 
 **Resultados:** 253 tests unitarios, 253 PASSED / 0 FAILED.
+
+---
+
+<a name="hands/test-persistencia_recuperacion_inventario_entorno_real"></a>
+### `hands\test_persistencia_recuperacion_inventario_entorno_real.py`
+
+**Descripcion:** Verificacion real de persistencia en disco, recuperacion desde
+una nueva instancia, migracion de esquema y base corrupta/ausente (unidad
+3.8.5.1.4.10.2). Cada prueba opera sobre ficheros SQLite REALES en un
+directorio temporal (tmp_path), sin mocks que decidan el resultado: se comprueba
+el estado del fichero de base de datos antes y despues de cada operacion,
+abriendo una NUEVA instancia de SystemInventoryStorage sobre el mismo fichero
+para simular un reinicio de JARVIS. Cubre: (1) persistencia real en disco y
+lectura desde una nueva instancia tras cierre; (2) base ausente: initialize()
+crea el fichero y el esquema actual; (3) base corrupta: verify_integrity
+detecta la corrupcion y restaurar_desde_backup recupera los datos sobre una
+nueva instancia, sin sobrescribir una base valida con una copia vacia, incompleta
+o corrupta; base corrupta sin backup levanta InventoryCorruptError; (4)
+migracion de esquema: una base v1 antigua se lleva a SCHEMA_VERSION aplicando
+todas las migraciones registradas en orden, sin perder datos. No toca datos de
+produccion.
+
+**Modulos de origen probados:** src.hands.system_inventory_storage
+
+**Clases de test:**
+
+| Clase | Descripcion |
+|---|---|
+| `TestPersistenciaDiscoYNuevaInstancia` | Los datos escritos por una instancia se leen desde una NUEVA instancia sobre el mismo fichero (simula reinicio de JARVIS); no duplica maquina ni volumen. |
+| `TestBaseAusente` | Inicializar una base ausente crea el fichero en disco y el esquema actual (SCHEMA_VERSION) sin copia de seguridad previa. |
+| `TestBaseCorrupta` | Detecta corrupcion con verify_integrity (ok=False), recupera desde copia de seguridad valida sobre nueva instancia, InventoryCorruptError sin backup y InventoryBackupError al respaldar base inexistente. |
+| `TestMigracionEsquema` | Una base v1 antigua se migra a SCHEMA_VERSION aplicando las migraciones registradas en orden (normalized_path, indice unico, etc.) sin perder datos previos. |
+
+**Resultados:** 7 tests de verificacion en entorno real, 7 PASSED / 0 FAILED.
 
 ---
 
