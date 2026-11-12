@@ -94,6 +94,7 @@
 - [`hands\test_restore_window_state.py`](#hands/test-restore_window_state)
 - [`hands\test_system_inventory.py`](#hands/test-system_inventory)
 - [`hands\test_system_inventory_storage.py`](#hands/test-system_inventory_storage)
+- [`hands\test_inventario_integridad_privacidad_almacenamiento_entorno_real.py`](#hands/test-inventario_integridad_privacidad_almacenamiento_entorno_real)
 - [`hands\test_inventario_oculto_unicode_largo_permisos_entorno_real.py`](#hands/test-inventario_oculto_unicode_largo_permisos_entorno_real)
 - [`hands\test_persistencia_recuperacion_inventario_entorno_real.py`](#hands/test-persistencia_recuperacion_inventario_entorno_real)
 - [`hands\test_diferenciacion_estado_acceso_entorno_real.py`](#hands/test-diferenciacion_estado_acceso_entorno_real)
@@ -11298,6 +11299,19 @@ decidan el resultado. Todo se limpia al finalizar.
 **Clases de test:** ninguna (funciones de test de módulo).
 
 **Resultados:** 6 pruebas de verificación en entorno real, 6 PASSED / 0 FAILED.
+
+---
+
+<a name="hands/test-inventario_integridad_privacidad_almacenamiento_entorno_real"></a>
+### `hands\test_inventario_integridad_privacidad_almacenamiento_entorno_real.py`
+
+**Descripcion:** Verificacion en entorno real para la unidad 3.8.5.1.4.10.6. Confirma que el escaner y el almacenamiento de inventario: (1) no copian contenidos de documentos/archivos personales (ninguna entrada del inventario almacena el contenido de los archivos ni se crean copias fuera de los originales); (2) no modifican archivos originales (hash SHA-256 y tamano idénticos antes y despues del escaneo, lectura solo); (3) la base de inventario permanece limitada al almacenamiento definido (el almacenamiento solo crea archivos dentro del directorio de db_path: base SQLite, manifest, copias de seguridad y archivos laterales -wal/-shm; nada se escribe fuera de ese alcance). Todos los tests usan directorios temporales (`tmp_path`) y SQLite temporal; no tocan datos de produccion ni rutas de usuario; no usan mocks que decidan el resultado; limpian recursos al finalizar.
+
+**Modulos de origen probados:** src.hands.system_inventory, src.hands.system_inventory_storage
+
+**Clases de test:** ninguna (funciones de test de modulo).
+
+**Resultados:** 3 pruebas de verificacion en entorno real, 3 PASSED / 0 FAILED.
 
 ---
 
