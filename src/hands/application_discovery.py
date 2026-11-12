@@ -24,6 +24,7 @@ lectura sola sobre el equipo.
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import sqlite3
 import uuid
@@ -36,6 +37,7 @@ from src.hands.application_launch_classifier import (
     LaunchClassification,
     LaunchClassifier,
     LaunchType,
+    leer_version_archivo_windows,
 )
 from src.hands.application_preflight import ApplicationPreflight
 from src.hands.calibration_manager import CalibrationManager
@@ -288,6 +290,197 @@ class CandidatoConCatalogo:
             "conocimiento": conocimiento,
             "fuente_autoritaria": self.fuente_autoritaria,
         }
+
+
+# ---------------------------------------------------------------------------
+# Identidad global estable (unidad 3.8.5.1.4.11.2)
+# ---------------------------------------------------------------------------
+
+_TIPO_EVIDENCIA_PAQUETE = "paquete"
+_TIPO_EVIDENCIA_FABRICANTE_PRODUCTO = "fabricante_producto"
+_TIPO_EVIDENCIA_NOMBRE_COMERCIAL = "nombre_comercial"
+_TIPO_EVIDENCIA_INSUFICIENTE = "insuficiente"
+
+_PREFIJO_ENTIDAD_PAQUETE = "paquete"
+_PREFIJO_ENTIDAD_FABRICANTE_PRODUCTO = "fabprod"
+_PREFIJO_ENTIDAD_NOMBRE = "nombre"
+_PREFIJO_ENTIDAD_CANDIDATO = "candidato"
+
+
+def _normalizar_texto_identidad(texto: Optional[str]) -> str:
+    """Normaliza texto para usarlo como base de identidad estable.
+
+    Aplica minusculas, recorta extremos, colapsa espacios interiores y elimina
+    caracteres no alfanumericos. Nunca incluye rutas absolutas ni datos que
+    puedan cambiar entre maquinas.
+    """
+    if not texto or not isinstance(texto, str):
+        return ""
+    normalizado = re.sub(r"\s+", " ", texto.strip()).lower()
+    normalizado = re.sub(r"[^a-z0-9\s]", "", normalizado)
+    return normalizado.strip()
+
+
+@dataclass
+class IdentidadGlobalEstable:
+    """
+    Identidad global estable de una aplicacion descubierta (3.8.5.1.4.11.2).
+
+    La identidad se establece por evidencia estable disponible, en este orden
+    de precedencia:
+
+      1. identificador de paquete / AUMID (evidencia de aporte de fuente de
+         descubrimiento, ej. catalogo de paquetes o registro de
+         desinstaladores);
+      2. fabricante + producto (metadatos de recursos de version del
+         ejecutable, leidos del sistema operativo);
+      3. nombre comercial normalizado (evidencia mas debil: por si sola no
+         justifica fusionar entidades);
+      4. insuficiente: no hay evidencia estable, el candidato se conserva
+         separado con sus alternativas y no se fusiona por nombre.
+
+    La ruta absoluta nunca es base de la identidad global: puede cambiar entre
+    maquinas y no se usa para construir el ``entity_id``.
+    """
+
+    entity_id: str
+    nombre_canonico: str
+    tipo_evidencia: str
+    evidencia_base: dict
+    confianza: str
+    fusionar_por_nombre_desaconsejado: bool
+    alternativas: list
+
+
+def _extraer_evidencia_identidad(candidato: DiscoveredCandidate) -> dict:
+    """Extrae evidencia de identidad estable de un candidato descubierto.
+
+    Lee metadatos verificables observados (identificador de paquete/AUMID
+    cuando una fuente de descubrimiento lo aporta, fabricante y producto de los
+    recursos de version del ejecutable, nombre comercial y version) sin
+    basarse en la ruta absoluta como identidad.
+    """
+    evidencia: dict[str, Any] = {}
+    nombre_comercial = str(candidato.nombre_comercial or "").strip()
+
+    # Lectura real de recursos de version del ejecutable (CompanyName,
+    # ProductName, versiones) cuando el destino existe en el equipo.
+    ruta = str(candidato.absolute_path or "").strip()
+    version_info: Optional[dict] = None
+    if ruta and os.path.isfile(ruta):
+        version_info = leer_version_archivo_windows(ruta)
+
+    if version_info:
+        if version_info.get("ProductName"):
+            evidencia["nombre_comercial"] = version_info["ProductName"]
+            nombre_comercial = str(version_info["ProductName"]).strip()
+        if version_info.get("CompanyName"):
+            evidencia["fabricante"] = str(version_info["CompanyName"]).strip()
+        version = version_info.get("ProductVersion") or version_info.get("FileVersion")
+        if version:
+            evidencia["version"] = str(version).strip()
+        evidencia["version_recurso_leida"] = True
+    elif nombre_comercial:
+        evidencia["nombre_comercial"] = nombre_comercial
+
+    # Datos ya observados por el clasificador.
+    if (
+        candidato.producto
+        and str(candidato.producto).strip()
+        and str(candidato.producto).strip().lower() != nombre_comercial.lower()
+    ):
+        evidencia.setdefault("fabricante", str(candidato.producto).strip())
+    if candidato.producto and str(candidato.producto).strip():
+        evidencia.setdefault("producto", str(candidato.producto).strip())
+    if candidato.version:
+        evidencia.setdefault("version", str(candidato.version).strip())
+
+    # Identificador de paquete / AUMID aportado por alguna fuente de descubrimiento.
+    for item in candidato.evidencia:
+        if isinstance(item, str) and item.startswith("paquete_id:"):
+            evidencia["paquete_id"] = item[len("paquete_id:"):].strip()
+            break
+
+    evidencia["fuentes"] = list(
+        dict.fromkeys([str(candidato.fuente or "")] + list(candidato.fuentes_consultadas or []))
+    )
+    return evidencia
+
+
+def calcular_identidad_estable(candidato: DiscoveredCandidate) -> IdentidadGlobalEstable:
+    """
+    Calcula la identidad global estable de un candidato (3.8.5.1.4.11.2).
+
+    Precedencia de evidencia estable:
+      1. paquete_id / AUMID (maxima estabilidad, independiente de la ruta);
+      2. fabricante + producto (estable, independiente de la ruta de instalacion);
+      3. nombre comercial normalizado (evidencia mas debil: no fusiona entidades
+         por nombre solo; se mantienen separadas con alternativas);
+      4. insuficiente: sin evidencia estable, el candidato se conserva separado.
+
+    Nunca se usa la ruta absoluta como base de la identidad global.
+    """
+    evidencia = _extraer_evidencia_identidad(candidato)
+    nombre_canonico = _normalizar_texto_identidad(
+        candidato.nombre_comercial or candidato.name or ""
+    )
+    confianza = str(candidato.confianza or CONFIANZA_NINGUNA)
+    nombre_normalizado = _normalizar_texto_identidad(candidato.name or "")
+
+    # 1. Identificador de paquete / AUMID: maxima estabilidad.
+    paquete_id = str(evidencia.get("paquete_id", "")).strip()
+    if paquete_id:
+        return IdentidadGlobalEstable(
+            entity_id=f"{_PREFIJO_ENTIDAD_PAQUETE}:{paquete_id}",
+            nombre_canonico=nombre_canonico or nombre_normalizado,
+            tipo_evidencia=_TIPO_EVIDENCIA_PAQUETE,
+            evidencia_base=evidencia,
+            confianza=confianza,
+            fusionar_por_nombre_desaconsejado=False,
+            alternativas=[],
+        )
+
+    # 2. Fabricante + producto: estable e independiente de la ruta de instalacion.
+    fabricante = str(evidencia.get("fabricante", "")).strip()
+    producto = str(evidencia.get("producto", "")).strip()
+    if fabricante and producto:
+        return IdentidadGlobalEstable(
+            entity_id=(
+                f"{_PREFIJO_ENTIDAD_FABRICANTE_PRODUCTO}:"
+                f"{_normalizar_texto_identidad(fabricante)}:"
+                f"{_normalizar_texto_identidad(producto)}"
+            ),
+            nombre_canonico=nombre_canonico or nombre_normalizado,
+            tipo_evidencia=_TIPO_EVIDENCIA_FABRICANTE_PRODUCTO,
+            evidencia_base=evidencia,
+            confianza=confianza,
+            fusionar_por_nombre_desaconsejado=False,
+            alternativas=[],
+        )
+
+    # 3. Nombre comercial normalizado: evidencia mas debil, no fusiona por nombre solo.
+    if nombre_canonico:
+        return IdentidadGlobalEstable(
+            entity_id=f"{_PREFIJO_ENTIDAD_NOMBRE}:{nombre_canonico}",
+            nombre_canonico=nombre_canonico,
+            tipo_evidencia=_TIPO_EVIDENCIA_NOMBRE_COMERCIAL,
+            evidencia_base=evidencia,
+            confianza=confianza,
+            fusionar_por_nombre_desaconsejado=True,
+            alternativas=[candidato.to_dict()],
+        )
+
+    # 4. Evidencia insuficiente: se conserva el candidato separado con alternativas.
+    clave_sufijo = candidato.candidate_id or nombre_normalizado or "desconocido"
+    return IdentidadGlobalEstable(
+        entity_id=f"{_PREFIJO_ENTIDAD_CANDIDATO}:{clave_sufijo}",
+        nombre_canonico=nombre_canonico or nombre_normalizado,
+        tipo_evidencia=_TIPO_EVIDENCIA_INSUFICIENTE,
+        evidencia_base=evidencia,
+        confianza=confianza,
+        fusionar_por_nombre_desaconsejado=True,
+        alternativas=[candidato.to_dict()],
+    )
 
 
 # ---------------------------------------------------------------------------

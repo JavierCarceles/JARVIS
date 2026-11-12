@@ -6998,6 +6998,34 @@ lanza ninguna aplicacion.
     entorno real (`machine_id`, SO, equipo); captura de procesos antes/despues para confirmar
     que no se lanza ninguna aplicacion; `entities.json` sin modificar.
 
+- **`TestIdentidadGlobalEstable`** (línea 3079) — 9 método(s) de test
+  - Unidad 3.8.5.1.4.11.2: identidad global estable por evidencia estable
+    (identificador de paquete/AUMID, fabricante + producto, nombre comercial
+    normalizado) reutilizando el modelo `Entity` de `src/memory/storage.py`;
+    la ruta absoluta nunca es base de la identidad.
+  - `test_3_8_5_1_4_11_2_identidad_desde_paquete_id` (L3112): identificador de
+    paquete/AUMID establece identidad estable independiente de la ruta.
+  - `test_3_8_5_1_4_11_2_identidad_desde_fabricante_producto_independiente_de_ruta` (L3126):
+    fabricante + producto estable aunque cambie la ruta de instalacion.
+  - `test_3_8_5_1_4_11_2_nombre_comercial_solo_no_fusiona_por_nombre` (L3139):
+    nombre comercial solo establece identidad estable pero desaconseja fusionar
+    por nombre y conserva alternativas separadas.
+  - `test_3_8_5_1_4_11_2_evidencia_insuficiente_mantiene_candidato_separado` (L3152):
+    sin evidencia estable, tipo insuficiente y candidato conservado con alternativas.
+  - `test_3_8_5_1_4_11_2_ruta_absoluta_no_es_base_de_identidad` (L3163): misma
+    evidencia con rutas absolutas distintas produce el mismo `entity_id`; la ruta
+    nunca forma parte de la identidad.
+  - `test_3_8_5_1_4_11_2_precedencia_paquete_sobre_fabricante_producto` (L3176):
+    el identificador de paquete tiene precedencia sobre fabricante + producto.
+  - `test_3_8_5_1_4_11_2_evidencia_base_contiene_metadatos_verificables` (L3185):
+    la evidencia base registra nombre comercial, fabricante, producto, version,
+    lectura de recursos de version y fuentes de descubrimiento.
+  - `test_3_8_5_1_4_11_2_mismo_candidato_devuelve_misma_identidad` (L3195): la
+    identidad estable es determinista.
+  - `test_3_8_5_1_4_11_2_entity_id_aptos_para_modelo_entity` (L3203): el
+    `entity_id` resultante es apto como `id` de `Entity` de
+    `src/memory/storage.py`.
+
 ---
 
 <a name="hands/test-application_discovery_no_recursive_disk_search"></a>

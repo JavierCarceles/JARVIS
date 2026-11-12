@@ -45,6 +45,7 @@ from src.hands.application_discovery import (
     CandidatoConCatalogo,
     DiscoveredCandidate,
     FUENTE_APP_PATHS,
+    calcular_identidad_estable,
     FUENTE_APPX,
     FUENTE_APLICACION_ABIERTA,
     FUENTE_CATALOGO,
@@ -3069,3 +3070,160 @@ class TestEscenariosBloqueoEntornoReal:
             for ruta in rutas:
                 if os.path.exists(ruta):
                     os.unlink(ruta)
+
+
+# ---------------------------------------------------------------------------
+# Identidad global estable (3.8.5.1.4.11.2)
+# ---------------------------------------------------------------------------
+
+class TestIdentidadGlobalEstable:
+    """Pruebas de `calcular_identidad_estable`: identidad estable por
+    evidencia (paquete/AUMID, fabricante+producto, nombre comercial) sin
+    basarse en la ruta absoluta, y conservacion de candidatos separados
+    cuando la evidencia es insuficiente."""
+
+    def _candidato(
+        self,
+        candidate_id: str,
+        name: str,
+        ruta: str = r"C:\falsa\ruta\app.exe",
+        nombre_comercial: Optional[str] = None,
+        producto: Optional[str] = None,
+        version: Optional[str] = None,
+        confianza: str = "media",
+        fuente: str = FUENTE_INVENTARIO,
+        evidencia: Optional[list] = None,
+    ) -> DiscoveredCandidate:
+        return DiscoveredCandidate(
+            candidate_id=candidate_id,
+            name=name,
+            absolute_path=ruta,
+            destination=ruta,
+            nombre_comercial=nombre_comercial,
+            aliases=[],
+            producto=producto,
+            version=version,
+            confianza=confianza,
+            fuente=fuente,
+            evidencia=list(evidencia or []),
+            ultima_comprobacion="2024-01-01T00:00:00+00:00",
+        )
+
+    def test_3_8_5_1_4_11_2_identidad_desde_paquete_id(self):
+        """Identificador de paquete/AUMID da entidad estable independiente de la ruta."""
+        c1 = self._candidato("pkg-1", "MiApp", ruta=r"C:\Uno\app.exe",
+                             evidencia=["paquete_id:MiApp.Package.1.0"])
+        c2 = self._candidato("pkg-1", "MiApp", ruta=r"D:\Otro\app.exe",
+                             evidencia=["paquete_id:MiApp.Package.1.0"])
+        id1 = calcular_identidad_estable(c1)
+        id2 = calcular_identidad_estable(c2)
+        assert id1.entity_id == id2.entity_id == "paquete:MiApp.Package.1.0"
+        assert id1.tipo_evidencia == "paquete"
+        assert id1.fusionar_por_nombre_desaconsejado is False
+        assert id1.alternativas == []
+        assert id1.nombre_canonico == "miapp"
+
+    def test_3_8_5_1_4_11_2_identidad_desde_fabricante_producto_independiente_de_ruta(self):
+        """Fabricante + producto dan entidad estable aunque la ruta cambie."""
+        c1 = self._candidato("f1", "Notepad", ruta=r"C:\Windows\System32\notepad.exe",
+                             nombre_comercial="Notepad", producto="Microsoft Corporation", version="10.0")
+        c2 = self._candidato("f2", "Notepad", ruta=r"D:\Copia\notepad.exe",
+                             nombre_comercial="Notepad", producto="Microsoft Corporation", version="10.0")
+        id1 = calcular_identidad_estable(c1)
+        id2 = calcular_identidad_estable(c2)
+        assert id1.entity_id == id2.entity_id == "fabprod:microsoft corporation:microsoft corporation"
+        assert id1.tipo_evidencia == "fabricante_producto"
+        assert id1.fusionar_por_nombre_desaconsejado is False
+        assert id1.alternativas == []
+
+    def test_3_8_5_1_4_11_2_nombre_comercial_solo_no_fusiona_por_nombre(self):
+        """Solo nombre comercial: entidad estable pero no se fusiona por nombre;
+        se conserva la alternativa separada."""
+        c1 = self._candidato("n1", "App", ruta=r"C:\Uno\app.exe", nombre_comercial="Mi App")
+        c2 = self._candidato("n2", "App", ruta=r"D:\Dos\app.exe", nombre_comercial="Mi App")
+        id1 = calcular_identidad_estable(c1)
+        id2 = calcular_identidad_estable(c2)
+        assert id1.entity_id == id2.entity_id == "nombre:mi app"
+        assert id1.tipo_evidencia == "nombre_comercial"
+        assert id1.fusionar_por_nombre_desaconsejado is True
+        assert id1.alternativas == [c1.to_dict()]
+        assert id2.alternativas == [c2.to_dict()]
+
+    def test_3_8_5_1_4_11_2_evidencia_insuficiente_mantiene_candidato_separado(self):
+        """Sin evidencia estable: tipo insuficiente, fusionar por nombre
+        desaconsejado y candidato conservado como alternativa."""
+        c = self._candidato("x1", "", ruta=r"C:\Nada\app.exe")
+        identidad = calcular_identidad_estable(c)
+        assert identidad.tipo_evidencia == "insuficiente"
+        assert identidad.fusionar_por_nombre_desaconsejado is True
+        assert identidad.alternativas == [c.to_dict()]
+        assert identidad.entity_id.startswith("candidato:")
+        assert identidad.nombre_canonico == ""
+
+    def test_3_8_5_1_4_11_2_ruta_absoluta_no_es_base_de_identidad(self):
+        """Misma evidencia estable, rutas absolutas distintas: mismo entity_id;
+        la ruta absoluta no forma parte de la identidad."""
+        c1 = self._candidato("r1", "App", ruta=r"C:\Uno\app.exe",
+                             nombre_comercial="App", producto="Fab", version="1")
+        c2 = self._candidato("r2", "App", ruta=r"D:\Otro\app.exe",
+                             nombre_comercial="App", producto="Fab", version="1")
+        id1 = calcular_identidad_estable(c1)
+        id2 = calcular_identidad_estable(c2)
+        assert id1.entity_id == id2.entity_id
+        assert "C:\\Uno" not in id1.entity_id
+        assert "D:\\Otro" not in id2.entity_id
+
+    def test_3_8_5_1_4_11_2_precedencia_paquete_sobre_fabricante_producto(self):
+        """Cuando hay paquete y fabricante+producto, gana el identificador de paquete."""
+        c = self._candidato("p1", "App", ruta=r"C:\app.exe",
+                            nombre_comercial="App", producto="Fab",
+                            evidencia=["paquete_id:MiApp.Pkg"])
+        identidad = calcular_identidad_estable(c)
+        assert identidad.entity_id == "paquete:MiApp.Pkg"
+        assert identidad.tipo_evidencia == "paquete"
+
+    def test_3_8_5_1_4_11_2_evidencia_base_contiene_metadatos_verificables(self):
+        """La evidencia base registra los metadatos verificables usados."""
+        c = self._candidato("m1", "App", ruta=r"C:\app.exe",
+                            nombre_comercial="Mi App", producto="Fab", version="2.0")
+        identidad = calcular_identidad_estable(c)
+        assert identidad.evidencia_base["nombre_comercial"] == "Mi App"
+        assert identidad.evidencia_base["fabricante"] == "Fab"
+        assert identidad.evidencia_base["version"] == "2.0"
+        assert "fuentes" in identidad.evidencia_base
+
+    def test_3_8_5_1_4_11_2_mismo_candidato_devuelve_misma_identidad(self):
+        """La identidad es determinista para el mismo candidato."""
+        c = self._candidato("d1", "App", ruta=r"C:\app.exe", nombre_comercial="App")
+        assert (
+            calcular_identidad_estable(c).entity_id
+            == calcular_identidad_estable(c).entity_id
+        )
+
+    def test_3_8_5_1_4_11_2_entity_id_aptos_para_modelo_entity(self):
+        """El entity_id resultante es apto como id de `Entity`: str estable,
+        normalizado y sin rutas absolutas."""
+        from src.memory.storage import Entity
+
+        c = self._candidato("e1", "App", ruta=r"C:\app.exe",
+                            nombre_comercial="Mi App", producto="Fab")
+        identidad = calcular_identidad_estable(c)
+        ent = Entity(
+            id=identidad.entity_id,
+            type="application",
+            name=c.nombre_comercial or c.name,
+            properties={
+                "fabricante": identidad.evidencia_base.get("fabricante"),
+                "producto": identidad.evidencia_base.get("producto"),
+                "version": identidad.evidencia_base.get("version"),
+                "tipo_evidencia": identidad.tipo_evidencia,
+                "fuentes": identidad.evidencia_base.get("fuentes"),
+            },
+            aliases=list(c.aliases),
+            created_at="2024-01-01T00:00:00+00:00",
+            updated_at="2024-01-01T00:00:00+00:00",
+        )
+        assert ent.id == identidad.entity_id
+        assert ent.type == "application"
+        assert "C:\\app.exe" not in ent.id
+        assert ent.to_dict()["id"] == identidad.entity_id
