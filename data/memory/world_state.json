@@ -1,10 +1,10 @@
 {
-  "timestamp": 1794465003.4266884,
+  "timestamp": 1794468844.6202915,
   "applications": {
     "chrome": {
       "last_action_failed": true,
       "last_error": "fail",
-      "last_failure_timestamp": 1794465003.382079,
+      "last_failure_timestamp": 1794468844.5559435,
       "last_failed_node": "n1"
     }
   },
@@ -14,15 +14,15 @@
       "user_input": "navega a example.com",
       "goal_type": "navigate",
       "target": "https://example.com",
-      "timestamp": 1794464998.1088881
+      "timestamp": 1794468830.8837404
     },
     "last_htn_result": {
       "goal_id": "test_navigate_goal",
       "goal_type": "navigate",
       "target": "https://example.com",
       "success": true,
-      "execution_time": 8.779999916441739e-05,
-      "timestamp": 1794464998.9228814
+      "execution_time": 8.579999848734587e-05,
+      "timestamp": 1794468831.7296615
     },
     "last_failures": [
       {
@@ -30,8 +30,8 @@
         "action": "orig_action",
         "application": null,
         "error": "Acción no encontrada: orig_action",
-        "timestamp": 1794465003.0874195,
-        "execution_time": 9.620000491850078e-05,
+        "timestamp": 1794468844.2814693,
+        "execution_time": 0.0001021999996737577,
         "status": "failed"
       },
       {
@@ -39,8 +39,8 @@
         "action": "alt_action",
         "application": null,
         "error": "Acción no encontrada: alt_action",
-        "timestamp": 1794465003.0880947,
-        "execution_time": 2.2300002456177026e-05,
+        "timestamp": 1794468844.2822242,
+        "execution_time": 2.7599999157246202e-05,
         "status": "failed"
       },
       {
@@ -48,8 +48,8 @@
         "action": "nonexistent_xyz",
         "application": null,
         "error": "Acción no encontrada: nonexistent_xyz",
-        "timestamp": 1794465003.1388695,
-        "execution_time": 0.0001154000055976212,
+        "timestamp": 1794468844.346295,
+        "execution_time": 0.0001019000046653673,
         "status": "failed"
       },
       {
@@ -57,8 +57,8 @@
         "action": "nonexistent_xyz",
         "application": null,
         "error": "Acción no encontrada: nonexistent_xyz",
-        "timestamp": 1794465003.166846,
-        "execution_time": 8.70000003487803e-05,
+        "timestamp": 1794468844.372605,
+        "execution_time": 9.490000229561701e-05,
         "status": "failed"
       },
       {
@@ -66,7 +66,7 @@
         "action": "test",
         "application": "Chrome",
         "error": "fail",
-        "timestamp": 1794465003.382079,
+        "timestamp": 1794468844.5559435,
         "execution_time": 0.0,
         "status": "failed"
       },
@@ -75,7 +75,7 @@
         "action": "test",
         "application": null,
         "error": "fail",
-        "timestamp": 1794465003.4266624,
+        "timestamp": 1794468844.620279,
         "execution_time": 0.0,
         "status": "failed"
       }

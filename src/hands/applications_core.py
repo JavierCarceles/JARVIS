@@ -2275,7 +2275,17 @@ def register_custom_application(app_config: Dict[str, Any]) -> bool:
                 data.pop("default_state", None)
 
         app = ApplicationKnowledge(**data)
-        return get_application_manager().register_application(app)
+        manager = get_application_manager()
+        ok = manager.register_application(app)
+        # register_application evita duplicados: si la clave ya existe en
+        # memoria (p. ej. cargada desde entities.json), su rama de duplicado
+        # no sobrescribe self.applications[key] con el app nuevo, por lo que
+        # los campos del config (preflight_requirements, calibration_policy,
+        # nombres de capabilities...) se perderían al recuperar la app.
+        # Asegurar que la app registrada refleje el config recibido.
+        key = manager._normalize_name(app.name)
+        manager.applications[key] = app
+        return ok
     except Exception as exc:
         logger._print_log("INFO", "Procesando solicitud", "applications_core.py", "register_custom_application", 1054)
         return False
