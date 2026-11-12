@@ -9247,3 +9247,15 @@ VERIFICACION: SINTAXIS: OK; MAIN.PY: OK (importa); COMPORTAMIENTO / INTEGRACION 
 DISCREPANCIAS: Ninguna entre documentos; el fallo fue un defecto preexistente de codigo, corregido en `src/hands/applications_core.py`.
 PENDIENTES: NINGUNO
 ESTADO FINAL: 3.8.5.1.4.10.11 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.8.5.1.4.10.12
+FECHA: 2026-11-12
+OBJETIVO: Inspeccionar documentación de datos existente (README_DATA.md como documento canónico de data/), verificar su precisión contra el estado real de data/ y corregir discrepancias encontradas. Documentar rutas, formato SQLite/JSON, tablas, campos, responsables de lectura/escritura, flujo, versionado y estado real de integridad. Actualizar README.md solo si cambian módulos de src/.
+TIPO DE TRABAJO: INSPECCION + DOCUMENTACION
+CAMBIOS / HALLAZGOS: Se corrigieron 2 discrepancias en docs/README_DATA.md: (1) entrada de world_state.json en tabla de sección 5: de "Texto corrupto / MagicMock no es JSON válido" a "JSON objeto / Estado del mundo actual del sistema (aplicaciones, estado de acciones, restricciones, objetivos activos, último estado conocido)"; (2) nota de sección 8 sobre jarvis_learned_aliases.json: de "fue eliminado (directorio corrupto)" a "persiste como directorio vacío (no es fichero JSON válido, no consumido por src/ ni tests/)". Se verificó contra archivos reales: data/knowledge/entities.json (7 entidades, coincide con doc), data/memory/entities.json (1348 líneas, coincide con ~1.346 documentado), world_state.json es JSON válido de 87 líneas, system_inventory.sqlite3 y system_inventory_manifest.json coinciden con su documentación. No se modificaron módulos de src/.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: NA; DOCUMENTACION: docs/README_DATA.md (2 correcciones de precisión)
+TESTS Y RESULTADOS: UNITARIOS: NA; INTEGRACION: NA; NO REGRESION: NA (cambio únicamente de documentación, no afecta código de producción ni tests)
+VERIFICACION: SINTAXIS: OK; MAIN.PY: OK (sin cambios de src/, importación inalterada, verificada en unidad previa); COMPORTAMIENTO / INTEGRACION REAL: Verificado contra archivos reales de data/: world_state.json es JSON válido (87 líneas), jarvis_learned_aliases.json persiste como directorio, entidades de knowledge y memory coinciden con documentación.
+DISCREPANCIAS: 2 corregidas (ver CAMBIOS/HALLAZGOS); ninguna pendiente.
+PENDIENTES: Ninguno para esta unidad.
+ESTADO FINAL: 3.8.5.1.4.10.12 - IMPLEMENTADA

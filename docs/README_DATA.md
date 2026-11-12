@@ -259,7 +259,7 @@ Contiene los ficheros de almacenamiento mejorado del `MemoryManager` (`src/memor
 | `plans.json` | PLANS | JSON array | `[]` (vacío) |
 | `relationships.json` | RELATIONSHIPS | JSON object | `{}` (vacío) |
 | `user_preferences.json` | PREFERENCES | JSON object | 1 entrada: `default_user_entity_confidence_selection_entity_confidence_selection_google_chrome` (confidence 1.0, usage_count 24) |
-| `world_state.json` | STATE | Texto corrupto | `"<MagicMock name='WorldState().to_dict().to_dict()' ...>"` (corrupto, no es JSON válido) |
+| `world_state.json` | STATE | JSON objeto | Estado del mundo actual del sistema (aplicaciones, estado de acciones, restricciones, objetivos activos, último estado conocido) |
 
 **Quién lee/escribe:** `src/memory/storage.py` (`JSONStorage` con `file_mapping` que asocia cada `MemoryType` a su fichero). `MemoryManager.save(data, memory_type)` y `MemoryManager.load(memory_type)` operan sobre estos ficheros.
 
@@ -360,7 +360,7 @@ Contiene los ficheros de almacenamiento mejorado del `MemoryManager` (`src/memor
 
 ## 8. Estado de integridad conocido
 
-> **Nota:** Los reportes de integridad (`integrity_report.txt`, `data_integrity_report.txt`, `data_integrity_summary.json`) y `cleaning_report.txt` fueron eliminados al ser ficheros huérfanos no referenciados por ningún código de `src/` ni `tests/`. También se eliminó `jarvis_learned_aliases.json` (era un directorio corrupto, no un archivo JSON, con permisos denegados). La información siguiente se conserva como registro histórico del estado conocido antes de la limpieza.
+> **Nota:** Los reportes de integridad (`integrity_report.txt`, `data_integrity_report.txt`, `data_integrity_summary.json`) y `cleaning_report.txt` fueron eliminados al ser ficheros huérfanos no referenciados por ningún código de `src/` ni `tests/`. `jarvis_learned_aliases.json` persiste como directorio vacío (no es un fichero JSON válido; no es consumido por ningún código de `src/` ni `tests/`). La información siguiente se conserva como registro histórico del estado conocido antes de la limpieza.
 
 Según los reportes de integridad (fecha 2025-06-17, antes de su eliminación):
 
