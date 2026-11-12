@@ -6822,7 +6822,10 @@ unidad 3.8.5.1.4.9.9: ejecucion en el equipo real de la ruta de consulta/resoluc
 aplicacion inocua conocida (bloc de notas, catalogo global) y otra localizada por el
 inventario y no registrada previamente, usando almacenamiento SQLite real, consulta
 (ApplicationDiscovery) y ApplicationPreflight reales, comprobando el resultado de preflight
-sin lanzar ninguna aplicacion ni modificar entities.json.
+sin lanzar ninguna aplicacion ni modificar entities.json. Cubre tambien la unidad
+3.8.5.1.4.9.10: comprobacion en el equipo real de que una ruta obsoleta, un volumen desmontado
+y una coincidencia ambigua se bloquean, se revalidan o se devuelven para aclaracion de forma
+segura, sin invocar el lanzador ni probar apertura.
 
 **Módulos de origen probados:** src.hands.application_discovery, src.hands.application_preflight,
 src.hands.application_launch_classifier, src.hands.system_inventory_storage
@@ -6970,6 +6973,23 @@ lanza ninguna aplicacion.
   - Usa almacenamiento SQLite real y temporal, `ApplicationPreflight` y `LaunchClassifier`
     reales, `ApplicationManager` real sobre `data/memory/entities.json`; captura evidencia de
     entorno real (`machine_id`, SO, equipo). Ningun mock decide el resultado.
+
+- **`TestEscenariosBloqueoEntornoReal`** — 3 método(s) de test
+  - Unidad 3.8.5.1.4.9.10, escenario ruta obsoleta: ruta cuyo archivo ya no existe se excluye
+    de la resolucion (`resultado == []`), se registra como inaccesible (`disponible=False`,
+    `preflight_decision is None`), no se invoca preflight ni lanzador, y la revalidacion real
+    contra el SO devuelve `valido=False` / `existe=False`.
+  - Unidad 3.8.5.1.4.9.10, escenario volumen desmontado: entrada de inventario en volumen no
+    montado (D:) no aparece en `search(solo_volumes_montados=True)` ni en `buscar_por_nombre`;
+    `revalidar_destino_aplicacion` devuelve `valido=False` / `existe=False`.
+  - Unidad 3.8.5.1.4.9.10, escenario coincidencia ambigua: dos entradas de inventario con
+    nombres plausibles para la misma consulta y destinos distintos devuelven
+    `ambiguo=True`, `requiere_desambiguacion=True`, `fuente_autoritaria=None` y alternativas
+    conservadas sin elegir silenciosamente.
+  - Usa almacenamiento SQLite real y temporal, `ApplicationPreflight` y `LaunchClassifier`
+    reales, `ApplicationManager` real sobre `data/memory/entities.json`; captura evidencia de
+    entorno real (`machine_id`, SO, equipo); captura de procesos antes/despues para confirmar
+    que no se lanza ninguna aplicacion; `entities.json` sin modificar.
 
 ---
 

@@ -2739,3 +2739,333 @@ class TestResolucionPreflightEntornoReal:
         finally:
             if os.path.exists(ruta_sonda):
                 os.unlink(ruta_sonda)
+
+
+# ---------------------------------------------------------------------------
+# Unidad 3.8.5.1.4.9.10: comprobacion en entorno real de los tres escenarios
+# de bloqueo / revalidacion / aclaracion sin lanzar aplicaciones:
+# (1) ruta obsoleta, (2) volumen desmontado y (3) coincidencia ambigua.
+# ---------------------------------------------------------------------------
+
+class TestEscenariosBloqueoEntornoReal:
+    """
+    Unidad 3.8.5.1.4.9.10: comprueba en el flujo real (almacenamiento SQLite
+    real y temporal, ApplicationPreflight y LaunchClassifier reales sobre
+    archivos reales del disco, machine_id real del equipo) que:
+
+    - una ruta obsoleta se bloquea y se revalida sin intentar el lanzador,
+    - un volumen desmontado no se consulta ni se considera destino accesible,
+    - una coincidencia ambigua se devuelve para aclaracion sin elegir
+      silenciosamente.
+
+    Ninguna prueba lanza aplicaciones ni modifica `entities.json`.
+    """
+
+    def _una_entrada(self, entry_id: str, ruta: str, nombre: str,
+                     extension: str = ".exe", volume: str = "C:") -> dict:
+        return {
+            "entry_id": entry_id,
+            "absolute_path": ruta,
+            "relative_path": ruta,
+            "name": nombre,
+            "extension": extension,
+            "entry_type": EntryType.FILE.value,
+            "size_bytes": 1024,
+            "modified_at": "2024-01-01T10:00:00",
+            "created_at": "2024-01-01T09:00:00",
+            "attributes": [],
+            "excluded": False,
+            "source": "filesystem_scan",
+            "last_checked_at": "2024-01-03T00:00:00",
+            "volume": volume,
+        }
+
+    def _crear_storage_con_entrada(self, tmp_path, machine_id: str,
+                                   entry_id: str, ruta: str, nombre: str,
+                                   volume: str = "C:"):
+        """Almacenamiento SQLite real y temporal con una entrada de archivo
+        para el equipo actual, respetando el aislamiento por machine_id."""
+        ahora = datetime.now(timezone.utc).isoformat()
+        storage = SystemInventoryStorage(
+            db_path=tmp_path / f"test_inventory_910_{entry_id}.sqlite3")
+        storage.initialize()
+        storage.record_machine(machine_id)
+        storage.record_volume(f"vol-{volume}", machine_id, volume, "local", "online")
+        storage.begin_scan_run(
+            f"scan-910-{entry_id}", machine_id, volume, SCAN_MODE_FULL, ahora,
+        )
+        storage.insert_file_entries(
+            f"scan-910-{entry_id}", machine_id, volume,
+            [self._una_entrada(entry_id, ruta, nombre, volume=volume)],
+        )
+        storage.end_scan_run(
+            f"scan-910-{entry_id}", ahora, SCAN_RESULT_OK, 1, 0, 0, None,
+        )
+        return storage
+
+    def _descubrimiento_real(self, storage, machine_id: str):
+        """ApplicationDiscovery con preflight, clasificador y almacenamiento
+        reales; fuentes de descubrimiento mockeadas (no deciden el resultado)."""
+        preflight = ApplicationPreflight()
+        clasificador = LaunchClassifier(preflight=preflight)
+        calib = MagicMock()
+        calib.discover_applications.return_value = []
+        return ApplicationDiscovery(
+            preflight=preflight,
+            clasificador=clasificador,
+            storage=storage,
+            calibration=calib,
+            machine_id=machine_id,
+        )
+
+    def _marca_entorno_real(self) -> dict:
+        """Captura evidencia de entorno real (equipo, SO y machine_id)."""
+        import sys
+        return {
+            "machine_id": generate_machine_id(),
+            "sistema": platform.system(),
+            "release": platform.release(),
+            "version": platform.version(),
+            "equipo": platform.node(),
+            "python": sys.version,
+        }
+
+    def _procesos_con_nombre(self, nombre_ejecutable: str) -> set[str]:
+        """Instantanea real de procesos con ese nombre (tasklist del SO)."""
+        nombre_ejecutable = str(nombre_ejecutable or "").lower()
+        if not nombre_ejecutable:
+            return set()
+        try:
+            resultado = subprocess.run(
+                [
+                    "tasklist", "/FO", "CSV", "/NH",
+                    "/FI", f"IMAGENAME eq {nombre_ejecutable}",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return set()
+        procesos: set[str] = set()
+        for linea in resultado.stdout.splitlines():
+            if not linea.strip():
+                continue
+            partes = [p.strip('"') for p in linea.split(",")]
+            if partes and partes[0].lower() == nombre_ejecutable:
+                procesos.add(partes[0])
+        return procesos
+
+    # ------------------------------------------------------------------
+    # Escenario 1: ruta obsoleta
+    # ------------------------------------------------------------------
+
+    def test_ruta_obsoleta_bloqueada_sin_lanzar(self, tmp_path):
+        """Una ruta cuyo archivo ya no existe se bloquea: no se resuelve
+        como candidata, se registra como inaccesible, no se le invoca
+        preflight ni lanzador, y la revalidacion real contra el SO devuelve
+        valido=False / existe=False."""
+        entorno = self._marca_entorno_real()
+        machine_id = entorno["machine_id"]
+        notepad = r"C:\Windows\System32\notepad.exe"
+        if not os.path.exists(notepad):
+            pytest.skip("notepad.exe no disponible en este equipo")
+
+        with tempfile.NamedTemporaryFile(suffix=".exe", delete=False) as f:
+            ruta_obsoleta = f.name
+        os.unlink(ruta_obsoleta)
+        try:
+            storage = self._crear_storage_con_entrada(
+                tmp_path, machine_id, "e-obsoleto-910", ruta_obsoleta,
+                "obsoleto910.exe",
+            )
+            discovery = self._descubrimiento_real(storage, machine_id)
+            hash_antes = _hash_archivo(_ruta_entities_json_memoria())
+            procesos_antes = self._procesos_con_nombre("obsoleto910.exe")
+
+            resultado = discovery.buscar_por_nombre(
+                "obsoleto910", incluir_inventario=True,
+            )
+            assert resultado == [], (
+                "la ruta obsoleta no debe resolverse como candidata"
+            )
+
+            inaccesibles = discovery.candidatos_inaccesibles_ultima_resolucion
+            assert len(inaccesibles) == 1
+            assert inaccesibles[0].disponible is False
+            assert inaccesibles[0].preflight_decision is None, (
+                "la ruta obsoleta no debe pasar por preflight"
+            )
+            assert any("inaccesible" in a
+                       for a in inaccesibles[0].advertencias)
+            assert any("ruta_no_accesible_en_disco" in e
+                       for e in inaccesibles[0].evidencia)
+
+            # Revalidacion real contra el SO: la ruta obsoleta no existe.
+            reval = storage.revalidar_destino_aplicacion(
+                machine_id, "C:", ruta_obsoleta,
+            )
+            assert reval["valido"] is False
+            assert reval["existe"] is False
+            assert reval["es_archivo"] is False
+            assert reval["razon"] is not None
+
+            procesos_despues = self._procesos_con_nombre("obsoleto910.exe")
+            assert procesos_despues == procesos_antes, (
+                "no se lanza ninguna aplicacion durante la consulta/resolucion"
+            )
+            hash_despues = _hash_archivo(_ruta_entities_json_memoria())
+            assert hash_despues == hash_antes, (
+                "entities.json no debe modificarse"
+            )
+        finally:
+            if os.path.exists(ruta_obsoleta):
+                os.unlink(ruta_obsoleta)
+
+    # ------------------------------------------------------------------
+    # Escenario 2: volumen desmontado
+    # ------------------------------------------------------------------
+
+    def test_volumen_desmontado_bloqueado_y_revalidado(self, tmp_path):
+        """Una entrada de inventario en un volumen no montado (D:) no se
+        devuelve en la consulta filtrada por volumenes montados y su
+        revalidacion real contra el SO devuelve valido=False / existe=False."""
+        entorno = self._marca_entorno_real()
+        machine_id = entorno["machine_id"]
+        volumen_desmontado = "D:"
+        if os.path.exists(volumen_desmontado):
+            pytest.skip(
+                f"el volumen {volumen_desmontado} esta montado; "
+                "no se puede probar volumen desmontado"
+            )
+
+        ruta_en_volumen_desmontado = r"D:\jarvis_910_volumen\app_910.exe"
+        storage = self._crear_storage_con_entrada(
+            tmp_path, machine_id, "e-volumen-910", ruta_en_volumen_desmontado,
+            "appvolumen910.exe", volume=volumen_desmontado,
+        )
+        # El constructor de ApplicationDiscovery inicializa ApplicationManager
+        # (carga y normalizacion de entities.json), por lo que el hash de
+        # referencia se toma DESPUES de crearlo, igual que en los tests .9.9.
+        discovery = self._descubrimiento_real(storage, machine_id)
+        hash_antes = _hash_archivo(_ruta_entities_json_memoria())
+        procesos_antes = self._procesos_con_nombre("app_910.exe")
+
+        # Consulta con filtro de volumenes montados: la entrada del volumen
+        # desmontado no debe aparecer.
+        entradas = storage.search(
+            machine_id=machine_id,
+            extension=".exe",
+            tipo=EntryType.FILE.value,
+            disponible=True,
+            solo_volumes_montados=True,
+        )
+        rutas_devueltas = {str(e.get("absolute_path", "")) for e in entradas}
+        assert ruta_en_volumen_desmontado not in rutas_devueltas, (
+            "el volumen desmontado no debe aportar rutas en la consulta filtrada"
+        )
+
+        # Revalidacion real contra el SO: ruta en volumen desmontado no existe.
+        reval = storage.revalidar_destino_aplicacion(
+            machine_id, volumen_desmontado, ruta_en_volumen_desmontado,
+        )
+        assert reval["valido"] is False
+        assert reval["existe"] is False
+        assert reval["es_archivo"] is False
+        assert reval["razon"] is not None
+
+        # Tampoco debe resolverse como candidato de descubrimiento.
+        resultado = discovery.buscar_por_nombre(
+            "appvolumen910", incluir_inventario=True,
+        )
+        assert resultado == [], (
+            "el volumen desmontado no debe producir candidato resoluble"
+        )
+
+        procesos_despues = self._procesos_con_nombre("app_910.exe")
+        assert procesos_despues == procesos_antes, (
+            "no se lanza ninguna aplicacion durante la consulta/resolucion"
+        )
+        hash_despues = _hash_archivo(_ruta_entities_json_memoria())
+        assert hash_despues == hash_antes, (
+            "entities.json no debe modificarse"
+        )
+
+    # ------------------------------------------------------------------
+    # Escenario 3: coincidencia ambigua
+    # ------------------------------------------------------------------
+
+    def test_coincidencia_ambigua_devuelta_para_aclaracion(self, tmp_path):
+        """Dos entradas de inventario con nombres plausibles para la misma
+        consulta y destinos distintos se devuelven como alternativas ambiguas:
+        ambiguo=True, requiere_desambiguacion=True, sin elegir silenciosamente
+        y sin lanzar nada."""
+        entorno = self._marca_entorno_real()
+        machine_id = entorno["machine_id"]
+        notepad = r"C:\Windows\System32\notepad.exe"
+        if not os.path.exists(notepad):
+            pytest.skip("notepad.exe no disponible en este equipo")
+
+        rutas = []
+        nombres = []
+        for i in (1, 2):
+            with tempfile.NamedTemporaryFile(suffix=".exe", delete=False) as f:
+                f.write(b"MZ" + b"\x00" * 64)
+                rutas.append(f.name)
+                nombres.append(f"ambigua910{i}.exe")
+        try:
+            storage = SystemInventoryStorage(
+                db_path=tmp_path / "test_inventory_910_ambigua.sqlite3")
+            storage.initialize()
+            storage.record_machine(machine_id)
+            storage.record_volume("vol-c:", machine_id, "C:", "local", "online")
+            ahora = datetime.now(timezone.utc).isoformat()
+            storage.begin_scan_run(
+                "scan-910-ambigua", machine_id, "C:", SCAN_MODE_FULL, ahora,
+            )
+            storage.insert_file_entries(
+                "scan-910-ambigua", machine_id, "C:",
+                [self._una_entrada(
+                    f"e-ambigua-910-{i}", rutas[i - 1], nombres[i - 1],
+                    volume="C:") for i in (1, 2)],
+            )
+            storage.end_scan_run(
+                "scan-910-ambigua", ahora, SCAN_RESULT_OK, 2, 0, 0, None,
+            )
+
+            discovery = self._descubrimiento_real(storage, machine_id)
+            hash_antes = _hash_archivo(_ruta_entities_json_memoria())
+            procesos_antes = self._procesos_con_nombre("ambigua9101.exe")
+
+            resultado = discovery.buscar_por_nombre_con_desambiguacion(
+                "ambigua910",
+            )
+
+            procesos_despues = self._procesos_con_nombre("ambigua9101.exe")
+            assert procesos_despues == procesos_antes, (
+                "no se lanza ninguna aplicacion durante la consulta/resolucion"
+            )
+            hash_despues = _hash_archivo(_ruta_entities_json_memoria())
+            assert hash_despues == hash_antes, (
+                "entities.json no debe modificarse"
+            )
+
+            assert resultado.ambiguo is True
+            assert resultado.requiere_desambiguacion is True
+            assert resultado.motivo_ambiguedad is not None
+            assert "ambigua" in (resultado.motivo_ambiguedad or "").lower()
+            assert len(resultado.candidatos) >= 2
+            assert len(resultado.alternativas) >= 2
+            assert resultado.fuente_autoritaria is None
+            nombres_devueltos = {c.name for c in resultado.alternativas}
+            assert nombres[0] in nombres_devueltos
+            assert nombres[1] in nombres_devueltos
+            for c in resultado.alternativas:
+                assert c.fuente == FUENTE_INVENTARIO
+                assert c.esta_en_inventario is True
+                assert c.preflight_decision is not None
+                assert "valid" in c.preflight_decision
+        finally:
+            for ruta in rutas:
+                if os.path.exists(ruta):
+                    os.unlink(ruta)

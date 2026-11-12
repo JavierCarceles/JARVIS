@@ -545,20 +545,18 @@ class ApplicationManager:
         """Registra una aplicación en memoria y en el gestor.
 
         Evita duplicados: si la aplicación ya está registrada en el gestor
-        (por nombre normalizado), se omite la persistencia y se devuelve
-        ``False``. Esto es consistente con ``_load_custom_applications``
-        que ya omite apps ya registradas.
+        (por nombre normalizado), se actualizan sus aliases en memoria y se
+        persiste la entidad en ``entities.json`` para que las resoluciones
+        posteriores por alias dinámico sigan funcionando, en lugar de omitir
+        silenciosamente la actualización. Se devuelve ``True`` cuando la
+        aplicación se registra o se actualiza correctamente.
         """
         try:
             key = self._normalize_name(app.name)
-            if key in self.applications:
-                logger._print_log(
-                    "info",
-                    f"Aplicacion '{key}' ya registrada, se omite duplicado "
-                    "[file:applications_core.py, method:register_application]",
-                    "applications_core.py", "register_application", 395,
-                )
-                return False
+            aliases = []
+            if app.metadata and isinstance(app.metadata, dict):
+                aliases = [str(a) for a in (app.metadata.get("aliases") or [])]
+
             entity_data = {
                 "id": f"app_{key}",
                 "type": "application",
@@ -572,10 +570,35 @@ class ApplicationManager:
                     "ui_elements": [_serialize_ui_element(e) for e in app.ui_elements],
                     "states": [s.value for s in app.states],
                 },
-                "aliases": [],
+                "aliases": aliases,
                 "confidence": 1.0,
                 "tags": [],
             }
+
+            if key in self.applications:
+                # Aplicacion ya registrada: refrescar los aliases en memoria y
+                # persistirlos para que _resolve_alias los vea en ejecuciones
+                # posteriores sin depender de entidades previas con aliases
+                # vacios en disco.
+                existing = self.applications[key]
+                if existing.metadata is None:
+                    existing.metadata = {}
+                existing.metadata["aliases"] = aliases
+                try:
+                    self.memory_manager.save_entity(Entity.from_dict(entity_data))
+                except Exception:
+                    # La entidad ya existe en disco; guardar la versione
+                    # actualizada es el camino preferido pero no bloquea el
+                    # registro en memoria si el almacenamiento falla.
+                    pass
+                logger._print_log(
+                    "info",
+                    f"Aplicacion '{key}' ya registrada, aliases actualizados "
+                    "[file:applications_core.py, method:register_application]",
+                    "applications_core.py", "register_application", 395,
+                )
+                return True
+
             self.memory_manager.save_entity(Entity.from_dict(entity_data))
             self.applications[key] = app
             logger._print_log("info", "Procesando solicitud", "applications_core.py", "method", 371)
