@@ -6813,6 +6813,11 @@ unidad 3.8.5.1.4.9.7: aislamiento del inventario por equipo y volumen, detecció
 distinto cuando la base de datos se copia a otro equipo, exigencia de reescaneo antes de usar
 destinos (`verificar_aislamiento_inventario`, `inventario_requiere_reescaneo`,
 `inventario_utilizable_para_maquina_actual`, `informe_aislamiento_ultima_resolucion`).
+Cubre la unidad 3.8.5.1.4.9.8: verificación de la integración entre aplicaciones ya
+registradas (catálogo global / `ApplicationManager`) y descubiertas (inventario / fuentes
+primarias), pasando todas las candidatas por `ApplicationPreflight`, vinculando al catálogo
+global (`en_catalogo_global`, `fuente_autoritaria`) sin modificar `entities.json`, sin lanzar
+ninguna aplicación y sin crear rutas paralelas Brain/Planner/Executor.
 
 **Módulos de origen probados:** src.hands.application_discovery, src.hands.application_preflight,
 src.hands.application_launch_classifier, src.hands.system_inventory_storage
@@ -6934,6 +6939,21 @@ lanza ninguna aplicacion.
   - `test_inventario_copiado_a_otro_equipo_no_se_usa_entorno_real`: copia física real de la base
     SQLite de inventario con `machine_id` distinto: no se usan sus destinos y se exige
     reescaneo; la base original del equipo actual sigue sirviendo candidatos.
+
+- **`TestIntegracionCatalogoDescubierto`** — 3 método(s) de test
+  - Verifica que una aplicación registrada en el catálogo global se resuelve y vincula su
+    `ApplicationKnowledge` (`en_catalogo_global=True`, `fuente_autoritaria`, `preflight_policy`
+    poblado) sin modificar `entities.json` ni lanzar nada.
+  - Verifica que una aplicación descubierta del inventario y no registrada en el catálogo no se
+    vincula (`en_catalogo_global=False`, `fuente_autoritaria=None`) con `preflight_policy`
+    poblado y sin lanzar.
+  - Verifica que un nombre registrado no es ambiguo, tiene `fuente_autoritaria` autoritativa y su
+    candidato se vincula al catálogo global.
+- **`TestSinRutasParalelasPlannerExecutor`** — 2 método(s) de test
+  - Verifica que `src/hands/application_discovery.py` no importa ni referencia Brain, Planner ni
+    Executor (sin rutas paralelas en el flujo de resolución de aplicaciones).
+  - Verifica que `vincular_con_catalogo` solo consulta `ApplicationManager.get_application`
+    (lectura, sin registro ni auto-registro) y usa `ApplicationPreflight`.
 
 ---
 

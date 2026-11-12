@@ -2237,3 +2237,254 @@ class TestPreflightPoliticaEntornoReal:
         assert c is not None
         assert c.preflight_policy is not None
         assert "allowed" in c.preflight_policy
+
+
+# ---------------------------------------------------------------------------
+# Integracion catalogo global + descubrimiento: sin rutas paralelas
+# Brain/Planner/Executor (unidad 3.8.5.1.4.9.8)
+# ---------------------------------------------------------------------------
+
+def _almacenamiento_temporal_con_entrada(
+    tmp_path, entry_id: str, ruta: str, nombre: str, machine_id: str
+) -> SystemInventoryStorage:
+    """Crea almacenamiento SQLite temporal real con una entrada de archivo."""
+    db_path = tmp_path / f"test_inventory_98_{entry_id}.sqlite3"
+    storage = SystemInventoryStorage(db_path=db_path)
+    storage.initialize()
+    storage.record_machine(machine_id)
+    storage.record_volume("vol-c:", machine_id, "C:", "local", "online")
+    storage.begin_scan_run(
+        f"scan-98-{entry_id}", machine_id, "C:", SCAN_MODE_FULL, "2024-01-03T00:00:00",
+    )
+    storage.insert_file_entries(
+        f"scan-98-{entry_id}",
+        machine_id,
+        "C:",
+        [{
+            "entry_id": entry_id,
+            "absolute_path": ruta,
+            "relative_path": ruta,
+            "name": nombre,
+            "extension": ".exe",
+            "entry_type": EntryType.FILE.value,
+            "size_bytes": 1024,
+            "modified_at": "2024-01-01T10:00:00",
+            "created_at": "2024-01-01T09:00:00",
+            "attributes": [],
+            "excluded": False,
+            "source": "filesystem_scan",
+            "last_checked_at": "2024-01-03T00:00:00",
+            "volume": "C:",
+        }],
+    )
+    storage.end_scan_run(f"scan-98-{entry_id}", "2024-01-03T01:00:00", SCAN_RESULT_OK, 1, 0, 0, 100.0)
+    return storage
+
+
+class TestIntegracionCatalogoDescubierto:
+    """
+    Unidad 3.8.5.1.4.9.8: verifica la integracion entre aplicaciones ya
+    registradas (catalogo global / ApplicationManager) y descubiertas
+    (inventario / fuentes primarias), sin crear rutas paralelas
+    Brain/Planner/Executor.
+
+    Estrategia de mocks: solo se mockean las fuentes de datos
+    (CalibrationManager / SystemInventoryStorage cuando se inyecta). La
+    clasificacion, el preflight y el catalogo son REALES. No se lanza ninguna
+    aplicacion y no se modifica data/memory/entities.json.
+    """
+
+    def test_app_registrada_vinculada_al_catalogo_global_con_preflight(self, tmp_path):
+        """Nombre registrado en el catalogo global (bloc de notas / notepad)
+        se resuelve via ApplicationManager y vincula su ApplicationKnowledge:
+        en_catalogo_global=True, fuente autoritativa, preflight_policy
+        poblado. No se lanza nada ni se modifica entities.json."""
+        notepad = r"C:\Windows\System32\notepad.exe"
+        if not os.path.exists(notepad):
+            pytest.skip("notepad.exe no disponible en este equipo")
+        storage = _almacenamiento_temporal_con_entrada(
+            tmp_path, "e-notepad-98", notepad, "notepad.exe", "maquina-integra-98"
+        )
+        calib = MagicMock()
+        calib.discover_applications.return_value = []
+        discovery = ApplicationDiscovery(
+            preflight=ApplicationPreflight(),
+            clasificador=LaunchClassifier(preflight=ApplicationPreflight()),
+            storage=storage,
+            calibration=calib,
+            machine_id="maquina-integra-98",
+        )
+        hash_antes = _hash_archivo(_ruta_entities_json_memoria())
+
+        candidatos, vinculados = discovery.buscar_por_nombre_con_catalogo(
+            "bloc de notas", incluir_inventario=True
+        )
+        assert len(candidatos) == len(vinculados) >= 1
+
+        vinculado_notepad = next(
+            (
+                v
+                for v in vinculados
+                if v.conocimiento is not None
+                and str(v.conocimiento.name).casefold() == "bloc de notas"
+            ),
+            None,
+        )
+        assert vinculado_notepad is not None, (
+            "No se vinculo notepad al catalogo global; vinculados: "
+            f"{[v.candidato.name for v in vinculados]}"
+        )
+        assert vinculado_notepad.en_catalogo_global is True
+        assert vinculado_notepad.conocimiento is not None
+        assert vinculado_notepad.conocimiento.executable == "notepad.exe"
+        assert vinculado_notepad.fuente_autoritaria is not None
+        assert vinculado_notepad.candidato.preflight_policy is not None
+        assert "allowed" in vinculado_notepad.candidato.preflight_policy
+        assert "blocked_by" in vinculado_notepad.candidato.preflight_policy
+
+        hash_despues = _hash_archivo(_ruta_entities_json_memoria())
+        assert hash_despues == hash_antes, (
+            "la integracion catalogo+descubrimiento no debe modificar entities.json"
+        )
+
+    def test_app_descubierta_no_registrada_sin_vinculo_al_catalogo(self, tmp_path):
+        """Nombre no registrado en el catalogo se descubre del inventario sin
+        vinculo al catalogo global: en_catalogo_global=False,
+        fuente_autoritaria=None, preflight_policy poblado, sin lanzar."""
+        with tempfile.NamedTemporaryFile(suffix=".exe", delete=False) as f:
+            ruta_sonda = f.name
+            f.write(b"MZ" + b"\x00" * 64)
+        try:
+            storage = _almacenamiento_temporal_con_entrada(
+                tmp_path, "e-sonda-98", ruta_sonda, "sondapp98.exe",
+                "maquina-integra-98-b",
+            )
+            calib = MagicMock()
+            calib.discover_applications.return_value = []
+            discovery = ApplicationDiscovery(
+                preflight=ApplicationPreflight(),
+                clasificador=LaunchClassifier(preflight=ApplicationPreflight()),
+                storage=storage,
+                calibration=calib,
+                machine_id="maquina-integra-98-b",
+            )
+            candidatos, vinculados = discovery.buscar_por_nombre_con_catalogo(
+                "sondapp98", incluir_inventario=True
+            )
+            assert len(candidatos) == len(vinculados) == 1
+            assert candidatos[0].fuente == FUENTE_INVENTARIO
+            assert vinculados[0].en_catalogo_global is False
+            assert vinculados[0].conocimiento is None
+            assert vinculados[0].fuente_autoritaria is None
+            assert vinculados[0].candidato.preflight_policy is not None
+            assert "allowed" in vinculados[0].candidato.preflight_policy
+        finally:
+            if os.path.exists(ruta_sonda):
+                os.unlink(ruta_sonda)
+
+    def test_nombre_registrado_no_es_ambiguo_tiene_fuente_autoritativa(self, tmp_path):
+        """Nombre registrado en el catalogo (bloc de notas): la resolucion no
+        es ambigua ni se elige silenciosamente, y la fuente_autoritaria es
+        autoritativa (el catalogo decide). Sin lanzar nada."""
+        notepad = r"C:\Windows\System32\notepad.exe"
+        if not os.path.exists(notepad):
+            pytest.skip("notepad.exe no disponible en este equipo")
+        storage = _almacenamiento_temporal_con_entrada(
+            tmp_path, "e-nota-98", notepad, "notepad.exe", "maquina-integra-98-d"
+        )
+        calib = MagicMock()
+        calib.discover_applications.return_value = []
+        discovery = ApplicationDiscovery(
+            preflight=ApplicationPreflight(),
+            clasificador=LaunchClassifier(preflight=ApplicationPreflight()),
+            storage=storage,
+            calibration=calib,
+            machine_id="maquina-integra-98-d",
+        )
+        resultado = discovery.buscar_por_nombre_con_desambiguacion(
+            "bloc de notas", incluir_inventario=True
+        )
+        assert resultado.ambiguo is False
+        assert resultado.requiere_desambiguacion is False
+        assert resultado.motivo_ambiguedad is None
+        assert resultado.fuente_autoritaria is not None
+        assert len(resultado.candidatos) >= 1
+        # El candidato vinculado conserva el conocimiento del catalogo global.
+        vinculados = discovery.vincular_con_catalogo(resultado.candidatos)
+        assert len(vinculados) == len(resultado.candidatos)
+        vinculado_notepad = next(
+            (
+                v
+                for v in vinculados
+                if v.conocimiento is not None
+                and str(v.conocimiento.name).casefold() == "bloc de notas"
+            ),
+            None,
+        )
+        assert vinculado_notepad is not None, (
+            "bloc de notas no vinculado al catalogo; vinculados: "
+            f"{[(v.en_catalogo_global, v.fuente_autoritaria) for v in vinculados]}"
+        )
+        assert vinculado_notepad.en_catalogo_global is True
+        assert vinculado_notepad.conocimiento is not None
+        assert vinculado_notepad.conocimiento.executable == "notepad.exe"
+
+
+class TestSinRutasParalelasPlannerExecutor:
+    """
+    Unidad 3.8.5.1.4.9.8: verifica que el flujo de resolucion de aplicaciones
+    (registradas + descubiertas) no crea rutas paralelas Brain/Planner/Executor.
+    Solo usa ApplicationDiscovery + ApplicationManager + ApplicationPreflight.
+    """
+
+    def test_modulo_application_discovery_sin_imports_brain_planner_executor(self):
+        """application_discovery.py no importa ni referencia Brain, Planner ni
+        Executor; el flujo de resolucion reutiliza contratos verificados de
+        aplicaciones y preflight."""
+        ruta_modulo = (
+            Path(__file__).resolve().parents[2]
+            / "src" / "hands" / "application_discovery.py"
+        )
+        fuente = ruta_modulo.read_text(encoding="utf-8")
+        prohibidos = [
+            "src.brain",
+            "src.hands.planner",
+            "src.hands.executor",
+            "src.tools.executor",
+            "from src.brain",
+            "from src.hands.planner",
+            "from src.hands.executor",
+            "from src.tools.executor",
+        ]
+        for prohibido in prohibidos:
+            assert prohibido not in fuente, (
+                f"Ruta paralela detectada: application_discovery referencia {prohibido}"
+            )
+
+    def test_flujo_resolucion_solo_usa_contratos_verificados(self):
+        """buscar_por_nombre_con_catalogo solo consulta get_application_manager(),
+        ApplicationManager.get_application (lectura) y ApplicationPreflight.check;
+        nunca registra, nunca lanza, nunca delega en planificador ni ejecutor."""
+        manager = _AppManagerFake(
+            {"bloc de notas": _conocimiento_prueba("Bloc de notas", "notepad.exe")}
+        )
+        discovery = _discovery_con_manager_y_storage(manager)
+        candidato = DiscoveredCandidate(
+            candidate_id="inv-1",
+            name="bloc de notas",
+            absolute_path=r"C:\Windows\System32\notepad.exe",
+            destination=r"C:\Windows\System32\notepad.exe",
+            fuente=FUENTE_INVENTARIO,
+            esta_en_inventario=True,
+            disponible=True,
+        )
+        vinculados = discovery.vincular_con_catalogo([candidato])
+        assert len(vinculados) == 1
+        v = vinculados[0]
+        assert v.en_catalogo_global is True
+        assert v.conocimiento is not None
+        assert v.conocimiento.executable == "notepad.exe"
+        # Solo consulta (get_application registra la llamada), sin registro ni
+        # auto-registro: el puente de auto-registro corresponde a 3.8.5.1.4.11.
+        assert manager.llamadas == ["bloc de notas"]
+        assert v.fuente_autoritaria == FUENTE_CATALOGO
