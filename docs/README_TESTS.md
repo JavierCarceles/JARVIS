@@ -105,6 +105,7 @@
 - [`hands\test_volumes_montados_entorno_real.py`](#hands/test-volumes_montados_entorno_real)
 - [`hands\test_buscar_candidatos_para_orden_entorno_real.py`](#hands/test-buscar_candidatos_para_orden_entorno_real)
 - [`hands\test_inventario_volumen_significativo_entorno_real.py`](#hands/test-inventario_volumen_significativo_entorno_real)
+- [`hands\test_inventario_no_alteracion_ejecucion_completa_entorno_real.py`](#hands/test-inventario_no_alteracion_ejecucion_completa_entorno_real)
 - [`hands\test_filesystem_observer.py`](#hands/test-filesystem_observer)
 - [`hands\test_ui_elements.py`](#hands/test-ui_elements)
 - [`hands\test_ui_elements_final.py`](#hands/test-ui_elements_final)
@@ -11381,6 +11382,19 @@ decidan el resultado. Todo se limpia al finalizar.
 **Modulos de origen probados:** src.hands.system_inventory, src.hands.system_inventory_storage, src.hands.application_launch_classifier, src.hands.application_discovery
 
 **Clases de test:** ninguna (funciones de test de modulo).
+
+**Resultados:** 1 prueba de verificacion en entorno real, 1 PASSED / 0 FAILED.
+
+---
+
+<a name="hands/test-inventario_no_alteracion_ejecucion_completa_entorno_real"></a>
+### `hands\test_inventario_no_alteracion_ejecucion_completa_entorno_real.py`
+
+**Descripcion:** Verificacion en entorno real para la unidad 3.8.5.1.4.10.15. Comprueba que la ejecucion completa del escaneo de inventario de produccion (`escanear_ruta` / `RecorridoVolumen` de src.hands.system_inventory) NO altera: (1) los archivos originales (hash SHA-256 y tamano identicos antes y despues del escaneo real, lectura solo de metadatos sobre arbol real en directorio temporal); (2) los datos persistentes protegidos (`data/memory/entities.json`, `data/knowledge/entities.json` y `data/macros_coords.json`, hash y tamano inalterados antes y despues de la ejecucion real); (3) la configuracion de pantalla/ventanas del usuario (`data/macros_coords.json`, calibracion y coordenadas UI de los monitores reales, inalterado; el modulo del escanador no importa dependencias de GUI, verificado estaticamente sobre el archivo de produccion real: sin pyautogui, pygetwindow, mss, cv2, ScreenManager, coordinate_manager, calibration_manager ni calibrator; la topologia de monitores se documenta mediante enumeracion real de ScreenManager sin crear, mover, cerrar ni modificar ventana alguna). Usa directorio temporal (`tmp_path`) y SQLite temporal; no toca `data/system_inventory.sqlite3` de produccion ni rutas de usuario; no lanza aplicaciones; no hay interaccion grafica ni mocks que decidan el resultado.
+
+**Modulos de origen probados:** src.hands.system_inventory, src.hands.system_inventory_storage, src.utils.screen_manager
+
+**Clases de test:** ninguna (funcion de test de modulo).
 
 **Resultados:** 1 prueba de verificacion en entorno real, 1 PASSED / 0 FAILED.
 
