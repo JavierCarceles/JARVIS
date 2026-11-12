@@ -1,0 +1,50 @@
+# =============================================================================
+# .gitignore — JARVIS
+# Archivos y directorios que NO deben ir al control de versiones.
+# Datos locales, caché, logs, entornos virtuales y configuración específica
+# de cada equipo (machine_id, rutas absolutas, calibraciones, etc.).
+# =============================================================================
+
+# --- Base de datos local del inventario (machine_id específico del equipo) ---
+data/system_inventory.sqlite3
+data/system_inventory.sqlite3-wal
+data/system_inventory.sqlite3-shm
+data/system_inventory_manifest.json
+
+# --- Datos de memoria y conocimiento locales (no portables entre equipos) ---
+data/memory/
+data/knowledge/
+data/entities.json
+data/*.json
+
+# --- Logs del sistema ---
+logs/
+*.log
+
+# --- Python / entornos ---
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+.venv
+
+# --- Caché y pruebas ---
+.cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# --- Editor y herramientas ---
+.vscode/
+.idea/
+.supercomplete/
+
+# --- Archivos temporales del proyecto ---
+temp/
+*.tmp
+*.bak
+
+# --- Archivos generados por el sistema operativo ---
+.DS_Store
+Thumbs.db
