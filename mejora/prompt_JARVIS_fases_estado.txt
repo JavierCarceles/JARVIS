@@ -9259,3 +9259,58 @@ VERIFICACION: SINTAXIS: OK; MAIN.PY: OK (sin cambios de src/, importación inalt
 DISCREPANCIAS: 2 corregidas (ver CAMBIOS/HALLAZGOS); ninguna pendiente.
 PENDIENTES: Ninguno para esta unidad.
 ESTADO FINAL: 3.8.5.1.4.10.12 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.8.5.1.4.10.13
+FECHA: 2026-11-12
+OBJETIVO: Consolidar la matriz de cobertura del inventario real por volumen, tipo de entrada, estado de acceso, consulta, persistencia, actualización incremental, mantenimiento e integración con ApplicationPreflight; enumerar explícitamente todos los escenarios pendientes, parciales o bloqueados, sin lanzar aplicaciones ni ejecutar candidatos en lote.
+TIPO DE TRABAJO: CONSOLIDACIÓN + DOCUMENTACIÓN + VERIFICACIÓN DE EVIDENCIA EXISTENTE
+CAMBIOS / HALLAZGOS: Consolidación de la evidencia real de las unidades .10.1 a .10.12 sobre el equipo Windows 11 (DESKTOP-OUA1CIO, Python 3.14.7 x64, machine_id 4de10a54-5054-515b-aa57-1b30a1feb801, datos confirmados contra data/system_inventory.sqlite3 y ficheros de entidades):
+- Volumen C: (FIXED, NTFS, disponible): escaneo completo real, scan_id=scan-68602080-d2af-43dc-bca8-320fe82b0f47, modo=completo, resultado=ok, 5.090.349 entradas (3.547.474 archivos + 1.542.675 directorios), errores=4333 (permiso_denegado en directorios protegidos de Windows, sin abortar el recorrido), exclusiones=22, cobertura=100.00%, duración 2333.622 s. end_scan_run persistido con finished_at. Volúmenes de red/extraíbles: 0 detectados, excluidos por defecto (inclusión requiere política explícita).
+- Esquema SQLite v5, tablas: application_candidates, file_entries, lineas_base, machines, scan_runs, schema_version, volumes. 1 máquina registrada (machine_id 4de10a54-5054-515b-aa57-1b30a1feb801, creado 2026-11-12T05:20:55.772878).
+- application_candidates: 1 fila (cand-charmap.exe-4de10a54, Mapa de caracteres, C:\Windows\System32\charmap.exe, launch_type=ejecutable, confidence=0.9, source=inventory_preflight, volumen C:). file_entries: 5.090.349.
+- data/knowledge/entities.json sin modificar (SHA-256 60635AA8F64FAAD75C2C9635E483769874A60E0A98FD1244F696AC2B62A0DAB7, 113 líneas). data/memory/entities.json hash cambió a 1834BC697274D20113FB35A35DF7094E83C579FB3A56B77B348391E622369206 (1348 líneas) por efecto documentado de ApplicationManager.init (refresh de updated_at de app_chrome/app_spotify), ajeno al alcance de esta unidad y registrado como hallazgo en .10.7/.10.9.
+- Tipos de lanzamiento (launch_type): ejecutable=DISPONIBLE (charmap.exe preflight valid=True); acceso_directo=NO VERIFICADO (adaptador valida .lnk real del sistema, 0 candidatos registrados); uri_aplicacion=NO VERIFICADO (ms-settings:/https: valid=True, 0 candidatos); paquete=NO VERIFICADO (.appx/.msix detectable, 0 candidatos validados); bundle=NO SOPORTADO (.app macOS, no aplica Windows 11; validate_launch_destination -> valid=False); lanzador=NO VERIFICADO (steam:// preflight valid=False, 0 candidatos). Ninguna aplicación lanzada; sin ejecución en lote.
+- Adaptadores de SO: Windows verificado nativamente; Linux/macOS NO VERIFICADOS (no existen src/hands/linux ni src/hands/macos en este equipo).
+- Archivos ocultos, rutas Unicode, rutas largas (>260 con prefijo \\?\) y permiso denegado registrados conforme al contrato (.10.5). Integridad/privacidad verificada: no se copian contenidos de documentos, no se modifican archivos originales (hashes invariantes), almacenamiento acotado al directorio de db_path (.10.6).
+- Preflight real integrado y verificado: validar_destino real sobre ejecutable (.lnk) y URI (ms-settings:/https:) -> valid=True; steam:// -> valid=False. validar_ruta_para_lanzamiento disponible.
+- Consultas: search/buscar paginada, search_con_evidencia, diferenciar_estado_acceso, buscar_candidatos_para_orden operan sobre implementación real con aislamiento por machine_id y solo_volumes_montados=True por defecto.
+- Persistencia: verificada en disco entre instancias (nueva instancia sobre misma base recupera entradas), migración de esquema v1→v5 conservando datos, backup/corrupción/recuperación verificadas (.10.2).
+- Actualización incremental: refrescar_entrada_por_ruta, refrescar_volumen, refrescar_incremental_global actualizan last_checked_at sin nuevas generaciones (.10.4).
+- Mantenimiento: marcar_entradas_eliminadas, limpiar_generaciones_antiguas, detectar_cambios_incrementales, detectar_renombrados implementados (.10.4).
+- No se lanzó ninguna aplicación; sin interacción gráfica; sin modificación de entidades de producción ni archivos de usuario.
+MATRIZ DE COBERTURA CONSOLIDADA (volumen / tipo entrada / estado acceso / consulta / persistencia / actualización incremental / mantenimiento / preflight):
+| Dimensión | Escenario | Estado | Evidencia real |
+| Volumen | C: local montado | COMPLETO | scan-68602080..., 5.090.349 entradas, cobertura 100.00%, 2333.622 s |
+| Volumen | Red/extraíbles | EXCLUIDOS | 0 detectados, política exige consentimiento explícito |
+| Volumen | Linux/macOS adaptadores | NO VERIFICADO | No existen adaptadores nativos en este equipo |
+| Tipo entrada | ejecutable | DISPONIBLE | charmap.exe, preflight valid=True, launch_type=ejecutable |
+| Tipo entrada | acceso_directo | NO VERIFICADO | .lnk real validado, 0 candidatos registrados (.10.9) |
+| Tipo entrada | uri_aplicacion | NO VERIFICADO | ms-settings:/https: valid=True, 0 candidatos (.10.9) |
+| Tipo entrada | paquete | NO VERIFICADO | .appx/.msix detectable, 0 candidatos validados (.10.9) |
+| Tipo entrada | bundle | NO SOPORTADO | .app macOS, no aplica Windows 11 (.10.9) |
+| Tipo entrada | lanzador | NO VERIFICADO | steam:// preflight valid=False, 0 candidatos (.10.9) |
+| Estado acceso | archivo oculto | VERIFICADO | FILE_ATTRIBUTE_HIDDEN en attributes (.10.5) |
+| Estado acceso | ruta Unicode | VERIFICADO | normalización NFC (.10.5) |
+| Estado acceso | ruta larga | VERIFICADO | prefijo \\?\ Windows (>260) (.10.5) |
+| Estado acceso | permiso denegado | VERIFICADO | categoría permiso_denegado, recorrido continúa sin abortar (.10.5) |
+| Consulta | search paginada + evidencia | VERIFICADO | search_con_evidencia, diferenciar_estado_acceso |
+| Persistencia | SQLite real, nueva instancia recupera | VERIFICADO | 7/7 persistencia, migración v1→v5 (.10.2) |
+| Actualización incremental | refrescar_* sin nuevas generaciones | VERIFICADO | last_checked_at actualizado (.10.4) |
+| Mantenimiento | backup/corrupción/recuperación | VERIFICADO | verify_integrity, restaurar_desde_backup (.10.2) |
+| Preflight integración | validar_destino real | VERIFICADO | ejecutable/.lnk/URI valid=True, steam:// valid=False |
+| Entidades globales | no alteradas por inventario | VERIFICADO | hashes iguales antes/después salvo efecto ApplicationManager.init documentado |
+ESCENARIOS PENDIENTES / PARCIALES / BLOQUEADOS (explícitos):
+- .10.14: Muestra estratificada del inventario real vs consultas directas del SO (directorios raíz, subdirectorios profundos, ocultos, del sistema, Unicode, zonas con permisos restringidos); registrar falsos positivos, omisiones y causas — PENDIENTE.
+- .10.14.1: Crear tests/hands/test_escaneo_volumenes_locales_completo_entorno_real.py como prueba opt-in de sistema real (enumerar volúmenes locales montados, RecorridoVolumen por volumen, persistir en SQLite real, autorización explícita antes de la primera ejecución global, solo lectura de metadatos, sin unidades de red/extraíbles salvo consentimiento, no ejecutar en suite normal ni al arranque) — PENDIENTE (archivo existe pero sin registro de cierre de unidad).
+- .10.14.2: Ejecutar prueba global por volumen: registrar identificador, tipo, punto de montaje, entradas detectadas, exclusiones, denegaciones, errores, cobertura no recorrida, duración, CPU, memoria, E/S; contrastar muestra independiente con enumeración directa del SO; verificar interrupción no convierte el scan en completo — PENDIENTE (requiere autorización explícita de alcance).
+- .10.15: Verificar que la ejecución completa no altera archivos originales, datos persistentes protegidos ni configuración de pantalla/ventanas del usuario — PENDIENTE.
+- .10.16: Cerrar .10 solo cuando escaneo real de todos los volúmenes locales, consultas, persistencia, operación controlada, integración con preflight, seguridad, privacidad, cobertura independiente y no regresión tengan evidencia registrada — PENDIENTE.
+- Linux/macOS: NO VERIFICADOS / BLOQUEADOS (no hay adaptadores; requieren pruebas nativas en esos SO).
+- Red/extraíbles: EXCLUIDOS por defecto (inclusión requiere política explícita).
+- acceso_directo / uri_aplicacion / paquete / lanzador: NO VERIFICADOS (0 candidatos; .10.9). Apertura real de aplicaciones reservada para 3.8.5.4 (3.8.5.4.2.6).
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: NA (no se crearon tests nuevos en esta unidad; se consolidan los existentes); DOCUMENTACIÓN: NA (no hay cambios de src/ que requieran actualizar docs/README.md ni de tests que requieran actualizar docs/README_TESTS.md; no se creó ni modificó README_DATA.md porque no hay cambios de formato de datos).
+TESTS Y RESULTADOS: UNITARIOS: NA (consolidación de evidencia de unidades previas; suites de referencia ya verdes: test_system_inventory.py + test_system_inventory_storage.py = 331/331 PASSED en .10.1; 16 suites de no-regresión = 1271/1271 PASSED en .10.11; test_clasificacion_tipos_lanzamiento_entorno_real.py = 13/13 PASSED en .10.9; test_matriz_sistemas_operativos_adaptadores_entorno_real.py = 11/11 PASSED en .10.10); INTEGRACIÓN: main.py importa correctamente; NO REGRESIÓN: 1271/1271 PASSED en .10.11, 483/483 suites relacionadas en .10.9.
+VERIFICACIÓN: SINTAXIS: OK; MAIN.PY: OK (importa sin cambios); COMPORTAMIENTO / INTEGRACIÓN REAL: Windows 11, Python 3.14.7 (x64), equipo DESKTOP-OUA1CIO, machine_id real de generate_machine_id(); escaneo real de producción completado y persistido (5.090.349 entradas en C:); preflight real contra destinos reales sin lanzar procesos; sin interacción gráfica; entidades de producción sin alterar indebidamente; archivos de usuario sin tocar.
+DISCREPANCIAS: Ninguna. El hash de data/memory/entities.json difiere del baseline de .10.9 por el efecto documentado de ApplicationManager.init (registrado como hallazgo ajeno, no como discrepancia activa).
+PENDIENTES: .10.14, .10.14.1, .10.14.2, .10.15, .10.16 (hermanas de .10.13 bajo padre 3.8.5.1.4.10); siguiente hoja pendiente real: 3.8.5.1.4.10.14.1.
+ESTADO FINAL: 3.8.5.1.4.10.13 - IMPLEMENTADA
