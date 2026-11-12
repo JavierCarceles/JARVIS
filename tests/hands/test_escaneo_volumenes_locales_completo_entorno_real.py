@@ -20,6 +20,7 @@ Por defecto guarda el escaneo en la base de datos real de JARVIS:
 
 Uso:
     # Escaneo completo de C: en la BD real de JARVIS (recomendado).
+    # Requiere JARVIS_AUTORIZAR_ESCANEO_VOLUMEN_GLOBAL=1 (escaneo global de raiz de volumen).
     python tests/hands/test_escaneo_volumenes_locales_completo_entorno_real.py
 
     # Prueba rapida en un subarbol pequeno con BD temporal (no afecta a JARVIS).
@@ -44,11 +45,20 @@ from src.hands.system_inventory import (
     ProgresoRecorrido,
     default_contract,
     detectar_sistema,
+    enumerar_volumenes_comun,
     generate_machine_id,
     escanear_volumen,
     escanear_ruta,
 )
 from src.hands.system_inventory_storage import SystemInventoryStorage
+
+
+# Prueba opt-in de entorno real (3.8.5.1.4.10.14.1): se lanza unicamente de
+# forma manual con `python ...` (para escaneo global de raiz de volumen, ademas
+# con JARVIS_AUTORIZAR_ESCANEO_VOLUMEN_GLOBAL=1). Nunca forma parte de la suite
+# automatizada de pytest ni del arranque de JARVIS.
+if "pytest" in sys.modules:
+    __test__ = False
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -73,6 +83,34 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+VAR_AUTORIZACION_GLOBAL = "JARVIS_AUTORIZAR_ESCANEO_VOLUMEN_GLOBAL"
+"""Variable de entorno que autoriza el escaneo global (raiz de volumen completo)."""
+
+
+def _es_raiz_de_volumen(ruta: str) -> bool:
+    """Devuelve True si la ruta indicada es la raiz de un volumen (ej. C:)."""
+    _drive, _resto = os.path.splitdrive(os.path.abspath(ruta))
+    if not _drive:
+        return False
+    return _resto.strip("\\/") == ""
+
+
+def _exigir_autorizacion_global(raiz: str) -> None:
+    """Exige autorizacion expresa antes de escanear una raiz de volumen completa.
+
+    Si falta la variable de entorno `JARVIS_AUTORIZAR_ESCANEO_VOLUMEN_GLOBAL=1`
+    y `raiz` es una raiz de volumen, aborta la prueba con `SkipTest`. Los
+    subarboles controlados (no raiz de volumen) no requieren esta autorizacion.
+    """
+    if _es_raiz_de_volumen(raiz) and os.environ.get(VAR_AUTORIZACION_GLOBAL) != "1":
+        raise unittest.SkipTest(
+            "Escaneo global de volumen completo requiere autorizacion expresa. "
+            f"Establezca la variable de entorno {VAR_AUTORIZACION_GLOBAL}=1 y vuelva a ejecutar. "
+            "Para una prueba controlada use --raiz con un subarbol (no raiz de volumen) "
+            "y --db-path con una base de datos temporal."
+        )
+
+
 class TestEscaneoVolumenesLocalesCompletoEntornoReal(unittest.TestCase):
     """Escaneo completo de volumenes locales en el equipo real."""
 
@@ -84,6 +122,26 @@ class TestEscaneoVolumenesLocalesCompletoEntornoReal(unittest.TestCase):
         machine_id = generate_machine_id()
         contrato = default_contract()
         contrato.machine_id = machine_id
+
+        # Autorizacion expresa obligatoria antes de cualquier escaneo global
+        # (raiz de volumen completo). Los subarboles controlados no la requieren.
+        _exigir_autorizacion_global(args.raiz)
+
+        # Enumerar con el adaptador de produccion todos los volumenes locales
+        # montados admitidos (solo lectura de metadatos).
+        volumenes_detectados = enumerar_volumenes_comun()
+        print(
+            f"\nVOLUMENES LOCALES MONTADOS (adaptador de produccion): "
+            f"{len(volumenes_detectados)}",
+            flush=True,
+        )
+        for _v in volumenes_detectados:
+            print(
+                f"  identificador={_v.identificador} raiz={_v.raiz} "
+                f"tipo={_v.tipo.value} disponible={_v.disponible} "
+                f"estado={_v.estado.value} sistema_origen={_v.sistema_origen}",
+                flush=True,
+            )
 
         # Contrastar volumen detectado por el adaptador con el SO.
         sistema = detectar_sistema()
