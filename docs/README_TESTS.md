@@ -94,6 +94,7 @@
 - [`hands\test_restore_window_state.py`](#hands/test-restore_window_state)
 - [`hands\test_system_inventory.py`](#hands/test-system_inventory)
 - [`hands\test_system_inventory_storage.py`](#hands/test-system_inventory_storage)
+- [`hands\test_inventario_oculto_unicode_largo_permisos_entorno_real.py`](#hands/test-inventario_oculto_unicode_largo_permisos_entorno_real)
 - [`hands\test_persistencia_recuperacion_inventario_entorno_real.py`](#hands/test-persistencia_recuperacion_inventario_entorno_real)
 - [`hands\test_diferenciacion_estado_acceso_entorno_real.py`](#hands/test-diferenciacion_estado_acceso_entorno_real)
 - [`hands\test_revalidar_destino_aplicacion_entorno_real.py`](#hands/test-revalidar_destino_aplicacion_entorno_real)
@@ -11284,6 +11285,19 @@ decidan el resultado. Todo se limpia al finalizar.
 **Clases de test:** ninguna (funciones de test de módulo).
 
 **Resultados:** 5 pruebas de verificación en entorno real, 5 PASSED / 0 FAILED.
+
+---
+
+<a name="hands/test-inventario_oculto_unicode_largo_permisos_entorno_real"></a>
+### `hands\test_inventario_oculto_unicode_largo_permisos_entorno_real.py`
+
+**Descripción:** Verificación en entorno real para la unidad 3.8.5.1.4.10.5. Comprueba que el escáner de producción (`RecorridoVolumen` / `escanear_ruta`) registra correctamente en el sistema real: (1) archivos ocultos con atributo real del SO aparecen con "hidden" en `attributes`; (2) rutas Unicode (caracteres no ASCII en nombres de archivo) se registran sin error y con normalización NFC; (3) rutas largas que superan MAX_PATH (260 caracteres en Windows) se almacenan con el prefijo de ruta larga `\\\\?\\`; (4) directorios con permiso denegado real se registran con categoría "permiso_denegado" sin abortar el recorrido, y su contenido no se lista; (5) lo que no pudo inspeccionarse se indica explícitamente mediante `errores_por_categoria` y `scan_run.errors_count`. También verifica privacidad: el inventario solo registra metadatos, nunca el contenido de archivos. Todos los tests usan directorios temporales (`tmp_path`) y SQLite temporal; no tocan datos de producción ni rutas de usuario; no usan mocks que decidan el resultado; limpian recursos (incluyendo restauración de permisos y atributos ocultos) al finalizar.
+
+**Módulos de origen probados:** src.hands.system_inventory, src.hands.system_inventory_storage
+
+**Clases de test:** ninguna (funciones de test de módulo).
+
+**Resultados:** 6 pruebas de verificación en entorno real, 6 PASSED / 0 FAILED.
 
 ---
 
