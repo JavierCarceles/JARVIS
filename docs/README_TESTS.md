@@ -11274,6 +11274,19 @@ decidan el resultado. Todo se limpia al finalizar.
 
 ---
 
+<a name="hands/test-inventario_vs_sistema_archivos_entorno_real"></a>
+### `hands\test_inventario_vs_sistema_archivos_entorno_real.py`
+
+**Descripción:** Verificación en entorno real del contraste entre el inventario persistente del sistema de archivos y el estado observable del sistema operativo. Crea un árbol de archivos reales en un directorio temporal, escanea con el código de producción (`escanear_ruta` + `SystemInventoryStorage`) y valida cada entrada contra el SO real mediante `search_con_evidencia` -> `validar_destino` (existencia, tipo, volumen, identidad y accesibilidad). Luego comprueba que una alta (archivo nuevo), un cambio (modificación de tamaño) y una eliminación (archivo borrado) se reflejan correctamente en el siguiente inventario o en el refresco puntual de ruta, comparando el estado antes y después sobre el sistema de archivos real. Todo se ejecuta sobre directorios temporales y base de datos SQLite temporal; no toca datos de producción ni rutas de usuario, no usa mocks que decidan el resultado y limpia los recursos al finalizar.
+
+**Módulos de origen probados:** src.hands.system_inventory, src.hands.system_inventory_storage
+
+**Clases de test:** ninguna (funciones de test de módulo).
+
+**Resultados:** 5 pruebas de verificación en entorno real, 5 PASSED / 0 FAILED.
+
+---
+
 <a name="hands/test-filesystem_observer"></a>
 ### `hands\test_filesystem_observer.py` (162 líneas)
 
