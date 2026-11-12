@@ -667,18 +667,24 @@ class SystemInventoryStorage:
     ) -> dict:
         """Comprueba si el equipo registrado en la base coincide con el actual.
 
-        No modifica la base de datos. Retorna un informe con
-        `maquina_actual`, `maquina_registrada`, `equipo_coincide`, `bloqueado`
-        y `motivo`. Si no hay equipo registrado aún, no se bloquea.
-        (3.8.5.1.4.8.4)
+        Lee todas las maquinas registradas (no solo la primera), de modo que
+        la deteccion de host distinto sea determinista incluso si la base de
+        datos se copio a otro equipo. No modifica la base de datos. Retorna un
+        informe con `maquina_actual`, `maquinas_registradas`,
+        `maquina_registrada`, `equipo_coincide`, `bloqueado`,
+        `requiere_reescaneo` y `motivo`. Si no hay equipo registrado aun, no
+        se bloquea. (3.8.5.1.4.8.4, 3.8.5.1.4.9.7)
         """
         if machine_id_actual is None:
             machine_id_actual = generate_machine_id()
+        maquinas_registradas: list[str] = []
         informe: dict[str, object] = {
             "maquina_actual": machine_id_actual,
+            "maquinas_registradas": maquinas_registradas,
             "maquina_registrada": None,
             "equipo_coincide": False,
             "bloqueado": False,
+            "requiere_reescaneo": False,
             "motivo": None,
         }
         if not self.db_path.exists():
@@ -688,23 +694,26 @@ class SystemInventoryStorage:
             return informe
         try:
             conn = self.connect()
-            cur = conn.execute("SELECT machine_id FROM machines LIMIT 1")
-            row = cur.fetchone()
-            if row is None:
+            cur = conn.execute("SELECT machine_id FROM machines")
+            for row in cur.fetchall():
+                maquinas_registradas.append(str(row["machine_id"]))
+            if not maquinas_registradas:
                 informe["motivo"] = "No hay equipo registrado aún en la base de datos."
                 return informe
-            maquina_registrada = row["machine_id"]
-            informe["maquina_registrada"] = maquina_registrada
-            informe["equipo_coincide"] = maquina_registrada == machine_id_actual
+            informe["maquina_registrada"] = maquinas_registradas[0]
+            informe["equipo_coincide"] = machine_id_actual in maquinas_registradas
             if not informe["equipo_coincide"]:
                 informe["bloqueado"] = True
+                informe["requiere_reescaneo"] = True
                 informe["motivo"] = (
                     f"El inventario pertenece al equipo "
-                    f"{maquina_registrada!r}, no al equipo actual "
-                    f"{machine_id_actual!r}."
+                    f"{maquinas_registradas[0]!r}, no al equipo actual "
+                    f"{machine_id_actual!r}. Reescanee el equipo antes de usar "
+                    "sus destinos."
                 )
         except sqlite3.OperationalError as exc:
             informe["bloqueado"] = True
+            informe["requiere_reescaneo"] = True
             informe["motivo"] = f"No se pudo leer la identidad del equipo: {exc}"
         return informe
 
@@ -2104,7 +2113,33 @@ class SystemInventoryStorage:
                 "scan_id": None,
                 "last_checked_at": None,
                 "entradas_refrescadas": 0,
+                "host_distinto": False,
+                "requiere_reescaneo": False,
                 "razon": "Destino vacío o no es una cadena.",
+            }
+
+        # 3.8.5.1.4.9.7: si el inventario pertenece a otro equipo (base de
+        # datos copiada a otro host), no se revalida ni se usa ningun destino;
+        # se exige reescaneo antes de usar destinos.
+        identidad = self.verificar_identidad_equipo(machine_id)
+        if identidad.get("bloqueado"):
+            return {
+                "valido": False,
+                "existe": False,
+                "es_archivo": False,
+                "ruta": ruta,
+                "normalized_path": "",
+                "machine_id": machine_id,
+                "volume": volume,
+                "scan_id": None,
+                "last_checked_at": None,
+                "entradas_refrescadas": 0,
+                "host_distinto": True,
+                "requiere_reescaneo": True,
+                "razon": str(
+                    identidad.get("motivo")
+                    or "El inventario pertenece a otro equipo; requiere reescaneo antes de usar destinos."
+                ),
             }
 
         self.record_machine(machine_id)
@@ -2156,6 +2191,8 @@ class SystemInventoryStorage:
             "scan_id": scan_id,
             "last_checked_at": ahora,
             "entradas_refrescadas": entradas_refrescadas,
+            "host_distinto": False,
+            "requiere_reescaneo": False,
             "razon": razon,
         }
 

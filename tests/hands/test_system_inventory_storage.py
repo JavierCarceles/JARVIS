@@ -209,8 +209,123 @@ class TestProteccionPermisosYIdentidad:
 
 
 # ---------------------------------------------------------------------------
-# Equipos y volumenes (aislamiento por equipo)
+# Aislamiento de equipo cuando la base de datos se copia a otro host (3.8.5.1.4.9.7)
 # ---------------------------------------------------------------------------
+
+class TestAislamientoEquipoAlCopiarBaseDeDatos:
+    """El inventario permanece aislado por equipo incluso si su base de datos
+    se copia a otro equipo: se detecta el host distinto y se exige reescaneo
+    antes de usar destinos (unidad 3.8.5.1.4.9.7).
+    Todas las pruebas usan bases SQLite temporales y nunca tocan datos de
+    produccion.
+    """
+
+    def test_deteccion_host_distinto_en_base_de_otro_equipo(
+        self, storage: SystemInventoryStorage, db_path: Path
+    ):
+        """Base de otro equipo (solo su machine_id registrado): el equipo
+        actual no figura entre los registrados, por lo que se bloquea y se
+        exige reescaneo antes de usar destinos (3.8.5.1.4.9.7)."""
+        maquina_original = generate_machine_id()
+        maquina_actual = "maquina-actual-inexistente-97"
+        storage.initialize(machine_id_actual=maquina_original)
+        storage.record_machine(maquina_original)
+
+        filas = storage.connect().execute("SELECT machine_id FROM machines").fetchall()
+        storage.close()
+        maquinas = {str(f["machine_id"]) for f in filas}
+        assert maquinas == {maquina_original}
+
+        informe = storage.verificar_identidad_equipo(maquina_actual)
+        assert informe["bloqueado"] is True
+        assert informe["equipo_coincide"] is False
+        assert informe["requiere_reescaneo"] is True
+        assert informe["maquina_registrada"] == maquina_original
+        assert informe["maquinas_registradas"] == [maquina_original]
+        assert maquina_actual not in informe["maquinas_registradas"]
+        assert informe["motivo"] is not None
+        assert "reescan" in informe["motivo"].lower()
+
+    def test_verificar_identidad_equipo_host_distinto_informe_completo(
+        self, storage: SystemInventoryStorage, db_path: Path
+    ):
+        """Informe de host distinto con todos los campos de 3.8.5.1.4.9.7."""
+        maquina_a = "maquina-a-97"
+        maquina_b = "maquina-b-97"
+        storage.initialize(machine_id_actual=maquina_a)
+        storage.record_machine(maquina_a)
+        storage.record_volume("vol-c:", maquina_a, "C:", "local", "online")
+
+        informe_a = storage.verificar_identidad_equipo(maquina_a)
+        assert informe_a["bloqueado"] is False
+        assert informe_a["equipo_coincide"] is True
+        assert informe_a["requiere_reescaneo"] is False
+        assert informe_a["maquina_registrada"] == maquina_a
+
+        informe_b = storage.verificar_identidad_equipo(maquina_b)
+        assert informe_b["bloqueado"] is True
+        assert informe_b["equipo_coincide"] is False
+        assert informe_b["requiere_reescaneo"] is True
+        assert informe_b["maquina_registrada"] == maquina_a
+        assert informe_b["maquinas_registradas"] == [maquina_a]
+        assert informe_b["maquina_actual"] == maquina_b
+        assert informe_b["motivo"] is not None
+
+    def test_verificar_identidad_equipo_sin_registro_no_bloquea(
+        self, storage: SystemInventoryStorage, db_path: Path
+    ):
+        """Sin equipo registrado aun, no se bloquea ni se exige reescaneo."""
+        storage.initialize()
+        maquina = generate_machine_id()
+        informe = storage.verificar_identidad_equipo(maquina)
+        assert informe["bloqueado"] is False
+        assert informe["requiere_reescaneo"] is False
+        assert informe["maquinas_registradas"] == []
+        assert "No hay equipo registrado" in informe["motivo"]
+
+    def test_revalidar_destino_aplicacion_host_distinto_rechaza_y_exige_reescaneo(
+        self, storage: SystemInventoryStorage, db_path: Path
+    ):
+        """revalidar_destino_aplicacion sobre base de otro equipo no valida
+        ningun destino, marca host_distinto y exige reescaneo."""
+        maquina_a = "maquina-a-97"
+        maquina_b = "maquina-b-97"
+        storage.initialize(machine_id_actual=maquina_a)
+        storage.record_machine(maquina_a)
+        storage.record_volume("vol-c:", maquina_a, "C:", "local", "online")
+
+        resultado = storage.revalidar_destino_aplicacion(
+            maquina_b, "C:", r"C:\Windows\System32\notepad.exe"
+        )
+        assert resultado["valido"] is False
+        assert resultado["existe"] is False
+        assert resultado["host_distinto"] is True
+        assert resultado["requiere_reescaneo"] is True
+        assert resultado["razon"] is not None
+        assert resultado["machine_id"] == maquina_b
+        assert "reescan" in resultado["razon"].lower()
+
+    def test_revalidar_destino_aplicacion_misma_maquina_sigue_funcionando(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        """Mismo equipo: la revalidacion real contra el SO sigue funcionando
+        y no marca host_distinto."""
+        storage.initialize()
+        maquina = generate_machine_id()
+        storage.record_machine(maquina)
+        storage.record_volume("vol-c:", maquina, "C:", "local", "online")
+
+        ejecutable = tmp_path / "app_valida_97.exe"
+        ejecutable.write_bytes(b"MZplaceholder")
+
+        resultado = storage.revalidar_destino_aplicacion(
+            maquina, "C:", str(ejecutable)
+        )
+        assert resultado["valido"] is True
+        assert resultado["existe"] is True
+        assert resultado["es_archivo"] is True
+        assert resultado["host_distinto"] is False
+        assert resultado["requiere_reescaneo"] is False
 
 class TestMaquinasYVolumenes:
     """Registro de equipos y volumenes con aislamiento por `machine_id`."""

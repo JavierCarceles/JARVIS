@@ -29,6 +29,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -64,7 +65,7 @@ from src.hands.application_launch_classifier import (
     CONFIANZA_NINGUNA,
     LaunchClassifier,
 )
-from src.hands.system_inventory import EntryType
+from src.hands.system_inventory import EntryType, generate_machine_id
 from src.hands.system_inventory_storage import (
     SCAN_MODE_FULL,
     SCAN_RESULT_OK,
@@ -1433,9 +1434,185 @@ class TestEstadoVigenteRutasInaccesibles:
 
 
 # ---------------------------------------------------------------------------
-# Unidad 3.8.5.1.4.9.5: conexion del resultado de resolucion con
-# ApplicationManager / ApplicationKnowledge (catalogo global entities.json)
+# Unidad 3.8.5.1.4.9.7: aislamiento por equipo y volumen del inventario;
+# deteccion de host distinto y exigencia de reescaneo antes de usar destinos
 # ---------------------------------------------------------------------------
+
+
+class TestAislamientoInventarioPorEquipo:
+    """El inventario persistente esta aislado por equipo: si la base de datos
+    se copia a otro host, no se usan sus destinos y se exige reescaneo.
+    Ninguna prueba lanza aplicaciones ni modifica entities.json."""
+
+    def test_inventario_de_otro_equipo_no_se_consulta(
+        self, tmp_path: Path
+    ):
+        """Storage de maquina distinta: discovery no consulta el inventario y
+        senaliza requiere_reescaneo."""
+        db_path = tmp_path / "inventario_otro_equipo.sqlite3"
+        storage = SystemInventoryStorage(db_path=db_path)
+        storage.initialize(machine_id_actual="maquina-otra-97")
+        storage.record_machine("maquina-otra-97")
+        storage.record_volume("vol-c:", "maquina-otra-97", "C:", "local", "online")
+
+        preflight = ApplicationPreflight()
+        clasificador = LaunchClassifier(preflight=preflight)
+        calib = MagicMock()
+        calib.discover_applications.return_value = []
+        discovery = ApplicationDiscovery(
+            preflight=preflight,
+            clasificador=clasificador,
+            storage=storage,
+            calibration=calib,
+            machine_id="maquina-actual-97",
+        )
+
+        informe = discovery.verificar_aislamiento_inventario()
+        assert informe["bloqueado"] is True
+        assert informe["equipo_coincide"] is False
+        assert informe["requiere_reescaneo"] is True
+        assert informe["inventario_utilizable"] is False
+        assert discovery.inventario_requiere_reescaneo is True
+        assert discovery.inventario_utilizable_para_maquina_actual is False
+        assert discovery.informe_aislamiento_ultima_resolucion["requiere_reescaneo"] is True
+
+        # El inventario no se consulta como fuente complementaria.
+        resultado = discovery.buscar_por_nombre("cualquierapp", incluir_inventario=True)
+        assert resultado == []
+
+    def test_misma_maquina_inventario_utilizable(
+        self, tmp_path: Path
+    ):
+        """Mismo equipo: el inventario puede consultarse y no senaliza
+        reescaneo."""
+        maquina = generate_machine_id()
+        db_path = tmp_path / "inventario_misma_maquina.sqlite3"
+        storage = SystemInventoryStorage(db_path=db_path)
+        storage.initialize(machine_id_actual=maquina)
+        storage.record_machine(maquina)
+        storage.record_volume("vol-c:", maquina, "C:", "local", "online")
+
+        preflight = ApplicationPreflight()
+        clasificador = LaunchClassifier(preflight=preflight)
+        calib = MagicMock()
+        calib.discover_applications.return_value = []
+        discovery = ApplicationDiscovery(
+            preflight=preflight,
+            clasificador=clasificador,
+            storage=storage,
+            calibration=calib,
+            machine_id=maquina,
+        )
+
+        informe = discovery.verificar_aislamiento_inventario()
+        assert informe["bloqueado"] is False
+        assert informe["equipo_coincide"] is True
+        assert informe["requiere_reescaneo"] is False
+        assert informe["inventario_utilizable"] is True
+        assert discovery.inventario_utilizable_para_maquina_actual is True
+        assert discovery.inventario_requiere_reescaneo is False
+
+    def test_inventario_copiado_a_otro_equipo_no_se_usa_entorno_real(
+        self, tmp_path: Path
+    ):
+        """Copia fisica de la base de inventario en otro equipo (simulado con
+        machine_id distinto): no se usan los destinos del inventario copiado y
+        se exige reescaneo. La base original del equipo actual sigue sirviendo
+        sus candidatos. No se lanza ninguna aplicacion."""
+        notepad = r"C:\Windows\System32\notepad.exe"
+        if not os.path.exists(notepad):
+            pytest.skip("notepad.exe no disponible en este equipo")
+
+        maquina_actual = generate_machine_id()
+        maquina_otra = "maquina-otra-97-inexistente"
+
+        # Base de inventario real del equipo actual con un candidato de
+        # inventario que solo existe ahi.
+        with tempfile.NamedTemporaryFile(suffix=".exe", delete=False) as f:
+            f.write(b"MZplaceholder")
+            ruta_inventario_real = f.name
+        try:
+            db_path = tmp_path / "inventario_real.sqlite3"
+            storage = SystemInventoryStorage(db_path=db_path)
+            storage.initialize(machine_id_actual=maquina_actual)
+            storage.record_machine(maquina_actual)
+            storage.record_volume("vol-c:", maquina_actual, "C:", "local", "online")
+            storage.begin_scan_run("scan-97", maquina_actual, "C:", SCAN_MODE_FULL, "2024-01-03T00:00:00")
+            storage.insert_file_entries("scan-97", maquina_actual, "C:", [
+                {
+                    "entry_id": "e-app-97",
+                    "absolute_path": ruta_inventario_real,
+                    "relative_path": ruta_inventario_real,
+                    "name": "appinventario97.exe",
+                    "extension": ".exe",
+                    "entry_type": EntryType.FILE.value,
+                    "size_bytes": 1024,
+                    "modified_at": "2024-01-01T10:00:00",
+                    "created_at": "2024-01-01T09:00:00",
+                    "attributes": [],
+                    "excluded": False,
+                    "source": "filesystem_scan",
+                    "last_checked_at": "2024-01-03T00:00:00",
+                },
+            ])
+            storage.end_scan_run("scan-97", "2024-01-03T01:00:00", SCAN_RESULT_OK, 1, 0, 0, 100.0)
+
+            preflight = ApplicationPreflight()
+            clasificador = LaunchClassifier(preflight=preflight)
+            calib = MagicMock()
+            calib.discover_applications.return_value = []
+            discovery_actual = ApplicationDiscovery(
+                preflight=preflight,
+                clasificador=clasificador,
+                storage=storage,
+                calibration=calib,
+                machine_id=maquina_actual,
+            )
+
+            # Mismo equipo: el candidato del inventario se resuelve.
+            resultado_actual = discovery_actual.buscar_por_nombre(
+                "appinventario97", incluir_inventario=True
+            )
+            assert len(resultado_actual) == 1
+            assert resultado_actual[0].fuente == FUENTE_INVENTARIO
+            assert str(resultado_actual[0].destination or "").casefold() == ruta_inventario_real.casefold()
+            assert discovery_actual.inventario_utilizable_para_maquina_actual is True
+
+            # Cerrar la conexion original (checkpoint del modo WAL) antes de
+            # copiar el fichero, para que la copia contenga todo lo commitado.
+            storage.close()
+
+            # Copia fisica de la base a otro equipo.
+            db_copia = tmp_path / "inventario_copia.sqlite3"
+            shutil.copy2(db_path, db_copia)
+
+            storage_copia = SystemInventoryStorage(db_path=db_copia)
+            discovery_otra = ApplicationDiscovery(
+                preflight=preflight,
+                clasificador=clasificador,
+                storage=storage_copia,
+                calibration=calib,
+                machine_id=maquina_otra,
+            )
+
+            informe_otra = discovery_otra.verificar_aislamiento_inventario()
+            assert informe_otra["bloqueado"] is True
+            assert informe_otra["equipo_coincide"] is False
+            assert informe_otra["requiere_reescaneo"] is True
+            assert informe_otra["inventario_utilizable"] is False
+
+            # El inventario copiado no se consulta: no devuelve sus destinos.
+            resultado_otra = discovery_otra.buscar_por_nombre(
+                "appinventario97", incluir_inventario=True
+            )
+            assert resultado_otra == []
+            assert discovery_otra.inventario_requiere_reescaneo is True
+            assert discovery_otra.informe_aislamiento_ultima_resolucion["requiere_reescaneo"] is True
+
+            storage_copia.close()
+        finally:
+            if os.path.exists(ruta_inventario_real):
+                os.unlink(ruta_inventario_real)
 
 
 class _AppManagerFake:

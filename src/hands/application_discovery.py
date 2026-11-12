@@ -7,6 +7,14 @@ accesos directos .lnk del menu Inicio, paquetes AppX, registro de desinstaladore
 rutas PATH y App Paths del registro de Windows) y (2), solo para destinos faltantes,
 el inventario persistente del sistema de archivos como fuente complementaria.
 
+Unidad 3.8.5.1.4.9.7: antes de consultar el inventario se verifica que este
+pertenezca al equipo actual (`verificar_aislamiento_inventario`, delegado en
+`SystemInventoryStorage.verificar_identidad_equipo`). Si la base de datos del
+inventario se copio a otro equipo (host distinto), no se consultan ni se usan
+los destinos del inventario y se senaliza que se exige reescaneo antes de
+usarlos (`inventario_requiere_reescaneo`). `record_machine` nunca mezcla
+identidades de equipos distintos en una misma base.
+
 Este modulo NO lanza aplicaciones, no modifica `data/knowledge/entities.json` ni el
 catalogo conocido, y no persiste capacidades inferidas. Toda validacion de destino
 se delega en `ApplicationPreflight.validate_launch_destination` (sin lanzar). Es de
@@ -320,6 +328,10 @@ class ApplicationDiscovery:
         # accesible (ruta cambiada, desaparecida o inaccesible); su estado se
         # actualiza (disponible=False) y su ruta no se intenta ni se devuelve.
         self._inaccesibles_ultima_resolucion: list[DiscoveredCandidate] = []
+        # Informe de aislamiento del equipo para el inventario persistente
+        # (unidad 3.8.5.1.4.9.7): se rellena al verificar la identidad antes de
+        # usar destinos del inventario.
+        self._informe_aislamiento_ultima_resolucion: Optional[dict] = None
 
     # ------------------------------------------------------------------ #
     # API pública
@@ -460,25 +472,32 @@ class ApplicationDiscovery:
         if incluir_inventario and (
             not crudos or nombre_lower not in nombres_resueltos
         ):
-            try:
-                self.storage.connect()
-                entradas = self.storage.search(
-                    machine_id=self.machine_id,
-                    extension=".exe",
-                    tipo=EntryType.FILE.value,
-                    disponible=True,
-                    limit=limite_por_fuente,
-                    solo_volumes_montados=True,
-                )
-            except (OSError, PermissionError, sqlite3.Error):
+            self.verificar_aislamiento_inventario()
+            if not self.inventario_utilizable_para_maquina_actual:
+                # 3.8.5.1.4.9.7: el inventario pertenece a otro equipo (base de
+                # datos copiada a otro host); no se consultan ni se usan sus
+                # destinos hasta reescanear el equipo actual.
                 entradas = []
-            except Exception:
-                entradas = []
-            finally:
+            else:
                 try:
-                    self.storage.close()
+                    self.storage.connect()
+                    entradas = self.storage.search(
+                        machine_id=self.machine_id,
+                        extension=".exe",
+                        tipo=EntryType.FILE.value,
+                        disponible=True,
+                        limit=limite_por_fuente,
+                        solo_volumes_montados=True,
+                    )
+                except (OSError, PermissionError, sqlite3.Error):
+                    entradas = []
                 except Exception:
-                    pass
+                    entradas = []
+                finally:
+                    try:
+                        self.storage.close()
+                    except Exception:
+                        pass
 
             if entradas:
                 fuentes_consultadas.append(FUENTE_INVENTARIO)
@@ -855,6 +874,74 @@ class ApplicationDiscovery:
         """
         return list(self._inaccesibles_ultima_resolucion)
 
+    # ------------------------------------------------------------------ #
+    # Aislamiento por equipo y volumen del inventario (3.8.5.1.4.9.7)
+    # ------------------------------------------------------------------ #
+
+    def verificar_aislamiento_inventario(self) -> dict:
+        """Comprueba si el inventario persistente pertenece al equipo actual.
+
+        Delegacion en `SystemInventoryStorage.verificar_identidad_equipo`.
+        Detecta el caso de base de datos copiada a otro equipo (host distinto)
+        y exige reescaneo/revalidacion antes de usar cualquier destino del
+        inventario: cuando el equipo no coincide, el inventario no se consulta
+        ni se usan sus destinos.
+
+        Retorna un diccionario con `maquina_actual`, `maquina_registrada`,
+        `equipo_coincide`, `bloqueado`, `requiere_reescaneo`,
+        `inventario_utilizable` y `motivo`. El resultado se almacena en
+        `informe_aislamiento_ultima_resolucion`.
+        """
+        informe = self.storage.verificar_identidad_equipo(self.machine_id)
+        if not isinstance(informe, dict):
+            # Almacenamiento sin informe de identidad de equipo (doble de
+            # prueba o implementacion sin esta capacidad): no se puede exigir
+            # el aislamiento, por lo que no se bloquea el inventario.
+            normalizado: dict[str, object] = {
+                "maquina_actual": self.machine_id,
+                "maquina_registrada": None,
+                "equipo_coincide": True,
+                "bloqueado": False,
+                "requiere_reescaneo": False,
+                "motivo": None,
+                "inventario_utilizable": True,
+            }
+        else:
+            normalizado: dict[str, object] = {
+                "maquina_actual": informe.get("maquina_actual"),
+                "maquina_registrada": informe.get("maquina_registrada"),
+                "equipo_coincide": bool(informe.get("equipo_coincide", False)),
+                "bloqueado": bool(informe.get("bloqueado", False)),
+                "requiere_reescaneo": bool(informe.get("requiere_reescaneo", False)),
+                "motivo": informe.get("motivo"),
+                "inventario_utilizable": bool(
+                    informe.get("equipo_coincide", False)
+                    and not informe.get("bloqueado", False)
+                ),
+            }
+        self._informe_aislamiento_ultima_resolucion = dict(normalizado)
+        return normalizado
+
+    @property
+    def informe_aislamiento_ultima_resolucion(self) -> dict:
+        """Informe de aislamiento del equipo de la ultima verificacion del
+        inventario (ver `verificar_aislamiento_inventario`)."""
+        return dict(self._informe_aislamiento_ultima_resolucion or {})
+
+    @property
+    def inventario_requiere_reescaneo(self) -> bool:
+        """True si el inventario pertenece a otro equipo y hay que reescanear
+        antes de usar sus destinos."""
+        informe = self._informe_aislamiento_ultima_resolucion or {}
+        return bool(informe.get("requiere_reescaneo", False))
+
+    @property
+    def inventario_utilizable_para_maquina_actual(self) -> bool:
+        """True si el inventario persistente puede consultarse para el equipo
+        actual (equipo coincidente y sin bloqueo)."""
+        informe = self._informe_aislamiento_ultima_resolucion or {}
+        return bool(informe.get("inventario_utilizable", False))
+
     def registrar_candidatos(
         self,
         candidatos: list[DiscoveredCandidate],
@@ -1178,6 +1265,12 @@ class ApplicationDiscovery:
 
         Lectura sola; no modifica la base de datos del inventario.
         """
+        self.verificar_aislamiento_inventario()
+        if not self.inventario_utilizable_para_maquina_actual:
+            # 3.8.5.1.4.9.7: el inventario pertenece a otro equipo (base de
+            # datos copiada a otro host); no se consultan ni se usan sus
+            # destinos hasta reescanear el equipo actual.
+            return []
         try:
             self.storage.connect()
         except Exception:

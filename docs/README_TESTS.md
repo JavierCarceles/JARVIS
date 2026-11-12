@@ -2,7 +2,7 @@
 
 > **Alcance:** documentación generada a partir de los **ficheros de prueba** (`tests/`, espejo de `src/`).
 > Cada entrada se deriva de las firmas, docstrings y clases de test extraídas mediante AST de los 149 ficheros de test (excluyendo `__pycache__`, `test__init__.py` placeholders vacíos, `__init__.py` y scripts auxiliares sin prefijo `test_`).
-> Total: 783 clases de test, 4025 métodos de test individuales.
+> Total: 785 clases de test, 4033 métodos de test individuales.
 
 ## 🗺️ Índice
 
@@ -6808,10 +6808,14 @@ verificados, sin modificar `entities.json` ni auto-registrar candidatos. Cubre l
 3.8.5.1.4.9.6: pasar los candidatos por `ApplicationPreflight` y las políticas existentes
 (política completa de pre-lanzamiento con `check()`: nombres bloqueados, app IDs bloqueados,
 login requerido, recursos no disponibles, manifest de elevación, uiAccess), sin llamar a
-`CalibrationManager.launch_application` ni depender de verificación proceso/ventana.
+`CalibrationManager.launch_application` ni depender de verificación proceso/ventana. Cubre la
+unidad 3.8.5.1.4.9.7: aislamiento del inventario por equipo y volumen, detección de host
+distinto cuando la base de datos se copia a otro equipo, exigencia de reescaneo antes de usar
+destinos (`verificar_aislamiento_inventario`, `inventario_requiere_reescaneo`,
+`inventario_utilizable_para_maquina_actual`, `informe_aislamiento_ultima_resolucion`).
 
 **Módulos de origen probados:** src.hands.application_discovery, src.hands.application_preflight,
-src.hands.application_launch_classifier
+src.hands.application_launch_classifier, src.hands.system_inventory_storage
 
 **Estrategia de mocks:** solo se mockean las fuentes de datos
 (`CalibrationManager.discover_applications` y `SystemInventoryStorage`). La clasificacion y el
@@ -6923,6 +6927,13 @@ lanza ninguna aplicacion.
     preflight_policy poblado, sin lanzar nada ni modificar entities.json.
   - `test_buscar_por_nombre_con_preflight_policy_real_cmd` (L2035): cmd.exe real, preflight_policy
     poblado, sin lanzar nada.
+
+- **`TestAislamientoInventarioPorEquipo`** (línea 2171) — 3 método(s) de test
+  - `test_inventario_de_otro_equipo_no_se_consulta`: storage de otra máquina no se consulta y
+    señala `requiere_reescaneo`; mismo equipo sí usa el inventario.
+  - `test_inventario_copiado_a_otro_equipo_no_se_usa_entorno_real`: copia física real de la base
+    SQLite de inventario con `machine_id` distinto: no se usan sus destinos y se exige
+    reescaneo; la base original del equipo actual sigue sirviendo candidatos.
 
 ---
 
@@ -11036,12 +11047,13 @@ Todos los tests usan directorios temporales (`tmp_path`) y bases de datos tempor
 | `TestConcurrenciaEscaneos` | Bloqueo de concurrencia, `ConcurrentScanError`, liberación del bloqueo y modo de journaling WAL. |
 | `TestBackupCorrupcionYRecuperacion` | Copia de seguridad, verificación de integridad (`PRAGMA quick_check` / `integrity_check`) y restauración desde copia sin sobrescribir una base válida con una copia vacía, incompleta o corrupta. |
 | `TestProteccionPermisosYIdentidad` | Protección de permisos de fichero (propietario único 0o600, ACL de Windows con fallback), identidad de equipo (`machine_id` registrado vs equipo actual, bloqueo sin decisión explícita) y no-exposición por red (ruta local vs UNC, SQLite integrado sin servidor). |
+| `TestAislamientoEquipoAlCopiarBaseDeDatos` | Aislamiento cuando la base de datos se copia a otro equipo (3.8.5.1.4.9.7): `record_machine`, `verificar_identidad_equipo` y `revalidar_destino_aplicacion` detectan el host distinto y exigen reescaneo antes de usar destinos; mismo equipo sigue funcionando. |
 | `TestLimpiezaGeneracionesAntiguas` | `limpiar_generaciones_antiguas`: elimina scan_runs antiguos protegiendo la última completa por volumen y los escaneos activos; elimina por antigüedad o exceso de generaciones; no elimina sin scan_runs. |
 | `TestLimpiezaEntradasObsoletas` | `limpiar_entradas_obsoletas`: elimina entradas OBSOLETO/EXPIRADO según TTL, protege las del último escaneo completo, no elimina sin TTL configurado. |
 | `TestLimpiezaBackupsAntiguos` | `limpiar_backups_antiguos`: conserva solo los `max_backups` .bak más recientes por mtime, no elimina si está dentro del límite, no falla sin backups. |
 | `TestEjecucionLimpiezaRetencion` | `ejecutar_limpieza_retencion`: flujo orquestado (backup previo, limpieza de generaciones, entradas obsoletas y backups antiguos), resultado `ResultadoLimpieza` con contadores reales y resumen serializable. |
 
-**Resultados:** 248 tests unitarios, 248 PASSED / 0 FAILED.
+**Resultados:** 253 tests unitarios, 253 PASSED / 0 FAILED.
 
 ---
 
