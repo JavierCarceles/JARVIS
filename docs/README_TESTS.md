@@ -78,6 +78,7 @@
 - [`hands\test_application_source_missing.py`](#hands/test-application_source_missing)
 - [`hands\test_applications_core.py`](#hands/test-applications_core)
 - [`hands\test_clasificacion_candidatos_lanzamiento_entorno_real.py`](#hands/test-clasificacion_candidatos_lanzamiento_entorno_real)
+- [`hands\test_clasificacion_tipos_lanzamiento_entorno_real.py`](#hands/test-clasificacion_tipos_lanzamiento_entorno_real)
 - [`hands\test_calibration_manager.py`](#hands/test-calibration_manager)
 - [`hands\test_calibration_requirements.py`](#hands/test-calibration_requirements)
 - [`hands\test_calibrator.py`](#hands/test-calibrator)
@@ -8385,7 +8386,30 @@ del nombre del ejecutable. No lanza ninguna aplicación ni modifica datos de usu
 
 ---
 
-<a name="hands/test-candidatos_reales_entorno_real"></a>
+<a name="hands/test-clasificacion_tipos_lanzamiento_entorno_real"></a>
+### `hands\test_clasificacion_tipos_lanzamiento_entorno_real.py`
+
+**Descripción:** Verificación en entorno real de la unidad 3.8.5.1.4.10.9. Clasifica cada tipo de
+lanzamiento declarado por el adaptador del SO (`ejecutable`, `acceso_directo`, `uri_aplicacion`,
+`paquete`, `bundle`, `lanzador`) como `disponible`, `no verificado` o `no soportado`, usando solo
+lectura de `application_candidates` (inventario real) y validaciones estáticas de
+`ApplicationPreflight.validate_launch_destination` (sin lanzar ninguna aplicación ni ejecutar
+candidatos en lote).
+
+**Módulos de origen probados:** src.hands.application_launch_classifier, src.hands.application_preflight, src.hands.system_inventory, src.hands.system_inventory_storage
+
+**Clases de test:**
+
+- **`TestTiposDeclaradosPorAdaptador`** — Verifica que el adaptador declara los seis tipos de `LaunchType`.
+- **`TestEjecutableDisponible`** — `ejecutable` disponible: candidato `charmap.exe` registrado, preflight `valid=True`, clasificador `es_lanzable=True`.
+- **`TestAccesoDirectoNoVerificado`** — `acceso_directo`: el adaptador valida `.lnk` real pero no hay candidatos registrados.
+- **`TestUriAplicacionNoVerificado`** — `uri_aplicacion`: el adaptador admite esquemas URI reales pero no hay candidatos registrados.
+- **`TestPaqueteNoVerificado`** — `paquete`: tipo detectable, ningún candidato real en esta máquina.
+- **`TestBundleNoSoportado`** — `bundle`: tipo macOS, no soportado en Windows.
+- **`TestLanzadorNoVerificado`** — `lanzador`: detectable, pero preflight no admite `steam://` y no hay candidatos.
+- **`TestMatrizClasificacionFinal`** — Matriz consolidada: `ejecutable=disponible`; el resto `no_verificado` salvo `bundle=no_soportado`.
+
+---
 ### `hands\test_candidatos_reales_entorno_real.py`
 
 **Descripción:** Verificación en entorno real de la unidad 3.8.5.1.4.7.11. Ejecuta
