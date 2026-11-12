@@ -95,6 +95,7 @@
 - [`hands\test_system_inventory.py`](#hands/test-system_inventory)
 - [`hands\test_system_inventory_storage.py`](#hands/test-system_inventory_storage)
 - [`hands\test_inventario_integridad_privacidad_almacenamiento_entorno_real.py`](#hands/test-inventario_integridad_privacidad_almacenamiento_entorno_real)
+- [`hands\test_inventario_no_altera_entidades_entorno_real.py`](#hands/test-inventario_no_altera_entidades_entorno_real)
 - [`hands\test_inventario_oculto_unicode_largo_permisos_entorno_real.py`](#hands/test-inventario_oculto_unicode_largo_permisos_entorno_real)
 - [`hands\test_persistencia_recuperacion_inventario_entorno_real.py`](#hands/test-persistencia_recuperacion_inventario_entorno_real)
 - [`hands\test_diferenciacion_estado_acceso_entorno_real.py`](#hands/test-diferenciacion_estado_acceso_entorno_real)
@@ -11312,6 +11313,19 @@ decidan el resultado. Todo se limpia al finalizar.
 **Clases de test:** ninguna (funciones de test de modulo).
 
 **Resultados:** 3 pruebas de verificacion en entorno real, 3 PASSED / 0 FAILED.
+
+---
+
+<a name="hands/test-inventario_no_altera_entidades_entorno_real"></a>
+### `hands\test_inventario_no_altera_entidades_entorno_real.py`
+
+**Descripcion:** Verificacion en entorno real para la unidad 3.8.5.1.4.10.7. Comprueba que las operaciones de inventario, clasificacion y registro de candidatos en SQLite (3.8.5.1.4.1-3.8.5.1.4.10), SIN ejecutar el puente de auto-registro del catalogo global (3.8.5.1.4.11), NO alteran `data/memory/entities.json` (catalogo GLOBAL de identidad de aplicaciones) ni `data/knowledge/entities.json` (perfil adaptativo de conocimiento/uso). Captura la linea base real (hash SHA-256 y conteo de lineas) antes y despues de ejecutar la ruta de produccion real: escaneo de lectura-solo de un directorio temporal con ejecutables reales del sistema (`escanear_ruta` de src.hands.system_inventory), clasificacion de candidatos `.exe` (`LaunchClassifier` de src.hands.application_launch_classifier con `ApplicationPreflight` real) y registro en la tabla `application_candidates` de una SQLite temporal (`ApplicationDiscovery.registrar_candidatos` de src.hands.application_discovery). Incluye control positivo de que los candidatos se persisten y se consultan en SQLite. No hay mocks que decidan el resultado; no se lanza ninguna aplicacion; no se toca `data/system_inventory.sqlite3` de produccion ni rutas de usuario; no hay interaccion grafica. Nota: instanciar `ApplicationDiscovery` con dependencias por defecto crea `ApplicationManager` real, cuyo inicializado refresca `updated_at` de entradas `app_chrome`/`app_spotify` en `data/memory/entities.json` (efecto de arranque del gestor, ajeno a este pipeline); la prueba inyecta un gestor sustituto para aislar el alcance de la unidad.
+
+**Modulos de origen probados:** src.hands.system_inventory, src.hands.system_inventory_storage, src.hands.application_launch_classifier, src.hands.application_discovery
+
+**Clases de test:** ninguna (funciones de test de modulo).
+
+**Resultados:** 1 prueba de verificacion en entorno real, 1 PASSED / 0 FAILED.
 
 ---
 
