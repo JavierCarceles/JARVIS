@@ -32,6 +32,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, Optional, Set
 
+from src.hands.system_inventory import generate_machine_id
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -611,6 +612,9 @@ class ApplicationPreflight:
         if cache_key in self._executable_cache:
             return self._executable_cache[cache_key]
 
+        executable = None
+
+        # 1) Resolver via shell:AppsFolder (menú de inicio / UWP).
         try:
             executable = self._resolve_from_apps_folder(
                 name=name,
@@ -624,8 +628,98 @@ class ApplicationPreflight:
             if not os.path.isfile(executable):
                 executable = None
 
+        # 2) Fallback al inventario local cuando shell:AppsFolder no resuelve.
+        #    El inventario ya sabe dónde está el ejecutable en disco aunque
+        #    no esté en shell:AppsFolder como ruta .exe verificable.
+        if not executable:
+            try:
+                executable = self._resolve_from_inventory_local(
+                    name=name,
+                    app_id=app_id,
+                )
+            except Exception:
+                executable = None
+
+        if executable:
+            executable = os.path.abspath(executable)
+            if not os.path.isfile(executable):
+                executable = None
+
         self._executable_cache[cache_key] = executable
         return executable
+
+    def _resolve_from_inventory_local(
+        self,
+        name: str,
+        app_id: Optional[str] = None,
+    ) -> Optional[str]:
+        """
+        Resuelve el ejecutable consultando la base de inventario local
+        (data/system_inventory.sqlite3) cuando shell:AppsFolder no devuelve
+        una ruta verificable.
+
+        Es un fallback general para cualquier falso negativo de shell:AppsFolder:
+        busca en el inventario local una entrada de tipo file, extension .exe,
+        no excluida, en volumen montado, cuya ruta exista en disco real.
+        Respeta el aislamiento por machine_id.
+
+        Se prueban las variantes de nombre: el name tal cual y, si termina en
+        .exe, también sin la extension (por si el inventario lo guarda sin ella).
+
+        Si app_id es una ruta absoluta de un .exe existente en disco y esa ruta
+        aparece en el inventario local, se devuelve directamente.
+        """
+        from src.hands.system_inventory_storage import SystemInventoryStorage
+
+        repo_root = Path(__file__).resolve().parents[2]
+        db_path = repo_root / "data" / "system_inventory.sqlite3"
+        storage = SystemInventoryStorage(db_path)
+        try:
+            machine_id = generate_machine_id()
+
+            # Variantes de nombre a probar en el inventario.
+            nombres_a_probar = {name}
+            if name.casefold().endswith(".exe"):
+                nombres_a_probar.add(name[:-4])
+
+            for nombre in nombres_a_probar:
+                resultados = storage.search(
+                    machine_id=machine_id,
+                    name=nombre,
+                    extension=".exe",
+                    tipo="file",
+                    disponible=True,
+                    solo_volumes_montados=True,
+                    limit=20,
+                )
+                for entrada in resultados:
+                    ruta = entrada.get("absolute_path")
+                    if (
+                        ruta
+                        and os.path.isfile(ruta)
+                        and ruta.casefold().endswith(".exe")
+                    ):
+                        return os.path.abspath(ruta)
+
+            # Si app_id es una ruta absoluta de un .exe en disco, verificar que
+            # exista en el inventario local antes de devolverla.
+            if app_id and os.path.isfile(app_id) and app_id.casefold().endswith(".exe"):
+                resultados = storage.search(
+                    machine_id=machine_id,
+                    ruta=app_id,
+                    tipo="file",
+                    disponible=True,
+                    solo_volumes_montados=True,
+                    limit=5,
+                )
+                app_id_norm = os.path.normcase(app_id)
+                for entrada in resultados:
+                    ruta = entrada.get("absolute_path")
+                    if ruta and os.path.normcase(ruta) == app_id_norm:
+                        return os.path.abspath(ruta)
+        finally:
+            storage.close()
+        return None
 
     def _resolve_from_apps_folder(
         self,

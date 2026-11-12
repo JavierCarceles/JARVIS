@@ -25,7 +25,7 @@
 - [`src/hands/action_registry.py` (1272 líneas)](#src-hands-action_registry-py)
 - [`src/hands/application_discovery.py` (684 líneas)](#src-hands-application_discovery-py)
 - [`src/hands/application_launch_classifier.py` (855 líneas)](#src-hands-application_launch_classifier-py)
-- [`src/hands/application_preflight.py` (894 líneas)](#src-hands-application_preflight-py)
+- [`src/hands/application_preflight.py` (1089 líneas)](#src-hands-application_preflight-py)
 - [`src/hands/applications_core.py` (1357 líneas)](#src-hands-applications_core-py)
 - [`src/hands/calibration_manager.py` (2343 líneas)](#src-hands-calibration_manager-py)
 - [`src/hands/calibrator.py` (1059 líneas)](#src-hands-calibrator-py)
@@ -977,7 +977,7 @@ Funciones a nivel módulo:
 | `def resolver_target_acceso_directo(ruta_lnk)`  (L215) | Resuelve el destino de un acceso directo `.lnk` mediante `Shell.Application` de PowerShell. |
 
 <a name="src-hands-application_preflight-py"></a>
-### `src/hands/application_preflight.py` [894 líneas] — Preflight de aplicaciones para JARVIS.
+### `src/hands/application_preflight.py` [1089 líneas] — Preflight de aplicaciones para JARVIS.
 
 **Descripción:** Preflight de aplicaciones para JARVIS.
 
@@ -1011,6 +1011,7 @@ Métodos:
 | `def _optional_bool(value)` |  |
 | `def resolve_executable(name, app_id)` |  |
 | `def _resolve_from_apps_folder(name, app_id)` |  |
+| `def _resolve_from_inventory_local(name, app_id=None)` |  |
 | `def _resolve_from_target_string(target)` |  |
 | `def _is_executable(path)` |  |
 | `def inspect_executable_manifest(executable_path)` |  |
