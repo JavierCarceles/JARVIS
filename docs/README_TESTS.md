@@ -79,6 +79,7 @@
 - [`hands\test_applications_core.py`](#hands/test-applications_core)
 - [`hands\test_clasificacion_candidatos_lanzamiento_entorno_real.py`](#hands/test-clasificacion_candidatos_lanzamiento_entorno_real)
 - [`hands\test_clasificacion_tipos_lanzamiento_entorno_real.py`](#hands/test-clasificacion_tipos_lanzamiento_entorno_real)
+- [`hands\test_matriz_sistemas_operativos_adaptadores_entorno_real.py`](#hands/test-matriz_sistemas_operativos_adaptadores_entorno_real)
 - [`hands\test_calibration_manager.py`](#hands/test-calibration_manager)
 - [`hands\test_calibration_requirements.py`](#hands/test-calibration_requirements)
 - [`hands\test_calibrator.py`](#hands/test-calibrator)
@@ -8408,6 +8409,38 @@ candidatos en lote).
 - **`TestBundleNoSoportado`** — `bundle`: tipo macOS, no soportado en Windows.
 - **`TestLanzadorNoVerificado`** — `lanzador`: detectable, pero preflight no admite `steam://` y no hay candidatos.
 - **`TestMatrizClasificacionFinal`** — Matriz consolidada: `ejecutable=disponible`; el resto `no_verificado` salvo `bundle=no_soportado`.
+
+---
+<a name="hands/test-matriz_sistemas_operativos_adaptadores_entorno_real"></a>
+### `hands\test_matriz_sistemas_operativos_adaptadores_entorno_real.py`
+
+**Descripción:** Verificación en entorno real de la unidad 3.8.5.1.4.10.10. Comprueba la matriz de
+sistemas operativos y adaptadores nativos del equipo, declarando como NO SOPORTADO / NO VERIFICADO
+cualquier adaptador o tipo de lanzamiento sin pruebas nativas satisfactorias. Detecta el SO real con
+`platform.system()`, verifica que solo existe adaptador nativo para Windows
+(`src/hands/windows/`) y que Linux y macOS no tienen adaptador, y valida con
+`ApplicationPreflight.validate_launch_destination` contra destinos reales del SO: `ejecutable`
+(`charmap.exe`), `acceso_directo` (`.lnk` real) y `uri_aplicacion` (esquemas admitidos
+`ms-settings:`, `https:`). Confirma que `steam://` (lanzador) no es esquema admitido y que `paquete`
+y `bundle` no son devueltos nativamente en Windows. No lanza aplicaciones y no usa mocks que decidan
+el resultado.
+
+**Módulos de origen probados:** src.hands.application_preflight
+
+**Clases de test:**
+
+- **`TestMatrizSistemasOperativosAdaptadoresEntornoReal`** — Verificación real de la matriz de SO, adaptadores y tipos de lanzamiento (11 pruebas).
+  - `test_01_so_equipo_detectado_nativamente` — SO detectado con `platform.system()` (Windows en este equipo).
+  - `test_02_adaptador_windows_nativo_existe` — Adaptador nativo Windows presente.
+  - `test_03_adaptador_linux_nativo_no_existe` — Sin adaptador nativo Linux.
+  - `test_04_adaptador_macos_nativo_no_existe` — Sin adaptador nativo macOS.
+  - `test_05_validacion_tipo_ejecutable_real` — `.exe` real valida como `ejecutable`.
+  - `test_06_validacion_tipo_acceso_directo_real` — `.lnk` real valida como `acceso_directo`.
+  - `test_07_validacion_tipo_uri_aplicacion_admitido_real` — URI admitidos (`ms-settings:`, `https:`) validan como `uri_aplicacion`.
+  - `test_08_uri_lanzador_no_admitido` — `steam://` (lanzador) no es esquema admitido.
+  - `test_09_tipos_paquete_bundle_lanzador_nunca_devueltos_en_windows` — `paquete`/`bundle`/`lanzador` no son devueltos nativamente en Windows.
+  - `test_10_matriz_declaracion_estado_adaptadores` — Solo Windows tiene adaptador nativo verificado.
+  - `test_11_matriz_declaracion_estado_tipos_lanzamiento` — `ejecutable`/`acceso_directo`/`uri_aplicacion` = VERIFICADO; `paquete`/`bundle` = NO SOPORTADO / NO VERIFICADO; `lanzador` = NO VERIFICADO.
 
 ---
 ### `hands\test_candidatos_reales_entorno_real.py`
