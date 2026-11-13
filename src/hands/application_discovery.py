@@ -30,7 +30,7 @@ import sqlite3
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 from src.hands.application_launch_classifier import (
     CONFIANZA_NINGUNA,
@@ -481,6 +481,243 @@ def calcular_identidad_estable(candidato: DiscoveredCandidate) -> IdentidadGloba
         fusionar_por_nombre_desaconsejado=True,
         alternativas=[candidato.to_dict()],
     )
+
+
+# ---------------------------------------------------------------------------
+# Registro mínimo de aplicación del catálogo global (unidad 3.8.5.1.4.11.3)
+# ---------------------------------------------------------------------------
+
+# Claves de propiedades del registro mínimo que debe incluir cada entidad de
+# tipo "application" del catálogo global `data/memory/entities.json`.
+PROP_RUTA_ABSOLUTA_OBSERVADA = "ruta_absoluta_observada"
+PROP_TIPO_LANZAMIENTO_NATIVO = "tipo_lanzamiento_nativo"
+PROP_ESTADO_DISPONIBLE = "estado_disponible"
+VALOR_ESTADO_DISPONIBLE = "available"
+VALOR_ESTADO_NO_DISPONIBLE = "no_disponible"
+PROP_FECHA_OBSERVACION = "fecha_observacion"
+PROP_FUENTE_OBSERVACION = "fuente_observacion"
+PROP_EVIDENCIA_OBSERVACION = "evidencia_observacion"
+PROP_CAPACIDADES_VERIFICADAS = "capacidades_verificadas"
+PROP_CAPACIDADES_NO_VERIFICADAS = "capacidades_no_verificadas"
+PROP_TIPO_EVIDENCIA_IDENTIDAD = "tipo_evidencia_identidad"
+PROP_FUSION_POR_NOMBRE_DESACONSEJADA = "fusionar_por_nombre_desaconsejada"
+
+# Campos obligatorios del registro mínimo. Sin ellos el registro no es válido
+# para persistir en el catálogo global de aplicaciones.
+_CAMPOS_REQUERIDOS_REGISTRO_MINIMO = (
+    "entity_id",
+    "nombre",
+    "tipo",
+    "aliases",
+    "categoria_rol",
+    "estado_disponible",
+    "fecha_observacion",
+    "fuente_observacion",
+    "evidencia_observacion",
+)
+
+
+def destino_observable(candidato: DiscoveredCandidate) -> bool:
+    """
+    Indica si el destino del candidato fue observado como accesible.
+
+    Se considera observable cuando existe un archivo de disco en la ruta
+    absoluta observada (ejecutable, acceso directo, etc.) o, para destinos
+    que no son archivos de disco (paquetes, URI, lanzadores), cuando se
+    conserva un destino nativo verificado. Nunca se asume disponibilidad solo
+    por la extensión de archivo.
+    """
+    if str(candidato.absolute_path or "").strip() and os.path.isfile(
+        str(candidato.absolute_path)
+    ):
+        return True
+    if not str(candidato.absolute_path or "").strip() and str(
+        candidato.destination or ""
+    ).strip():
+        return True
+    return False
+
+
+@dataclass
+class RegistroMinimoAplicacion:
+    """
+    Registro mínimo de aplicación del catálogo global
+    `data/memory/entities.json` (3.8.5.1.4.11.3).
+
+    Cada entidad creada o actualizada del catálogo global incluye como mínimo:
+    identificador estable, nombre, aliases observados y seguros, categoría/rol
+    clasificado, ruta absoluta observada cuando existe, tipo de lanzamiento
+    nativo y estado `available` con fecha, fuente de observación y evidencia.
+
+    Los paquetes y URI sin `.exe` conservan su identificador y su destino
+    nativo verificado (la ruta absoluta queda ausente). Nunca se inventan
+    capacidades: `capacidades_verificadas` y `capacidades_no_verificadas`
+    permanecen vacías a menos que existan acciones reales que las sustenten.
+    El identificador estable proviene de `calcular_identidad_estable`
+    (3.8.5.1.4.11.2) y nunca incorpora rutas absolutas.
+    """
+
+    entity_id: str
+    nombre: str
+    tipo: str = "application"
+    aliases: list[str] = field(default_factory=list)
+    categoria_rol: str = "desconocido"
+    ruta_absoluta_observada: Optional[str] = None
+    tipo_lanzamiento_nativo: Optional[str] = None
+    estado_disponible: str = VALOR_ESTADO_DISPONIBLE
+    fecha_observacion: str = ""
+    fuente_observacion: str = ""
+    evidencia_observacion: list[str] = field(default_factory=list)
+    capacidades_verificadas: list[str] = field(default_factory=list)
+    capacidades_no_verificadas: list[str] = field(default_factory=list)
+    metadata: Optional[dict] = None
+    created_at: str = ""
+    updated_at: str = ""
+
+    def a_dict_entidad(self) -> dict:
+        """
+        Convierte el registro en un diccionario compatible con `Entity` de
+        `src.memory.storage`, listo para persistir en `entities.json`.
+        """
+        properties: dict[str, Any] = {
+            PROP_RUTA_ABSOLUTA_OBSERVADA: self.ruta_absoluta_observada,
+            PROP_TIPO_LANZAMIENTO_NATIVO: self.tipo_lanzamiento_nativo,
+            PROP_ESTADO_DISPONIBLE: self.estado_disponible,
+            PROP_FECHA_OBSERVACION: self.fecha_observacion,
+            PROP_FUENTE_OBSERVACION: self.fuente_observacion,
+            PROP_EVIDENCIA_OBSERVACION: list(self.evidencia_observacion),
+            PROP_CAPACIDADES_VERIFICADAS: list(self.capacidades_verificadas),
+            PROP_CAPACIDADES_NO_VERIFICADAS: list(self.capacidades_no_verificadas),
+        }
+        if self.metadata:
+            properties.update(self.metadata)
+        return {
+            "id": self.entity_id,
+            "type": self.tipo,
+            "name": self.nombre,
+            "properties": properties,
+            "aliases": list(self.aliases),
+            "tags": [self.categoria_rol] if self.categoria_rol else [],
+            "confidence": 1.0,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+        }
+
+
+def construir_registro_minimo_aplicacion(
+    candidato: DiscoveredCandidate,
+    identidad: IdentidadGlobalEstable,
+    ahora_iso: Optional[str] = None,
+) -> RegistroMinimoAplicacion:
+    """
+    Construye el registro mínimo de aplicación de un candidato descubierto
+    y su identidad global estable (3.8.5.1.4.11.3).
+
+    Reutiliza `calcular_identidad_estable` (3.8.5.1.4.11.2) para el
+    `entity_id` estable, nunca la ruta absoluta. Clasifica el rol a partir
+    del `launch_subtype` real del candidato. Marca `estado_disponible` como
+    `available` solo cuando el destino fue observado como accesible
+    (archivo existente o destino nativo de paquete/URI/lanzador); conserva
+    la ruta absoluta observada cuando existe y nunca inventa capacidades.
+    """
+    ahora = ahora_iso or _ahora_iso()
+    observable = destino_observable(candidato)
+    ruta = str(candidato.absolute_path or "").strip() or None
+    launch_subtype = getattr(candidato.launch_subtype, "value", None)
+    categoria_rol = (
+        str(launch_subtype) if launch_subtype else str(candidato.launch_subtype or "desconocido")
+    )
+    return RegistroMinimoAplicacion(
+        entity_id=identidad.entity_id,
+        nombre=str(
+            identidad.nombre_canonico
+            or candidato.nombre_comercial
+            or candidato.name
+            or ""
+        ),
+        tipo="application",
+        aliases=list(candidato.aliases or []),
+        categoria_rol=categoria_rol,
+        ruta_absoluta_observada=ruta,
+        tipo_lanzamiento_nativo=candidato.launch_type,
+        estado_disponible=(
+            VALOR_ESTADO_DISPONIBLE if observable else VALOR_ESTADO_NO_DISPONIBLE
+        ),
+        fecha_observacion=ahora,
+        fuente_observacion=str(candidato.fuente or ""),
+        evidencia_observacion=list(candidato.evidencia or []),
+        capacidades_verificadas=[],
+        capacidades_no_verificadas=[],
+        metadata={
+            PROP_TIPO_EVIDENCIA_IDENTIDAD: identidad.tipo_evidencia,
+            PROP_FUSION_POR_NOMBRE_DESACONSEJADA: bool(
+                identidad.fusionar_por_nombre_desaconsejado
+            ),
+        },
+        created_at=ahora,
+        updated_at=ahora,
+    )
+
+
+def _datos_para_validar_registro(
+    registro: Union[RegistroMinimoAplicacion, dict],
+) -> dict:
+    """
+    Normaliza un registro mínimo (dataclass o diccionario, también en forma
+    de diccionario `Entity` de `a_dict_entidad`) a los nombres de campo del
+    registro mínimo para validar sus campos obligatorios.
+    """
+    if isinstance(registro, RegistroMinimoAplicacion):
+        return {
+            "entity_id": registro.entity_id,
+            "nombre": registro.nombre,
+            "tipo": registro.tipo,
+            "aliases": list(registro.aliases or []),
+            "categoria_rol": registro.categoria_rol,
+            "estado_disponible": registro.estado_disponible,
+            "fecha_observacion": registro.fecha_observacion,
+            "fuente_observacion": registro.fuente_observacion,
+            "evidencia_observacion": list(registro.evidencia_observacion or []),
+        }
+    datos = dict(registro)
+    # Soporte para diccionario estilo Entity (claves id/name/type/tags/properties).
+    if "id" in datos and "entity_id" not in datos:
+        datos["entity_id"] = datos.get("id")
+    if "name" in datos and "nombre" not in datos:
+        datos["nombre"] = datos.get("name")
+    if "type" in datos and "tipo" not in datos:
+        datos["tipo"] = datos.get("type")
+    propiedades = datos.get("properties") or {}
+    if isinstance(propiedades, dict):
+        for campo in (
+            "estado_disponible",
+            "fecha_observacion",
+            "fuente_observacion",
+            "evidencia_observacion",
+        ):
+            if campo not in datos and campo in propiedades:
+                datos[campo] = propiedades[campo]
+    if "categoria_rol" not in datos and datos.get("tags"):
+        tags = datos["tags"]
+        datos["categoria_rol"] = tags[0] if tags else ""
+    return datos
+
+
+def validar_registro_minimo_aplicacion(
+    registro: Union[RegistroMinimoAplicacion, dict],
+) -> list[str]:
+    """
+    Devuelve los campos obligatorios faltantes de un registro mínimo de
+    aplicación. Lista vacía cuando el registro es válido para persistir en
+    el catálogo global de aplicaciones.
+    """
+    datos = _datos_para_validar_registro(registro)
+    faltantes: list[str] = []
+    for campo in _CAMPOS_REQUERIDOS_REGISTRO_MINIMO:
+        valor = datos.get(campo)
+        if valor is None or (isinstance(valor, str) and valor.strip() == ""):
+            faltantes.append(campo)
+    return faltantes
 
 
 # ---------------------------------------------------------------------------

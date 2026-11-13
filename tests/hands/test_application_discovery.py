@@ -45,7 +45,6 @@ from src.hands.application_discovery import (
     CandidatoConCatalogo,
     DiscoveredCandidate,
     FUENTE_APP_PATHS,
-    calcular_identidad_estable,
     FUENTE_APPX,
     FUENTE_APLICACION_ABIERTA,
     FUENTE_CATALOGO,
@@ -54,7 +53,15 @@ from src.hands.application_discovery import (
     FUENTE_START_MENU,
     FUENTE_UNINSTALL_REGISTRY,
     FUENTES_PRIMARIAS,
+    IdentidadGlobalEstable,
+    RegistroMinimoAplicacion,
     ResultadoResolucionCandidatos,
+    _CAMPOS_REQUERIDOS_REGISTRO_MINIMO,
+    construir_registro_minimo_aplicacion,
+    destino_observable,
+    validar_registro_minimo_aplicacion,
+    calcular_identidad_estable,
+    _CAMPOS_REQUERIDOS_REGISTRO_MINIMO,
 )
 from src.hands.application_preflight import ApplicationPreflight
 from src.hands.applications_core import (
@@ -62,12 +69,16 @@ from src.hands.applications_core import (
     ApplicationCapabilityDef,
     ApplicationKnowledge,
 )
+from src.memory.storage import Entity
 from src.hands.application_launch_classifier import (
     CONFIANZA_ALTA,
     CONFIANZA_BAJA,
     CONFIANZA_MEDIA,
     CONFIANZA_NINGUNA,
     LaunchClassifier,
+    LaunchSubtype,
+    LaunchType,
+    leer_version_archivo_windows,
 )
 from src.hands.system_inventory import EntryType, generate_machine_id
 from src.hands.system_inventory_storage import (
@@ -3227,3 +3238,302 @@ class TestIdentidadGlobalEstable:
         assert ent.type == "application"
         assert "C:\\app.exe" not in ent.id
         assert ent.to_dict()["id"] == identidad.entity_id
+
+
+# ---------------------------------------------------------------------------
+# Registro mínimo de aplicación (unidad 3.8.5.1.4.11.3)
+# ---------------------------------------------------------------------------
+
+
+class TestRegistroMinimoAplicacion:
+    """
+    Pruebas del registro mínimo de aplicación (3.8.5.1.4.11.3) del catálogo
+    global `data/memory/entities.json`.
+
+    Cada entidad creada o actualizada incluye como mínimo: identificador
+    estable, nombre, aliases observados y seguros, categoría/rol clasificado,
+    ruta absoluta observada cuando existe, tipo de lanzamiento nativo y
+    estado `available` con fecha, fuente de observación y evidencia. Nunca se
+    inventan capacidades.
+    """
+
+    AHORA = "2026-11-12T00:00:00+00:00"
+    RUTA_NOTEPAD = r"C:\Windows\System32\notepad.exe"
+
+    def _candidato_notepad_real(self) -> DiscoveredCandidate:
+        """Candidato real sobre notepad.exe del equipo (no se lanza)."""
+        return DiscoveredCandidate(
+            candidate_id="cand-notepad-real",
+            name="Notepad",
+            absolute_path=self.RUTA_NOTEPAD,
+            destination=self.RUTA_NOTEPAD,
+            nombre_comercial="Notepad",
+            aliases=["notepad", "bloc de notas"],
+            launch_type=LaunchType.EJECUTABLE,
+            launch_subtype=LaunchSubtype.GUI_APLICACION,
+            es_lanzable=True,
+            evidencia=["archivo_existe:" + self.RUTA_NOTEPAD],
+            confianza=CONFIANZA_ALTA,
+            fuente=FUENTE_START_MENU,
+            ultima_comprobacion=self.AHORA,
+        )
+
+    def _identidad_notepad(self) -> IdentidadGlobalEstable:
+        return IdentidadGlobalEstable(
+            entity_id="fabprod:microsoft corporation:notepad",
+            nombre_canonico="notepad",
+            tipo_evidencia="fabricante_producto",
+            evidencia_base={
+                "nombre_comercial": "Notepad",
+                "fabricante": "Microsoft Corporation",
+                "version": "10.0.26100.9949",
+            },
+            confianza="alta",
+            fusionar_por_nombre_desaconsejado=False,
+            alternativas=[],
+        )
+
+    def test_3_8_5_1_4_11_3_registro_minimo_todos_los_campos_requeridos(self):
+        """El registro mínimo de un ejecutable real tiene todos los campos
+        obligatorios y supera la validación."""
+        candidato = self._candidato_notepad_real()
+        identidad = self._identidad_notepad()
+        registro = construir_registro_minimo_aplicacion(
+            candidato, identidad, ahora_iso=self.AHORA
+        )
+        assert validar_registro_minimo_aplicacion(registro) == []
+        assert registro.entity_id == identidad.entity_id
+        assert registro.nombre == "notepad"
+        assert registro.aliases == ["notepad", "bloc de notas"]
+        assert registro.categoria_rol == "gui_aplicacion"
+        assert registro.ruta_absoluta_observada == self.RUTA_NOTEPAD
+        assert registro.tipo_lanzamiento_nativo == "ejecutable"
+        assert registro.estado_disponible == "available"
+        assert registro.fecha_observacion == self.AHORA
+        assert registro.fuente_observacion == FUENTE_START_MENU
+        assert registro.evidencia_observacion == [
+            "archivo_existe:" + self.RUTA_NOTEPAD
+        ]
+        assert registro.capacidades_verificadas == []
+        assert registro.capacidades_no_verificadas == []
+        assert registro.metadata["tipo_evidencia_identidad"] == "fabricante_producto"
+
+    def test_3_8_5_1_4_11_3_entity_id_estable_sin_ruta_absoluta(self):
+        """El identificador estable nunca incorpora la ruta absoluta y es
+        determinista para el mismo candidato e identidad."""
+        candidato = self._candidato_notepad_real()
+        identidad = self._identidad_notepad()
+        r1 = construir_registro_minimo_aplicacion(
+            candidato, identidad, ahora_iso=self.AHORA
+        )
+        r2 = construir_registro_minimo_aplicacion(
+            candidato, identidad, ahora_iso=self.AHORA
+        )
+        assert r1.entity_id == r2.entity_id == identidad.entity_id
+        assert "C:" not in r1.entity_id
+        assert "Windows" not in r1.entity_id
+        assert "System32" not in r1.entity_id
+        assert r1.a_dict_entidad() is not None  # serializable a Entity
+        assert r1.created_at == r1.updated_at == self.AHORA
+
+    def test_3_8_5_1_4_11_3_paquete_uri_sin_exe_conserva_destino_nativo(self):
+        """Paquete/URI sin .exe: conserva identificador y destino nativo,
+        ruta absoluta ausente, estado available."""
+        candidato = DiscoveredCandidate(
+            candidate_id="cand-ms-settings",
+            name="Configuración",
+            absolute_path=None,
+            destination="ms-settings:",
+            nombre_comercial="Configuración",
+            aliases=["config", "ajustes"],
+            launch_type=LaunchType.URI_APLICACION,
+            launch_subtype=LaunchSubtype.DESCONOCIDO,
+            es_lanzable=True,
+            evidencia=["esquema_uri:ms-settings"],
+            confianza=CONFIANZA_ALTA,
+            fuente=FUENTE_INVENTARIO,
+            ultima_comprobacion=self.AHORA,
+        )
+        identidad = IdentidadGlobalEstable(
+            entity_id="paquete:ms.settings",
+            nombre_canonico="configuración",
+            tipo_evidencia="paquete",
+            evidencia_base={"paquete_id": "ms.settings", "fuentes": ["inventario"]},
+            confianza="alta",
+            fusionar_por_nombre_desaconsejado=False,
+            alternativas=[],
+        )
+        registro = construir_registro_minimo_aplicacion(
+            candidato, identidad, ahora_iso=self.AHORA
+        )
+        assert validar_registro_minimo_aplicacion(registro) == []
+        assert registro.ruta_absoluta_observada is None
+        assert registro.tipo_lanzamiento_nativo == "uri_aplicacion"
+        assert registro.categoria_rol == "desconocido"
+        assert registro.estado_disponible == "available"
+        assert registro.fuente_observacion == FUENTE_INVENTARIO
+
+    def test_3_8_5_1_4_11_3_no_inventa_capacidades(self):
+        """Nunca se inventan capacidades: listas vacías y sin campo
+        capabilities inventado en las propiedades."""
+        candidato = self._candidato_notepad_real()
+        identidad = self._identidad_notepad()
+        registro = construir_registro_minimo_aplicacion(
+            candidato, identidad, ahora_iso=self.AHORA
+        )
+        datos = registro.a_dict_entidad()
+        assert registro.capacidades_verificadas == []
+        assert registro.capacidades_no_verificadas == []
+        assert "capabilities" not in datos["properties"]
+        assert datos["properties"]["capacidades_verificadas"] == []
+        assert datos["properties"]["capacidades_no_verificadas"] == []
+
+    def test_3_8_5_1_4_11_3_categoria_rol_desde_subtipo_real(self):
+        """La categoría/rol se clasifica desde el launch_subtype real del
+        candidato, sin asumir GUI por la extensión."""
+        cli = self._candidato_notepad_real()
+        cli.launch_subtype = LaunchSubtype.HERRAMIENTA_CLI
+        servicio = self._candidato_notepad_real()
+        servicio.launch_subtype = LaunchSubtype.SERVICIO
+        desconocido = self._candidato_notepad_real()
+        desconocido.launch_subtype = LaunchSubtype.DESCONOCIDO
+        identidad = self._identidad_notepad()
+        assert (
+            construir_registro_minimo_aplicacion(cli, identidad, ahora_iso=self.AHORA)
+            .categoria_rol
+            == "herramienta_cli"
+        )
+        assert (
+            construir_registro_minimo_aplicacion(
+                servicio, identidad, ahora_iso=self.AHORA
+            ).categoria_rol
+            == "servicio"
+        )
+        assert (
+            construir_registro_minimo_aplicacion(
+                desconocido, identidad, ahora_iso=self.AHORA
+            ).categoria_rol
+            == "desconocido"
+        )
+
+    def test_3_8_5_1_4_11_3_estado_available_con_fecha_fuente_evidencia(self):
+        """Estado available con fecha ISO, fuente de observación y evidencia
+        sobre un archivo real del equipo (sin lanzar nada)."""
+        candidato = self._candidato_notepad_real()
+        identidad = self._identidad_notepad()
+        registro = construir_registro_minimo_aplicacion(
+            candidato, identidad, ahora_iso=self.AHORA
+        )
+        assert registro.estado_disponible == "available"
+        assert registro.fecha_observacion == self.AHORA
+        datetime.fromisoformat(registro.fecha_observacion)
+        assert registro.fuente_observacion == FUENTE_START_MENU
+        assert len(registro.evidencia_observacion) > 0
+
+    def test_3_8_5_1_4_11_3_registro_a_dict_entidad_compatible(self):
+        """El registro se serializa a un diccionario apto para `Entity` de
+        `src.memory.storage` (id, type, name, properties, aliases, tags)."""
+        candidato = self._candidato_notepad_real()
+        identidad = self._identidad_notepad()
+        registro = construir_registro_minimo_aplicacion(
+            candidato, identidad, ahora_iso=self.AHORA
+        )
+        datos = registro.a_dict_entidad()
+        ent = Entity.from_dict(datos)
+        assert ent.id == identidad.entity_id
+        assert ent.type == "application"
+        assert ent.name == "notepad"
+        assert ent.aliases == ["notepad", "bloc de notas"]
+        assert ent.tags == ["gui_aplicacion"]
+        p = ent.properties
+        assert p["ruta_absoluta_observada"] == self.RUTA_NOTEPAD
+        assert p["tipo_lanzamiento_nativo"] == "ejecutable"
+        assert p["estado_disponible"] == "available"
+        assert p["fecha_observacion"] == self.AHORA
+        assert p["fuente_observacion"] == FUENTE_START_MENU
+
+    def test_3_8_5_1_4_11_3_validacion_rechaza_campos_faltantes(self):
+        """La validación rechaza registros con campos obligatorios faltantes
+        y acepta los completos."""
+        registro_valido = construir_registro_minimo_aplicacion(
+            self._candidato_notepad_real(), self._identidad_notepad(), ahora_iso=self.AHORA
+        )
+        assert validar_registro_minimo_aplicacion(registro_valido) == []
+        assert validar_registro_minimo_aplicacion(registro_valido.a_dict_entidad()) == []
+
+        incompleto = {
+            "entity_id": "x",
+            "nombre": "App",
+            # falta tipo, aliases, categoria_rol, estado, fecha, fuente, evidencia
+        }
+        faltantes = validar_registro_minimo_aplicacion(incompleto)
+        assert "tipo" in faltantes
+        assert "aliases" in faltantes
+        assert "categoria_rol" in faltantes
+        assert "estado_disponible" in faltantes
+        assert "fecha_observacion" in faltantes
+        assert "fuente_observacion" in faltantes
+        assert "evidencia_observacion" in faltantes
+        assert "entity_id" not in faltantes
+        assert "nombre" not in faltantes
+
+        vacio = {}
+        assert set(validar_registro_minimo_aplicacion(vacio)) == set(
+            _CAMPOS_REQUERIDOS_REGISTRO_MINIMO
+        )
+
+    def test_3_8_5_1_4_11_3_destino_no_observable_estado_no_disponible(self):
+        """Destino sin archivo existente ni destino nativo: estado
+        no_disponible y ruta absoluta ausente."""
+        candidato = DiscoveredCandidate(
+            candidate_id="cand-inexistente",
+            name="NoExiste",
+            absolute_path=r"C:\No\Existe\app.exe",
+            destination=None,
+            nombre_comercial="NoExiste",
+            aliases=[],
+            launch_type=LaunchType.EJECUTABLE,
+            launch_subtype=LaunchSubtype.DESCONOCIDO,
+            es_lanzable=False,
+            evidencia=[],
+            confianza=CONFIANZA_NINGUNA,
+            fuente=FUENTE_INVENTARIO,
+            ultima_comprobacion=self.AHORA,
+        )
+        identidad = IdentidadGlobalEstable(
+            entity_id="candidato:noexiste",
+            nombre_canonico="noexiste",
+            tipo_evidencia="insuficiente",
+            evidencia_base={},
+            confianza="ninguna",
+            fusionar_por_nombre_desaconsejado=True,
+            alternativas=[],
+        )
+        registro = construir_registro_minimo_aplicacion(
+            candidato, identidad, ahora_iso=self.AHORA
+        )
+        assert registro.estado_disponible == "no_disponible"
+        # La ruta observada se conserva aunque el archivo no exista; la
+        # disponibilidad se expresa en el estado.
+        assert registro.ruta_absoluta_observada == r"C:\No\Existe\app.exe"
+        assert validar_registro_minimo_aplicacion(registro) == []
+
+    def test_3_8_5_1_4_11_3_identidad_real_de_notepad_sin_ruta_en_id(self):
+        """Integración con cálculo de identidad real (11.2) sobre notepad.exe
+        del equipo: entity_id estable derivado de metadatos del SO, sin
+        fragmentos de ruta absoluta."""
+        candidato = self._candidato_notepad_real()
+        identidad = calcular_identidad_estable(candidato)
+        registro = construir_registro_minimo_aplicacion(
+            candidato, identidad, ahora_iso=self.AHORA
+        )
+        assert identidad.entity_id == "nombre:notepad"
+        assert identidad.tipo_evidencia == "nombre_comercial"
+        assert identidad.fusionar_por_nombre_desaconsejado is True
+        assert "C:" not in identidad.entity_id
+        assert "System32" not in identidad.entity_id
+        assert "Windows" not in identidad.entity_id
+        assert registro.entity_id == identidad.entity_id
+        assert registro.metadata["tipo_evidencia_identidad"] == "nombre_comercial"
+        assert identidad.evidencia_base["fabricante"] == "Microsoft Corporation"
+        assert validar_registro_minimo_aplicacion(registro) == []

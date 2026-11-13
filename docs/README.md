@@ -853,8 +853,23 @@ candidatos (el puente de auto-registro corresponde a una unidad posterior).
   identidades de equipos distintos al registrar volumenes ni escaneos; la
   deteccion de host distinto considera todos los equipos registrados en la
   base.
+- 3.8.5.1.4.11.3: registro mínimo de aplicación del catálogo global
+  `data/memory/entities.json`. Cada entidad creada o actualizada incluye
+  identificador estable (`entity_id` de `calcular_identidad_estable`, nunca
+  la ruta absoluta), nombre, aliases observados y seguros, categoría/rol
+  clasificado (`categoria_rol` desde el `launch_subtype` real del candidato),
+  ruta absoluta observada cuando existe, tipo de lanzamiento nativo, estado
+  `available` con fecha, fuente de observación y evidencia. Las capacidades
+  permanecen vacías (`capacidades_verificadas`/`capacidades_no_verificadas`)
+  a menos que existan acciones reales que las sustenten: nunca se inventan
+  capacidades. `construir_registro_minimo_aplicacion` combina un
+  `DiscoveredCandidate` con su `IdentidadGlobalEstable` y devuelve un
+  `RegistroMinimoAplicacion` serializable a `Entity` de
+  `src.memory.storage`; `validar_registro_minimo_aplicacion` rechaza los
+  campos obligatorios faltantes. La serialización nunca incluye fragmentos de
+  ruta absoluta en el identificador estable.
 
-**Importaciones:** 10.
+**Importaciones:** 11.
 
 `class DiscoveredCandidate` — Resultado completo de un candidato descubierto, que combina la
 clasificación de lanzamiento con metadatos de descubrimiento (fuente, esta_en_inventario,

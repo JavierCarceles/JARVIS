@@ -7026,6 +7026,47 @@ lanza ninguna aplicacion.
     `entity_id` resultante es apto como `id` de `Entity` de
     `src/memory/storage.py`.
 
+- **`TestRegistroMinimoAplicacion`** (línea 3249) — 10 método(s) de test
+  - Unidad 3.8.5.1.4.11.3: registro mínimo de aplicación del catálogo global
+    `data/memory/entities.json` (identificador estable, nombre, aliases,
+    categoría/rol, ruta absoluta observada, tipo de lanzamiento nativo,
+    estado `available` con fecha/fuente/evidencia, capacidades no inventadas).
+  - `test_3_8_5_1_4_11_3_registro_minimo_todos_los_campos_requeridos` (L3254):
+    un ejecutable real (`notepad.exe` del equipo) construye un registro con
+    todos los campos obligatorios y supera la validación; el identificador
+    estable no incorpora la ruta absoluta.
+  - `test_3_8_5_1_4_11_3_entity_id_estable_sin_ruta_absoluta` (L3285): el
+    `entity_id` es determinista y nunca contiene fragmentos de ruta absoluta;
+    serializable a `Entity`.
+  - `test_3_8_5_1_4_11_3_paquete_uri_sin_exe_conserva_destino_nativo`
+    (L3313): paquete/URI sin `.exe` conserva identificador y destino nativo,
+    ruta absoluta ausente y estado `available`.
+  - `test_3_8_5_1_4_11_3_no_inventa_capacidades` (L3338): nunca se inventan
+    capacidades (listas vacías, sin campo `capabilities` inventado).
+  - `test_3_8_5_1_4_11_3_categoria_rol_desde_subtipo_real` (L3358): la
+    categoría/rol se clasifica desde el `launch_subtype` real del candidato.
+  - `test_3_8_5_1_4_11_3_estado_available_con_fecha_fuente_evidencia`
+    (L3375): estado `available` con fecha ISO, fuente de observación y
+    evidencia sobre un archivo real del equipo.
+  - `test_3_8_5_1_4_11_3_registro_a_dict_entidad_compatible` (L3388): el
+    registro se serializa a un diccionario apto para `Entity` de
+    `src.memory.storage`.
+  - `test_3_8_5_1_4_11_3_validacion_rechaza_campos_faltantes` (L3407): la
+    validación rechaza campos obligatorios faltantes y acepta los completos;
+    soporta tanto `RegistroMinimoAplicacion` como diccionarios estilo
+    `Entity`.
+  - `test_3_8_5_1_4_11_3_destino_no_observable_estado_no_disponible`
+    (L3438): destino sin archivo existente tiene estado `no_disponible` y
+    sigue siendo válido para el registro.
+  - `test_3_8_5_1_4_11_3_identidad_real_de_notepad_sin_ruta_en_id` (L3465):
+    integración con `calcular_identidad_estable` (11.2) sobre el ejecutable
+    real `notepad.exe`: `entity_id` estable derivado de metadatos del SO,
+    fabricante leído realmente, sin fragmentos de ruta absoluta.
+
+**Estrategia de mocks:** no se añaden mocks que decidan el resultado; la
+verificación usa `calcular_identidad_estable` (11.2) y campos observados del
+candidato, sin lanzar ninguna aplicación.
+
 ---
 
 <a name="hands/test-application_discovery_no_recursive_disk_search"></a>
