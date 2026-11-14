@@ -15,10 +15,13 @@ los destinos del inventario y se senaliza que se exige reescaneo antes de
 usarlos (`inventario_requiere_reescaneo`). `record_machine` nunca mezcla
 identidades de equipos distintos en una misma base.
 
-Este modulo NO lanza aplicaciones, no modifica `data/knowledge/entities.json` ni el
-catalogo conocido, y no persiste capacidades inferidas. Toda validacion de destino
-se delega en `ApplicationPreflight.validate_launch_destination` (sin lanzar). Es de
-lectura sola sobre el equipo.
+Este modulo NO lanza aplicaciones, no modifica `data/knowledge/entities.json` y sus
+operaciones de descubrimiento son de lectura sola sobre el equipo. A partir de la
+unidad 3.8.5.1.4.11, `auto_registrar_descubiertos` escribe en el catalogo global
+`data/memory/entities.json` (upsert por ID estable, idempotente; sin tocar
+`data/knowledge/entities.json`, sin lanzar aplicaciones y sin pedir alta manual).
+Toda validacion de destino se delega en `ApplicationPreflight.validate_launch_destination`
+(sin lanzar).
 """
 
 from __future__ import annotations
@@ -48,6 +51,7 @@ from src.hands.system_inventory_storage import (
     SCAN_RESULT_OK,
     SystemInventoryStorage,
 )
+from src.memory.storage import Entity
 
 
 def _ahora_iso() -> str:
@@ -1450,6 +1454,108 @@ class ApplicationDiscovery:
             except Exception:
                 pass
             raise
+
+    # ------------------------------------------------------------------ #
+    # Auto-registro de candidatos descubiertos en el catalogo global
+    # (unidad 3.8.5.1.4.11.4)
+    # ------------------------------------------------------------------ #
+
+    def auto_registrar_descubiertos(
+        self,
+        limite_por_fuente: int = 50,
+        incluir_inventario: bool = True,
+        memory_manager: Optional[Any] = None,
+    ) -> dict[str, Any]:
+        """
+        Auto-registra cada candidato descubierto (incluidos los `.exe`
+        accesibles de RecorridoVolumen/inventario y las fuentes nativas de
+        Windows `.lnk`, AppX, registro de desinstaladores, PATH y App Paths)
+        en el catalogo global `data/memory/entities.json`, sin intervencion
+        manual y sin filtrar por ser GUI: registra CLI, servicios,
+        instaladores, actualizadores, controladores y roles desconocidos,
+        etiquetando cada rol correctamente.
+
+        Para cada candidato accesible calcula la identidad estable
+        (3.8.5.1.4.11.2), construye el registro minimo de aplicacion
+        (3.8.5.1.4.11.3), valida sus campos obligatorios y lo guarda mediante
+        `MemoryManager.save_entity` (upsert por ID estable, idempotente; rechaza
+        JSON corrupto sin vaciar el catalogo). No lanza aplicaciones ni pide
+        alta manual al usuario.
+
+        Parametros:
+        - limite_por_fuente: tope de candidatos leidos de cada fuente.
+        - incluir_inventario: si True, complementa con el inventario los
+          destinos no cubiertos por las fuentes primarias.
+        - memory_manager: gestor de memoria destino; por defecto el del
+          `ApplicationManager` asociado (`data/memory/entities.json`).
+
+        Retorna:
+        Resumen con contadores y detalle de registrados, omitidos y errores.
+        """
+        mm = memory_manager or self.app_manager.memory_manager
+        descubiertos = self.descubrir_todos(
+            limite_por_fuente=limite_por_fuente,
+            incluir_inventario=incluir_inventario,
+        )
+        registrados: list[dict[str, Any]] = []
+        omitidos: list[dict[str, Any]] = []
+        errores: list[dict[str, Any]] = []
+        for c in descubiertos:
+            # .11.4: no filtrar por GUI; solo exigir que el destino sea
+            # accesible/observable en el equipo.
+            if not destino_observable(c):
+                omitidos.append(
+                    {
+                        "candidato": c.name,
+                        "razon": "destino_no_observable",
+                        "fuente": c.fuente,
+                    }
+                )
+                continue
+            identidad = calcular_identidad_estable(c)
+            registro = construir_registro_minimo_aplicacion(c, identidad)
+            faltantes = validar_registro_minimo_aplicacion(registro)
+            if faltantes:
+                omitidos.append(
+                    {
+                        "candidato": c.name,
+                        "razon": "campos_obligatorios_faltantes",
+                        "faltantes": faltantes,
+                        "fuente": c.fuente,
+                    }
+                )
+                continue
+            try:
+                entity = Entity.from_dict(registro.a_dict_entidad())
+                ok = mm.save_entity(entity)
+            except Exception as exc:  # noqa: BLE001
+                errores.append(
+                    {
+                        "candidato": c.name,
+                        "razon": f"excepcion:{type(exc).__name__}",
+                        "fuente": c.fuente,
+                    }
+                )
+                continue
+            if ok:
+                registrados.append(registro.a_dict_entidad())
+            else:
+                errores.append(
+                    {
+                        "candidato": c.name,
+                        "razon": "guardado_rechazado_por_gestor",
+                        "fuente": c.fuente,
+                    }
+                )
+        return {
+            "total_descubiertos": len(descubiertos),
+            "registrados": len(registrados),
+            "omitidos": len(omitidos),
+            "errores": len(errores),
+            "detalle_registrados": registrados,
+            "detalle_omitidos": omitidos,
+            "detalle_errores": errores,
+        }
 
     # ------------------------------------------------------------------ #
     # Estado vigente de destinos (3.8.5.1.4.9.4)

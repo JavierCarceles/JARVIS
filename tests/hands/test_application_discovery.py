@@ -69,7 +69,7 @@ from src.hands.applications_core import (
     ApplicationCapabilityDef,
     ApplicationKnowledge,
 )
-from src.memory.storage import Entity
+from src.memory.storage import Entity, MemoryManager
 from src.hands.application_launch_classifier import (
     CONFIANZA_ALTA,
     CONFIANZA_BAJA,
@@ -3537,3 +3537,220 @@ class TestRegistroMinimoAplicacion:
         assert registro.metadata["tipo_evidencia_identidad"] == "nombre_comercial"
         assert identidad.evidencia_base["fabricante"] == "Microsoft Corporation"
         assert validar_registro_minimo_aplicacion(registro) == []
+
+
+# ---------------------------------------------------------------------------
+# Unidad 3.8.5.1.4.11.4: auto-registro de candidatos descubiertos en el
+# catalogo global data/memory/entities.json.
+# ---------------------------------------------------------------------------
+
+class TestAutoRegistroDescubiertos:
+    """
+    Pruebas de `ApplicationDiscovery.auto_registrar_descubiertos`
+    (3.8.5.1.4.11.4): auto-registra cada `.exe` descubierto en el catalogo
+    global `data/memory/entities.json`, sin filtro por GUI y sin
+    intervencion manual.
+
+    Usa `MemoryManager` sobre ruta temporal para no tocar `data/` de
+    produccion. `descubrir_todos` se reemplaza por un doble que devuelve
+    candidatos conocidos (no toca fuentes reales del SO ni el inventario).
+    No lanza ninguna aplicacion.
+    """
+
+    def _discovery_con_registro_temp(self, tmp_path, candidatos,
+                                     machine_id="maquina-prueba"):
+        from src.hands.application_preflight import ApplicationPreflight
+        from src.hands.application_launch_classifier import LaunchClassifier
+        from unittest.mock import MagicMock
+
+        preflight = ApplicationPreflight()
+        clasificador = LaunchClassifier(preflight=preflight)
+        calib = MagicMock()
+        calib.discover_applications.return_value = []
+        storage = MagicMock()
+        storage.connect.return_value = None
+        storage.close.return_value = None
+        storage.search.return_value = []
+        mm = MemoryManager(str(tmp_path / "data" / "memory"))
+        app_manager = MagicMock()
+        app_manager.memory_manager = mm
+        discovery = ApplicationDiscovery(
+            preflight=preflight,
+            clasificador=clasificador,
+            storage=storage,
+            calibration=calib,
+            machine_id=machine_id,
+            app_manager=app_manager,
+        )
+        discovery.descubrir_todos = lambda *a, **k: list(candidatos)
+        return discovery, mm
+
+    def _candidato(self, candidate_id, name, ruta, fuente=FUENTE_PATH,
+                   launch_subtype=LaunchSubtype.DESCONOCIDO,
+                   nombre_comercial=None, aliases=None, evidencia=None):
+        return DiscoveredCandidate(
+            candidate_id=candidate_id,
+            name=name,
+            absolute_path=ruta,
+            destination=ruta,
+            nombre_comercial=nombre_comercial or name,
+            aliases=list(aliases or []),
+            launch_type=LaunchType.EJECUTABLE,
+            launch_subtype=launch_subtype,
+            es_lanzable=True,
+            evidencia=list(evidencia or []),
+            confianza=CONFIANZA_ALTA,
+            fuente=fuente,
+            ultima_comprobacion="2026-11-12T00:00:00+00:00",
+            disponible=True,
+        )
+
+    def test_3_8_5_1_4_11_4_registra_accesibles_sin_filtro_gui(self, tmp_path):
+        """Registra ejecutables GUI y CLI por igual (sin filtro por GUI) y
+        omite los cuyo destino no es observable en el equipo. Los entity_id
+        son estables y nunca contienen la ruta absoluta."""
+        exe_gui = tmp_path / "app_gui.exe"
+        exe_gui.write_text("dummy ejecutable gui")
+        exe_cli = tmp_path / "app_cli.exe"
+        exe_cli.write_text("dummy ejecutable cli")
+
+        candidatos = [
+            self._candidato("c-gui", "App GUI", str(exe_gui),
+                            launch_subtype=LaunchSubtype.GUI_APLICACION,
+                            nombre_comercial="App GUI"),
+            self._candidato("c-cli", "App CLI", str(exe_cli),
+                            nombre_comercial="App CLI"),
+            self._candidato("c-missing", "App Inexistente",
+                            str(tmp_path / "no_existe.exe"),
+                            fuente=FUENTE_INVENTARIO),
+        ]
+
+        discovery, mm = self._discovery_con_registro_temp(tmp_path, candidatos)
+        resultado = discovery.auto_registrar_descubiertos(memory_manager=mm)
+
+        assert resultado["registrados"] == 2
+        assert resultado["omitidos"] == 1
+        assert resultado["errores"] == 0
+        assert resultado["total_descubiertos"] == 3
+
+        omitido = resultado["detalle_omitidos"][0]
+        assert omitido["candidato"] == "App Inexistente"
+        assert omitido["razon"] == "destino_no_observable"
+
+        # entity_id estable y sin fragmentos de ruta absoluta
+        ids_registrados = [e["id"] for e in resultado["detalle_registrados"]]
+        for eid in ids_registrados:
+            assert "C:" not in eid
+            assert str(tmp_path) not in eid
+
+        # Ambas entidades se persisten en el MemoryManager temporal
+        for e in resultado["detalle_registrados"]:
+            entidad = mm.get_entity(e["id"])
+            assert entidad is not None
+            assert entidad.type == "application"
+            assert entidad.properties["estado_disponible"] == "available"
+            assert entidad.properties["capacidades_verificadas"] == []
+            assert entidad.properties["capacidades_no_verificadas"] == []
+
+    def test_3_8_5_1_4_11_4_upsert_no_duplica_al_repetir(self, tmp_path):
+        """El upsert por ID estable no duplica al registrar el mismo candidato
+        dos veces (idemposiente)."""
+        exe = tmp_path / "app_dup.exe"
+        exe.write_text("dummy")
+        candidato = self._candidato("c-dup", "App Dup", str(exe),
+                                    nombre_comercial="App Dup")
+
+        discovery, mm = self._discovery_con_registro_temp(tmp_path, [candidato])
+        r1 = discovery.auto_registrar_descubiertos(memory_manager=mm)
+        r2 = discovery.auto_registrar_descubiertos(memory_manager=mm)
+
+        assert r1["registrados"] == 1
+        assert r2["registrados"] == 1  # actualiza, no duplica
+        entidades = mm.get_entities_by_type("application")
+        assert len(entidades) == 1  # una sola entidad, no dos
+
+    def test_3_8_5_1_4_11_4_preserva_entidades_preexistentes(self, tmp_path):
+        """No borra ni sobrescribe entidades que ya estaban en el catalogo
+        global (preservacion de entidades no-app y previas)."""
+        memoria_dir = tmp_path / "data" / "memory"
+        memoria_dir.mkdir(parents=True, exist_ok=True)
+        entidades_path = memoria_dir / "entities.json"
+        entidades_path.write_text(
+            json.dumps([
+                {"id": "streamer-existente", "type": "streamer", "name": "Streamer",
+                 "properties": {}, "aliases": [], "tags": [], "confidence": 1.0},
+                {"id": "app-previa", "type": "application", "name": "App Previa",
+                 "properties": {"estado_disponible": "available"}, "aliases": [],
+                 "tags": [], "confidence": 1.0},
+            ], ensure_ascii=False)
+        )
+
+        exe = tmp_path / "app_nueva.exe"
+        exe.write_text("dummy")
+        candidato = self._candidato("c-nueva", "App Nueva", str(exe),
+                                    nombre_comercial="App Nueva")
+
+        discovery, mm = self._discovery_con_registro_temp(tmp_path, [candidato])
+        resultado = discovery.auto_registrar_descubiertos(memory_manager=mm)
+
+        assert resultado["registrados"] == 1
+        ids_todos = [e.id for e in mm.get_entities_by_type("application")] + \
+                    [e.id for e in mm.get_entities_by_type("streamer")]
+        assert "streamer-existente" in ids_todos
+        assert "app-previa" in ids_todos
+
+    def test_3_8_5_1_4_11_4_json_corrupto_no_vacia_catalogo(self, tmp_path):
+        """Un entities.json corrupto hace que save_entity rechace la escritura
+        (retorna False) sin vaciar el catalogo; el candidato se reporta como
+        error y no se registra."""
+        memoria_dir = tmp_path / "data" / "memory"
+        memoria_dir.mkdir(parents=True, exist_ok=True)
+        entidades_path = memoria_dir / "entities.json"
+        entidades_path.write_text("{json corrupto no valido")
+
+        exe = tmp_path / "app_corrupt.exe"
+        exe.write_text("dummy")
+        candidato = self._candidato("c-corrupt", "App Corrupt", str(exe),
+                                    nombre_comercial="App Corrupt")
+
+        discovery, mm = self._discovery_con_registro_temp(tmp_path, [candidato])
+        resultado = discovery.auto_registrar_descubiertos(memory_manager=mm)
+
+        assert resultado["registrados"] == 0
+        assert resultado["errores"] == 1
+        assert resultado["detalle_errores"][0]["candidato"] == "App Corrupt"
+        # El archivo corrupto no se vació (proteccion de save_entity)
+        assert entidades_path.read_text(encoding="utf-8") == "{json corrupto no valido"
+
+    def test_3_8_5_1_4_11_4_integracion_notepad_real(self, tmp_path):
+        """Integracion real: registra notepad.exe del equipo en un catalogo
+        temporal y verifica que quede representado con entity_id estable y
+        sin ruta absoluta, sin lanzar la aplicacion."""
+        candidato = DiscoveredCandidate(
+            candidate_id="c-notepad-integ",
+            name="Notepad",
+            absolute_path=r"C:\Windows\System32\notepad.exe",
+            destination=r"C:\Windows\System32\notepad.exe",
+            nombre_comercial="Notepad",
+            aliases=["notepad", "bloc de notas"],
+            launch_type=LaunchType.EJECUTABLE,
+            launch_subtype=LaunchSubtype.GUI_APLICACION,
+            es_lanzable=True,
+            evidencia=["archivo_existe:C:\\Windows\\System32\\notepad.exe"],
+            confianza=CONFIANZA_ALTA,
+            fuente=FUENTE_START_MENU,
+            ultima_comprobacion="2026-11-12T00:00:00+00:00",
+            disponible=True,
+        )
+
+        discovery, mm = self._discovery_con_registro_temp(tmp_path, [candidato])
+        resultado = discovery.auto_registrar_descubiertos(memory_manager=mm)
+
+        assert resultado["registrados"] == 1
+        entidad = mm.get_entity(resultado["detalle_registrados"][0]["id"])
+        assert entidad is not None
+        assert entidad.name == "notepad"
+        assert entidad.type == "application"
+        assert "C:" not in entidad.id
+        assert "System32" not in entidad.id
+        assert "Windows" not in entidad.id
