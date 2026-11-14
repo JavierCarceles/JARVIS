@@ -924,6 +924,7 @@ Métodos:
 | `def ejecutar_preflight_sobre_candidato(candidato_raw, clasificacion)` | Pasa un candidato por `ApplicationPreflight.check()` (política completa de pre-lanzamiento: nombres bloqueados, app IDs bloqueados, login, recursos, manifest de elevación, uiAccess). Retorna el dict estructurado de `PreflightResult.to_dict()`. Sin lanzar nada. |
 | `def filtrar_por_preflight_policy(candidatos)` | Retorna solo candidatos autorizados por el preflight completo (`preflight_policy["allowed"] is True`). Los bloqueados se excluyen; su `preflight_policy` conserva `blocked_by` y `reason`. |
 | `def resolver_aplicacion_por_nombre(nombre, incluir_preflight)` | Resuelve una aplicación por nombre siguiendo el contrato 3.8.5.1.4.11.6: consulta primero el catálogo global (`entities.json` / `ApplicationManager`); si no está, consulta `application_candidates` de SQLite filtrado por `machine_id` actual, nombre y volúmenes montados; si se encuentra un candidato local, lo auto-registra en `entities.json` y continúa por preflight; revalida la ruta ejecutable en el SO antes de considerar válida. La ruta en `entities.json` es observación global y nunca se asume vigente sin revalidación. Retorna `DiscoveredCandidate` o `None`. Sin lanzar nada. |
+| `def resolver_aplicacion_por_nombre_con_desambiguacion(nombre, incluir_preflight)` | Resuelve una aplicación por nombre integrando el catálogo global (`ApplicationManager` / `entities.json`: identidad, nombres y aliases primero) con la resolución de instalación local (`ApplicationDiscovery` / SQLite). Cuando hay varios destinos locales plausibles, conserva todas las alternativas y señala ambigüedad (3.8.5.1.4.9.3) sin elegir silenciosamente (`ResultadoResolucionCandidatos` con `ambiguo=True` y `requiere_desambiguacion=True`). `ApplicationPreflight` es obligatorio y se ejecuta antes de considerar un destino válido, sin lanzar nada. No crea rutas paralelas de Brain/Planner/Executor. |
 
 <a name="src-hands-application_launch_classifier-py"></a>
 ### `src/hands/application_launch_classifier.py` [855 líneas] — Clasificador de candidatos por tipo de lanzamiento.
@@ -3800,8 +3801,8 @@ Métodos:
 
 | Firma | Docstring |
 |---|---|
-| `def __init__(memory_manager)` |  |
-| `def resolve_entity(entity_reference, context, entity_type)` | Resuelve una referencia de entidad a una entidad específica. |
+| `def __init__(memory_manager, app_manager)` | Crea el resolutor con el gestor de memoria y, opcionalmente, el gestor del catálogo global de aplicaciones (`ApplicationManager` / `entities.json`). Si no se inyecta, se resuelve perezosamente al primer uso para evitar importación circular. |
+| `def resolve_entity(entity_reference, context, entity_type)` | Resuelve una referencia de entidad a una entidad específica. Para referencias de aplicación (o sin tipo declarado) consulta primero el catálogo global (`ApplicationManager` / `entities.json`) para obtener la identidad, nombres y aliases (unidad 3.8.5.1.4.11.7); si no hay aplicación registrada, sigue con la búsqueda habitual en la memoria de dominio. |
 | `def resolve_entities_batch(entity_references, context)` | Resuelve múltiples entidades en lote. |
 | `def _normalize_reference(reference)` | Normaliza una referencia de entidad. |
 | `def _find_exact_matches(reference, entity_type)` | Busca coincidencias exactas. |

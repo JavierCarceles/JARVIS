@@ -115,6 +115,7 @@
 - [`hands\test_ui_elements_working.py`](#hands/test-ui_elements_working)
 - [`hands\windows\test_window_verification.py`](#hands/windows/test-window_verification)
 - [`helpers\test_entities_state_helper.py`](#helpers/test-entities_state_helper)
+- [`memory\test_entity_resolver.py`](#memory/test-entity_resolver)
 - [`memory\test_memory_entities_json_estado_inicial.py`](#memory/test-memory_entities_json_estado_inicial)
 - [`memory\test_memory_save_entity_persist_bug.py`](#memory/test-memory_save_entity_persist_bug)
 - [`utils\adaptive_learning_engine\test_adaptive_learning_engine_original.py`](#utils/adaptive_learning_engine/test-adaptive_learning_engine_original)
@@ -7094,11 +7095,40 @@ candidato, sin lanzar ninguna aplicación.
     `buscar_candidatos_registrados` filtra por nombre (subcadena,
     case-insensitive) cuando se pasa el parámetro `name`.
 
+- **`TestResolucionAplicacionPorNombreConDesambiguacion`** (línea 4078) — 6 método(s) de test
+  - Unidad 3.8.5.1.4.11.7: integración del catálogo global
+    (`ApplicationManager` / `entities.json`: identidad, nombres y aliases
+    primero) con la resolución de instalación local
+    (`ApplicationDiscovery` / SQLite). Cuando hay varios destinos locales
+    plausibles, conserva todas las alternativas y señala ambigüedad
+    (3.8.5.1.4.9.3) sin elegir silenciosamente (`ResultadoResolucionCandidatos`
+    con `ambiguo=True` y `requiere_desambiguacion=True`). `ApplicationPreflight`
+    es obligatorio y se ejecuta antes de considerar un destino válido.
+  - `test_117_varios_destinos_locales_ambiguos_mantiene_alternativas` (L4084):
+    dos destinos locales válidos para el mismo nombre: `ambiguo=True`,
+    `requiere_desambiguacion=True` y ambas alternativas conservadas; no se
+    elige silenciosamente.
+  - `test_117_un_destino_valido_retorna_unico_sin_ambiguedad` (L4112): un único
+    destino local válido: resolución única, sin ambigüedad, con `preflight_decision`
+    válido.
+  - `test_117_app_en_catalogo_fuente_autoritaria_es_catalogo` (L4140): app en
+    catálogo global: la fuente autoritativa es el catálogo y la ruta se
+    resuelve desde SQLite local.
+  - `test_117_candidato_sin_preflight_valido_se_excluye` (L4168): candidato cuyo
+    preflight no es válido: se excluye de la resolución (preflight obligatorio
+    antes de cualquier lanzamiento).
+  - `test_117_no_encontrado_retorna_vacio` (L4216): sin catálogo ni candidatos
+    locales: resolución vacía.
+  - `test_117_auto_registra_en_entities_json_cuando_no_esta_en_catalogo` (L4244):
+    app no en catálogo global y un destino local válido: se auto-registra en
+    `entities.json` (upsert, sin intervención manual) y se resuelve.
+
 **Estrategia de mocks:** `ApplicationManager` mockeado para controlar si la
 app está en el catálogo global; `SystemInventoryStorage` real sobre SQLite
 temporal; clasificador y preflight REALES (`LaunchClassifier` +
-`ApplicationPreflight` sobre `notepad.exe` real del equipo). No se lanza
-ninguna aplicación.
+`ApplicationPreflight` sobre `notepad.exe` real del equipo), salvo en la prueba
+de exclusión por preflight donde se inyecta un preflight que deniega. No se
+lanza ninguna aplicación.
 
 ---
 
@@ -11940,7 +11970,32 @@ Uses mocks to test _verificar_aplicacion_abierta.
 
 ## 📂 `memory/`
 
-2 ficheros de test, 8 métodos de test.
+3 ficheros de test, 14 métodos de test.
+
+<a name="memory/test-entity_resolver"></a>
+### `memory\test_entity_resolver.py`
+
+**Descripción:** Verifica que `EntityResolver` consulta el catálogo global de
+aplicaciones (`ApplicationManager` / `entities.json`) PRIMERO para obtener la
+identidad, nombres y aliases de una aplicación (unidad 3.8.5.1.4.11.7), antes
+de buscar en la memoria de dominio, y que conserva el comportamiento habitual
+cuando no hay aplicación registrada en el catálogo.
+
+**Módulos de origen probados:** src.memory.entity_resolver, src.memory.storage
+
+**Clases de test:**
+
+- **`TestEntityResolverCatalogoGlobalPrimero`** (línea 1) — 5 método(s) de test
+  - `test_resolve_entity_aplicacion_resuelve_catalogo_global_primero`: referencia de aplicación se resuelve desde el catálogo global con método `catalogo_global_aplicacion` y confianza 1.0.
+  - `test_resolve_entity_sin_tipo_declarado_con_app_consulta_catalogo`: sin `entity_type` declarado, una aplicación conocida en el catálogo se resuelve desde ahí primero.
+  - `test_resolve_entity_no_app_en_catalogo_usa_memoria_de_dominio`: sin aplicación en el catálogo, se conserva la búsqueda en la memoria de dominio (no regresión).
+  - `test_resolve_entity_app_no_en_catalogo_ni_memoria_entidad_temporal`: sin aplicación en catálogo ni entidad en memoria: entidad temporal con confianza reducida, sin fallar.
+  - `test_resolver_funciona_sin_app_manager_inyectado`: por defecto se obtiene el `ApplicationManager` real y el resolutor se construye sin error.
+
+- **`TestEntityResolverInicializacion`** (línea 1) — 1 método(s) de test
+  - `test_acepta_app_manager_inyectado`: acepta un `app_manager` inyectado.
+
+---
 
 <a name="memory/test-memory_save_entity_persist_bug"></a>
 ### `memory\test_memory_save_entity_persist_bug.py`

@@ -1817,6 +1817,199 @@ class ApplicationDiscovery:
         return None
 
     # ------------------------------------------------------------------ #
+    # Resolución de aplicación por nombre con desambiguación
+    # (unidad 3.8.5.1.4.11.7)
+    # ------------------------------------------------------------------ #
+
+    def resolver_aplicacion_por_nombre_con_desambiguacion(
+        self,
+        nombre: str,
+        incluir_preflight: bool = True,
+    ) -> ResultadoResolucionCandidatos:
+        """
+        Resuelve una aplicación por nombre integrando el catálogo global
+        (`ApplicationManager` / `entities.json`: identidad, nombres y aliases
+        primero) con la resolución de instalación local
+        (`ApplicationDiscovery` / SQLite).
+
+        Flujo (3.8.5.1.4.11.7):
+
+        1. Consulta el catálogo global primero para obtener la identidad,
+           nombres y aliases de la entidad global.
+        2. Consulta `application_candidates` de SQLite filtrado por el
+           `machine_id` actual y el nombre para resolver la instalación local.
+        3. Cada candidato local se revalida en el SO y se pasa por
+           `ApplicationPreflight` (obligatorio, sin lanzar).
+        4. Si hay varios destinos locales plausibles, se mantienen todas las
+           alternativas y se señala `ambiguo=True` /
+           `requiere_desambiguacion=True` (reutiliza la señal de
+           3.8.5.1.4.9.3); no se elige silenciosamente.
+        5. Si la aplicación no está en el catálogo global y existe exactamente
+           un destino local válido, se auto-registra en `entities.json`
+           (upsert idempotente de 3.8.5.1.4.11.5).
+        6. No crea rutas paralelas de Brain/Planner/Executor.
+
+        No lanza aplicaciones ni abre ventanas.
+        """
+        if not nombre or not isinstance(nombre, str):
+            return ResultadoResolucionCandidatos(
+                candidatos=[], ambiguo=False, motivo_ambiguedad=None,
+                alternativas=[], requiere_desambiguacion=False,
+                fuente_autoritaria=None,
+            )
+        nombre = nombre.strip()
+        if not nombre:
+            return ResultadoResolucionCandidatos(
+                candidatos=[], ambiguo=False, motivo_ambiguedad=None,
+                alternativas=[], requiere_desambiguacion=False,
+                fuente_autoritaria=None,
+            )
+
+        # ------------------------------------------------------------------
+        # Paso 1: identidad global primero (catálogo conocido).
+        # ------------------------------------------------------------------
+        app_conocimiento = self.app_manager.get_application(nombre)
+        en_catalogo = app_conocimiento is not None
+        fuente_autoritaria = FUENTE_CATALOGO if en_catalogo else None
+
+        # ------------------------------------------------------------------
+        # Paso 2: candidatos locales de SQLite (instalación local real).
+        # ------------------------------------------------------------------
+        try:
+            filas = self.storage.buscar_candidatos_registrados(
+                machine_id=self.machine_id,
+                name=nombre,
+                limite=10,
+            )
+        except (OSError, PermissionError, sqlite3.Error):
+            filas = []
+        except Exception:  # noqa: BLE001
+            filas = []
+
+        validos: list[DiscoveredCandidate] = []
+        ahora = _ahora_iso()
+        for fila in filas:
+            ruta = str(fila.get("absolute_path") or "").strip()
+            volumen = str(fila.get("volume") or "")
+            if not ruta or not os.path.isfile(ruta):
+                continue
+            # Revalidación real en el SO antes de considerar el destino.
+            try:
+                revalidacion = self.storage.revalidar_destino_aplicacion(
+                    self.machine_id, volumen, ruta
+                )
+            except Exception:
+                revalidacion = None
+            if not isinstance(revalidacion, dict) or not revalidacion.get("valido"):
+                continue
+
+            # Preflight obligatorio antes de cualquier lanzamiento.
+            preflight_decision = None
+            preflight_ok = True
+            if incluir_preflight:
+                try:
+                    preflight_decision = (
+                        self.clasificador.validar_destino_antes_de_lanzar(ruta)
+                    )
+                except Exception:
+                    preflight_decision = {
+                        "valid": False,
+                        "reason": "Error al validar destino con preflight",
+                        "destination": ruta,
+                    }
+                preflight_ok = (
+                    bool(preflight_decision.get("valid"))
+                    if isinstance(preflight_decision, dict)
+                    else False
+                )
+            if not preflight_ok:
+                continue
+
+            candidato = DiscoveredCandidate(
+                candidate_id=str(fila.get("candidate_id") or ruta),
+                name=str(fila.get("name") or nombre),
+                absolute_path=ruta,
+                destination=ruta,
+                volume=volumen,
+                launch_type=str(fila.get("launch_type") or ""),
+                launch_subtype="desconocido",
+                es_lanzable=True,
+                evidencia=list(fila.get("evidencia") or []),
+                confianza=str(fila.get("confianza") or CONFIANZA_NINGUNA),
+                version=fila.get("version"),
+                producto=fila.get("producto"),
+                fuente=(
+                    FUENTE_CATALOGO if en_catalogo
+                    else str(fila.get("fuente") or "application_candidates_sqlite")
+                ),
+                ultima_comprobacion=str(fila.get("ultima_comprobacion") or ahora),
+                disponible=True,
+                preflight_decision=preflight_decision,
+            )
+            validos.append(candidato)
+
+        # ------------------------------------------------------------------
+        # Paso 3: varios destinos locales plausibles -> ambigüedad explícita.
+        # ------------------------------------------------------------------
+        if not validos:
+            return ResultadoResolucionCandidatos(
+                candidatos=[], ambiguo=False, motivo_ambiguedad=None,
+                alternativas=[], requiere_desambiguacion=False,
+                fuente_autoritaria=fuente_autoritaria,
+            )
+
+        if len(validos) > 1:
+            return ResultadoResolucionCandidatos(
+                candidatos=list(validos),
+                ambiguo=True,
+                motivo_ambiguedad=(
+                    f"Se encontraron {len(validos)} destinos locales plausibles "
+                    f"para '{nombre}' sin evidencia que permita elegir uno de "
+                    f"forma inequívoca"
+                ),
+                alternativas=list(validos),
+                requiere_desambiguacion=True,
+                fuente_autoritaria=fuente_autoritaria,
+            )
+
+        # ------------------------------------------------------------------
+        # Paso 4: exactamente un destino válido -> resolución única.
+        # ------------------------------------------------------------------
+        candidato = validos[0]
+
+        # Si no está en el catálogo global, auto-registrar en entities.json.
+        if not en_catalogo:
+            identidad = calcular_identidad_estable(candidato)
+            registro = construir_registro_minimo_aplicacion(candidato, identidad)
+            faltantes = validar_registro_minimo_aplicacion(registro)
+            if not faltantes:
+                try:
+                    entidad_nueva = Entity.from_dict(registro.a_dict_entidad())
+                    existente = self.app_manager.memory_manager.get_entity(
+                        entidad_nueva.id
+                    )
+                    if existente is not None:
+                        fusionada = _fusionar_entidad_existente(
+                            existente.to_dict(), entidad_nueva.to_dict()
+                        )
+                        entidad_para_guardar = Entity.from_dict(fusionada)
+                    else:
+                        entidad_para_guardar = entidad_nueva
+                    self.app_manager.memory_manager.save_entity(entidad_para_guardar)
+                except Exception:  # noqa: BLE001
+                    # El auto-registro no bloquea la resolución local válida.
+                    pass
+
+        return ResultadoResolucionCandidatos(
+            candidatos=[candidato],
+            ambiguo=False,
+            motivo_ambiguedad=None,
+            alternativas=[],
+            requiere_desambiguacion=False,
+            fuente_autoritaria=fuente_autoritaria,
+        )
+
+    # ------------------------------------------------------------------ #
     # Estado vigente de destinos (3.8.5.1.4.9.4)
     # ------------------------------------------------------------------ #
 

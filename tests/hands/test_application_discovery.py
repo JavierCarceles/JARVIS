@@ -4073,3 +4073,367 @@ class TestResolucionAplicacionPorNombre:
             assert len(resultados) == 2
         finally:
             storage.close()
+
+
+# ---------------------------------------------------------------------------
+# TestResolucionAplicacionPorNombreConDesambiguacion (unidad 3.8.5.1.4.11.7)
+# ---------------------------------------------------------------------------
+
+class TestResolucionAplicacionPorNombreConDesambiguacion:
+    """
+    Pruebas de `ApplicationDiscovery.resolver_aplicacion_por_nombre_con_desambiguacion`
+    (3.8.5.1.4.11.7): integración del catálogo global
+    (`ApplicationManager` / `entities.json`: identidad, nombres y aliases
+    primero) con la resolución de instalación local (`ApplicationDiscovery` /
+    SQLite).
+
+    Cuando existen varios destinos locales plausibles para el mismo nombre,
+    mantiene todas las alternativas y señala `ambiguo=True` /
+    `requiere_desambiguacion=True` (reutiliza la señal de 3.8.5.1.4.9.3) sin
+    elegir silenciosamente. `ApplicationPreflight` es obligatorio y se
+    ejecuta antes de considerar un destino válido. No lanza nada ni abre
+    ventanas.
+
+    Usa `SystemInventoryStorage` real sobre SQLite temporal y
+    `ApplicationManager` mockeado para controlar si la app está en el
+    catálogo global. El clasificador y el preflight son REALES salvo en la
+    prueba de exclusión por preflight, donde se inyecta un preflight que
+    deniega.
+    """
+
+    def _setup_resolver_117(
+        self,
+        tmp_path,
+        app_en_catalogo: bool,
+        rutas_sqlite: list,
+        nombres_sqlite: list,
+        machine_id: str = "maquina-prueba-117",
+    ):
+        from unittest.mock import MagicMock
+
+        from src.hands.applications_core import ApplicationKnowledge
+
+        # SQLite real temporal
+        db_path = tmp_path / "data" / "system_inventory.sqlite3"
+        storage = SystemInventoryStorage(db_path=db_path)
+        storage.initialize(machine_id_actual=machine_id)
+
+        if rutas_sqlite:
+            storage.record_machine(machine_id)
+            scan_id = f"scan-test-{uuid.uuid4()}"
+            ahora = datetime.now(timezone.utc).isoformat()
+            storage.begin_scan_run(
+                scan_id=scan_id,
+                machine_id=machine_id,
+                volume="C:",
+                mode=SCAN_MODE_FULL,
+                started_at=ahora,
+            )
+            storage.insert_application_candidates(
+                scan_id=scan_id,
+                machine_id=machine_id,
+                volume="C:",
+                candidates=[
+                    {
+                        "candidate_id": str(uuid.uuid4()),
+                        "name": n,
+                        "absolute_path": r,
+                        "launch_type": "ejecutable",
+                        "confianza": "alta",
+                        "version": None,
+                        "producto": None,
+                        "evidencia": [],
+                        "source": "inventario",
+                        "last_checked_at": ahora,
+                    }
+                    for r, n in zip(rutas_sqlite, nombres_sqlite)
+                ],
+            )
+            storage.end_scan_run(
+                scan_id=scan_id,
+                finished_at=ahora,
+                result=SCAN_RESULT_OK,
+                entries_count=len(rutas_sqlite),
+            )
+
+        # MemoryManager temporal para entities.json
+        memoria_dir = tmp_path / "data" / "memory"
+        memoria_dir.mkdir(parents=True, exist_ok=True)
+        mm = MemoryManager(str(memoria_dir))
+
+        # ApplicationManager mockeado (get_application controlado)
+        app_manager = MagicMock()
+        app_manager.memory_manager = mm
+        if app_en_catalogo and rutas_sqlite:
+            app_manager.get_application.return_value = ApplicationKnowledge(
+                name="App Test 117",
+                type="application",
+                executable=rutas_sqlite[0],
+                url=None,
+                login_required=False,
+                default_state=None,
+                capabilities=[],
+            )
+        else:
+            app_manager.get_application.return_value = None
+
+        discovery = ApplicationDiscovery(
+            preflight=ApplicationPreflight(),
+            clasificador=LaunchClassifier(preflight=ApplicationPreflight()),
+            storage=storage,
+            calibration=None,
+            machine_id=machine_id,
+            app_manager=app_manager,
+        )
+
+        return discovery, storage, app_manager, mm
+
+    def _teardown_resolver(self, storage):
+        """Cierra storage."""
+        storage.close()
+
+    def _copia_notepad(self, tmp_path) -> str:
+        """Copia real de notepad.exe en un directorio temporal (recurso controlado)."""
+        import shutil
+
+        origen = r"C:\Windows\System32\notepad.exe"
+        destino = str(tmp_path / "notepad_copia_117.exe")
+        shutil.copyfile(origen, destino)
+        return destino
+
+    def test_117_varios_destinos_locales_ambiguos_mantiene_alternativas(
+        self, tmp_path
+    ):
+        """Dos destinos locales válidos para el mismo nombre: ambiguo, se
+        conservan ambas alternativas y no se elige silenciosamente."""
+        notepad = r"C:\Windows\System32\notepad.exe"
+        copia = self._copia_notepad(tmp_path)
+        if not os.path.isfile(notepad):
+            pytest.skip("notepad.exe no disponible en este equipo")
+
+        discovery, storage, _, _ = self._setup_resolver_117(
+            tmp_path,
+            app_en_catalogo=False,
+            rutas_sqlite=[notepad, copia],
+            nombres_sqlite=["App Duplicada", "App Duplicada"],
+            machine_id="maquina-prueba-117a",
+        )
+        try:
+            resultado = discovery.resolver_aplicacion_por_nombre_con_desambiguacion(
+                "App Duplicada"
+            )
+
+            assert resultado.ambiguo is True
+            assert resultado.requiere_desambiguacion is True
+            assert len(resultado.candidatos) == 2
+            assert len(resultado.alternativas) == 2
+            rutas_devueltas = {c.absolute_path for c in resultado.candidatos}
+            assert rutas_devueltas == {notepad, copia}
+            # Ninguno se eligió silenciosamente: todas son alternativas.
+            assert all(c.preflight_decision is not None for c in resultado.candidatos)
+        finally:
+            self._teardown_resolver(storage)
+
+    def test_117_un_destino_valido_retorna_unico_sin_ambiguedad(self, tmp_path):
+        """Un único destino local válido: resolución única, sin ambigüedad."""
+        notepad = r"C:\Windows\System32\notepad.exe"
+        if not os.path.isfile(notepad):
+            pytest.skip("notepad.exe no disponible en este equipo")
+
+        discovery, storage, _, _ = self._setup_resolver_117(
+            tmp_path,
+            app_en_catalogo=False,
+            rutas_sqlite=[notepad],
+            nombres_sqlite=["App Unica"],
+            machine_id="maquina-prueba-117c",
+        )
+        try:
+            resultado = discovery.resolver_aplicacion_por_nombre_con_desambiguacion(
+                "App Unica"
+            )
+
+            assert resultado.ambiguo is False
+            assert resultado.requiere_desambiguacion is False
+            assert len(resultado.candidatos) == 1
+            assert len(resultado.alternativas) == 0
+            assert resultado.candidatos[0].absolute_path == notepad
+            assert resultado.candidatos[0].disponible is True
+            assert resultado.candidatos[0].preflight_decision is not None
+            assert resultado.candidatos[0].preflight_decision.get("valid") is True
+        finally:
+            self._teardown_resolver(storage)
+
+    def test_117_app_en_catalogo_fuente_autoritaria_es_catalogo(self, tmp_path):
+        """App en el catálogo global: la fuente autoritativa es el catálogo y
+        la ruta se resuelve desde SQLite local (no se confía en la del catálogo)."""
+        notepad = r"C:\Windows\System32\notepad.exe"
+        if not os.path.isfile(notepad):
+            pytest.skip("notepad.exe no disponible en este equipo")
+
+        discovery, storage, _, _ = self._setup_resolver_117(
+            tmp_path,
+            app_en_catalogo=True,
+            rutas_sqlite=[notepad],
+            nombres_sqlite=["App Test 117"],
+            machine_id="maquina-prueba-117d",
+        )
+        try:
+            resultado = discovery.resolver_aplicacion_por_nombre_con_desambiguacion(
+                "App Test 117"
+            )
+
+            assert resultado.ambiguo is False
+            assert len(resultado.candidatos) == 1
+            assert resultado.fuente_autoritaria == FUENTE_CATALOGO
+            assert resultado.candidatos[0].absolute_path == notepad
+            assert resultado.candidatos[0].preflight_decision.get("valid") is True
+        finally:
+            self._teardown_resolver(storage)
+
+    def test_117_candidato_sin_preflight_valido_se_excluye(self, tmp_path):
+        """Candidato cuyo preflight no es válido: se excluye de la resolución
+        (preflight obligatorio antes de cualquier lanzamiento)."""
+        notepad = r"C:\Windows\System32\notepad.exe"
+        if not os.path.isfile(notepad):
+            pytest.skip("notepad.exe no disponible en este equipo")
+
+        from unittest.mock import MagicMock
+
+        from src.hands.applications_core import ApplicationKnowledge
+
+        db_path = tmp_path / "data" / "system_inventory.sqlite3"
+        storage = SystemInventoryStorage(db_path=db_path)
+        storage.initialize(machine_id_actual="maquina-prueba-117b")
+        storage.record_machine("maquina-prueba-117b")
+        scan_id = f"scan-test-{uuid.uuid4()}"
+        ahora = datetime.now(timezone.utc).isoformat()
+        storage.begin_scan_run(
+            scan_id=scan_id, machine_id="maquina-prueba-117b", volume="C:",
+            mode=SCAN_MODE_FULL, started_at=ahora,
+        )
+        storage.insert_application_candidates(
+            scan_id=scan_id, machine_id="maquina-prueba-117b", volume="C:",
+            candidates=[
+                {
+                    "candidate_id": str(uuid.uuid4()),
+                    "name": "App Bloqueada",
+                    "absolute_path": notepad,
+                    "launch_type": "ejecutable",
+                    "confianza": "alta",
+                    "version": None,
+                    "producto": None,
+                    "evidencia": [],
+                    "source": "inventario",
+                    "last_checked_at": ahora,
+                }
+            ],
+        )
+        storage.end_scan_run(
+            scan_id=scan_id,
+            finished_at=ahora,
+            result=SCAN_RESULT_OK,
+            entries_count=1,
+        )
+
+        memoria_dir = tmp_path / "data" / "memory"
+        memoria_dir.mkdir(parents=True, exist_ok=True)
+        mm = MemoryManager(str(memoria_dir))
+
+        app_manager = MagicMock()
+        app_manager.memory_manager = mm
+        app_manager.get_application.return_value = None
+
+        clasificador = LaunchClassifier(preflight=MagicMock())
+        clasificador.preflight.validate_launch_destination.return_value = {
+            "valid": False,
+            "reason": "Destino bloqueado por política",
+            "destination": notepad,
+        }
+        discovery = ApplicationDiscovery(
+            preflight=ApplicationPreflight(),
+            clasificador=clasificador,
+            storage=storage,
+            calibration=None,
+            machine_id="maquina-prueba-117b",
+            app_manager=app_manager,
+        )
+        try:
+            resultado = discovery.resolver_aplicacion_por_nombre_con_desambiguacion(
+                "App Bloqueada"
+            )
+
+            assert resultado.ambiguo is False
+            assert resultado.requiere_desambiguacion is False
+            assert len(resultado.candidatos) == 0
+        finally:
+            storage.close()
+
+    def test_117_no_encontrado_retorna_vacio(self, tmp_path):
+        """No hay catálogo ni candidatos locales: resolución vacía."""
+        discovery, storage, _, _ = self._setup_resolver_117(
+            tmp_path,
+            app_en_catalogo=False,
+            rutas_sqlite=[],
+            nombres_sqlite=[],
+        )
+        try:
+            resultado = discovery.resolver_aplicacion_por_nombre_con_desambiguacion(
+                "AppQueNoExisteEnNingunLadoXYZ"
+            )
+
+            assert resultado.ambiguo is False
+            assert resultado.requiere_desambiguacion is False
+            assert len(resultado.candidatos) == 0
+            assert len(resultado.alternativas) == 0
+        finally:
+            self._teardown_resolver(storage)
+
+    def test_117_auto_registra_en_entities_json_cuando_no_esta_en_catalogo(
+        self, tmp_path
+    ):
+        """App no en catálogo global y un destino local válido: se auto-registra
+        en entities.json (upsert, sin intervención manual) y se resuelve."""
+        notepad = r"C:\Windows\System32\notepad.exe"
+        if not os.path.isfile(notepad):
+            pytest.skip("notepad.exe no disponible en este equipo")
+
+        discovery, storage, app_manager, mm = self._setup_resolver_117(
+            tmp_path,
+            app_en_catalogo=False,
+            rutas_sqlite=[notepad],
+            nombres_sqlite=["App AutoRegistro"],
+            machine_id="maquina-prueba-117e",
+        )
+        try:
+            resultado = discovery.resolver_aplicacion_por_nombre_con_desambiguacion(
+                "App AutoRegistro"
+            )
+
+            assert resultado is not None
+            assert resultado.ambiguo is False
+            assert len(resultado.candidatos) == 1
+            assert resultado.candidatos[0].absolute_path == notepad
+            assert resultado.candidatos[0].preflight_decision.get("valid") is True
+
+            # Verificar auto-registro en entities.json del disco.
+            entidades_path = tmp_path / "data" / "memory" / "entities.json"
+            assert entidades_path.exists(), f"entities.json no existe en {entidades_path}"
+            entidades = json.loads(entidades_path.read_text(encoding="utf-8"))
+            entidad = [
+                e
+                for e in entidades
+                if e.get("type") == "application"
+                and e.get("properties", {}).get("ruta_absoluta_observada") == notepad
+            ]
+            assert len(entidad) == 1, f"Esperada 1 entidad, encontradas {len(entidad)}: {entidades}"
+            entidad = entidad[0]
+            assert entidad.get("type") == "application"
+            props = entidad.get("properties", {})
+            assert props.get("ruta_absoluta_observada") == notepad
+            assert props.get("estado_disponible") == "available"
+            # entity_id estable sin fragmentos de ruta absoluta.
+            assert "C:" not in entidad.get("id", "")
+            assert "System32" not in entidad.get("id", "")
+            assert "Windows" not in entidad.get("id", "")
+        finally:
+            self._teardown_resolver(storage)

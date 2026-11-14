@@ -48,11 +48,18 @@ class ResolutionContext:
 class EntityResolver:
     """Sistema avanzado de resolución de entidades."""
     
-    def __init__(self, memory_manager: Optional[MemoryManager] = None):
+    def __init__(self, memory_manager: Optional[MemoryManager] = None, app_manager: Optional[Any] = None):
         self.memory_manager = memory_manager or MemoryManager()
         self.resolution_threshold = 0.7
         self.max_alternatives = 3
         self.default_user_id = "default_user"
+        # Gestor del catálogo global de aplicaciones (ApplicationManager /
+        # entities.json): se consulta primero para identidad, nombres y aliases
+        # de aplicaciones (unidad 3.8.5.1.4.11.7). Se resuelve perezosamente
+        # en el primer uso para evitar importación circular al cargar el módulo
+        # (`src.hands.applications_core` depende de `src.memory`).
+        self.app_manager = app_manager
+        self._app_manager_resuelto = app_manager is not None
         
         # Patrones para diferentes tipos de entidades
         self.patterns = {
@@ -90,7 +97,32 @@ class EntityResolver:
         
         # Normalizar la referencia
         normalized_ref = self._normalize_reference(entity_reference)
-        
+
+        # 0. Catálogo global primero: identidad, nombres y aliases de la
+        #    entidad global (ApplicationManager / entities.json)
+        #    (unidad 3.8.5.1.4.11.7). Para referencias de aplicación (o sin
+        #    tipo declarado) se consulta el catálogo global antes de la
+        #    memoria de dominio; si no hay aplicación registrada, se sigue
+        #    con la búsqueda habitual en entidades.
+        if entity_type is None or str(entity_type or "").strip().lower() == "application":
+            if self.app_manager is None and not self._app_manager_resuelto:
+                from src.hands.applications_core import get_application_manager
+
+                self.app_manager = get_application_manager()
+                self._app_manager_resuelto = True
+            app = self.app_manager.get_application(normalized_ref)
+            if app is not None:
+                entidad = self._entidad_desde_conocimiento_aplicacion(app)
+                ctx = context or ResolutionContext([], None, [], {}, {})
+                return EntityResolutionResult(
+                    entity=entidad,
+                    confidence=1.0,
+                    resolution_method="catalogo_global_aplicacion",
+                    alternatives=[],
+                    context_used=ctx.__dict__,
+                    timestamp=datetime.now().isoformat(),
+                )
+
         # 1. Búsqueda exacta
         exact_matches = self._find_exact_matches(normalized_ref, entity_type)
         
@@ -369,6 +401,58 @@ class EntityResolver:
             timestamp=datetime.now().isoformat()
         )
     
+    def _entidad_desde_conocimiento_aplicacion(self, app: Any) -> Entity:
+        """
+        Construye una `Entity` a partir del `ApplicationKnowledge` del catálogo
+        global (`ApplicationManager` / `entities.json`).
+
+        Reutiliza la identidad estable del gestor (`app_<clave normalizada>`)
+        y conserva nombre, aliases, ejecutable, URL, capacidades, estados y
+        tipo de la entidad global. Nunca incorpora rutas absolutas como base
+        de la identidad (unidad 3.8.5.1.4.11.7).
+        """
+        from src.hands.applications_core import ApplicationManager
+
+        clave = ApplicationManager._normalize_name(app.name)
+        aliases: list[str] = []
+        if app.metadata and isinstance(app.metadata, dict):
+            aliases = [str(a) for a in (app.metadata.get("aliases") or [])]
+        ahora = datetime.now().isoformat()
+        propiedades: dict[str, Any] = {
+            "type": app.type,
+            "executable": app.executable,
+            "url": app.url,
+            "login_required": app.login_required,
+            "capabilities": [
+                cap.capability.value for cap in (app.capabilities or [])
+            ],
+            "ui_elements": [
+                {
+                    "name": elemento.name,
+                    "type": elemento.type,
+                    "description": elemento.description,
+                    "required_capability": (
+                        elemento.required_capability.value
+                        if elemento.required_capability is not None
+                        else None
+                    ),
+                }
+                for elemento in (app.ui_elements or [])
+            ],
+            "states": [estado.value for estado in (app.states or [])],
+        }
+        return Entity(
+            id=f"app_{clave}",
+            type="application",
+            name=app.name,
+            properties=propiedades,
+            aliases=aliases,
+            tags=[app.type] if app.type else [],
+            confidence=1.0,
+            created_at=ahora,
+            updated_at=ahora,
+        )
+
     def get_entity_suggestions(self, 
                               partial_text: str, 
                               entity_type: Optional[str] = None,

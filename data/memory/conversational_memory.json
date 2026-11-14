@@ -10185,5 +10185,133 @@
     "confidence": 1.0,
     "execution_time": 8.579999848734587e-05,
     "success": true
+  },
+  {
+    "id": "conv_1794664814.345056",
+    "message": "abre chrome",
+    "response": "Objetivo creado: Abrir aplicación Google Chrome",
+    "timestamp": "2026-11-14T15:00:14.345060",
+    "context": {
+      "goal_id": "open_application_google_chrome_1794664814",
+      "parameters": {},
+      "confidence": 0.7058823529411765,
+      "resolution_method": "context_disambiguation"
+    },
+    "intent": "open_application",
+    "entities": [
+      "google_chrome"
+    ],
+    "confidence": 1.0,
+    "execution_time": 0.0,
+    "success": null
+  },
+  {
+    "id": "conv_1794664814.353636",
+    "message": "abre chrome",
+    "response": "Objetivo creado: Abrir aplicación Chrome",
+    "timestamp": "2026-11-14T15:00:14.353638",
+    "context": {
+      "goal_id": "open_application_app_chrome_1794664814",
+      "parameters": {},
+      "confidence": 0.7,
+      "resolution_method": "fallback"
+    },
+    "intent": "open_application",
+    "entities": [
+      "app_chrome"
+    ],
+    "confidence": 1.0,
+    "execution_time": 0.0,
+    "success": null
+  },
+  {
+    "id": "conv_1794664815.438932",
+    "message": "navega a example.com",
+    "response": "Objetivo creado: test",
+    "timestamp": "2026-11-14T15:00:15.438935",
+    "context": null,
+    "intent": "navigate",
+    "entities": [],
+    "confidence": 1.0,
+    "execution_time": 0.0,
+    "success": null
+  },
+  {
+    "id": "conv_1794664815.456558",
+    "message": "navega a example.com",
+    "response": "Objetivo creado: test",
+    "timestamp": "2026-11-14T15:00:15.456560",
+    "context": null,
+    "intent": "navigate",
+    "entities": [
+      "https://example.com"
+    ],
+    "confidence": 1.0,
+    "execution_time": 0.0,
+    "success": null
+  },
+  {
+    "id": "conv_1794665440.149379",
+    "message": "abre chrome",
+    "response": "Objetivo creado: Abrir aplicación Google Chrome",
+    "timestamp": "2026-11-14T15:10:40.149381",
+    "context": {
+      "goal_id": "open_application_google_chrome_1794665440",
+      "parameters": {},
+      "confidence": 0.7058823529411765,
+      "resolution_method": "context_disambiguation"
+    },
+    "intent": "open_application",
+    "entities": [
+      "google_chrome"
+    ],
+    "confidence": 1.0,
+    "execution_time": 0.0,
+    "success": null
+  },
+  {
+    "id": "conv_1794665440.157973",
+    "message": "abre chrome",
+    "response": "Objetivo creado: Abrir aplicación Chrome",
+    "timestamp": "2026-11-14T15:10:40.157976",
+    "context": {
+      "goal_id": "open_application_app_chrome_1794665440",
+      "parameters": {},
+      "confidence": 0.7,
+      "resolution_method": "fallback"
+    },
+    "intent": "open_application",
+    "entities": [
+      "app_chrome"
+    ],
+    "confidence": 1.0,
+    "execution_time": 0.0,
+    "success": null
+  },
+  {
+    "id": "conv_1794665441.239245",
+    "message": "navega a example.com",
+    "response": "Objetivo creado: test",
+    "timestamp": "2026-11-14T15:10:41.239247",
+    "context": null,
+    "intent": "navigate",
+    "entities": [],
+    "confidence": 1.0,
+    "execution_time": 0.0,
+    "success": null
+  },
+  {
+    "id": "conv_1794665441.254714",
+    "message": "navega a example.com",
+    "response": "Objetivo creado: test",
+    "timestamp": "2026-11-14T15:10:41.254717",
+    "context": null,
+    "intent": "navigate",
+    "entities": [
+      "https://example.com"
+    ],
+    "confidence": 1.0,
+    "execution_time": 0.0,
+    "success": null
   }
 ]
