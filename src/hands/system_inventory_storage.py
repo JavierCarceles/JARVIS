@@ -3068,6 +3068,7 @@ class SystemInventoryStorage:
         machine_id: str,
         launch_type: Optional[str] = None,
         fuente: Optional[str] = None,
+        name: Optional[str] = None,
         limite: int = 50,
         offset: int = 0,
     ) -> list[dict]:
@@ -3082,6 +3083,8 @@ class SystemInventoryStorage:
         - machine_id: identificador del equipo (aislamiento por equipo).
         - launch_type: filtro opcional por tipo de lanzamiento.
         - fuente: filtro opcional por fuente de descubrimiento.
+        - name: filtro opcional por nombre (comparacion case-insensitive,
+          coincidencia de subcadena).
         - limite: numero maximo de resultados (paginado).
         - offset: desplazamiento para paginacion.
 
@@ -3098,6 +3101,9 @@ class SystemInventoryStorage:
         if fuente is not None:
             condiciones.append("source = ?")
             parametros.append(fuente)
+        if name is not None:
+            condiciones.append("lower(name) LIKE lower(?)")
+            parametros.append("%" + name + "%")
         where = " AND ".join(condiciones)
         cur = conn.execute(
             f"""

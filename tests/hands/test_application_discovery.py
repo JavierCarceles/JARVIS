@@ -34,6 +34,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -3754,3 +3755,321 @@ class TestAutoRegistroDescubiertos:
         assert "C:" not in entidad.id
         assert "System32" not in entidad.id
         assert "Windows" not in entidad.id
+
+
+# ---------------------------------------------------------------------------
+# TestResolucionAplicacionPorNombre (unidad 3.8.5.1.4.11.6)
+# ---------------------------------------------------------------------------
+
+class TestResolucionAplicacionPorNombre:
+    """
+    Pruebas de `ApplicationDiscovery.resolver_aplicacion_por_nombre`
+    (3.8.5.1.4.11.6): resolucion de aplicaciones por nombre que consulta
+    primero el catalogo global (entities.json) y, si no esta, consulta
+    application_candidates de SQLite local filtrado por machine_id y
+    volumenes montados, auto-registra en el catalogo y revalida la ruta
+    en el SO antes de considerar valida.
+
+    Usa `SystemInventoryStorage` real sobre SQLite temporal y
+    `ApplicationManager` mockeado para controlar si la app esta en el
+    catalogo global. No lanza ninguna aplicacion.
+    """
+
+    def _setup_resolver(
+        self,
+        tmp_path,
+        app_en_catalogo: bool = True,
+        ruta_sqlite: Optional[str] = None,
+        nombre_sqlite: Optional[str] = None,
+        machine_id: str = "maquina-prueba-116",
+    ):
+        """
+        Crea un ApplicationDiscovery con:
+        - SystemInventoryStorage real sobre SQLite temporal
+        - ApplicationManager mockeado (get_application controlado por app_en_catalogo)
+        - Clasificador/preflight REALES
+
+        Retorna (discovery, storage, app_manager_mock, mm_temp).
+        El llamante debe cerrar storage al terminar.
+        """
+        from unittest.mock import MagicMock
+
+        from src.hands.applications_core import ApplicationKnowledge
+
+        # SQLite real temporal
+        db_path = tmp_path / "data" / "system_inventory.sqlite3"
+        storage = SystemInventoryStorage(db_path=db_path)
+        storage.initialize(machine_id_actual=machine_id)
+
+        # Registrar candidato en SQLite si se proporciona ruta
+        if ruta_sqlite:
+            storage.record_machine(machine_id)
+            scan_id = f"scan-test-{uuid.uuid4()}"
+            ahora = datetime.now(timezone.utc).isoformat()
+            storage.begin_scan_run(
+                scan_id=scan_id,
+                machine_id=machine_id,
+                volume="C:",
+                mode=SCAN_MODE_FULL,
+                started_at=ahora,
+            )
+            storage.insert_application_candidates(
+                scan_id=scan_id,
+                machine_id=machine_id,
+                volume="C:",
+                candidates=[
+                    {
+                        "candidate_id": str(uuid.uuid4()),
+                        "name": nombre_sqlite or "App Test",
+                        "absolute_path": ruta_sqlite,
+                        "launch_type": "ejecutable",
+                        "confianza": "alta",
+                        "version": None,
+                        "producto": None,
+                        "evidencia": [],
+                        "source": "inventario",
+                        "last_checked_at": ahora,
+                    }
+                ],
+            )
+            storage.end_scan_run(
+                scan_id=scan_id,
+                finished_at=ahora,
+                result=SCAN_RESULT_OK,
+                entries_count=1,
+            )
+
+        # MemoryManager temporal para entities.json
+        memoria_dir = tmp_path / "data" / "memory"
+        memoria_dir.mkdir(parents=True, exist_ok=True)
+        mm = MemoryManager(str(memoria_dir))
+
+        # ApplicationManager mockeado
+        app_manager = MagicMock()
+        app_manager.memory_manager = mm
+        if app_en_catalogo:
+            app_manager.get_application.return_value = ApplicationKnowledge(
+                name="App Test",
+                type="application",
+                executable=ruta_sqlite or r"C:\Windows\System32\notepad.exe",
+                url=None,
+                login_required=False,
+                default_state=None,
+                capabilities=[],
+            )
+        else:
+            app_manager.get_application.return_value = None
+
+        discovery = ApplicationDiscovery(
+            preflight=ApplicationPreflight(),
+            clasificador=LaunchClassifier(preflight=ApplicationPreflight()),
+            storage=storage,
+            calibration=None,
+            machine_id=machine_id,
+            app_manager=app_manager,
+        )
+
+        return discovery, storage, app_manager, mm
+
+    def _teardown_resolver(self, storage):
+        """Cierra storage."""
+        storage.close()
+
+    def test_116_resolver_en_catalogo_con_ruta_sqlite_valida(self, tmp_path):
+        """App en catalogo global + ruta valida en SQLite: se resuelve con
+        ruta de SQLite (no del catalogo), revalidada en el SO."""
+        notepad = r"C:\Windows\System32\notepad.exe"
+        if not os.path.isfile(notepad):
+            pytest.skip("notepad.exe no disponible en este equipo")
+
+        discovery, storage, app_manager, mm = self._setup_resolver(
+            tmp_path,
+            app_en_catalogo=True,
+            ruta_sqlite=notepad,
+            nombre_sqlite="Notepad",
+        )
+        try:
+            resultado = discovery.resolver_aplicacion_por_nombre("Notepad")
+
+            assert resultado is not None
+            assert resultado.name == "Notepad"
+            assert resultado.absolute_path == notepad
+            assert resultado.fuente == "catalogo_conocido"
+            assert resultado.disponible is True
+            assert resultado.preflight_decision is not None
+            assert resultado.preflight_decision.get("valid") is True
+        finally:
+            self._teardown_resolver(storage)
+
+    def test_116_resolver_no_en_catalogo_sino_en_sqlite_auto_registra(self, tmp_path):
+        """App NO en catalogo global pero SI en SQLite: se auto-registra en
+        entities.json y se resuelve con preflight."""
+        notepad = r"C:\Windows\System32\notepad.exe"
+        if not os.path.isfile(notepad):
+            pytest.skip("notepad.exe no disponible en este equipo")
+
+        discovery, storage, app_manager, mm = self._setup_resolver(
+            tmp_path,
+            app_en_catalogo=False,
+            ruta_sqlite=notepad,
+            nombre_sqlite="Notepad",
+        )
+        try:
+            resultado = discovery.resolver_aplicacion_por_nombre("Notepad")
+
+            assert resultado is not None
+            assert resultado.name == "Notepad"
+            assert resultado.absolute_path == notepad
+            assert resultado.fuente == "inventario"
+            assert resultado.disponible is True
+            assert resultado.preflight_decision is not None
+
+            # Verificar que se auto-registro en entities.json (leer disco directamente
+            # para evitar problemas de cache entre el mm del test y el del discovery).
+            entidades_path = tmp_path / "data" / "memory" / "entities.json"
+            assert entidades_path.exists(), f"entities.json no existe en {entidades_path}"
+            entidades = json.loads(entidades_path.read_text(encoding="utf-8"))
+            entidad_notepad = [e for e in entidades if e.get("name") == "notepad"]
+            assert len(entidad_notepad) == 1, f"Esperada 1 entidad notepad, encontradas {len(entidad_notepad)}"
+            entidad = entidad_notepad[0]
+            assert entidad.get("type") == "application"
+            # entity_id estable y sin fragmentos de ruta absoluta
+            assert "C:" not in entidad.get("id", "")
+            assert "System32" not in entidad.get("id", "")
+            assert "Windows" not in entidad.get("id", "")
+            # Ruta real observada en properties
+            props = entidad.get("properties", {})
+            assert props.get("ruta_absoluta_observada") == notepad
+            assert props.get("estado_disponible") == "available"
+            assert props.get("fuente_observacion") == "inventario"
+        finally:
+            self._teardown_resolver(storage)
+
+    def test_116_resolver_no_en_catalogo_no_en_sqlite_retorna_none(self, tmp_path):
+        """App no en catalogo ni en SQLite: retorna None."""
+        discovery, storage, app_manager, mm = self._setup_resolver(
+            tmp_path,
+            app_en_catalogo=False,
+            ruta_sqlite=None,
+        )
+        try:
+            resultado = discovery.resolver_aplicacion_por_nombre("AppInexistenteXYZ")
+
+            assert resultado is None
+        finally:
+            self._teardown_resolver(storage)
+
+    def test_116_resolver_en_catalogo_sin_ruta_valida_sqlite_retorna_none(self, tmp_path):
+        """App en catalogo global pero sin ruta valida en SQLite: retorna None
+        (no se asume vigente la ruta del catalogo)."""
+        discovery, storage, app_manager, mm = self._setup_resolver(
+            tmp_path,
+            app_en_catalogo=True,
+            ruta_sqlite=None,  # No hay candidato en SQLite
+        )
+        try:
+            resultado = discovery.resolver_aplicacion_por_nombre("Notepad")
+
+            assert resultado is None
+        finally:
+            self._teardown_resolver(storage)
+
+    def test_116_resolver_ruta_inexistente_en_sqlite_se_salta(self, tmp_path):
+        """Candidato en SQLite con ruta que no existe en disco: se salta y
+        retorna None si no hay otra valida."""
+        ruta_inexistente = r"C:\NoExiste\app_inexistente.exe"
+        discovery, storage, app_manager, mm = self._setup_resolver(
+            tmp_path,
+            app_en_catalogo=False,
+            ruta_sqlite=ruta_inexistente,
+            nombre_sqlite="App Inexistente",
+        )
+        try:
+            resultado = discovery.resolver_aplicacion_por_nombre("App Inexistente")
+
+            assert resultado is None
+        finally:
+            self._teardown_resolver(storage)
+
+    def test_116_buscar_candidatos_registrados_filtro_nombre(self, tmp_path):
+        """buscar_candidatos_registrados filtra por nombre (case-insensitive,
+        subcadena) cuando se pasa el parametro name."""
+        db_path = tmp_path / "data" / "system_inventory.sqlite3"
+        storage = SystemInventoryStorage(db_path=db_path)
+        storage.initialize(machine_id_actual="maquina-prueba-116b")
+        try:
+            storage.record_machine("maquina-prueba-116b")
+            scan_id = f"scan-test-{uuid.uuid4()}"
+            ahora = datetime.now(timezone.utc).isoformat()
+            storage.begin_scan_run(
+                scan_id=scan_id,
+                machine_id="maquina-prueba-116b",
+                volume="C:",
+                mode=SCAN_MODE_FULL,
+                started_at=ahora,
+            )
+            storage.insert_application_candidates(
+                scan_id=scan_id,
+                machine_id="maquina-prueba-116b",
+                volume="C:",
+                candidates=[
+                    {
+                        "candidate_id": str(uuid.uuid4()),
+                        "name": "Notepad",
+                        "absolute_path": r"C:\Windows\System32\notepad.exe",
+                        "launch_type": "ejecutable",
+                        "confianza": "alta",
+                        "version": None,
+                        "producto": None,
+                        "evidencia": [],
+                        "source": "inventario",
+                        "last_checked_at": ahora,
+                    },
+                    {
+                        "candidate_id": str(uuid.uuid4()),
+                        "name": "Calculator",
+                        "absolute_path": r"C:\Windows\System32\calc.exe",
+                        "launch_type": "ejecutable",
+                        "confianza": "alta",
+                        "version": None,
+                        "producto": None,
+                        "evidencia": [],
+                        "source": "inventario",
+                        "last_checked_at": ahora,
+                    },
+                ],
+            )
+            storage.end_scan_run(
+                scan_id=scan_id,
+                finished_at=ahora,
+                result=SCAN_RESULT_OK,
+                entries_count=2,
+            )
+
+            # Buscar por nombre "pad" (subcadena case-insensitive)
+            resultados = storage.buscar_candidatos_registrados(
+                machine_id="maquina-prueba-116b", name="pad", limite=10
+            )
+            assert len(resultados) == 1
+            assert resultados[0]["name"] == "Notepad"
+
+            # Buscar por nombre exacto "Calculator"
+            resultados = storage.buscar_candidatos_registrados(
+                machine_id="maquina-prueba-116b", name="Calculator", limite=10
+            )
+            assert len(resultados) == 1
+            assert resultados[0]["name"] == "Calculator"
+
+            # Buscar nombre que no existe
+            resultados = storage.buscar_candidatos_registrados(
+                machine_id="maquina-prueba-116b", name="NoExiste", limite=10
+            )
+            assert len(resultados) == 0
+
+            # Sin filtro name devuelve todos
+            resultados = storage.buscar_candidatos_registrados(
+                machine_id="maquina-prueba-116b", limite=10
+            )
+            assert len(resultados) == 2
+        finally:
+            storage.close()

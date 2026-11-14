@@ -725,6 +725,59 @@ def validar_registro_minimo_aplicacion(
 
 
 # ---------------------------------------------------------------------------
+# Fusion de upsert preservando campos definidos manualmente (unidad 3.8.5.1.4.11.5)
+# ---------------------------------------------------------------------------
+
+# Campos de nivel superior que el pipeline de auto-registro posee y refresca
+# en cada upsert. `created_at` se preserva siempre (momento de creacion original).
+_CAMPOS_SUPERIOR_REFRESCAR = {"updated_at"}
+
+# Claves de `properties` que el pipeline gestiona (datos de observacion).
+# Cualquier otra clave de properties de la entidad existente se considera
+# definida manualmente y se preserva ante un upsert repetido.
+_PROPIEDADES_OBSERVACION = {
+    PROP_RUTA_ABSOLUTA_OBSERVADA,
+    PROP_TIPO_LANZAMIENTO_NATIVO,
+    PROP_ESTADO_DISPONIBLE,
+    PROP_FECHA_OBSERVACION,
+    PROP_FUENTE_OBSERVACION,
+    PROP_EVIDENCIA_OBSERVACION,
+    PROP_CAPACIDADES_VERIFICADAS,
+    PROP_CAPACIDADES_NO_VERIFICADAS,
+    PROP_TIPO_EVIDENCIA_IDENTIDAD,
+    PROP_FUSION_POR_NOMBRE_DESACONSEJADA,
+}
+
+
+def _fusionar_entidad_existente(existing: dict, nuevo: dict) -> dict:
+    """
+    Fusiona un registro nuevo de auto-registro sobre una entidad existente
+    del catalogo global (`data/memory/entities.json`), preservando los campos
+    que el usuario u otro componente definieron manualmente (3.8.5.1.4.11.5).
+
+    Se parte de la entidad existente (se conserva `created_at`, `nombre`,
+    `aliases`, `tags`, `confidence` y cualquier propiedad adicional) y solo
+    se refrescan `updated_at` y las propiedades de observacion propias del
+    pipeline. Así un upsert repetido nunca borra datos definidos manualmente.
+    El upsert actua por ID estable, por lo que nunca duplica ni elimina
+    entidades no-aplicacion.
+    """
+    resultado = dict(existing)
+    resultado["updated_at"] = nuevo.get(
+        "updated_at", resultado.get("updated_at")
+    )
+
+    props_exist = existing.get("properties") or {}
+    props_nuevo = nuevo.get("properties") or {}
+    resultado_props = dict(props_exist)
+    for clave in _PROPIEDADES_OBSERVACION:
+        if clave in props_nuevo:
+            resultado_props[clave] = props_nuevo[clave]
+    resultado["properties"] = resultado_props
+    return resultado
+
+
+# ---------------------------------------------------------------------------
 # Orquestador de descubrimiento
 # ---------------------------------------------------------------------------
 
@@ -1526,8 +1579,18 @@ class ApplicationDiscovery:
                 )
                 continue
             try:
-                entity = Entity.from_dict(registro.a_dict_entidad())
-                ok = mm.save_entity(entity)
+                entidad_nueva = Entity.from_dict(registro.a_dict_entidad())
+                entidad_para_guardar = entidad_nueva
+                # .11.5: si la entidad ya existe en el catalogo, fusionar
+                # preservando los campos definidos manualmente y refrescando
+                # solo los datos de observacion propios del pipeline.
+                existente = mm.get_entity(entidad_nueva.id)
+                if existente is not None:
+                    fusionada = _fusionar_entidad_existente(
+                        existente.to_dict(), entidad_nueva.to_dict()
+                    )
+                    entidad_para_guardar = Entity.from_dict(fusionada)
+                ok = mm.save_entity(entidad_para_guardar)
             except Exception as exc:  # noqa: BLE001
                 errores.append(
                     {
@@ -1556,6 +1619,202 @@ class ApplicationDiscovery:
             "detalle_omitidos": omitidos,
             "detalle_errores": errores,
         }
+
+    # ------------------------------------------------------------------ #
+    # Resolucion de aplicacion por nombre: catalogo global + SQLite local
+    # (unidad 3.8.5.1.4.11.6)
+    # ------------------------------------------------------------------ #
+
+    def resolver_aplicacion_por_nombre(
+        self,
+        nombre: str,
+        incluir_preflight: bool = True,
+    ) -> Optional[DiscoveredCandidate]:
+        """
+        Resuelve una aplicacion por nombre siguiendo el contrato de
+        3.8.5.1.4.11.6:
+
+        1. Consulta primero el catalogo global (entities.json /
+           ApplicationManager).
+        2. Si no esta en el catalogo, consulta application_candidates de
+           SQLite filtrando por machine_id actual, nombre y volumenes
+           montados.
+        3. Si se encuentra un candidato local, lo auto-registra en
+           entities.json y continua por preflight.
+        4. Revalida la ruta ejecutable en el SO antes de considerar valida.
+
+        La ruta guardada en entities.json es una observacion global del
+        destino: nunca se asume vigente en el equipo actual por el mero
+        hecho de existir en el catalogo. Siempre se obtiene la ruta
+        ejecutable actual desde system_inventory.sqlite3 filtrando por
+        machine_id y volumenes montados, y se revalida en el SO.
+
+        No lanza la aplicacion ni abre ninguna ventana. Retorna None si no
+        se encuentra o no es valida tras la revalidacion.
+        """
+        if not nombre or not isinstance(nombre, str):
+            return None
+        nombre = nombre.strip()
+        if not nombre:
+            return None
+
+        # ------------------------------------------------------------------
+        # Paso 1: Catalogo global (entities.json / ApplicationManager).
+        # ------------------------------------------------------------------
+        app = self.app_manager.get_application(nombre)
+        if app is not None:
+            ejecutable = str(getattr(app, "executable", None) or "").strip()
+            if ejecutable:
+                # Obtener la ruta vigente desde SQLite (filtrado por
+                # machine_id y volumenes montados), no asumir la del catalogo.
+                candidatos_sqlite = self.storage.buscar_candidatos_registrados(
+                    machine_id=self.machine_id,
+                    name=nombre,
+                    limite=10,
+                )
+                for c in candidatos_sqlite:
+                    ruta = str(c.get("absolute_path") or "").strip()
+                    if not ruta or not os.path.isfile(ruta):
+                        continue
+                    volumen = str(c.get("volume") or "")
+                    revalidacion = self.storage.revalidar_destino_aplicacion(
+                        self.machine_id, volumen, ruta
+                    )
+                    if not revalidacion.get("valido"):
+                        continue
+                    preflight_decision = None
+                    if incluir_preflight:
+                        try:
+                            preflight_decision = (
+                                self.clasificador.validar_destino_antes_de_lanzar(
+                                    ruta
+                                )
+                            )
+                        except Exception:
+                            preflight_decision = {
+                                "valid": False,
+                                "reason": "Error al validar destino con preflight",
+                                "destination": ruta,
+                            }
+                    return DiscoveredCandidate(
+                        candidate_id=str(c.get("candidate_id") or ruta),
+                        name=str(c.get("name") or nombre),
+                        absolute_path=ruta,
+                        destination=ruta,
+                        volume=volumen,
+                        launch_type=str(c.get("launch_type") or ""),
+                        launch_subtype="desconocido",
+                        es_lanzable=True,
+                        evidencia=list(c.get("evidencia") or []),
+                        confianza=str(c.get("confianza") or CONFIANZA_NINGUNA),
+                        version=c.get("version"),
+                        producto=c.get("producto"),
+                        fuente="catalogo_conocido",
+                        ultima_comprobacion=str(
+                            c.get("ultima_comprobacion") or ""
+                        ),
+                        disponible=True,
+                        preflight_decision=preflight_decision,
+                    )
+            # El catalogo conoce la app pero no hay ruta valida en SQLite
+            return None
+
+        # ------------------------------------------------------------------
+        # Paso 2: No esta en el catalogo global, consultar SQLite local.
+        # ------------------------------------------------------------------
+        candidatos_sqlite = self.storage.buscar_candidatos_registrados(
+            machine_id=self.machine_id,
+            name=nombre,
+            limite=10,
+        )
+
+        for c in candidatos_sqlite:
+            ruta = str(c.get("absolute_path") or "").strip()
+            if not ruta or not os.path.isfile(ruta):
+                continue
+
+            # Revalidar en el SO antes de considerar valida.
+            volumen = str(c.get("volume") or "")
+            revalidacion = self.storage.revalidar_destino_aplicacion(
+                self.machine_id, volumen, ruta
+            )
+            if not revalidacion.get("valido"):
+                continue
+
+            # ------------------------------------------------------------------
+            # Paso 3: Auto-registrar en entities.json (catalogo global).
+            # ------------------------------------------------------------------
+            candidato = DiscoveredCandidate(
+                candidate_id=str(c.get("candidate_id") or ruta),
+                name=str(c.get("name") or nombre),
+                absolute_path=ruta,
+                destination=ruta,
+                volume=volumen,
+                launch_type=str(c.get("launch_type") or ""),
+                launch_subtype="desconocido",
+                es_lanzable=True,
+                evidencia=list(c.get("evidencia") or []),
+                confianza=str(c.get("confianza") or CONFIANZA_NINGUNA),
+                version=c.get("version"),
+                producto=c.get("producto"),
+                fuente=str(c.get("fuente") or "application_candidates_sqlite"),
+                ultima_comprobacion=str(c.get("ultima_comprobacion") or ""),
+                disponible=True,
+            )
+
+            identidad = calcular_identidad_estable(candidato)
+            registro = construir_registro_minimo_aplicacion(candidato, identidad)
+            faltantes = validar_registro_minimo_aplicacion(registro)
+            if not faltantes:
+                entidad_nueva = Entity.from_dict(registro.a_dict_entidad())
+                existente = self.app_manager.memory_manager.get_entity(
+                    entidad_nueva.id
+                )
+                if existente is not None:
+                    fusionada = _fusionar_entidad_existente(
+                        existente.to_dict(), entidad_nueva.to_dict()
+                    )
+                    entidad_para_guardar = Entity.from_dict(fusionada)
+                else:
+                    entidad_para_guardar = entidad_nueva
+                self.app_manager.memory_manager.save_entity(entidad_para_guardar)
+
+            # ------------------------------------------------------------------
+            # Paso 4: Preflight (sin lanzar).
+            # ------------------------------------------------------------------
+            preflight_decision = None
+            if incluir_preflight:
+                try:
+                    preflight_decision = (
+                        self.clasificador.validar_destino_antes_de_lanzar(ruta)
+                    )
+                except Exception:
+                    preflight_decision = {
+                        "valid": False,
+                        "reason": "Error al validar destino con preflight",
+                        "destination": ruta,
+                    }
+
+            return DiscoveredCandidate(
+                candidate_id=candidato.candidate_id,
+                name=candidato.name,
+                absolute_path=ruta,
+                destination=ruta,
+                volume=volumen,
+                launch_type=candidato.launch_type or "",
+                launch_subtype="desconocido",
+                es_lanzable=True,
+                evidencia=list(candidato.evidencia),
+                confianza=candidato.confianza,
+                version=candidato.version,
+                producto=candidato.producto,
+                fuente=candidato.fuente,
+                ultima_comprobacion=candidato.ultima_comprobacion,
+                disponible=True,
+                preflight_decision=preflight_decision,
+            )
+
+        return None
 
     # ------------------------------------------------------------------ #
     # Estado vigente de destinos (3.8.5.1.4.9.4)

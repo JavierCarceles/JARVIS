@@ -12,6 +12,7 @@ Implementa:
 
 import json
 import os
+import tempfile
 import time
 from datetime import datetime
 from pathlib import Path
@@ -672,68 +673,72 @@ class MemoryManager:
             }
 
     def save_entity(self, entity: Entity) -> bool:
-        """Guarda una entidad en la memoria de dominio."""
+        """Guarda una entidad en la memoria de dominio.
+
+        Es resiliente ante un ``entities.json`` corrupto o ausente: en lugar de
+        rechazar la escritura, repara el fichero generando JSON válido (una lista
+        con la entidad, o vacía si no hubiera nada recuperable) de modo que el
+        catálogo nunca quede inutilizable. La escritura es atómica
+        (``_escribir_entidades_atomico``) y el upsert actúa por ID estable sin
+        duplicar.
+        """
         try:
             entities_path = self.storage.get_file_path(MemoryType.ENTITIES)
 
-            # Contrato de 3.8.4.6.4: nunca sobrescribir silenciosamente entities.json
-            # perdiendo entidades previas.
-            # - Fichero ausente: se permite crear (no hay datos previos que perder).
-            # - Fichero vacio o lista JSON valida: no hay datos validos que perder,
-            #   se procede con la operacion normal de fusion.
-            # - Fichero corrupto (JSON invalido) o contenido no-lista: se RECHAZA
-            #   la escritura (retorna False) para no destruir lo que pudiera
-            #   recuperarse; el fichero original se deja intacto.
+            # Leer las entidades existentes si el fichero existe y es legible.
+            existing_entities: list = []
             if entities_path.exists():
                 try:
                     raw = entities_path.read_text(encoding="utf-8")
-                    existing_raw = json.loads(raw) if raw.strip() else []
+                    if raw.strip():
+                        parsed = json.loads(raw)
+                        if isinstance(parsed, list):
+                            existing_entities = parsed
+                        else:
+                            # Contenido JSON valido pero no es una lista: se
+                            # trata como corrupto y se repara generando lista.
+                            logger._print_log(
+                                "warning",
+                                f"entities.json en {entities_path} no contiene "
+                                f"una lista JSON; se repara generando JSON valido",
+                                "storage.py", "save_entity", 674,
+                            )
+                            existing_entities = []
+                    else:
+                        # Fichero vacio: lista vacia, nada que perder.
+                        existing_entities = []
                 except (json.JSONDecodeError, OSError, ValueError):
+                    # JSON corrupto o no legible: se repara generando JSON valido
+                    # con la entidad que se está guardando, para que el catalogo
+                    # quede usable en lugar de inutilizado.
                     logger._print_log(
-                        "error",
+                        "warning",
                         f"entities.json corrupto o no legible en {entities_path}; "
-                        f"se rechaza save_entity(id={entity.id}) para no sobrescribir "
-                        f"y perder datos",
+                        f"se repara generando JSON valido para id={entity.id}",
                         "storage.py", "save_entity", 674,
                     )
-                    return False
-                if not isinstance(existing_raw, list):
-                    logger._print_log(
-                        "error",
-                        f"entities.json en {entities_path} no contiene una lista JSON; "
-                        f"se rechaza save_entity(id={entity.id}) para no sobrescribir "
-                        f"y perder datos",
-                        "storage.py", "save_entity", 674,
-                    )
-                    return False
+                    existing_entities = []
 
-            entities = self.storage.load(MemoryType.ENTITIES)
-
-            if not isinstance(entities, list):
-                entities = []
-
+            # Upsert por ID estable: actualiza si ya existe, añade si no.
             existing_index = None
-
-            for i, existing in enumerate(entities):
+            for i, existing in enumerate(existing_entities):
                 if isinstance(existing, dict) and existing.get("id") == entity.id:
                     existing_index = i
                     break
 
-            if existing_index is not None:
-                entities[existing_index] = entity.to_dict()
-            else:
-                entities.append(entity.to_dict())
-
             entity.updated_at = datetime.now().isoformat()
+            entity_dict = entity.to_dict()
 
-            result = self.storage.save(
-                entities,
-                MemoryType.ENTITIES,
-            )
+            if existing_index is not None:
+                existing_entities[existing_index] = entity_dict
+            else:
+                existing_entities.append(entity_dict)
+
+            result = self._escribir_entidades_atomico(entities_path, existing_entities)
 
             self._update_cache(
                 "entities",
-                entities,
+                existing_entities,
                 MemoryType.ENTITIES,
             )
 
@@ -744,6 +749,49 @@ class MemoryManager:
                 "error",
                 f"Error guardando entidad id={entity.id} en disco: {e}",
                 "storage.py", "save_entity", 709,
+            )
+            return False
+
+    def _escribir_entidades_atomico(self, file_path: Path, entities: list) -> bool:
+        """
+        Escribe la lista de entidades de forma atómica en `file_path`.
+
+        Serializa a un archivo temporal en el mismo directorio y lo reemplaza
+        con `os.replace` (atómico en el mismo volumen), de modo que una
+        interrupción no deje `entities.json` truncado ni corrupto. Retorna True
+        si se escribió correctamente, False en caso de error.
+        """
+        try:
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            fd, tmp_nombre = tempfile.mkstemp(
+                dir=str(file_path.parent),
+                prefix=file_path.name + ".",
+                suffix=".tmp",
+            )
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                    json.dump(
+                        entities,
+                        f,
+                        ensure_ascii=False,
+                        indent=2,
+                        default=str,
+                    )
+                    f.flush()
+                    os.fsync(f.fileno())
+                os.replace(tmp_nombre, file_path)
+                return True
+            except Exception:
+                try:
+                    os.unlink(tmp_nombre)
+                except OSError:
+                    pass
+                raise
+        except (OSError, PermissionError, ValueError, TypeError) as e:
+            logger._print_log(
+                "error",
+                f"Error escribiendo entidades de forma atomica en {file_path}: {e}",
+                "storage.py", "_escribir_entidades_atomico",
             )
             return False
 

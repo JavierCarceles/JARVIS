@@ -7067,6 +7067,39 @@ lanza ninguna aplicacion.
 verificación usa `calcular_identidad_estable` (11.2) y campos observados del
 candidato, sin lanzar ninguna aplicación.
 
+- **`TestResolucionAplicacionPorNombre`** (línea 3764) — 6 método(s) de test
+  - Unidad 3.8.5.1.4.11.6: resolución de aplicación por nombre que consulta
+    primero el catálogo global (`entities.json` / `ApplicationManager`) y, si
+    no está, consulta `application_candidates` de SQLite filtrado por
+    `machine_id` actual, nombre y volúmenes montados; si se encuentra un
+    candidato local, lo auto-registra en `entities.json` y continúa por
+    preflight; revalida la ruta ejecutable en el SO antes de considerar
+    válida. La ruta en `entities.json` es observación global y nunca se asume
+    vigente sin revalidación.
+  - `test_116_resolver_en_catalogo_con_ruta_sqlite_valida` (L3770): app en
+    catálogo global + ruta válida en SQLite: se resuelve con ruta de SQLite,
+    revalidada en el SO, con `preflight_decision` válido.
+  - `test_116_resolver_no_en_catalogo_sino_en_sqlite_auto_registra` (L3789):
+    app NO en catálogo pero SI en SQLite: se auto-registra en
+    `entities.json` con `entity_id` estable (sin fragmentos de ruta absoluta)
+    y se resuelve con preflight.
+  - `test_116_resolver_no_en_catalogo_no_en_sqlite_retorna_none` (L3814): app
+    no en catálogo ni en SQLite: retorna `None`.
+  - `test_116_resolver_en_catalogo_sin_ruta_valida_sqlite_retorna_none` (L3826):
+    app en catálogo global pero sin ruta válida en SQLite: retorna `None` (no
+    se asume vigente la ruta del catálogo).
+  - `test_116_resolver_ruta_inexistente_en_sqlite_se_salta` (L3839): candidato
+    en SQLite con ruta inexistente en disco: se salta y retorna `None`.
+  - `test_116_buscar_candidatos_registrados_filtro_nombre` (L3853):
+    `buscar_candidatos_registrados` filtra por nombre (subcadena,
+    case-insensitive) cuando se pasa el parámetro `name`.
+
+**Estrategia de mocks:** `ApplicationManager` mockeado para controlar si la
+app está en el catálogo global; `SystemInventoryStorage` real sobre SQLite
+temporal; clasificador y preflight REALES (`LaunchClassifier` +
+`ApplicationPreflight` sobre `notepad.exe` real del equipo). No se lanza
+ninguna aplicación.
+
 ---
 
 <a name="hands/test-application_discovery_no_recursive_disk_search"></a>
