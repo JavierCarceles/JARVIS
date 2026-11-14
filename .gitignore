@@ -48,3 +48,9 @@ temp/
 # --- Archivos generados por el sistema operativo ---
 .DS_Store
 Thumbs.db
+
+# --- Macros del root (configuración/local) ---
+macro_mejoraActual.json
+macro_recorder.py
+macro_runner.py
+macro_scheduler.py

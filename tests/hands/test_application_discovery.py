@@ -3758,6 +3758,271 @@ class TestAutoRegistroDescubiertos:
 
 
 # ---------------------------------------------------------------------------
+# TestAutoRegistroCandidatosInventario (unidad 3.8.5.1.4.11.9)
+# ---------------------------------------------------------------------------
+
+class TestAutoRegistroCandidatosInventario:
+    """
+    Pruebas de `ApplicationDiscovery.auto_registrar_candidatos_inventario`
+    (3.8.5.1.4.11.9): preservacion del catalogo entre equipos y estados de
+    inventario.
+
+    Estrategia de mocks: storage mockeado para controlar
+    `verificar_identidad_equipo`; MemoryManager real sobre ruta temporal para
+    no tocar `data/` de produccion. No lanza aplicaciones.
+    """
+
+    def _discovery_con_inventario_temp(self, tmp_path, machine_id,
+                                       informe_aislamiento):
+        from src.hands.application_preflight import ApplicationPreflight
+        from src.hands.application_launch_classifier import LaunchClassifier
+        from unittest.mock import MagicMock
+
+        preflight = ApplicationPreflight()
+        clasificador = LaunchClassifier(preflight=preflight)
+        calib = MagicMock()
+        calib.discover_applications.return_value = []
+        storage = MagicMock()
+        storage.verificar_identidad_equipo.return_value = informe_aislamiento
+        mm = MemoryManager(str(tmp_path / "data" / "memory"))
+        app_manager = MagicMock()
+        app_manager.memory_manager = mm
+        discovery = ApplicationDiscovery(
+            preflight=preflight,
+            clasificador=clasificador,
+            storage=storage,
+            calibration=calib,
+            machine_id=machine_id,
+            app_manager=app_manager,
+        )
+        return discovery, mm, storage
+
+    def _candidato_inventario(self, candidate_id, name, ruta,
+                              fuente=FUENTE_INVENTARIO):
+        return DiscoveredCandidate(
+            candidate_id=candidate_id,
+            name=name,
+            absolute_path=ruta,
+            destination=ruta,
+            nombre_comercial=name,
+            aliases=[],
+            launch_type=LaunchType.EJECUTABLE,
+            launch_subtype=LaunchSubtype.DESCONOCIDO,
+            es_lanzable=True,
+            evidencia=["archivo_existe:" + ruta],
+            confianza=CONFIANZA_ALTA,
+            fuente=fuente,
+            ultima_comprobacion="2026-11-12T00:00:00+00:00",
+            disponible=True,
+        )
+
+    def _informe_coincide(self, machine_id="maquina-prueba"):
+        return {
+            "maquina_actual": machine_id,
+            "maquina_registrada": machine_id,
+            "equipo_coincide": True,
+            "bloqueado": False,
+            "requiere_reescaneo": False,
+            "motivo": None,
+            "inventario_utilizable": True,
+        }
+
+    def test_registra_candidatos_inventario_preserva_entidades_preexistentes(
+        self, tmp_path
+    ):
+        """Candidatos del inventario se registran en entities.json y las
+        entidades preexistentes (incluidas no-app) se preservan."""
+        memoria_dir = tmp_path / "data" / "memory"
+        memoria_dir.mkdir(parents=True, exist_ok=True)
+        entidades_path = memoria_dir / "entities.json"
+        entidades_path.write_text(
+            json.dumps([
+                {"id": "streamer-existente", "type": "streamer", "name": "Streamer",
+                 "properties": {}, "aliases": [], "tags": [], "confidence": 1.0},
+                {"id": "app-previa", "type": "application", "name": "App Previa",
+                 "properties": {"estado_disponible": "available"}, "aliases": [],
+                 "tags": [], "confidence": 1.0},
+            ], ensure_ascii=False)
+        )
+
+        exe1 = tmp_path / "app_inventario1.exe"
+        exe1.write_text("dummy")
+        exe2 = tmp_path / "app_inventario2.exe"
+        exe2.write_text("dummy")
+
+        candidatos = [
+            self._candidato_inventario("c-inv-1", "App Inventario 1", str(exe1)),
+            self._candidato_inventario("c-inv-2", "App Inventario 2", str(exe2)),
+        ]
+
+        discovery, mm, _ = self._discovery_con_inventario_temp(
+            tmp_path, "maquina-prueba", self._informe_coincide()
+        )
+        resultado = discovery.auto_registrar_candidatos_inventario(candidatos)
+
+        assert resultado["registrados"] == 2
+        assert resultado["bloqueado"] is False
+        assert resultado["no_verificado"] is False
+        assert resultado["errores"] == 0
+
+        for e in resultado["detalle_registrados"]:
+            entidad = mm.get_entity(e["id"])
+            assert entidad is not None
+            assert entidad.type == "application"
+
+        ids_todos = [e.id for e in mm.get_entities_by_type("application")] + \
+                    [e.id for e in mm.get_entities_by_type("streamer")]
+        assert "streamer-existente" in ids_todos
+        assert "app-previa" in ids_todos
+
+    def test_inventario_bloqueado_otro_equipo_no_registra(self, tmp_path):
+        """Si el inventario pertenece a otro equipo (bloqueado), no se registra
+        nada y se reporta bloqueado."""
+        exe = tmp_path / "app_bloqueado.exe"
+        exe.write_text("dummy")
+        candidatos = [self._candidato_inventario("c-bloq", "App Bloqueado", str(exe))]
+
+        informe = {
+            "maquina_actual": "maquina-actual",
+            "maquina_registrada": "maquina-otra",
+            "equipo_coincide": False,
+            "bloqueado": True,
+            "requiere_reescaneo": True,
+            "motivo": "El inventario pertenece al equipo 'maquina-otra'.",
+            "inventario_utilizable": False,
+        }
+
+        discovery, mm, _ = self._discovery_con_inventario_temp(
+            tmp_path, "maquina-actual", informe
+        )
+        resultado = discovery.auto_registrar_candidatos_inventario(candidatos)
+
+        assert resultado["bloqueado"] is True
+        assert resultado["registrados"] == 0
+        assert resultado["errores"] == 0
+        assert resultado["bloqueados"] == 1
+        assert len(mm.get_entities_by_type("application")) == 0
+
+    def test_inventario_no_poblado_maquina_nueva_no_verificado(self, tmp_path):
+        """Equipo nuevo sin inventario poblado: disponibilidad local
+        BLOQUEADA/NO VERIFICADA, no se registra nada."""
+        exe = tmp_path / "app_nueva.exe"
+        exe.write_text("dummy")
+        candidatos = [self._candidato_inventario("c-nueva", "App Nueva", str(exe))]
+
+        informe = {
+            "maquina_actual": "maquina-nueva",
+            "maquina_registrada": None,
+            "equipo_coincide": False,
+            "bloqueado": False,
+            "requiere_reescaneo": False,
+            "motivo": "No hay equipo registrado aun en la base de datos.",
+            "inventario_utilizable": False,
+        }
+
+        discovery, mm, _ = self._discovery_con_inventario_temp(
+            tmp_path, "maquina-nueva", informe
+        )
+        resultado = discovery.auto_registrar_candidatos_inventario(candidatos)
+
+        assert resultado["no_verificado"] is True
+        assert resultado["registrados"] == 0
+        assert resultado["errores"] == 0
+        assert len(mm.get_entities_by_type("application")) == 0
+
+    def test_importacion_parcial_no_marca_desaparecidas(self, tmp_path):
+        """Importacion parcial: solo se agregan/actualizan los candidatos
+        procesados; las entidades existentes no incluidas se preservan y
+        nunca se marcan como desaparecidas."""
+        memoria_dir = tmp_path / "data" / "memory"
+        memoria_dir.mkdir(parents=True, exist_ok=True)
+        entidades_path = memoria_dir / "entities.json"
+        entidades_path.write_text(
+            json.dumps([
+                {"id": "app-existente-no-en-muestra", "type": "application",
+                 "name": "App No En Muestra",
+                 "properties": {"estado_disponible": "available"},
+                 "aliases": [], "tags": [], "confidence": 1.0},
+            ], ensure_ascii=False)
+        )
+
+        exe = tmp_path / "app_en_muestra.exe"
+        exe.write_text("dummy")
+        candidatos = [self._candidato_inventario("c-en-muestra", "App En Muestra", str(exe))]
+
+        discovery, mm, _ = self._discovery_con_inventario_temp(
+            tmp_path, "maquina-prueba", self._informe_coincide()
+        )
+        resultado = discovery.auto_registrar_candidatos_inventario(candidatos)
+
+        assert resultado["registrados"] == 1
+
+        entidad_no_muestra = mm.get_entity("app-existente-no-en-muestra")
+        assert entidad_no_muestra is not None
+        assert entidad_no_muestra.name == "App No En Muestra"
+
+        entidad_muestra = mm.get_entity(resultado["detalle_registrados"][0]["id"])
+        assert entidad_muestra is not None
+        assert entidad_muestra.name == "app en muestra"
+
+    def test_upsert_idempotente_no_duplica(self, tmp_path):
+        """Registrar el mismo candidato dos veces no duplica la entidad."""
+        exe = tmp_path / "app_idem.exe"
+        exe.write_text("dummy")
+        candidato = self._candidato_inventario("c-idem", "App Idem", str(exe))
+
+        discovery, mm, _ = self._discovery_con_inventario_temp(
+            tmp_path, "maquina-prueba", self._informe_coincide()
+        )
+        r1 = discovery.auto_registrar_candidatos_inventario([candidato])
+        r2 = discovery.auto_registrar_candidatos_inventario([candidato])
+
+        assert r1["registrados"] == 1
+        assert r2["registrados"] == 1
+        entidades = mm.get_entities_by_type("application")
+        assert len(entidades) == 1
+
+    def test_integracion_notepad_real_sin_lanzar(self, tmp_path):
+        """Integracion real: registra notepad.exe del equipo en un catalogo
+        temporal y verifica que quede representado con entity_id estable,
+        sin lanzar la aplicacion y sin tocar data/ de produccion."""
+        notepad = r"C:\Windows\System32\notepad.exe"
+        if not os.path.exists(notepad):
+            pytest.skip("notepad.exe no disponible en este equipo")
+
+        candidato = DiscoveredCandidate(
+            candidate_id="c-notepad-inv-11.9",
+            name="Notepad",
+            absolute_path=notepad,
+            destination=notepad,
+            nombre_comercial="Notepad",
+            aliases=["notepad", "bloc de notas"],
+            launch_type=LaunchType.EJECUTABLE,
+            launch_subtype=LaunchSubtype.GUI_APLICACION,
+            es_lanzable=True,
+            evidencia=["archivo_existe:" + notepad],
+            confianza=CONFIANZA_ALTA,
+            fuente=FUENTE_INVENTARIO,
+            ultima_comprobacion="2026-11-12T00:00:00+00:00",
+            disponible=True,
+        )
+
+        discovery, mm, _ = self._discovery_con_inventario_temp(
+            tmp_path, "maquina-prueba", self._informe_coincide()
+        )
+        resultado = discovery.auto_registrar_candidatos_inventario([candidato])
+
+        assert resultado["registrados"] == 1
+        entidad = mm.get_entity(resultado["detalle_registrados"][0]["id"])
+        assert entidad is not None
+        assert entidad.name == "notepad"
+        assert entidad.type == "application"
+        assert "C:" not in entidad.id
+        assert "System32" not in entidad.id
+        assert "Windows" not in entidad.id
+
+
+# ---------------------------------------------------------------------------
 # TestResolucionAplicacionPorNombre (unidad 3.8.5.1.4.11.6)
 # ---------------------------------------------------------------------------
 

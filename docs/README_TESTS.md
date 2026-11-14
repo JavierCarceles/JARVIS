@@ -1,8 +1,8 @@
 # 🧪 README — JARVIS (documentación exhaustiva de la suite de tests)
 
 > **Alcance:** documentación generada a partir de los **ficheros de prueba** (`tests/`, espejo de `src/`).
-> Cada entrada se deriva de las firmas, docstrings y clases de test extraídas mediante AST de los 149 ficheros de test (excluyendo `__pycache__`, `test__init__.py` placeholders vacíos, `__init__.py` y scripts auxiliares sin prefijo `test_`).
-> Total: 785 clases de test, 4033 métodos de test individuales.
+> Cada entrada se deriva de las firmas, docstrings y clases de test extraídas mediante AST de los 150 ficheros de test (excluyendo `__pycache__`, `test__init__.py` placeholders vacíos, `__init__.py` y scripts auxiliares sin prefijo `test_`).
+> Total: 794 clases de test, 4052 métodos de test individuales.
 
 ## 🗺️ Índice
 
@@ -57,6 +57,10 @@
 - [`hands\test_application_discovery_persistence_contract.py`](#hands/test-application_discovery_persistence_contract)
 - [`hands\test_application_discovery_separation.py`](#hands/test-application_discovery_separation)
 - [`hands\test_application_discovery_sources.py`](#hands/test-application_discovery_sources)
+- [`hands\test_application_entities_auto_registration.py`](#hands/test-application_entities_auto_registration)
+- [`hands\test_application_entities_equipo_nuevo.py`](#hands/test-application_entities_equipo_nuevo)
+- [`hands\test_application_entities_machine_resolution.py`](#hands/test-application_entities_machine_resolution)
+- [`hands\test_application_entities_sqlite_registro_real.py`](#hands/test-application_entities_sqlite_registro_real)
 - [`hands\test_application_identification.py`](#hands/test-application_identification)
 - [`hands\test_application_invalid_json.py`](#hands/test-application_invalid_json)
 - [`hands\test_application_load.py`](#hands/test-application_load)
@@ -6833,7 +6837,12 @@ inventario y no registrada previamente, usando almacenamiento SQLite real, consu
 sin lanzar ninguna aplicacion ni modificar entities.json. Cubre tambien la unidad
 3.8.5.1.4.9.10: comprobacion en el equipo real de que una ruta obsoleta, un volumen desmontado
 y una coincidencia ambigua se bloquean, se revalidan o se devuelven para aclaracion de forma
-segura, sin invocar el lanzador ni probar apertura.
+segura, sin invocar el lanzador ni probar apertura. Cubre tambien la unidad
+3.8.5.1.4.11.9: preservación del catálogo global entre equipos y estados de
+inventario (`auto_registrar_candidatos_inventario`): upsert de candidatos
+ya persistidos sin borrar entidades globales de otros equipos, importación
+parcial que nunca marca como desaparecida, y ausencia local que no elimina
+la entidad global.
 
 **Módulos de origen probados:** src.hands.application_discovery, src.hands.application_preflight,
 src.hands.application_launch_classifier, src.hands.system_inventory_storage
@@ -7068,6 +7077,15 @@ lanza ninguna aplicacion.
 verificación usa `calcular_identidad_estable` (11.2) y campos observados del
 candidato, sin lanzar ninguna aplicación.
 
+- **`TestAutoRegistroCandidatosInventario`** (línea 3760) — 6 método(s) de test
+  - Unidad 3.8.5.1.4.11.9: preservación del catálogo global entre equipos y estados de inventario.
+  - `test_registra_candidatos_inventario_preserva_entidades_preexistentes`: candidatos del inventario se registran (upsert) en entities.json y las entidades preexistentes (incluidas no-app) se preservan.
+  - `test_inventario_bloqueado_otro_equipo_no_registra`: inventario de otro equipo (bloqueado) no registra nada y reporta bloqueado.
+  - `test_inventario_no_poblado_maquina_nueva_no_verificado`: equipo nuevo sin inventario poblado -> disponibilidad local BLOQUEADA/NO VERIFICADA, sin registro.
+  - `test_importacion_parcial_no_marca_desaparecidas`: importación parcial solo agrega/actualiza; entidades no incluidas se preservan y nunca se marcan como desaparecidas.
+  - `test_upsert_idempotente_no_duplica`: registrar el mismo candidato dos veces no duplica la entidad.
+  - `test_integracion_notepad_real_sin_lanzar`: notepad.exe real se registra con entity_id estable, sin lanzar la aplicación y sin modificar data/ de producción.
+
 - **`TestResolucionAplicacionPorNombre`** (línea 3764) — 6 método(s) de test
   - Unidad 3.8.5.1.4.11.6: resolución de aplicación por nombre que consulta
     primero el catálogo global (`entities.json` / `ApplicationManager`) y, si
@@ -7272,6 +7290,230 @@ se guarda solo en memoria y no genera entidad de persistencia.
 
   - **`test_imprime_resumen_evidencia_todas_las_fuentes`** (L313)
     - Imprime el resumen completo de evidencia real de cada fuente (para registro canonico).
+
+---
+<a name="hands/test-application_entities_auto_registration"></a>
+### `hands\test_application_entities_auto_registration.py`
+
+**Descripcion:** Tests de la unidad 3.8.5.1.4.11.10: upsert, auto-registro y
+preservacion del catalogo global `data/memory/entities.json`. Cubre
+`ApplicationDiscovery.auto_registrar_candidatos_inventario` junto con
+`calcular_identidad_estable`, `construir_registro_minimo_aplicacion`,
+`validar_registro_minimo_aplicacion` y `_fusionar_entidad_existente`.
+
+**Módulos de origen probados:** src.hands.application_discovery
+
+**Estrategia de mocks:** storage mockeado para controlar `verificar_identidad_equipo`;
+MemoryManager real sobre ruta temporal para no tocar `data/` de produccion.
+Clasificador y preflight REALES. No se lanza ninguna aplicacion.
+
+**Clases de test:**
+
+- **`TestAutoRegistroTiposEjecutableYSubtipo`** — 4 metodo(s) de test
+  - Registro de .exe con subtipos GUI, CLI, instalador y desconocido.
+  - `test_registro_gui_aplicacion`, `test_registro_herramienta_cli`,
+    `test_registro_instalador`, `test_registro_rol_desconocido`.
+
+- **`TestAutoRegistroAliasYTipoLanzamiento`** — 2 metodo(s) de test
+  - Aliases preservados en la entidad del catalogo; tipo de lanzamiento
+    nativo guardado en properties.
+  - `test_aliases_preservados_en_catalogo`,
+    `test_tipo_lanzamiento_registrado_en_properties`.
+
+- **`TestAutoRegistroEstadoDisponible`** — 2 metodo(s) de test
+  - `estado_disponible` = available cuando el destino es observable;
+    destino no observable se omite (no se crea entidad).
+  - `test_estado_available_cuando_destino_observable`,
+    `test_estado_no_disponible_cuando_destino_no_observable`.
+
+- **`TestAutoRegistroUpsertRepetido`** — 2 metodo(s) de test
+  - Upsert por ID estable no duplica y refresca fecha de observacion.
+  - `test_upsert_repetido_no_duplica`,
+    `test_upsert_repetido_actualiza_fecha_observacion`.
+
+- **`TestAutoRegistroIDsEstables`** — 4 metodo(s) de test
+  - entity_id estable, determinista y sin fragmentos de ruta absoluta.
+  - `test_entity_id_sin_fragmentos_ruta_absoluta`,
+    `test_identidad_paquete_determinista`,
+    `test_identidad_nombre_comercial_determinista`,
+    `test_identidad_insuficiente_usa_candidate_id`.
+
+- **`TestAutoRegistroDatosJSONCorruptos`** — 1 metodo(s) de test
+  - Catalogo JSON corrupto no bloquea el registro; se repara y sigue
+    escribiendo (comportamiento actual de save_entity).
+  - `test_catalogo_corrupto_continua_registro`.
+
+- **`TestAutoRegistroPreservacionEntidadesPrevias`** — 2 metodo(s) de test
+  - Entidades preexistentes y no-app se preservan; campos definidos
+    manualmente no se sobrescriben en upsert repetido.
+  - `test_entidades_no_app_preservadas`,
+    `test_campos_definidos_manualmente_preservados_tras_upsert`.
+
+- **`TestAutoRegistroCeroIntervencionManual`** — 1 metodo(s) de test
+  - Registro automatico sin entrada de usuario ni modificacion manual.
+  - `test_registro_automatico_sin_intervencion_usuario`.
+
+- **`TestAutoRegistroIntegracionRealNotepad`** — 1 metodo(s) de test
+  - Integracion real con notepad.exe: entity_id estable, sin lanzar la
+    aplicacion y sin tocar data/ de produccion.
+  - `test_integracion_notepad_real_sin_lanzar`.
+
+---
+
+<a name="hands/test-application_entities_machine_resolution"></a>
+### `hands\test_application_entities_machine_resolution.py`
+
+**Descripcion:** Tests de la unidad 3.8.5.1.4.11.11: resolucion entre el
+catalogo global `data/memory/entities.json` y el inventario local
+`data/system_inventory.sqlite3`. Cubre
+`ApplicationDiscovery.resolver_aplicacion_por_nombre` y
+`resolver_aplicacion_por_nombre_con_desambiguacion`: catalogo conocido con ruta
+de otra maquina resuelve ruta local desde SQLite del machine_id actual; entidad
+inexistente global con candidato local hace auto-upsert y resolucion; ruta
+obsoleta o volumen desmontado no lanza; coincidencias multiples generan
+desambiguacion; preflight negativo no lanza; dos machine_id distintos con
+SQLite temporal real nunca se cruzan rutas.
+
+**Modulos de origen probados:** src.hands.application_discovery,
+src.hands.system_inventory_storage, src.hands.application_preflight,
+src.hands.application_launch_classifier, src.memory.storage
+
+**Estrategia de mocks:** ApplicationManager sustituido por un stub que controla
+si una app esta en el catalogo global; MemoryManager real sobre ruta temporal;
+SystemInventoryStorage real sobre SQLite temporal por machine_id; clasificador
+y preflight REALES. No se lanza ninguna aplicacion y no se toca data/ de
+produccion.
+
+**Clases de test:**
+
+- **`Test385141111CatalogoConoceAppRutaOtraMaquina`** — 1 metodo(s) de test
+  - `test_3_8_5_1_4_11_11_catalogo_conoce_app_ruta_otra_maquina_resuelve_ruta_local`.
+
+- **`Test385141111EntidadInexistenteGlobalCandidatoLocal`** — 1 metodo(s) de test
+  - Auto-upsert en entities.json y resolucion con ruta local.
+  - `test_3_8_5_1_4_11_11_entidad_inexistente_global_candidato_local_auto_upsert`.
+
+- **`Test385141111RutaObsoleta`** — 2 metodo(s) de test
+  - Ruta obsoleta / volumen desmontado no lanza (resolucion vacia).
+  - `test_3_8_5_1_4_11_11_ruta_obsoleta_no_lanza`,
+    `test_3_8_5_1_4_11_11_catalogo_conoce_app_ruta_sqlite_obsoleta_no_lanza`.
+
+- **`Test385141111CoincidenciasMultiples`** — 1 metodo(s) de test
+  - Desambiguacion: ambiguo=True y requiere_desambiguacion=True.
+  - `test_3_8_5_1_4_11_11_coincidencias_multiples_desambiguacion`.
+
+- **`Test385141111PreflightNegativo`** — 1 metodo(s) de test
+  - Preflight negativo no lanza.
+  - `test_3_8_5_1_4_11_11_preflight_negativo_no_lanza`.
+
+- **`Test385141111DosMachineIds`** — 1 metodo(s) de test
+  - Dos machine_id con SQLite temporal real nunca se cruzan rutas.
+  - `test_3_8_5_1_4_11_11_dos_machine_ids_nunca_se_cruza_ruta`.
+
+- **`Test385141111IntegracionRealNotepad`** — 1 metodo(s) de test
+  - Integracion real con notepad.exe del equipo: resolucion y auto-upsert,
+    sin lanzar y sin tocar data/ de produccion.
+  - `test_3_8_5_1_4_11_11_integracion_real_notepad_sin_lanzar`.
+
+---
+
+<a name="hands/test-application_entities_sqlite_registro_real"></a>
+### `hands\test_application_entities_sqlite_registro_real.py`
+
+**Descripcion:** Tests de la unidad 3.8.5.1.4.11.12: verificacion real de
+auto-registro desde el inventario persistente `data/system_inventory.sqlite3`.
+Lee candidatos `.exe` ya persistidos en la SQLite real (conexion read-only,
+URI mode=ro), comprueba el machine_id del equipo actual, ejecuta el pipeline
+`auto_registrar_candidatos_inventario` sin `RecorridoVolumen` ni escaneo, y
+compara candidatos leidos con entidades generadas. Aisla escrituras del
+catalogo global mediante una copia controlada de `data/memory/entities.json`
+en ruta temporal; nunca modifica la SQLite real ni el `entities.json` de
+produccion.
+
+**Modulos de origen probados:** src.hands.application_discovery,
+src.hands.application_preflight, src.hands.application_launch_classifier,
+src.hands.system_inventory, src.memory.storage
+
+**Estrategia de mocks:** Storage de inventario sustituido por un mock que
+devuelve un informe de aislamiento coincidente (la verificacion de identidad
+del equipo se hace manualmente con una conexion read-only, sin tocar la
+SQLite real); ApplicationManager sustituido por un stub con MemoryManager real
+sobre copia de entities.json en tmp_path; clasificador y preflight REALES. No
+se lanza ninguna aplicacion y no se toca data/ de produccion.
+
+**Clases de test:**
+
+- **`TestSqliteRealSoloLecturaYAislamiento`** — 3 metodo(s) de test
+  - `test_sqlite_real_no_se_modifica`: hash SHA-256 de la SQLite real idéntico
+    antes y despues de la lectura read-only.
+  - `test_machine_id_coincide_con_sqlite_real`: machine_id generado registrado
+    en la SQLite real (aislamiento por equipo).
+  - `test_existen_candidatos_exe_en_sqlite_real`: al menos un candidato .exe
+    persistido y accesible en el equipo para el machine_id actual.
+
+- **`TestAutoRegistroDesdeSqliteReal`** — 3 metodo(s) de test
+  - `test_auto_registro_candidatos_reales_sqlite`: lee candidatos de la
+    SQLite real, ejecuta auto-registro, verifica 0 errores, al menos 1
+    registrado, comparacion 1:1 candidatos vs entidades, entity_id estable
+    sin fragmentos de ruta absoluta.
+  - `test_catalogo_produccion_sin_modificaciones`: entities.json de
+    produccion intacto despues del pipeline; catalogo aislado en tmp_path
+    tiene las nuevas entidades.
+  - `test_sqlite_real_sin_modificaciones_despues_de_registro`: hash SHA-256
+    de la SQLite real idéntico despues de ejecutar el pipeline.
+
+- **`TestRegistroMinimoAplicacionDesdeSqlite`** — 1 metodo(s) de test
+  - `test_entidades_tienen_campos_obligatorios_registro_minimo`: cada entidad
+    generada tiene entity_id, nombre, tipo, aliases, categoria_rol,
+    estado_disponible (available/no_disponible), fecha_observacion,
+    fuente_observacion y evidencia_observacion (lista no vacia).
+
+---
+
+<a name="hands/test-application_entities_equipo_nuevo"></a>
+### `hands\test_application_entities_equipo_nuevo.py`
+
+**Descripcion:** Tests de la unidad 3.8.5.1.4.11.13: verificacion en equipo
+nuevo. Con dos perfiles machine_id separados y almacenamiento SQLite temporal
+(aislamiento logico; no disponible una segunda maquina fisica en este entorno),
+demuestra que las entidades globales anteriores permanecen en el catalogo
+global `data/memory/entities.json` al cambiar de maquina, que las nuevas rutas
+aparecen en el inventario local correcto (SQLite por machine_id) y que solo
+los destinos locales se pasan a preflight (nunca rutas de otro equipo). La
+cobertura de maquina fisica segunda queda NO VERIFICADA.
+
+**Modulos de origen probados:** src.hands.application_discovery,
+src.hands.system_inventory_storage, src.hands.application_preflight,
+src.hands.application_launch_classifier, src.hands.applications_core,
+src.memory.storage
+
+**Estrategia de mocks:** ApplicationManager sustituido por un stub que controla
+el catalogo global; MemoryManager real sobre copia controlada de
+`data/memory/entities.json` en tmp_path; SystemInventoryStorage real sobre
+SQLite temporal por machine_id; clasificador y preflight REALES. No se lanza
+ninguna aplicacion y no se toca data/ de produccion.
+
+**Clases de test:**
+
+- **`TestEntidadesGlobalesPermanecen`** — 1 metodo(s) de test
+  - `test_entidades_previas_permanecen_al_cambiar_maquina`: entidades previas
+    del catalogo global permanecen tras auto-registro en un machine_id nuevo;
+    ninguna se borra ni se mezcla con el inventario local.
+
+- **`TestRutasLocalesEnInventarioCorrecto`** — 1 metodo(s) de test
+  - `test_ruta_solo_en_inventario_de_su_maquina`: cada ruta aparece solo en el
+    inventario SQLite de su propio machine_id; consultar otro machine_id desde
+    un almacenamiento distinto devuelve vacio.
+
+- **`TestSoloDestinosLocalesPreflight`** — 1 metodo(s) de test
+  - `test_resolucion_usa_ruta_local_no_otra_maquina`: resolver por nombre usa
+    solo la ruta local del machine_id actual, pasa preflight real y nunca usa
+    la ruta de otra maquina.
+
+- **Integracion real** — 1 metodo(s) de test
+  - `test_integracion_real_notepad_maquina_nueva_sin_lanzar`: resolucion y
+    auto-upsert reales sobre notepad.exe del equipo, sin lanzar y sin tocar
+    data/ de produccion.
 
 ---
 

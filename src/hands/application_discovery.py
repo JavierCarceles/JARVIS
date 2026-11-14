@@ -1621,6 +1621,147 @@ class ApplicationDiscovery:
         }
 
     # ------------------------------------------------------------------ #
+    # Auto-registro de candidatos ya persistidos en el inventario local
+    # hacia el catalogo global con preservacion entre equipos
+    # (unidad 3.8.5.1.4.11.9)
+    # ------------------------------------------------------------------ #
+
+    def auto_registrar_candidatos_inventario(
+        self,
+        candidatos: list[DiscoveredCandidate],
+    ) -> dict[str, Any]:
+        """
+        Upserta candidatos ya persistidos en el inventario SQLite local hacia
+        el catalogo global `data/memory/entities.json`, con garantias de
+        preservacion entre equipos (3.8.5.1.4.11.9):
+
+        - Maquina-scopado: verifica que el inventario pertenezca al equipo
+          actual (`verificar_aislamiento_inventario`). Si el inventario esta
+          bloqueado (base de otro equipo) o no esta poblado para el
+          `machine_id` actual, queda BLOQUEADA/NO VERIFICADA y no se registra
+          nada ni se escanean volumenes.
+        - Solo agrega/actualiza entidades (upsert por ID estable); nunca
+          elimina entidades globales de otros equipos ni entidades no-app.
+        - Nunca marca como desaparecidas aplicaciones no incluidas en la
+          muestra procesada (importacion parcial/interrumpida es solo
+          aditiva: solo agrega/actualiza observaciones comprobadas).
+        - La ausencia local de una aplicacion no elimina su entidad global:
+          solo se actualiza el inventario del `machine_id` cuando existe
+          evidencia local valida.
+
+        Parametros:
+        - candidatos: lista de `DiscoveredCandidate` ya leídos del inventario
+          SQLite (filtrados por `machine_id` actual).
+
+        Retorna:
+        Resumen con contadores de registrados, omitidos, errores, bloqueados
+        y detalle de cada uno.
+        """
+        # Verificar aislamiento del inventario por equipo.
+        informe = self.verificar_aislamiento_inventario()
+        bloqueado = bool(informe.get("bloqueado"))
+        equipo_coincide = bool(informe.get("equipo_coincide"))
+
+        if bloqueado or not equipo_coincide:
+            # BLOQUEADA/NO VERIFICADA: inventario de otro equipo o no poblado
+            # para el equipo actual. No se registra nada.
+            return {
+                "registrados": 0,
+                "omitidos": 0,
+                "errores": 0,
+                "bloqueados": len(candidatos),
+                "bloqueado": bloqueado,
+                "no_verificado": not bloqueado and not equipo_coincide,
+                "motivo": (
+                    informe.get("motivo")
+                    or "Inventario no disponible para el equipo actual."
+                ),
+                "detalle_registrados": [],
+                "detalle_omitidos": [],
+                "detalle_errores": [],
+                "detalle_bloqueados": [
+                    {"candidato": c.name, "razon": "inventario_no_disponible_para_maquina", "fuente": c.fuente}
+                    for c in candidatos
+                ],
+            }
+
+        mm = self.app_manager.memory_manager
+        registrados: list[dict[str, Any]] = []
+        omitidos: list[dict[str, Any]] = []
+        errores: list[dict[str, Any]] = []
+
+        for c in candidatos:
+            # Solo registrar candidatos con destino observable (evidencia real).
+            if not destino_observable(c):
+                omitidos.append(
+                    {
+                        "candidato": c.name,
+                        "razon": "destino_no_observable",
+                        "fuente": c.fuente,
+                    }
+                )
+                continue
+            identidad = calcular_identidad_estable(c)
+            registro = construir_registro_minimo_aplicacion(c, identidad)
+            faltantes = validar_registro_minimo_aplicacion(registro)
+            if faltantes:
+                omitidos.append(
+                    {
+                        "candidato": c.name,
+                        "razon": "campos_obligatorios_faltantes",
+                        "faltantes": faltantes,
+                        "fuente": c.fuente,
+                    }
+                )
+                continue
+            try:
+                entidad_nueva = Entity.from_dict(registro.a_dict_entidad())
+                # Upsert por ID estable: preserva campos definidos manualmente
+                # y entidades no-app preexistentes (3.8.5.1.4.11.5).
+                existente = mm.get_entity(entidad_nueva.id)
+                if existente is not None:
+                    fusionada = _fusionar_entidad_existente(
+                        existente.to_dict(), entidad_nueva.to_dict()
+                    )
+                    entidad_para_guardar = Entity.from_dict(fusionada)
+                else:
+                    entidad_para_guardar = entidad_nueva
+                ok = mm.save_entity(entidad_para_guardar)
+            except Exception as exc:  # noqa: BLE001
+                errores.append(
+                    {
+                        "candidato": c.name,
+                        "razon": f"excepcion:{type(exc).__name__}",
+                        "fuente": c.fuente,
+                    }
+                )
+                continue
+            if ok:
+                registrados.append(registro.a_dict_entidad())
+            else:
+                errores.append(
+                    {
+                        "candidato": c.name,
+                        "razon": "guardado_rechazado_por_gestor",
+                        "fuente": c.fuente,
+                    }
+                )
+
+        return {
+            "registrados": len(registrados),
+            "omitidos": len(omitidos),
+            "errores": len(errores),
+            "bloqueados": 0,
+            "bloqueado": False,
+            "no_verificado": False,
+            "motivo": None,
+            "detalle_registrados": registrados,
+            "detalle_omitidos": omitidos,
+            "detalle_errores": errores,
+            "detalle_bloqueados": [],
+        }
+
+    # ------------------------------------------------------------------ #
     # Resolucion de aplicacion por nombre: catalogo global + SQLite local
     # (unidad 3.8.5.1.4.11.6)
     # ------------------------------------------------------------------ #
