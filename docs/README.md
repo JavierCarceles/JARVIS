@@ -801,7 +801,7 @@ y expone una señal de ambigüedad para que el llamador solicite
 desambiguación. Vincula el resultado de la resolución con el catálogo global
 de aplicaciones (`ApplicationManager` / `ApplicationKnowledge`) mediante
 contratos verificados, sin modificar `entities.json` ni auto-registrar
-candidatos (el puente de auto-registro corresponde a una unidad posterior).
+candidatos (el puente de auto-registro esta implementado en ApplicationDiscovery.auto_registrar_candidatos_inventario, resolucion por nombre y desambiguacion, unidades 3.8.5.1.4.11.5 a 3.8.5.1.4.11.7).
 
 **Características:**
 

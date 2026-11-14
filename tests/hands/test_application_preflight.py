@@ -327,6 +327,82 @@ class TestCheck:
         assert "confidence" in result
 
 
+class TestCheckElevationRejection:
+    def setup_method(self, _method=None):
+        self.pf = ApplicationPreflight()
+
+    def test_check_rejects_requireadministrator_manifest(self):
+        with tempfile.NamedTemporaryFile(suffix=".exe", delete=False) as f:
+            path = f.name
+        try:
+            with patch.object(
+                self.pf, "resolve_executable", return_value=path
+            ), patch.object(
+                self.pf, "inspect_executable_manifest",
+                return_value={"found": True, "requested_execution_level": "requireAdministrator", "ui_access": False},
+            ):
+                result = self.pf.check({"name": "mi_aplicacion"})
+                assert result["allowed"] is False
+                assert result["blocked_by"] == "elevation_manifest"
+                assert result["requires_elevation"] is True
+                assert "requireadministrator" in result["reason"]
+        finally:
+            os.unlink(path)
+
+    def test_check_rejects_highestavailable_manifest(self):
+        with tempfile.NamedTemporaryFile(suffix=".exe", delete=False) as f:
+            path = f.name
+        try:
+            with patch.object(
+                self.pf, "resolve_executable", return_value=path
+            ), patch.object(
+                self.pf, "inspect_executable_manifest",
+                return_value={"found": True, "requested_execution_level": "highestAvailable", "ui_access": False},
+            ):
+                result = self.pf.check({"name": "mi_aplicacion"})
+                assert result["allowed"] is False
+                assert result["blocked_by"] == "elevation_manifest"
+                assert result["requires_elevation"] is True
+                assert "highestavailable" in result["reason"]
+        finally:
+            os.unlink(path)
+
+    def test_check_rejects_uiaccess_true(self):
+        with tempfile.NamedTemporaryFile(suffix=".exe", delete=False) as f:
+            path = f.name
+        try:
+            with patch.object(
+                self.pf, "resolve_executable", return_value=path
+            ), patch.object(
+                self.pf, "inspect_executable_manifest",
+                return_value={"found": True, "requested_execution_level": "asInvoker", "ui_access": True},
+            ):
+                result = self.pf.check({"name": "ui_access_app"})
+                assert result["allowed"] is False
+                assert result["blocked_by"] == "ui_access"
+                assert result["requires_elevation"] is True
+                assert "uiAccess=true" in result["reason"]
+        finally:
+            os.unlink(path)
+
+    def test_check_allows_asinvoker_without_uiaccess(self):
+        with tempfile.NamedTemporaryFile(suffix=".exe", delete=False) as f:
+            path = f.name
+        try:
+            with patch.object(
+                self.pf, "resolve_executable", return_value=path
+            ), patch.object(
+                self.pf, "inspect_executable_manifest",
+                return_value={"found": True, "requested_execution_level": "asInvoker", "ui_access": False},
+            ):
+                result = self.pf.check({"name": "normal_app"})
+                assert result["allowed"] is True
+                assert result["blocked_by"] is None
+                assert result["requires_elevation"] is False
+        finally:
+            os.unlink(path)
+
+
 class TestCheckApplication:
     def setup_method(self, _method=None):
         self.pf = ApplicationPreflight()
@@ -523,3 +599,140 @@ class TestVerifyAppIdInAppsFolder:
             self.pf.verify_app_id_in_apps_folder("Test.App.Id")
             _, kwargs = mock_run.call_args
             assert kwargs["env"]["JARVIS_APP_ID"] == "Test.App.Id"
+
+
+# ============================================================================
+# Pruebas de la unidad 3.8.5.2: rechazos de preflight
+# (aplicaciones bloqueadas, elevacion no permitida, destinos de ejecucion no
+# verificables). La produccion de src/hands/application_preflight.py ya
+# implementa estos rechazos; esta unidad los cubre con pruebas y verificacion
+# real sin lanzar aplicaciones.
+# ============================================================================
+
+def _crear_exe_con_manifiesto_lateral(tmp_path, nivel, ui_access=False):
+    """Crea un .exe temporal con un fichero de manifiesto .exe.manifest lateral.
+
+    No se lanza el ejecutable; solo se lee el manifiesto lateral, igual que
+    hace inspect_executable_manifest en produccion.
+    """
+    ruta_exe = tmp_path / "app_prueba.exe"
+    ruta_exe.write_bytes(b"MZ" + b"\x00" * 128)
+    ruta_manifiesto = tmp_path / "app_prueba.exe.manifest"
+    contenido = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<assembly xmlns="urn:schemas-microsoft-com:asm.v1">\n'
+        '  <trustInfo>\n'
+        '    <security>\n'
+        '      <requestedPrivileges>\n'
+        f'        <requestedExecutionLevel level="{nivel}" uiAccess="{str(ui_access).lower()}"/>\n'
+        '      </requestedPrivileges>\n'
+        '    </security>\n'
+        '  </trustInfo>\n'
+        '</assembly>\n'
+    )
+    ruta_manifiesto.write_text(contenido, encoding="utf-8")
+    return str(ruta_exe)
+
+
+class TestElevacionNoPermedidaManifest:
+    """Rechazo de manifiestos que exigen elevacion (3.8.5.2)."""
+
+    def test_rechaza_requireadministrator(self, tmp_path):
+        pf = ApplicationPreflight()
+        ruta = _crear_exe_con_manifiesto_lateral(tmp_path, "requireAdministrator")
+        with patch.object(pf, "resolve_executable", return_value=ruta):
+            resultado = pf.check({"name": "app_elevada"})
+        assert resultado["allowed"] is False
+        assert resultado["blocked_by"] == "elevation_manifest"
+        assert resultado["requires_elevation"] is True
+        assert "requireadministrator" in resultado["reason"].casefold()
+
+    def test_rechaza_highestavailable(self, tmp_path):
+        pf = ApplicationPreflight()
+        ruta = _crear_exe_con_manifiesto_lateral(tmp_path, "highestAvailable")
+        with patch.object(pf, "resolve_executable", return_value=ruta):
+            resultado = pf.check({"name": "app_elevada"})
+        assert resultado["allowed"] is False
+        assert resultado["blocked_by"] == "elevation_manifest"
+        assert resultado["requires_elevation"] is True
+        assert "highestavailable" in resultado["reason"].casefold()
+
+    def test_permite_asinvocador_sin_elevacion(self, tmp_path):
+        pf = ApplicationPreflight()
+        ruta = _crear_exe_con_manifiesto_lateral(tmp_path, "asInvoker")
+        with patch.object(pf, "resolve_executable", return_value=ruta):
+            resultado = pf.check({"name": "app_normal"})
+        assert resultado["allowed"] is True
+        assert resultado["requires_elevation"] is False
+        assert resultado["confidence"] == "high"
+
+
+class TestUiAccessNoPermedido:
+    """Rechazo de manifiestos con uiAccess=true (3.8.5.2)."""
+
+    def test_rechaza_ui_access_true(self, tmp_path):
+        pf = ApplicationPreflight()
+        ruta = _crear_exe_con_manifiesto_lateral(tmp_path, "asInvoker", ui_access=True)
+        with patch.object(pf, "resolve_executable", return_value=ruta):
+            resultado = pf.check({"name": "app_uiaccess"})
+        assert resultado["allowed"] is False
+        assert resultado["blocked_by"] == "ui_access"
+        assert resultado["requires_elevation"] is True
+        assert "uiaccess=true" in resultado["reason"].casefold()
+
+
+class TestDestinoEjecucionNoVerificable:
+    """Rechazo de destinos de lanzamiento no verificables (3.8.5.2)."""
+
+    def test_ejecutable_resuelto_que_es_directorio_es_rechazado(self, tmp_path):
+        pf = ApplicationPreflight()
+        with tempfile.TemporaryDirectory() as carpeta:
+            with patch.object(pf, "resolve_executable", return_value=carpeta):
+                resultado = pf.check({"name": "app"})
+        assert resultado["allowed"] is False
+        assert resultado["blocked_by"] == "launch_destination_invalid"
+        assert "directorio" in resultado["reason"]
+
+    def test_ruta_inexistente_resuelta_es_rechazada(self):
+        pf = ApplicationPreflight()
+        with patch.object(
+            pf, "resolve_executable", return_value=r"C:\No\Existe\app.exe"
+        ):
+            resultado = pf.check({"name": "app"})
+        assert resultado["allowed"] is False
+        assert resultado["blocked_by"] == "launch_destination_invalid"
+        assert "no existe" in resultado["reason"]
+
+    def test_texto_sin_ejecutable_ni_destino_valido_es_rechazado(self):
+        pf = ApplicationPreflight()
+        with patch.object(pf, "resolve_executable", return_value=None):
+            resultado = pf.check({"name": "app_desconocida"})
+        assert resultado["allowed"] is False
+        assert resultado["blocked_by"] == "executable_not_resolved"
+        assert "verificable" in resultado["reason"]
+
+
+class TestBloqueosYValidacionReal:
+    """Verificacion real contra archivos del equipo sin lanzar nada (3.8.5.2)."""
+
+    def test_manifiesto_real_notepad_es_asinvocador(self):
+        pf = ApplicationPreflight()
+        resultado = pf.inspect_executable_manifest(r"C:\Windows\System32\notepad.exe")
+        assert resultado["found"] is True
+        assert resultado["requested_execution_level"] == "asInvoker"
+        assert resultado["ui_access"] is False
+        assert resultado["source"] == r"C:\Windows\System32\notepad.exe"
+
+    def test_destino_real_notepad_es_valido(self):
+        pf = ApplicationPreflight()
+        resultado = pf.validate_launch_destination(r"C:\Windows\System32\notepad.exe")
+        assert resultado["valid"] is True
+        assert resultado["launch_type"] == ApplicationPreflight.LAUNCH_TYPE_EXECUTABLE
+        assert "Ejecutable existente admitido" in resultado["reason"]
+
+    def test_nombre_bloqueado_no_resuelve_ejecutable(self):
+        pf = ApplicationPreflight()
+        resultado = pf.check({"name": "Task Scheduler"})
+        assert resultado["allowed"] is False
+        assert resultado["blocked_by"] == "blocked_name"
+        assert resultado["executable_path"] is None

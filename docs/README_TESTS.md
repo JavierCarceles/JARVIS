@@ -2,7 +2,7 @@
 
 > **Alcance:** documentación generada a partir de los **ficheros de prueba** (`tests/`, espejo de `src/`).
 > Cada entrada se deriva de las firmas, docstrings y clases de test extraídas mediante AST de los 150 ficheros de test (excluyendo `__pycache__`, `test__init__.py` placeholders vacíos, `__init__.py` y scripts auxiliares sin prefijo `test_`).
-> Total: 794 clases de test, 4052 métodos de test individuales.
+> Total: 795 clases de test, 4056 métodos de test individuales.
 
 ## 🗺️ Índice
 
@@ -8488,6 +8488,18 @@ required_capability son opcionales.
 
   Métodos auxiliares (no test): setup_method
 
+- **`TestCheckElevationRejection`** (línea 330) — 4 método(s) de test
+
+  - **`test_check_rejects_requireadministrator_manifest`** (L334)
+
+  - **`test_check_rejects_highestavailable_manifest`** (L352)
+
+  - **`test_check_rejects_uiaccess_true`** (L370)
+
+  - **`test_check_allows_asinvoker_without_uiaccess`** (L388)
+
+  Métodos auxiliares (no test): setup_method
+
 - **`TestCheckApplication`** (línea 294) — 3 método(s) de test
 
   - **`test_check_application_returns_preflight_result`** (L298)
@@ -8547,6 +8559,36 @@ required_capability son opcionales.
   - **`test_parse_manifest_xml_empty`** (L438)
 
   Métodos auxiliares (no test): setup_method
+
+- **`TestElevacionNoPermedidaManifest`** (línea 637) — 3 método(s) de test
+
+  - **`test_rechaza_requireadministrator`** (L640)
+
+  - **`test_rechaza_highestavailable`** (L650)
+
+  - **`test_permite_asinvocador_sin_elevacion`** (L660)
+
+- **`TestUiAccessNoPermedido`** (línea 670) — 1 método(s) de test
+
+  - **`test_rechaza_ui_access_true`** (L673)
+
+- **`TestDestinoEjecucionNoVerificable`** (línea 684) — 3 método(s) de test
+
+  - **`test_ejecutable_resuelto_que_es_directorio_es_rechazado`** (L687)
+
+  - **`test_ruta_inexistente_resuelta_es_rechazada`** (L696)
+
+  - **`test_texto_sin_ejecutable_ni_destino_valido_es_rechazado`** (L706)
+
+- **`TestBloqueosYValidacionReal`** (línea 715) — 3 método(s) de test
+
+  - **`test_manifiesto_real_notepad_es_asinvocador`** (L718)
+
+  - **`test_destino_real_notepad_es_valido`** (L726)
+
+  - **`test_nombre_bloqueado_no_resuelve_ejecutable`** (L733)
+
+  Métodos auxiliares (no test): _crear_exe_con_manifiesto_lateral
 
 ---
 
