@@ -21,6 +21,7 @@ from src.hands.applications_core import (
     get_available_commands,
     get_application_knowledge,
     get_applications_by_capability,
+    is_application_open,
     move_application_to_monitor,
     navigate_to_url,
     open_application,
@@ -29,6 +30,7 @@ from src.hands.applications_core import (
     get_application_manager,
     _check_application_available,
     _check_application_login,
+    _is_process_running,
     verify_target_monitor,
     maximize_or_restore_application,
 )
@@ -718,11 +720,12 @@ class TestOpenApplication:
                 mock_preflight.return_value.check.return_value = {
                     "allowed": True, "reason": "ok", "blocked_by": None,
                 }
-                with patch("src.hands.applications_core.subprocess.Popen") as mock_popen:
-                    mock_popen.return_value = MagicMock()
-                    result = open_application("testopen")
-                    assert "exitosamente" in result
-                    mock_popen.assert_called_once()
+                with patch("src.hands.applications_core._is_process_running", return_value=False):
+                    with patch("src.hands.applications_core.subprocess.Popen") as mock_popen:
+                        mock_popen.return_value = MagicMock()
+                        result = open_application("testopen")
+                        assert "exitosamente" in result
+                        mock_popen.assert_called_once()
 
     def test_open_via_url(self):
         fake_manager = ApplicationManager()
@@ -759,9 +762,10 @@ class TestOpenApplication:
                 mock_preflight.return_value.check.return_value = {
                     "allowed": True, "reason": "ok", "blocked_by": None,
                 }
-                with patch("src.hands.applications_core._check_application_available", return_value=False):
-                    with pytest.raises(RuntimeError, match="no está disponible"):
-                        open_application("unavailableapp")
+                with patch("src.hands.applications_core._is_process_running", return_value=False):
+                    with patch("src.hands.applications_core._check_application_available", return_value=False):
+                        with pytest.raises(RuntimeError, match="no esta disponible"):
+                            open_application("unavailableapp")
 
     def test_open_rechazado_por_preflight_nombre_bloqueado(self):
         """3.8.5.1.4.7.10: open_application rechaza apps con nombre bloqueado (ej. Task Scheduler)."""
@@ -771,7 +775,7 @@ class TestOpenApplication:
         )
         fake_manager.applications["task scheduler"] = app
         with patch("src.hands.applications_core.get_application_manager", return_value=fake_manager):
-            with pytest.raises(RuntimeError, match="no pasó el preflight"):
+            with pytest.raises(RuntimeError, match="no paso el preflight"):
                 open_application("task scheduler")
 
     def test_open_rechazado_por_preflight_ejecutable_no_resuelto(self):
@@ -782,7 +786,7 @@ class TestOpenApplication:
         )
         fake_manager.applications["unknownapp"] = app
         with patch("src.hands.applications_core.get_application_manager", return_value=fake_manager):
-            with pytest.raises(RuntimeError, match="no pasó el preflight"):
+            with pytest.raises(RuntimeError, match="no paso el preflight"):
                 open_application("unknownapp")
 
     def test_open_rechazado_por_preflight_destino_manipulado(self):
@@ -793,8 +797,94 @@ class TestOpenApplication:
         )
         fake_manager.applications["dirapp"] = app
         with patch("src.hands.applications_core.get_application_manager", return_value=fake_manager):
-            with pytest.raises(RuntimeError, match="no pasó el preflight"):
+            with pytest.raises(RuntimeError, match="no paso el preflight"):
                 open_application("dirapp")
+
+
+class TestIsApplicationOpen:
+    """ApplicationManager.is_application_open: deteccion real de proceso en ejecucion."""
+
+    def test_is_application_open_false_when_not_running(self):
+        fake_manager = ApplicationManager()
+        app = ApplicationKnowledge(
+            name="TestNoRun", type="utility", executable="testnorun_app",
+        )
+        fake_manager.applications["testnorun"] = app
+        with patch("src.hands.applications_core._is_process_running", return_value=False):
+            assert fake_manager.is_application_open("testnorun") is False
+
+    def test_is_application_open_true_when_running(self):
+        fake_manager = ApplicationManager()
+        app = ApplicationKnowledge(
+            name="TestRun", type="utility", executable="testrun_app",
+        )
+        fake_manager.applications["testrun"] = app
+        with patch("src.hands.applications_core._is_process_running", return_value=True):
+            assert fake_manager.is_application_open("testrun") is True
+
+    def test_is_application_open_false_when_app_not_found(self):
+        fake_manager = ApplicationManager()
+        with patch("src.hands.applications_core._is_process_running", return_value=True):
+            assert fake_manager.is_application_open("app_inexistente_xyz") is False
+
+    def test_is_application_open_false_when_no_executable(self):
+        fake_manager = ApplicationManager()
+        app = ApplicationKnowledge(
+            name="TestNoExe", type="browser", executable=None,
+            url="https://example.com",
+        )
+        fake_manager.applications["testnoexe"] = app
+        with patch("src.hands.applications_core._is_process_running", return_value=False):
+            assert fake_manager.is_application_open("testnoexe") is False
+
+
+class TestOpenApplicationReutilizacion:
+    """open_application: reutiliza instancia ya abierta cuando el contrato lo permite."""
+
+    def test_open_reutiliza_ya_abierta_sin_lanzar_duplicado(self):
+        fake_manager = ApplicationManager()
+        app = ApplicationKnowledge(
+            name="TestReuse", type="utility", executable="testreuse_app",
+        )
+        fake_manager.applications["testreuse"] = app
+        with patch("src.hands.applications_core.get_application_manager", return_value=fake_manager):
+            with patch("src.hands.applications_core.get_application_preflight") as mock_preflight:
+                mock_preflight.return_value.check.return_value = {
+                    "allowed": True, "reason": "ok", "blocked_by": None,
+                }
+                with patch("src.hands.applications_core._is_process_running", return_value=True):
+                    with patch("src.hands.applications_core.subprocess.Popen") as mock_popen:
+                        result = open_application("testreuse")
+                        assert "ya esta abierta" in result
+                        mock_popen.assert_not_called()
+
+    def test_open_no_reutiliza_contrato_requiere_cerrado(self):
+        fake_manager = ApplicationManager()
+        app = ApplicationKnowledge(
+            name="TestChrome", type="browser", executable="chrome.exe",
+            capabilities=[
+                ApplicationCapabilityDef(
+                    capability=ApplicationCapability.OPEN,
+                    name="open_testchrome",
+                    description="Abre TestChrome",
+                    required_ui_elements=[],
+                    preconditions=["chrome_closed"],
+                    effects=["chrome_open"],
+                    cost=10.0,
+                )
+            ],
+        )
+        fake_manager.applications["testchrome"] = app
+        with patch("src.hands.applications_core.get_application_manager", return_value=fake_manager):
+            with patch("src.hands.applications_core.get_application_preflight") as mock_preflight:
+                mock_preflight.return_value.check.return_value = {
+                    "allowed": True, "reason": "ok", "blocked_by": None,
+                }
+                with patch("src.hands.applications_core._is_process_running", return_value=True):
+                    with patch("src.hands.applications_core.subprocess.Popen") as mock_popen:
+                        with pytest.raises(RuntimeError, match="ya esta abierta"):
+                            open_application("testchrome")
+                        mock_popen.assert_not_called()
 
 
 class TestCloseApplication:
@@ -1560,4 +1650,138 @@ class TestMaximizeOrRestoreApplication:
         registry = get_action_registry()
         actions = registry.list_actions()
         assert "maximize_or_restore_application" in actions
+
+
+class TestIsApplicationOpen:
+    """is_application_open: deteccion real de proceso ya en ejecucion en el SO."""
+
+    def _registrar_app(self, manager, nombre, ejecutable):
+        app = ApplicationKnowledge(
+            name=nombre, type="utilidad", executable=ejecutable,
+        )
+        manager.applications[manager._normalize_name(nombre)] = app
+        return app
+
+    def test_app_abierta_devuelve_true_y_consulta_ejecutable(self):
+        manager = ApplicationManager()
+        self._registrar_app(manager, "RunApp", "runapp.exe")
+        with patch(
+            "src.hands.applications_core.get_application_manager", return_value=manager
+        ), patch(
+            "src.hands.applications_core._is_process_running", return_value=True
+        ) as m:
+            assert manager.is_application_open("RunApp") is True
+            m.assert_called_once_with("runapp.exe")
+
+    def test_app_no_abierta_devuelve_false(self):
+        manager = ApplicationManager()
+        self._registrar_app(manager, "NoRunApp", "notepad.exe")
+        with patch(
+            "src.hands.applications_core.get_application_manager", return_value=manager
+        ), patch(
+            "src.hands.applications_core._is_process_running", return_value=False
+        ):
+            assert manager.is_application_open("NoRunApp") is False
+
+    def test_app_no_registrada_devuelve_false_sin_consultar_so(self):
+        manager = ApplicationManager()
+        with patch("src.hands.applications_core._is_process_running") as m:
+            assert manager.is_application_open("ninguna_app_xyz_12345") is False
+            m.assert_not_called()
+
+    def test_app_sin_ejecutable_consulta_por_nombre(self):
+        manager = ApplicationManager()
+        self._registrar_app(manager, "UrlApp", None)
+        with patch(
+            "src.hands.applications_core.get_application_manager", return_value=manager
+        ), patch(
+            "src.hands.applications_core._is_process_running", return_value=True
+        ) as m:
+            assert manager.is_application_open("UrlApp") is True
+            m.assert_called_once_with("UrlApp")
+
+    def test_funcion_modulo_delega_en_gestionario(self):
+        manager = ApplicationManager()
+        with patch.object(manager, "is_application_open", return_value=True) as m, patch(
+            "src.hands.applications_core.get_application_manager", return_value=manager
+        ):
+            assert is_application_open("cualquiera") is True
+            m.assert_called_once_with("cualquiera")
+
+
+class TestOpenApplicationReutilizacionYaAbierta:
+    """open_application: reutiliza instancia abierta cuando el contrato lo permite (3.8.5.3)."""
+
+    def _registrar_app_con_capacidad(self, manager, nombre, ejecutable, precondiciones):
+        cap = ApplicationCapabilityDef(
+            capability=ApplicationCapability.OPEN,
+            name=f"open_{nombre}",
+            description=f"Abre {nombre}",
+            required_ui_elements=[],
+            preconditions=precondiciones,
+            effects=[f"{nombre}_abierta"],
+            cost=10.0,
+        )
+        app = ApplicationKnowledge(
+            name=nombre,
+            type="utilidad",
+            executable=ejecutable,
+            capabilities=[cap],
+        )
+        manager.applications[manager._normalize_name(nombre)] = app
+        return app
+
+    def test_app_abierta_sin_requerimiento_cerrado_reutiliza_sin_lanzar(self):
+        manager = ApplicationManager()
+        self._registrar_app_con_capacidad(
+            manager, "ReuseApp", "reuseapp.exe", precondiciones=[]
+        )
+        preflight_result = {"allowed": True, "reason": "ok", "blocked_by": None}
+        with patch(
+            "src.hands.applications_core.get_application_manager", return_value=manager
+        ), patch.object(manager, "is_application_open", return_value=True) as m_open, patch(
+            "src.hands.applications_core.get_application_preflight"
+        ) as mock_preflight, patch(
+            "src.hands.applications_core.subprocess.Popen"
+        ) as mock_popen:
+            mock_preflight.return_value.check.return_value = preflight_result
+            resultado = open_application("ReuseApp")
+            assert "reutilizo" in resultado
+            mock_popen.assert_not_called()
+            m_open.assert_called_once_with("ReuseApp")
+            mock_preflight.return_value.check.assert_called_once()
+
+    def test_app_abierta_con_precondicion_cerrado_levanta_error(self):
+        manager = ApplicationManager()
+        self._registrar_app_con_capacidad(
+            manager, "ChromeApp", "chrome.exe", precondiciones=["chrome_closed"]
+        )
+        preflight_result = {"allowed": True, "reason": "ok", "blocked_by": None}
+        with patch(
+            "src.hands.applications_core.get_application_manager", return_value=manager
+        ), patch.object(manager, "is_application_open", return_value=True), patch(
+            "src.hands.applications_core.get_application_preflight"
+        ) as mock_preflight:
+            mock_preflight.return_value.check.return_value = preflight_result
+            with pytest.raises(RuntimeError, match="ya esta abierta"):
+                open_application("ChromeApp")
+
+    def test_app_cerrada_lanza_normalmente(self):
+        manager = ApplicationManager()
+        self._registrar_app_con_capacidad(
+            manager, "LaunchApp", "launchapp.exe", precondiciones=[]
+        )
+        preflight_result = {"allowed": True, "reason": "ok", "blocked_by": None}
+        with patch(
+            "src.hands.applications_core.get_application_manager", return_value=manager
+        ), patch.object(manager, "is_application_open", return_value=False), patch(
+            "src.hands.applications_core.get_application_preflight"
+        ) as mock_preflight, patch(
+            "src.hands.applications_core.subprocess.Popen"
+        ) as mock_popen:
+            mock_preflight.return_value.check.return_value = preflight_result
+            mock_popen.return_value = MagicMock()
+            resultado = open_application("LaunchApp")
+            assert "exitosamente" in resultado
+            mock_popen.assert_called_once()
 

@@ -163,7 +163,7 @@ class ApplicationCapabilityDef:
 
 @dataclass
 class ApplicationKnowledge:
-    """Conocimiento estructurado de una aplicación."""
+    """Conocimiento estructurado de una aplicacion."""
 
     name: str
     type: str
@@ -1363,6 +1363,29 @@ class ApplicationManager:
             )
             return False
 
+    def is_application_open(self, app_name: str) -> bool:
+        """Comprueba si la aplicacion ya tiene un proceso en ejecucion en el SO.
+
+        Operacion de inspeccion de lectura sola: consulta el sistema operativo
+        (tasklist en Windows, pgrep en Unix) sobre el ejecutable de la
+        aplicacion registrada. Nunca lanza, instala ni modifica ninguna
+        aplicacion. Devuelve False si la app no esta registrada o no se puede
+        consultar el sistema.
+        """
+        app = self.get_application(app_name)
+        if app is None:
+            return False
+        try:
+            return _proceso_de_aplicacion_activo(app, app_name)
+        except Exception as exc:
+            logger._print_log(
+                "info",
+                f"Error comprobando si {app_name} esta abierta: {exc} "
+                "[file:applications_core.py, method:is_application_open]",
+                "applications_core.py", "is_application_open", 778,
+            )
+            return False
+
     def get_application_observed_facts(self, app_name: str) -> Dict[str, Any]:
         """Devuelve los hechos observados de una aplicacion, o dict vacio si no existe."""
         app = self.get_application(app_name)
@@ -1444,32 +1467,52 @@ def _app_knowledge_to_preflight_dict(app: ApplicationKnowledge) -> Dict[str, Any
 
 
 def open_application(app_name: str) -> str:
-    """Abre una aplicación conocida y valida su disponibilidad.
+    """Abre una aplicacion conocida y valida su disponibilidad.
 
     Antes de lanzar, pasa al candidato por ApplicationPreflight y las
-    políticas existentes (unidad 3.8.5.1.4.7.10). Se rechazan ejecutables
-    desconocidos, destinos ambiguos y rutas manipuladas.
+    politicas existentes (unidad 3.8.5.1.4.7.10). Se rechazan ejecutables
+    desconocidos, destinos ambiguos y rutas manipuladas. Cuando la aplicacion
+    ya esta abierta, se reutiliza la instancia existente si el contrato
+    (precondiciones de la capacidad OPEN) no exige que este cerrada.
     """
     app_manager = get_application_manager()
     app = app_manager.get_application(app_name)
 
     if not app:
-        raise ValueError(f"Aplicación no encontrada: {app_name}")
+        raise ValueError(f"Aplicacion no encontrada: {app_name}")
 
     # 3.8.5.1.4.7.10: todo candidato que se pretenda abrir debe pasar por
-    # ApplicationPreflight y las políticas existentes antes de lanzarse.
+    # ApplicationPreflight y las politicas existentes antes de lanzarse.
     # Se rechazan ejecutables desconocidos, destinos ambiguos y rutas manipuladas.
     preflight = get_application_preflight()
     preflight_result = preflight.check(_app_knowledge_to_preflight_dict(app))
     if not preflight_result.get("allowed", False):
         raise RuntimeError(
-            f"La aplicación {app.name} no pasó el preflight: "
+            f"La aplicacion {app.name} no paso el preflight: "
             f"{preflight_result.get('reason', 'sin motivo')} "
             f"(bloqueado por: {preflight_result.get('blocked_by', 'desconocido')})"
         )
 
     if "application_available" in app.preflight_requirements and not _check_application_available(app):
-        raise RuntimeError(f"La aplicación {app.name} no está disponible")
+        raise RuntimeError(f"La aplicacion {app.name} no esta disponible")
+
+    # 3.8.5.3: si la aplicacion ya esta abierta, reutilizar la instancia
+    # existente cuando el contrato (precondiciones de la capacidad OPEN)
+    # no exige que este cerrada.
+    if app_manager.is_application_open(app_name):
+        open_cap = app.get_capability(ApplicationCapability.OPEN.value)
+        requiere_cerrado = (
+            open_cap is not None
+            and any("closed" in str(p).lower() for p in (open_cap.preconditions or []))
+        )
+        if requiere_cerrado:
+            raise RuntimeError(
+                f"La aplicacion {app.name} ya esta abierta pero su contrato "
+                f"requiere cerrarla primero (precondiciones: "
+                f"{open_cap.preconditions})"
+            )
+        logger._print_log("info", "Procesando solicitud", "applications_core.py", "method", 371)
+        return f"Aplicacion {app.name} ya esta abierta; se reutilizo la instancia existente"
 
     try:
         if app.executable:
@@ -1834,6 +1877,25 @@ def _call_calibrate_all_applications(manager: Any, force: bool = False) -> Any:
         pass
 
     return method()
+
+
+def _proceso_de_aplicacion_activo(app: ApplicationKnowledge, app_name: str) -> bool:
+    """Devuelve True si el proceso de la aplicacion esta en ejecucion en el SO.
+
+    Consulta el nombre del ejecutable de la aplicacion registrada mediante
+    ``_is_process_running`` (lectura sola del sistema operativo). Si la app no
+    declara ejecutable (p. ej. solo URL), consulta por el nombre de la
+    aplicacion. Nunca lanza nada.
+    """
+    ejecutable = str(getattr(app, "executable", None) or "").strip()
+    if ejecutable:
+        nombre = os.path.basename(ejecutable.replace("\\", "/"))
+        if _is_process_running(nombre):
+            return True
+    nombre_app = str(app_name or "").strip()
+    if nombre_app:
+        return _is_process_running(nombre_app)
+    return False
 
 
 def _check_application_available(app: ApplicationKnowledge) -> bool:
@@ -2299,6 +2361,19 @@ def is_application_available(app_name: str) -> bool:
     """
     try:
         return bool(get_application_manager().is_application_available(app_name))
+    except Exception:
+        return False
+
+
+def is_application_open(app_name: str) -> bool:
+    """Comprueba si la aplicacion ya tiene un proceso en ejecucion en el SO.
+
+    Operacion de inspeccion de lectura sola sobre el gestionador de
+    aplicaciones: consulta si el proceso de la app registrada esta activo.
+    Nunca lanza, instala ni modifica ninguna aplicacion.
+    """
+    try:
+        return bool(get_application_manager().is_application_open(app_name))
     except Exception:
         return False
 

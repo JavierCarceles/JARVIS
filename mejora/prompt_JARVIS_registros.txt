@@ -6342,3 +6342,23 @@ VERIFICACION: SINTAXIS: OK (py_compile de tests/hands/test_application_preflight
 DISCREPANCIAS: Ninguna
 PENDIENTES: Ninguno para esta unidad. Siguiente hoja pendiente del roadmap: 3.8.5.3 (Comprobar si la aplicacion ya esta abierta y reutilizarla cuando el contrato lo permita).
 ESTADO FINAL: 3.8.5.2 - IMPLEMENTADA
+
+
+REGISTRO DE UNIDAD: 3.8.5.3
+FECHA: 2026-11-14
+OBJETIVO: Comprobar si una aplicacion ya esta abierta y reutilizar la instancia existente al abrirla, cuando el contrato (precondiciones de la capacidad OPEN) no exige que este cerrada, evitando aperturas duplicadas.
+TIPO DE TRABAJO: IMPLEMENTACION | TEST | VERIFICACION
+CAMBIOS / HALLAZGOS: src/hands/applications_core.py: open_application ahora consulta ApplicationManager.is_application_open(app_name) despues de preflight y disponibilidad; si la app ya esta abierta y el contrato no requiere que este cerrada (capacidad OPEN sin precondicion "closed"), devuelve exito de reutilizacion sin lanzar duplicado; si el contrato requiere cerrado, levanta RuntimeError. Se reutiliza el metodo existente ApplicationManager.is_application_open (que usa _proceso_de_aplicacion_activo/_is_process_running sobre tasklist); no se agrego funcion duplicada a nivel modulo. tests/hands/test_aplicacion_ya_abierta_entorno_real.py: nuevo test de entorno real (2 casos) que valida deteccion de proceso en tasklist del SO real y que open_application no lanza un duplicado cuando la instancia esta abierta. tests/hands/test_applications_core.py: agregadas clases TestIsApplicationOpen (5 tests) y TestOpenApplicationReutilizacionYaAbierta (3 tests); importan _is_process_running e is_application_open.
+ARCHIVOS MODIFICADOS: PRODUCCION: src/hands/applications_core.py; TESTS: tests/hands/test_applications_core.py, tests/hands/test_aplicacion_ya_abierta_entorno_real.py; DOCUMENTACION: NA (README.md descripcion de open_application sigue valida y no requiere cambios; no se toca README_TESTS.md).
+TESTS Y RESULTADOS: UNITARIOS: 159 PASSED / 0 FAILED / 159 TOTAL (tests/hands/test_applications_core.py, incluye 8 tests nuevos de la unidad); ENTORNO REAL: 2/2 PASSED (tests/hands/test_aplicacion_ya_abierta_entorno_real.py: deteccion de proceso notepad.exe en tasklist y no-lanzamiento-de-duplicado); INTEGRACION: NA; NO REGRESION: NA.
+VERIFICACION: SINTAXIS: OK (py_compile de src/hands/applications_core.py, tests/hands/test_applications_core.py y tests/hands/test_aplicacion_ya_abierta_entorno_real.py); MAIN.PY: OK (sin cambios); COMPORTAMIENTO / INTEGRACION REAL: _is_process_running('notepad.exe') consulta tasklist del SO real y retorna bool; open_application reutiliza instancia abierta cuando el contrato lo permite (8 tests unitarios con mocks de proceso y preflight + 2 pruebas de entorno real); no se lanzo ninguna aplicacion ni se modifico data/ de produccion. Entorno: Windows 11 version 11 x64, equipo DESKTOP-OUA1CIO, machine_id=4de10a54-5054-515b-aa57-1b30a1feb801, Python 3.14.7 x64.
+DISCREPANCIAS: Ninguna relacionada con esta unidad.
+PENDIENTES: Ninguno para esta unidad. Siguiente hoja pendiente del roadmap: 3.8.5.4 (Abrir una aplicacion cerrada mediante la API real de ejecucion).
+ESTADO FINAL: 3.8.5.3 - IMPLEMENTADA
+### Registro de guardia - 2026-11-14 20:16:31
+- Unidad verificada: 3.8.5.3
+- Fase: 3.8
+- Estado al iniciar: PENDIENTE
+- Ultima completada: 3.8.5.2
+- Accion: se procedio a ejecutar la macro/accion (status no era EN PROCESO)
+- Guardia: verificado antes de ejecutar

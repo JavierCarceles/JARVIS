@@ -421,6 +421,9 @@ class TestInternalFunctionsConsumeRealModel:
              patch(
                  "src.hands.applications_core._check_application_available",
                  return_value=True,
+             ), patch(
+                 "src.hands.applications_core._is_process_running",
+                 return_value=False,
              ):
             mock_popen.return_value = MagicMock()
             result = open_application("chrome")
@@ -435,6 +438,9 @@ class TestInternalFunctionsConsumeRealModel:
              patch(
                  "src.hands.applications_core._check_application_available",
                  return_value=True,
+             ), patch(
+                 "src.hands.applications_core._is_process_running",
+                 return_value=False,
              ):
             mock_popen.return_value = MagicMock()
             result = open_application("gh")
@@ -459,7 +465,8 @@ class TestInternalFunctionsConsumeRealModel:
         with patch(
             "src.hands.applications_core.get_application_manager",
             return_value=manager,
-        ), patch("src.hands.applications_core.subprocess.Popen") as mock_popen:
+        ), patch("src.hands.applications_core.subprocess.Popen") as mock_popen, \
+             patch("src.hands.applications_core._is_process_running", return_value=False):
             mock_popen.return_value = MagicMock()
             result = open_application("minapp")
             assert "MinApp" in result
