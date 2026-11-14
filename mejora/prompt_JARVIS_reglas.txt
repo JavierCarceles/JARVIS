@@ -38,8 +38,8 @@ Evolucionar de `intencion -> comando -> funcion -> ejecucion` a `intencion -> Go
 6. Leer solo el codigo necesario; implementar exclusivamente la hoja activa.
 7. Ejecutar tests pertinentes, corregir fallos de tests validos en produccion, verificar comportamiento real, sintaxis e integraciones afectadas. Si se ha modificado de forma relevante cualquier fichero dentro de `src/`, revisar si `README.md` debe actualizarse y hacerlo cuando corresponda, conforme a la regla de documentacion de la seccion 1.
 8. Registrar el resultado real en `prompt_JARVIS_registros.txt` y cerrar la unidad conforme a la transicion de estado; actualizar el puntero en `prompt_mejoraActual.txt`.
-9. Al cerrar la unidad, ejecutar en el equipo local el script de macro: `python macro_runner.py macro_mejoraActual.json` (ubicado en la carpeta raiz de JARVIS). Esto finaliza el chat, coge el prompt y lo envia al siguiente chat.
-10. Terminar el chat al cerrar la unidad. No abrir, inspeccionar, probar ni implementar la siguiente hoja en ese mismo chat.
+9. Al cerrar la unidad (cuando el resumen, tests, verificaciones reales e integraciones estan completos y la unidad queda IMPLEMENTADA), ejecutar en el equipo local el script de macro: `python macro_runner.py macro_mejoraActual.json` (ubicado en la carpeta raiz de JARVIS). Esta es la ultima accion obligatoria del chat: coge el prompt actualizado y lo envia al siguiente chat. No ejecutar la macro antes de cerrar la unidad ni como paso intermedio; solo es el paso final de cierre.
+10. Terminar el chat al cerrar la unidad. Al finalizar la ejecucion de la macro (`python macro_runner.py macro_mejoraActual.json`), matar el proceso de la macro que se quede colgado esperando (por ejemplo `taskkill /PID <pid_de_la_macro> /F` en PowerShell o el equivalente en el SO) para no dejar procesos huerfanos. No abrir, inspeccionar, probar ni implementar la siguiente hoja en ese mismo chat.
 
 5. TRANSICION DE ESTADO Y CONTINUIDAD
 - `CURRENT_WORK_STATUS` siempre describe exclusivamente la unidad indicada por `CURRENT_WORK_UNIT`. Solo puede haber una hoja `EN PROCESO`.

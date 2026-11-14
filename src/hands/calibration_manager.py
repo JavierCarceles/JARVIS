@@ -310,6 +310,8 @@ class CalibrationManager:
         self._last_launch_window: Any = None
         self._last_launch_was_owned: bool = False
         self._last_launch_root_pid: Optional[int] = None
+        self._last_launch_executable_path: Optional[str] = None
+        self._last_launch_app_id: str = ""
         self._temporary_browser_tab_open: bool = False
         self._temporary_browser_hwnd: Optional[int] = None
 
@@ -1519,6 +1521,8 @@ $result | ConvertTo-Json -Compress -Depth 4
         executable = str(application.get("path", application.get("executable", ""))).strip()
         arguments = str(application.get("arguments", "")).strip()
         self._reset_launch_context()
+        self._last_launch_executable_path = executable or None
+        self._last_launch_app_id = app_id
 
         if (
             not app_name
@@ -1603,6 +1607,82 @@ $result | ConvertTo-Json -Compress -Depth 4
         except Exception as exc:
             logger._print_log("info", "Procesando solicitud", "calibration_manager.py", "method", 344)
             return before_hwnds, False
+
+    def verify_launch_process_stability(
+        self,
+        pid: Optional[int] = None,
+        stability_interval: float = 2.0,
+        stability_checks: int = 3,
+    ) -> Dict[str, Any]:
+        """Verifica que un proceso exista y siga vivo durante un intervalo acotado.
+
+        Comprueba el PID inmediatamente y repite la comprobacion a lo largo del
+        intervalo para evitar declarar exito a un proceso que se cierra al
+        instante. Correlaciona con la ruta ejecutable y el app_id del ultimo
+        lanzamiento cuando estan disponibles.
+
+        Args:
+            pid: PID a verificar. Si es None, usa el _last_launch_root_pid.
+            stability_interval: Intervalo total en segundos para las comprobaciones.
+            stability_checks: Numero de comprobaciones dentro del intervalo.
+
+        Returns:
+            Dict con claves: alive, pid, stable, checks_passed, total_checks,
+            executable_path, app_id, was_owned, error.
+        """
+        target_pid = int(pid) if pid is not None else self._last_launch_root_pid
+        if not target_pid:
+            return {
+                "alive": False,
+                "pid": None,
+                "stable": False,
+                "checks_passed": 0,
+                "total_checks": 0,
+                "executable_path": self._last_launch_executable_path,
+                "app_id": self._last_launch_app_id,
+                "was_owned": self._last_launch_was_owned,
+                "error": "No hay PID para verificar",
+            }
+
+        total_checks = max(1, int(stability_checks))
+        delay = max(0.1, float(stability_interval) / total_checks)
+        checks_passed = 0
+
+        for i in range(total_checks):
+            if self._is_process_alive(target_pid):
+                checks_passed += 1
+            if i < total_checks - 1:
+                time.sleep(delay)
+
+        alive = self._is_process_alive(target_pid)
+        stable = checks_passed == total_checks and alive
+
+        return {
+            "alive": alive,
+            "pid": target_pid,
+            "stable": stable,
+            "checks_passed": checks_passed,
+            "total_checks": total_checks,
+            "executable_path": self._last_launch_executable_path,
+            "app_id": self._last_launch_app_id,
+            "was_owned": self._last_launch_was_owned,
+        }
+
+    def get_launch_evidence(self) -> Dict[str, Any]:
+        """Devuelve la evidencia minima del ultimo lanzamiento para correlacion.
+
+        Incluye PID raiz, PIDs/HWNDs propios, ruta ejecutable, app_id y si el
+        lanzamiento creo ventana/proceso nuevos. No registra contenido privado
+        ni argumentos que puedan contener secretos.
+        """
+        return {
+            "root_pid": self._last_launch_root_pid,
+            "owned_pids": set(self._last_launch_owned_pids),
+            "owned_hwnds": set(self._last_launch_owned_hwnds),
+            "was_owned": self._last_launch_was_owned,
+            "executable_path": self._last_launch_executable_path,
+            "app_id": self._last_launch_app_id,
+        }
 
     def _wait_for_application_window(self, application_name: str, app_id: str, before_hwnds: Set[int], before_pids: Optional[Set[int]] = None, timeout: float = 12.0) -> Any:
         before_pids = before_pids or set()
@@ -1848,6 +1928,462 @@ $result | ConvertTo-Json -Compress -Depth 4
             if self._win32_is_window(hwnd) and self._win32_is_visible(hwnd):
                 result.append(window)
         return result
+
+    def detect_window_for_process(
+        self,
+        root_pid: Optional[int],
+        application_name: str = "",
+        app_id: str = "",
+        timeout: float = 10.0,
+    ) -> Any:
+        """
+        Detecta una ventana perteneciente al proceso/aplicacion objetivo
+        mediante identificadores (PID, arbol de procesos, nombre de proceso,
+        app_id) y propietario (relacion HWND owner), sin aceptar una
+        coincidencia basada solo en el titulo de la ventana.
+
+        Args:
+            root_pid: PID del proceso raiz (obligatorio).
+            application_name: Nombre de la aplicacion (referencia; no es
+                criterio suficiente por si solo).
+            app_id: Identificador de aplicacion UWP/tienda (referencia).
+            timeout: Tiempo maximo de espera en segundos.
+
+        Returns:
+            Objeto de ventana (pygetwindow) si se detecta una ventana
+            perteneciente al proceso, o None si no se encuentra.
+        """
+        if not root_pid:
+            return None
+
+        process_pids = self._get_process_tree(int(root_pid))
+        if not process_pids:
+            process_pids = {int(root_pid)}
+
+        deadline = time.monotonic() + max(0.0, float(timeout))
+        best = None
+        best_score = -1
+
+        while time.monotonic() < deadline:
+            candidates = []
+            for window in self._get_windows():
+                if not self._window_is_usable(window, allow_console=False):
+                    continue
+
+                hwnd = self._get_window_handle(window)
+                if not hwnd:
+                    continue
+
+                win_pid = self._get_window_process_id(window)
+
+                # Criterio 1: el PID de la ventana esta en el arbol de
+                # procesos del objetivo.
+                pid_match = win_pid is not None and win_pid in process_pids
+
+                # Criterio 2: el propietario (owner HWND) de la ventana
+                # pertenece a una ventana cuyo PID esta en el arbol de
+                # procesos del objetivo.
+                owner_match = False
+                if not pid_match:
+                    owner_hwnd = self._win32_get_owner(hwnd)
+                    if owner_hwnd:
+                        owner_window = self._get_window_by_handle(owner_hwnd)
+                        if owner_window is not None:
+                            owner_pid = self._get_window_process_id(
+                                owner_window
+                            )
+                            owner_match = (
+                                owner_pid is not None
+                                and owner_pid in process_pids
+                            )
+
+                # Rechazar coincidencia basada solo en el titulo: sin
+                # identificador de proceso ni relacion de propietario,
+                # la ventana no es candidata.
+                if not (pid_match or owner_match):
+                    continue
+
+                score = 300 if pid_match else 150
+
+                # Desempate por nombre de proceso y app_id (referencia,
+                # nunca criterio de aceptacion por si solos).
+                if application_name:
+                    process_name = (
+                        self._get_window_process_name(window).casefold()
+                    )
+                    normalized_app = self._normalize_application_name(
+                        application_name
+                    )
+                    if normalized_app and normalized_app in process_name:
+                        score += 50
+                if app_id:
+                    process_name = (
+                        self._get_window_process_name(window).casefold()
+                    )
+                    normalized_id = self._normalize_application_name(app_id)
+                    if normalized_id and normalized_id in process_name:
+                        score += 30
+
+                candidates.append((score, window))
+
+            if candidates:
+                candidates.sort(key=lambda item: item[0], reverse=True)
+                if candidates[0][0] > best_score:
+                    best_score, best = candidates[0]
+                if best_score >= 300:
+                    return best
+
+            time.sleep(0.4)
+
+        return best
+
+    MAX_WAIT_TIMEOUT = 30.0
+    """Tiempo maximo permitido (segundos) para esperar una ventana. El timeout
+    solicitado se acota a este valor para no bloquear el flujo indefinidamente."""
+
+    INICIO_LENTO_FRACCION = 0.5
+    """Fraccion del timeout a partir de la cual se considera que la deteccion
+    de la ventana fue tardia (inicio lento)."""
+
+    def wait_for_application_window(
+        self,
+        root_pid: Optional[int],
+        application_name: str = "",
+        app_id: str = "",
+        timeout: float = 10.0,
+        poll_interval: float = 0.4,
+    ) -> Dict[str, Any]:
+        """
+        Espera la ventana de una aplicacion durante un timeout acotado y
+        configurable, distinguiendo entre inicio lento, aplicacion de fondo,
+        proceso sin interfaz y fallo de apertura.
+
+        El timeout solicitado se acota a MAX_WAIT_TIMEOUT para evitar esperas
+        indefinidas. Devuelve un diccionario con el estado observado, la
+        ventana detectada (si procede), el PID, el tiempo transcurrido y
+        indicadores de inicio lento y aplicacion en fondo.
+
+        Estados devueltos en "status":
+        - VENTANA_DETECTADA: ventana usable (visible) del proceso detectada
+          dentro del timeout. inicio_lento=True si aparecio despues de la
+          mitad del timeout.
+        - APLICACION_EN_FONDO: el proceso sigue vivo y tiene una ventana, pero
+          no es visible (segundo plano).
+        - PROCESO_SIN_INTERFAZ: el proceso sigue vivo pero no creo ninguna
+          ventana dentro del timeout.
+        - FALLO_APERTURA: el proceso no esta vivo al iniciar o durante la
+          espera, o el root_pid es invalido/ausente.
+        """
+        resultado = {
+            "status": None,
+            "window": None,
+            "hwnd": None,
+            "pid": None,
+            "process_alive": False,
+            "elapsed_seconds": 0.0,
+            "timeout": 0.0,
+            "inicio_lento": False,
+            "es_fondo": False,
+            "reason": "",
+        }
+
+        timeout_acotado = max(0.0, min(float(timeout), self.MAX_WAIT_TIMEOUT))
+        poll_interval = max(0.1, float(poll_interval))
+        resultado["timeout"] = timeout_acotado
+
+        inicio = time.monotonic()
+        deadline = inicio + timeout_acotado
+
+        # Validar que exista un PID de proceso a esperar.
+        if not root_pid:
+            resultado.update(
+                status="FALLO_APERTURA",
+                process_alive=False,
+                elapsed_seconds=0.0,
+                reason="root_pid invalido o ausente: no hay proceso que esperar",
+            )
+            return resultado
+
+        root_pid = int(root_pid)
+
+        # El proceso nunca arranco o ya murio antes de comenzar la espera.
+        if not self._is_process_alive(root_pid):
+            resultado.update(
+                status="FALLO_APERTURA",
+                process_alive=False,
+                elapsed_seconds=time.monotonic() - inicio,
+                reason="el proceso no esta vivo al iniciar la espera",
+            )
+            return resultado
+
+        process_pids = self._get_process_tree(root_pid)
+        if not process_pids:
+            process_pids = {root_pid}
+
+        fondo_visto = False
+
+        while time.monotonic() < deadline:
+            # Si el proceso finalizo durante la espera, es fallo de apertura.
+            if not self._is_process_alive(root_pid):
+                resultado.update(
+                    status="FALLO_APERTURA",
+                    process_alive=False,
+                    elapsed_seconds=time.monotonic() - inicio,
+                    reason="el proceso finalizo durante la espera",
+                )
+                return resultado
+
+            restante = deadline - time.monotonic()
+            sub_timeout = max(0.05, min(poll_interval, restante))
+
+            # Buscar una ventana usable (visible) perteneciente al proceso.
+            ventana = self.detect_window_for_process(
+                root_pid, application_name, app_id, timeout=sub_timeout
+            )
+            if ventana is not None:
+                hwnd = self._get_window_handle(ventana)
+                visible = bool(hwnd and self._win32_is_visible(hwnd))
+                pid = self._get_window_process_id(ventana) if hwnd else None
+                transcurrido = time.monotonic() - inicio
+                inicio_lento = (
+                    timeout_acotado > 0
+                    and transcurrido > timeout_acotado * self.INICIO_LENTO_FRACCION
+                )
+                resultado.update(
+                    status="VENTANA_DETECTADA",
+                    window=ventana,
+                    hwnd=hwnd,
+                    pid=pid,
+                    process_alive=True,
+                    elapsed_seconds=transcurrido,
+                    inicio_lento=inicio_lento,
+                    es_fondo=False,
+                    reason="ventana usable del proceso detectada dentro del timeout"
+                    + (" (inicio lento)" if inicio_lento else ""),
+                )
+                return resultado
+
+            # Detectar si el proceso tiene una ventana aunque no sea usable
+            # (aplicacion en segundo plano) para distinguirla de sin interfaz.
+            if not fondo_visto:
+                for w in self._get_windows():
+                    hwnd_c = self._get_window_handle(w)
+                    if not hwnd_c:
+                        continue
+                    win_pid = self._get_window_process_id(w)
+                    if win_pid is not None and win_pid in process_pids:
+                        if not self._win32_is_visible(hwnd_c):
+                            fondo_visto = True
+                        break
+
+            time.sleep(poll_interval)
+
+        # Timeout alcanzado sin ventana usable.
+        transcurrido = time.monotonic() - inicio
+        proceso_vivo = self._is_process_alive(root_pid)
+        resultado["process_alive"] = proceso_vivo
+        resultado["elapsed_seconds"] = transcurrido
+
+        if not proceso_vivo:
+            resultado.update(
+                status="FALLO_APERTURA",
+                reason="el proceso no esta vivo al finalizar el timeout",
+            )
+        elif fondo_visto:
+            resultado.update(
+                status="APLICACION_EN_FONDO",
+                es_fondo=True,
+                reason="el proceso sigue vivo pero su ventana no es visible (aplicacion en fondo)",
+            )
+        else:
+            resultado.update(
+                status="PROCESO_SIN_INTERFAZ",
+                reason="el proceso sigue vivo pero no creo ninguna ventana dentro del timeout",
+            )
+
+        return resultado
+
+    def verify_visible_window_for_application(
+        self,
+        window: Any,
+        application_name: str = "",
+        app_id: str = "",
+        root_pid: Optional[int] = None,
+        owned_pids: Optional[Set[int]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Verifica que una ventana detectada sea visible y corresponda a la
+        aplicacion solicitada, sin forzar foco, maximizar ni moverla.
+
+        Solo consulta el estado real de la ventana (visibilidad, PID, nombre
+        de proceso, monitor). No llama a ShowWindow, SetForegroundWindow,
+        SetWindowPos ni move_window_to_monitor. Una coincidencia basada solo
+        en el titulo no es suficiente para aceptar la ventana.
+
+        Args:
+            window: Objeto de ventana (pygetwindow) a verificar.
+            application_name: Nombre de la aplicacion solicitada (referencia).
+            app_id: Identificador de aplicacion UWP/tienda (referencia).
+            root_pid: PID del proceso raiz lanzado (referencia fuerte).
+            owned_pids: Conjunto de PIDs propios del lanzamiento actual.
+
+        Returns:
+            Dict con claves: verificada, visible, corresponde_aplicacion,
+            ventana, hwnd, pid, process_name, window_title,
+            application_name, app_id, root_pid, criterio_pid,
+            criterio_nombre_proceso, criterio_titulo,
+            es_visual_studio_code, monitor_id, monitor_primario,
+            en_segunda_pantalla, reason.
+        """
+        resultado = {
+            "verificada": False,
+            "visible": False,
+            "corresponde_aplicacion": False,
+            "ventana": None,
+            "hwnd": None,
+            "pid": None,
+            "process_name": "",
+            "window_title": "",
+            "application_name": application_name,
+            "app_id": app_id,
+            "root_pid": root_pid,
+            "criterio_pid": False,
+            "criterio_nombre_proceso": False,
+            "criterio_titulo": False,
+            "es_visual_studio_code": False,
+            "monitor_id": None,
+            "monitor_primario": False,
+            "en_segunda_pantalla": False,
+            "reason": "ventana no evaluada",
+        }
+
+        if window is None:
+            resultado["reason"] = "ventana ausente: no hay objeto que verificar"
+            return resultado
+
+        hwnd = self._get_window_handle(window)
+        if not hwnd:
+            resultado["reason"] = "no se obtuvo HWND de la ventana"
+            return resultado
+
+        resultado["hwnd"] = int(hwnd)
+        resultado["ventana"] = window
+
+        if not self._win32_is_window(hwnd):
+            resultado["reason"] = "el HWND ya no es una ventana valida"
+            return resultado
+
+        # Visibilidad real: IsWindowVisible y estilo WS_VISIBLE.
+        visible = bool(self._win32_is_visible(hwnd))
+        try:
+            style = int(self._win32_get_style(hwnd)) & 0xFFFFFFFF
+            visible = visible and bool(style & WS_VISIBLE)
+        except Exception:
+            pass
+        resultado["visible"] = visible
+
+        # Identificacion del proceso y titulo de la ventana (solo lectura).
+        pid = self._get_window_process_id(window)
+        resultado["pid"] = pid
+        if pid is not None:
+            try:
+                resultado["root_pid"] = int(root_pid) if root_pid is not None else None
+            except (TypeError, ValueError):
+                resultado["root_pid"] = None
+        process_name = str(self._get_window_process_name(window) or "")
+        resultado["process_name"] = process_name
+        window_title = str(self._win32_get_window_title(hwnd) or "")
+        resultado["window_title"] = window_title
+
+        # Deteccion de Visual Studio Code a nivel de ventana (proceso o titulo).
+        # Nunca se confunde con la aplicacion solicitada salvo que sea la propia.
+        es_vscode_proceso = process_name.casefold() in {
+            x.casefold() for x in self.VSCODE_EXECUTABLES
+        }
+        titulo_normalizado = self._normalize_application_name(window_title)
+        es_vscode_titulo = any(
+            self._normalize_application_name(x) in titulo_normalizado
+            for x in self.VSCODE_NAME_PARTS
+        ) or "visualstudiocode" in titulo_normalizado
+        resultado["es_visual_studio_code"] = bool(es_vscode_proceso or es_vscode_titulo)
+
+        # Corresponde a la aplicacion: PID en arbol/owned o nombre de proceso
+        # esperado. El titulo solo es evidencia de apoyo, nunca suficiente.
+        expected_processes = self._expected_process_names(application_name, app_id)
+        process_name_casefold = process_name.casefold()
+        criterio_nombre_proceso = bool(
+            expected_processes
+            and process_name_casefold
+            and process_name_casefold
+            in {p.casefold() for p in expected_processes}
+        )
+        resultado["criterio_nombre_proceso"] = criterio_nombre_proceso
+
+        pid_match = False
+        if pid is not None:
+            process_pids: Set[int] = set()
+            if root_pid is not None:
+                try:
+                    process_pids = set(self._get_process_tree(int(root_pid)))
+                except Exception:
+                    process_pids = set()
+                if not process_pids:
+                    process_pids = {int(root_pid)}
+            elif owned_pids is not None:
+                process_pids = set(owned_pids)
+            pid_match = int(pid) in process_pids
+        resultado["criterio_pid"] = bool(pid_match)
+
+        titulo_normalizado_app = self._normalize_application_name(application_name)
+        criterio_titulo = bool(
+            titulo_normalizado_app
+            and titulo_normalizado_app in titulo_normalizado
+        )
+        resultado["criterio_titulo"] = criterio_titulo
+
+        corresponde = bool(pid_match or criterio_nombre_proceso)
+        # Si la ventana es de Visual Studio Code, nunca corresponde a otra app.
+        if (
+            resultado["es_visual_studio_code"]
+            and not self._is_vscode_application(application_name, app_id)
+        ):
+            corresponde = False
+        resultado["corresponde_aplicacion"] = bool(corresponde)
+
+        # Monitor real de la ventana (sin moverla).
+        try:
+            monitor = self.screen_manager.get_monitor_for_window(window)
+        except Exception:
+            monitor = None
+        if monitor is not None:
+            try:
+                resultado["monitor_id"] = int(monitor.monitor_id)
+            except (TypeError, ValueError):
+                resultado["monitor_id"] = None
+            try:
+                resultado["monitor_primario"] = bool(monitor.is_primary)
+            except Exception:
+                resultado["monitor_primario"] = False
+            resultado["en_segunda_pantalla"] = bool(
+                monitor is not None and not monitor.is_primary
+            )
+
+        # Verificacion final: visible y corresponde (lectura, sin forzar nada).
+        resultado["verificada"] = bool(visible and corresponde)
+
+        if not visible:
+            resultado["reason"] = "la ventana detectada no es visible"
+        elif (
+            resultado["es_visual_studio_code"]
+            and not resultado["corresponde_aplicacion"]
+        ):
+            resultado["reason"] = "la ventana pertenece a Visual Studio Code, no a la aplicacion solicitada"
+        elif not corresponde:
+            resultado["reason"] = "la ventana no se identifica como la aplicacion solicitada (PID o nombre de proceso no coinciden)"
+        else:
+            resultado["reason"] = "ventana visible y correspondiente a la aplicacion solicitada"
+
+        return resultado
 
     def _force_terminate_process(self, pid: int) -> bool:
         if pid <= 0 or pid in self._last_launch_before_pids:

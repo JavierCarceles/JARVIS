@@ -1263,6 +1263,11 @@ Métodos:
 | `def _find_existing_application_window(application_name, app_id)` |  |
 | `def _reset_launch_context()` |  |
 | `def launch_application(application)` | Reutiliza una ventana existente o lanza la aplicación de forma genérica. |
+| `def verify_launch_process_stability(pid, stability_interval, stability_checks)` | Verifica que un proceso exista y siga vivo durante un intervalo acotado. |
+| `def get_launch_evidence()` | Devuelve la evidencia minima del ultimo lanzamiento para correlacion. |
+| `def detect_window_for_process(root_pid, application_name, app_id, timeout)` | Detecta una ventana perteneciente al proceso objetivo por PID, arbol de procesos y propietario (HWND owner), sin aceptar coincidencia solo por el titulo. |
+| `def wait_for_application_window(root_pid, application_name, app_id, timeout, poll_interval)` | Espera la ventana durante un timeout acotado y configurable, distinguiendo inicio lento, aplicacion de fondo, proceso sin interfaz y fallo de apertura. |
+| `def verify_visible_window_for_application(window, application_name, app_id, root_pid, owned_pids)` | Verifica que una ventana detectada sea visible y corresponda a la aplicacion solicitada por PID/arbol de procesos y nombre de proceso, sin forzar foco, maximizar ni moverla, y sin confundirse con Visual Studio Code. |
 | `def _wait_for_application_window(application_name, app_id, before_hwnds, before_pids, timeout)` |  |
 | `def _set_window_position(hwnd, x, y)` |  |
 | `def _maximize_window(hwnd)` |  |
