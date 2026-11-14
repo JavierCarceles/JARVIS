@@ -8,7 +8,7 @@ ESTRUCTURA Y RESPONSABILIDADES
 - `prompt_JARVIS_registros.txt`: un unico registro canonico por unidad con registro, incluidos los estados parciales, resultados y evidencia historica. No insertar registros en este roadmap.
 - `prompt_mejoraActual.txt`: unico estado persistente que determina la unidad activa.
 - `prompt_JARVIS_reglas.txt`: reglas obligatorias de trabajo, pruebas, seguridad, errores y transiciones.
-- `errores_supercomplete.txt`: registro append-only de errores operativos y de desarrollo; consultar antes de actuar y anotar cada error inmediatamente.
+- `mejora/errores_supercomplete.txt`: registro append-only de errores operativos y de desarrollo; consultar antes de actuar y anotar cada error inmediatamente.
 - Los marcadores `[COMPLETADO]` / `[IMPLEMENTADA]` del arbol son referencias historicas; no sustituyen los registros canonicos ni el estado persistente.
 
 USO

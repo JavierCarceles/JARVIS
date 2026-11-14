@@ -164,10 +164,10 @@ ESTADO FINAL: <ID> - <NO IMPLEMENTADA | EN PROCESO | PARCIALMENTE IMPLEMENTADA |
 - Las tildes causan problemas de codificacion, comparacion de strings y fallos en el sistema. Usar siempre la forma sin tilde: `a` en lugar de `a`, `e` en lugar de `e`, `i` en lugar de `i`, `o` en lugar de `o`, `u` en lugar de `u`, `n` en lugar de `n`.
 - Esta regla se aplica a todo contenido nuevo y a todo contenido modificado. Antes de guardar cualquier fichero, verificar que no contiene tildes ni acentos.
 
-19. REGISTRO DE ERRORES EN TIEMPO REAL (errores_supercomplete.txt)
-- Todos los errores del proyecto deben escribirse en el fichero `errores_supercomplete.txt` en el mismo momento en que ocurren. No se puede diferir el registro hasta el final de la unidad.
+19. REGISTRO DE ERRORES EN TIEMPO REAL (mejora/errores_supercomplete.txt)
+- Todos los errores del proyecto deben escribirse en el fichero `mejora/errores_supercomplete.txt` en el mismo momento en que ocurren. No se puede diferir el registro hasta el final de la unidad.
 - El formato de cada entrada es: `FECHA-HORA | TIPO_ERROR | DESCRIPCION | ARCHIVO | DETALLES`
 - Si un mismo tipo de error se repite mas de 3 veces, guardar ese error de forma permanente en el contexto del chat para que no se vuelva a cometer. Contar repeticiones por tipo de error (SHELL_TIMEOUT, EDIT_ERROR, TILDE_ERROR, etc.).
-- Cuando un error alcance 4 repeticiones del mismo tipo, anadir una entrada permanente en `errores_supercomplete.txt` con el prefijo `ERROR_PERMANENTE_CONTEXTO:` y describir la causa y la forma de evitarlo. Ese error no debe repetirse en futuras acciones del chat.
+- Cuando un error alcance 4 repeticiones del mismo tipo, anadir una entrada permanente en `mejora/errores_supercomplete.txt` con el prefijo `ERROR_PERMANENTE_CONTEXTO:` y describir la causa y la forma de evitarlo. Ese error no debe repetirse en futuras acciones del chat.
 - No delegar el registro de errores al final de la unidad. Escribir cada error inmediatamente al ocurrirlo.
 

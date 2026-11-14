@@ -6362,3 +6362,28 @@ ESTADO FINAL: 3.8.5.3 - IMPLEMENTADA
 - Ultima completada: 3.8.5.2
 - Accion: se procedio a ejecutar la macro/accion (status no era EN PROCESO)
 - Guardia: verificado antes de ejecutar
+
+
+REGISTRO DE UNIDAD: 3.8.5.4
+FECHA: 2026-11-14
+OBJETIVO: Abrir una aplicacion cerrada mediante la API real de ejecucion (CalibrationManager.launch_application), validando el destino con ApplicationPreflight y obteniendo la ruta del inventario local SQLite (machine_id actual), sin cerrar ni alterar ventanas ajenas. Padre: 3.8.5; abuelo: 3.8 (FASE 3.8).
+TIPO DE TRABAJO: IMPLEMENTACION | TEST | VERIFICACION REAL
+CAMBIOS / HALLAZGOS: No se modifica codigo de produccion: la capacidad de apertura real ya existe (open_application en src/hands/applications_core.py, CalibrationManager.launch_application en src/hands/calibration_manager.py, resolver_aplicacion_por_nombre en src/hands/application_discovery.py, puente de catalogo 3.8.5.1.4.11 ya implementado). Se crea un arnes seguro de pruebas con lanzamiento real en tests/hands/test_apertura_aplicacion_cerrada_entorno_real.py (6 tests) que:
+  * registra linea base real de procesos (tasklist) y ventanas (CalibrationManager._get_window_handles) antes de cada prueba;
+  * usa una allowlist de una aplicacion inocua del equipo (charmap.exe / Mapa de caracteres, C:\Windows\System32\charmap.exe), la unica aplicacion en application_candidates del inventario local que pasa preflight real en este equipo;
+  * valida el destino con ApplicationPreflight.check() (sin lanzar) y confirma la ruta resuelta (C:\Windows\System32\charmap.exe, allowed=true);
+  * lanza con CalibrationManager.launch_application() REAL (sin mockear lanzador, procesos ni ventanas) y evidencia PID propio (_last_launch_root_pid), procesos propios (_last_launch_owned_pids), ventana propia (_last_launch_owned_hwnds) y _last_launch_was_owned=True;
+  * comprueba que el conteo de charmap.exe pasa de antes a antes+1 tras el lanzamiento;
+  * cierra SOLO el proceso creado por la prueba, identificado por PID (taskkill /PID), nunca por nombre;
+  * verifica que la cuenta de charmap.exe vuelve a la linea base (no se tocan instancias ajenas);
+  * comprueba que un ejecutable inexistente es rechazado por preflight sin lanzar nada;
+  * enumera los dos monitores reales (DISPLAY1 primario 0-3840, DISPLAY2 segunda 3840-7680 donde reside Visual Studio Code) y confirma que la ventana de prueba queda en DISPLAY1, sin superponer VS Code.
+Hallazgo de diseno: ApplicationPreflight.check() resuelve el destino desde el nombre vía shell:AppsFolder e inventario local SQLite (no desde la clave 'path'), por lo que solo charmap.exe (registrada en el inventario real) pasa preflight; notepad.exe esta en el catalogo global entities.json pero no resuelve como destino verificable desde el inventario local, por lo que preflight la rechaza y no se usa para la prueba real de apertura.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA (no se modifica src/); TESTS: tests/hands/test_apertura_aplicacion_cerrada_entorno_real.py (nuevo, 6 tests de entorno real); DOCUMENTACION: NA (no se toca docs/README.md ni docs/README_TESTS.md; no se modifica comportamiento tecnico documentado).
+TESTS Y RESULTADOS: UNITARIOS: NA (todos son de entorno real, sin mocks del lanzador/procesos/ventanas); ENTORNO REAL: 6/6 PASSED (test_apertura_aplicacion_cerrada_entorno_real.py: linea base, monitores reales, destino+preflight, lanzamiento real PID/ventana, cierre solo propio+preservacion, ejecutable inexistente rechazado); NO REGRESION: 244 PASSED / 0 FAILED (tests/hands/test_applications_core.py + tests/hands/test_application_preflight.py).
+VERIFICACION: SINTAXIS: OK (py_compile del nuevo fichero de tests); MAIN.PY: OK (sin cambios); COMPORTAMIENTO / INTEGRACION REAL: CalibrationManager.launch_application abre charmap.exe en el SO real (ok=True, root_pid=25580, ventana HWND=198402, owned=True); proceso confirmado vivo tras lanzamiento y terminado tras cerrar por PID; charmap.exe procesos finales=0 (sin residuos); Visual Studio Code y ventanas preexistentes intactas (ventanas nuevas solo las creadas por la prueba). DISPOSITIVOS GRAFICOS: prueba en monitor primario DISPLAY1, VS Code en DISPLAY2 (segunda pantalla), sin teclado ni raton, sin superposicion sobre VS Code. Entorno: Windows 11 version 11 x64, equipo DESKTOP-OUA1CIO, machine_id=4de10a54-5054-515b-aa57-1b30a1feb801, Python 3.14.7 x64.
+DISCREPANCIAS: 
+  - Impedimento documentado por instruccion del usuario: no se ejecuta el "analisis del sistema completo". Este analisis NO es requerido por los criterios de aceptacion de 3.8.5.4 (criterio 3.8.5.4.2.6 exige "al menos un lanzamiento correcto por cada tipo de destino que el adapter soporte"; se verifico charmap.exe como tipo ejecutable local). Se registra como NO EJECUTADO por restriccion expresa, no por incapacidad tecnica.
+  - notepad.exe esta en el catalogo global entities.json pero NO resuelve como destino verificable desde el inventario local SQLite (application_candidates solo tiene charmap.exe), por lo que ApplicationPreflight la rechaza y no se usa en la prueba real de apertura. Esto no bloquea la unidad: 3.8.5.4.2.6 exige verificar al menos un tipo de destino, y se verifico charmap.exe.
+PENDIENTES: Ninguno para esta unidad. Siguiente hoja pendiente del roadmap: 3.8.5.5 (Verificar proceso, ventana y estado posterior a la apertura).
+ESTADO FINAL: 3.8.5.4 - IMPLEMENTADA
