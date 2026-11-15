@@ -1,8 +1,8 @@
 # 🧪 README — JARVIS (documentación exhaustiva de la suite de tests)
 
 > **Alcance:** documentación generada a partir de los **ficheros de prueba** (`tests/`, espejo de `src/`).
-> Cada entrada se deriva de las firmas, docstrings y clases de test extraídas mediante AST de los 150 ficheros de test (excluyendo `__pycache__`, `test__init__.py` placeholders vacíos, `__init__.py` y scripts auxiliares sin prefijo `test_`).
-> Total: 795 clases de test, 4056 métodos de test individuales.
+> Cada entrada se deriva de las firmas, docstrings y clases de test extraídas mediante AST de los 151 ficheros de test (excluyendo `__pycache__`, `test__init__.py` placeholders vacíos, `__init__.py` y scripts auxiliares sin prefijo `test_`).
+> Total: 796 clases de test, 4079 métodos de test individuales.
 
 ## 🗺️ Índice
 
@@ -26,6 +26,8 @@
 - [`eyes\test_vision.py`](#eyes/test-vision)
 - [`eyes\test_vision_calibration_integration.py`](#eyes/test-vision_calibration_integration)
 - [`eyes\test_vision_only.py`](#eyes/test-vision_only)
+- [`eyes\test_vision_opencv.py`](#eyes/test-vision_opencv)
+- [`eyes\test_visual_ui_detector_fusion.py`](#eyes/test-visual-ui-detector-fusion)
 - [`hands\planner\test_advanced_state_graph.py`](#hands/planner/test-advanced_state_graph)
 - [`hands\planner\test_application_integration.py`](#hands/planner/test-application_integration)
 - [`hands\planner\test_application_knowledge_to_goal.py`](#hands/planner/test-application_knowledge_to_goal)
@@ -2402,6 +2404,55 @@ creencias falsas — hoja 3.4.3.2 'No afirmar un estado solo por configuración'
 
 ---
 
+<a name="eyes/test-vision_opencv"></a>
+### `eyes\test_vision_opencv.py`
+
+**Descripcion:** Tests del procesador OpenCV de Vision (src/eyes/vision.py).
+
+**Modulos de origen probados:** src.eyes.vision
+
+**Clases de test:**
+
+- **`TestVisionOpenCVProcessorLoadImage`** (linea 35) — 3 metodo(s) de test
+  - **`test_load_image_missing_file_returns_none`** (L36)
+  - **`test_load_image_none_returns_none`** (L39)
+  - **`test_load_image_valid_returns_bgr_array`** (L42)
+
+- **`TestVisionOpenCVProcessorPrepareCrop`** (linea 55) — 4 metodo(s) de test
+  - **`test_prepare_crop_returns_expected_size`** (L56)
+  - **`test_prepare_crop_padding_expands`** (L66)
+  - **`test_prepare_crop_clamps_to_image_bounds`** (L75)
+  - **`test_prepare_crop_invalid_bbox_returns_none`** (L85)
+
+- **`TestVisionOpenCVProcessorNormalizeImage`** (linea 95) — 3 metodo(s) de test
+  - **`test_normalize_image_grayscale_returns_2d`** (L96)
+  - **`test_normalize_image_resize_changes_size`** (L102)
+  - **`test_normalize_image_none_returns_none`** (L108)
+
+- **`TestVisionOpenCVProcessorDetectChanges`** (linea 112) — 3 metodo(s) de test
+  - **`test_detect_changes_identical_frames_no_change`** (L113)
+  - **`test_detect_changes_different_frames_change_detected`** (L120)
+  - **`test_detect_changes_none_frame_no_change`** (L128)
+
+- **`TestVisionOpenCVProcessorDetectEdgesRegions`** (linea 135) — 2 metodo(s) de test
+  - **`test_detect_edges_regions_returns_regions_for_rectangle`** (L136)
+  - **`test_detect_edges_regions_none_returns_empty`** (L146)
+
+- **`TestVisionOpenCVProcessorRefineBounds`** (linea 153) — 4 metodo(s) de test
+  - **`test_refine_bounds_returns_hint_only_true`** (L154)
+  - **`test_refine_bounds_refines_within_original`** (L161)
+  - **`test_refine_bounds_invalid_returns_not_ok`** (L173)
+  - **`test_refine_bounds_never_marks_interactive`** (L179)
+
+- **`TestVisionDetectUIElementsOpenCVRefine`** (linea 186) — 2 metodo(s) de test
+  - **`test_detect_ui_elements_default_no_refine`** (L191)
+  - **`test_detect_ui_elements_refine_with_opencv_interactive_unchanged`** (L201)
+
+- **`TestVisionOpenCVRealEnvironment`** (linea 217) — 1 metodo(s) de test
+  - **`test_real_screen_capture_and_opencv_preprocessing`** (L218)
+
+---
+
 <a name="eyes/test-vision_calibration_integration"></a>
 ### `eyes\test_vision_calibration_integration.py`
 
@@ -2558,6 +2609,45 @@ por defecto. Anteriormente caia en ApplicationState.OPEN; ahora debe
 usar CLOSED como fallback seguro.
 
   - **`test_exception_returns_closed`** (L263)
+
+---
+
+### `eyes\test_qwen3vl_semantic_interpretation.py`
+
+**Descripción:** Tests unitarios de interpretacion semantica Qwen3-VL/Ollama en `Vision.interpret_element_semantics`. Valida el contrato de entrada/salida, la asociacion con la imagen/crop, la validacion del esquema, el rechazo de coordenadas/cajas invalidas y la gestion de respuestas incompletas. `is_actionable` siempre es False.
+
+**Modulos de origen probados:** src.eyes.vision
+
+**Clases de test:**
+
+- **`TestSemanticInterpretationContract`** — contrato de entrada/salida (todos los campos requeridos, `is_actionable` siempre False, rango de confianza, evidencia visual).
+- **`TestSemanticInterpretacionConCrop`** — asociacion con recorte (bbox valido, longitud incorrecta, valores no numericos, coordenadas invertidas, fuera de rango).
+- **`TestSemanticInterpretacionRespuestaIncompleta`** — respuestas no dict, vacias, campos faltantes, envio de imagen original, inclusión de referencia en prompt.
+- **`TestSemanticInterpretacionEstructuraSalida`** — hints como lista de cadenas, coordinate_check valido sin crop, error nulo en exito.
+
+---
+
+### `eyes\test_qwen3vl_ollama_multimodal_integration.py`
+
+**Descripción:** Test de integracion real: `Vision.interpret_element_semantics` invoca al servidor y modelo Qwen3-VL de Ollama en el equipo real (sin mocks). Verifica estructura de salida valida, envio de crop con coordenadas dentro de rango, y rechazo de crop fuera de los limites de la imagen sin llamar al modelo.
+
+**Modulos de origen probados:** src.eyes.vision
+
+**Clases de test:**
+
+- Tests de integracion con Ollama real: `test_ollama_interpretacion_estructura_valida_entorno_real`, `test_ollama_interpretacion_con_crop_entorno_real`, `test_ollama_interpretacion_rechaza_crop_fuera_de_rango`.
+
+### `eyes\test_visual_ui_detector_fusion.py`
+
+**Descripcion:** Tests de fusion de deteccion de elementos UI (unidad 3.8.6.3.3.9). Verifica union sin duplicados, preservacion de fuentes y confianza, desacuerdos entre fuentes, interactividad solo con evidencia real (patron UIA o Qwen3-VL con evidencia visual) y asociacion por texto. Incluye integracion real con el arbol UIA de Notepad en el monitor secundario y verificacion real de Qwen3-VL via Ollama.
+
+**Modulos de origen probados:** src.eyes.visual_ui_detector_fusion, src.hands.ui_automation_adapter
+
+**Clases de test:**
+
+- **`TestVisualUIDetectorFusionUnit`** (linea 140) — 20 metodo(s) de test
+- **`TestVisualUIDetectorFusionNotepadReal`** (linea 388) — 2 metodo(s) de test
+- **`TestVisualUIDetectorFusionQwen3VLReal`** (linea 579) — 1 metodo(s) de test
 
 ---
 

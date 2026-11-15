@@ -21,6 +21,7 @@
 - [`src/eyes/screen_capture.py` (368 líneas)](#src-eyes-screen_capture-py)
 - [`src/eyes/vision.py` (935 líneas)](#src-eyes-vision-py)
 - [`src/eyes/vision_only.py` (417 líneas)](#src-eyes-vision_only-py)
+- [`src/eyes/visual_ui_detector_fusion.py` (782 lineas)](#src-eyes-visual-ui-detector-fusion-py)
 - [`src/hands/__init__.py` (30 líneas)](#src-hands-_init_-py)
 - [`src/hands/action_registry.py` (1272 líneas)](#src-hands-action_registry-py)
 - [`src/hands/application_discovery.py` (684 líneas)](#src-hands-application_discovery-py)
@@ -578,18 +579,19 @@ Funciones a nivel módulo:
 | `def get_screen_capture()`  (L361) | Obtiene la instancia global del sistema de captura. |
 
 <a name="src-eyes-vision-py"></a>
-### `src/eyes/vision.py` [935 líneas] — Visión por computadora (Qwen3-VL/Ollama)
+### `src/eyes/vision.py` [1188 lineas] — Vision por computadora (Qwen3-VL/Ollama)
 
-**Descripción:** Sistema de visión basado en modelo VL vía Ollama. Analiza pantallas, detecta elementos UI, verifica visibilidad y resultados de acciones, detecta estado de aplicaciones y genera nodos de visión para el planificador.
+**Descripcion:** Sistema de vision basado en modelo VL via Ollama. Analiza pantallas, detecta elementos UI, verifica visibilidad y resultados de acciones, detecta estado de aplicaciones y genera nodos de vision para el planificador. Incluye preprocesamiento OpenCV de imagenes (recortes, normalizacion, bordes y refinement de limites).
 
-**Características:**
+**Caracteristicas:**
 
-- Detección de elementos UI
-- Verificación visual de resultados
-- Nodos de visión para el planificador
+- Deteccion de elementos UI
+- Verificacion visual de resultados
+- Nodos de vision para el planificador
 - Multi-monitor
+- Preprocesamiento OpenCV (recortes, normalizacion, bordes y refinement de limites)
 
-**Importaciones:** 15.
+**Importaciones:** 18.
 
 `class VisionNodeType(Enum)`  (línea 31) — Tipos de nodos de visión disponibles para planificación.
 
@@ -632,18 +634,32 @@ Métodos:
 | `def _get_available_monitor_numbers()` | Obtiene los identificadores lógicos reales desde ScreenManager. |
 | `def _get_default_monitor_number()` | Selecciona el monitor activo y, como fallback, el principal. |
 | `def analyze_screen_for_world_state()` | Analiza todas las pantallas disponibles y construye un WorldState válido. |
-| `def detect_ui_elements(image_path, application)` | Detecta elementos interactivos visibles en una imagen. |
+| `def detect_ui_elements(image_path, application, refine_with_opencv)` | Detecta elementos interactivos visibles en una imagen. Cuando refine_with_opencv es verdadero, refina los limites con OpenCV (pista geometrica, nunca interactividad). |
 | `def analyze_image(image_path, prompt, calibration_target)` | Analiza una captura para calibración universal. |
 | `def verify_element_visibility(element_name, application, expected_coords)` | Verifica visualmente si un elemento está presente. |
 | `def verify_action_result(expected_state, application, tolerance)` | Verifica visualmente el resultado esperado de una acción. |
 | `def _build_verification_prompt(expected_type, expected_state, application)` |  |
 | `def detect_application_state(app_name)` | Busca una aplicación en todas las pantallas disponibles. |
 | `def _chat_json(image_path, prompt, response_format, num_ctx, num_predict, temperature)` |  |
+| `def interpret_element_semantics(image_path, crop_bbox, reference_label)` | Interpreta semanticamente un elemento visual mediante Qwen3-VL/Ollama: funcion aparente de un icono, asociacion de etiqueta a control y pistas de desambiguacion. Nunca decide accionabilidad. |
 | `def _safe_json_loads(value)` |  |
 | `def _clamp_float(value)` |  |
 | `def _normalize_int_list(value, minimum, maximum)` |  |
 | `def _coordinates_match(expected_coords, center, bbox, tolerance)` |  |
 | `def get_vision_capabilities()` |  |
+
+`class VisionOpenCVProcessor` — Procesador de imagen con OpenCV para preparar recortes, normalizar color/tamano, detectar cambios, bordes/regiones y refinar limites. Los resultados de contornos y bordes son pistas geometricas: nunca prueban que un elemento sea interactivo.
+
+Metodos:
+
+| Firma | Docstring |
+|---|---|
+| `def load_image(image_path)` | Carga una imagen en formato BGR o None. |
+| `def prepare_crop(image_path, bbox, padding)` | Prepara un recorte limitado a una caja con padding clampado a los limites de la imagen. |
+| `def normalize_image(image, target_size, grayscale)` | Normaliza imagen: opcional a gris y redimension. |
+| `def detect_changes(frame_a, frame_b)` | Detecta regiones cambiadas entre dos frames. |
+| `def detect_edges_regions(image)` | Detecta bordes Canny y regiones candidatas. |
+| `def refine_bounds(image, bbox)` | Refina limites de un elemento (pista geometrica, hint_only). |
 
 <a name="src-eyes-vision_only-py"></a>
 ### `src/eyes/vision_only.py` [417 líneas] — Visión por computadora usando Qwen3-VL mediante Ollama.
@@ -677,6 +693,22 @@ Métodos:
 | `def detect_application_state(app_name)` | Detecta el estado de una aplicación específica visualmente. |
 | `def get_vision_capabilities()` | Devuelve las capacidades de visión disponibles para el planificador. |
 | `def get_total_vision_cost()` | Calcula el costo total de las capacidades de visión. |
+
+### `src/eyes/visual_ui_detector_fusion.py` [782 lineas] — Fusion de deteccion de elementos UI de multiples fuentes.
+
+**Descripcion:** Fusiona candidatos de UI Automation, OmniParser V2, PaddleOCR, OpenCV y Qwen3-VL sin duplicar el mismo elemento. Asocia candidatos por solapamiento (IoU), centro, texto, tipo y ventana. Preserva por separado cada fuente, su confianza y sus desacuerdos. Determina la interactividad solo con evidencia real (patron UIA o Qwen3-VL con evidencia visual); OpenCV aporta solo pistas geometricas.
+
+**Importaciones:** 6.
+
+`class SourceEvidence` (linea 155) — Evidencia de una unica fuente de deteccion para un candidato fusionado.
+
+`class FusedCandidate` (linea 181) — Elemento UI resultante de fusionar evidencias de varias fuentes.
+
+`class FusionResult` (linea 225) — Resultado de una fusion de detecciones para una ventana/pantalla.
+
+`class DetectedCandidate` (linea 255) — Candidato detectado por una unica fuente, listo para fusionar.
+
+`class VisualUIDetectorFusion` (linea 269) — Fusiona candidatos de UI Automation, OmniParser, PaddleOCR, OpenCV y Qwen3-VL.
 
 ## 🖐️ `src/hands/`
 

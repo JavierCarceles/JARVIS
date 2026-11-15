@@ -105,6 +105,7 @@ ESTADO FINAL: <ID> - <NO IMPLEMENTADA | EN PROCESO | IMPLEMENTADA>
 - SI USAR: `shell` con comandos individuales de PowerShell; `read` / `get-content` para leer archivos; `edit` para cambios parciales en archivos existentes; `write` solo para archivos nuevos o reemplazo total; `glob`, `grep`, `webfetch`, `websearch`, `question`, `subagent`, `execute`, `mcp` segun corresponda.
 - Antes de usar `write` en un archivo existente, leerlo primero con `read` para conocer su contenido y evitar perdidas de datos.
 - Para obtener la fecha actual en formato AAAA-MM-DD al cerrar una unidad, usar en `shell`: `(Get-Date).ToString("yyyy-MM-dd")` (PowerShell, Windows). Nunca usar `NR` para el campo FECHA de los registros de unidad.
+- NO USAR `glob` para listar, buscar o leer archivos en este entorno: `glob` no es un comando de PowerShell y no esta disponible en el entorno de ejecucion de comandos `shell`. Para localizar archivos usar `read` sobre rutas conocidas o `grep` para buscar contenido.
 
 13. CONTRATO OBLIGATORIO DE CATALOGO GLOBAL, INVENTARIO LOCAL Y AUTO-REGISTRO
 - Separacion de responsabilidades: `data/memory/entities.json` es el catalogo GLOBAL de identidad de aplicaciones (identidad estable, nombre, aliases, categoria/rol, capacidades verificadas y metadatos de lanzamiento observados); `data/knowledge/entities.json` es el perfil ADAPTATIVO de conocimiento/uso del usuario, que se enriquece con las aplicaciones utilizadas realmente y alimenta DomainMemory/prediccion; `data/system_inventory.sqlite3` es el inventario LOCAL del equipo donde corre JARVIS (machine_id, volumenes, rutas reales, resultados de escaneo, candidatos, disponibilidad local y calibracion UI fisica). No intercambiar estas funciones ni mantener dos catalogos de instalacion.
@@ -199,3 +200,23 @@ ESTADO FINAL: <ID> - <NO IMPLEMENTADA | EN PROCESO | IMPLEMENTADA>
 - Agrupar repeticiones por causa raiz y `TIPO_NORMALIZADO`, no por redaccion literal. Contar las apariciones de todos los chats leyendo el fichero completo. Cuando un tipo ocurra mas de 3 veces (desde la cuarta aparicion), guardar el error concreto y su prevencion en el contexto/memoria persistente disponible y anotar esa elevacion en el log. No afirmar que la memoria se actualizo si no se ha confirmado.
 - No delegar el registro al final de la unidad. Registrar cada error inmediatamente y actualizarlo despues con su resolucion y verificacion sin eliminar el evento original.
 
+
+19. RESTRICCIONES CRITICAS DE TESTS GUI Y USO DE WRITE
+
+- WRITE SOLO PARA CREAR ARCHIVOS NUEVOS: Queda terminantemente prohibido usar `write` sobre cualquier archivo existente. `write` sobrescribe TODO el archivo y borra su contenido previo sin posibilidad de recuperacion (Git prohibido). Para modificar partes de un archivo existente, usar obligatoriamente `edit` con un `oldString` que coincida univocamente. Error critico cometido y registrado como ERR-0021: borrado accidental de 20 tests unitarios al usar `write` sobre `tests/eyes/test_visual_ui_detector_fusion.py`.
+
+- UNA SOLA VENTANA DE APLICACION A LA VEZ: Los tests que abren aplicaciones GUI deben abrir y cerrar UNA sola instancia de aplicacion por test, nunca en sets ni en lote. No ejecutar multiples tests GUI que abran la misma aplicacion simultaneamente. Antes de lanzar un test GUI, verificar que no haya otro test GUI ejecutandose (usar lock de archivo o mecanismo de exclusion mutua equivalente). Si hay un test GUI en curso, esperar a que termine completamente antes de iniciar el siguiente. Error critico cometido y registrado como ERR-0021: ejecucion de multiples tests GUI a la vez abrio ~20 ventanas de Notepad y casi colgo el ordenador del usuario.
+
+- CIERRE GARANTIZADO: Cada test GUI que abra una aplicación debe controlar el ciclo de vida completo: abrir, verificar, y cerrar exclusivamente la aplicación que creó, sin dejar ninguna ventana abierta tras el test salvo que el usuario la hubiera abierto previamente.
+
+
+20. COMPARTIR UNA SOLA VENTANA DE APLICACION ENTRE VARIOS TESTS GUI
+
+- Cuando se creen varios tests que abran la misma aplicacion de SO real, no abrir una ventana por test ni por clase de test. Se debe abrir UNA sola ventana y compartirla entre todos los tests de la sesion.
+- Usar estado compartido a nivel de modulo (diccionario global de la sesion de pytest) que guarde la HWND y el PID REAL de la ventana abierta.
+- La primera clase/test que entra en setUpClass: limpia ventanas huorfanas previas, lanza la aplicacion y captura la HWND y el PID REAL de la ventana enumerando ventanas por titulo tras el lanzamiento. NO confiar en subprocess.Popen(...).pid, porque es el PID del lanzador (proceso corto), no el del proceso que mantiene la ventana. En Windows muchas aplicaciones (ej. notepad.exe) son de instancia unica: lanzar varias veces no crea varias ventanas, reusa la existente.
+- Guardar HWND y PID real en el estado compartido y asignarlos a cls.hwnd y cls.pid.
+- El resto de clases/test de la misma sesion: leer el estado compartido y reusar la ventana ya abierta (misma HWND y mismo PID). No lanzar una nueva instancia de la aplicacion.
+- Cierre: no cerrar la ventana en tearDownClass, para que las demas clases/test de la sesion la sigan reusando. Cerrar al salir del proceso de pytest mediante atexit: enviar WM_CLOSE por HWND y hacer taskkill por PID como respaldo. Limpiar el estado compartido tras cerrar.
+- Usar un lock de archivo para impedir que dos clases GUI se ejecuten a la vez.
+- Resultado: ejecutar varios tests en un comando pytest = exactamente 1 ventana compartida. Ejecutar un test solo (proceso aparte) = 1 ventana, cerrada al salir de ese proceso.

@@ -1331,7 +1331,7 @@ Objetivo: que las capacidades de descubrimiento, preflight, lanzamiento y verifi
   3.8.10.10.3 [DIFICULTAD: 2/10] Actualizar README/README_TESTS unicamente con el comportamiento implementado y comprobado en cada plataforma.
   3.8.10.10.4 [DIFICULTAD: 8/10] Cerrar 3.8.10 solo con pruebas reales para cada plataforma declarada soportada y regresion completa de Windows.
 
-3.7.3.4 [DIFICULTAD: 7/10] Cerrar FASE 3 solo con todas las hojas completadas, incluidas todas las hojas de 3.8.
+3.9 [DIFICULTAD: 7/10] Cerrar FASE 3 solo con todas las hojas completadas
 
 CONVENCION DE ESPECIFICIDAD Y TRAZABILIDAD DE TESTS PARA TODAS LAS UNIDADES FUTURAS
 - No utilizar titulos aislados como "Tests", "Regresion" o "Verificacion". Cada grupo debe nombrar expresamente los comportamientos que comprobara: entradas validas/invalidas, limites, estados, persistencia, integraciones y efectos observables que correspondan a esa unidad.

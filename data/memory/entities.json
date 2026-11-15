@@ -695,8 +695,8 @@
         "loading"
       ]
     },
-    "created_at": "2026-11-15T16:11:45.489081",
-    "updated_at": "2026-11-15T16:11:45.489305",
+    "created_at": "2026-11-15T19:49:34.478788",
+    "updated_at": "2026-11-15T19:49:34.479027",
     "metadata": null,
     "aliases": [],
     "confidence": 1.0,
@@ -735,8 +735,8 @@
         "active"
       ]
     },
-    "created_at": "2026-11-15T16:11:45.493244",
-    "updated_at": "2026-11-15T16:11:45.514120",
+    "created_at": "2026-11-15T19:49:34.483255",
+    "updated_at": "2026-11-15T19:49:34.488968",
     "metadata": null,
     "aliases": [],
     "confidence": 1.0,
@@ -1421,6 +1421,123 @@
     },
     "created_at": "2026-11-15T16:11:44.565602",
     "updated_at": "2026-11-15T16:11:44.573676",
+    "metadata": null,
+    "aliases": [],
+    "confidence": 1.0,
+    "tags": []
+  },
+  {
+    "id": "app_unknownstateapp",
+    "type": "application",
+    "name": "UnknownStateApp",
+    "properties": {
+      "type": "utility",
+      "executable": null,
+      "url": null,
+      "login_required": false,
+      "capabilities": [],
+      "ui_elements": [],
+      "states": [
+        "open",
+        "active"
+      ]
+    },
+    "created_at": "2026-11-15T19:47:56.626695",
+    "updated_at": "2026-11-15T19:47:56.635423",
+    "metadata": null,
+    "aliases": [],
+    "confidence": 1.0,
+    "tags": []
+  },
+  {
+    "id": "app_allunknownstatesapp",
+    "type": "application",
+    "name": "AllUnknownStatesApp",
+    "properties": {
+      "type": "utility",
+      "executable": null,
+      "url": null,
+      "login_required": false,
+      "capabilities": [],
+      "ui_elements": [],
+      "states": []
+    },
+    "created_at": "2026-11-15T19:47:56.667605",
+    "updated_at": "2026-11-15T19:47:56.678924",
+    "metadata": null,
+    "aliases": [],
+    "confidence": 1.0,
+    "tags": []
+  },
+  {
+    "id": "app_unknowndefaultapp",
+    "type": "application",
+    "name": "UnknownDefaultApp",
+    "properties": {
+      "type": "utility",
+      "executable": null,
+      "url": null,
+      "login_required": false,
+      "capabilities": [],
+      "ui_elements": [],
+      "states": []
+    },
+    "created_at": "2026-11-15T19:47:56.704721",
+    "updated_at": "2026-11-15T19:47:56.714359",
+    "metadata": null,
+    "aliases": [],
+    "confidence": 1.0,
+    "tags": []
+  },
+  {
+    "id": "app_descokapp",
+    "type": "application",
+    "name": "DescOkApp",
+    "properties": {
+      "type": "utility",
+      "executable": null,
+      "url": null,
+      "login_required": false,
+      "capabilities": [],
+      "ui_elements": [
+        {
+          "name": "btn",
+          "type": "button",
+          "description": "Un botón",
+          "required_capability": null
+        }
+      ],
+      "states": []
+    },
+    "created_at": "2026-11-15T19:49:34.234632",
+    "updated_at": "2026-11-15T19:49:34.246041",
+    "metadata": null,
+    "aliases": [],
+    "confidence": 1.0,
+    "tags": []
+  },
+  {
+    "id": "app_nodescokapp",
+    "type": "application",
+    "name": "NoDescOkApp",
+    "properties": {
+      "type": "utility",
+      "executable": null,
+      "url": null,
+      "login_required": false,
+      "capabilities": [],
+      "ui_elements": [
+        {
+          "name": "btn",
+          "type": "button",
+          "description": "",
+          "required_capability": null
+        }
+      ],
+      "states": []
+    },
+    "created_at": "2026-11-15T19:49:34.276618",
+    "updated_at": "2026-11-15T19:49:34.281872",
     "metadata": null,
     "aliases": [],
     "confidence": 1.0,

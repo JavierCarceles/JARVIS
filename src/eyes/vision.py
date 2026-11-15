@@ -11,7 +11,11 @@ UniversalVisualCalibrator / CalibrationManager.
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 import time
+import cv2
+import numpy as np
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
@@ -416,8 +420,16 @@ Devuelve ÚNICAMENTE JSON válido:
         self,
         image_path: str,
         application: Optional[str] = None,
+        refine_with_opencv: bool = False,
     ) -> VisionResponse:
-        """Detecta elementos interactivos visibles en una imagen."""
+        """Detecta elementos interactivos visibles en una imagen.
+
+        Cuando ``refine_with_opencv`` es verdadero, se prepara un recorte
+        de cada elemento detectado y se refinan sus limites con OpenCV
+        (bordes/contornos). Ese refinamiento es solo una pista geometrica:
+        nunca modifica el campo ``interactive`` ni constituye prueba de
+        que el elemento sea interactuable.
+        """
         logger._print_log("info", "Procesando solicitud", "vision.py", "method", 111)
 
         app_context = f" en {application}" if application else ""
@@ -512,6 +524,26 @@ Devuelve exclusivamente JSON válido con esta estructura:
                     )
                 except Exception:
                     continue
+
+            if refine_with_opencv:
+                image = VisionOpenCVProcessor.load_image(image_path)
+                if image is not None:
+                    refined_elements: List[UIElement] = []
+                    for element in valid_elements:
+                        bbox = list(element.bbox) if element.bbox else None
+                        if bbox:
+                            refinement = VisionOpenCVProcessor.refine_bounds(image, bbox)
+                            if refinement["ok"] and refinement["refined_bbox"]:
+                                refined_bbox = refinement["refined_bbox"]
+                                element.bbox = refined_bbox
+                                element.center = [
+                                    (refined_bbox[0] + refined_bbox[2]) // 2,
+                                    (refined_bbox[1] + refined_bbox[3]) // 2,
+                                ]
+                            # hint_only: contornos y bordes nunca marcan el
+                            # elemento como interactivo.
+                        refined_elements.append(element)
+                    valid_elements = refined_elements
 
             return VisionResponse(elements=valid_elements)
         except Exception as exc:
@@ -857,8 +889,14 @@ Responde ÚNICAMENTE JSON:
             },
             keep_alive="5m",
         )
-        message = response.get("message", {}) if isinstance(response, dict) else {}
-        content = message.get("content", "") if isinstance(message, dict) else ""
+        if isinstance(response, dict):
+            message = response.get("message", {}) or {}
+        else:
+            message = getattr(response, "message", None) or {}
+        if isinstance(message, dict):
+            content = message.get("content", "") or ""
+        else:
+            content = getattr(message, "content", "") or ""
         return str(content or "").strip()
 
     @staticmethod
@@ -878,6 +916,211 @@ Responde ÚNICAMENTE JSON:
                 except json.JSONDecodeError:
                     return None
         return None
+
+    # ====================================================================
+    # INTERPRETACION SEMANTICA QWEN3-VL/OLLAMA
+    # ====================================================================
+
+    def interpret_element_semantics(
+        self,
+        image_path: str,
+        crop_bbox: Optional[List[int]] = None,
+        reference_label: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Interpreta semanticamente un elemento visual mediante Qwen3-VL/Ollama.
+
+        Distingue la funcion aparente de un icono, relaciona una etiqueta con
+        un control y ayuda a desambiguar candidatos. NO convierte por si sola
+        un candidato visual en control accionable: es una capa interpretativa
+        que devuelve pistas contextuales, nunca una decision de accionabilidad.
+
+        La salida es estructurada y validable, asociada a la misma entrada
+        (imagen/crop + referencia). Rechaza coordenadas fuera de rango, cajas
+        inventadas y descripciones sin evidencia visual.
+        """
+        coordinate_check = {"in_range": True, "within_image": True}
+        effective_image_path = image_path
+        temp_crop_path: Optional[str] = None
+
+        # Validar coordenadas de entrada cuando se solicita un recorte
+        if crop_bbox is not None:
+            if not isinstance(crop_bbox, (list, tuple)) or len(crop_bbox) != 4:
+                return {
+                    "apparent_function": "",
+                    "label_association": "",
+                    "confidence": 0.0,
+                    "is_actionable": False,
+                    "evidence_visual": False,
+                    "disambiguation_hints": [],
+                    "coordinate_check": {"in_range": False, "within_image": False},
+                    "error": "crop_bbox debe ser [x1, y1, x2, y2] con 4 valores numericos",
+                }
+            try:
+                x1, y1, x2, y2 = [int(round(float(v))) for v in crop_bbox]
+            except (TypeError, ValueError):
+                return {
+                    "apparent_function": "",
+                    "label_association": "",
+                    "confidence": 0.0,
+                    "is_actionable": False,
+                    "evidence_visual": False,
+                    "disambiguation_hints": [],
+                    "coordinate_check": {"in_range": False, "within_image": False},
+                    "error": "crop_bbox contiene valores no numericos",
+                }
+            if x2 <= x1 or y2 <= y1:
+                return {
+                    "apparent_function": "",
+                    "label_association": "",
+                    "confidence": 0.0,
+                    "is_actionable": False,
+                    "evidence_visual": False,
+                    "disambiguation_hints": [],
+                    "coordinate_check": {"in_range": False, "within_image": False},
+                    "error": "crop_bbox tiene coordenadas invertidas o nulas",
+                }
+            # Verificar que la caja este dentro de los limites de la imagen
+            image = VisionOpenCVProcessor.load_image(image_path)
+            if image is None:
+                return {
+                    "apparent_function": "",
+                    "label_association": "",
+                    "confidence": 0.0,
+                    "is_actionable": False,
+                    "evidence_visual": False,
+                    "disambiguation_hints": [],
+                    "coordinate_check": {"in_range": False, "within_image": False},
+                    "error": "no se pudo cargar la imagen",
+                }
+            height, width = image.shape[:2]
+            if x1 < 0 or y1 < 0 or x2 > width or y2 > height:
+                coordinate_check = {"in_range": False, "within_image": False}
+                return {
+                    "apparent_function": "",
+                    "label_association": "",
+                    "confidence": 0.0,
+                    "is_actionable": False,
+                    "evidence_visual": False,
+                    "disambiguation_hints": [],
+                    "coordinate_check": coordinate_check,
+                    "error": "coordenadas del crop fuera de los limites de la imagen",
+                }
+            # Preparar recorte y guardarlo como archivo temporal para enviarlo al modelo
+            crop = VisionOpenCVProcessor.prepare_crop(image_path, crop_bbox, padding=0.0)
+            if crop is None:
+                return {
+                    "apparent_function": "",
+                    "label_association": "",
+                    "confidence": 0.0,
+                    "is_actionable": False,
+                    "evidence_visual": False,
+                    "disambiguation_hints": [],
+                    "coordinate_check": coordinate_check,
+                    "error": "no se pudo preparar el recorte",
+                }
+            fd, temp_crop_path = tempfile.mkstemp(suffix=".png")
+            os.close(fd)
+            try:
+                cv2.imwrite(temp_crop_path, crop)
+                effective_image_path = temp_crop_path
+            except Exception:
+                if temp_crop_path and os.path.exists(temp_crop_path):
+                    try:
+                        os.remove(temp_crop_path)
+                    except OSError:
+                        pass
+                temp_crop_path = None
+
+        # Construir prompt de interpretacion semantica
+        ref_ctx = f"\nReferencia de etiqueta: {reference_label}" if reference_label else ""
+        prompt = f"""
+Analiza la imagen/capture y interpreta semanticamente el elemento visual.{ref_ctx}
+
+Devuelve unicamente JSON valido con esta estructura:
+{{
+  "apparent_function": "descripcion de lo que el icono o control aparenta hacer (vacio si no se puede determinar)",
+  "label_association": "etiqueta de texto asociada al control (vacio si no hay una asociada)",
+  "confidence": 0.0 a 1.0 (grado de confianza en la interpretacion),
+  "disambiguation_hints": ["lista de pistas para distinguir este elemento de otros similares"]
+}}
+
+No declares que el elemento sea accionable: solo describ su funcion aparente y asociaciones.
+"""
+
+        schema = {
+            "type": "object",
+            "properties": {
+                "apparent_function": {"type": "string"},
+                "label_association": {"type": "string"},
+                "confidence": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+                "disambiguation_hints": {"type": "array", "items": {"type": "string"}},
+            },
+            "required": ["apparent_function", "label_association", "confidence", "disambiguation_hints"],
+        }
+
+        try:
+            raw = self._chat_json(
+                image_path=effective_image_path,
+                prompt=prompt,
+                response_format=schema,
+                num_ctx=8192,
+                num_predict=2048,
+                temperature=self.temperature,
+            )
+            data = self._safe_json_loads(raw)
+            if not isinstance(data, dict):
+                return {
+                    "apparent_function": "",
+                    "label_association": "",
+                    "confidence": 0.0,
+                    "is_actionable": False,
+                    "evidence_visual": False,
+                    "disambiguation_hints": [],
+                    "coordinate_check": coordinate_check,
+                    "error": "respuesta no decodificable como objeto JSON",
+                }
+
+            confidence = self._clamp_float(data.get("confidence", 0.0))
+            apparent_function = str(data.get("apparent_function", "") or "").strip()
+            label_association = str(data.get("label_association", "") or "").strip()
+            hints = data.get("disambiguation_hints", [])
+            if not isinstance(hints, list):
+                hints = []
+            hints = [str(h).strip() for h in hints if str(h).strip()]
+
+            # La interpretacion semantica nunca decide accionabilidad
+            is_actionable = False
+            evidence_visual = bool(apparent_function) or bool(label_association) or bool(hints)
+
+            return {
+                "apparent_function": apparent_function,
+                "label_association": label_association,
+                "confidence": confidence,
+                "is_actionable": is_actionable,
+                "evidence_visual": evidence_visual,
+                "disambiguation_hints": hints,
+                "coordinate_check": coordinate_check,
+                "error": None,
+            }
+        except Exception as exc:
+            return {
+                "apparent_function": "",
+                "label_association": "",
+                "confidence": 0.0,
+                "is_actionable": False,
+                "evidence_visual": False,
+                "disambiguation_hints": [],
+                "coordinate_check": coordinate_check,
+                "error": str(exc),
+            }
+        finally:
+            # Limpiar archivo temporal de recorte si se creo
+            if temp_crop_path and os.path.exists(temp_crop_path):
+                try:
+                    os.remove(temp_crop_path)
+                except OSError:
+                    pass
 
     @staticmethod
     def _clamp_float(value: Any) -> float:
@@ -928,10 +1171,230 @@ Responde ÚNICAMENTE JSON:
         }
 
 
+# ====================================================================
+# PROCESADOR DE IMAGEN CON OPENCV (recortes, normalizacion, cambios,
+# bordes/regiones y refinamiento de limites)
+# ====================================================================
+class VisionOpenCVProcessor:
+    """Procesamiento de imagen basado en OpenCV para el pipeline de
+    vision de JARVIS.
+
+    Proporciona utilidades para preparar recortes de elementos, normalizar
+    color/tamano, detectar cambios entre frames, detectar bordes/regiones y
+    refinar los limites de un elemento detectado.
+
+    IMPORTANTE: los resultados de contornos, contraste y bordes son
+    PISTAS DE REFINAMIENTO GEOMETRICO. NUNCA constituyen prueba de que un
+    elemento sea interactuable y NUNCA modifican el campo ``interactive``
+    de un elemento. La interactividad solo puede provenir del modelo de
+    vision (Ollama/Qwen3-VL) o de un patron de interaccion real verificado.
+    """
+
+    @staticmethod
+    def load_image(image_path):
+        """Carga una imagen desde ruta en formato BGR (numpy array).
+
+        Devuelve ``None`` si la ruta no existe, no es legible o no es una
+        imagen valida. No lanza excepciones.
+        """
+        try:
+            if not image_path or not os.path.exists(str(image_path)):
+                return None
+            image = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
+            if image is None:
+                return None
+            return image
+        except Exception:
+            return None
+
+    @staticmethod
+    def prepare_crop(image_path, bbox, padding=0.1):
+        """Prepara un recorte de la imagen limitado a la caja ``bbox``.
+
+        ``bbox`` es ``[x1, y1, x2, y2]`` en pixeles de la imagen original.
+        Se agrega ``padding`` (fraccion del tamaño de la caja) alrededor y
+        el resultado se clampa a los limites de la imagen.
+
+        Devuelve el recorte como array BGR de numpy, o ``None`` si no se
+        puede cargar la imagen o la caja es invalida.
+        """
+        image = VisionOpenCVProcessor.load_image(image_path)
+        if image is None:
+            return None
+        try:
+            x1, y1, x2, y2 = [int(round(float(v))) for v in bbox]
+        except (TypeError, ValueError):
+            return None
+        if x2 <= x1 or y2 <= y1:
+            return None
+        height, width = image.shape[:2]
+        w = x2 - x1
+        h = y2 - y1
+        pad_x = int(round(w * padding))
+        pad_y = int(round(h * padding))
+        cx1 = max(0, x1 - pad_x)
+        cy1 = max(0, y1 - pad_y)
+        cx2 = min(width, x2 + pad_x)
+        cy2 = min(height, y2 + pad_y)
+        if cx2 <= cx1 or cy2 <= cy1:
+            return None
+        return image[cy1:cy2, cx1:cx2]
+
+    @staticmethod
+    def normalize_image(image, target_size=None, grayscale=False):
+        """Normaliza una imagen: opcionalmente la pasa a grises y la
+        redimensiona a ``target_size`` (ancho, alto).
+
+        Devuelve el array normalizado o ``None`` si la entrada es invalida.
+        """
+        if image is None or not isinstance(image, np.ndarray):
+            return None
+        try:
+            result = image
+            if grayscale and len(result.shape) == 3:
+                result = cv2.cvtColor(result, cv2.COLOR_BGR2GRAY)
+            if target_size is not None:
+                tw, th = int(target_size[0]), int(target_size[1])
+                if tw > 0 and th > 0:
+                    result = cv2.resize(result, (tw, th), interpolation=cv2.INTER_AREA)
+            return result
+        except Exception:
+            return None
+
+    @staticmethod
+    def detect_changes(frame_a, frame_b):
+        """Compara dos frames y detecta regiones que cambiaron.
+
+        Devuelve un diccionario con:
+        - ``changed``: bool, si hay cambios significativos
+        - ``score``: float, proporcion de pixeles diferentes (0.0-1.0)
+        - ``regions``: lista de cajas [x1, y1, x2, y2] de regiones cambiadas
+        """
+        result = {"changed": False, "score": 0.0, "regions": []}
+        if frame_a is None or frame_b is None:
+            return result
+        try:
+            a_gray = frame_a
+            b_gray = frame_b
+            if len(a_gray.shape) == 3:
+                a_gray = cv2.cvtColor(a_gray, cv2.COLOR_BGR2GRAY)
+            if len(b_gray.shape) == 3:
+                b_gray = cv2.cvtColor(b_gray, cv2.COLOR_BGR2GRAY)
+            if a_gray.shape != b_gray.shape:
+                b_gray = cv2.resize(
+                    b_gray,
+                    (a_gray.shape[1], a_gray.shape[0]),
+                    interpolation=cv2.INTER_AREA,
+                )
+            diff = cv2.absdiff(a_gray, b_gray)
+            _, thresh = cv2.threshold(diff, 25, 255, cv2.THRESH_BINARY)
+            kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+            thresh = cv2.dilate(thresh, kernel, iterations=2)
+            total = float(thresh.size)
+            changed_pixels = float(cv2.countNonZero(thresh))
+            score = changed_pixels / total if total > 0 else 0.0
+            contours, _ = cv2.findContours(
+                thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+            )
+            regions = []
+            for contour in contours:
+                x, y, w, h = cv2.boundingRect(contour)
+                if w > 0 and h > 0:
+                    regions.append([int(x), int(y), int(x + w), int(y + h)])
+            result["changed"] = score > 0.001
+            result["score"] = round(score, 6)
+            result["regions"] = regions
+            return result
+        except Exception:
+            return result
+
+    @staticmethod
+    def detect_edges_regions(image):
+        """Detecta bordes y regiones candidatas mediante Canny y contornos.
+
+        Devuelve un diccionario con:
+        - ``edges``: array binario de bordes (o None si falla)
+        - ``regions``: lista de cajas [x1, y1, x2, y2] de contornos encontrados
+        - ``count``: cantidad de regiones
+        """
+        result = {"edges": None, "regions": [], "count": 0}
+        if image is None or not isinstance(image, np.ndarray):
+            return result
+        try:
+            if len(image.shape) == 3:
+                gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            else:
+                gray = image
+            blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+            edges = cv2.Canny(blurred, 50, 150)
+            contours, _ = cv2.findContours(
+                edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+            )
+            regions = []
+            for contour in contours:
+                x, y, w, h = cv2.boundingRect(contour)
+                if w > 0 and h > 0:
+                    regions.append([int(x), int(y), int(x + w), int(y + h)])
+            result["edges"] = edges
+            result["regions"] = regions
+            result["count"] = len(regions)
+            return result
+        except Exception:
+            return result
+
+    @staticmethod
+    def refine_bounds(image, bbox):
+        """Refina los limites de un elemento usando bordes/contornos dentro
+        de su caja.
+
+        Devuelve un diccionario con:
+        - ``refined_bbox``: caja [x1, y1, x2, y2] refinada dentro de la
+          entrada, o None si no se pudo refinar
+        - ``hint_only``: True (el resultado es una pista geometrica, nunca
+          prueba de interactividad)
+        - ``ok``: bool, si la refino se produjo
+        """
+        result = {"refined_bbox": None, "hint_only": True, "ok": False}
+        if image is None or not isinstance(image, np.ndarray):
+            return result
+        try:
+            x1, y1, x2, y2 = [int(round(float(v))) for v in bbox]
+        except (TypeError, ValueError):
+            return result
+        if x2 <= x1 or y2 <= y1:
+            return result
+        height, width = image.shape[:2]
+        x1 = max(0, min(x1, width - 1))
+        y1 = max(0, min(y1, height - 1))
+        x2 = max(x1 + 1, min(x2, width))
+        y2 = max(y1 + 1, min(y2, height))
+        crop = image[y1:y2, x1:x2]
+        edge_info = VisionOpenCVProcessor.detect_edges_regions(crop)
+        if not edge_info["regions"]:
+            result["refined_bbox"] = [x1, y1, x2, y2]
+            result["ok"] = True
+            return result
+        # Usar el contorno mas grande como pista de ajuste de limites
+        best = max(
+            edge_info["regions"], key=lambda r: (r[2] - r[0]) * (r[3] - r[1])
+        )
+        rx1, ry1, rx2, ry2 = best
+        refined = [x1 + rx1, y1 + ry1, x1 + rx2, y1 + ry2]
+        # Clamp final
+        refined[0] = max(0, min(refined[0], width - 1))
+        refined[1] = max(0, min(refined[1], height - 1))
+        refined[2] = max(refined[0] + 1, min(refined[2], width))
+        refined[3] = max(refined[1] + 1, min(refined[3], height))
+        result["refined_bbox"] = refined
+        result["ok"] = True
+        return result
+
+
 __all__ = [
     "UIElement",
     "VisionResponse",
     "Vision",
     "VisionNode",
     "VisionNodeType",
+    "VisionOpenCVProcessor",
 ]
