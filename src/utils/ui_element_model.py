@@ -178,4 +178,109 @@ class UIElementData(BaseModel):
         ).strip("_")
 
 
-__all__ = ["UIElementData"]
+# ---------------------------------------------------------------------------
+# Normalizacion de tipos de elemento (Vision -> canonico)
+# ---------------------------------------------------------------------------
+
+# Conjunto canonico de tipos de elemento validos para
+# ``coordinate_manager.validate_resource_for_action``. Es la union de los
+# subconjuntos que esa funcion acepta segun la accion (``focus_``,
+# ``click_``, ``type_``), mas el tipo generico ``"element"``. Nunca se
+# inventan tipos fuera de este conjunto.
+CANONICAL_ELEMENT_TYPES: frozenset[str] = frozenset({
+    "input",
+    "address_bar",
+    "field",
+    "text",
+    "element",  # generico: aceptado por focus_/click_; rechazado por type_
+    "button",
+    "link",
+    "menu",
+    "checkbox",
+    "radio",
+    "select",
+    "toolbar",
+})
+
+# Alias de forma libre (variantes ingles/espanol que el LLM de Vision puede
+# devolver en D-UI-TYPE-FREE-FORM) -> tipo canonico. Este mapa nunca crea
+# tipos nuevos: solo traduce variantes observadas al vocabulario canonico.
+_ELEMENT_TYPE_ALIASES: Dict[str, str] = {
+    # button
+    "button": "button",
+    "boton": "button",
+    "botón": "button",
+    "btn": "button",
+    # input
+    "input": "input",
+    "campo de texto": "input",
+    "campo": "field",            # "campo" solo -> field; "campo de texto" -> input
+    "entrada": "input",
+    "textbox": "input",
+    "text input": "input",
+    "cuadro de texto": "input",
+    # address_bar
+    "address_bar": "address_bar",
+    "barra de direcciones": "address_bar",
+    "address bar": "address_bar",
+    "url bar": "address_bar",
+    "url_bar": "address_bar",
+    # field
+    "field": "field",
+    # text
+    "text": "text",
+    "texto": "text",
+    # link
+    "link": "link",
+    "enlace": "link",
+    "vínculo": "link",
+    "hipervínculo": "link",
+    # menu
+    "menu": "menu",
+    "menú": "menu",
+    # checkbox
+    "checkbox": "checkbox",
+    "casilla": "checkbox",
+    "casilla de verificacion": "checkbox",
+    "casilla de verificación": "checkbox",
+    # radio
+    "radio": "radio",
+    "boton de radio": "radio",
+    "botón de radio": "radio",
+    # select
+    "select": "select",
+    "desplegable": "select",
+    "lista desplegable": "select",
+    "combo": "select",
+    # toolbar
+    "toolbar": "toolbar",
+    "barra de herramientas": "toolbar",
+}
+
+# Lookup completo: alias mas cada tipo canonico mapeado a si mismo.
+_ELEMENT_TYPE_LOOKUP: Dict[str, str] = dict(_ELEMENT_TYPE_ALIASES)
+for _canon in CANONICAL_ELEMENT_TYPES:
+    _ELEMENT_TYPE_LOOKUP.setdefault(_canon, _canon)
+
+
+def normalize_element_type(type_str: Any) -> str:
+    """Normaliza un tipo de elemento libre generado por Vision
+    (D-UI-TYPE-FREE-FORM) a uno de los tipos canonicos validados por
+    ``coordinate_manager.validate_resource_for_action``.
+
+    Nunca inventa tipos nuevos: solo devuelve valores de
+    ``CANONICAL_ELEMENT_TYPES``. Un tipo desconocido (o vacio/nulo) se resuelve
+    al tipo generico ``"element"``, que el contrato de validacion acepta para
+    acciones de enfoque (``focus_``) y clic (``click_``) y rechaza para
+    escritura (``type_``), coherente con el comportamiento real de
+    ``validate_resource_for_action``.
+    """
+    if type_str is None:
+        return "element"
+    key = str(type_str).strip().lower()
+    if not key:
+        return "element"
+    return _ELEMENT_TYPE_LOOKUP.get(key, "element")
+
+
+__all__ = ["UIElementData", "CANONICAL_ELEMENT_TYPES", "normalize_element_type"]

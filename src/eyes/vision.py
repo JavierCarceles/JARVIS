@@ -23,7 +23,7 @@ from src.eyes.screen_capture import ScreenCapture
 from src.eyes.screen import ApplicationInfo, ApplicationState
 from src.memory.storage import MemoryType, WorldState, get_memory_manager
 from src.utils.logger import get_logger
-from src.utils.ui_element_model import UIElementData
+from src.utils.ui_element_model import UIElementData, normalize_element_type
 
 logger = get_logger(__name__)
 
@@ -353,7 +353,7 @@ Devuelve ÚNICAMENTE JSON válido:
                     key = f"monitor_{monitor_number}:{element_name}"
                     ui_elements[key] = {
                         "name": element_name,
-                        "type": element.get("type", "other"),
+                        "type": normalize_element_type(element.get("type", "other")),
                         "text": element.get("text", ""),
                         "interactive": bool(element.get("interactive", True)),
                         "monitor": monitor_number,
@@ -501,7 +501,7 @@ Devuelve exclusivamente JSON válido con esta estructura:
                     valid_elements.append(
                         UIElement(
                             name=element_name or f"element_{len(valid_elements)}",
-                            type=str(item.get("type", "other")),
+                            type=normalize_element_type(str(item.get("type", "other"))),
                             text=str(item.get("text", "") or ""),
                             description=str(item.get("description", "") or ""),
                             bbox=bbox,
