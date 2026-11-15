@@ -2226,6 +2226,55 @@ Clases:
 | `class FileSystemChangeEvent` | Evento de cambio del sistema de archivos observado (tipo de evento, ruta y marca de tiempo ISO 8601 UTC). |
 | `class FileSystemObserver` | Observador opcional de cambios del sistema de archivos; inicio, detencion y consulta de disponibilidad. |
 
+### `src/hands/ui_automation_adapter.py` (670 lineas) - Adaptador de automatizacion de UI de Windows sobre UI Automation.
+
+**Descripcion:** Capa reutilizable sobre pywinauto con backend="uia" y acceso al elemento AutomationElement subyacente (COM/UIAutomationCore via comtypes) cuando el backend de pywinauto no expone una propiedad o patron necesario. Recibe el HWND/PID de una ventana YA IDENTIFICADA y consulta solo el arbol UI Automation de esa ventana. Nunca enumera el escritorio ni ventanas ajenas. Durante el descubrimiento solo se leen propiedades y patrones disponibles; nunca se invocan patrones de accion (Invoke, Value, Toggle...) ni se modifica el estado de la ventana.
+
+**Caracteristicas:**
+
+- Conexion por HWND a una ventana ya abierta mediante pywinauto Application(backend="uia").connect(handle=hwnd).
+- Lectura de AutomationId, Name, ControlType, ClassName, BoundingRectangle, ProcessId, IsEnabled, IsOffscreen, RuntimeId, handle, framework_id, parent_handle, child_count, depth y patrones de control disponibles.
+- Recorrido recursivo del arbol de hijos con limites de profundidad (MAX_DEPTH=60) y cantidad (MAX_ELEMENTS=2000) para evitar ciclos y arboles virtualizados.
+- Deteccion de patrones de control (Invoke, Value, Toggle, Selection, ExpandCollapse, Scroll, Text, RangeValue, Window, Transform, Grid, GridItem, SelectionItem, ScrollItem, Table, TableItem, LegacyIAccessible) solo lectura; nunca se invocan.
+- Fallback a IUIAutomation.ElementFromHandle (COM) si pywinauto no produce un arbol usable.
+- Metodo get_actionable_elements() que clasifica como candidatos a interaccion los elementos que declaran patrones de accion y estan habilitados, visibles y no fuera de pantalla.
+- Serializacion a diccionario plano (to_dict) de elementos y arboles para consumo por el planificador y la verificacion.
+- Sin persistencia de coordenadas fisicas ni de elementos en entities.json; el adaptador es de solo lectura.
+
+**Importaciones:** 12.
+
+Clases:
+
+| Clase | Docstring |
+|---|---|
+| `class UIAutomationElement` | Propiedades de un control del arbol UI Automation de una ventana. |
+| `class UIAutomationTree` | Resultado de la enumeracion del arbol UI Automation de una ventana. |
+| `class UIAutomationAdapter` | Adaptador reutilizable de Windows UI Automation. |
+
+Metodos de UIAutomationAdapter:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(timeout, max_depth, max_elements)` | Crea el adaptador con timeout, profundidad maxima y cantidad maxima de elementos. |
+| `def enumerate_window(hwnd, pid)` | Enumera el arbol UI Automation de la ventana identificada por hwnd. |
+| `def get_actionable_elements(tree)` | Devuelve elementos que declaran al menos un patron de accion legible. |
+| `def _window_exists(hwnd)` | Comprueba que el HWND corresponde a una ventana real de Windows. |
+| `def _enumerate_with_pywinauto(hwnd, pid, start)` | Enumera usando pywinauto con backend UI Automation. |
+| `def _enumerate_children(parent_info, parent_handle, depth, elements, seen_handles, pid)` | Enumera recursivamente los hijos directos de un elemento UIA. |
+| `def _element_info_to_dataclass(info, depth, parent_handle, pid)` | Convierte un UIAElementInfo en un UIAutomationElement serializable. |
+| `def _read_offscreen(info)` | Lee IsOffscreen del elemento AutomationElement subyacente (COM). |
+| `def _collect_patterns(info)` | Devuelve los nombres de los patrones de control soportados. |
+| `def _enumerate_with_automation_element(hwnd, pid, start)` | Fallback usando IUIAutomation directamente para obtener el elemento raiz de la ventana y sus hijos inmediatos. |
+| `def _automation_element_to_dataclass(elem, depth, parent_handle, pid, uia)` | Convierte un IUIAutomationElement crudo (COM) en UIAutomationElement. |
+| `def _collect_patterns_com(elem)` | Consulta patrones de control en un IUIAutomationElement crudo. |
+
+Funciones a nivel modulo:
+
+| Firma | Docstring |
+|---|---|
+| `def _pattern_id(pattern_name)` | Devuelve el ID numerico de un patron de control UIA, o None. |
+| `def uia_defines_property(name)` | Devuelve un property ID de UIA por nombre (fallback COM). |
+
 ## 🗺️ `src/hands/planner/`
 
 <!-- src/hands/planner -->
