@@ -88,6 +88,7 @@
 - [`hands\test_calibration_requirements.py`](#hands/test-calibration_requirements)
 - [`hands\test_calibrator.py`](#hands/test-calibrator)
 - [`hands\test_candidatos_reales_entorno_real.py`](#hands/test-candidatos_reales_entorno_real)
+- [`hands\test_lanzamiento_discord_entorno_real.py`](#hands/test-lanzamiento_discord_entorno_real)
 - [`hands\test_capability_absent_verification.py`](#hands/test-capability_absent_verification)
 - [`hands\test_capability_availability_distinction.py`](#hands/test-capability_availability_distinction)
 - [`hands\test_capability_query_contract.py`](#hands/test-capability_query_contract)
@@ -8887,6 +8888,28 @@ src.hands.application_preflight, src.hands.application_launch_classifier
 - **`TestFalsosPositivos`** (línea 205) — 4 método(s) de test
 - **`TestPipelineCompletoDescubrimiento`** (línea 242) — 4 método(s) de test
 - **`TestRegistroCampos76Pipeline`** (línea 292) — 1 método(s) de test
+
+---
+
+### `hands\test_lanzamiento_discord_entorno_real.py`
+
+**Descripción:** Verificación en entorno real de la unidad 3.8.5.6.9. Ejecuta controles negativos reales (destino inexistente, ruta obsoleta, ejecutable desconocido, permiso denegado) confirmando que no aparece un proceso nuevo ni se modifica ninguna ventana previa, y ejecuta el ciclo real de lanzamiento de Discord (abrir → detectar proceso → detectar ventana → verificar estado → cerrar solo lo creado por la prueba) mediante CalibrationManager.launch_application, ApplicationPreflight y wait_for_application_window, sin mocks.
+
+**Módulos de origen probados:** src.hands.application_discovery, src.hands.application_preflight, src.hands.calibration_manager, src.hands.system_inventory, src.hands.system_inventory_storage
+
+**Clases de test:**
+
+- **`TestLanzamientoDiscordEntornoReal`** (línea 1) — 10 método(s) de test
+  - `test_01_linea_base_conteos` — Línea base real de procesos y ventanas
+  - `test_02_monitores_y_segunda_pantalla` — Enumeración de monitores (DISPLAY1 primario, DISPLAY2 secundario)
+  - `test_03_consulta_inventario_discord` — Consulta a application_candidates por machine_id
+  - `test_04_registrar_discord_candidato` — Registro de Discord como candidato (skip si ya existe)
+  - `test_05_preflight_discord` — ApplicationPreflight: allowed=True, requires_elevation=False
+  - `test_06_lanzamiento_discord_completo` — Ciclo real completo de Discord (PID=28028, HWND=3933580, VENTANA_DETECTADA, cierre limpio)
+  - `test_07_destino_inexistente_no_lanza` — Control negativo: destino inexistente rechazado
+  - `test_08_ejecutable_desconocido_no_lanza` — Control negativo: ejecutable desconocido rechazado
+  - `test_09_ruta_obsoleta_no_lanza` — Control negativo: ruta obsoleta rechazada
+  - `test_10_permiso_denegado_no_verificado` — Control negativo: permiso denegado registrado como NO VERIFICADO
 
 ---
 

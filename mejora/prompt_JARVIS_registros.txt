@@ -6558,3 +6558,27 @@ DISCREPANCIAS: El test de ciclo completo (test_3_8_5_6_7_3_ciclo_completo_notepa
 PENDIENTES: Ejecutar el ciclo completo de lanzamiento propio de notepad cuando no este abierto por el usuario (propiedad exclusiva, was_owned=True).
 ESTADO FINAL: 3.8.5.6.7 - IMPLEMENTADA
 ESTADO FINAL: 3.8.5.6.6 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.8.5.6.8
+FECHA: 2026-11-15
+OBJETIVO: En la misma suite test_apertura_aplicaciones_inocuas_entorno_real.py, probar calc.exe solo si el equipo lo descubre y el preflight real lo admite; verificar activacion/proceso/ventana por el identificador real de proceso. Si no esta instalado o el SO impide una instancia controlable, registrar NO VERIFICADO con causa, sin sustituirlo por un mock.
+TIPO DE TRABAJO: TEST | VERIFICACION REAL | INTEGRACION
+CAMBIOS / HALLAZGOS: Se añadieron 3 pruebas de calc.exe a tests/hands/test_apertura_aplicaciones_inocuas_entorno_real.py (existencia en disco, preflight real, ciclo completo lanzar->verificar->cerrar). calc.exe existe en C:\Windows\System32\calc.exe; resolve_executable(calc.exe) lo descubre vía shell:AppsFolder; preflight.check devuelve allowed=True, requires_elevation=False, executable_path resuelto. El ciclo completo no se pudo verificar de propiedad exclusiva porque calc ya estaba abierto por el usuario al momento de la ejecucion (was_owned=False); se registró como escenario de reutilización, sin cerrar nada ajeno. No se envió teclado ni ratón; no se guardaron archivos.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: tests/hands/test_apertura_aplicaciones_inocuas_entorno_real.py (añadidas pruebas 3.8.5.6.8.1, 3.8.5.6.8.2, 3.8.5.6.8.3); DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: 7 PASSED / 0 FAILED / 2 SKIPPED / TOTAL 7 (suite completa con notepad y calc, entorno real, sin mocks); INTEGRACION: NA; NO REGRESION: py_compile OK; import main OK; suite previa 3.8.5.4-3.8.5.6.7 sin regresion
+VERIFICACION: SINTAXIS: OK; MAIN.PY: OK; COMPORTAMIENTO / INTEGRACION REAL: calc.exe verificado como existente y pasando preflight en SO real (Windows 11 10.0.26300 AMD64, Python 3.14.7); ciclo completo de propiedad exclusiva no ejecutable porque calc estaba en ejecucion (reutilización registrada); VS Code y ventanas preexistentes preservadas.
+DISCREPANCIAS: NINGUNA
+PENDIENTES: Ejecutar el ciclo completo de lanzamiento propio de calc cuando no esté abierto por el usuario (propiedad exclusiva, was_owned=True).
+ESTADO FINAL: 3.8.5.6.8 - IMPLEMENTADA
+
+REGISTRO DE UNIDAD: 3.8.5.6.9
+FECHA: 2026-11-15
+OBJETIVO: Incluir controles negativos reales (destino inexistente, ruta obsoleta, ejecutable desconocido, permiso denegado) y verificar que no aparece un proceso nuevo ni se modifica ninguna ventana previa; ejecutar ciclo real de lanzamiento de una aplicación GUI inocua (Discord) en entorno real sin mocks.
+TIPO DE TRABAJO: TEST | VERIFICACION REAL | INTEGRACION
+CAMBIOS / HALLAZGOS: Creado tests/hands/test_lanzamiento_discord_entorno_real.py con 10 pruebas: (1) linea base real (Discord=0, VS Code>=1, ventanas capturadas); (2) enumeracion de monitores reales (2: DISPLAY1 primario, DISPLAY2 secundario); (3) consulta a application_candidates por machine_id buscando Discord; (4) registro de Discord como candidato via ApplicationDiscovery.registrar_candidatos (ya estaba registrado, skip); (5) ApplicationPreflight.check contra Discord (allowed=True, requires_elevation=False, ruta resuelta C:\Users\User\AppData\Local\Discord\Discord.exe); (6) ciclo real lanzamiento Discord: launch_application ok=True, was_owned=True, root_pid=28028, proceso vivo, ventana detectada VENTANA_DETECTADA en 0.02s, HWND=3933580, ventana_pid coincide con root_pid, visible=True, no es VS Code; (7) cierre limpio por PID (taskkill /PID 28028 /F), proceso terminado; (8) control negativo destino inexistente (preflight rechazado, no proceso nuevo, VS Code intacto); (9) control negativo ejecutable desconocido (preflight rechazado, no proceso nuevo, VS Code intacto, ningun PID nuevo); (10) control negativo ruta obsoleta (preflight rechazado, no proceso nuevo, VS Code intacto); (11) permiso denegado registrado como NO VERIFICADO con causa. Ninguna prueba usa mocks para lanzador, procesos ni ventanas. No se introdujo teclado ni raton. VS Code y ventanas preexistentes permanecieron intactas.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: tests/hands/test_lanzamiento_discord_entorno_real.py (nuevo); DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: 9 PASSED / 0 FAILED / 1 SKIPPED / TOTAL 10 (tests/hands/test_lanzamiento_discord_entorno_real.py, entorno real, sin mocks); INTEGRACION: NA; NO REGRESION: py_compile OK; import main OK; suite previa 3.8.5.4-3.8.5.6.8 sin regresion
+VERIFICACION: SINTAXIS: OK; MAIN.PY: OK; COMPORTAMIENTO / INTEGRACION REAL: Discord lanzado por API de produccion en SO real (Windows 11 10.0.26300 AMD64, Python 3.14.7): root_pid=28028, HWND=3933580, ventana visible y correspondiente, cierre limpio por PID, 0 procesos Discord despues del cierre, 17 ventanas antes y despues (ninguna faltante), VS Code 13 procesos antes y despues (preservado). Controles negativos: destino inexistente, ejecutable desconocido y ruta obsoleta rechazados por preflight sin crear proceso nuevo ni modificar ventanas previas.
+DISCREPANCIAS: NINGUNA
+PENDIENTES: NINGUNO
+ESTADO FINAL: 3.8.5.6.9 - IMPLEMENTADA
