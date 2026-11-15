@@ -1,8 +1,8 @@
 ESTADO PERSISTENTE ACTUAL
 CURRENT_PHASE: 3.8
-CURRENT_WORK_UNIT: 3.8.5.5.5
-CURRENT_WORK_STATUS: EN PROCESO
-LAST_COMPLETED_UNIT: 3.8.5.5.4
+CURRENT_WORK_UNIT: 3.8.5.6.8
+CURRENT_WORK_STATUS: PENDIENTE
+LAST_COMPLETED_UNIT: 3.8.5.6.7
 
 # PROMPT PRINCIPAL JARVIS — PUNTO DE ENTRADA Y CONTINUIDAD
 
@@ -43,7 +43,7 @@ El desarrollo debe producir capacidades funcionales, integradas y verificadas en
 
 Si `CURRENT_WORK_STATUS` es `PENDIENTE`, cambiar unicamente `CURRENT_WORK_STATUS` a `EN PROCESO` en este archivo y guardar este archivo antes de tocar codigo.
 
-Si ya esta `EN PROCESO` o `PARCIALMENTE IMPLEMENTADA`, continuar esa misma unidad, inspeccionando primero lo realizado y sus pendientes. No reiniciar el trabajo ni cambiar de unidad por conveniencia.
+Si ya esta `EN PROCESO`, continuar esa misma unidad y finalizarla en este chat. No reiniciar el trabajo ni cambiar de unidad por conveniencia. Una unidad nunca se deja en `PARCIALMENTE IMPLEMENTADA` al cerrar el chat.
 
 ## PLANIFICACION Y VERIFICACION ANTES DE IMPLEMENTAR
 
@@ -115,7 +115,7 @@ La unidad terminada queda reflejada en su registro historico y en `LAST_COMPLETE
 ### Si queda incompleta o bloqueada
 
 - Mantener `CURRENT_WORK_UNIT` apuntando a la misma unidad.
-- Establecer `CURRENT_WORK_STATUS: PARCIALMENTE IMPLEMENTADA`.
+- Establecer `CURRENT_WORK_STATUS: BLOQUEADA`.
 - Registrar los cambios realizados, los resultados reales, las causas del bloqueo y los pendientes concretos.
 - No avanzar a otra unidad.
 - No presentar como completado aquello que unicamente esta implementado parcialmente.

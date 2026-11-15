@@ -109,6 +109,7 @@
 - [`src/utils/screen_manager.py` (1958 líneas)](#src-utils-screen_manager-py)
 - [`src/utils/self_improvement_system.py` (1261 líneas)](#src-utils-self_improvement_system-py)
 - [`src/utils/ui_element_model.py` (181 líneas)](#src-utils-ui_element_model-py)
+- [`src/utils/test_result_categorizer.py` (192 líneas)](#src-utils-test_result_categorizer-py)
 
 ## 🏗️ Arquitectura por capas y flujo de ejecución
 
@@ -1202,6 +1203,8 @@ Métodos:
 
 _Sin métodos definidos en el AST._
 
+`class LaunchState`  (línea 166) — Estados transitorios de lanzamiento de aplicaciones, representados por separado: ABRIENDO, PROCESO_INICIADO, VENTANA_DETECTADA, ABIERTA_VERIFICADA, ABIERTA_SIN_VENTANA, FALLO y TIMEOUT.
+
 `class CalibrationManager`  (línea 170) — Coordinador universal de calibración multiaplicación y multimonitor.
 
 Métodos:
@@ -1265,9 +1268,13 @@ Métodos:
 | `def launch_application(application)` | Reutiliza una ventana existente o lanza la aplicación de forma genérica. |
 | `def verify_launch_process_stability(pid, stability_interval, stability_checks)` | Verifica que un proceso exista y siga vivo durante un intervalo acotado. |
 | `def get_launch_evidence()` | Devuelve la evidencia minima del ultimo lanzamiento para correlacion. |
+| `def registrar_ventana_lanzamiento(hwnd, visible, monitor_id, en_segunda_pantalla)` | Registra la informacion de ventana (HWND, visibilidad, monitor, segunda pantalla) del ultimo lanzamiento para la evidencia. |
+| `def guardar_evidencia_lanzamiento(ruta_archivo=None)` | Guarda la evidencia tecnica minima del ultimo lanzamiento en JSON (tipo de destino, fuente, destino validado, PID, ventana y tiempos) sin contenido privado ni secretos. |
+| `def get_launch_state()` | Devuelve el ultimo estado de lanzamiento registrado (LaunchState o None). |
 | `def detect_window_for_process(root_pid, application_name, app_id, timeout)` | Detecta una ventana perteneciente al proceso objetivo por PID, arbol de procesos y propietario (HWND owner), sin aceptar coincidencia solo por el titulo. |
 | `def wait_for_application_window(root_pid, application_name, app_id, timeout, poll_interval)` | Espera la ventana durante un timeout acotado y configurable, distinguiendo inicio lento, aplicacion de fondo, proceso sin interfaz y fallo de apertura. |
 | `def verify_visible_window_for_application(window, application_name, app_id, root_pid, owned_pids)` | Verifica que una ventana detectada sea visible y corresponda a la aplicacion solicitada por PID/arbol de procesos y nombre de proceso, sin forzar foco, maximizar ni moverla, y sin confundirse con Visual Studio Code. |
+| `def verify_estabilidad_minima_proceso_ventana(root_pid, window, application_name, app_id, estabilidad_interval, estabilidad_checks, poll_interval)` | Verifica la estabilidad minima del proceso y (si se proporciona) la ventana durante un intervalo definido, sin forzar foco, maximizar ni mover nada. |
 | `def _wait_for_application_window(application_name, app_id, before_hwnds, before_pids, timeout)` |  |
 | `def _set_window_position(hwnd, x, y)` |  |
 | `def _maximize_window(hwnd)` |  |
@@ -7372,17 +7379,65 @@ Funciones a nivel módulo:
 | `def _is_number(value)`  (L30) | Devuelve ``True`` solo para valores numéricos reales (no bool). |
 | `def _as_int_list(value, expected_len)`  (L35) | Normaliza ``value`` a una lista de enteros con longitud exacta. |
 
-## 📂 Archivos de configuración y datos
+<a name="src-utils-test_result_categorizer-py"></a>
+### `src/utils/test_result_categorizer.py` [192 lineas] — Categorizador y reporte de resultados de prueba por tipo de verificacion.
+
+**Descripcion:** Categoriza y registra resultados de prueba en categorias estrictamente separadas: resultados simulados (SIMULADO), pruebas unitarias con mocks (UNIT_MOCKS), pruebas de integracion con recursos reales del SO (INTEGRACION_OS) y aperturas de aplicaciones GUI verificadas visualmente (APERTURA_GUI). Cada categoria mantiene su propio contador independiente de PASSED / FAILED / SKIPPED / TOTAL. No existe un contador global que sume categorias, por lo que los conteos nunca se mezclan.
+
+**Caracteristicas:**
+
+- Registro de resultados de prueba asociados a una unica categoria.
+- Conteo independiente por categoria y estado.
+- Reporte de texto con conteos separados por categoria (sin total global mezclado).
+- Verificacion de que los conteos de cada categoria son independientes.
+- Heuristica ligera de categorizacion de archivos de prueba existente.
+- Deteccion de presencia de resultados simulados vs resultados reales.
+
+**Importaciones:** 3.
+
+`class CategoriaResultadoTest(Enum)`  (linea 22) — Categorias de resultado de prueba.
+
+_Sin metodos definidos en el AST._
+
+`class ResultadoTest`  (linea 29) — Un resultado de prueba individual, asociado a una unica categoria.
+
+**Decoradores:** `@dataclass`
+
+Campos: `nombre_test` (str), `categoria` (CategoriaResultadoTest), `estado` (str), `tiene_mock` (bool), `usa_recursos_reales` (bool), `verificacion_visual` (bool), `detalle` (str).
+
+`class TestResultCategorizer`  (linea 54) — Categoriza y registra resultados de prueba por separado, sin mezclar conteos.
+
+Metodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__()` |  |
+| `def registrar(nombre_test, categoria, estado, tiene_mock=False, usa_recursos_reales=False, verificacion_visual=False, detalle='')` | Registra un resultado de prueba en su categoria correspondiente. |
+| `def conteo(categoria, estado=None)` | Devuelve el conteo para una categoria y estado dados. |
+| `def conteo_todas_categorias()` | Devuelve una copia de los conteos por categoria. |
+| `def reporte()` | Genera un reporte de texto con conteos separados por categoria. |
+| `def verificar_separacion()` | Verifica que los conteos de cada categoria son independientes. |
+| `def resultados_por_categoria(categoria)` | Devuelve todos los resultados registrados para una categoria dada. |
+| `def tiene_resultados_simulados()` | Devuelve True si hay resultados de categoria SIMULADO registrados. |
+| `def tiene_resultados_reales()` | Devuelve True si hay resultados de categorias reales (no simulados). |
+
+Funciones a nivel modulo:
+
+| Firma | Docstring |
+|---|---|
+| `def categorizar_archivo_test(ruta_archivo)`  (L169) | Intenta categorizar un archivo de prueba por su nombre y contenido. |
+
+## 📂 Archivos de configuracion y datos
 
 Resumen de artefactos persistentes (consumidos por `utils/config.py` y `memory/storage.py`):
 
 | Ruta | Rol |
 |---|---|
-| `config/config.json` | Configuración maestra: `project`, `llm`, `memory`, `execution`, `keyboard`, `visual`, `prediction`, `logging`. Accedida vía `get_memory_config()`/`get_timeout_config()`/`get_keyboard_config()`/`get_visual_config()`/`get_predictive_config()`. |
-| `config/command_aliases.json` | Aliases estáticos `intención → comando` (FASE 16). |
-| `data/knowledge/{entities,applications,capabilities}.json` | Conocimiento de dominio estático (FASE 5), cargado por `DomainMemory`. |
+| `config/config.json` | Configuracion maestra: `project`, `llm`, `memory`, `execution`, `keyboard`, `visual`, `prediction`, `logging`. Accedida via `get_memory_config()`/`get_timeout_config()`/`get_keyboard_config()`/`get_visual_config()`/`get_predictive_config()`. |
+| `config/command_aliases.json` | Aliases estaticos `intencion → comando` (FASE 16). |
+| `data/knowledge/{entities,applications,capabilities}.json` | Conocimiento de dominio estatico (FASE 5), cargado por `DomainMemory`. |
 | `data/{entities,applications,capabilities,knowledge_graph,contextual_knowledge_base}.json` | Versiones de datos usadas por `MemoryManager`/`EntityResolver`. |
-| `data/conversational_memory.json` | Histórico de chat con metadatos de planificación. |
+| `data/conversational_memory.json` | Historico de chat con metadatos de planificacion. |
 | `data/prediction_memory.json` | `PredictionResult`s y estadísticas de uso (FASE 15/18). |
 | `data/jarvis_memory.json` | Memoria general de largo plazo. |
 | `data/jarvis_learned_aliases.json` | Aliases aprendidos en runtime. |

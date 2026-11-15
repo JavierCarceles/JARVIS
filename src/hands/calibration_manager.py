@@ -163,6 +163,26 @@ class _WindowStateSnapshot:
     normal_bottom: int
 
 
+class LaunchState(Enum):
+    """Estados de lanzamiento de aplicaciones, representados por separado.
+
+    Modela el ciclo transitorio de verificacion de apertura:
+    ABRIENDO -> PROCESO_INICIADO -> VENTANA_DETECTADA -> ABIERTA_VERIFICADA
+    con ramas alternativas ABIERTA_SIN_VENTANA, FALLO y TIMEOUT.
+
+    Estos estados son transitorios de la operacion de lanzamiento y no se
+    mezclan con ApplicationState (estados persistentes de la aplicacion).
+    """
+
+    ABRIENDO = "abriendo"
+    PROCESO_INICIADO = "proceso_iniciado"
+    VENTANA_DETECTADA = "ventana_detectada"
+    ABIERTA_VERIFICADA = "abierta_verificada"
+    ABIERTA_SIN_VENTANA = "abierta_sin_ventana"
+    FALLO = "fallo"
+    TIMEOUT = "timeout"
+
+
 # ============================================================================
 # GESTOR
 # ============================================================================
@@ -312,6 +332,13 @@ class CalibrationManager:
         self._last_launch_root_pid: Optional[int] = None
         self._last_launch_executable_path: Optional[str] = None
         self._last_launch_app_id: str = ""
+        self._last_launch_state: Optional[LaunchState] = None
+        self._last_launch_tipo_destino: Optional[str] = None
+        self._last_launch_fuente: str = ""
+        self._last_launch_destino_validado: Optional[str] = None
+        self._last_launch_timestamps: Dict[str, Any] = {}
+        self._last_launch_window_info: Dict[str, Any] = {}
+        self._last_launch_evidence_path: Optional[str] = None
         self._temporary_browser_tab_open: bool = False
         self._temporary_browser_hwnd: Optional[int] = None
 
@@ -1511,8 +1538,19 @@ $result | ConvertTo-Json -Compress -Depth 4
         self._last_launch_window = None
         self._last_launch_was_owned = False
         self._last_launch_root_pid = None
+        self._last_launch_state = None
+        self._last_launch_tipo_destino = None
+        self._last_launch_fuente = ""
+        self._last_launch_destino_validado = None
+        self._last_launch_timestamps = {}
+        self._last_launch_window_info = {}
+        self._last_launch_evidence_path = None
         self._temporary_browser_tab_open = False
         self._temporary_browser_hwnd = None
+
+    def get_launch_state(self) -> Optional[LaunchState]:
+        """Devuelve el ultimo estado de lanzamiento registrado (LaunchState o None)."""
+        return self._last_launch_state
 
     def launch_application(self, application: Dict[str, str]) -> Tuple[Set[int], bool]:
         """Reutiliza una ventana existente o lanza la aplicación de forma genérica."""
@@ -1523,12 +1561,15 @@ $result | ConvertTo-Json -Compress -Depth 4
         self._reset_launch_context()
         self._last_launch_executable_path = executable or None
         self._last_launch_app_id = app_id
+        self._last_launch_state = LaunchState.ABRIENDO
+        self._last_launch_timestamps = {"inicio": time.time()}
 
         if (
             not app_name
             or self._should_ignore_application(app_name, app_id)
             or self._is_game_application(app_name, app_id)
         ):
+            self._last_launch_state = LaunchState.FALLO
             return set(), False
 
         existing_window = self._find_existing_application_window(app_name, app_id)
@@ -1541,6 +1582,7 @@ $result | ConvertTo-Json -Compress -Depth 4
                 self._last_launch_window = existing_window
                 self._last_launch_root_pid = pid
                 self._last_launch_was_owned = False
+                self._last_launch_state = LaunchState.ABIERTA_VERIFICADA
                 state = "minimizada" if USER32.IsIconic(wintypes.HWND(hwnd)) else "visible"
                 logger._print_log("info", "Procesando solicitud", "calibration_manager.py", "method", 344)
                 return set(self._last_launch_before_hwnds), True
@@ -1549,6 +1591,20 @@ $result | ConvertTo-Json -Compress -Depth 4
         before_pids = self._get_process_ids()
         self._last_launch_before_hwnds = set(before_hwnds)
         self._last_launch_before_pids = set(before_pids)
+
+        # Clasificar tipo de destino, fuente y destino validado antes de lanzar.
+        if app_id:
+            self._last_launch_tipo_destino = "paquete"
+            self._last_launch_fuente = "shell_apps_folder"
+            self._last_launch_destino_validado = app_id or None
+        elif executable and os.path.isfile(executable):
+            self._last_launch_tipo_destino = "ejecutable"
+            self._last_launch_fuente = "ruta_directa"
+            self._last_launch_destino_validado = executable
+        else:
+            self._last_launch_tipo_destino = None
+            self._last_launch_fuente = "metadatos_descubrimiento"
+            self._last_launch_destino_validado = None
 
         try:
             if app_id:
@@ -1566,6 +1622,10 @@ $result | ConvertTo-Json -Compress -Depth 4
                     path = str(item.get("path", "")).strip()
                     if not path or not os.path.isfile(path):
                         continue
+                    self._last_launch_destino_validado = path
+                    fuente_item = str(item.get("source", "")).strip()
+                    self._last_launch_fuente = fuente_item or "metadatos_descubrimiento"
+                    self._last_launch_tipo_destino = self._clasificar_tipo_destino_por_ruta(path)
                     command = [path]
                     item_args = str(item.get("arguments", "")).strip()
                     if item_args:
@@ -1574,16 +1634,21 @@ $result | ConvertTo-Json -Compress -Depth 4
                     launched = True
                     break
                 if not launched:
+                    self._last_launch_state = LaunchState.FALLO
                     logger._print_log("info", "Procesando solicitud", "calibration_manager.py", "method", 344)
                     return before_hwnds, False
 
             window = self._wait_for_application_window(app_name, app_id, before_hwnds, before_pids)
             if window is None:
+                self._last_launch_state = LaunchState.FALLO
                 return before_hwnds, False
 
+            self._last_launch_timestamps["ventana_detectada"] = time.time()
             hwnd = self._get_window_handle(window)
+            self._last_launch_window_info = {"hwnd": hwnd}
             pid = self._get_window_process_id(window)
             if hwnd is None:
+                self._last_launch_state = LaunchState.FALLO
                 return before_hwnds, False
 
             is_new_window = hwnd not in before_hwnds
@@ -1595,8 +1660,10 @@ $result | ConvertTo-Json -Compress -Depth 4
             self._last_launch_window = window
             self._last_launch_was_owned = is_new_window or is_new_process
             self._last_launch_root_pid = pid
+            self._last_launch_state = LaunchState.PROCESO_INICIADO
 
             if self._is_process_elevated(pid):
+                self._last_launch_state = LaunchState.FALLO
                 logger._print_log("info", "Procesando solicitud", "calibration_manager.py", "method", 344)
                 if owned_hwnds:
                     self._close_all_owned_windows(window, owned_hwnds, owned_pids)
@@ -1605,6 +1672,7 @@ $result | ConvertTo-Json -Compress -Depth 4
             logger._print_log("info", f"Aplicación lanzada: {app_name} | HWND={hwnd} | PID={pid} | owned={self._last_launch_was_owned}", "calibration_manager.py", "_launch_application_by_name", 1344)
             return before_hwnds, True
         except Exception as exc:
+            self._last_launch_state = LaunchState.FALLO
             logger._print_log("info", "Procesando solicitud", "calibration_manager.py", "method", 344)
             return before_hwnds, False
 
@@ -1668,6 +1736,179 @@ $result | ConvertTo-Json -Compress -Depth 4
             "was_owned": self._last_launch_was_owned,
         }
 
+    def verify_estabilidad_minima_proceso_ventana(
+        self,
+        root_pid: Optional[int] = None,
+        window: Any = None,
+        application_name: str = "",
+        app_id: str = "",
+        estabilidad_interval: float = 2.0,
+        estabilidad_checks: int = 3,
+        poll_interval: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """
+        Verifica la estabilidad minima del proceso y (si se proporciona) de la
+        ventana durante un intervalo definido, para evitar declarar exito a un
+        proceso que se cierra inmediatamente o a una ventana que desaparece.
+
+        Realiza comprobaciones espaciadas a lo largo del intervalo: el proceso
+        debe seguir vivo y, cuando se entrega una ventana, esta debe seguir
+        siendo valida, visible y pertenecer al proceso. Solo consulta estado
+        real de lectura: no forza foco, maximizar, mover ni cerrar nada.
+
+        Args:
+            root_pid: PID del proceso raiz. Si es None, usa el del ultimo
+                lanzamiento (_last_launch_root_pid).
+            window: Objeto de ventana (pygetwindow) a verificar (opcional).
+            application_name: Nombre de la aplicacion (referencia).
+            app_id: Identificador de aplicacion UWP/tienda (referencia).
+            estabilidad_interval: Intervalo total en segundos para las
+                comprobaciones.
+            estabilidad_checks: Numero de comprobaciones dentro del intervalo.
+            poll_interval: Pausa entre comprobaciones. Si es None, se deriva
+                del intervalo y del numero de comprobaciones.
+
+        Returns:
+            Dict con claves: status, estable, pid, root_pid, process_alive,
+            window_valida, window_visible, ventana_pertenece_proceso,
+            checks_passed, total_checks, estabilidad_interval,
+            elapsed_seconds, executable_path, app_id, was_owned, reason,
+            error.
+
+        Estados en "status":
+        - ESTABLE: proceso vivo durante todo el intervalo y, si se entrego
+          una ventana, ventana valida y visible perteneciente al proceso.
+        - PROCESO_CERRADO: el proceso dejo de estar vivo durante el intervalo.
+        - VENTANA_CERRADA: la ventana dejo de ser una ventana valida.
+        - VENTANA_NO_VISIBLE: la ventana dejo de ser visible.
+        - VENTANA_NO_PERTENECE: la ventana dejo de pertenecer al proceso.
+        - ERROR: no hay PID para verificar.
+        """
+        resultado = {
+            "status": None,
+            "estable": False,
+            "pid": None,
+            "root_pid": None,
+            "process_alive": False,
+            "window_valida": False,
+            "window_visible": False,
+            "ventana_pertenece_proceso": False,
+            "checks_passed": 0,
+            "total_checks": 0,
+            "estabilidad_interval": 0.0,
+            "elapsed_seconds": 0.0,
+            "executable_path": self._last_launch_executable_path,
+            "app_id": self._last_launch_app_id,
+            "was_owned": self._last_launch_was_owned,
+            "reason": "",
+            "error": None,
+        }
+
+        target_pid = (
+            int(root_pid) if root_pid is not None else self._last_launch_root_pid
+        )
+        if not target_pid:
+            resultado.update(
+                status="ERROR",
+                error="No hay PID para verificar",
+                reason="no se pidio ni se obtuvo un PID de proceso",
+            )
+            self._last_launch_state = LaunchState.FALLO
+            return resultado
+
+        target_pid = int(target_pid)
+        resultado["pid"] = target_pid
+        resultado["root_pid"] = target_pid
+
+        intervalo = max(0.1, float(estabilidad_interval))
+        total_checks = max(1, int(estabilidad_checks))
+        if poll_interval is None:
+            pausa = max(0.1, intervalo / total_checks)
+        else:
+            pausa = max(0.05, float(poll_interval))
+        resultado["estabilidad_interval"] = intervalo
+
+        process_pids = self._get_process_tree(target_pid)
+        if not process_pids:
+            process_pids = {target_pid}
+
+        hwnd = None
+        if window is not None:
+            hwnd = self._get_window_handle(window)
+            resultado["window_valida"] = bool(
+                hwnd and self._win32_is_window(hwnd)
+            )
+            if resultado["window_valida"]:
+                resultado["window_visible"] = bool(self._win32_is_visible(hwnd))
+                win_pid = self._get_window_process_id(window)
+                resultado["ventana_pertenece_proceso"] = bool(
+                    win_pid is not None and win_pid in process_pids
+                )
+
+        inicio = time.monotonic()
+        deadline = inicio + intervalo
+        checks_passed = 0
+        estado_fallo = None
+
+        for i in range(total_checks):
+            # El proceso debe seguir vivo en cada comprobacion.
+            if not self._is_process_alive(target_pid):
+                estado_fallo = "PROCESO_CERRADO"
+                break
+
+            # La ventana (si se entrego) debe seguir valida, visible y del proceso.
+            if window is not None and hwnd:
+                try:
+                    if not self._win32_is_window(hwnd):
+                        estado_fallo = "VENTANA_CERRADA"
+                        break
+                    if not self._win32_is_visible(hwnd):
+                        estado_fallo = "VENTANA_NO_VISIBLE"
+                        break
+                    win_pid = self._get_window_process_id(window)
+                    if not (win_pid is not None and win_pid in process_pids):
+                        estado_fallo = "VENTANA_NO_PERTENECE"
+                        break
+                except Exception:
+                    estado_fallo = "VENTANA_NO_PERTENECE"
+                    break
+
+            checks_passed += 1
+            if i < total_checks - 1:
+                time.sleep(pausa)
+
+        transcurrido = time.monotonic() - inicio
+        resultado["elapsed_seconds"] = transcurrido
+        resultado["total_checks"] = total_checks
+        resultado["checks_passed"] = checks_passed
+        resultado["process_alive"] = self._is_process_alive(target_pid)
+
+        if estado_fallo is not None:
+            resultado["status"] = estado_fallo
+            resultado["reason"] = {
+                "PROCESO_CERRADO": "el proceso dejo de estar vivo durante el intervalo",
+                "VENTANA_CERRADA": "la ventana dejo de ser una ventana valida",
+                "VENTANA_NO_VISIBLE": "la ventana dejo de ser visible",
+                "VENTANA_NO_PERTENECE": "la ventana dejo de pertenecer al proceso",
+            }.get(estado_fallo, "fallo de estabilidad no especificado")
+            resultado["estable"] = False
+            self._last_launch_state = LaunchState.FALLO
+        elif checks_passed == total_checks:
+            resultado["status"] = "ESTABLE"
+            resultado["estable"] = True
+            if window is not None:
+                resultado["reason"] = "proceso y ventana estables durante el intervalo"
+            else:
+                resultado["reason"] = "proceso estable durante el intervalo"
+            self._last_launch_state = LaunchState.ABIERTA_VERIFICADA
+        else:
+            resultado["status"] = "PROCESO_CERRADO"
+            resultado["reason"] = "comprobaciones incompletas antes de finalizar el intervalo"
+            resultado["estable"] = False
+            self._last_launch_state = LaunchState.FALLO
+
+        return resultado
+
     def get_launch_evidence(self) -> Dict[str, Any]:
         """Devuelve la evidencia minima del ultimo lanzamiento para correlacion.
 
@@ -1682,7 +1923,98 @@ $result | ConvertTo-Json -Compress -Depth 4
             "was_owned": self._last_launch_was_owned,
             "executable_path": self._last_launch_executable_path,
             "app_id": self._last_launch_app_id,
+            "launch_state": self._last_launch_state.value if self._last_launch_state else None,
+            "tipo_destino": self._last_launch_tipo_destino,
+            "fuente": self._last_launch_fuente,
+            "destino_validado": self._last_launch_destino_validado,
+            "timestamps": dict(self._last_launch_timestamps),
+            "ventana": dict(self._last_launch_window_info),
         }
+
+    @staticmethod
+    def _clasificar_tipo_destino_por_ruta(ruta: str) -> str:
+        """Clasifica el tipo de destino a partir de su ruta, sin abrir nada."""
+        if not ruta or not isinstance(ruta, str):
+            return "desconocido"
+        if ruta.casefold().endswith(".lnk"):
+            return "acceso_directo"
+        if ruta.casefold().endswith(".exe"):
+            return "ejecutable"
+        return "desconocido"
+
+    def registrar_ventana_lanzamiento(
+        self,
+        hwnd: Optional[int],
+        visible: Optional[bool] = None,
+        monitor_id: Optional[str] = None,
+        en_segunda_pantalla: Optional[bool] = None,
+    ) -> None:
+        """Registra la informacion de ventana del ultimo lanzamiento para la evidencia.
+
+        Solo almacena identificadores de ventana y monitor (no coordenadas,
+        titulos ni contenido privado).
+        """
+        self._last_launch_window_info = {
+            "hwnd": hwnd,
+            "visible": visible,
+            "monitor_id": monitor_id,
+            "en_segunda_pantalla": en_segunda_pantalla,
+        }
+        if hwnd is not None:
+            self._last_launch_timestamps["ventana_detectada"] = time.time()
+
+    def guardar_evidencia_lanzamiento(self, ruta_archivo: Optional[str] = None) -> Optional[str]:
+        """Guarda la evidencia tecnica minima del ultimo lanzamiento en JSON.
+
+        Incluye tipo de destino, fuente, ruta/identificador validado, PID o
+        identificador equivalente, ventana y tiempos. No registra contenido
+        privado ni argumentos que puedan contener secretos. La escritura es
+        atomica (archivo temporal + reemplazo).
+
+        Retorna la ruta del archivo escrito, o None si no hubo lanzamiento
+        previo o no se pudo escribir.
+        """
+        if self._last_launch_state is None and self._last_launch_root_pid is None:
+            return None
+        evidencia = self.get_launch_evidence()
+        timestamps = dict(evidencia.get("timestamps", {}))
+        timestamps["fin"] = time.time()
+        if timestamps.get("inicio") is not None:
+            try:
+                timestamps["duracion_segundos"] = round(
+                    float(timestamps["fin"]) - float(timestamps["inicio"]), 4
+                )
+            except (TypeError, ValueError):
+                pass
+        serializable = {
+            "root_pid": evidencia.get("root_pid"),
+            "owned_pids": sorted(int(p) for p in evidencia.get("owned_pids", set())),
+            "owned_hwnds": sorted(int(h) for h in evidencia.get("owned_hwnds", set())),
+            "was_owned": bool(evidencia.get("was_owned", False)),
+            "executable_path": evidencia.get("executable_path"),
+            "app_id": evidencia.get("app_id"),
+            "launch_state": evidencia.get("launch_state"),
+            "tipo_destino": evidencia.get("tipo_destino"),
+            "fuente": evidencia.get("fuente", ""),
+            "destino_validado": evidencia.get("destino_validado"),
+            "timestamps": timestamps,
+            "ventana": evidencia.get("ventana", {}),
+            "guardado_en": time.time(),
+        }
+        if ruta_archivo is None:
+            raiz_proyecto = Path(__file__).resolve().parents[2]
+            ruta_archivo = str(raiz_proyecto / "data" / "launch_evidence.json")
+        ruta = Path(ruta_archivo)
+        try:
+            ruta.parent.mkdir(parents=True, exist_ok=True)
+            tmp = ruta.with_suffix(ruta.suffix + ".tmp")
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(serializable, f, ensure_ascii=False, indent=2)
+            os.replace(tmp, ruta)
+            self._last_launch_evidence_path = str(ruta)
+            return str(ruta)
+        except Exception:
+            return None
 
     def _wait_for_application_window(self, application_name: str, app_id: str, before_hwnds: Set[int], before_pids: Optional[Set[int]] = None, timeout: float = 12.0) -> Any:
         before_pids = before_pids or set()
@@ -2102,6 +2434,7 @@ $result | ConvertTo-Json -Compress -Depth 4
                 elapsed_seconds=0.0,
                 reason="root_pid invalido o ausente: no hay proceso que esperar",
             )
+            self._last_launch_state = LaunchState.FALLO
             return resultado
 
         root_pid = int(root_pid)
@@ -2114,6 +2447,7 @@ $result | ConvertTo-Json -Compress -Depth 4
                 elapsed_seconds=time.monotonic() - inicio,
                 reason="el proceso no esta vivo al iniciar la espera",
             )
+            self._last_launch_state = LaunchState.FALLO
             return resultado
 
         process_pids = self._get_process_tree(root_pid)
@@ -2131,6 +2465,7 @@ $result | ConvertTo-Json -Compress -Depth 4
                     elapsed_seconds=time.monotonic() - inicio,
                     reason="el proceso finalizo durante la espera",
                 )
+                self._last_launch_state = LaunchState.FALLO
                 return resultado
 
             restante = deadline - time.monotonic()
@@ -2161,6 +2496,7 @@ $result | ConvertTo-Json -Compress -Depth 4
                     reason="ventana usable del proceso detectada dentro del timeout"
                     + (" (inicio lento)" if inicio_lento else ""),
                 )
+                self._last_launch_state = LaunchState.VENTANA_DETECTADA
                 return resultado
 
             # Detectar si el proceso tiene una ventana aunque no sea usable
@@ -2189,17 +2525,20 @@ $result | ConvertTo-Json -Compress -Depth 4
                 status="FALLO_APERTURA",
                 reason="el proceso no esta vivo al finalizar el timeout",
             )
+            self._last_launch_state = LaunchState.FALLO
         elif fondo_visto:
             resultado.update(
                 status="APLICACION_EN_FONDO",
                 es_fondo=True,
                 reason="el proceso sigue vivo pero su ventana no es visible (aplicacion en fondo)",
             )
+            self._last_launch_state = LaunchState.ABIERTA_SIN_VENTANA
         else:
             resultado.update(
                 status="PROCESO_SIN_INTERFAZ",
                 reason="el proceso sigue vivo pero no creo ninguna ventana dentro del timeout",
             )
+            self._last_launch_state = LaunchState.TIMEOUT
 
         return resultado
 
@@ -2259,11 +2598,13 @@ $result | ConvertTo-Json -Compress -Depth 4
 
         if window is None:
             resultado["reason"] = "ventana ausente: no hay objeto que verificar"
+            self._last_launch_state = LaunchState.FALLO
             return resultado
 
         hwnd = self._get_window_handle(window)
         if not hwnd:
             resultado["reason"] = "no se obtuvo HWND de la ventana"
+            self._last_launch_state = LaunchState.FALLO
             return resultado
 
         resultado["hwnd"] = int(hwnd)
@@ -2271,6 +2612,7 @@ $result | ConvertTo-Json -Compress -Depth 4
 
         if not self._win32_is_window(hwnd):
             resultado["reason"] = "el HWND ya no es una ventana valida"
+            self._last_launch_state = LaunchState.FALLO
             return resultado
 
         # Visibilidad real: IsWindowVisible y estilo WS_VISIBLE.
@@ -2370,6 +2712,11 @@ $result | ConvertTo-Json -Compress -Depth 4
 
         # Verificacion final: visible y corresponde (lectura, sin forzar nada).
         resultado["verificada"] = bool(visible and corresponde)
+
+        if resultado["verificada"]:
+            self._last_launch_state = LaunchState.ABIERTA_VERIFICADA
+        else:
+            self._last_launch_state = LaunchState.FALLO
 
         if not visible:
             resultado["reason"] = "la ventana detectada no es visible"

@@ -95,6 +95,8 @@
 - [`hands\test_discovery_source_report.py`](#hands/test-discovery_source_report)
 - [`hands\test_discovery_source_report_3816.py`](#hands/test-discovery_source_report_3816)
 - [`hands\test_entities_json_preservation_discovery.py`](#hands/test-entities_json_preservation_discovery)
+- [`hands\test_estados_lanzamiento_aplicacion.py`](#hands/test-estados_lanzamiento_aplicacion)
+- [`hands\test_estados_lanzamiento_aplicacion_entorno_real.py`](#hands/test-estados_lanzamiento_aplicacion_entorno_real)
 - [`hands\test_executor.py`](#hands/test-executor)
 - [`hands\test_executor_state.py`](#hands/test-executor_state)
 - [`hands\test_restore_window_state.py`](#hands/test-restore_window_state)

@@ -9,10 +9,13 @@ Cubre:
 - launch_application almacena ruta ejecutable y app_id para correlacion
 """
 
+import json
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from src.hands.calibration_manager import CalibrationManager
+from src.hands.calibration_manager import CalibrationManager, LaunchState
 
 
 class TestVerificacionProcesoDespuesLanzamiento(unittest.TestCase):
@@ -136,6 +139,59 @@ class TestVerificacionProcesoDespuesLanzamiento(unittest.TestCase):
             r"C:\Program Files\TestApp\testapp.exe",
         )
         self.assertEqual(manager._last_launch_app_id, "TestApp.Package")
+
+    def test_clasificar_tipo_destino_por_ruta(self):
+        """Clasificacion de tipo de destino por extension de ruta."""
+        manager = self._make_manager()
+        self.assertEqual(
+            manager._clasificar_tipo_destino_por_ruta(
+                r"C:\Windows\System32\charmap.exe"
+            ),
+            "ejecutable",
+        )
+        self.assertEqual(
+            manager._clasificar_tipo_destino_por_ruta(r"C:\Users\app.lnk"),
+            "acceso_directo",
+        )
+        self.assertEqual(manager._clasificar_tipo_destino_por_ruta(""), "desconocido")
+        self.assertEqual(manager._clasificar_tipo_destino_por_ruta(None), "desconocido")
+
+    def test_guardar_evidencia_lanzamiento_escribe_json_sin_secretos(self):
+        """guardar_evidencia_lanzamiento persiste evidencia JSON serializable y sin secretos."""
+        manager = self._make_manager()
+        manager._last_launch_root_pid = 12345
+        manager._last_launch_owned_pids = {12345}
+        manager._last_launch_owned_hwnds = {54321}
+        manager._last_launch_was_owned = True
+        manager._last_launch_executable_path = r"C:\Windows\System32\charmap.exe"
+        manager._last_launch_app_id = ""
+        manager._last_launch_state = LaunchState.PROCESO_INICIADO
+        manager._last_launch_tipo_destino = "ejecutable"
+        manager._last_launch_fuente = "ruta_directa"
+        manager._last_launch_destino_validado = r"C:\Windows\System32\charmap.exe"
+        manager._last_launch_timestamps = {"inicio": 100.0}
+        manager._last_launch_window_info = {"hwnd": 54321, "visible": True}
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            ruta = Path(tmpdir) / "evidencia.json"
+            guardado = manager.guardar_evidencia_lanzamiento(str(ruta))
+            self.assertEqual(guardado, str(ruta))
+            self.assertTrue(ruta.exists(), "el archivo de evidencia no se escribio")
+            with open(ruta, "r", encoding="utf-8") as f:
+                datos = json.load(f)
+            self.assertEqual(datos["root_pid"], 12345)
+            self.assertEqual(datos["owned_pids"], [12345])
+            self.assertEqual(datos["owned_hwnds"], [54321])
+            self.assertTrue(datos["was_owned"])
+            self.assertEqual(datos["tipo_destino"], "ejecutable")
+            self.assertEqual(datos["fuente"], "ruta_directa")
+            self.assertEqual(
+                datos["destino_validado"], r"C:\Windows\System32\charmap.exe"
+            )
+            self.assertEqual(datos["ventana"]["hwnd"], 54321)
+            self.assertIn("duracion_segundos", datos["timestamps"])
+            self.assertNotIn("arguments", datos)
+            self.assertNotIn("command_line", datos)
 
 
 if __name__ == "__main__":

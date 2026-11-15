@@ -19,6 +19,7 @@ en el monitor primario (DISPLAY1), sin superponer Visual Studio Code, que
 reside en la segunda pantalla (DISPLAY2).
 """
 
+import json
 import os
 import subprocess
 import time
@@ -161,6 +162,75 @@ class TestVerificacionProcesoDespuesLanzamientoEntornoReal(unittest.TestCase):
             self.assertEqual(estabilidad["checks_passed"], 4)
             self.assertTrue(estabilidad["alive"])
 
+    # ---- 3.8.5.5.5: estabilidad minima de proceso y ventana durante un intervalo ----
+    def test_3_8_5_5_5_estabilidad_minima_proceso_ventana(self):
+        """El proceso y su ventana permanecen estables durante un intervalo definido."""
+        pf = self.preflight.check({
+            "name": _CHARMAP_NOMBRE, "app_id": "",
+        })
+        self.assertTrue(pf.get("allowed", False), f"preflight: {pf.get('reason')}")
+
+        resultado = self.cal.launch_application({
+            "name": _CHARMAP_NOMBRE,
+            "app_id": "",
+            "path": _CHARMAP_PATH,
+            "arguments": "",
+        })
+        ok = bool(resultado[1]) if isinstance(resultado, tuple) else bool(resultado)
+        self.assertTrue(ok, "launch_application no informo exito al abrir charmap")
+
+        root_pid = getattr(self.cal, "_last_launch_root_pid", None)
+        was_owned = bool(getattr(self.cal, "_last_launch_was_owned", False))
+        self.assertTrue(was_owned, "charmap no fue lanzado como proceso propio")
+        self.assertIsNotNone(root_pid, "no se obtuvo root_pid del lanzamiento")
+        self.proc_pid = int(root_pid)
+
+        # Esperar la ventana (3.8.5.5.3).
+        espera = self.cal.wait_for_application_window(
+            root_pid=root_pid,
+            application_name=_CHARMAP_NOMBRE,
+            app_id="",
+            timeout=8.0,
+            poll_interval=0.4,
+        )
+        self.assertEqual(
+            espera["status"], "VENTANA_DETECTADA",
+            f"se esperaba ventana detectada, obtuvo: {espera}",
+        )
+        ventana = espera["window"]
+        self.assertIsNotNone(ventana, "no se devolvio objeto de ventana")
+
+        # Verificar que la ventana es visible y corresponde (3.8.5.5.4).
+        verificacion = self.cal.verify_visible_window_for_application(
+            ventana,
+            application_name=_CHARMAP_NOMBRE,
+            app_id="",
+            root_pid=root_pid,
+            owned_pids=getattr(self.cal, "_last_launch_owned_pids", set()),
+        )
+        self.assertTrue(verificacion["verificada"], f"no verificada: {verificacion['reason']}")
+        self.assertTrue(verificacion["visible"])
+
+        # Estabilidad minima del proceso y la ventana durante un intervalo (3.8.5.5.5).
+        estabilidad = self.cal.verify_estabilidad_minima_proceso_ventana(
+            root_pid=root_pid,
+            window=ventana,
+            application_name=_CHARMAP_NOMBRE,
+            app_id="",
+            estabilidad_interval=1.5,
+            estabilidad_checks=3,
+        )
+        self.assertEqual(estabilidad["status"], "ESTABLE", f"no estable: {estabilidad}")
+        self.assertTrue(estabilidad["estable"], f"no estable: {estabilidad}")
+        self.assertTrue(estabilidad["process_alive"], "el proceso no estuvo vivo")
+        self.assertTrue(estabilidad["window_valida"], "la ventana no estuvo valida")
+        self.assertTrue(estabilidad["window_visible"], "la ventana no estuvo visible")
+        self.assertTrue(estabilidad["ventana_pertenece_proceso"], "la ventana no pertenece al proceso")
+        self.assertEqual(estabilidad["checks_passed"], 3)
+        self.assertEqual(estabilidad["total_checks"], 3)
+        self.assertEqual(estabilidad["pid"], root_pid)
+        self.assertIn("estables", estabilidad["reason"])
+
     # ---- 3.8.5.5.7: evidencia tecnica minima del resultado ----
     def test_3_8_5_5_7_evidencia_tecnica_minima(self):
         """La evidencia tecnica minima incluye tipo de destino, fuente, ruta, PID, ventana y tiempos."""
@@ -205,6 +275,35 @@ class TestVerificacionProcesoDespuesLanzamientoEntornoReal(unittest.TestCase):
         # Verificar que no se registre contenido privado ni argumentos secretos
         self.assertNotIn("arguments", evidencia)
         self.assertNotIn("command_line", evidencia)
+
+        # Campos requeridos por 3.8.5.5.7: tipo de destino, fuente,
+        # destino validado, tiempos y ventana.
+        self.assertEqual(evidencia["tipo_destino"], "ejecutable")
+        self.assertEqual(evidencia["fuente"], "ruta_directa")
+        self.assertIsInstance(evidencia["destino_validado"], str)
+        self.assertEqual(
+            evidencia["destino_validado"].lower(), _CHARMAP_PATH.lower(),
+            "el destino validado debe ser la ruta de lanzamiento"
+        )
+        self.assertIsInstance(evidencia["timestamps"], dict)
+        self.assertIn("inicio", evidencia["timestamps"])
+        self.assertIsInstance(evidencia["ventana"], dict)
+        self.assertIsNotNone(
+            evidencia["ventana"].get("hwnd"), "evidencia sin hwnd de ventana"
+        )
+
+        # Guardar evidencia y verificar persistencia JSON sin secretos
+        ruta_guardada = self.cal.guardar_evidencia_lanzamiento()
+        self.assertIsInstance(ruta_guardada, str)
+        self.assertTrue(os.path.exists(ruta_guardada), "el archivo de evidencia no se escribio")
+        with open(ruta_guardada, "r", encoding="utf-8") as f:
+            guardado = json.load(f)
+        self.assertEqual(guardado["tipo_destino"], "ejecutable")
+        self.assertEqual(guardado["fuente"], "ruta_directa")
+        self.assertIsInstance(guardado["owned_pids"], list)
+        self.assertIsInstance(guardado["owned_hwnds"], list)
+        self.assertNotIn("arguments", guardado)
+        self.assertNotIn("command_line", guardado)
 
 
 if __name__ == "__main__":
