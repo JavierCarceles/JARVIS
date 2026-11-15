@@ -22,7 +22,8 @@ incompatibles que exist\u00edan con anterioridad (faltaba ``name`` en visi\u00f3
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, List, Optional
+from enum import Enum
+from typing import Any, Dict, Iterable, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -40,6 +41,46 @@ def _as_int_list(value: Any, expected_len: int) -> Optional[List[int]]:
         return [int(round(float(item))) for item in value]  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return None
+
+
+# ---------------------------------------------------------------------------
+# Clasificacion de elementos segun la evidencia de interactividad (unidad 3.8.6.3.3.10)
+# ---------------------------------------------------------------------------
+
+class ElementClassification(str, Enum):
+    """Clasificacion de un elemento UI segun la evidencia de interactividad.
+
+    Solo UIA_ACTIONABLE acredita interactividad verificada (patron de accion
+    UIA utilizable, habilitado, visible y dentro de pantalla). Los demas
+    valores describen el elemento sin garantizar que se pueda actuar sobre
+    el.
+    """
+
+    UIA_ACTIONABLE = "uia_actionable"
+    VISUAL_INTERACTABLE_CANDIDATE = "visual_interactable_candidate"
+    TEXT_LABEL = "text_label"
+    CONTAINER = "container"
+    STATIC_CONTENT = "static_content"
+    OFFSCREEN = "offscreen"
+    DISABLED = "disabled"
+    UNKNOWN = "unknown"
+
+
+# Patrones de control UIA que acreditan capacidad de interaccion. Coincide
+# con el conjunto usado por ui_automation_adapter y visual_ui_detector_fusion.
+CLASSIFICATION_ACTIONABLE_PATTERNS = frozenset({
+    "Invoke", "Value", "Toggle", "Selection", "ExpandCollapse",
+    "Scroll", "Window", "Transform",
+})
+
+# Tipos canonicos que representan un contenedor de otros controles.
+CLASSIFICATION_CONTAINER_TYPES = frozenset({"menu", "toolbar"})
+
+# Tipos canonicos con rol interactivo aparente (candidato sin verificar).
+CLASSIFICATION_INTERACTIVE_TYPES = frozenset({
+    "button", "link", "checkbox", "radio", "input", "address_bar",
+    "field", "select",
+})
 
 
 class UIElementData(BaseModel):
@@ -69,6 +110,7 @@ class UIElementData(BaseModel):
     calibrated: bool = False
     calibration_data: Optional[Dict[str, Any]] = None
     required_capability: Optional[str] = None
+    classification: ElementClassification = ElementClassification.UNKNOWN
 
     # ------------------------------------------------------------------
     # Consultas semánticas
@@ -283,4 +325,93 @@ def normalize_element_type(type_str: Any) -> str:
     return _ELEMENT_TYPE_LOOKUP.get(key, "element")
 
 
-__all__ = ["UIElementData", "CANONICAL_ELEMENT_TYPES", "normalize_element_type"]
+def classify_element(
+    element: UIElementData,
+    uia_patterns: Optional[Iterable[str]] = None,
+    enabled: Optional[bool] = None,
+    visible: Optional[bool] = None,
+    offscreen: Optional[bool] = None,
+) -> ElementClassification:
+    """Clasifica un elemento segun la evidencia de interactividad disponible.
+
+    Solo se declara interactividad verificada (UIA_ACTIONABLE) cuando hay un
+    patron de accion UIA utilizable y el control esta habilitado, visible y
+    dentro de pantalla. Un elemento detectado solo visualmente (por ejemplo,
+    un icono) queda como VISUAL_INTERACTABLE_CANDIDATE hasta que exista un
+    patron UIA o una prueba controlada que demuestre la accion sobre el control.
+
+    Prioridad de decision:
+      1. OFFSCREEN: el elemento esta fuera de pantalla.
+      2. DISABLED: el control esta deshabilitado.
+      3. UIA_ACTIONABLE: patron UIA de accion + habilitado + visible + en pantalla.
+      4. TEXT_LABEL: tipo canonico "text".
+      5. CONTAINER: tipo canonico "menu" o "toolbar".
+      6. STATIC_CONTENT: tipo generico "element" sin rol interactivo.
+      7. VISUAL_INTERACTABLE_CANDIDATE: tipo interactivo aparente detectado visualmente, sin verificar.
+      8. UNKNOWN: no se pudo clasificar.
+
+    Argumentos:
+        element: elemento canonico (se usa su tipo normalizado).
+        uia_patterns: patrones de control UIA reportados para el elemento.
+        enabled: si el control esta habilitado segun UIA; None = desconocido.
+        visible: si el control es visible; None = desconocido.
+        offscreen: si el control esta fuera de pantalla; None = desconocido.
+
+    Retorna:
+        ElementClassification correspondiente.
+    """
+    raw_type = str(element.type or "").strip().lower()
+    etype = normalize_element_type(element.type)
+
+    offscreen_flag = bool(offscreen) if offscreen is not None else False
+    if offscreen_flag:
+        return ElementClassification.OFFSCREEN
+
+    enabled_flag = bool(enabled) if enabled is not None else True
+    if not enabled_flag:
+        return ElementClassification.DISABLED
+
+    visible_flag = bool(visible) if visible is not None else True
+
+    patterns = set(str(p) for p in (uia_patterns or ()))
+    if patterns & CLASSIFICATION_ACTIONABLE_PATTERNS:
+        if enabled_flag and visible_flag and not offscreen_flag:
+            return ElementClassification.UIA_ACTIONABLE
+
+    if etype == "text":
+        return ElementClassification.TEXT_LABEL
+
+    if etype in CLASSIFICATION_CONTAINER_TYPES:
+        return ElementClassification.CONTAINER
+
+    if etype in CLASSIFICATION_INTERACTIVE_TYPES:
+        return ElementClassification.VISUAL_INTERACTABLE_CANDIDATE
+
+    if etype == "element":
+        # Tipo generico: puede ser un icono detectado visualmente (candidato
+        # sin verificar), un generico explicito (estatico) o un tipo no
+        # reconocido (desconocido).
+        if raw_type in ("", "unknown"):
+            return ElementClassification.UNKNOWN
+        if raw_type == "element":
+            # Solo se considera candidato interactivo si la deteccion visual
+            # lo marco como interactivo y expone geometria utilizable.
+            if bool(element.interactive) and element.has_valid_geometry():
+                return ElementClassification.VISUAL_INTERACTABLE_CANDIDATE
+            return ElementClassification.STATIC_CONTENT
+        # normalize devolve "element" como fallback para tipos no reconocidos
+        return ElementClassification.UNKNOWN
+
+    return ElementClassification.UNKNOWN
+
+
+__all__ = [
+    "UIElementData",
+    "ElementClassification",
+    "classify_element",
+    "CANONICAL_ELEMENT_TYPES",
+    "normalize_element_type",
+    "CLASSIFICATION_ACTIONABLE_PATTERNS",
+    "CLASSIFICATION_CONTAINER_TYPES",
+    "CLASSIFICATION_INTERACTIVE_TYPES",
+]

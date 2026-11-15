@@ -2,7 +2,7 @@
 
 > **Alcance:** documentación generada a partir de los **ficheros de prueba** (`tests/`, espejo de `src/`).
 > Cada entrada se deriva de las firmas, docstrings y clases de test extraídas mediante AST de los 151 ficheros de test (excluyendo `__pycache__`, `test__init__.py` placeholders vacíos, `__init__.py` y scripts auxiliares sin prefijo `test_`).
-> Total: 796 clases de test, 4079 métodos de test individuales.
+> Total: 802 clases de test, 4110 métodos de test individuales.
 
 ## 🗺️ Índice
 
@@ -16,6 +16,7 @@
 - [`eyes\test_application_state_enumeration.py`](#eyes/test-application_state_enumeration)
 - [`eyes\test_application_state_separation.py`](#eyes/test-application_state_separation)
 - [`eyes\test_application_state_unknown.py`](#eyes/test-application_state_unknown)
+- [`eyes\test_element_classification_integration.py`](#eyes/test-element_classification_integration)
 - [`eyes\test_screen.py`](#eyes/test-screen)
 - [`eyes\test_screen_capture.py`](#eyes/test-screen_capture)
 - [`eyes\test_state_comparison.py`](#eyes/test-state_comparison)
@@ -116,6 +117,8 @@
 - [`hands\test_inventario_volumen_significativo_entorno_real.py`](#hands/test-inventario_volumen_significativo_entorno_real)
 - [`hands\test_inventario_no_alteracion_ejecucion_completa_entorno_real.py`](#hands/test-inventario_no_alteracion_ejecucion_completa_entorno_real)
 - [`hands\test_filesystem_observer.py`](#hands/test-filesystem_observer)
+- [`hands\test_ui_automation_adapter.py`](#hands/test-ui_automation_adapter)
+- [`hands\test_ui_automation_framework.py`](#hands/test-ui_automation_framework)
 - [`hands\test_ui_elements.py`](#hands/test-ui_elements)
 - [`hands\test_ui_elements_final.py`](#hands/test-ui_elements_final)
 - [`hands\test_ui_elements_minimal.py`](#hands/test-ui_elements_minimal)
@@ -186,6 +189,7 @@
 - [`utils\test_contextual_pattern_recognizer.py`](#utils/test-contextual_pattern_recognizer)
 - [`utils\test_contextual_pattern_recognizer_legacy.py`](#utils/test-contextual_pattern_recognizer_legacy)
 - [`utils\test_dynamic_resource_allocator.py`](#utils/test-dynamic_resource_allocator)
+- [`utils\test_element_classification.py`](#utils/test-element_classification)
 - [`utils\test_meta_learning_system.py`](#utils/test-meta_learning_system)
 - [`utils\test_pattern_analyzer.py`](#utils/test-pattern_analyzer)
 - [`utils\test_performance_optimizer.py`](#utils/test-performance_optimizer)
@@ -1010,6 +1014,23 @@ aceptados por ApplicationState().
 
   - **`test_screen_application_state_valid_values`** (L278)
     - Verifica que todos los valores del Enum de screen son aceptados.
+
+---
+
+<a name="eyes/test-element_classification_integration"></a>
+### `eyes\test_element_classification_integration.py`
+
+**Descripción:** Tests de integracion real de clasificacion de elementos UI sobre el arbol UI Automation de una ventana real (Notepad). Verifica que la clasificacion discrimina categorias: UIA_ACTIONABLE solo con patron de accion UIA, y OFFSCREEN/DISABLED nunca actionables.
+
+**Modulos de origen probados:** src.hands.ui_automation_adapter, src.eyes.visual_ui_detector_fusion, src.utils.ui_element_model
+
+**Clases de test:**
+
+- **`TestClasificacionIntegracionNotepad`** — Clasificacion sobre el arbol UIA real de Notepad.
+  - `test_arbol_uia_real_devuelve_elementos` — Comprueba que el arbol UIA de Notepad se enumera sin errores y con elementos.
+  - `test_clasificacion_tiene_actionable_y_textos` — Comprueba que hay elementos UIA_ACTIONABLE, que la clasificacion discrimina (no todo es actionable) y que UIA_ACTIONABLE siempre tiene patron de accion UIA.
+
+**Modo de ejecución:** Solo se ejecutan si `JARVIS_TEST_GUI_REAL=1`. Abre y cierra una sola ventana de Notepad por sesión (ciclo de vida propio, cierre en `atexit`). Operación de solo lectura sobre el arbol UIA; no envía input ni invoca patrones de acción.
 
 ---
 
@@ -2653,7 +2674,44 @@ usar CLOSED como fallback seguro.
 
 ## 📂 `hands/`
 
-68 ficheros de test, 2569 métodos de test.
+69 ficheros de test, 2600 métodos de test.
+
+<a name="hands/test-ui_automation_adapter"></a>
+### `hands\test_ui_automation_adapter.py`
+
+**Descripción:** Tests de integración del adaptador de Windows UI Automation. Verifica contrato/logica pura (sin GUI) y pruebas de integración real sobre Notepad (enumeración de árbol UIA, propiedades reales, patrones de control, clasificación de elementos actionable).
+
+**Módulos de origen probados:** src.hands.ui_automation_adapter, src.utils.screen_manager
+
+**Clases de test:**
+
+- **`TestUIAutomationAdapterContract`** — 12 método(s) de test: patrones de control, clasificación actionable, serialización, límites de enumeración, rutas pywinauto y COM fallback.
+- **`TestUIAutomationAdapterRealWindow`** — 7 método(s) de test: integración real sobre Notepad en monitor secundario (árbol UIA, propiedades, patrones, clasificación). Solo lectura, una ventana por prueba, cierre en tearDown.
+- **`TestUIAutomationTreeEnumeration`** — 7 método(s) de test: mapeo de propiedades, duplicados, truncado por profundidad/cantidad, proveedores incompletos.
+
+Modo de ejecución: las pruebas de `TestUIAutomationAdapterRealWindow` abren y cierran Notepad real en el monitor secundario derecho; no requieren `JARVIS_TEST_GUI_REAL` pero siguen las reglas de una sola ventana GUI por prueba.
+
+---
+
+<a name="hands/test-ui_automation_framework"></a>
+### `hands\test_ui_automation_framework.py`
+
+**Descripción:** Tests de clasificación de framework y cobertura por framework (unidad 3.8.6.3.3.11). Verifica classify_framework(), get_framework_coverage(), UIAutomationAdapter.get_framework_summary() y el campo framework de UIAutomationTest. Incluye integración real sobre Notepad (framework Win32) en monitor secundario.
+
+**Módulos de origen probados:** src.hands.ui_automation_adapter, src.utils.screen_manager
+
+**Clases de test:**
+
+- **`TestClassifyFramework`** — 16 método(s) de test: mapeo de framework_id (Win32, WinForms, WPF, UWP, Qt, Chromium/Electron, navegadores, DirectX/OpenGL, juegos, overlay, contenido remoto, pantalla protegida, custom_drawn, unknown).
+- **`TestGetFrameworkCoverage`** — 6 método(s) de test: cobertura UIA, fiabilidad y fallback por framework (win32, qt, chromium_electron, custom_drawn, protected_screen, unknown).
+- **`TestFrameworkCoverageSerialization`** — 1 método(s) de test: serialización de FrameworkCoverage.
+- **`TestUIAutomationElementFramework`** — 2 método(s) de test: campo framework por defecto y serialización en to_dict().
+- **`TestGetFrameworkSummary`** — 3 método(s) de test: resumen de distribución de frameworks en un árbol UIA.
+- **`TestFrameworkRealNotepad`** — 2 método(s) de test: integración real sobre Notepad real (clasificación de framework y resumen de cobertura). Solo lectura, una ventana por prueba, cierre en tearDown.
+
+Modo de ejecución: las pruebas de `TestFrameworkRealNotepad` abren y cierran Notepad real en el monitor secundario derecho; siguen las reglas de una sola ventana GUI por prueba.
+
+---
 
 <a name="hands/planner/test-advanced_state_graph"></a>
 ### `hands\planner\test_advanced_state_graph.py`
@@ -15167,6 +15225,43 @@ Verificar el flujo completo de integración entre todos los componentes.
     - cleanup elimina todas las asignaciones
 
   Métodos auxiliares (no test): setUp
+
+---
+
+<a name="utils/test-element_classification"></a>
+### `utils\test_element_classification.py`
+
+**Descripción:** Tests unitarios de clasificacion de elementos UI. Verifica que classify_element asigna la categoria correcta segun la evidencia de interactividad: UIA_ACTIONABLE solo con patron de accion UIA, habilitado, visible y dentro de pantalla; un elemento detectado solo visualmente queda como candidato sin verificar.
+
+**Modulos de origen probados:** src.utils.ui_element_model
+
+**Clases de test:**
+
+- **`TestElementClassificationEnum`** — El enum expone las 8 categorias del roadmap.
+  - `test_categorias_esperadas` — Verifica que el enum expone exactamente las 8 categorias.
+  - `test_son_strings` — Verifica que cada valor es string.
+
+- **`TestClassifyElement`** — Logica pura de clasificacion.
+  - `test_elemento_sin_evidencia_es_unknown`
+  - `test_boton_con_patron_invoke_es_uia_actionable`
+  - `test_boton_con_patron_valor_es_uia_actionable`
+  - `test_boton_con_varios_patrones_uno_actionable_es_uia_actionable`
+  - `test_boton_sin_patron_uia_es_candidato_visual`
+  - `test_icono_visual_con_geometria_es_candidato_no_estatico`
+  - `test_elemento_generico_sin_geometria_es_estatico`
+  - `test_elemento_generico_interactivo_sin_geometria_es_estatico`
+  - `test_etiqueta_de_texto_es_text_label`
+  - `test_menu_es_contenedor`
+  - `test_toolbar_es_contenedor`
+  - `test_link_es_candidato_visual`
+  - `test_fuera_de_pantalla_es_offscreen_incluso_con_patron_uia`
+  - `test_deshabilitado_es_disabled_incluso_con_patron_uia`
+  - `test_patron_uia_sin_habilitado_ni_visible_no_es_actionable`
+  - `test_patron_no_actionable_no_hace_uia_actionable`
+  - `test_tipo_desconocido_es_unknown`
+  - `test_tipo_vacio_es_unknown`
+
+**Modo de ejecución:** Pruebas unitarias puras (sin GUI ni modelos). Siempre ejecutables.
 
 ---
 

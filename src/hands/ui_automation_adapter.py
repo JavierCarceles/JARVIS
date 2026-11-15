@@ -64,6 +64,283 @@ ACTIONABLE_PATTERNS = {
 MAX_ELEMENTS = 2000
 MAX_DEPTH = 60
 
+# ---------------------------------------------------------------------------
+# Clasificacion de framework y registro de cobertura por framework (unidad 3.8.6.3.3.11)
+# ---------------------------------------------------------------------------
+
+class FrameworkCoverage:
+    """Describe el nivel de soporte de UI Automation para un framework y el fallback disponible.
+
+    No asume que pywinauto/UIA se comporte igual en todos los frameworks:
+    cada entrada declara de forma independiente cuanta cobertura ofrece UIA,
+    si es fiable y que fallback esta disponible (o None si no hay ninguno).
+    """
+
+    def __init__(
+        self,
+        framework: str,
+        category: str,
+        uia_coverage: str,
+        uia_reliable: bool,
+        fallback: Optional[str],
+        fallback_available: bool,
+        notes: str,
+    ) -> None:
+        self.framework = framework
+        self.category = category
+        self.uia_coverage = uia_coverage
+        self.uia_reliable = uia_reliable
+        self.fallback = fallback
+        self.fallback_available = fallback_available
+        self.notes = notes
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "framework": self.framework,
+            "category": self.category,
+            "uia_coverage": self.uia_coverage,
+            "uia_reliable": bool(self.uia_reliable),
+            "fallback": self.fallback,
+            "fallback_available": bool(self.fallback_available),
+            "notes": self.notes,
+        }
+
+
+# CATEGORIAS DE FRAMEWORK
+FRAMEWORK_CAT_DESKTOP_NATIVE = "desktop_native"
+FRAMEWORK_CAT_BROWSER = "browser"
+FRAMEWORK_CAT_CUSTOM_RENDER = "custom_render"
+FRAMEWORK_CAT_PROTECTED = "protected"
+FRAMEWORK_CAT_UNKNOWN = "unknown"
+
+# NIVELES DE COBERTURA UIA
+UIA_COVERAGE_FULL = "full"
+UIA_COVERAGE_PARTIAL = "partial"
+UIA_COVERAGE_NONE = "none"
+
+# Fallbacks reconocidos (nombres logicos, no rutas ni coordenadas)
+FALLBACK_NONE = None
+FALLBACK_VISION_OCR = "vision_ocr"
+FALLBACK_CDP = "chrome_devtools_protocol"
+FALLBACK_QACCESSIBLE = "qaccessible"
+
+
+# Registro de cobertura por framework. Cada clave es el nombre canonico de
+# framework devuelto por classify_framework(). Ninguna entrada asume cobertura
+# uniforme: cada framework declara su propio nivel y fallback.
+FRAMEWORK_COVERAGE: Dict[str, FrameworkCoverage] = {
+    "win32": FrameworkCoverage(
+        framework="win32",
+        category=FRAMEWORK_CAT_DESKTOP_NATIVE,
+        uia_coverage=UIA_COVERAGE_FULL,
+        uia_reliable=True,
+        fallback=None,
+        fallback_available=False,
+        notes="Controles Win32 nativos. UI Automation expide arbol completo, patrones y geometria sin limitaciones conocidas.",
+    ),
+    "winforms": FrameworkCoverage(
+        framework="winforms",
+        category=FRAMEWORK_CAT_DESKTOP_NATIVE,
+        uia_coverage=UIA_COVERAGE_FULL,
+        uia_reliable=True,
+        fallback=None,
+        fallback_available=False,
+        notes="Windows Forms. UI Automation suele exponer nombre, tipo, patrones y bounding box de forma fiable.",
+    ),
+    "wpf": FrameworkCoverage(
+        framework="wpf",
+        category=FRAMEWORK_CAT_DESKTOP_NATIVE,
+        uia_coverage=UIA_COVERAGE_FULL,
+        uia_reliable=True,
+        fallback=None,
+        fallback_available=False,
+        notes="WPF. UI Automation expide arbol y patrones; algunos controles personalizados pueden no exponer AutomationId.",
+    ),
+    "uwp_appx": FrameworkCoverage(
+        framework="uwp_appx",
+        category=FRAMEWORK_CAT_DESKTOP_NATIVE,
+        uia_coverage=UIA_COVERAGE_PARTIAL,
+        uia_reliable=True,
+        fallback=None,
+        fallback_available=False,
+        notes="UWP/AppX (DirectUI). UI Automation funciona pero algunos controles de la tienda tienen patrones limitados o jerarquia virtualizada.",
+    ),
+    "qt": FrameworkCoverage(
+        framework="qt",
+        category=FRAMEWORK_CAT_DESKTOP_NATIVE,
+        uia_coverage=UIA_COVERAGE_PARTIAL,
+        uia_reliable=False,
+        fallback=FALLBACK_QACCESSIBLE,
+        fallback_available=False,
+        notes="Qt. UI Automation puede exponer arbol parcial; patrones y nombres dependen de la version de Qt y de QAccessibleBridge. No se asume cobertura completa.",
+    ),
+    "chromium_electron": FrameworkCoverage(
+        framework="chromium_electron",
+        category=FRAMEWORK_CAT_BROWSER,
+        uia_coverage=UIA_COVERAGE_PARTIAL,
+        uia_reliable=False,
+        fallback=FALLBACK_CDP,
+        fallback_available=False,
+        notes="Chromium/Electron (Chrome, Edge, apps Electron). UI Automation ve el contenedor HWND pero el contenido renderizado (DOM/Canvas) no es accesible por UIA. Fallback: Chrome DevTools Protocol si el navegador lo expone con puerto de depuracion.",
+    ),
+    "browser_legacy": FrameworkCoverage(
+        framework="browser_legacy",
+        category=FRAMEWORK_CAT_BROWSER,
+        uia_coverage=UIA_COVERAGE_PARTIAL,
+        uia_reliable=False,
+        fallback=None,
+        fallback_available=False,
+        notes="Navegadores legacy (IE, EdgeHTML). Cobertura parcial y no garantizada por UIA.",
+    ),
+    "browser_gecko": FrameworkCoverage(
+        framework="browser_gecko",
+        category=FRAMEWORK_CAT_BROWSER,
+        uia_coverage=UIA_COVERAGE_PARTIAL,
+        uia_reliable=False,
+        fallback=None,
+        fallback_available=False,
+        notes="Motor Gecko (Firefox). UI Automation tiene soporte limitado; no se asume cobertura de contenido web.",
+    ),
+    "custom_drawn": FrameworkCoverage(
+        framework="custom_drawn",
+        category=FRAMEWORK_CAT_CUSTOM_RENDER,
+        uia_coverage=UIA_COVERAGE_NONE,
+        uia_reliable=False,
+        fallback=FALLBACK_VISION_OCR,
+        fallback_available=False,
+        notes="Controles dibujados a medida (canvas, custom paint, DirectX/OpenGL, juegos). UI Automation no expone controles internos. Fallback: vision/OCR sobre captura de pantalla.",
+    ),
+    "directx_opengl": FrameworkCoverage(
+        framework="directx_opengl",
+        category=FRAMEWORK_CAT_CUSTOM_RENDER,
+        uia_coverage=UIA_COVERAGE_NONE,
+        uia_reliable=False,
+        fallback=FALLBACK_VISION_OCR,
+        fallback_available=False,
+        notes="Superficies DirectX/OpenGL y juegos. UI Automation no accede al contenido renderizado. Fallback: vision/OCR.",
+    ),
+    "game": FrameworkCoverage(
+        framework="game",
+        category=FRAMEWORK_CAT_CUSTOM_RENDER,
+        uia_coverage=UIA_COVERAGE_NONE,
+        uia_reliable=False,
+        fallback=FALLBACK_VISION_OCR,
+        fallback_available=False,
+        notes="Juegos y aplicaciones con renderizado propio. UI Automation no expide controles interactivos. Fallback: vision/OCR.",
+    ),
+    "overlay": FrameworkCoverage(
+        framework="overlay",
+        category=FRAMEWORK_CAT_CUSTOM_RENDER,
+        uia_coverage=UIA_COVERAGE_PARTIAL,
+        uia_reliable=False,
+        fallback=None,
+        fallback_available=False,
+        notes="Overlays y ventanas flotantes. UI Automation puede ver la ventana pero no garantiza controles internos ni estabilidad de geometria.",
+    ),
+    "remote_content": FrameworkCoverage(
+        framework="remote_content",
+        category=FRAMEWORK_CAT_CUSTOM_RENDER,
+        uia_coverage=UIA_COVERAGE_NONE,
+        uia_reliable=False,
+        fallback=None,
+        fallback_available=False,
+        notes="Contenido remoto (escritorio remoto, citrix, streaming). UI Automation no accede al contenido del lado remoto.",
+    ),
+    "protected_screen": FrameworkCoverage(
+        framework="protected_screen",
+        category=FRAMEWORK_CAT_PROTECTED,
+        uia_coverage=UIA_COVERAGE_NONE,
+        uia_reliable=False,
+        fallback=None,
+        fallback_available=False,
+        notes="Pantallas protegidas (DRM, contenido protegido, ventanas de credenciales seguras). Captura e interaccion bloqueadas por el SO.",
+    ),
+    "unknown": FrameworkCoverage(
+        framework="unknown",
+        category=FRAMEWORK_CAT_UNKNOWN,
+        uia_coverage=UIA_COVERAGE_NONE,
+        uia_reliable=False,
+        fallback=FALLBACK_VISION_OCR,
+        fallback_available=False,
+        notes="Framework no identificado. No se asume cobertura de UIA; se recomienda verificacion visual/OCR antes de cualquier interaccion.",
+    ),
+}
+
+
+def classify_framework(
+    framework_id: Optional[str],
+    class_name: Optional[str] = None,
+    control_type: Optional[str] = None,
+) -> str:
+    """Clasifica el framework de un control UI Automation.
+
+    Argumentos:
+        framework_id: valor bruto de CurrentFrameworkId del proveedor UIA.
+        class_name: nombre de clase del control (pista secundaria).
+        control_type: tipo de control UIA (pista secundaria).
+
+    Retorna:
+        Nombre canonico de framework: win32, winforms, wpf, uwp_appx, qt,
+        chromium_electron, browser_legacy, browser_gecko, custom_drawn,
+        directx_opengl, game, overlay, remote_content, protected_screen o unknown.
+
+    Nota: framework_id vacio no se rellena por inferencia visual; se clasifica
+    como custom_drawn si hay class_name (indica que UIA ve algo pero no sabe el
+    framework) o unknown si no hay ninguna pista.
+    """
+    fid = (framework_id or "").strip()
+    cls = (class_name or "").strip()
+    ctype = (control_type or "").strip()
+
+    if not fid:
+        # framework_id vacio: UIA no expone el framework del proveedor.
+        # Puede ser custom-drawn, DirectX, juego, overlay o desconocido.
+        # No inferimos por class_name para no asumir: solo marcamos la pista.
+        if cls:
+            return "custom_drawn"
+        return "unknown"
+
+    fid_lower = fid.lower()
+
+    if fid_lower == "win32":
+        return "win32"
+    if fid_lower == "winforms":
+        return "winforms"
+    if fid_lower == "wpf":
+        return "wpf"
+    if fid_lower in ("uwp", "directui", "windows.ui.xaml", "directuihost"):
+        return "uwp_appx"
+    if fid_lower in ("qt", "qwidget", "qquickwindow", "qwindow"):
+        return "qt"
+    if fid_lower in (
+        "chrome", "chromium", "chrome_renderwidgethosthwnd",
+        "chrome_legacy_window", "electron",
+    ):
+        return "chromium_electron"
+    if fid_lower in ("ie", "internet_explorer", "edgehtml", "trident"):
+        return "browser_legacy"
+    if "firefox" in fid_lower or "mozilla" in fid_lower or "gecko" in fid_lower:
+        return "browser_gecko"
+    if "directx" in fid_lower or "opengl" in fid_lower or "d3d" in fid_lower:
+        return "directx_opengl"
+    if "game" in fid_lower or "unreal" in fid_lower or "unity" in fid_lower:
+        return "game"
+    if "overlay" in fid_lower:
+        return "overlay"
+    if "remote" in fid_lower or "citrix" in fid_lower or "rdp" in fid_lower:
+        return "remote_content"
+    if "protected" in fid_lower or "secure" in fid_lower:
+        return "protected_screen"
+
+    # framework_id no vacio pero no reconocido: se conserva tal cual en minusculas
+    # como identificativo de framework desconocido.
+    return "unknown"
+
+
+def get_framework_coverage(framework: str) -> FrameworkCoverage:
+    """Devuelve la cobertura registrada para un framework, o la entrada unknown si no esta registrada."""
+    return FRAMEWORK_COVERAGE.get(framework, FRAMEWORK_COVERAGE["unknown"])
+
 
 @dataclass
 class UIAutomationElement:
@@ -82,6 +359,7 @@ class UIAutomationElement:
     visible: bool = False
     handle: int = 0
     framework_id: str = ""
+    framework: str = ""
     parent_handle: int = 0
     child_count: int = 0
     patterns: List[str] = field(default_factory=list)
@@ -103,6 +381,7 @@ class UIAutomationElement:
             "visible": self.visible,
             "handle": self.handle,
             "framework_id": self.framework_id,
+            "framework": self.framework,
             "parent_handle": self.parent_handle,
             "child_count": self.child_count,
             "patterns": list(self.patterns),
@@ -241,6 +520,72 @@ class UIAutomationAdapter:
             if any(p in ACTIONABLE_PATTERNS for p in elem.patterns):
                 result.append(elem)
         return result
+
+    # ------------------------------------------------------------------
+    # Cobertura por framework (unidad 3.8.6.3.3.11)
+    # ------------------------------------------------------------------
+
+    def get_framework_coverage(self, framework: str) -> FrameworkCoverage:
+        """Devuelve la informacion de cobertura registrada para un framework.
+
+        Argumentos:
+            framework: nombre canonico de framework (win32, wpf, qt,
+                chromium_electron, custom_drawn, unknown, etc.).
+
+        Retorna:
+            FrameworkCoverage con cobertura UIA, fiabilidad y fallback.
+        """
+        return get_framework_coverage(framework)
+
+    def get_framework_summary(self, tree: UIAutomationTree) -> Dict[str, Any]:
+        """Resume la distribucion de frameworks y cobertura de un arbol UIA.
+
+        Argumentos:
+            tree: arbol UIAutomationTree ya enumerado.
+
+        Retorna:
+            Diccionario con:
+              - total_elements: cantidad de elementos del arbol
+              - by_framework: dict {nombre_framework: {count, coverage, uia_reliable, fallback, fallback_available}}
+              - frameworks_detectados: lista de nombres canonicos presentes
+              - frameworks_sin_cobertura: frameworks con cobertura none o unknown
+              - elementos_con_framework_desconocido: count de elementos con framework unknown
+        """
+        by_framework: Dict[str, Dict[str, Any]] = {}
+        frameworks_detectados: Set[str] = set()
+        frameworks_sin_cobertura: List[str] = []
+        elementos_desconocidos = 0
+
+        for elem in tree.elements:
+            fw = elem.framework or "unknown"
+            frameworks_detectados.add(fw)
+            coverage = get_framework_coverage(fw)
+
+            if fw not in by_framework:
+                by_framework[fw] = {
+                    "count": 0,
+                    "coverage": coverage.uia_coverage,
+                    "uia_reliable": coverage.uia_reliable,
+                    "fallback": coverage.fallback,
+                    "fallback_available": coverage.fallback_available,
+                    "notes": coverage.notes,
+                }
+            by_framework[fw]["count"] += 1
+
+            if coverage.uia_coverage in (UIA_COVERAGE_NONE,) or fw == "unknown":
+                if fw not in frameworks_sin_cobertura:
+                    frameworks_sin_cobertura.append(fw)
+
+            if fw == "unknown":
+                elementos_desconocidos += 1
+
+        return {
+            "total_elements": len(tree.elements),
+            "by_framework": by_framework,
+            "frameworks_detectados": sorted(frameworks_detectados),
+            "frameworks_sin_cobertura": frameworks_sin_cobertura,
+            "elementos_con_framework_desconocido": elementos_desconocidos,
+        }
 
     # ------------------------------------------------------------------
     # Enumeracion con pywinauto (uia)
@@ -397,6 +742,7 @@ class UIAutomationAdapter:
 
         is_offscreen = self._read_offscreen(info)
 
+        raw_framework_id = str(getattr(info, "framework_id", "") or "")
         return UIAutomationElement(
             automation_id=str(info.automation_id or ""),
             name=str(info.name or ""),
@@ -410,7 +756,12 @@ class UIAutomationAdapter:
             is_offscreen=is_offscreen,
             visible=bool(info.visible),
             handle=int(info.handle or 0),
-            framework_id=str(getattr(info, "framework_id", "") or ""),
+            framework_id=raw_framework_id,
+            framework=classify_framework(
+                raw_framework_id,
+                str(info.class_name or ""),
+                str(info.control_type or ""),
+            ),
             parent_handle=parent_handle,
             child_count=0,
             patterns=list(patterns),
@@ -610,6 +961,7 @@ class UIAutomationAdapter:
 
         patterns = self._collect_patterns_com(elem)
 
+        raw_framework_id = str(elem.CurrentFrameworkId or "")
         return UIAutomationElement(
             automation_id=str(elem.CurrentAutomationId or ""),
             name=str(elem.CurrentName or ""),
@@ -623,7 +975,12 @@ class UIAutomationAdapter:
             is_offscreen=offscreen,
             visible=visible,
             handle=handle,
-            framework_id=str(elem.CurrentFrameworkId or ""),
+            framework_id=raw_framework_id,
+            framework=classify_framework(
+                raw_framework_id,
+                str(elem.CurrentClassName or ""),
+                str(elem.CurrentControlTypeProgrammaticName or ""),
+            ),
             parent_handle=parent_handle,
             child_count=0,
             patterns=list(patterns),

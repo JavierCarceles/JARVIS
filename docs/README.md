@@ -2258,19 +2258,23 @@ Clases:
 | `class FileSystemChangeEvent` | Evento de cambio del sistema de archivos observado (tipo de evento, ruta y marca de tiempo ISO 8601 UTC). |
 | `class FileSystemObserver` | Observador opcional de cambios del sistema de archivos; inicio, detencion y consulta de disponibilidad. |
 
-### `src/hands/ui_automation_adapter.py` (670 lineas) - Adaptador de automatizacion de UI de Windows sobre UI Automation.
+### `src/hands/ui_automation_adapter.py` (1045 lineas) - Adaptador de automatizacion de UI de Windows sobre UI Automation.
 
 **Descripcion:** Capa reutilizable sobre pywinauto con backend="uia" y acceso al elemento AutomationElement subyacente (COM/UIAutomationCore via comtypes) cuando el backend de pywinauto no expone una propiedad o patron necesario. Recibe el HWND/PID de una ventana YA IDENTIFICADA y consulta solo el arbol UI Automation de esa ventana. Nunca enumera el escritorio ni ventanas ajenas. Durante el descubrimiento solo se leen propiedades y patrones disponibles; nunca se invocan patrones de accion (Invoke, Value, Toggle...) ni se modifica el estado de la ventana.
 
 **Caracteristicas:**
 
 - Conexion por HWND a una ventana ya abierta mediante pywinauto Application(backend="uia").connect(handle=hwnd).
-- Lectura de AutomationId, Name, ControlType, ClassName, BoundingRectangle, ProcessId, IsEnabled, IsOffscreen, RuntimeId, handle, framework_id, parent_handle, child_count, depth y patrones de control disponibles.
+- Lectura de AutomationId, Name, ControlType, ClassName, BoundingRectangle, ProcessId, IsEnabled, IsOffscreen, RuntimeId, handle, framework_id, framework (clasificado), parent_handle, child_count, depth y patrones de control disponibles.
 - Recorrido recursivo del arbol de hijos con limites de profundidad (MAX_DEPTH=60) y cantidad (MAX_ELEMENTS=2000) para evitar ciclos y arboles virtualizados.
 - Deteccion de patrones de control (Invoke, Value, Toggle, Selection, ExpandCollapse, Scroll, Text, RangeValue, Window, Transform, Grid, GridItem, SelectionItem, ScrollItem, Table, TableItem, LegacyIAccessible) solo lectura; nunca se invocan.
 - Fallback a IUIAutomation.ElementFromHandle (COM) si pywinauto no produce un arbol usable.
 - Metodo get_actionable_elements() que clasifica como candidatos a interaccion los elementos que declaran patrones de accion y estan habilitados, visibles y no fuera de pantalla.
 - Serializacion a diccionario plano (to_dict) de elementos y arboles para consumo por el planificador y la verificacion.
+- Clasificacion de framework por elemento (clasify_framework): Win32, WinForms, WPF, UWP/AppX, Qt, Chromium/Electron, navegadores legacy/Gecko, DirectX/OpenGL, juegos, overlay, contenido remoto, pantalla protegida, custom_drawn y unknown.
+- Registro de cobertura por framework (FRAMEWORK_COVERAGE): nivel de cobertura UIA (full/partial/none), fiabilidad, fallback disponible y notas por framework.
+- Metodo get_framework_coverage(framework) que devuelve la cobertura registrada para un framework.
+- Metodo get_framework_summary(tree) que resume la distribucion de frameworks, cobertura y elementos sin cobertura en un arbol UIA.
 - Sin persistencia de coordenadas fisicas ni de elementos en entities.json; el adaptador es de solo lectura.
 
 **Importaciones:** 12.
@@ -2282,6 +2286,7 @@ Clases:
 | `class UIAutomationElement` | Propiedades de un control del arbol UI Automation de una ventana. |
 | `class UIAutomationTree` | Resultado de la enumeracion del arbol UI Automation de una ventana. |
 | `class UIAutomationAdapter` | Adaptador reutilizable de Windows UI Automation. |
+| `class FrameworkCoverage` | Nivel de soporte de UI Automation para un framework y el fallback disponible. |
 
 Metodos de UIAutomationAdapter:
 
@@ -2290,6 +2295,8 @@ Metodos de UIAutomationAdapter:
 | `def __init__(timeout, max_depth, max_elements)` | Crea el adaptador con timeout, profundidad maxima y cantidad maxima de elementos. |
 | `def enumerate_window(hwnd, pid)` | Enumera el arbol UI Automation de la ventana identificada por hwnd. |
 | `def get_actionable_elements(tree)` | Devuelve elementos que declaran al menos un patron de accion legible. |
+| `def get_framework_coverage(framework)` | Devuelve la cobertura registrada para un framework (nivel UIA, fiabilidad, fallback). |
+| `def get_framework_summary(tree)` | Resume la distribucion de frameworks, cobertura y elementos sin cobertura de un arbol UIA. |
 | `def _window_exists(hwnd)` | Comprueba que el HWND corresponde a una ventana real de Windows. |
 | `def _enumerate_with_pywinauto(hwnd, pid, start)` | Enumera usando pywinauto con backend UI Automation. |
 | `def _enumerate_children(parent_info, parent_handle, depth, elements, seen_handles, pid)` | Enumera recursivamente los hijos directos de un elemento UIA. |
@@ -2304,6 +2311,8 @@ Funciones a nivel modulo:
 
 | Firma | Docstring |
 |---|---|
+| `def classify_framework(framework_id, class_name, control_type)` | Clasifica el framework de un control UI Automation a un nombre canonico. |
+| `def get_framework_coverage(framework)` | Devuelve la cobertura registrada para un framework, o unknown si no esta registrado. |
 | `def _pattern_id(pattern_name)` | Devuelve el ID numerico de un patron de control UIA, o None. |
 | `def uia_defines_property(name)` | Devuelve un property ID de UIA por nombre (fallback COM). |
 
@@ -7463,7 +7472,7 @@ Métodos:
 | `def __del__()` | Destructor |
 
 <a name="src-utils-ui_element_model-py"></a>
-### `src/utils/ui_element_model.py` [181 líneas] — Modelo canónico de elemento de interfaz de usuario (UI Element).
+### `src/utils/ui_element_model.py` [417 líneas] — Modelo canónico de elemento de interfaz de usuario (UI Element).
 
 **Descripción:** Modelo canónico de elemento de interfaz de usuario (UI Element).
 
@@ -7484,12 +7493,15 @@ Métodos:
 | `def from_compact_dict(cls, data)` | Construye desde la respuesta compacta del modelo de visión. |
 | `def normalize_name(name)` | Normaliza un nombre a clave canónica (uso interno/planificador). |
 
+`class ElementClassification(str, Enum)`  (línea 50) — Clasificacion de un elemento UI segun la evidencia de interactividad.
+
 Funciones a nivel módulo:
 
 | Firma | Docstring |
 |---|---|
 | `def _is_number(value)`  (L30) | Devuelve ``True`` solo para valores numéricos reales (no bool). |
 | `def _as_int_list(value, expected_len)`  (L35) | Normaliza ``value`` a una lista de enteros con longitud exacta. |
+| `def classify_element(element, uia_patterns=None, enabled=None, visible=None, offscreen=None)`  (L328) | Clasifica un elemento segun la evidencia de interactividad disponible. |
 
 <a name="src-utils-test_result_categorizer-py"></a>
 ### `src/utils/test_result_categorizer.py` [192 lineas] — Categorizador y reporte de resultados de prueba por tipo de verificacion.

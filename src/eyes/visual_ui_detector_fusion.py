@@ -22,6 +22,8 @@ from typing import Any, Dict, List, Optional, Tuple
 from src.utils.logger import get_logger
 from src.utils.ui_element_model import (
     UIElementData,
+    ElementClassification,
+    classify_element,
     normalize_element_type,
 )
 
@@ -198,6 +200,7 @@ class FusedCandidate:
     interactive: bool = False
     interactive_evidence: List[str] = field(default_factory=list)
     calibrated: bool = False
+    classification: ElementClassification = ElementClassification.UNKNOWN
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -218,6 +221,7 @@ class FusedCandidate:
             "interactive": bool(self.interactive),
             "interactive_evidence": list(self.interactive_evidence),
             "calibrated": bool(self.calibrated),
+            "classification": str(self.classification.value),
         }
 
 
@@ -590,6 +594,29 @@ class VisualUIDetectorFusion:
                 elif str(qwen_meta["apparent_function"]) not in description:
                     description = description + " | " + str(qwen_meta["apparent_function"])
 
+        # Clasificacion del candidato segun la evidencia de interactividad.
+        # Solo UIA_ACTIONABLE acredita interactividad verificada (patron UIA
+        # utilizable, habilitado, visible y dentro de pantalla). Un icono
+        # detectado solo visualmente queda como candidato sin verificar.
+        fused_element = UIElementData(
+            name=name,
+            type=fused_type,
+            text=text,
+            description=description,
+            bbox=merged_bbox,
+            center=[int(round(c)) for c in merged_center] if merged_center else None,
+            confidence=merged_confidence,
+        )
+        uia_ev = source_by_name.get(SOURCE_UIA)
+        uia_raw = uia_ev.raw if (uia_ev is not None and uia_ev.raw) else {}
+        classification = classify_element(
+            fused_element,
+            uia_patterns=uia_raw.get("patterns", []),
+            enabled=uia_raw.get("is_enabled"),
+            visible=uia_raw.get("visible"),
+            offscreen=uia_raw.get("is_offscreen"),
+        )
+
         # Desacuerdos de geometria entre fuentes del mismo cluster
         bboxes = [ev.bbox for ev in source_evidence if ev.bbox and len(ev.bbox) == 4]
         if len(bboxes) >= 2:
@@ -668,6 +695,7 @@ class VisualUIDetectorFusion:
             interactive=interactive,
             interactive_evidence=interactive_evidence,
             calibrated=False,
+            classification=classification,
         )
 
     # ------------------------------------------------------------------
