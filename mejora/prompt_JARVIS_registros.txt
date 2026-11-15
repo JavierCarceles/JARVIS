@@ -6671,3 +6671,31 @@ VERIFICACION: SINTAXIS: OK; MAIN.PY: NA; COMPORTAMIENTO / INTEGRACION REAL: veri
 DISCREPANCIAS: NINGUNA
 PENDIENTES: Siguiente hoja pendiente real en orden del roadmap: 3.8.6.2 (Calibrar la ventana real de la aplicacion objetivo).
 ESTADO FINAL: 3.8.6.1.2 - IMPLEMENTADA
+
+
+===
+REGISTRO DE UNIDAD: 3.8.6.2
+FECHA: 2026-11-15
+OBJETIVO: Verificar que CalibrationManager.calibrate_application() calibra la ventana real de una aplicacion objetivo usando un flujo universal sin depender de coordenadas o plantillas codificadas por programa. No se modifico codigo de produccion porque el flujo universal ya existe (calibrate_application linea 2929, _calibrate_open_window linea 3074, UniversalVisualCalibrator.calibrate linea 443).
+TIPO DE TRABAJO: TEST | VERIFICACION
+CAMBIOS / HALLAZGOS: Se creo tests/hands/test_calibrate_application_universal.py con 10 tests que verifican: (1) no hay calibradores built-in registrados por programa (flujo universal), (2) no hay referencias hardcodeadas a programas especificos en calibrate_application, (3) aplicacion no encontrada retorna error, (4) preflight rechazado retorna error, (5) lanzamiento fallido retorna error, (6) preparacion de ventana fallida retorna error, (7) flujo exitoso con elementos detectados, (8) calibracion en monitor especifico, (9) proceso elevado rechazado, (10) no se detectaron elementos retorna error. Se verifico que _register_builtin_calibrators queda vacio y que UniversalVisualCalibrator usa Vision para deteccion dinamica de elementos (no plantillas por programa). No hay tildes ni acentos en el archivo de tests. Sintaxis verificada OK.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: tests/hands/test_calibrate_application_universal.py (nuevo, 10 tests); DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: 10 PASSED / 0 FAILED / TOTAL 10 (tests/hands/test_calibrate_application_universal.py); suites relacionadas sin regresion: test_calibration_manager.py 19 PASSED, test_calibracion_descubrimiento_requisitos.py 9 PASSED, test_applications_core.py calibracion 15 PASSED; INTEGRACION: NA; NO REGRESION: 38 tests totales en suites de calibracion, 0 fallos.
+VERIFICACION: SINTAXIS: OK (py_compile de test file y archivos de produccion relacionados); MAIN.PY: OK (import main completa sin error); COMPORTAMIENTO / INTEGRACION REAL: verificado con codigo real de CalibrationManager y UniversalVisualCalibrator mediante tests unitarios con mocks de dependencias pesadas (screen manager, vision, preflight, lanzamiento); no se abren ventanas GUI (calibracion grafica real queda para 3.8.6.7 y 3.8.6.8 segun roadmap).
+DISCREPANCIAS: NINGUNA entre codigo, roadmap y registros para esta unidad.
+PENDIENTES: Siguiente hoja pendiente real en orden del roadmap: 3.8.6.3 (Usar Vision para detectar elementos visibles y relevantes para la tarea concreta).
+ESTADO FINAL: 3.8.6.2 - IMPLEMENTADA
+
+
+===
+REGISTRO DE UNIDAD: 3.8.6.3.1
+FECHA: 2026-11-15
+OBJETIVO: Que un elemento detectado por Vision conserve su campo description a traves del flujo Vision -> UIElement -> serializacion -> registro en register_custom_application, sin perder datos.
+TIPO DE TRABAJO: IMPLEMENTACION | TEST
+CAMBIOS / HALLAZGOS: Se agrego "description" al schema JSON del modelo de vision en src/eyes/vision.py para que el modelo lo devuelva; se agrego description=... al constructor UIElement(...) en vision.py para mapearlo desde la respuesta de deteccion. UIElementData y UIElement (applications_core) ya definian description; _serialize_ui_element y _reconstruct_ui_elements ya lo conservaban; register_custom_application ya lo filtra en element_kwargs. Se agrego tests/hands/test_ui_element_description_preservation.py con 15 tests unitarios que verifican preservacion de description en UIElementData, UIElement (core y vision), serializacion, reconstruccion y register_custom_application. No se modificaron datos persistidos existentes ni se creo un tercer formato. Se documenta discrepancia historica: el roadmap (3.8.6.3.1) afirmaba que UIElement no definia description y que register_custom_application fallaba en silencio con description, pero el codigo real ya contaba con el campo en ambos sitios; la brecha real era que vision.py no poblaba description desde la deteccion visual. Se corrigio ese punto.
+ARCHIVOS MODIFICADOS: PRODUCCION: src/eyes/vision.py; TESTS: tests/hands/test_ui_element_description_preservation.py; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: 15 PASSED / 0 FAILED / TOTAL 15 (tests/hands/test_ui_element_description_preservation.py); INTEGRACION: 187 PASSED / 0 FAILED / TOTAL 187 (suites relacionadas test_applications_core.py, test_calibration_manager.py, test_calibracion_descubrimiento_requisitos.py sin regresion); NO REGRESION: py_compile y import main OK; 187 tests de suites relacionadas sin fallos.
+VERIFICACION: SINTAXIS: OK; MAIN.PY: OK (import main completa sin error); COMPORTAMIENTO / INTEGRACION REAL: verificado con codigo real de vision.py y applications_core.py mediante tests unitarios sin mocks que fabriquen el resultado; no hay interaccion GUI (esta unidad es de logica de datos; la calibracion grafica real queda para 3.8.6.7 y 3.8.6.8).
+DISCREPANCIAS: El roadmap (3.8.6.3.1) afirmaba que UIElement no definia description y que register_custom_application fallaba en silencio si ui_elements incluía description. Evidencia real: UIElement (applications_core.py linea 129) y UIElementData (ui_element_model.py linea 61) ya definen description; register_custom_application (applications_core.py linea 2298) ya lo filtra en element_kwargs. La brecha real era que vision.py (lineas 501-509) no poblaba description al construir UIElement desde deteccion y el schema JSON del modelo (lineas 447-468) no lo solicitaba. Se corrigio ese punto. No hay contradiccion activa entre codigo y roadmap tras la correccion.
+PENDIENTES: Siguiente hoja pendiente real en orden del roadmap: 3.8.6.3.2 (Normalizar el tipo del elemento detectado por Vision).
+ESTADO FINAL: 3.8.6.3.1 - IMPLEMENTADA
