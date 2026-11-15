@@ -2275,6 +2275,37 @@ Funciones a nivel modulo:
 | `def _pattern_id(pattern_name)` | Devuelve el ID numerico de un patron de control UIA, o None. |
 | `def uia_defines_property(name)` | Devuelve un property ID de UIA por nombre (fallback COM). |
 
+### `src/hands/omniparser_adapter.py` — Adaptador de deteccion visual OmniParser V2 (icon_detect_v3).
+
+**Descripcion:** Capa de fallback visual para controles que UI Automation no expone. Utiliza el detector TorchScript YOLOv9-E de OmniParser V2 (microsoft/OmniParser-v2.0, icon_detect_v3/model.pt, licencia MIT) para detectar regiones que parecen interactivas en una captura de pantalla. El modelo se carga explicitamente mediante model_path; nunca se descargan pesos de forma silenciosa. Si el modelo no esta disponible, el adaptador se degrada de forma gracefully y reporta el motivo en la propiedad error. La deteccion corre en CPU por defecto (CUDA solo si esta disponible). Adaptado de microsoft/OmniParser (util/yolov9.py, licencia MIT).
+
+**Caracteristicas:**
+
+- Carga explicita de un modelo TorchScript ya disponible localmente (ruta proporcionada por el caller); descargas silenciosas prohibidas.
+- Deteccion de regiones interactivas candidatas con caja [x1, y1, x2, y2] y confianza mediante predict() del detector YOLOv9-E.
+- NMS puro en PyTorch (sin dependencia de torchvision).
+- Salida como OmniParserRegion con conversion a UIElementData canonico (fuente, modelo, dispositivo, confianza y metadatos conservados en calibration_data).
+- Disponibilidad consultable mediante available y error; detect() devuelve lista vacia si no esta disponible.
+- compatibility_info() expone datos de compatibilidad sin ejecutar el SO (fuente, modelo, licencia, dispositivo, CUDA disponible, tiempo de carga, umbrales).
+- Sin escritura de coordenadas fisicas ni geometria local en entities.json; los elementos son candidatos visuales no calibrados.
+
+**Importaciones:** 10.
+
+Clases:
+
+| Clase | Docstring |
+|---|---|
+| `class OmniParserRegion` | Region interactiva detectada por OmniParser V2 icon_detect_v3 con conversion a UIElementData. |
+| `class OmniParserAdapter` | Adaptador de deteccion visual basado en OmniParser V2 icon_detect_v3. |
+
+Metodos de OmniParserAdapter:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(model_path, device, conf_threshold, iou_threshold, max_detections, img_size)` | Crea el adaptador y carga el modelo explicito. |
+| `def detect(image, screen)` | Detecta regiones interactivas candidatas en una imagen. |
+| `def compatibility_info()` | Devuelve datos de compatibilidad del adaptador sin ejecutar el SO. |
+
 ## 🗺️ `src/hands/planner/`
 
 <!-- src/hands/planner -->
