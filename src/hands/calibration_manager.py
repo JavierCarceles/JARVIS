@@ -3470,6 +3470,87 @@ $result | ConvertTo-Json -Compress -Depth 4
             "monitors_detected": len(getattr(self.screen_manager, "monitors", []) or []),
         }
 
+    # ========================================================================
+    # REQUISITOS DE CALIBRACION (FASE 3.5) CONECTADOS AL DESCUBRIMIENTO
+    # ========================================================================
+
+    def get_aplicaciones_con_requisito_de_calibracion(
+        self,
+        aplicaciones: Optional[List[Dict[str, str]]] = None,
+        app_manager: Optional[Any] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Devuelve, para cada aplicacion (descubierta por defecto), su requisito
+        de calibracion de la fase 3.5 separado del resultado de calibracion.
+
+        Requisito (3.5.1.1 y 3.5.1.2): los elementos declarados en
+        ApplicationKnowledge.calibration_policy del catalogo de
+        ApplicationManager. Las aplicaciones descubiertas se vinculan al
+        catalogo global sin modificarlo. Si no se pasa app_manager se usa el
+        gestor global de aplicaciones.
+        Resultado (3.5.1.3): si la aplicacion ya esta calibrada segun
+        CalibrationManager.is_application_calibrated (macros_coords.json).
+
+        Cada entrada devuelve:
+        - name: nombre de la aplicacion.
+        - app_id: identificador de paquete cuando lo hay.
+        - requiere_calibracion: True si declara al menos un elemento a calibrar.
+        - elementos_requeridos: nombres de los elementos que requieren
+          calibracion (requisito de 3.5).
+        - ya_calibrada: True si la aplicacion ya tiene calibracion vigente
+          (resultado de 3.5).
+        - estado: "calibrada" (requisito y resultado resueltos), "pendiente"
+          (requiere calibracion y no esta hecha) o "sin_requisito".
+        - fuente: origen de descubrimiento de la aplicacion.
+        """
+        if aplicaciones is None:
+            aplicaciones = self.discover_applications()
+        resultado: List[Dict[str, Any]] = []
+        if app_manager is None:
+            try:
+                from src.hands.applications_core import get_application_manager
+
+                app_manager = get_application_manager()
+            except Exception:
+                app_manager = None
+        for app in aplicaciones or []:
+            if not isinstance(app, dict):
+                continue
+            name = str(app.get("name", "")).strip()
+            app_id = str(app.get("app_id", "")).strip()
+            if not name:
+                continue
+            elementos_requeridos: List[str] = []
+            if app_manager is not None:
+                try:
+                    conocimiento = app_manager.get_application(name)
+                    if conocimiento is not None:
+                        elementos_requeridos = list(
+                            getattr(conocimiento, "calibration_policy", None) or []
+                        )
+                except Exception:
+                    elementos_requeridos = []
+            ya_calibrada = bool(self.is_application_calibrated(app))
+            requiere = bool(elementos_requeridos)
+            if ya_calibrada:
+                estado = "calibrada"
+            elif requiere:
+                estado = "pendiente"
+            else:
+                estado = "sin_requisito"
+            resultado.append(
+                {
+                    "name": name,
+                    "app_id": app_id,
+                    "requiere_calibracion": requiere,
+                    "elementos_requeridos": elementos_requeridos,
+                    "ya_calibrada": ya_calibrada,
+                    "estado": estado,
+                    "fuente": str(app.get("source", "")).strip() or None,
+                }
+            )
+        return resultado
+
 
 # ============================================================================
 # SINGLETON

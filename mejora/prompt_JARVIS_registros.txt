@@ -6643,3 +6643,31 @@ VERIFICACION: SINTAXIS: OK; MAIN.PY: OK; COMPORTAMIENTO / INTEGRACION REAL: Edge
 DISCREPANCIAS: NINGUNA
 PENDIENTES: NINGUNO
 ESTADO FINAL: 3.8.5.6.12 - IMPLEMENTADA
+
+
+===
+REGISTRO DE UNIDAD: 3.8.6.1.1
+FECHA: 2026-11-15
+OBJETIVO: Delimitar el alcance de 3.8.6: documentar componentes reutilizados (CalibrationManager, UniversalVisualCalibrator, CoordinateManager, ScreenManager), sus mecanismos de identificacion de ventana y monitor, y registrar limitaciones conocidas (contrato de capability calibrate, calibracion multipantalla completa, seguridad operativa en FASE 12).
+TIPO DE TRABAJO: INSPECCION
+CAMBIOS / HALLAZGOS: Se inspeccionaron CalibrationManager (discover_applications linea 580, launch_application linea 1555, calibrate_application linea 2929, preflight_application), UniversalVisualCalibrator (calibrate_application_elements linea 384, calibrate linea 443, get_ui_capability linea 350, CalibrationPolicy con BLOCKED_APPLICATIONS, ALLOWED_APPLICATIONS, BLOCKED_ELEMENT_TYPES, MIN_ELEMENT_CONFIDENCE=0.30), CoordinateManager (UIResource linea 58, UICapability linea 148, validate_resource_for_action linea 729), ScreenManager (linea 180, enumeracion real de monitores desde Windows). Sintaxis verificada OK para los 3 archivos. No se modifico codigo de produccion.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: NA; DOCUMENTACION: este registro en mejora/prompt_JARVIS_registros.txt
+TESTS Y RESULTADOS: UNITARIOS: NE; INTEGRACION: NA; NO REGRESION: NE
+VERIFICACION: SINTAXIS: OK; MAIN.PY: NA; COMPORTAMIENTO / INTEGRACION REAL: evidencia de inspeccion de codigo real (lineas documentadas arriba); no hay ejecucion de tests nueva para esta unidad de inspeccion.
+DISCREPANCIAS: NINGUNA entre codigo, roadmap y README para esta unidad.
+PENDIENTES: Siguiente hoja pendiente real en orden del roadmap: 3.8.6.1.2 (Conectar el descubrimiento con el requisito de calibracion de 3.5 y el CalibrationManager/UniversalVisualCalibrator existentes).
+ESTADO FINAL: 3.8.6.1.1 - IMPLEMENTADA
+
+
+===
+REGISTRO DE UNIDAD: 3.8.6.1.2
+FECHA: 2026-11-15
+OBJETIVO: Conectar el descubrimiento de aplicaciones con el requisito de calibracion de la fase 3.5 y con CalibrationManager/UniversalVisualCalibrator existentes, de modo que el planificador vea requisitos reales (elementos a calibrar por aplicacion descubierta) separados del resultado de calibracion (ya_calibrada).
+TIPO DE TRABAJO: IMPLEMENTACION; TEST
+CAMBIOS / HALLAZGOS: Se agrego CalibrationManager.get_aplicaciones_con_requisito_de_calibracion, que mapea cada aplicacion descubierta a su calibration_policy del catalogo de ApplicationManager (requisito 3.5) y a ya_calibrada segun is_application_calibrated (resultado 3.5), manteniendo requisito y resultado separados. Se agrego ApplicationDiscovery.registrar_requisitos_de_calibracion_descubiertos, que vincula cada candidato descubierto al catalogo global (ApplicationManager, sin modificarlo) y registra un CalibrationElement en EnhancedCalibrator por cada elemento con requisito, de modo que Planner.get_calibration_requirements / get_calibration_requirements_for_goal exponga requisitos reales. No se lanzan aplicaciones, no se modifica entities.json, no se escriben coordenadas fisicas, no se crea ruta paralela de Brain/Planner/Executor. Sintaxis verificada OK en ambos archivos de produccion.
+ARCHIVOS MODIFICADOS: PRODUCCION: src/hands/calibration_manager.py; src/hands/application_discovery.py; TESTS: tests/hands/test_calibracion_descubrimiento_requisitos.py; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: 9 PASSED / 0 FAILED / TOTAL 9 (tests/hands/test_calibracion_descubrimiento_requisitos.py, conexion descubrimiento-calibracion-planner); suites relacionadas previas sin regresion: test_calibration_requirements, test_application_minimal_contract, test_application_optional_data (PASSED); INTEGRACION: NA; NO REGRESION: sin regresion en suites relacionadas
+VERIFICACION: SINTAXIS: OK; MAIN.PY: NA; COMPORTAMIENTO / INTEGRACION REAL: verificado con codigo real (sin mocks que fabriquen el resultado demostrado) en CalibrationManager, ApplicationDiscovery, EnhancedCalibrator y Planner; esta unidad no abre ventanas GUI (la calibracion grafica real queda para 3.8.6.2 a 3.8.6.8 segun roadmap), por lo que no interfiere con el monitor principal ni con VS Code en la segunda pantalla; las pruebas son unitarias/contractuales.
+DISCREPANCIAS: NINGUNA
+PENDIENTES: Siguiente hoja pendiente real en orden del roadmap: 3.8.6.2 (Calibrar la ventana real de la aplicacion objetivo).
+ESTADO FINAL: 3.8.6.1.2 - IMPLEMENTADA

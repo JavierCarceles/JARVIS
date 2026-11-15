@@ -33,7 +33,7 @@ import sqlite3
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 from src.hands.application_launch_classifier import (
     CONFIANZA_NINGUNA,
@@ -1164,6 +1164,100 @@ class ApplicationDiscovery:
                 )
             )
         return vinculados
+
+    # ------------------------------------------------------------------ #
+    # Conexion de descubrimiento con requisitos de calibracion (3.8.6.1.2)
+    # ------------------------------------------------------------------ #
+
+    def registrar_requisitos_de_calibracion_descubiertos(
+        self,
+        incluir_inventario: bool = True,
+        limite_por_fuente: int = 50,
+        calibrador=None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Descubre aplicaciones, vincula cada una al catalogo global y, para
+        aquellas con requisito de calibracion de la fase 3.5
+        (ApplicationKnowledge.calibration_policy), registra un
+        CalibrationElement en el calibrador mejorado para que el planificador
+        los vea a traves de get_calibration_requirements_for_goal.
+
+        El requisito se separa del resultado: ya_calibrada se consulta a
+        CalibrationManager.is_application_calibrated. No lanza aplicaciones,
+        no modifica entities.json y no crea rutas paralelas de ejecucion.
+
+        Devuelve, por aplicacion descubierta, el requisito separado del
+        resultado de calibracion (ver CalibrationManager.get_aplicaciones_con_requisito_de_calibracion).
+        """
+        candidatos = self.descubrir_todos(
+            incluir_inventario=incluir_inventario, limite_por_fuente=limite_por_fuente
+        )
+        vinculados = self.vincular_con_catalogo(candidatos)
+        if calibrador is None:
+            try:
+                from src.hands.calibrator import get_enhanced_calibrator
+
+                calibrador = get_enhanced_calibrator()
+            except Exception:
+                calibrador = None
+        if calibrador is not None:
+            for vinculado in vinculados:
+                conocimiento = vinculado.conocimiento
+                if conocimiento is None:
+                    continue
+                elementos = list(
+                    getattr(conocimiento, "calibration_policy", None) or []
+                )
+                if not elementos:
+                    continue
+                app_name = str(getattr(conocimiento, "name", "") or "")
+                if not app_name:
+                    continue
+                ya_calibrada = bool(
+                    self.calibration.is_application_calibrated(
+                        {"name": app_name, "app_id": ""}
+                    )
+                )
+                for elemento in elementos:
+                    elemento = str(elemento).strip()
+                    if not elemento:
+                        continue
+                    # element_type lleva el nombre del elemento para coincidir
+                    # con el mapeo de objetivos del planificador
+                    # (get_calibration_requirements_for_goal).
+                    element_id = f"{app_name}.{elemento}"
+                    try:
+                        from src.hands.calibrator import (
+                            CalibrationElement,
+                            CalibrationStatus,
+                        )
+
+                        status = (
+                            CalibrationStatus.CALIBRATED
+                            if ya_calibrada
+                            else CalibrationStatus.NOT_CALIBRATED
+                        )
+                        calibrador.elements[element_id] = CalibrationElement(
+                            id=element_id,
+                            name=elemento,
+                            application=app_name,
+                            element_type=elemento,
+                            calibration_status=status,
+                        )
+                    except Exception:
+                        continue
+        aplicaciones_dict = [
+            {
+                "name": str(getattr(c, "name", "") or "").strip(),
+                "app_id": "",
+                "source": str(getattr(c, "fuente", "") or "").strip(),
+            }
+            for c in candidatos
+            if str(getattr(c, "name", "") or "").strip()
+        ]
+        return self.calibration.get_aplicaciones_con_requisito_de_calibracion(
+            aplicaciones_dict, app_manager=self.app_manager
+        )
 
     def buscar_por_nombre_con_catalogo(
         self,
