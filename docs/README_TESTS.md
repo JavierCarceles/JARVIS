@@ -1021,31 +1021,65 @@ aceptados por ApplicationState().
 <a name="eyes/test-dxcam_capture_core"></a>
 ### `eyes\test_dxcam_capture_core.py`
 
-**Descripcion:** Tests de DXcamCapture (backend opcional de captura continua de frames). Incluye tests unitarios con mocks (contrato de la clase) y pruebas de hardware real (captura de frame, region, marca temporal, inicio/parada/liberacion, mapeo a monitor y cursor por API del SO).
+**Descripcion:** Tests de DXcamCapture (backend opcional de captura continua de frames), de MssCapture (captura puntual mediante mss como ruta de respaldo y punto de captura) y del degradado de DXcamCapture a mss cuando dxcam no esta disponible, falla o devuelve un frame caducado. Adiciona los tests de AdaptiveCapture (captura adaptativa): cadencia baja durante espera estable, rafaga temporal al detectar transicion, buffer acotado de frames, marca temporal monotona, liberacion garantizada de recursos y transicion real con una ventana de Notepad. Incluye tests unitarios con camara y reloj falsos (contrato determinista), pruebas de hardware real con dxcam sobre el equipo y una prueba GUI real (requiere JARVIS_TEST_GUI_REAL=1) que abre una unica ventana de Notepad en el monitor secundario.
 
 **Modulos de origen probados:** src.eyes.screen_capture
 
 **Clases de test:**
 
-- **`TestDXcamCaptureInit`** (linea 81) — 2 metodo(s) de test
+- **`TestDXcamCaptureInit`** (linea 82) — 2 metodo(s) de test
   - Verificacion de configuracion y disponibilidad de dxcam.
 
-- **`TestDXcamCaptureStartStopRelease`** (linea 101) — 5 metodo(s) de test
+- **`TestDXcamCaptureStartStopRelease`** (linea 102) — 5 metodo(s) de test
   - Creacion de camara, inicio/detencion, liberacion y fallback de backend.
 
-- **`TestDXcamCaptureGrab`** (linea 152) — 3 metodo(s) de test
+- **`TestDXcamCaptureGrab`** (linea 153) — 3 metodo(s) de test
   - Captura de frame puntual y frame mas reciente en modo continuo.
 
-- **`TestDXcamCaptureMonitorMapping`** (linea 181) — 3 metodo(s) de test
+- **`TestDXcamCaptureMonitorMapping`** (linea 205) — 3 metodo(s) de test
   - Mapeo de salida dxcam a MonitorInfo de ScreenManager por resolucion y bandera primaria, sin confiar en indices.
 
-- **`TestEvaluateDXcamBackends`** (linea 217) — 4 metodo(s) de test
+- **`TestEvaluateDXcamBackends`** (linea 241) — 4 metodo(s) de test
   - Estructura de evaluacion, disponibilidad de dxgi, winrt no disponible y cursor por API del SO.
 
-- **`TestDXcamCaptureRealHardware`** (linea 251) — 5 metodo(s) de test
+- **`TestDXcamCaptureRealHardware`** (linea 275) — 5 metodo(s) de test
   - Captura real de frame, recorte por region, ciclo de vida inicio/parada/liberacion, mapeo a monitor y cursor independiente de dxcam.
 
-Metodos auxiliares (no test): `_install_fake_dxcam`.
+- **`TestMssCapture`** (linea 328) — 4 metodo(s) de test
+  - Disponibilidad de mss en el entorno, captura de monitor real, captura de region real y monitor inexistente retorna None con error.
+
+- **`TestDXcamCaptureMssFallback`** (linea 378) — 6 metodo(s) de test
+  - Degradacion a mss sin dxcam reportando backend efectivo, frame fresco de dxcam sin fallback, frame nulo degrada a mss, frame caducado degrada a mss, inicio sin dxcam reportado y sin mss retorna None sin ocultar el error.
+
+- **`TestDXcamCaptureMssRealEntorno`** (linea 476) — 2 metodo(s) de test
+  - Captura real del monitor secundario mediante mss y degradacion real de dxcam a mss forzando el estado de no-disponibilidad.
+
+- **`TestAdaptiveCaptureUnit`** — 14 metodo(s) de test
+  - Estado inicial inactivo, arranque automatico en la primera entrega, cadencia baja respetada con reloj falso, transicion que dispara rafaga con intervalo corto, fin de ventana de rafaga y vuelta a baja cadencia, frames iguales sin transicion, buffer acotado que descarta los mas antiguos, marcas temporales monotonas, indice de frame incremental, cierre y context manager que liberan la camara, detencion del stream por inactividad y camara que devuelve None sin bloquear.
+
+- **`TestAdaptiveCaptureReal`** — 5 metodo(s) de test
+  - Captura real de frame y backend (dxgi o mss), marcas temporales monotonas, cadencia baja respetada en el equipo real, buffer acotado y cierre que libera recursos sin entregar mas frames.
+
+- **`TestAdaptiveCaptureGuiReal`** — 1 metodo(s) de test
+  - Transicion real al ocultar/restaurar una unica ventana de Notepad en el monitor secundario, comprobando que la captura adaptativa entra en modo rafaga. Requiere JARVIS_TEST_GUI_REAL=1. Cierra solo la ventana que abrio.
+
+Metodos auxiliares (no test): `_install_fake_dxcam`, `_FakeClock`, `_FakeAdaptiveCamera`, funciones de lock GUI y enumerado de ventanas Notepad.
+
+---
+
+<a name="eyes/test-adaptive_capture_gui_real"></a>
+### `eyes\test_adaptive_capture_gui_real.py`
+
+**Descripcion:** Test GUI real de captura adaptativa (unidad 3.8.6.3.3.13.3). Abre UNA sola ventana de Notepad en el monitor secundario derecho, la oculta y restaura para forzar transiciones reales, y comprueba que la captura adaptativa entra en modo rafaga. Cierra solo la ventana que abrio. No se skipea: ejecutar con `JARVIS_TEST_GUI_REAL=1`; sin esa variable, `setUpClass` lanza `RuntimeError` explicito.
+
+**Modulos de origen probados:** src.eyes.screen_capture
+
+**Clases de test:**
+
+- **`TestAdaptiveCaptureGuiReal`** — 1 metodo(s) de test
+  - `test_transicion_notepad_detecta_rafaga`: transicion real al ocultar/restaurar una unica ventana de Notepad en el monitor secundario, comprobando que la captura adaptativa entra en modo rafaga. Requiere `JARVIS_TEST_GUI_REAL=1`. Cierra solo la ventana que abrio.
+
+**Metodos auxiliares (no test):** funciones de lock GUI (`_gui_lock_activo_adaptive`, `_adquirir_gui_lock_adaptive`, `_liberar_gui_lock_adaptive`) y enumerado de ventanas Notepad (`_enumerar_ventanas_notepad`).
 
 ---
 

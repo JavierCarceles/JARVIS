@@ -13,12 +13,25 @@ import ctypes
 import os
 import re
 import time
+from collections import deque
+from dataclasses import dataclass
 from ctypes import wintypes
 from pathlib import Path
 from typing import Optional
 
 import pyautogui
 from PIL import ImageGrab
+
+import numpy as np
+
+try:
+    from mss import MSS as _MssClass
+    _MSS_AVAILABLE = True
+    _MSS_ERROR = None
+except Exception as _mss_exc:  # mss no instalado en este entorno
+    _MssClass = None
+    _MSS_AVAILABLE = False
+    _MSS_ERROR = "mss no disponible: %s" % _mss_exc
 
 from src.utils.logger import get_logger
 from src.utils.screen_manager import get_monitor_info, get_screen_manager
@@ -406,6 +419,127 @@ def get_cursor_position():
     return None
 
 
+def _mss_region_for_monitor(monitor_num):
+    """Resuelve la geometria real de un monitor para mss.
+
+    Usa ScreenManager (monitor fisico real con rectangulo absoluto) y nunca
+    asume que el indice de mss coincide con DISPLAYn ni con el de
+    ScreenManager. Retorna (region_dict, monitor) o None si no se resuelve.
+    """
+    try:
+        monitor = get_monitor_info(int(monitor_num))
+    except Exception:
+        monitor = None
+    if monitor is None:
+        return None
+    return (
+        {
+            "left": int(monitor.left),
+            "top": int(monitor.top),
+            "width": int(monitor.width),
+            "height": int(monitor.height),
+        },
+        monitor,
+    )
+
+
+class MssCapture:
+    """
+    Captura puntual (un solo frame) mediante mss.
+
+    Es la ruta de respaldo y el punto de captura puntual cuando DXcam no
+    esta disponible. mss captura el escritorio real por region y devuelve
+    un array numpy (BGRA) o None si no se puede capturar. No guarda ni
+    devuelve coordenadas fisicas como parte de un catalogo global: solo
+    produce el frame solicitado.
+    """
+
+    def __init__(self):
+        self._available = _MSS_AVAILABLE and _MssClass is not None
+        self._error = _MSS_ERROR
+        self._sct = None
+
+    @property
+    def available(self):
+        return self._available
+
+    @property
+    def error(self):
+        return self._error
+
+    def _open(self):
+        if self._sct is None:
+            if _MssClass is None:
+                return None
+            self._sct = _MssClass()
+        return self._sct
+
+    def close(self):
+        if self._sct is not None:
+            try:
+                self._sct.close()
+            except Exception:
+                pass
+            self._sct = None
+
+    def capture_monitor(self, monitor_num):
+        """Captura un monitor real mediante mss y devuelve su frame (numpy)."""
+        if not self._available:
+            self._error = _MSS_ERROR or "mss no disponible"
+            return None
+        sct = self._open()
+        if sct is None:
+            self._error = "mss no disponible"
+            return None
+        resolved = _mss_region_for_monitor(monitor_num)
+        if resolved is None:
+            self._error = "no se resolvio la geometria del monitor %s" % monitor_num
+            return None
+        region, _monitor = resolved
+        try:
+            shot = sct.grab(region)
+        except Exception as exc:
+            self._error = "mss capture_monitor fallo: %s" % exc
+            return None
+        if shot is None:
+            self._error = "mss devolvio frame nulo para monitor %s" % monitor_num
+            return None
+        self._error = None
+        return np.asarray(shot)
+
+    def capture_region(self, x, y, width, height):
+        """Captura una region absoluta del escritorio mediante mss (numpy)."""
+        if not self._available:
+            self._error = _MSS_ERROR or "mss no disponible"
+            return None
+        sct = self._open()
+        if sct is None:
+            self._error = "mss no disponible"
+            return None
+        try:
+            x = int(x)
+            y = int(y)
+            width = int(width)
+            height = int(height)
+        except (TypeError, ValueError):
+            self._error = "coordenadas de region invalidas"
+            return None
+        if width <= 0 or height <= 0:
+            self._error = "dimensiones de region invalidas"
+            return None
+        region = {"left": x, "top": y, "width": width, "height": height}
+        try:
+            shot = sct.grab(region)
+        except Exception as exc:
+            self._error = "mss capture_region fallo: %s" % exc
+            return None
+        if shot is None:
+            self._error = "mss devolvio frame nulo para la region"
+            return None
+        self._error = None
+        return np.asarray(shot)
+
+
 class DXcamCapture:
     """
     Backend opcional de captura continua de frames basado en dxcam (Windows).
@@ -434,6 +568,8 @@ class DXcamCapture:
         self._last_frame_time = None
         self._last_frame_ticks = None
         self._import_dxcam()
+        self._mss_fallback = MssCapture()
+        self._using_fallback = False
 
     def _import_dxcam(self):
         try:
@@ -581,8 +717,30 @@ class DXcamCapture:
     def grab(self):
         """Captura un frame puntual y lo devuelve como array numpy.
 
+        Si la camara dxcam no devuelve un frame fresco (no hay camara, la
+        captura devuelve None o devuelve un frame caducado con los mismos
+        ticks/tiempo que el anterior), se degrada al fallback mss: captura
+        un punto real de la pantalla asignada y reporta
+        `effective_backend` como "mss" sin ocultar el fallo (`error` y
+        `fallback_active` quedan poblados para que el llamador lo detecte).
         Actualiza _last_frame, _last_frame_time y _last_frame_ticks.
-        Retorna None si no hay camara.
+        """
+        frame = self._grab_dxcam_frame()
+        if frame is not None:
+            self._using_fallback = False
+            self._error = None
+            self._effective_backend = (
+                self._effective_backend
+                or getattr(self._camera, "backend", self.backend)
+            )
+            return frame
+        return self._grab_via_mss_fallback()
+
+    def _grab_dxcam_frame(self):
+        """Intenta un frame fresco de la camara dxcam.
+
+        Retorna None si no hay camara, la captura falla o el frame esta
+        caducado (mismos ticks/tiempo que el frame previo).
         """
         if self._camera is None:
             return None
@@ -592,24 +750,99 @@ class DXcamCapture:
             return None
         if frame is None:
             return None
+        ticks = getattr(self._camera, "latest_frame_ticks", None)
+        frame_time = getattr(self._camera, "latest_frame_time", None)
+        is_stale = False
+        if self._last_frame is not None:
+            if (
+                ticks is not None
+                and self._last_frame_ticks is not None
+                and ticks == self._last_frame_ticks
+            ):
+                is_stale = True
+            elif (
+                ticks is None
+                and frame_time is not None
+                and self._last_frame_time is not None
+                and frame_time == self._last_frame_time
+            ):
+                is_stale = True
+        if is_stale:
+            # Frame caducado: dxcam no produjo un frame nuevo.
+            return None
         self._last_frame = frame
-        self._last_frame_time = getattr(self._camera, "latest_frame_time", None)
-        self._last_frame_ticks = getattr(self._camera, "latest_frame_ticks", None)
+        self._last_frame_time = frame_time
+        self._last_frame_ticks = ticks
+        return frame
+
+    def _grab_via_mss_fallback(self):
+        """Fallback a mss: captura un punto real de la pantalla asignada.
+
+        Nunca oculta el fallo de dxcam: `error` se mantiene y
+        `effective_backend` se informa como "mss" solo cuando el fallback
+        efectivamente captura un frame.
+        """
+        self._using_fallback = True
+        if self._error is None:
+            self._error = "dxcam sin frame disponible o camara ausente"
+        if not self._mss_fallback.available:
+            self._error = "dxcam sin frame disponible y fallback mss no disponible: %s" % (
+                self._mss_fallback.error or "mss no instalado"
+            )
+            self._effective_backend = None
+            return None
+        monitor_num = None
+        if self._monitor_info is not None:
+            monitor_num = getattr(self._monitor_info, "monitor_id", None)
+        if monitor_num is None:
+            try:
+                primary = get_screen_manager().get_primary_monitor()
+                monitor_num = (
+                    getattr(primary, "monitor_id", None) if primary is not None else None
+                )
+            except Exception:
+                monitor_num = None
+        if monitor_num is None:
+            self._error = "dxcam sin frame disponible y no se resolvio monitor para el fallback mss"
+            return None
+        try:
+            frame = self._mss_fallback.capture_monitor(monitor_num)
+        except Exception as exc:
+            self._error = "fallback mss fallo: %s" % exc
+            return None
+        if frame is None:
+            self._error = self._error or "dxcam sin frame disponible y fallback mss devolvio None"
+            self._effective_backend = None
+            return None
+        self._effective_backend = "mss"
+        self._last_frame = frame
+        self._last_frame_time = time.time()
+        self._last_frame_ticks = None
         return frame
 
     def get_latest_frame(self):
-        """Devuelve el ultimo frame capturado en modo continuo sin bloquear."""
-        if self._camera is None:
-            return None
-        try:
-            frame = self._camera.get_latest_frame()
-        except Exception:
-            return None
-        if frame is not None:
-            self._last_frame = frame
-            self._last_frame_time = getattr(self._camera, "latest_frame_time", None)
-            self._last_frame_ticks = getattr(self._camera, "latest_frame_ticks", None)
-        return frame
+        """Devuelve el ultimo frame capturado en modo continuo sin bloquear.
+
+        Si no hay camara dxcam o esta no devuelve frame, degrada a una
+        captura puntual mss en lugar de devolver silenciosamente None.
+        """
+        if self._camera is not None:
+            try:
+                frame = self._camera.get_latest_frame()
+            except Exception:
+                frame = None
+            if frame is not None:
+                self._using_fallback = False
+                self._last_frame = frame
+                self._last_frame_time = getattr(self._camera, "latest_frame_time", None)
+                self._last_frame_ticks = getattr(self._camera, "latest_frame_ticks", None)
+                self._effective_backend = (
+                    self._effective_backend
+                    or getattr(self._camera, "backend", self.backend)
+                )
+                return frame
+            return self._grab_via_mss_fallback()
+        return self._grab_via_mss_fallback()
 
     @property
     def is_capturing(self):
@@ -651,6 +884,26 @@ class DXcamCapture:
     def last_frame_ticks(self):
         return self._last_frame_ticks
 
+    @property
+    def fallback_active(self):
+        """True si la ultima captura sirvio mediante el fallback mss."""
+        return self._using_fallback
+
+    @property
+    def using_mss_fallback(self):
+        """Alias de fallback_active."""
+        return self._using_fallback
+
+    @property
+    def mss_fallback_available(self):
+        """Indica si el fallback mss esta disponible en este entorno."""
+        return self._mss_fallback.available
+
+    @property
+    def mss_fallback_error(self):
+        """Error del fallback mss, si lo hay."""
+        return self._mss_fallback.error
+
 
 def evaluate_dxcam_backends(output_idx: int = 0):
     """Evalua dxcam en el equipo real: backends, formatos de pixel y cursor.
@@ -667,6 +920,8 @@ def evaluate_dxcam_backends(output_idx: int = 0):
         "frame_dtype": None,
         "cursor_position": get_cursor_position(),
         "error": None,
+        "mss_available": _MSS_AVAILABLE,
+        "mss_error": _MSS_ERROR,
     }
     try:
         import dxcam as dxcam_mod
@@ -699,3 +954,404 @@ def evaluate_dxcam_backends(output_idx: int = 0):
             backend_result["error"] = str(exc)
         results["backends"].append(backend_result)
     return results
+
+
+# ---------------------------------------------------------------------------
+# Captura adaptativa de frames (unidad 3.8.6.3.3.13.3).
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class FrameInfo:
+    """Metadatos de un frame entregado por la captura adaptativa.
+
+    frame: array numpy del frame capturado, o None si no se pudo entregar.
+    timestamp: marca temporal monotona (time.monotonic) de la entrega.
+    backend: backend efectivo que sirvio el frame ("dxgi", "mss" o None).
+    cadence: cadencia vigente en la entrega ("low" o "burst").
+    is_burst: True si la entrega ocurrio dentro de una ventana de rafaga.
+    transition_detected: True si este frame se interpreto como una transicion
+        respecto del frame previamente entregado.
+    frame_index: indice secuencial de entrega (0-based).
+    fallback_active: True si el frame sirvio mediante el fallback mss.
+    """
+
+    frame: object = None
+    timestamp: float = 0.0
+    backend: str = None
+    cadence: str = "low"
+    is_burst: bool = False
+    transition_detected: bool = False
+    frame_index: int = 0
+    fallback_active: bool = False
+
+
+class AdaptiveCapture:
+    """
+    Captura adaptativa de frames sobre DXcamCapture (con fallback mss).
+
+    Politica de cadencia:
+    * Durante espera estable (sin transiciones) se usa cadencia baja: entre
+      dos entregas transcurre al menos 1 / low_cadence_fps segundos, de modo
+      que no se satura la GPU ni se mantiene un stream activo sin necesidad.
+    * Al detectar una transicion (diferencia entre frames consecutivos por
+      encima de transition_threshold) se entra en modo rafaga durante
+      burst_window_seconds a cadencia burst_cadence_fps para capturar el
+      transito completo.
+    * Si no hay nuevas transiciones durante la rafaga, se vuelve a cadencia
+      baja. Si transcurre idle_release_seconds sin transiciones, el stream
+      subyacente se detiene y no se reactiva hasta la siguiente entrega.
+
+    Buffer: cola acotada (deque con maxlen=max_buffer_frames) que descarta
+    los frames mas antiguos al llegar los nuevos; nunca crece sin limite.
+
+    Marca temporal: time.monotonic por entrega, monotona y no retroactiva,
+    complementada con latest_frame_time/latest_frame_ticks de la camara.
+
+    La camara subyacente se inicia en la primera entrega y se detiene/libera
+    con close() o al salir del context manager; nunca se deja activa mas
+    tiempo del necesario.
+
+    Los parametros camera y clock son inyectables para pruebas deterministas.
+    """
+
+    _STATE_IDLE = "IDLE"
+    _STATE_STABLE = "STABLE"
+    _STATE_BURST = "BURST"
+
+    def __init__(
+        self,
+        output_idx=0,
+        backend="dxgi",
+        region=None,
+        low_cadence_fps=2.0,
+        burst_cadence_fps=15.0,
+        burst_window_seconds=3.0,
+        transition_threshold=0.05,
+        max_buffer_frames=8,
+        idle_release_seconds=10.0,
+        camera=None,
+        clock=time.monotonic,
+    ):
+        self.output_idx = int(output_idx)
+        self.backend = str(backend)
+        self.region = region
+        self.low_cadence_fps = float(low_cadence_fps)
+        self.burst_cadence_fps = float(burst_cadence_fps)
+        self.burst_window_seconds = float(burst_window_seconds)
+        self.transition_threshold = float(transition_threshold)
+        self.max_buffer_frames = int(max_buffer_frames)
+        self.idle_release_seconds = float(idle_release_seconds)
+        self._camera = camera
+        self._owns_camera = camera is None
+        self._clock = clock
+        self._dxcam_capture = None
+        self._capturing = False
+        self._released = False
+        self._state = self._STATE_IDLE
+        self._last_grab_time = None
+        self._last_frame = None
+        self._burst_until = None
+        self._idle_since = None
+        self._buffer = deque(maxlen=self.max_buffer_frames)
+        self._frame_index = 0
+        self._last_timestamp = None
+        self._error = None
+
+    # ------------------------------------------------------------------
+    # Ciclo de vida
+    # ------------------------------------------------------------------
+
+    def _ensure_camera(self):
+        """Crea y arranca la camara subyacente si todavia no esta activa."""
+        if self._released:
+            self._error = "AdaptiveCapture ya esta liberado"
+            return None
+        cam = self._dxcam_capture if self._owns_camera else self._camera
+        if cam is None:
+            if self._dxcam_capture is None:
+                self._dxcam_capture = DXcamCapture(
+                    output_idx=self.output_idx,
+                    backend=self.backend,
+                    region=self.region,
+                )
+            cam = self._dxcam_capture
+        if not getattr(cam, "is_capturing", False):
+            try:
+                cam.start()
+            except Exception as exc:
+                self._error = "no se pudo iniciar la camara de captura: %s" % exc
+                return None
+        self._capturing = True
+        self._error = None
+        return cam
+
+    def _stop_stream(self):
+        """Detiene el stream subyacente sin descartar la camara (reanudable)."""
+        cam = self._dxcam_capture if self._owns_camera else self._camera
+        if cam is not None:
+            try:
+                cam.stop()
+            except Exception:
+                pass
+        self._capturing = False
+        self._state = self._STATE_IDLE
+        self._burst_until = None
+        self._idle_since = None
+
+    def _release_resources(self):
+        """Libera la camara y todos sus recursos (no reanudable sin nuevo objeto)."""
+        cam = self._dxcam_capture if self._owns_camera else self._camera
+        if cam is not None:
+            try:
+                cam.stop()
+            except Exception:
+                pass
+            try:
+                cam.release()
+            except Exception:
+                pass
+        if self._owns_camera:
+            self._dxcam_capture = None
+        self._capturing = False
+        self._released = True
+        self._state = self._STATE_IDLE
+        self._last_frame = None
+        self._burst_until = None
+        self._idle_since = None
+        self._buffer.clear()
+        self._error = None
+
+    def start(self):
+        """Arranca la captura adaptiva (camara subyacente en espera estable)."""
+        if self._released:
+            self._error = "AdaptiveCapture ya esta liberado"
+            return False
+        cam = self._ensure_camera()
+        if cam is None:
+            return False
+        self._state = self._STATE_STABLE
+        self._idle_since = self._clock()
+        self._last_grab_time = None
+        self._error = None
+        return True
+
+    def stop(self):
+        """Detiene la entrega de frames sin liberar la camara."""
+        self._stop_stream()
+
+    def close(self):
+        """Libera todos los recursos de captura de forma garantizada."""
+        self._release_resources()
+
+    def __enter__(self):
+        self.start()
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self.close()
+        return False
+
+    # ------------------------------------------------------------------
+    # Captura adaptativa
+    # ------------------------------------------------------------------
+
+    def _min_interval(self):
+        if self._state == self._STATE_BURST and self.burst_cadence_fps > 0:
+            return 1.0 / self.burst_cadence_fps
+        if self.low_cadence_fps > 0:
+            return 1.0 / self.low_cadence_fps
+        return 0.0
+
+    def _frame_diff(self, a, b):
+        """Diferencia normalizada entre dos frames (0.0 iguales, 1.0 muy distintos)."""
+        if a is None or b is None:
+            return 0.0
+        try:
+            if a.shape != b.shape:
+                return 1.0
+            diff = np.abs(a.astype(np.float32) - b.astype(np.float32)).mean()
+            return float(diff / 255.0)
+        except Exception:
+            return 1.0
+
+    def _monotonic_timestamp(self, now):
+        """Garantiza una marca temporal monotonica y no retroactiva."""
+        if self._last_timestamp is None:
+            self._last_timestamp = now
+            return now
+        if now <= self._last_timestamp:
+            self._last_timestamp += 1e-6
+            return self._last_timestamp
+        self._last_timestamp = now
+        return now
+
+    def _current_cadence_name(self):
+        return "burst" if self._state == self._STATE_BURST else "low"
+
+    def grab_adaptive(self):
+        """
+        Entrega el siguiente frame respetando la cadencia adaptativa.
+
+        Retorna un FrameInfo cuando toca entregar segun la cadencia vigente,
+        o None si aun no ha transcurrido el intervalo minimo (el llamador
+        debe reintentar despues). Nunca bloquea.
+        """
+        now = self._clock()
+        if self._released:
+            self._error = "AdaptiveCapture ya esta liberado"
+            return None
+
+        interval = self._min_interval()
+        if (
+            self._last_grab_time is not None
+            and interval > 0
+            and now - self._last_grab_time < interval
+        ):
+            return None
+
+        self._last_grab_time = now
+
+        cam = self._ensure_camera()
+        if cam is None:
+            return FrameInfo(
+                frame=None,
+                timestamp=self._monotonic_timestamp(now),
+                backend=None,
+                cadence=self._current_cadence_name(),
+                is_burst=self._state == self._STATE_BURST,
+                transition_detected=False,
+                frame_index=self._frame_index,
+                fallback_active=False,
+            )
+
+        frame = None
+        backend = None
+        fallback_active = False
+        try:
+            frame = cam.grab()
+        except Exception as exc:
+            self._error = "captura de frame fallo: %s" % exc
+            frame = None
+        if frame is None:
+            self._error = self._error or "camara devolvio frame nulo"
+            return FrameInfo(
+                frame=None,
+                timestamp=self._monotonic_timestamp(now),
+                backend=None,
+                cadence=self._current_cadence_name(),
+                is_burst=self._state == self._STATE_BURST,
+                transition_detected=False,
+                frame_index=self._frame_index,
+                fallback_active=False,
+            )
+
+        if hasattr(cam, "effective_backend"):
+            backend = cam.effective_backend
+        if hasattr(cam, "fallback_active"):
+            fallback_active = bool(cam.fallback_active)
+
+        transition_detected = False
+        if self._last_frame is not None:
+            diff = self._frame_diff(frame, self._last_frame)
+            if diff > self.transition_threshold:
+                transition_detected = True
+
+        # Maquina de estados: estable / rafaga / inactivo.
+        if self._state == self._STATE_IDLE:
+            self._state = self._STATE_STABLE
+            self._idle_since = now
+        if transition_detected:
+            self._state = self._STATE_BURST
+            self._burst_until = now + self.burst_window_seconds
+            self._idle_since = None
+        elif self._state == self._STATE_BURST and (
+            self._burst_until is not None and now >= self._burst_until
+        ):
+            self._state = self._STATE_STABLE
+            self._idle_since = now
+        elif self._state == self._STATE_STABLE:
+            if self._idle_since is None:
+                self._idle_since = now
+            elif (
+                self.idle_release_seconds > 0
+                and now - self._idle_since >= self.idle_release_seconds
+            ):
+                self._stop_stream()
+                return FrameInfo(
+                    frame=frame,
+                    timestamp=self._monotonic_timestamp(now),
+                    backend=backend,
+                    cadence=self._current_cadence_name(),
+                    is_burst=False,
+                    transition_detected=transition_detected,
+                    frame_index=self._frame_index,
+                    fallback_active=fallback_active,
+                )
+
+        self._last_frame = frame
+        self._frame_index += 1
+        info = FrameInfo(
+            frame=frame,
+            timestamp=self._monotonic_timestamp(now),
+            backend=backend,
+            cadence=self._current_cadence_name(),
+            is_burst=self._state == self._STATE_BURST,
+            transition_detected=transition_detected,
+            frame_index=self._frame_index,
+            fallback_active=fallback_active,
+        )
+        self._buffer.append(info)
+        self._error = None
+        return info
+
+    def get_latest(self):
+        """Devuelve el ultimo FrameInfo entregado, o None si no hay ninguno."""
+        if not self._buffer:
+            return None
+        return self._buffer[-1]
+
+    # ------------------------------------------------------------------
+    # Estado y propiedades
+    # ------------------------------------------------------------------
+
+    @property
+    def is_capturing(self):
+        return self._capturing
+
+    @property
+    def is_released(self):
+        return self._released
+
+    @property
+    def state(self):
+        return self._state
+
+    @property
+    def cadence(self):
+        return self._current_cadence_name()
+
+    @property
+    def available(self):
+        cam = self._dxcam_capture if self._owns_camera else self._camera
+        if cam is None:
+            return False
+        return bool(getattr(cam, "available", False))
+
+    @property
+    def error(self):
+        return self._error
+
+    @property
+    def buffer_size(self):
+        return len(self._buffer)
+
+    @property
+    def last_frame(self):
+        if not self._buffer:
+            return None
+        return self._buffer[-1].frame
+
+    @property
+    def last_timestamp(self):
+        return self._last_timestamp

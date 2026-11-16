@@ -551,15 +551,15 @@ Funciones a nivel módulo:
 | `def get_screen_capture()`  (L979) | Obtiene la instancia global de captura. |
 
 <a name="src-eyes-screen_capture-py"></a>
-### `src/eyes/screen_capture.py` [701 lineas] — Sistema de captura de pantalla con backend opcional DXcam.
+### `src/eyes/screen_capture.py` [983 lineas] — Sistema de captura de pantalla con backend opcional DXcam, fallback mss y captura adaptativa.
 
-**Descripcion:** Sistema de captura de pantalla con backend opcional de frames continuos DXcam y captura puntual PyAutoGUI/ImageGrab.
+**Descripcion:** Sistema de captura de pantalla con backend opcional de frames continuos DXcam, captura puntual PyAutoGUI/ImageGrab y captura puntual mediante mss (`MssCapture`) como ruta de respaldo y punto de captura cuando DXcam no esta disponible. `DXcamCapture.grab()` degrada a mss si no hay camara, la captura devuelve None o devuelve un frame caducado, informando el backend efectivo (`effective_backend`) y manteniendo `error` visible sin ocultar el fallo. `AdaptiveCapture` implementa la captura adaptativa sobre `DXcamCapture` (con fallback mss): cadencia baja durante espera estable, rafaga temporal al detectar transicion, buffer acotado de frames, marca temporal monotona y liberacion garantizada de recursos, sin mantener el stream activo sin necesidad.
 
-**Importaciones:** 12.
+**Importaciones:** 15.
 
-`class ScreenCapture`  (línea 25) — Sistema de captura de pantalla con soporte multipantalla.
+`class ScreenCapture`  (linea 40) — Sistema de captura de pantalla con soporte multipantalla.
 
-Métodos:
+Metodos:
 
 | Firma | Docstring |
 |---|---|
@@ -572,13 +572,20 @@ Métodos:
 | `def get_world_state()` | Obtiene el estado actual del mundo. |
 | `def get_application_state(app_name)` | Obtiene el estado de una aplicación específica. |
 
-Funciones a nivel módulo:
+`class MssCapture`  (linea 444) — Captura puntual (un solo frame) mediante mss como ruta de respaldo y punto de captura.
+
+Metodos:
 
 | Firma | Docstring |
 |---|---|
-| `def get_screen_capture()`  (L365) | Obtiene la instancia global del sistema de captura. |
+| `def __init__()` | Inicializa el capturador mss. |
+| `def capture_monitor(monitor_num)` | Captura un monitor real mediante mss y devuelve su frame como array numpy (BGRA) o None. |
+| `def capture_region(x, y, width, height)` | Captura una region absoluta del escritorio mediante mss y devuelve su frame como array numpy (BGRA) o None. |
+| `def close()` | Cierra el capturador mss. |
 
-`class DXcamCapture`  (linea 409) — Backend opcional de captura continua de frames basado en dxcam (Windows).
+Propiedades: `available`, `error`.
+
+`class DXcamCapture`  (linea 541) — Backend opcional de captura continua de frames basado en dxcam (Windows).
 
 Metodos:
 
@@ -590,17 +597,38 @@ Metodos:
 | `def start()` | Crea la camara y comienza la captura continua; informa el backend efectivo y degrada sin ocultar fallos. |
 | `def stop()` | Detiene la captura continua sin liberar la camara. |
 | `def release()` | Libera la camara y sus recursos. |
-| `def grab()` | Captura un frame puntual y actualiza estado y marca temporal. |
-| `def get_latest_frame()` | Devuelve el ultimo frame capturado en modo continuo sin bloquear. |
+| `def grab()` | Captura un frame puntual y actualiza estado y marca temporal. Degrada a mss si no hay camara, la captura devuelve None o el frame esta caducado. |
+| `def _grab_dxcam_frame()` | Intenta un frame fresco de la camara dxcam; retorna None si no hay camara, la captura falla o el frame esta caducado. |
+| `def _grab_via_mss_fallback()` | Captura un punto real mediante mss como fallback, reportando el backend efectivo sin ocultar el fallo de dxcam. |
+| `def get_latest_frame()` | Devuelve el ultimo frame capturado en modo continuo sin bloquear. Degrada a mss si no hay camara. |
 
-Propiedades: `is_capturing`, `is_released`, `effective_backend`, `available`, `error`, `monitor_info`, `last_frame`, `last_frame_time`, `last_frame_ticks`.
+Propiedades: `is_capturing`, `is_released`, `effective_backend`, `available`, `error`, `monitor_info`, `last_frame`, `last_frame_time`, `last_frame_ticks`, `fallback_active`, `using_mss_fallback`, `mss_fallback_available`, `mss_fallback_error`.
+
+`class AdaptiveCapture` — Captura adaptativa de frames sobre `DXcamCapture` (con fallback mss).
+
+Metodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(output_idx, backend, region, low_cadence_fps, burst_cadence_fps, burst_window_seconds, transition_threshold, max_buffer_frames, idle_release_seconds, camera, clock)` | Configura la politica de captura adaptativa. `camera` y `clock` son inyectables para pruebas deterministas. |
+| `def start()` | Arranca la camara subyacente y pasa a espera estable. |
+| `def stop()` | Detiene la entrega de frames sin liberar la camara. |
+| `def close()` | Libera la camara y todos sus recursos de forma garantizada. |
+| `def grab_adaptive()` | Entrega el siguiente `FrameInfo` respetando la cadencia vigente, o `None` si aun no toca entregar. Nunca bloquea. |
+| `def get_latest()` | Devuelve el ultimo `FrameInfo` entregado, o `None` si no hay ninguno. |
+
+Propiedades: `is_capturing`, `is_released`, `state`, `cadence`, `available`, `error`, `buffer_size`, `last_frame`, `last_timestamp`.
+
+`class FrameInfo` — Metadatos de un frame entregado por la captura adaptativa.
+
+Campos: `frame`, `timestamp`, `backend`, `cadence`, `is_burst`, `transition_detected`, `frame_index`, `fallback_active`.
 
 Funciones a nivel modulo:
 
 | Firma | Docstring |
 |---|---|
 | `def get_cursor_position()` | Devuelve la posicion del cursor mediante la API del SO (GetCursorPos), independiente de dxcam. |
-| `def evaluate_dxcam_backends(output_idx)` | Evalua dxcam en el equipo real: backends, formatos de pixel y cursor. |
+| `def evaluate_dxcam_backends(output_idx)` | Evalua dxcam en el equipo real: backends, formatos de pixel y cursor. Incluye disponibilidad y error de mss. |
 
 <a name="src-eyes-vision-py"></a>
 ### `src/eyes/vision.py` [1188 lineas] — Vision por computadora (Qwen3-VL/Ollama)
