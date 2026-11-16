@@ -9,7 +9,11 @@ sin importar el Brain class para evitar circular imports.
 
 from __future__ import annotations
 
+import ctypes
+import os
+import re
 import time
+from ctypes import wintypes
 from pathlib import Path
 from typing import Optional
 
@@ -17,7 +21,7 @@ import pyautogui
 from PIL import ImageGrab
 
 from src.utils.logger import get_logger
-from src.utils.screen_manager import get_monitor_info
+from src.utils.screen_manager import get_monitor_info, get_screen_manager
 
 logger = get_logger(__name__)
 
@@ -366,3 +370,332 @@ def get_screen_capture() -> ScreenCapture:
         _screen_capture_instance = ScreenCapture()
     
     return _screen_capture_instance
+
+
+# ---------------------------------------------------------------------------
+# DXcam: backend opcional de captura continua de frames (Windows).
+# Unidad 3.8.6.3.3.13 (hija 3.8.6.3.3.13.1).
+# ---------------------------------------------------------------------------
+
+try:
+    _USER32 = ctypes.windll.user32
+except Exception:
+    _USER32 = None
+
+
+def get_cursor_position():
+    """Devuelve la posicion del cursor mediante la API del SO (GetCursorPos).
+
+    Es independiente de dxcam: no se asume que dxcam pinte el cursor en la
+    captura, por lo que la posicion del cursor se verifica por separado.
+    Retorna (x, y) o None si la API no esta disponible.
+    """
+    if _USER32 is None or os.name != "nt":
+        return None
+    try:
+        class _POINT(ctypes.Structure):
+            _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
+
+        pt = _POINT()
+        _USER32.GetCursorPos.argtypes = [ctypes.POINTER(_POINT)]
+        _USER32.GetCursorPos.restype = wintypes.BOOL
+        if _USER32.GetCursorPos(ctypes.byref(pt)):
+            return int(pt.x), int(pt.y)
+    except Exception:
+        pass
+    return None
+
+
+class DXcamCapture:
+    """
+    Backend opcional de captura continua de frames basado en dxcam (Windows).
+
+    Se crea una camara por salida real (output_idx). La salida de dxcam NO se
+    asume que coincida con DISPLAYn ni con el indice de ScreenManager: se
+    mapea a la identidad de monitor de ScreenManager comparando resolucion,
+    posicion y bandera de monitor primario.
+
+    Si dxcam no esta instalada o la camara no puede crearse, se reporta el
+    backend efectivo y el error, sin ocultar el fallo. El fallback a mss se
+    define en la unidad 3.8.6.3.3.13.2.
+    """
+
+    def __init__(self, output_idx: int = 0, backend: str = "dxgi", region=None):
+        self.output_idx = int(output_idx)
+        self.backend = str(backend)
+        self.region = region
+        self._dxcam = None
+        self._camera = None
+        self._monitor_info = None
+        self._effective_backend = None
+        self._available = False
+        self._error = None
+        self._last_frame = None
+        self._last_frame_time = None
+        self._last_frame_ticks = None
+        self._import_dxcam()
+
+    def _import_dxcam(self):
+        try:
+            import dxcam as _dxcam
+
+            self._dxcam = _dxcam
+            self._available = True
+        except ImportError as exc:
+            self._dxcam = None
+            self._available = False
+            self._error = "dxcam no instalado: %s" % exc
+
+    def enumerate_outputs(self):
+        """Lista las salidas de dxcam con resolucion y bandera primaria.
+
+        Los datos se leen de dxcam.output_info() y se devuelven como lista de
+        diccionarios: output_idx, width, height, rotation, primary.
+        """
+        outputs = []
+        if self._dxcam is None:
+            return outputs
+        try:
+            raw = self._dxcam.output_info()
+        except Exception as exc:
+            self._error = "No se pudieron enumerar salidas dxcam: %s" % exc
+            return outputs
+        pattern = re.compile(
+            r"Output\[(\d+)\]\s*:\s*Res:\((\d+)\s*,\s*(\d+)\)\s*Rot:(\d+)\s*Primary:(True|False)"
+        )
+        for line in str(raw).splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            match = pattern.search(line)
+            if match:
+                outputs.append(
+                    {
+                        "output_idx": int(match.group(1)),
+                        "width": int(match.group(2)),
+                        "height": int(match.group(3)),
+                        "rotation": int(match.group(4)),
+                        "primary": match.group(5) == "True",
+                    }
+                )
+        return outputs
+
+    def match_monitor(self, screen_manager=None):
+        """Mapea la salida dxcam de output_idx a un MonitorInfo de ScreenManager.
+
+        La comparacion usa resolucion y bandera primaria (y posicion cuando
+        este disponible), nunca el indice numerico, porque el indice de dxcam
+        no tiene por que coincidir con DISPLAYn ni con el de ScreenManager.
+        """
+        if screen_manager is None:
+            screen_manager = get_screen_manager()
+        outputs = self.enumerate_outputs()
+        target = None
+        for out in outputs:
+            if out["output_idx"] == self.output_idx:
+                target = out
+                break
+        if target is None and outputs:
+            target = outputs[0]
+        if target is None:
+            self._monitor_info = None
+            return None
+        candidates = list(getattr(screen_manager, "monitors", []) or [])
+        for monitor in candidates:
+            if (
+                int(monitor.width) == int(target["width"])
+                and int(monitor.height) == int(target["height"])
+                and bool(monitor.is_primary) == bool(target["primary"])
+            ):
+                self._monitor_info = monitor
+                return monitor
+        for monitor in candidates:
+            if int(monitor.width) == int(target["width"]) and int(monitor.height) == int(target["height"]):
+                self._monitor_info = monitor
+                return monitor
+        if candidates:
+            self._monitor_info = candidates[0]
+            return candidates[0]
+        self._monitor_info = None
+        return None
+
+    def start(self):
+        """Crea la camara dxcam y comienza la captura continua.
+
+        Retorna True si la captura inicio. Si el backend solicitado no esta
+        disponible, se informa el backend efectivo y se degrada sin ocultar
+        el fallo (self._error y self._effective_backend quedan poblados).
+        """
+        if self._dxcam is None:
+            self._error = self._error or "dxcam no disponible"
+            return False
+        backends = [self.backend]
+        if self.backend != "dxgi":
+            backends.append("dxgi")
+        last_exc = None
+        for backend in backends:
+            try:
+                camera = self._dxcam.create(
+                    device_idx=0,
+                    output_idx=self.output_idx,
+                    region=self.region,
+                    output_color="RGB",
+                    backend=backend,
+                )
+                camera.start()
+                self._camera = camera
+                self._effective_backend = getattr(camera, "backend", backend)
+                self._available = True
+                self._error = None
+                self._last_frame = None
+                self._last_frame_time = None
+                self._last_frame_ticks = None
+                return True
+            except Exception as exc:
+                last_exc = exc
+                self._error = "backend %s no disponible: %s" % (backend, exc)
+        self._camera = None
+        self._effective_backend = None
+        self._available = False
+        return False
+
+    def stop(self):
+        """Detiene la captura continua sin liberar la camara."""
+        if self._camera is not None:
+            try:
+                self._camera.stop()
+            except Exception:
+                pass
+
+    def release(self):
+        """Libera la camara y sus recursos."""
+        if self._camera is not None:
+            try:
+                self._camera.release()
+            except Exception:
+                pass
+            self._camera = None
+        self._available = False
+        self._effective_backend = None
+
+    def grab(self):
+        """Captura un frame puntual y lo devuelve como array numpy.
+
+        Actualiza _last_frame, _last_frame_time y _last_frame_ticks.
+        Retorna None si no hay camara.
+        """
+        if self._camera is None:
+            return None
+        try:
+            frame = self._camera.grab()
+        except Exception:
+            return None
+        if frame is None:
+            return None
+        self._last_frame = frame
+        self._last_frame_time = getattr(self._camera, "latest_frame_time", None)
+        self._last_frame_ticks = getattr(self._camera, "latest_frame_ticks", None)
+        return frame
+
+    def get_latest_frame(self):
+        """Devuelve el ultimo frame capturado en modo continuo sin bloquear."""
+        if self._camera is None:
+            return None
+        try:
+            frame = self._camera.get_latest_frame()
+        except Exception:
+            return None
+        if frame is not None:
+            self._last_frame = frame
+            self._last_frame_time = getattr(self._camera, "latest_frame_time", None)
+            self._last_frame_ticks = getattr(self._camera, "latest_frame_ticks", None)
+        return frame
+
+    @property
+    def is_capturing(self):
+        if self._camera is None:
+            return False
+        return bool(getattr(self._camera, "is_capturing", False))
+
+    @property
+    def is_released(self):
+        if self._camera is None:
+            return True
+        return bool(getattr(self._camera, "is_released", True))
+
+    @property
+    def effective_backend(self):
+        return self._effective_backend
+
+    @property
+    def available(self):
+        return self._available
+
+    @property
+    def error(self):
+        return self._error
+
+    @property
+    def monitor_info(self):
+        return self._monitor_info
+
+    @property
+    def last_frame(self):
+        return self._last_frame
+
+    @property
+    def last_frame_time(self):
+        return self._last_frame_time
+
+    @property
+    def last_frame_ticks(self):
+        return self._last_frame_ticks
+
+
+def evaluate_dxcam_backends(output_idx: int = 0):
+    """Evalua dxcam en el equipo real: backends, formatos de pixel y cursor.
+
+    Compara dxgi y winrt (cuando este disponible), reporta el backend efectivo,
+    resolucion y formato de frame, y verifica la posicion del cursor mediante
+    la API del SO (GetCursorPos), sin confiar en que dxcam lo pinte.
+    """
+    results = {
+        "dxcam_available": False,
+        "backends": [],
+        "effective_backend": None,
+        "frame_shape": None,
+        "frame_dtype": None,
+        "cursor_position": get_cursor_position(),
+        "error": None,
+    }
+    try:
+        import dxcam as dxcam_mod
+
+        results["dxcam_available"] = True
+    except ImportError as exc:
+        results["error"] = "dxcam no instalado: %s" % exc
+        return results
+    for backend in ("dxgi", "winrt"):
+        backend_result = {"backend": backend, "available": False, "error": None}
+        try:
+            cam = dxcam_mod.create(
+                device_idx=0, output_idx=output_idx, backend=backend
+            )
+            backend_result["available"] = True
+            backend_result["width"] = int(cam.width)
+            backend_result["height"] = int(cam.height)
+            backend_result["region"] = cam.region
+            frame = cam.grab()
+            if frame is not None:
+                backend_result["frame_shape"] = tuple(frame.shape)
+                backend_result["frame_dtype"] = str(frame.dtype)
+                if results["effective_backend"] is None:
+                    results["effective_backend"] = backend
+                    results["frame_shape"] = tuple(frame.shape)
+                    results["frame_dtype"] = str(frame.dtype)
+            cam.release()
+        except Exception as exc:
+            backend_result["available"] = False
+            backend_result["error"] = str(exc)
+        results["backends"].append(backend_result)
+    return results

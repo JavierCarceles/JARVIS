@@ -18,7 +18,7 @@
 - [`src/ear/listener.py` (587 líneas)](#src-ear-listener-py)
 - [`src/eyes/__init__.py` (5 líneas)](#src-eyes-_init_-py)
 - [`src/eyes/screen.py` (997 líneas)](#src-eyes-screen-py)
-- [`src/eyes/screen_capture.py` (368 líneas)](#src-eyes-screen_capture-py)
+- [`src/eyes/screen_capture.py` (701 lineas)](#src-eyes-screen_capture-py)
 - [`src/eyes/vision.py` (935 líneas)](#src-eyes-vision-py)
 - [`src/eyes/vision_only.py` (417 líneas)](#src-eyes-vision_only-py)
 - [`src/eyes/visual_ui_detector_fusion.py` (782 lineas)](#src-eyes-visual-ui-detector-fusion-py)
@@ -551,9 +551,9 @@ Funciones a nivel módulo:
 | `def get_screen_capture()`  (L979) | Obtiene la instancia global de captura. |
 
 <a name="src-eyes-screen_capture-py"></a>
-### `src/eyes/screen_capture.py` [368 líneas] — Sistema de captura de pantalla sin dependencias del cerebro.
+### `src/eyes/screen_capture.py` [701 lineas] — Sistema de captura de pantalla con backend opcional DXcam.
 
-**Descripción:** Sistema de captura de pantalla sin dependencias del cerebro.
+**Descripcion:** Sistema de captura de pantalla con backend opcional de frames continuos DXcam y captura puntual PyAutoGUI/ImageGrab.
 
 **Importaciones:** 12.
 
@@ -576,7 +576,31 @@ Funciones a nivel módulo:
 
 | Firma | Docstring |
 |---|---|
-| `def get_screen_capture()`  (L361) | Obtiene la instancia global del sistema de captura. |
+| `def get_screen_capture()`  (L365) | Obtiene la instancia global del sistema de captura. |
+
+`class DXcamCapture`  (linea 409) — Backend opcional de captura continua de frames basado en dxcam (Windows).
+
+Metodos:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(output_idx, backend, region)` | Configura la camara por salida real sin asumir coincidencia de indices con DISPLAYn ni ScreenManager. |
+| `def enumerate_outputs()` | Lista salidas dxcam con resolucion y bandera primaria. |
+| `def match_monitor(screen_manager)` | Mapea la salida dxcam a un MonitorInfo de ScreenManager por resolucion y bandera primaria. |
+| `def start()` | Crea la camara y comienza la captura continua; informa el backend efectivo y degrada sin ocultar fallos. |
+| `def stop()` | Detiene la captura continua sin liberar la camara. |
+| `def release()` | Libera la camara y sus recursos. |
+| `def grab()` | Captura un frame puntual y actualiza estado y marca temporal. |
+| `def get_latest_frame()` | Devuelve el ultimo frame capturado en modo continuo sin bloquear. |
+
+Propiedades: `is_capturing`, `is_released`, `effective_backend`, `available`, `error`, `monitor_info`, `last_frame`, `last_frame_time`, `last_frame_ticks`.
+
+Funciones a nivel modulo:
+
+| Firma | Docstring |
+|---|---|
+| `def get_cursor_position()` | Devuelve la posicion del cursor mediante la API del SO (GetCursorPos), independiente de dxcam. |
+| `def evaluate_dxcam_backends(output_idx)` | Evalua dxcam en el equipo real: backends, formatos de pixel y cursor. |
 
 <a name="src-eyes-vision-py"></a>
 ### `src/eyes/vision.py` [1188 lineas] — Vision por computadora (Qwen3-VL/Ollama)

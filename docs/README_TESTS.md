@@ -16,6 +16,7 @@
 - [`eyes\test_application_state_enumeration.py`](#eyes/test-application_state_enumeration)
 - [`eyes\test_application_state_separation.py`](#eyes/test-application_state_separation)
 - [`eyes\test_application_state_unknown.py`](#eyes/test-application_state_unknown)
+- [`eyes\test_dxcam_capture_core.py`](#eyes/test-dxcam_capture_core)
 - [`eyes\test_element_classification_integration.py`](#eyes/test-element_classification_integration)
 - [`eyes\test_screen.py`](#eyes/test-screen)
 - [`eyes\test_screen_capture.py`](#eyes/test-screen_capture)
@@ -1014,6 +1015,37 @@ aceptados por ApplicationState().
 
   - **`test_screen_application_state_valid_values`** (L278)
     - Verifica que todos los valores del Enum de screen son aceptados.
+
+---
+
+<a name="eyes/test-dxcam_capture_core"></a>
+### `eyes\test_dxcam_capture_core.py`
+
+**Descripcion:** Tests de DXcamCapture (backend opcional de captura continua de frames). Incluye tests unitarios con mocks (contrato de la clase) y pruebas de hardware real (captura de frame, region, marca temporal, inicio/parada/liberacion, mapeo a monitor y cursor por API del SO).
+
+**Modulos de origen probados:** src.eyes.screen_capture
+
+**Clases de test:**
+
+- **`TestDXcamCaptureInit`** (linea 81) — 2 metodo(s) de test
+  - Verificacion de configuracion y disponibilidad de dxcam.
+
+- **`TestDXcamCaptureStartStopRelease`** (linea 101) — 5 metodo(s) de test
+  - Creacion de camara, inicio/detencion, liberacion y fallback de backend.
+
+- **`TestDXcamCaptureGrab`** (linea 152) — 3 metodo(s) de test
+  - Captura de frame puntual y frame mas reciente en modo continuo.
+
+- **`TestDXcamCaptureMonitorMapping`** (linea 181) — 3 metodo(s) de test
+  - Mapeo de salida dxcam a MonitorInfo de ScreenManager por resolucion y bandera primaria, sin confiar en indices.
+
+- **`TestEvaluateDXcamBackends`** (linea 217) — 4 metodo(s) de test
+  - Estructura de evaluacion, disponibilidad de dxgi, winrt no disponible y cursor por API del SO.
+
+- **`TestDXcamCaptureRealHardware`** (linea 251) — 5 metodo(s) de test
+  - Captura real de frame, recorte por region, ciclo de vida inicio/parada/liberacion, mapeo a monitor y cursor independiente de dxcam.
+
+Metodos auxiliares (no test): `_install_fake_dxcam`.
 
 ---
 

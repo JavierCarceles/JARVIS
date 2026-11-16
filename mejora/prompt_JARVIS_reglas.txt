@@ -176,7 +176,7 @@ ESTADO FINAL: <ID> - <NO IMPLEMENTADA | EN PROCESO | IMPLEMENTADA>
 
 18. PROHIBICION DE DIACRITICOS EN CUALQUIER FICHERO
 - Como convencion de formato del proyecto, no escribir caracteres diacriticos en ningun fichero: vocales con tilde (Unicode U+00E1, U+00E9, U+00ED, U+00F3, U+00FA), `n` con virgulilla (U+00F1), `u` con dieresis (U+00FC) y sus equivalentes en mayuscula. No introducir tampoco marcas Unicode combinantes que representen esos diacriticos.
-- Usar las formas ASCII equivalentes: `a`, `e`, `i`, `o`, `u` y `n`. Esta es una restriccion interna de escritura y compatibilidad documental; no debe justificarse afirmando que UTF-8 o las cadenas de Python no admiten caracteres acentuados.
+- Usar las formas ASCII equivalentes: `a`, `e`, `i`, `o`, `u` y `n`. Esta es una restriccion interna de escritura y compatibilidad documental; no debe justificarse afirmando que UTF-8 o las cadenas de Python no admiten caracteres acentuados. Si encuentras acentos los debes eliminar aun que no los hayas escrito tu, todos los documentos deben estar libres de acentuacion
 - Esta regla se aplica a todo contenido nuevo y a todo contenido modificado. Antes de guardar cualquier fichero, verificar que no contiene caracteres diacriticos ni marcas combinantes.
 
 19. REGISTRO DE ERRORES EN TIEMPO REAL (`mejora/errores_supercomplete.txt`)
