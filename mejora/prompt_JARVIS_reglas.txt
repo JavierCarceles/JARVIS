@@ -25,7 +25,7 @@ Evolucionar de `intencion -> comando -> funcion -> ejecucion` a `intencion -> Go
 3. TESTS Y SEGURIDAD DE VERIFICACION
 - Un test correcto que falla obliga a corregir el codigo, no a debilitar el test.
 - Prohibido quitar asserts, ocultar errores, aceptar cualquier resultado, saltar casos o borrar pruebas para obtener PASS.
-- Cambiar un test solo si esta objetivamente mal, obsoleto por un cambio legitimo de contrato o contradice requisitos reales; registrar el motivo. Si un test fija correctamente un contrato aun no implementado, registrar el fallo como tal, nunca como PASSED.
+- Cambiar un test solo si esta objetivamente mal, obsoleto por un cambio legitimo de contrato o contradice requisitos reales; registrar el motivo. 
 - Todos los tests, mocks, fixtures, datos y scripts cuyo objetivo sea probar, depurar o reproducir deben residir en `tests/`.
 - Auditar los mocks: no permitir que un mock fuerce la decision que se pretende probar ni sustituya la seleccion/validacion del objetivo, autorizacion, persistencia o resultado real. Comprobar estados antes/despues y efectos observables; incluir controles positivos, negativos y sensibilidad de protecciones criticas cuando sea seguro y viable. Registrar limitaciones.
 - Separar resultados unitarios, integracion y no regresion; indicar conteos reales y baseline comparable cuando exista. No presentar resultados no ejecutados como pasados ni atribuir fallos de entorno a codigo sin evidencia.

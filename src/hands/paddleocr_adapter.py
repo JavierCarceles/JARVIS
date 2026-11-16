@@ -7,10 +7,8 @@ metodo para asociar etiquetas OCR con candidatos visuales (UIA, OmniParser,
 Vision) mediante proximidad, alineacion y contencion, sin convertir una
 region de texto en boton por el mero hecho de tener texto.
 
-El modelo NO se descarga de forma silenciosa: la ruta del modelo (model_dir)
-y los archivos de deteccion/reconocimiento deben proporcionarse explicitamente.
-Si PaddleOCR / paddlepaddle no estan disponibles o el modelo no puede cargarse,
-el adaptador se degrada graceful y reporta el motivo en la propiedad ``error``.
+revisar docs/jarvis_requirements.bat para revisar si hay modelos instalados, no usar glob para buscarlo, no
+funciona en powershell(el entorno) pero si está en ese documento, existe
 """
 
 from __future__ import annotations

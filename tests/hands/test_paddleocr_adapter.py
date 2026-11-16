@@ -28,7 +28,37 @@ from src.hands.paddleocr_adapter import (
 
 # Ruta al directorio de modelos proporcionada explicitamente (nunca
 # descargada automaticamente).
-MODEL_DIR = os.environ.get("PADDLEOCR_MODEL_DIR", "")
+MODEL_DIR_ENV = os.environ.get("PADDLEOCR_MODEL_DIR", "")
+
+# Busca automaticamente modelos PaddleOCR en .paddlex\official_models cuando
+# no se proporciona explicitamente, para que los tests de integracion real no
+# queden skippeados si los modelos estan instalados.
+# Prioriza PP-OCRv6_medium (el que reporta el motor PaddleOCR instalado)
+# sobre PP-OCRv5_server para evitar mismatches de nombre de modelo.
+_MODELO_DET_AUTODETECTADO = None
+_MODELO_REC_AUTODETECTADO = None
+_VERSIONES_PREFERIDAS = ["PP-OCRv6_medium", "PP-OCRv5_server", "PP-OCRv5_mobile"]
+if not MODEL_DIR_ENV:
+    _paddlex_cache = os.path.expanduser(r"~\.paddlex\official_models")
+    if os.path.isdir(_paddlex_cache):
+        for _version in _VERSIONES_PREFERIDAS:
+            if _MODELO_DET_AUTODETECTADO is not None and _MODELO_REC_AUTODETECTADO is not None:
+                break
+            for _nombre in os.listdir(_paddlex_cache):
+                _ruta = os.path.join(_paddlex_cache, _nombre)
+                if not os.path.isdir(_ruta):
+                    continue
+                if not os.path.exists(os.path.join(_ruta, "inference.onnx")):
+                    continue
+                if _version.lower() not in _nombre.lower():
+                    continue
+                if _MODELO_DET_AUTODETECTADO is None and "det" in _nombre.lower():
+                    _MODELO_DET_AUTODETECTADO = _ruta
+                if _MODELO_REC_AUTODETECTADO is None and "rec" in _nombre.lower():
+                    _MODELO_REC_AUTODETECTADO = _ruta
+
+MODEL_DIR = MODEL_DIR_ENV or _MODELO_DET_AUTODETECTADO or ""
+REC_MODEL_DIR = _MODELO_REC_AUTODETECTADO or None
 PADDLEOCR_DISPONIBLE = bool(MODEL_DIR) and os.path.isdir(MODEL_DIR)
 
 
@@ -155,19 +185,20 @@ class TestPaddleOCRAdapterContract(unittest.TestCase):
         self.assertNotIn("ocr", resultado[0])
 
 
-@skipIf(not PADDLEOCR_DISPONIBLE,
-        "Directorio de modelos PaddleOCR no proporcionado (PADDLEOCR_MODEL_DIR). "
-        "Prueba de integracion real omitida.")
 class TestPaddleOCRAdapterIntegracionReal(unittest.TestCase):
     """Integracion real con el motor PaddleOCR.
 
-    Solo se ejecuta si el usuario proporciona explicitamente la ruta al
-    directorio de modelos mediante PADDLEOCR_MODEL_DIR. Nunca se descargan
-    pesos automaticamente.
+    Se ejecuta cuando hay modelos PaddleOCR instalados (detectados
+    automaticamente en .paddlex\\official_models o proporcionados mediante
+    PADDLEOCR_MODEL_DIR).
     """
 
     def setUp(self):
-        self.adapter = PaddleOCRAdapter(model_dir=MODEL_DIR, device="cpu")
+        self.adapter = PaddleOCRAdapter(
+            model_dir=MODEL_DIR,
+            rec_model_dir=REC_MODEL_DIR,
+            device="cpu",
+        )
         self.assertTrue(self.adapter.available, self.adapter.error)
 
     def test_cargar_motor_real(self):

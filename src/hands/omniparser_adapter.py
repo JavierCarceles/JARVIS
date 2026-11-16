@@ -6,9 +6,7 @@ Utiliza el detector TorchScript YOLOv9-E de OmniParser V2
 (microsoft/OmniParser-v2.0, icon_detect_v3/model.pt, licencia MIT)
 para detectar regiones que parecen interactivas en una captura de pantalla.
 
-El modelo NO se descarga de forma silenciosa: la ruta del modelo (model_path)
-debe proporcionarse explicitamente. Si el modelo no esta disponible, el
-adaptador se degrada gracefully y reporta el error en la propiedad ``error``.
+Si no se encuentra se debe descargar el modelo que se considere, añadiendolo a docs/jarvis_requirements.bat
 La deteccion corre en CPU por defecto (CUDA solo si esta disponible).
 
 Adaptado de microsoft/OmniParser (util/yolov9.py), licencia MIT.

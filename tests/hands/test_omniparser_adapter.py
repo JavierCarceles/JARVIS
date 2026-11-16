@@ -25,7 +25,28 @@ from src.hands.omniparser_adapter import (
 
 
 # Ruta al modelo proporcionada explicitamente (nunca descargada automaticamente).
-MODEL_PATH = os.environ.get("OMNIPARSER_MODEL_PATH", "")
+MODEL_PATH_ENV = os.environ.get("OMNIPARSER_MODEL_PATH", "")
+
+# Busca automaticamente el modelo icon_detect_v3/model.pt en la cache de
+# HuggingFace cuando no se proporciona explicitamente, para que los tests de
+# integracion real no queden skippeados si el modelo esta instalado.
+_MODELO_OMNIPARSER_AUTODETECTADO = None
+if not MODEL_PATH_ENV:
+    _hf_cache = os.path.expanduser(
+        r"~\.cache\huggingface\hub\models--microsoft--OmniParser-v2.0"
+    )
+    if os.path.isdir(_hf_cache):
+        for _raiz, _dirs, _archivos in os.walk(_hf_cache):
+            for _nombre in _archivos:
+                if _nombre == "model.pt" and "icon_detect_v3" in _raiz:
+                    _MODELO_OMNIPARSER_AUTODETECTADO = os.path.join(
+                        _raiz, _nombre
+                    )
+                    break
+            if _MODELO_OMNIPARSER_AUTODETECTADO:
+                break
+
+MODEL_PATH = MODEL_PATH_ENV or _MODELO_OMNIPARSER_AUTODETECTADO or ""
 MODEL_DISPONIBLE = bool(MODEL_PATH) and os.path.exists(MODEL_PATH)
 
 
@@ -109,9 +130,6 @@ class TestOmniParserAdapterContract(unittest.TestCase):
         self.assertEqual(info["license"], "MIT")
 
 
-@skipIf(not MODEL_DISPONIBLE,
-        "Modelo icon_detect_v3 no proporcionado (OMNIPARSER_MODEL_PATH). "
-        "Prueba de integracion real omitida.")
 class TestOmniParserAdapterIntegracionReal(unittest.TestCase):
     """Integracion real con el modelo TorchScript de OmniParser V2.
 

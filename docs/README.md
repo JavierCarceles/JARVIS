@@ -2258,6 +2258,32 @@ Clases:
 | `class FileSystemChangeEvent` | Evento de cambio del sistema de archivos observado (tipo de evento, ruta y marca de tiempo ISO 8601 UTC). |
 | `class FileSystemObserver` | Observador opcional de cambios del sistema de archivos; inicio, detencion y consulta de disponibilidad. |
 
+### `src/hands/detector_manifest.py` (568 lineas) - Manifiesto local de detectores y modelos de vision.
+
+**Descripcion:** Agrega la configuracion y la disponibilidad real de cada detector del pipeline de deteccion de controles interactivos: UI Automation, OmniParser V2 (icon_detect_v3), PaddleOCR, Qwen3-VL/Ollama y OpenCV. Para cada detector registra version fijada, ruta de pesos, runtime, dispositivo CPU/GPU, precision numerica, parametros, licencia, disponibilidad y fallback. Nunca descarga pesos ni modelos silenciosamente; un modelo opcional ausente se reporta como NO_DISPONIBLE / NO_VERIFICADO, nunca como un resultado ficticio ni una sustitucion silenciosa.
+
+**Caracteristicas:**
+
+- `DetectorManifestEntry` modela una entrada del manifiesto: source, model, version, weight_path, runtime, device, precision, parameters, license, status, error, fallback, checked_at y load_time_seconds, con validacion de estado canonico (disponible / no_disponible / no_verificado) y serializacion a diccionario plano.
+- `DetectorManifest` agrega entradas, calcula el resumen contable (total, disponibles, no_disponibles, no_verificados, fuentes disponibles y no disponibles), y ofrece `to_json()`, `save_json(path)` y `load_json(path)` para persistir el manifiesto local sin escribir en datos de produccion.
+- `build_detector_manifest(model_path, model_dir, qwen3vl_model, sources)` comprueba la disponibilidad real de cada detector: UI Automation (pywinauto/comtypes), OmniParser (carga el modelo .pt local si se provee, si no NO_DISPONIBLE), PaddleOCR (carga el motor desde model_dir local si se provee, si no NO_DISPONIBLE), Qwen3-VL (consulta el servidor Ollama real; si no esta alcanzable, NO_VERIFICADO) y OpenCV.
+- Ninguna comprobacion descarga pesos ni sustituye una respuesta faltante por un resultado inventado.
+
+**Importaciones:** 7.
+
+Clases:
+
+| Clase | Docstring |
+|---|---|
+| `class DetectorManifestEntry` | Una entrada del manifiesto: configuracion y estado real de un detector. |
+| `class DetectorManifest` | Conjunto de entradas de detectores, con estado real comprobado y resumen contable. |
+
+Funciones a nivel modulo:
+
+| Firma | Docstring |
+|---|---|
+| `def build_detector_manifest(model_path, model_dir, qwen3vl_model, sources)` | Construye el manifiesto comprobando la disponibilidad real de cada detector. |
+
 ### `src/hands/ui_automation_adapter.py` (1045 lineas) - Adaptador de automatizacion de UI de Windows sobre UI Automation.
 
 **Descripcion:** Capa reutilizable sobre pywinauto con backend="uia" y acceso al elemento AutomationElement subyacente (COM/UIAutomationCore via comtypes) cuando el backend de pywinauto no expone una propiedad o patron necesario. Recibe el HWND/PID de una ventana YA IDENTIFICADA y consulta solo el arbol UI Automation de esa ventana. Nunca enumera el escritorio ni ventanas ajenas. Durante el descubrimiento solo se leen propiedades y patrones disponibles; nunca se invocan patrones de accion (Invoke, Value, Toggle...) ni se modifica el estado de la ventana.
