@@ -17,6 +17,7 @@
 - [`eyes\test_application_state_separation.py`](#eyes/test-application_state_separation)
 - [`eyes\test_application_state_unknown.py`](#eyes/test-application_state_unknown)
 - [`eyes\test_dxcam_capture_core.py`](#eyes/test-dxcam_capture_core)
+- [`eyes\test_dxcam_capture_integration.py`](#eyes/test-dxcam_capture_integration)
 - [`eyes\test_element_classification_integration.py`](#eyes/test-element_classification_integration)
 - [`eyes\test_screen.py`](#eyes/test-screen)
 - [`eyes\test_screen_capture.py`](#eyes/test-screen_capture)
@@ -1064,6 +1065,44 @@ aceptados por ApplicationState().
   - Transicion real al ocultar/restaurar una unica ventana de Notepad en el monitor secundario, comprobando que la captura adaptativa entra en modo rafaga. Requiere JARVIS_TEST_GUI_REAL=1. Cierra solo la ventana que abrio.
 
 Metodos auxiliares (no test): `_install_fake_dxcam`, `_FakeClock`, `_FakeAdaptiveCamera`, funciones de lock GUI y enumerado de ventanas Notepad.
+
+---
+
+<a name="eyes/test-dxcam_capture_integration"></a>
+### `eyes\test_dxcam_capture_integration.py`
+
+**Descripcion:** Tests de integracion de DXcamCapture como backend opcional de captura continua de frames (unidad 3.8.6.3.3.13.4). Separa tests unitarios de contrato (fakes/mocks, sin hardware real ni captura de pantalla) de pruebas reales de hardware (dxcam y mss reales sobre el equipo, captura pasiva de pantalla sin abrir ventanas GUI). Verifica salida y monitor real, forma y dimensiones de frame, marca temporal, region, inicio/parada/liberacion, frame nulo y repetido, backend no disponible y fallback a mss.
+
+**Modulos de origen probados:** src.eyes.screen_capture, src.utils.screen_manager
+
+**Clases de test:**
+
+- **`TestDXcamCaptureContrato`** (linea 103) — 2 metodo(s) de test
+  - Configuracion y disponibilidad de dxcam.
+
+- **`TestDXcamCaptureInicioParadaLiberacion`** (linea 123) — 5 metodo(s) de test
+  - Inicio de camara, detencion, liberacion y fallback de backend winrt a dxgi.
+
+- **`TestDXcamCaptureGrab`** (linea 184) — 4 metodo(s) de test
+  - Captura de frame puntual, frame mas reciente, frame repetido y frame nulo que degradan a mss.
+
+- **`TestDXcamCaptureMapeoMonitor`** (linea 242) — 2 metodo(s) de test
+  - Mapeo de salida dxcam a MonitorInfo por resolucion y bandera primaria, sin confiar en indices.
+
+- **`TestDXcamCaptureBackendNoDisponible`** (linea 266) — 2 metodo(s) de test
+  - Inicio sin dxcam reporta fallo y degradacion a mss sin ocultar el error.
+
+- **`TestMssCaptureContrato`** (linea 320) — 2 metodo(s) de test
+  - Disponibilidad de mss y monitor inexistente retorna None con error.
+
+- **`TestEvaluateDXcamBackends`** (linea 336) — 2 metodo(s) de test
+  - Estructura de la evaluacion de backends y posicion del cursor por API del SO.
+
+- **`TestDXcamCaptureRealHardware`** (linea 360) — 7 metodo(s) de test
+  - Captura real de frame (2160x3840x3) y marca temporal, recorte por region (200x200x3), ciclo de vida inicio/parada/liberacion, mapeo a monitor primario mediante ScreenManager, cursor independiente de dxcam y degradacion a mss ante frame nulo o repetido.
+
+- **`TestMssCaptureReal`** (linea 466) — 4 metodo(s) de test
+  - Captura real de monitor primario y secundario mediante mss, captura de region real y monitor inexistente retorna None con error.
 
 ---
 
@@ -2778,6 +2817,20 @@ Modo de ejecución: las pruebas de `TestUIAutomationAdapterRealWindow` abren y c
 Modo de ejecución: las pruebas de `TestFrameworkRealNotepad` abren y cierran Notepad real en el monitor secundario derecho; siguen las reglas de una sola ventana GUI por prueba.
 
 ---
+
+<a name="hands/test-window_evidence_validator"></a>
+### `hands\test_window_evidence_validator.py`
+
+**Descripcion:** Tests del validador de pertenencia de evidencia a ventana objetivo (unidad 3.8.6.4.1). Verifica contrato/logica pura (sin GUI): identidad HWND/PID, contenimiento geometrico, rechazo de captura de escritorio entero y candidatos con identificadores contradictorios. Incluye pruebas de integracion real GUI sobre una sola ventana de Notepad compartida por sesion en el monitor secundario derecho (arbol UIA real, captura real de la ventana, captura de escritorio entero rechazada, candidatos del arbol validados). Solo se ejecutan si `JARVIS_TEST_GUI_REAL=1`.
+
+**Modulos de origen probados:** src.hands.window_evidence_validator, src.hands.ui_automation_adapter, src.eyes.visual_ui_detector_fusion, src.utils.screen_manager
+
+**Clases de test:**
+
+- **`TestWindowEvidenceValidatorContract`** — 22 metodo(s) de test: identidad de ventana y proceso, contenimiento de region de captura, rechazo de escritorio entero, region invalida, candidatos con window_handle/process_id/bbox/pantalla contradictorios, validacion combinada y funcion de conveniencia.
+- **`TestWindowEvidenceValidatorNotepadReal`** — 7 metodo(s) de test: integracion real sobre Notepad en monitor secundario derecho (ventana compartida por sesion, cierre por atexit); arbol UIA real, captura real de ventana, rechazo de escritorio entero, candidatos desde arbol real, candidato con window_handle ajeno, validacion combinada y HWND inexistente.
+
+Modo de ejecucion: las pruebas de `TestWindowEvidenceValidatorNotepadReal` requieren `JARVIS_TEST_GUI_REAL=1`; abren UNA sola ventana de Notepad en el monitor secundario derecho y la cierran al salir del proceso (atexit).
 
 <a name="hands/planner/test-advanced_state_graph"></a>
 ### `hands\planner\test_advanced_state_graph.py`

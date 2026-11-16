@@ -62,6 +62,7 @@
 - [`src/hands/planner/preconditions_effects_types.py` (821 líneas)](#src-hands-planner-preconditions_effects_types-py)
 - [`src/hands/planner/task_executor.py` (1097 líneas)](#src-hands-planner-task_executor-py)
 - [`src/hands/universal_visual_calibrator.py` (922 líneas)](#src-hands-universal_visual_calibrator-py)
+- [`src/hands/window_evidence_validator.py`](#src-hands-window_evidence_validator-py)
 - [`src/hands/windows/__init__.py` (3 líneas)](#src-hands-windows-_init_-py)
 - [`src/hands/windows/calibrator_windows.py` (263 líneas)](#src-hands-windows-calibrator_windows-py)
 - [`src/hands/windows/windows.py` (694 líneas)](#src-hands-windows-windows-py)
@@ -2424,6 +2425,42 @@ Metodos de OmniParserAdapter:
 | `def __init__(model_path, device, conf_threshold, iou_threshold, max_detections, img_size)` | Crea el adaptador y carga el modelo explicito. |
 | `def detect(image, screen)` | Detecta regiones interactivas candidatas en una imagen. |
 | `def compatibility_info()` | Devuelve datos de compatibilidad del adaptador sin ejecutar el SO. |
+
+### `src/hands/window_evidence_validator.py` — Validador de pertenencia de evidencia de deteccion a una ventana objetivo.
+
+**Descripcion:** Puerta de seguridad previa a la calibracion y la interaccion. Valida que una captura de pantalla, un arbol de UI Automation y unos candidatos de deteccion fusionada pertenezcan a la ventana identificada por HWND/PID, y rechaza evidencia de escritorio entero cuando la ventana no puede separarse con seguridad. No captura pantalla, no enumera el escritorio y no ejecuta acciones sobre controles; solo valida identidad (HWND/PID) y geometria (contenimiento en el rectangulo de la ventana) de evidencia ya obtenida.
+
+**Caracteristicas:**
+
+- `WindowEvidenceValidator(target_hwnd, target_pid, screen_manager)` valida un `UIAutomationTree`, una region de captura y una lista de candidatos contra la ventana objetivo.
+- `WindowEvidenceValidation` devuelve checks por comprobacion (identidad de ventana, identidad de proceso, contenimiento geometrico, ausencia de evidencia de escritorio entero), evidencia rechazada y detalles para depuracion.
+- `validate_evidence_for_window()` funciona de conveniencia para validar toda la evidencia de una ventana en una sola llamada.
+- No escribe coordenadas fisicas ni geometria local en entidades; el validador es de solo lectura sobre la evidencia recibida.
+
+**Importaciones:** 7.
+
+Clases:
+
+| Clase | Docstring |
+|---|---|
+| `class WindowEvidenceValidation` | Resultado de validar que una evidencia pertenece a una ventana objetivo. |
+| `class WindowEvidenceValidator` | Validador de pertenencia de evidencia de deteccion a una ventana objetivo. |
+
+Metodos de WindowEvidenceValidator:
+
+| Firma | Docstring |
+|---|---|
+| `def __init__(target_hwnd, target_pid, screen_manager)` | Crea el validador para una ventana objetivo identificada por HWND/PID. |
+| `def validate_ui_automation_tree(tree)` | Valida que un arbol UIA pertenezca a la ventana objetivo (HWND/PID). |
+| `def validate_capture_region(region, backend, source)` | Valida que una region de captura pertenezca a la ventana objetivo. |
+| `def validate_candidates(candidates, screen)` | Valida que candidatos de deteccion pertenezcan a la ventana objetivo. |
+| `def validate_all(tree, capture_region, candidates, screen, backend, source)` | Valida conjuntamente arbol UIA, captura y candidatos. |
+
+Funciones a nivel modulo:
+
+| Firma | Docstring |
+|---|---|
+| `def validate_evidence_for_window(target_hwnd, tree, capture_region, candidates, target_pid, screen, backend, source)` | Valida la evidencia de una ventana objetivo en una sola llamada. |
 
 ## 🗺️ `src/hands/planner/`
 

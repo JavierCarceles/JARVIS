@@ -657,7 +657,7 @@ class TestGuiBase(unittest.TestCase):
         except Exception:
             # Si falla el setup, limpiar la ventana compartida que se pudo
             # haber abierto y liberar el lock, para no dejar ventanas
-            # huérfanas.
+            # huorfanas.
             try:
                 _cerrar_notepad_compartido()
             except Exception:
@@ -1012,3 +1012,481 @@ class TestVisualUIDetectorFusionQwen3VLReal(TestGuiBase):
                     os.remove(ruta)
             except Exception:
                 pass
+
+
+# ---------------------------------------------------------------------------
+# Tests GUI: comparativa UIA vs detector visual vs fusion sobre Notepad real
+# (unidad 3.8.6.3.3.15)
+#
+# Comprueba, sobre una aplicacion fixture real (Notepad):
+#   1. El arbol UIA por separado (enumeracion de controles reales).
+#   2. El detector visual por separado (Vision.detect_ui_elements sobre una
+#      captura real de la ventana).
+#   3. La fusion de ambas fuentes.
+# Registra: elementos existentes (en ambas), omitidos (en una pero no en la
+# otra), duplicados, falsos positivos y elementos a los que el proveedor de
+# UIA no da acceso.
+# ---------------------------------------------------------------------------
+
+import json as _json
+import math as _math
+
+
+def _iou_mismo_espacio(a, b):
+    """IoU de dos cajas [x1, y1, x2, y2] en el mismo espacio de coordenadas."""
+    if not a or not b or len(a) != 4 or len(b) != 4:
+        return 0.0
+    ax1, ay1, ax2, ay2 = [float(v) for v in a]
+    bx1, by1, bx2, by2 = [float(v) for v in b]
+    ix1 = max(ax1, bx1); iy1 = max(ay1, by1)
+    ix2 = min(ax2, bx2); iy2 = min(ay2, by2)
+    inter_w = max(0.0, ix2 - ix1); inter_h = max(0.0, iy2 - iy1)
+    inter = inter_w * inter_h
+    if inter <= 0.0:
+        return 0.0
+    area_a = max(0.0, ax2 - ax1) * max(0.0, ay2 - ay1)
+    area_b = max(0.0, bx2 - bx1) * max(0.0, by2 - by1)
+    union = area_a + area_b - inter
+    if union <= 0.0:
+        return 0.0
+    return inter / union
+
+
+class TestIntegracionUIAVisualFixtureReal(TestGuiBase):
+    """Integracion real UIA + detector visual + fusion sobre Notepad."""
+
+    REPORTE_PATH = os.path.join(os.path.dirname(__file__), "fixtures",
+                                "informe_integracion_uia_visual_fixture_real.json")
+
+    def _uia_element_a_candidato(self, elem, screen=0):
+        """Convierte un UIAutomationElement en DetectedCandidate (fuente UIA)."""
+        x1, y1, x2, y2 = [float(v) for v in elem.bounding_rectangle]
+        center = [int(round((x1 + x2) / 2.0)), int(round((y1 + y2) / 2.0))]
+        element = UIElementData(
+            name=(elem.automation_id or elem.name or "element"),
+            type=normalize_element_type(elem.control_type),
+            text=elem.name,
+            description="",
+            bbox=list(elem.bounding_rectangle),
+            center=center,
+            screen=int(screen),
+            interactive=bool(elem.is_enabled and elem.visible and not elem.is_offscreen),
+            confidence=0.9,
+            calibrated=False,
+            calibration_data={"source": SOURCE_UIA,
+                              "automation_id": elem.automation_id,
+                              "control_type": elem.control_type},
+        )
+        return DetectedCandidate(
+            source=SOURCE_UIA,
+            element=element,
+            confidence=0.9,
+            bbox=list(elem.bounding_rectangle),
+            center=center,
+            screen=int(screen),
+            window_handle=elem.handle,
+            process_id=elem.process_id,
+            raw={
+                "automation_id": elem.automation_id,
+                "name": elem.name,
+                "control_type": elem.control_type,
+                "class_name": elem.class_name,
+                "patterns": list(elem.patterns),
+                "is_enabled": bool(elem.is_enabled),
+                "visible": bool(elem.visible),
+                "is_offscreen": bool(elem.is_offscreen),
+                "handle": int(elem.handle),
+                "framework": elem.framework,
+                "depth": int(elem.depth),
+            },
+        )
+
+    def _visual_element_a_candidato(self, ve, screen=0, window_handle=None,
+                                     process_id=None, offset=(0, 0)):
+        """Convierte un UIElement de Vision.detect_ui_elements en DetectedCandidate.
+
+        Vision.detect_ui_elements consulta al modelo visual (Qwen3-VL via
+        Ollama) sobre la captura real, por tanto su procedencia es SOURCE_QWEN3VL.
+        """
+        ox, oy = offset
+        bbox = list(ve.bbox) if ve.bbox else None
+        if bbox:
+            bbox = [int(bbox[0] + ox), int(bbox[1] + oy),
+                    int(bbox[2] + ox), int(bbox[3] + oy)]
+        center = list(ve.center) if ve.center else None
+        if center:
+            center = [int(center[0] + ox), int(center[1] + oy)]
+        element = UIElementData(
+            name=ve.name or ve.text or "element",
+            type=ve.type,
+            text=ve.text,
+            description=ve.description,
+            bbox=bbox,
+            center=center,
+            screen=int(screen),
+            interactive=bool(ve.interactive),
+            confidence=float(ve.confidence or 0.0),
+            calibrated=False,
+        )
+        return DetectedCandidate(
+            source=SOURCE_QWEN3VL,
+            element=element,
+            confidence=float(ve.confidence or 0.0),
+            bbox=bbox,
+            center=center,
+            screen=int(screen),
+            window_handle=window_handle,
+            process_id=process_id,
+            raw={"name": ve.name, "text": ve.text, "type": ve.type,
+                 "description": ve.description,
+                 "interactive": bool(ve.interactive)},
+        )
+
+    def _centro_bbox(self, bbox):
+        if not bbox or len(bbox) != 4:
+            return None
+        return ((bbox[0] + bbox[2]) / 2.0, (bbox[1] + bbox[3]) / 2.0)
+
+    def _textos_candidato(self, c):
+        out = []
+        if c.element:
+            if c.element.name:
+                out.append(str(c.element.name))
+            if c.element.text:
+                out.append(str(c.element.text))
+        if c.raw and c.raw.get("text"):
+            out.append(str(c.raw["text"]))
+        return out
+
+    def _coinciden(self, uia_c, vis_c):
+        """True si un candidato UIA y uno visual parecen el mismo elemento."""
+        if uia_c.bbox and vis_c.bbox:
+            if _iou_mismo_espacio(uia_c.bbox, vis_c.bbox) >= 0.30:
+                return True
+        u_ctr = self._centro_bbox(uia_c.bbox)
+        v_ctr = self._centro_bbox(vis_c.bbox)
+        if u_ctr and v_ctr:
+            dist = _math.hypot(v_ctr[0] - u_ctr[0], v_ctr[1] - u_ctr[1])
+            if dist <= 60.0:
+                ut = self._textos_candidato(uia_c)
+                vt = self._textos_candidato(vis_c)
+                for a in ut:
+                    for b in vt:
+                        if a and b and (a == b or a in b or b in a):
+                            return True
+        return False
+
+    def _comparar_y_registrar(self, candidatos_uia, candidatos_visual,
+                              resultado_fusion, hwnd, pid):
+        """Compara UIA vs visual, categoriza y escribe el informe JSON."""
+        user32 = ctypes.windll.user32
+        rect = ctypes.wintypes.RECT()
+        user32.GetWindowRect(ctypes.c_void_p(hwnd), ctypes.byref(rect))
+        cap_left = int(rect.left); cap_top = int(rect.top)
+
+        uia_items = []
+        for c in candidatos_uia:
+            bx1, by1, bx2, by2 = c.bbox
+            rel_bbox = [int(bx1 - cap_left), int(by1 - cap_top),
+                        int(bx2 - cap_left), int(by2 - cap_top)]
+            uia_items.append((c, rel_bbox))
+
+        visual_items = []
+        for c in candidatos_visual:
+            visual_items.append((c, list(c.bbox) if c.bbox else None))
+
+        existentes = []
+        omitidos_visual = []
+        omitidos_uia = []
+        falsos_positivos = []
+        duplicados_uia = []
+        duplicados_visual = []
+
+        uia_matched = set()
+        vis_matched = set()
+
+        # Duplicados dentro de UIA (mismo elemento detectado dos veces)
+        for i in range(len(uia_items)):
+            for j in range(i + 1, len(uia_items)):
+                ci, bi = uia_items[i]; cj, bj = uia_items[j]
+                if _iou_mismo_espacio(bi, bj) >= 0.5:
+                    duplicados_uia.append({
+                        "uia_a": ci.raw.get("automation_id") or ci.raw.get("name"),
+                        "uia_b": cj.raw.get("automation_id") or cj.raw.get("name"),
+                        "iou": round(_iou_mismo_espacio(bi, bj), 3),
+                    })
+
+        # Duplicados dentro de visual
+        for i in range(len(visual_items)):
+            for j in range(i + 1, len(visual_items)):
+                ci, bi = visual_items[i]; cj, bj = visual_items[j]
+                if bi and bj and _iou_mismo_espacio(bi, bj) >= 0.5:
+                    duplicados_visual.append({
+                        "visual_a": ci.raw.get("name") or ci.raw.get("text"),
+                        "visual_b": cj.raw.get("name") or cj.raw.get("text"),
+                        "iou": round(_iou_mismo_espacio(bi, bj), 3),
+                    })
+
+        # Comparar UIA vs visual
+        for i, (uia_c, uia_bbox_rel) in enumerate(uia_items):
+            match_idx = None
+            for j, (vis_c, vis_bbox) in enumerate(visual_items):
+                if j in vis_matched:
+                    continue
+                if self._coinciden(uia_c, vis_c):
+                    match_idx = j
+                    break
+            if match_idx is not None:
+                uia_matched.add(i); vis_matched.add(match_idx)
+                existentes.append({
+                    "uia": {
+                        "name": uia_c.raw.get("name"),
+                        "automation_id": uia_c.raw.get("automation_id"),
+                        "control_type": uia_c.raw.get("control_type"),
+                        "patterns": uia_c.raw.get("patterns"),
+                        "bbox_captura": uia_bbox_rel,
+                        "interactivo": uia_c.element.interactive if uia_c.element else False,
+                    },
+                    "visual": {
+                        "name": vis_c.element.name if vis_c.element else None,
+                        "type": vis_c.element.type if vis_c.element else None,
+                        "text": vis_c.element.text if vis_c.element else None,
+                        "bbox": vis_bbox,
+                        "confidence": vis_c.confidence,
+                        "interactivo": vis_c.element.interactive if vis_c.element else False,
+                    },
+                })
+            else:
+                omitidos_visual.append({
+                    "name": uia_c.raw.get("name"),
+                    "automation_id": uia_c.raw.get("automation_id"),
+                    "control_type": uia_c.raw.get("control_type"),
+                    "patterns": uia_c.raw.get("patterns"),
+                    "bbox_captura": uia_bbox_rel,
+                    "interactivo": uia_c.element.interactive if uia_c.element else False,
+                    "motivo": "Detector visual no lo encontro en la captura",
+                })
+
+        for j, (vis_c, vis_bbox) in enumerate(visual_items):
+            if j in vis_matched:
+                continue
+            es_falso = vis_c.confidence < 0.4 or (vis_bbox and (
+                vis_bbox[2] - vis_bbox[0] < 5 or vis_bbox[3] - vis_bbox[1] < 5))
+            entry = {
+                "name": vis_c.element.name if vis_c.element else None,
+                "type": vis_c.element.type if vis_c.element else None,
+                "text": vis_c.element.text if vis_c.element else None,
+                "bbox": vis_bbox,
+                "confidence": vis_c.confidence,
+                "interactivo": vis_c.element.interactive if vis_c.element else False,
+            }
+            if es_falso:
+                falsos_positivos.append({**entry,
+                                         "motivo": "Confianza baja o caja degenerada"})
+            else:
+                omitidos_uia.append({**entry,
+                                     "motivo": "Proveedor UIA no expone este control"})
+
+        fusion_candidatos = []
+        for fc in resultado_fusion.candidates:
+            fusion_candidatos.append({
+                "canonical_id": fc.canonical_id,
+                "name": fc.name,
+                "type": fc.type,
+                "sources": [s.source for s in fc.sources],
+                "interactivo": fc.interactive,
+                "merged_confidence": fc.merged_confidence,
+                "disagreements": list(fc.disagreements),
+            })
+
+        informe = {
+            "fixture": "notepad.exe",
+            "ventana_hwnd": int(hwnd),
+            "ventana_pid": int(pid),
+            "total_uia": len(uia_items),
+            "total_visual": len(visual_items),
+            "total_fusion": resultado_fusion.candidate_count,
+            "existentes": existentes,
+            "omitidos_por_visual": omitidos_visual,
+            "omitidos_por_uia": omitidos_uia,
+            "falsos_positivos": falsos_positivos,
+            "duplicados_uia": duplicados_uia,
+            "duplicados_visual": duplicados_visual,
+            "fusion_candidatos": fusion_candidatos,
+            "duplicados_eliminados_fusion": resultado_fusion.duplicates_removed,
+            "desacuerdos_totales": resultado_fusion.disagreements_total,
+            "fuentes_usadas": list(resultado_fusion.sources_used),
+            "fuentes_disponibles": dict(resultado_fusion.sources_available),
+        }
+
+        os.makedirs(os.path.dirname(self.REPORTE_PATH), exist_ok=True)
+        with open(self.REPORTE_PATH, "w", encoding="utf-8") as f:
+            _json.dump(informe, f, ensure_ascii=False, indent=2)
+
+        return informe
+
+    def test_arbol_uia_por_separado_fixture_real(self):
+        """Arbol UIA de Notepad se enumera por separado y sus elementos se registran."""
+        _gui_log("TEST_INICIO: test_arbol_uia_por_separado_fixture_real")
+        from src.hands.ui_automation_adapter import UIAutomationAdapter
+        adapter = UIAutomationAdapter(timeout=8.0)
+        tree = adapter.enumerate_window(self.hwnd, self.pid)
+        self.assertIsNone(tree.error, "Error enumerando UIA: %s" % tree.error)
+        self.assertGreaterEqual(tree.element_count, 2,
+                                "Se esperaban al menos ventana + un hijo en Notepad")
+        root = tree.root_element
+        self.assertEqual(root.handle, self.hwnd)
+        self.assertEqual(root.control_type, "Window")
+        self.assertTrue(root.visible)
+        self.assertFalse(root.is_offscreen)
+        self.__class__.uia_tree = tree
+        self.__class__.uia_candidatos = [
+            self._uia_element_a_candidato(elem, screen=0) for elem in tree.elements
+        ]
+        _gui_log("TEST_FIN: test_arbol_uia_por_separado_fixture_real "
+                 "elementos=%d" % tree.element_count)
+
+    def test_detector_visual_por_separado_fixture_real(self):
+        """Detector visual (Vision.detect_ui_elements) sobre captura real de Notepad."""
+        _gui_log("TEST_INICIO: test_detector_visual_por_separado_fixture_real")
+        from src.eyes.screen_capture import ScreenCapture
+        from src.eyes.vision import Vision
+
+        user32 = ctypes.windll.user32
+        hwnd = self.hwnd
+        rect = ctypes.wintypes.RECT()
+        user32.GetWindowRect(ctypes.c_void_p(hwnd), ctypes.byref(rect))
+        left = int(rect.left); top = int(rect.top)
+        width = int(rect.right - rect.left); height = int(rect.bottom - rect.top)
+
+        ruta = os.path.join(os.getcwd(), "tests", "fixtures",
+                            "_tmp_integracion_visual_%d.png" % self.pid)
+        os.makedirs(os.path.dirname(ruta), exist_ok=True)
+        captor = ScreenCapture()
+        ruta_devuelta = captor.capture_region(left, top, width, height, save_path=ruta)
+        self.assertIsNotNone(ruta_devuelta, "No se pudo capturar la region de pantalla")
+        self.assertTrue(os.path.exists(ruta), "La captura no se escribio en disco")
+
+        try:
+            vision = Vision()
+            respuesta = vision.detect_ui_elements(ruta, application="notepad",
+                                                   refine_with_opencv=True)
+            self.assertIsNotNone(respuesta)
+            self.assertIsInstance(respuesta.elements, list)
+            self.__class__.visual_respuesta = respuesta
+            self.__class__.visual_candidatos = [
+                self._visual_element_a_candidato(
+                    ve, screen=0, window_handle=hwnd, process_id=self.pid,
+                    offset=(left, top))
+                for ve in respuesta.elements
+            ]
+            _gui_log("TEST_FIN: test_detector_visual_por_separado_fixture_real "
+                     "elementos_visual=%d" % len(respuesta.elements))
+        finally:
+            try:
+                if os.path.exists(ruta):
+                    os.remove(ruta)
+            except Exception:
+                pass
+
+    def test_fusion_comparativa_uia_visual_fixture_real(self):
+        """Fusion UIA + visual sobre Notepad real, con registro de existentes,
+        omitidos, duplicados, falsos positivos y UIA-inaccesibles."""
+        _gui_log("TEST_INICIO: test_fusion_comparativa_uia_visual_fixture_real")
+        from src.hands.ui_automation_adapter import UIAutomationAdapter
+        from src.eyes.screen_capture import ScreenCapture
+        from src.eyes.vision import Vision
+
+        # Obtener arbol UIA (reutilizar si ya se tuvo, si no enumerar de nuevo)
+        if (hasattr(self.__class__, "uia_tree")
+                and self.__class__.uia_tree is not None):
+            tree = self.__class__.uia_tree
+            candidatos_uia = self.__class__.uia_candidatos
+        else:
+            adapter = UIAutomationAdapter(timeout=8.0)
+            tree = adapter.enumerate_window(self.hwnd, self.pid)
+            self.assertIsNone(tree.error)
+            candidatos_uia = [
+                self._uia_element_a_candidato(elem, screen=0) for elem in tree.elements
+            ]
+
+        self.assertIsNotNone(tree)
+        self.assertGreaterEqual(tree.element_count, 2)
+        self.assertGreaterEqual(len(candidatos_uia), 1)
+
+        # Obtener deteccion visual (reutilizar si ya se tuvo, si no detectar de nuevo)
+        if (hasattr(self.__class__, "visual_respuesta")
+                and self.__class__.visual_respuesta is not None):
+            respuesta = self.__class__.visual_respuesta
+            candidatos_visual = self.__class__.visual_candidatos
+        else:
+            user32 = ctypes.windll.user32
+            hwnd = self.hwnd
+            rect = ctypes.wintypes.RECT()
+            user32.GetWindowRect(ctypes.c_void_p(hwnd), ctypes.byref(rect))
+            left = int(rect.left); top = int(rect.top)
+            width = int(rect.right - rect.left); height = int(rect.bottom - rect.top)
+            ruta = os.path.join(os.getcwd(), "tests", "fixtures",
+                                "_tmp_integracion_visual2_%d.png" % self.pid)
+            os.makedirs(os.path.dirname(ruta), exist_ok=True)
+            captor = ScreenCapture()
+            ruta_devuelta = captor.capture_region(left, top, width, height, save_path=ruta)
+            self.assertIsNotNone(ruta_devuelta)
+            try:
+                vision = Vision()
+                respuesta = vision.detect_ui_elements(ruta, application="notepad",
+                                                       refine_with_opencv=True)
+                self.assertIsNotNone(respuesta)
+                candidatos_visual = [
+                    self._visual_element_a_candidato(
+                        ve, screen=0, window_handle=hwnd, process_id=self.pid,
+                        offset=(left, top))
+                    for ve in respuesta.elements
+                ]
+            finally:
+                try:
+                    if os.path.exists(ruta):
+                        os.remove(ruta)
+                except Exception:
+                    pass
+
+        self.assertIsInstance(candidatos_visual, list)
+
+        # Fusionar ambas fuentes
+        fusion = VisualUIDetectorFusion()
+        resultado = fusion.fuse(
+            candidatos_uia + candidatos_visual,
+            window_handle=tree.window_handle,
+            process_id=tree.process_id,
+            screen=0,
+        )
+        self.assertIsNone(resultado.error)
+        self.assertGreaterEqual(resultado.candidate_count, 1)
+        self.assertIn(SOURCE_UIA, resultado.sources_used)
+        self.assertTrue(resultado.sources_available.get(SOURCE_UIA))
+
+        # Comparar y registrar informe
+        informe = self._comparar_y_registrar(
+            candidatos_uia, candidatos_visual, resultado,
+            tree.window_handle, tree.process_id,
+        )
+
+        # Verificaciones observables del informe
+        self.assertIsInstance(informe["existentes"], list)
+        self.assertIsInstance(informe["omitidos_por_visual"], list)
+        self.assertIsInstance(informe["omitidos_por_uia"], list)
+        self.assertIsInstance(informe["falsos_positivos"], list)
+        self.assertIsInstance(informe["duplicados_uia"], list)
+        self.assertIsInstance(informe["duplicados_visual"], list)
+        self.assertTrue(os.path.exists(self.REPORTE_PATH),
+                        "El informe de integracion debe escribirse en disco")
+        # UIA debe reportar al menos un patron de accion en Notepad (ventana con patron Window)
+        interactivos_uia = [c for c in candidatos_uia
+                            if any(p in ACTIONABLE_PATTERNS
+                                   for p in c.raw.get("patterns", []))]
+        self.assertGreaterEqual(len(interactivos_uia), 1,
+                                "UIA debe reportar al menos un patron de accion en Notepad")
+        _gui_log("TEST_FIN: test_fusion_comparativa_uia_visual_fixture_real "
+                 "existentes=%d omitidos_visual=%d omitidos_uia=%d falsos_positivos=%d"
+                 % (len(informe["existentes"]), len(informe["omitidos_por_visual"]),
+                    len(informe["omitidos_por_uia"]), len(informe["falsos_positivos"])))
