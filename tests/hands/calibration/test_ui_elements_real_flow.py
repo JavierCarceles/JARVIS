@@ -383,13 +383,32 @@ class TestApplicationManagerReal:
         assert manager.get_application("notepad") is app
 
     def test_register_application_evita_duplicados(self):
-        """Re-registrar la misma app retorna False y no duplica."""
+        """Re-registrar una app ya registrada no la duplica: conserva la
+        instancia original, actualiza sus aliases en memoria, persiste la
+        entidad actualizada y devuelve True (contrato vigente de
+        ApplicationManager.register_application)."""
         manager = _make_manager()
         app = _real_app_knowledge("Notepad", executable="notepad.exe")
-        manager.register_application(app)
-        resultado2 = manager.register_application(app)
-        assert resultado2 is False
+        assert manager.register_application(app) is True
+        assert len(manager.memory_manager.saved_entities) == 1
+
+        duplicada = _real_app_knowledge("Notepad", executable="notepad.exe")
+        duplicada.metadata = {"aliases": ["bloc de notas"]}
+        resultado2 = manager.register_application(duplicada)
+
+        assert resultado2 is True
         assert list(manager.applications.keys()).count("notepad") == 1
+        assert len(manager.applications) == 1
+        # La instancia registrada sigue siendo la original, no la duplicada.
+        assert manager.get_application("notepad") is app
+        assert manager.get_application("notepad") is not duplicada
+        # Los aliases nuevos se aplican a la instancia existente.
+        assert app.metadata["aliases"] == ["bloc de notas"]
+        # La entidad actualizada se persiste con el mismo id y los aliases.
+        assert len(manager.memory_manager.saved_entities) == 2
+        guardada = manager.memory_manager.saved_entities[-1]
+        assert guardada.id == "app_notepad"
+        assert list(guardada.aliases) == ["bloc de notas"]
 
     def test_resolve_application_exacto(self):
         """resolve_application encuentra la app por nombre normalizado exacto."""

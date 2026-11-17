@@ -88,23 +88,35 @@ def _info(ruta: Path) -> tuple[str, int]:
     return _hash_sha256(ruta), ruta.stat().st_size
 
 
-def _linea_base_protegidos() -> dict[str, tuple[str, int]]:
+def _linea_base_protegidos() -> dict[str, tuple[str, int] | None]:
     """Captura la linea base real (hash + tamano) de los archivos protegidos
-    de produccion ANTES de cualquier operacion de inventario."""
-    base: dict[str, tuple[str, int]] = {}
+    de produccion ANTES de cualquier operacion de inventario.
+
+    ``entities.json`` de conocimiento forma parte del repositorio y debe
+    existir. Los datos locales de cada equipo (memoria y
+    ``macros_coords.json``) pueden no existir: su ausencia se registra como
+    ``None`` y el escaneo tampoco puede crearlos."""
+    assert KNOWLEDGE_ENTITIES.exists(), (
+        f"Falta archivo de produccion protegido: {KNOWLEDGE_ENTITIES}"
+    )
+    base: dict[str, tuple[str, int] | None] = {}
     for ruta in (MEMORY_ENTITIES, KNOWLEDGE_ENTITIES, MACROS_COORDS):
-        assert ruta.exists(), f"Falta archivo de produccion protegido: {ruta}"
-        base[str(ruta)] = _info(ruta)
+        base[str(ruta)] = _info(ruta) if ruta.exists() else None
     return base
 
 
 def _afirmar_protegidos_inmutables(
-    linea_base: dict[str, tuple[str, int]],
+    linea_base: dict[str, tuple[str, int] | None],
 ) -> None:
     """Comprueba que los archivos protegidos conservan hash y tamano de la
-    linea base tras la ejecucion real del escaneo."""
-    for ruta_str, (hash_antes, tamano_antes) in linea_base.items():
+    linea base tras la ejecucion real del escaneo, y que los ausentes siguen
+    ausentes."""
+    for ruta_str, info_antes in linea_base.items():
         ruta = Path(ruta_str)
+        if info_antes is None:
+            assert not ruta.exists(), f"El escaneo creo un archivo protegido: {ruta}"
+            continue
+        hash_antes, tamano_antes = info_antes
         assert ruta.exists(), f"El archivo protegido desaparecio: {ruta}"
         hash_despues, tamano_despues = _info(ruta)
         assert hash_despues == hash_antes, (

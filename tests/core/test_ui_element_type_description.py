@@ -54,7 +54,11 @@ PROJECT_ROOT = get_project_root()
 KNOWLEDGE_APPLICATIONS_PATH = (
     PROJECT_ROOT / "data" / "knowledge" / "applications.json"
 )
-MACROS_COORDS_PATH = PROJECT_ROOT / "data" / "macros_coords.json"
+# ``data/macros_coords.json`` es local de cada equipo (``data/`` no se sube al
+# repositorio): se usa el fixture con el formato oficial.
+MACROS_COORDS_PATH = (
+    PROJECT_ROOT / "tests" / "hands" / "calibration" / "fixtures" / "macros_coords_formato_oficial.json"
+)
 
 
 @pytest.fixture(autouse=True, scope="module")

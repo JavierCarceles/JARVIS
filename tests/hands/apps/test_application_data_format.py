@@ -46,10 +46,25 @@ from src.core.config import get_project_root
 # Rutas absolutas de las fuentes de datos (read-only, no sandbox).
 # ---------------------------------------------------------------------------
 PROJECT_ROOT = get_project_root()
-MEM_ENTITIES_PATH = PROJECT_ROOT / "data" / "memory" / "entities.json"
-MEM_APPLICATIONS_PATH = PROJECT_ROOT / "data" / "memory" / "applications.json"
 KNOWLEDGE_APPLICATIONS_PATH = PROJECT_ROOT / "data" / "knowledge" / "applications.json"
 KNOWLEDGE_ENTITIES_PATH = PROJECT_ROOT / "data" / "knowledge" / "entities.json"
+
+
+def _mem_dir():
+    """Directorio de memoria que usa MemoryManager por defecto. En la suite es
+    el catalogo de prueba aislado por tests/conftest.py (copia de
+    tests/fixtures/memoria/), no el data/memory/ local del equipo."""
+    import src.memory.storage as storage_mod
+
+    return storage_mod.get_project_root() / "data" / "memory"
+
+
+def _mem_entities_path():
+    return _mem_dir() / "entities.json"
+
+
+def _mem_applications_path():
+    return _mem_dir() / "applications.json"
 
 # Los 10 campos del modelo Entity (storage.py:46-58), en orden de declaracion.
 ENTITY_FIELDS = [f.name for f in dataclasses.fields(Entity)]
@@ -95,7 +110,7 @@ def _make_minimal_manager():
 
 def _load_real_entities():
     """Carga el contenido raw de data/memory/entities.json (read-only)."""
-    return json.loads(MEM_ENTITIES_PATH.read_text(encoding="utf-8"))
+    return json.loads(_mem_entities_path().read_text(encoding="utf-8"))
 
 
 # ---------------------------------------------------------------------------
@@ -106,7 +121,7 @@ class TestMemoryEntitiesJsonFormat:
     `_load_custom_applications` consume via get_entities_by_type('application')."""
 
     def test_file_exists(self):
-        assert MEM_ENTITIES_PATH.exists(), "data/memory/entities.json debe existir"
+        assert _mem_entities_path().exists(), "data/memory/entities.json debe existir"
 
     def test_top_level_is_list(self):
         data = _load_real_entities()
@@ -224,7 +239,7 @@ class TestGetEntitiesByTypeRuntime:
     @pytest.fixture
     def isolated_mm(self, tmp_path):
         """MemoryManager aislado en tmp_path con copia de entities.json real."""
-        shutil.copy(MEM_ENTITIES_PATH, tmp_path / "entities.json")
+        shutil.copy(_mem_entities_path(), tmp_path / "entities.json")
         return MemoryManager(tmp_path)
 
     def test_loads_all_application_entities(self, isolated_mm):
@@ -301,30 +316,30 @@ class TestApplicationsMemoryFileFormat:
     esta mapeado a MemoryType.APPLICATIONS, pero NO es usado por ApplicationManager."""
 
     def test_file_exists(self):
-        assert MEM_APPLICATIONS_PATH.exists(), (
+        assert _mem_applications_path().exists(), (
             "data/memory/applications.json debe existir"
         )
 
     def test_top_level_is_dict(self):
         data = json.loads(
-            MEM_APPLICATIONS_PATH.read_text(encoding="utf-8")
+            _mem_applications_path().read_text(encoding="utf-8")
         )
         assert isinstance(data, dict)
 
     def test_content_is_empty_dict(self):
         data = json.loads(
-            MEM_APPLICATIONS_PATH.read_text(encoding="utf-8")
+            _mem_applications_path().read_text(encoding="utf-8")
         )
         assert data == {}
 
     def test_memory_type_applications_maps_to_applications_json(self):
         """JSONStorage.file_mapping mapea MemoryType.APPLICATIONS -> applications.json."""
-        storage = JSONStorage(PROJECT_ROOT / "data" / "memory")
+        storage = JSONStorage(_mem_dir())
         path = storage.get_file_path(MemoryType.APPLICATIONS)
-        assert path == MEM_APPLICATIONS_PATH
+        assert path == _mem_applications_path()
 
     def test_default_value_for_applications_is_dict(self):
-        storage = JSONStorage(PROJECT_ROOT / "data" / "memory")
+        storage = JSONStorage(_mem_dir())
         assert storage._get_default_value(MemoryType.APPLICATIONS) == {}
 
     def test_no_code_reads_applications_via_memory_type(self):

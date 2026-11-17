@@ -44,7 +44,15 @@ from tests.helpers.entities_state import (
 _TESTS_DIR = Path(__file__).resolve().parents[2]      # tests/
 _ROOT_DIR = _TESTS_DIR.parent                          # raiz del repositorio
 ENTITIES_KNOWLEDGE_PATH = _ROOT_DIR / "data" / "knowledge" / "entities.json"
-ENTITIES_MEMORY_PATH = _ROOT_DIR / "data" / "memory" / "entities.json"
+
+
+def _ruta_entities_memoria() -> Path:
+    """entities.json que MemoryManager usa por defecto; en la suite es el
+    catalogo de prueba aislado por tests/conftest.py."""
+    import src.memory.storage as storage_mod
+
+    return storage_mod.get_project_root() / "data" / "memory" / "entities.json"
+
 
 # Linea base fijada en 3.8.4.4.2 (data/knowledge/entities.json).
 ENTITIES_KNOWLEDGE_BASELINE_SHA256 = (
@@ -140,7 +148,7 @@ class TestPreservacionEntitiesJsonDescubrimiento:
         """data/memory/entities.json (usado por MemoryManager) no se modifica
         por registro/consumo de conocimiento dinamico."""
         resultado = verify_entities_json_unchanged(
-            ENTITIES_MEMORY_PATH, _operacion_registro_y_consumo
+            _ruta_entities_memoria(), _operacion_registro_y_consumo
         )
         assert resultado["source_untouched"] is True
         assert resultado["changed"] is False

@@ -39,6 +39,7 @@ No hay `pytest.ini`, `setup.cfg` ni `pyproject.toml`. Toda la configuracion esta
 | Ficheros ignorados | `collect_ignore` excluye `brain/`, `ear/`, `eyes/` y `hands/test__init__.py` (para evitar choques de nombres) |
 | Carpeta aislada | Crea una carpeta temporal `jarvis_pytest_sandbox_*` con `data/`, `models/`, `logs/` y `config/`, y cambia el directorio de trabajo a ella durante toda la sesion. Las rutas **relativas** que escriba el codigo acaban ahi y no en el proyecto. Las rutas **absolutas** (calculadas con `__file__` o `get_project_root()`) siguen apuntando a los datos reales. |
 | Rutas de los argumentos | Convierte en absolutas las rutas que pasas a pytest antes de cambiar de carpeta, asi que `pytest tests/memory` funciona desde la raiz. |
+| Catalogo de memoria de prueba | Desde `pytest_configure` (antes de recolectar y de cualquier `setUpClass`), la ruta por defecto de `MemoryManager` (`get_project_root()` de `src.memory.storage`) apunta a una carpeta temporal `jarvis_pytest_memoria_*`, cuyo `data/memory/` se restaura antes de cada test como copia de `tests/fixtures/memoria/` (`entities.json`: catalogo de referencia con 32 aplicaciones y 3 streamers; `applications.json`: `{}`). Ningun test lee ni escribe el `data/memory/` real, que es local de cada equipo y puede no existir. Los tests que leen ese `entities.json` directamente obtienen su ruta en tiempo de ejecucion con `src.memory.storage.get_project_root()`. `MemoryManager(ruta)` con ruta explicita no cambia. |
 | Singletons | Un fixture automatico pone a `None` antes y despues de cada test el gestor de aplicaciones (`src.hands.apps.applications_core`), el `MemoryManager` (`src.memory.storage`) y el integrador de aplicaciones del planificador. |
 
 No hay marcadores propios: los saltos se hacen en tiempo de ejecucion con `pytest.skip`, `unittest.skipUnless` o `unittest.SkipTest`.
@@ -137,7 +138,7 @@ Todos cierran solo el proceso que abrieron y comprueban que VS Code y las ventan
 - `test_visual_ui_detector_fusion.py` (con GUI real): sobrescribe `tests/eyes/fixtures/informe_integracion_uia_visual_fixture_real.json` y anade lineas a `tests/eyes/fixtures/gui_tests.log`.
 - Unos 15 tests de `tests/experimental/contextual_adaptation_engine/` crean el motor sin `data_dir` y usan la carpeta real `data/` (ruta absoluta). `test_goal_adaptation_production_data_clean.py` vigila que no queden restos de tests ahi.
 
-**Leen datos reales (solo lectura):** varios tests de `tests/eyes` y `tests/hands` comprueban el contenido real de `data/knowledge/applications.json`, `data/knowledge/capabilities.json`, `data/macros_coords.json` y `data/memory/entities.json`, o leen `data/system_inventory.sqlite3`. Si esos datos cambian, esos tests fallan.
+**Leen datos reales (solo lectura):** varios tests de `tests/eyes` y `tests/hands` comprueban el contenido real de `data/knowledge/applications.json` y `data/knowledge/capabilities.json`, o leen `data/system_inventory.sqlite3`. Si esos datos cambian, esos tests fallan. El catalogo `data/memory/entities.json` no se lee: se usa el catalogo de memoria de prueba (ver la seccion 2).
 
 **Cierran ventanas del usuario:** `test_element_classification_integration.py` y `test_visual_ui_detector_fusion.py` cierran, antes de empezar, cualquier ventana con titulo "Bloc de notas"/"Notepad". No tengas un Bloc de notas con trabajo sin guardar al ejecutarlos.
 
@@ -176,7 +177,7 @@ Subcarpetas: `capture/`, `vision/` y `detection/`, como `src/eyes/`. Las pruebas
 | `vision/test_vision_chat_json_ollama_integration.py` | `Vision._chat_json` contra Ollama real (`qwen3-vl:8b`), hasta 3 intentos. | Modelo real; falla si no hay Ollama |
 | `vision/test_qwen3vl_semantic_interpretation.py` | `Vision.interpret_element_semantics` con Ollama falso. | Unitario |
 | `vision/test_qwen3vl_ollama_multimodal_integration.py` | La misma funcion con `qwen3-vl:8b` real. | Modelo real; falla si no hay Ollama |
-| `vision/test_vision_calibration_integration.py` | Vision -> `CoordinateManager`/`UniversalVisualCalibrator`: los elementos de Chrome se resuelven a coordenadas calibradas validas para el planificador. | Integracion; lee `data/macros_coords.json` |
+| `vision/test_vision_calibration_integration.py` | Vision -> `CoordinateManager`/`UniversalVisualCalibrator`: los elementos de Chrome se resuelven a coordenadas calibradas validas para el planificador. | Integracion; usa el fixture `tests/hands/calibration/fixtures/macros_coords_formato_oficial.json` |
 | `detection/test_visual_ui_detector_fusion.py` | `VisualUIDetectorFusion`: fusion sin duplicados de UIA, OmniParser, OCR, OpenCV y Qwen3-VL; la interactividad solo con evidencia real. | Unitario (20 tests) + GUI real y Ollama real con `JARVIS_TEST_GUI_REAL=1`. Comparte un unico Bloc de notas por sesion y usa `tests/eyes/fixtures/_gui_lock.lock`. |
 | `detection/test_element_classification_integration.py` | Clasificacion de elementos sobre el arbol UIA real del Bloc de notas. | GUI real, Windows; se salta sin `JARVIS_TEST_GUI_REAL=1` |
 | `capture/test_application_state_enumeration.py` | Compara los enums `ApplicationState` de `screen.py` (5 valores) y `applications_core.py` (8 valores) y los estados de los JSON de conocimiento. | Inspeccion de datos reales |
@@ -186,7 +187,7 @@ Subcarpetas: `capture/`, `vision/` y `detection/`, como `src/eyes/`. Las pruebas
 | `tests/core/test_ui_element_behavior.py` | `UIElement`, `UIElementData` (calibrado, geometria, nombres, serializacion) y su uso en `ApplicationKnowledge` y el planificador. | Unitario/integracion; lee datos reales |
 | `tests/core/test_ui_element_type_description.py` | Tipo y descripcion de los elementos en todas las capas. | Comprueba el comportamiento actual, que pierde la descripcion: fallara cuando se corrija ese defecto |
 | `tests/core/test_ui_elements_structure.py` | Estructura real de `ui_elements` en `applications.json` y su reconstruccion. | Datos reales |
-| `tests/hands/calibration/test_ui_knowledge_coordinate_separation.py` | En `macros_coords.json`, el conocimiento UI va sin coordenadas y las coordenadas van en `calibraciones`. | Datos reales; desactiva el logging durante todo el modulo |
+| `tests/hands/calibration/test_ui_knowledge_coordinate_separation.py` | En el formato oficial de `macros_coords.json`, el conocimiento UI va sin coordenadas y las coordenadas van en `calibraciones`; `CoordinateManager` fusiona ambas secciones, usa `legacy_data.macros` como respaldo y arranca sin error si el fichero no existe (sin crearlo). | Unitario sobre el fixture `tests/hands/calibration/fixtures/macros_coords_formato_oficial.json`; no lee `data/`; desactiva el logging durante todo el modulo |
 | `test__init__.py` | Exportaciones de `src.eyes`. | Nunca se ejecuta (ignorado) |
 
 `tests/eyes/fixtures/` contiene el informe JSON que genera la prueba de fusion, su log y los ficheros de bloqueo GUI.
@@ -309,7 +310,7 @@ Otros:
 | Fichero | Que prueba | Tipo |
 |---|---|---|
 | `test_calibration_manager.py` | `CalibrationManager` (lanzamiento simulado). | Unitario |
-| `test_calibrate_application_universal.py` | `calibrate_application` universal. | Unitario |
+| `test_calibrate_application_universal.py` | `calibrate_application` universal: sin codigo por programa, delega en el `UICalibrationPipeline` unico (argumentos de la llamada) y convierte su `CalibrationReport` en `CalibrationResult` (exito, monitor, elementos, fallos por etapa, excepcion). Con el pipeline real y adaptador/lanzador vigilados, la etapa preflight rechaza aplicaciones bloqueadas o con riesgo de elevacion sin tocar el SO. | Unitario |
 | `test_calibration_requirements.py` | Requisitos de calibracion y su uso en el planificador. | Unitario |
 | `test_calibracion_descubrimiento_requisitos.py` | Del descubrimiento a los requisitos de calibracion. | Unitario |
 | `test_calibrator.py` | - | Vacio |

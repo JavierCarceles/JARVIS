@@ -1,25 +1,33 @@
 # -*- coding: utf-8 -*-
 """Tests de verificacion de la separacion conocimiento UI / coordenadas concretas - unidad 3.4.2.3 (FASE 3.4.2 - UI elements).
 
-Objetivo verificable: en ``data/macros_coords.json`` el conocimiento de UI
-(type, description, calibration_strategy, alternatives, confidence) vive bajo
-``ui_knowledge`` SIN coordenadas (sin ``screens``), y las coordenadas concretas
-viven bajo la seccion ``calibraciones`` (solo claves de pantalla y valores de
-coordenada). ``CoordinateManager`` carga el conocimiento desde ``ui_knowledge``,
-las coordenadas desde ``calibraciones`` y las fusiona por ``resource_id``.
+Objetivo verificable: en el formato oficial de ``macros_coords.json`` el
+conocimiento de UI (type, description, calibration_strategy, alternatives,
+confidence) vive bajo ``ui_knowledge`` SIN coordenadas (sin ``screens``), y las
+coordenadas concretas viven bajo la seccion ``calibraciones`` (solo claves de
+pantalla y valores de coordenada). ``CoordinateManager`` carga el conocimiento
+desde ``ui_knowledge``, las coordenadas desde ``calibraciones`` y las fusiona
+por ``resource_id``.
 
-No modifica codigo de produccion. Lectura read-only de ficheros de datos.
+``data/macros_coords.json`` es un fichero local de cada equipo (``data/`` esta
+excluido del repositorio) y puede no existir, por lo que los tests usan el
+fixture ``tests/hands/calibration/fixtures/macros_coords_formato_oficial.json``
+con el formato oficial, y comprueban ademas que ``CoordinateManager`` arranca
+sin error cuando el fichero no existe. No se lee ni se escribe ``data/``.
 """
 
 import json
+from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
-from src.core.config import get_project_root
+from src.hands.calibration.coordinate_manager import CoordinateManager
 
 
-PROJECT_ROOT = get_project_root()
-MACROS_COORDS_PATH = PROJECT_ROOT / "data" / "macros_coords.json"
+MACROS_COORDS_PATH = (
+    Path(__file__).resolve().parent / "fixtures" / "macros_coords_formato_oficial.json"
+)
 
 
 @pytest.fixture(autouse=True, scope="module")
@@ -251,3 +259,64 @@ class TestCoordinateManagerLoadCalibraciones:
 
         coord2 = cm.get_calibrated_coordinate(data, "chrome", "address_bar", screen_number=2)
         assert coord2 == (7447, 335), f"esperado (7447, 335), obtenido {coord2}"
+
+
+# ---------------------------------------------------------------------------
+# 5. CoordinateManager: carga desde el fichero (presente o ausente)
+# ---------------------------------------------------------------------------
+def _coordinate_manager_sin_init():
+    """CoordinateManager con el estado que deja ``__init__`` antes de cargar
+    el fichero (sin ScreenManager ni lectura de ``data/``)."""
+    cm = CoordinateManager.__new__(CoordinateManager)
+    cm.ui_resources = {}
+    cm.ui_capabilities = {}
+    cm.ui_knowledge = {}
+    cm.calibration_policies = {}
+    return cm
+
+
+class TestCoordinateManagerLoadFromFile:
+    """``_load_ui_knowledge`` lee la ruta ``macros_coords_path`` real del
+    gestor (sustituida por el fixture o por una ruta inexistente)."""
+
+    def test_carga_desde_fichero_fusiona_conocimiento_y_coordenadas(self):
+        cm = _coordinate_manager_sin_init()
+        with patch.object(
+            CoordinateManager, "macros_coords_path", new=property(lambda self: MACROS_COORDS_PATH)
+        ):
+            cm._load_ui_knowledge()
+
+        assert set(cm.ui_knowledge) == {"chrome", "spotify", "riot_api"}
+        assert "blocked_applications" in cm.calibration_policies
+        # Conocimiento + coordenadas de ``calibraciones`` fusionados.
+        address_bar = cm.get_ui_resource("chrome.address_bar")
+        assert address_bar is not None
+        assert address_bar.description == "Barra de direcciones de Chrome"
+        assert address_bar.alternatives == ["chrome.hotkey_ctrl_l"]
+        assert address_bar.is_calibrated is True
+        assert cm.get_calibrated_coordinate({}, "chrome", "address_bar", screen_number=1) == (3582, 339)
+        # Cada elemento de ``ui_knowledge`` conserva su conocimiento y recibe
+        # las coordenadas de su entrada en ``calibraciones``.
+        play_button = cm.get_ui_resource("spotify.play_button")
+        assert play_button is not None
+        assert play_button.alternatives == ["spotify.hotkey_space"]
+        assert play_button.is_calibrated is True
+        assert cm.get_calibrated_coordinate({}, "spotify", "play_button", screen_number=2) == (5015, 1020)
+        # Entrada solo legacy: se carga desde ``legacy_data.macros``.
+        sc_button = cm.get_ui_resource("supercomplete.sc_button")
+        assert sc_button is not None
+        assert sc_button.is_calibrated is True
+
+    def test_fichero_ausente_no_carga_nada_ni_lo_crea(self, tmp_path):
+        ruta_inexistente = tmp_path / "macros_coords.json"
+        cm = _coordinate_manager_sin_init()
+        with patch.object(
+            CoordinateManager, "macros_coords_path", new=property(lambda self: ruta_inexistente)
+        ):
+            cm._load_ui_knowledge()
+
+        assert cm.ui_resources == {}
+        assert cm.ui_knowledge == {}
+        assert cm.calibration_policies == {}
+        assert cm.get_ui_resource("chrome.address_bar") is None
+        assert not ruta_inexistente.exists()

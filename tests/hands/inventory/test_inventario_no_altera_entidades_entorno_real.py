@@ -81,11 +81,16 @@ def _lineas(ruta: Path) -> int:
         return sum(1 for _ in f)
 
 
-def _linea_base_entidades() -> dict[str, tuple[str, int]]:
-    """Captura la linea base real (hash + lineas) de ambos archivos de entidades."""
+def _linea_base_entidades() -> dict[str, tuple[str, int] | None]:
+    """Captura la linea base real (hash + lineas) de ambos archivos de entidades.
+
+    `data/knowledge/entities.json` esta en el repositorio y debe existir.
+    `data/memory/entities.json` es local de cada equipo y puede no existir: su
+    ausencia se registra como None y el flujo tampoco puede crearlo."""
+    assert KNOWLEDGE_ENTITIES.exists(), f"Falta {KNOWLEDGE_ENTITIES}"
     return {
-        str(MEMORY_ENTITIES): (_hash_sha256(MEMORY_ENTITIES), _lineas(MEMORY_ENTITIES)),
-        str(KNOWLEDGE_ENTITIES): (_hash_sha256(KNOWLEDGE_ENTITIES), _lineas(KNOWLEDGE_ENTITIES)),
+        str(ruta): ((_hash_sha256(ruta), _lineas(ruta)) if ruta.exists() else None)
+        for ruta in (MEMORY_ENTITIES, KNOWLEDGE_ENTITIES)
     }
 
 
@@ -107,10 +112,15 @@ class _StubAppManager:
         self.applications: dict = {}
 
 
-def _afirmar_entidades_inmutables(linea_base: dict[str, tuple[str, int]]) -> None:
-    """Comprueba que ambos archivos de entidades conservan hash y lineas de la linea base."""
-    for ruta_str, (hash_antes, lineas_antes) in linea_base.items():
+def _afirmar_entidades_inmutables(linea_base: dict[str, tuple[str, int] | None]) -> None:
+    """Comprueba que ambos archivos de entidades conservan hash y lineas de la
+    linea base, y que un archivo ausente sigue ausente."""
+    for ruta_str, info_antes in linea_base.items():
         ruta = Path(ruta_str)
+        if info_antes is None:
+            assert not ruta.exists(), f"Se creo un archivo de entidades: {ruta}"
+            continue
+        hash_antes, lineas_antes = info_antes
         assert ruta.exists(), f"El archivo de entidades desaparecio: {ruta}"
         hash_despues = _hash_sha256(ruta)
         lineas_despues = _lineas(ruta)

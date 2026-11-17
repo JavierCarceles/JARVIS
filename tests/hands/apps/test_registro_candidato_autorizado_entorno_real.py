@@ -36,7 +36,15 @@ from src.hands.inventory.system_inventory_storage import (
 
 ROOT_DIR = Path(__file__).resolve().parents[3]
 PROD_DB = ROOT_DIR / "data" / "system_inventory.sqlite3"
-ENTIDADES_GLOBAL = ROOT_DIR / "data" / "memory" / "entities.json"
+
+
+def _ruta_catalogo_global() -> Path:
+    """entities.json que MemoryManager usa por defecto (catalogo global); en la
+    suite es el catalogo de prueba aislado por tests/conftest.py."""
+    import src.memory.storage as storage_mod
+
+    return storage_mod.get_project_root() / "data" / "memory" / "entities.json"
+
 
 CANDIDATO_NOMBRE = "charmap.exe"            # Mapa de caracteres: herramienta del sistema inocua
 NOMBRE_APPSFOLDER = "Mapa de caracteres"    # nombre real en shell:AppsFolder (Windows en espanol)
@@ -81,7 +89,7 @@ def _leer_candidato_inventario_real():
 
 
 def _catalogo_global_no_registra(nombre):
-    with open(ENTIDADES_GLOBAL, encoding="utf-8") as f:
+    with open(_ruta_catalogo_global(), encoding="utf-8") as f:
         entidades = json.load(f)
     return nombre not in {str(e.get("name")) for e in entidades}
 

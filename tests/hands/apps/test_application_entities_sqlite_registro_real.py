@@ -51,7 +51,15 @@ from src.memory.storage import Entity, MemoryManager
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 SQLITE_REAL = PROJECT_ROOT / "data" / "system_inventory.sqlite3"
-ENTITIES_REAL = PROJECT_ROOT / "data" / "memory" / "entities.json"
+
+
+def _ruta_catalogo_global() -> Path:
+    """entities.json que MemoryManager usa por defecto (catalogo global); en la
+    suite es el catalogo de prueba aislado por tests/conftest.py."""
+    import src.memory.storage as storage_mod
+
+    return storage_mod.get_project_root() / "data" / "memory" / "entities.json"
+
 
 # Umbral de confianza para considerar un candidato valido (desde el clasificador real).
 CONFIANZA_ESPERADA = CONFIANZA_ALTA
@@ -178,7 +186,7 @@ def _discovery_con_catalogo_isolado(
     memoria_dir = tmp_path / "data" / "memory"
     memoria_dir.mkdir(parents=True, exist_ok=True)
     entidades_copia = memoria_dir / "entities.json"
-    shutil.copy2(ENTITIES_REAL, entidades_copia)
+    shutil.copy2(_ruta_catalogo_global(), entidades_copia)
 
     mm = MemoryManager(str(memoria_dir))
     app_manager = SimpleNamespace(memory_manager=mm, get_application=lambda nombre: None)
@@ -325,10 +333,10 @@ class TestAutoRegistroDesdeSqliteReal:
     def test_catalogo_produccion_sin_modificaciones(self, tmp_path):
         """data/memory/entities.json de produccion permanece intacto: todas
         las escrituras van a la copia isolada en tmp_path."""
-        if not SQLITE_REAL.exists() or not ENTITIES_REAL.exists():
+        if not SQLITE_REAL.exists() or not _ruta_catalogo_global().exists():
             pytest.skip("Recursos de produccion no disponibles")
 
-        antes = _sha256_archivo(ENTITIES_REAL)
+        antes = _sha256_archivo(_ruta_catalogo_global())
 
         machine_id = generate_machine_id()
         filas = _leer_candidatos_exe_sqlite_real(SQLITE_REAL, machine_id)
@@ -338,7 +346,7 @@ class TestAutoRegistroDesdeSqliteReal:
         discovery, mm = _discovery_con_catalogo_isolado(tmp_path, machine_id, informe)
         discovery.auto_registrar_candidatos_inventario(candidatos)
 
-        despues = _sha256_archivo(ENTITIES_REAL)
+        despues = _sha256_archivo(_ruta_catalogo_global())
         assert antes == despues, (
             "data/memory/entities.json de produccion fue modificado"
         )

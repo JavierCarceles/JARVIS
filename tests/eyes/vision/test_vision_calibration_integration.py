@@ -30,7 +30,11 @@ from src.core.config import get_project_root
 
 
 PROJECT_ROOT = get_project_root()
-MACROS_COORDS_PATH = PROJECT_ROOT / "data" / "macros_coords.json"
+# ``data/macros_coords.json`` es local de cada equipo (``data/`` no se sube al
+# repositorio): se usa el fixture con el formato oficial.
+MACROS_COORDS_PATH = (
+    PROJECT_ROOT / "tests" / "hands" / "calibration" / "fixtures" / "macros_coords_formato_oficial.json"
+)
 
 
 def _load_macros_coords():

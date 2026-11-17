@@ -78,6 +78,7 @@ def pytest_configure(config):
             if os.path.exists(_cand):
                 config.args[_i] = _cand + _sep + _tail
         _SANDBOX_ACTIVO = True
+        _activar_catalogo_memoria_de_prueba()
     os.chdir(_SANDBOX_DIR)
 
 
@@ -114,21 +115,71 @@ def pytest_sessionfinish(session, exitstatus):
 # Este fixture `autouse` de ambito de funcion reinicia los tres singletons
 # antes de CADA prueba y al finalizarla, de modo que:
 #   * Cada prueba parte de un `ApplicationManager` fresco (catalogo limpio:
-#     chrome/spotify + entidades reconstruidas de `data/memory/entities.json`,
-#     leidas solo-lectura), sin residuos de pruebas previas.
-#   * Ninguna prueba debilita sus aserciones: el `MemoryManager` fresco lee
-#     `data/memory/` de forma solo-lectura para `_load_custom_applications`;
-#     las pruebas que escriben usan stubs propios o `MemoryManager(tmp_path)`.
+#     chrome/spotify + entidades reconstruidas del catalogo de memoria de la
+#     prueba, ver `_catalogo_memoria_de_prueba`), sin residuos de pruebas
+#     previas.
+#   * Ninguna prueba debilita sus aserciones.
 #   * El estado global compartido queda aislado, eliminando la falla por orden
 #     de ejecucion y haciendo el resultado independiente del orden de pruebas.
 #
 # Nota: el `MemoryManager` del singleton se deja en None para que se recree
-# con su ruta por defecto (`data/memory/`), porque
+# con su ruta por defecto, porque
 # `_initialize_applications() -> _load_custom_applications()` necesita leer
 # `entities.json` (YouTube, GitHub, Twitch...) y pruebas como
-# `test_application_consumers_real_model.py` dependen de ese catalogo real.
+# `test_application_consumers_real_model.py` dependen de ese catalogo.
+
+
+# ---------------------------------------------------------------------------
+# CATALOGO DE MEMORIA DE LAS PRUEBAS
+# ---------------------------------------------------------------------------
+# La ruta por defecto de `MemoryManager` es ABSOLUTA
+# (`get_project_root() / "data" / "memory"`), asi que el sandbox del CWD no la
+# cubre. `data/memory/` es local de cada equipo (no esta en el repositorio):
+# puede no existir, tener otro contenido o acumular escrituras de las pruebas.
+#
+# Durante toda la sesion (desde `pytest_configure`, antes de la recoleccion y
+# de los `setUpClass`), la ruta por defecto de `MemoryManager` apunta a un
+# directorio temporal `data/memory/`. Antes de CADA prueba ese directorio se
+# restaura como copia de `tests/fixtures/memoria/` (`entities.json`: catalogo
+# de referencia de las pruebas, 32 aplicaciones -YouTube, Spotify, GitHub,
+# Twitch, Google Chrome, Bloc de notas, Discord...- y tres streamers;
+# `applications.json`: `{}`), de modo que ninguna prueba lee ni escribe el
+# `data/memory/` real ni hereda escrituras de otra prueba. Las pruebas que leen
+# ese fichero directamente obtienen su ruta, en tiempo de ejecucion, con
+# `src.memory.storage.get_project_root() / "data" / "memory" / "entities.json"`.
+# `MemoryManager(ruta)` con ruta explicita no cambia.
+_RAIZ_MEMORIA_PRUEBA = tempfile.mkdtemp(prefix="jarvis_pytest_memoria_")
+_FIXTURE_MEMORIA = os.path.join(_TESTS_DIR, "fixtures", "memoria")
+
+
+def _restaurar_catalogo_memoria():
+    import shutil
+
+    memoria = os.path.join(_RAIZ_MEMORIA_PRUEBA, "data", "memory")
+    shutil.rmtree(memoria, ignore_errors=True)
+    shutil.copytree(_FIXTURE_MEMORIA, memoria)
+    return memoria
+
+
+def _activar_catalogo_memoria_de_prueba():
+    from pathlib import Path
+
+    import src.memory.storage as _storage_mod  # noqa: E402
+
+    _restaurar_catalogo_memoria()
+    _storage_mod.get_project_root = lambda: Path(_RAIZ_MEMORIA_PRUEBA)
+
+
 @pytest.fixture(autouse=True)
-def _reset_global_singletons_between_tests():
+def _catalogo_memoria_de_prueba():
+    from pathlib import Path
+
+    memoria = _restaurar_catalogo_memoria()
+    yield Path(memoria) / "entities.json"
+
+
+@pytest.fixture(autouse=True)
+def _reset_global_singletons_between_tests(_catalogo_memoria_de_prueba):
     import src.hands.apps.applications_core as _applications_core_mod  # noqa: E402
     import src.memory.storage as _storage_mod  # noqa: E402
     import src.hands.planner.application_integration as _app_integration_mod  # noqa: E402

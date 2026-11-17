@@ -50,11 +50,18 @@ from src.memory.storage import MemoryManager
 
 
 # ---------------------------------------------------------------------------
-# Rutas de produccion (solo lectura para la copia del catalogo)
+# Catalogo global de origen (solo lectura para la copia del catalogo)
 # ---------------------------------------------------------------------------
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
-ENTITIES_REAL = PROJECT_ROOT / "data" / "memory" / "entities.json"
+
+
+def _ruta_catalogo_global() -> Path:
+    """entities.json que MemoryManager usa por defecto; en la suite es el
+    catalogo de prueba aislado por tests/conftest.py."""
+    import src.memory.storage as storage_mod
+
+    return storage_mod.get_project_root() / "data" / "memory" / "entities.json"
 
 
 # ---------------------------------------------------------------------------
@@ -166,7 +173,7 @@ def _copiar_catalogo_global(tmp_path: Path):
     memoria_dir = tmp_path / "data" / "memory"
     memoria_dir.mkdir(parents=True, exist_ok=True)
     destino = memoria_dir / "entities.json"
-    shutil.copy2(ENTITIES_REAL, destino)
+    shutil.copy2(_ruta_catalogo_global(), destino)
     return destino
 
 

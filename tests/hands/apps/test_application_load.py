@@ -580,8 +580,11 @@ class TestLoadFullApplicationSet:
 
     @pytest.fixture(autouse=True)
     def _setup(self, tmp_path):
-        from src.core.config import get_project_root
-        real = get_project_root() / "data" / "memory" / "entities.json"
+        # Catalogo que MemoryManager usa por defecto (en la suite, el catalogo
+        # de prueba aislado por tests/conftest.py).
+        import src.memory.storage as storage_mod
+
+        real = storage_mod.get_project_root() / "data" / "memory" / "entities.json"
         shutil.copy(real, tmp_path / "entities.json")
         self._tmp = tmp_path
 

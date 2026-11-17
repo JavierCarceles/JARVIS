@@ -1666,8 +1666,12 @@ def _conocimiento_prueba(
 
 
 def _ruta_entities_json_memoria() -> Path:
-    """Ruta absoluta a data/memory/entities.json (catalogo global)."""
-    return Path(__file__).resolve().parents[3] / "data" / "memory" / "entities.json"
+    """Ruta de data/memory/entities.json (catalogo global) que usa
+    MemoryManager por defecto; en la suite es el catalogo de prueba aislado
+    por tests/conftest.py."""
+    import src.memory.storage as storage_mod
+
+    return storage_mod.get_project_root() / "data" / "memory" / "entities.json"
 
 
 def _hash_archivo(ruta: Path) -> str:
