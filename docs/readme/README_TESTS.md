@@ -366,6 +366,12 @@ Todos unitarios, sin aplicaciones ni disco real:
 
 - `test__init__.py`: exportaciones de `src.hands`. Nunca se ejecuta (ignorado).
 
+### 11.13 Pruebas de plataforma de escritorio (tests/desktop/)
+
+- `test_desktop_platform_adapter_selection.py`: seleccion del adaptador de escritorio por SO detectado, error explicito sin adaptador, imports nativos perezosos, importacion del paquete en Windows y macOS, capacidades declaradas y marcadores de plataforma en requirements. Unitario, determinista, sin GUI ni SO real.
+- `test_desktop_platform_contract.py`: contrato de plataforma (seleccion de adaptador, capacidades, errores normalizados y modelos de geometria) y adaptador macOS con frontera nativa sintetica (Retina 2x, dos y tres monitores, origen negativo, monitor vertical, permisos denegados y concedidos), ejecutado en Windows. Incluye enumeracion real de monitores Windows con todos los campos de DisplayInfo (identificador estable, rectangulo, origen, resolucion, area de trabajo, escala/DPI, rotacion, orientacion, frecuencia, principal) y reenumeracion fresca sin dimensiones historicas (3.8.6.6.1). La verificacion real del adaptador macOS queda pendiente en `mejora/pendientes_macos.txt` (regla 3 del roadmap).
+- `test_monitor_topology.py`: modelo de topologia de monitores (relaciones izquierda/derecha/arriba/abajo, monitores centrales, tamano relativo, orientacion, principal, huella digital de topologia y consultas de punto/rectangulo/orden visual) con topologias sinteticas (1, 2, 3 y 4 monitores, origenes negativos, retrato/paisaje). Incluye integracion real en Windows que lee la topologia real via `get_current_topology()` sin modificar el equipo (3.8.6.6.2). Unitario, determinista, sin GUI.
+
 ## 12. `tests/core` y `tests/experimental`
 
 `tests/core/` prueba `src/core/`; `tests/experimental/` prueba los modulos de `src/experimental/`.

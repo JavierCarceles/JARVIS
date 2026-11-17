@@ -46,3 +46,33 @@ ESTADO: BLOQUEADO
 REPETICIONES_TIPO: 1 (primera aparicion de TIPO_NORMALIZADO MACRO_JSON_VACIO en este archivo)
 MEMORIA_PERSISTENTE: La unidad 3.8.6.4.1 esta cerrada como IMPLEMENTADA en prompt_JARVIS_registros.txt y en LAST_COMPLETED_UNIT. El puntero persistente apunta a 3.8.6.4.2 con estado PENDIENTE. La macro de cierre no se ejecuto porque macro_mejoraActual.json esta vacio.
 ---
+
+ERR-0023
+FECHA_HORA: 2026-11-17T17:10:05+01:00 Europe/Madrid
+UNIDAD: 3.8.6.6.2 (tests/desktop/test_monitor_topology.py)
+TIPO_NORMALIZADO: SINTAXIS_ERROR
+HERRAMIENTA_OPERACION: write/creacion de archivo de tests y edit posterior
+OBJETIVO: tests/desktop/test_monitor_topology.py
+SINTOMA_SALIDA: Al crear el archivo se escribieron dos firmas con parentesis de sobra ("def test_orientacion_propiedad(self) -> None):" y "def test_portrait_y_landscape(self) -> None):"). py_compile fallo con "Expected ':'".
+CAUSA: Error de transcripcion al escribir las firmas de los metodos en el contenido inicial del archivo.
+CORRECCION: Se corrigieron ambas firmas con edit y se verifico con py_compile (sin salida de error).
+VERIFICACION: python -m py_compile tests/desktop/test_monitor_topology.py -> OK; pytest del archivo 29 PASSED.
+ESTADO: RESUELTO
+REPETICIONES_TIPO: 1 (primera aparicion de TIPO_NORMALIZADO SINTAXIS_ERROR con esta causa en este archivo)
+MEMORIA_PERSISTENTE: Tras crear un archivo nuevo de codigo o tests, ejecutar siempre py_compile antes de pytest. Prohibido usar write sobre archivos existentes.
+---
+
+ERR-0024
+FECHA_HORA: 2026-11-17T17:10:05+01:00 Europe/Madrid
+UNIDAD: 3.8.6.6.2 (tests/desktop/test_monitor_topology.py y docs/readme/README_TESTS.md)
+TIPO_NORMALIZADO: DIACRITICOS_ERROR
+HERRAMIENTA_OPERACION: write/edit sobre archivos ASCII
+OBJETIVO: tests/desktop/test_monitor_topology.py; docs/readme/README_TESTS.md
+SINTOMA_SALIDA: py_compile fallo con "'ascii' codec can't decode byte 0xc3 in position 8363" y el escaneo de bytes detecto 0xc3 0xad en "test_primary_explicito" y en "topologias".
+CAUSA: Se escribieron dos palabras con tilde (i acentuada) incumpliendo la regla 18 de ASCII puro.
+CORRECCION: Se renombraron a "test_primary_explicito" y "topologias"; se verifico el archivo byte a byte (0 bytes > 127 en los cuatro ficheros tocados).
+VERIFICACION: Escaneo de bytes no ASCII en src/desktop/monitor_topology.py, tests/desktop/test_monitor_topology.py, docs/readme/README.md y docs/readme/README_TESTS.md -> 0 en todos.
+ESTADO: RESUELTO
+REPETICIONES_TIPO: 2 (vease tambien el bloque TILDE_ERROR de 2026-11-14 en este archivo)
+MEMORIA_PERSISTENTE: Todo contenido nuevo debe verificarse con un escaneo de bytes > 127 antes de cerrar cualquier unidad.
+---

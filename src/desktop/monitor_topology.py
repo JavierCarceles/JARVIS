@@ -315,6 +315,17 @@ class MonitorTopology:
     def landscape_displays(self) -> List[DisplayInfo]:
         return [d for d in self.displays if d.orientation == "landscape"]
 
+    def central_displays(self) -> List[DisplayInfo]:
+        """Monitores situados en el centro de la disposicion (no extremos en ninguno de los dos ejes).
+
+        Un monitor esta "al centro" cuando no es el mas a la izquierda ni el mas
+        a la derecha (dominado en horizontal) ni el mas arriba ni el mas abajo
+        (dominado en vertical). Se prioriza el centrado horizontal; si ningun
+        monitor cumple, se intenta el centrado vertical. Devuelve la lista de
+        monitores centrales (puede haber varios en empate).
+        """
+        return _middle_candidates(list(self.displays))
+
     def to_dict(self) -> Dict[str, Any]:
         order = self.visual_order()
         return {

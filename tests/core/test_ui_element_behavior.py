@@ -1135,8 +1135,10 @@ class TestUIElementDataToDict:
         expected_fields = {
             "name", "type", "description", "text",
             "bbox", "center", "coordinates", "screen",
-            "interactive", "confidence", "calibrated",
+            "interactive", "visible", "enabled", "actions",
+            "confidence", "calibrated", "classification",
             "calibration_data", "required_capability",
+            "identifier",
         }
         assert set(d.keys()) == expected_fields
 

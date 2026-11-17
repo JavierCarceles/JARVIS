@@ -226,6 +226,10 @@ class AccessibilityNode:
             text=self.value,
             bbox=bbox,
             center=center,
+            identifier=self.identifier,
+            visible=self.visible,
+            enabled=self.enabled,
+            actions=list(self.actions),
             interactive=bool(self.actions),
             confidence=1.0 if self.source in ("uia", "ax") else 0.0,
             calibrated=False,
@@ -237,8 +241,6 @@ class AccessibilityNode:
         element.classification = self.classification()
         element.calibration_data = {
             "native_role": self.native_role,
-            "identifier": self.identifier,
-            "actions": list(self.actions),
             "native_patterns": list(self.native_patterns),
             "source": self.source,
             "coordinate_space": self.coordinate_space,

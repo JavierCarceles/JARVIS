@@ -839,19 +839,28 @@ class ScreenManager:
         return None
 
     def get_foreground_window(self) -> Optional[Any]:
+        """Devuelve la ventana de Windows en primer plano como objeto pygetwindow.
+
+        El HWND se resuelve mediante el contrato de plataforma del adaptador
+        Windows (Win32 del SO real) y se vuelve a expresar como objeto
+        pygetwindow para mantener la API existente del modulo.
+        """
         if os.name != "nt":
             return None
         try:
-            hwnd = int(ctypes.windll.user32.GetForegroundWindow())
-            if hwnd == 0:
-                return None
-            for window in gw.getAllWindows():
-                if self._get_window_handle(window) == hwnd:
-                    return window
+            from src.desktop.platform_contract import get_desktop_platform
+
+            adapter = get_desktop_platform()
+            result = adapter.get_foreground_window()
+            if result.ok and result.value is not None:
+                hwnd = int(result.value.window_id)
+                for window in gw.getAllWindows():
+                    if self._get_window_handle(window) == hwnd:
+                        return window
+            return None
         except Exception as exc:
             logger.debug(
-                "[SCREEN-MANAGER] No se pudo obtener la ventana foreground: get_foreground_window: %s",
-                exc,
+                "[SCREEN-MANAGER] No se pudo obtener la ventana foreground: %s", exc
             )
         return None
 

@@ -599,7 +599,7 @@ Tambien resuelve URL, sugiere entidades y aprende preferencias. Lo usa `Brain`.
 
 `ui_element_model.py`:
 
-- `UIElementData` (pydantic): `name`, `type`, `description`, `text`, `bbox`, `center`, `coordinates`, `screen`, `interactive`, `confidence`, `calibrated`, `classification`. Metodos: `is_calibrated()`, `has_valid_geometry()`, `matches_name()`, `to_dict()`/`from_dict()`.
+- `UIElementData` (pydantic): `name`, `type`, `description`, `text`, `bbox`, `center`, `coordinates`, `screen`, `interactive`, `visible`, `enabled`, `actions`, `identifier`, `confidence`, `calibrated`, `classification`. Metodos: `is_calibrated()`, `has_valid_geometry()`, `matches_name()`, `to_dict()`/`from_dict()`.
 - `normalize_element_type(tipo)`: convierte el tipo libre del modelo de vision en `input`, `address_bar`, `field`, `text`, `element`, `button`, `link`, `menu`, `checkbox`, `radio`, `select` o `toolbar` (desconocido -> `element`).
 - `classify_element(...)` -> `ElementClassification`: `offscreen` > `disabled` > `uia_actionable` > `text_label` > `container` > `visual_interactable_candidate` > `static_content`/`unknown`. Solo `uia_actionable` (patron de accion de UI Automation, habilitado y visible) acredita que el control se puede usar.
 
@@ -612,7 +612,18 @@ Tambien resuelve URL, sugiere entidades y aprende preferencias. Lo usa `Brain`.
 - **Metodos:** `refresh_monitors()`, `get_monitor(n)`, `get_primary_monitor()`, `get_monitor_by_point(x, y)`, `get_monitor_for_window(ventana)`, `get_active_monitor()`, `move_window_to_monitor(titulo, n)`, `capture_monitor(n)` (PNG temporal), y funciones de Chrome (`open_chrome_on_monitor`, `close_chrome`, `get_chrome_windows`). Funciones de modulo: `get_monitor_info(n)`, `get_monitor_setup()`.
 - **macOS:** importa `pyautogui` y `pygetwindow` al cargarse; sin Win32 usa los monitores de `config/config.json` y no puede preparar ventanas.
 
-Aqui ira el contrato de plataforma Windows/macOS (roadmap, unidad 3.8.6.5).
+#### `monitor_topology.py` - modelo de topologia de monitores
+
+`get_current_topology()` reenumera siempre los monitores por el contrato de plataforma (`src/desktop/platform_contract.py`) y construye un `MonitorTopology`; nunca reutiliza dimensiones historicas. Si el adaptador no puede enumerar levanta `TopologyUnavailableError`.
+
+- **Datos:** `displays`, `fingerprint` (sha256 de identificador, geometria, resolucion, escala, DPI, rotacion, principal y espacio de coordenadas, independiente del orden de enumeracion) y `platform`.
+- **Consultas:** `get(display_id)`, `primary()` (el marcado por el SO o el que contiene el origen 0,0; nunca el primero de la lista), `display_for_point`, `display_for_rect` (mayor area de interseccion), `display_for_window` (monitor declarado por el SO o mayor interseccion), `virtual_bounds()`.
+- **Relaciones espaciales:** `relations(display_id)` devuelve los monitores a la izquierda, derecha, arriba y abajo: el otro monitor empieza donde acaba este (tolerancia de 2 unidades para redondeos) y comparte franja real en el otro eje; las listas van ordenadas por distancia entre centros.
+- **Orden y numeracion:** `visual_order()` ordena por centro de izquierda a derecha y, en la misma columna, de arriba a abajo; `visual_number(display_id)` da el numero 1..N que usan las referencias habladas.
+- **Clasificacion:** `largest()`/`smallest()` (empates dentro del 1%, desempate por area en pixeles fisicos), `portrait_displays()`, `landscape_displays()`, `central_displays()` (monitores que no son extremo; prioriza el centrado horizontal y, si ninguno cumple, el vertical) y `rightmost_non_primary()`.
+- **Serializacion:** `to_dict()` exporta huella, plataforma, numero de monitores, limites del escritorio virtual y, por monitor, su `to_dict()` con numero visual y relaciones.
+- **Cambios:** `diff_topologies(anterior, actual)` -> `TopologyChange` con monitores anadidos, quitados y campos modificados (geometria, area de trabajo, tamano de pixel, escala, DPI, rotacion, principal). `TopologyWatcher` fija una referencia con `baseline()`, la compara con `check()` (incluye los eventos recibidos del SO) y ofrece `assert_unchanged(fingerprint)`, la comprobacion obligatoria antes de una accion espacial; `start()` solo activa un listener del SO si el adaptador lo ofrece.
+- **Politicas del mismo modulo:** `resolve_monitor_reference(texto, topologia, current_display_id)` resuelve referencias habladas (direccion, centro, tamano, orientacion, principal, "la otra", numero visual, nombre del monitor, relativas al actual) y devuelve `resolved`, `ambiguous` con candidatos o `not_found`; nunca adivina. `TargetMonitorPolicy` aplica la politica de producto y `TestMonitorPolicy` la de pruebas (monitor no principal mas a la derecha por geometria real).
 
 ### 10.3 Experimental (`src/experimental/`)
 

@@ -110,6 +110,10 @@ class UIElementData(BaseModel):
     calibrated: bool = False
     calibration_data: Optional[Dict[str, Any]] = None
     required_capability: Optional[str] = None
+    identifier: str = ""
+    visible: bool = False
+    enabled: bool = False
+    actions: List[str] = Field(default_factory=list)
     classification: ElementClassification = ElementClassification.UNKNOWN
 
     # ------------------------------------------------------------------
