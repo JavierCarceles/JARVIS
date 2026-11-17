@@ -183,12 +183,23 @@ class CalibratedControlRecord:
     refined_box: Optional[Tuple[float, float, float, float]] = None
     confidences: Dict[str, float] = field(default_factory=dict)
     reasons: List[str] = field(default_factory=list)
+    calibrated_at: str = ""
 
     def __post_init__(self) -> None:
         self.semantic_state = _as_state(self.semantic_state)
         self.geometric_state = _as_state(self.geometric_state)
         self.action_state = _as_state(self.action_state)
         box = _tuple_or_none(self.client_box_normalized, 4, float)
+        self.client_box_normalized = box if box is not None else (0.0, 0.0, 0.0, 0.0)  # type: ignore[assignment]
+        self.client_box_px = _tuple_or_none(self.client_box_px, 4, int)  # type: ignore[assignment]
+        self.safe_point_normalized = _tuple_or_none(self.safe_point_normalized, 2, float)  # type: ignore[assignment]
+        self.original_box = _tuple_or_none(self.original_box, 4, float)  # type: ignore[assignment]
+        self.refined_box = _tuple_or_none(self.refined_box, 4, float)  # type: ignore[assignment]
+        self.provenance = [str(p) for p in (self.provenance or [])]
+        self.detector_versions = {str(k): str(v) for k, v in (self.detector_versions or {}).items()}
+        self.confidences = {str(k): float(v) for k, v in (self.confidences or {}).items()}
+        self.reasons = [str(r) for r in (self.reasons or [])]
+        self.calibrated_at = str(self.calibrated_at or "")
         self.client_box_normalized = box if box is not None else (0.0, 0.0, 0.0, 0.0)  # type: ignore[assignment]
         self.client_box_px = _tuple_or_none(self.client_box_px, 4, int)  # type: ignore[assignment]
         self.safe_point_normalized = _tuple_or_none(self.safe_point_normalized, 2, float)  # type: ignore[assignment]
@@ -238,6 +249,7 @@ class CalibratedControlRecord:
             "refined_box": list(self.refined_box) if self.refined_box else None,
             "confidences": dict(self.confidences),
             "reasons": list(self.reasons),
+            "calibrated_at": self.calibrated_at,
         }
 
 
@@ -375,6 +387,8 @@ def check_control_record(record: CalibratedControlRecord) -> List[str]:
             problems.append("accion por puntero VALIDADO sin geometria VALIDADO")
     if record.semantic_state == CalibrationState.VALIDADO and not sources:
         problems.append("semantica VALIDADO sin procedencia")
+    if not str(record.calibrated_at or "").strip():
+        problems.append("control calibrado sin marca de tiempo")
     return problems
 
 
@@ -562,12 +576,15 @@ class CalibrationProfileStore:
                 raise CalibrationStoreError(
                     "El perfil pertenece a otro equipo; no se guarda en este almacen"
                 )
+            now = _now_iso()
+            for control in profile.controls:
+                if not control.calibrated_at:
+                    control.calibrated_at = now
             problems = check_profile(profile)
             if problems:
                 raise CalibrationStoreError("Perfil de calibracion invalido: %s" % "; ".join(problems))
             if not profile.profile_id:
                 profile.profile_id = CalibrationProfile.new_id()
-            now = _now_iso()
             if not profile.created_at:
                 profile.created_at = now
             profile.updated_at = now
@@ -683,8 +700,9 @@ class CalibrationProfileStore:
                     semantic_state, geometric_state, action_state,
                     client_box_normalized, client_box_px, safe_point_normalized,
                     interaction_method, provenance, detector_versions,
-                    original_box, refined_box, confidences, reasons
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    original_box, refined_box, confidences, reasons,
+                    calibrated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     profile.profile_id,
@@ -706,6 +724,7 @@ class CalibrationProfileStore:
                     _json_dumps(list(control.refined_box)) if control.refined_box else None,
                     _json_dumps(control.confidences),
                     _json_dumps(control.reasons),
+                    control.calibrated_at,
                 ),
             )
 
@@ -916,6 +935,7 @@ class CalibrationProfileStore:
             refined_box=_json_loads(row["refined_box"], None),
             confidences=_json_loads(row["confidences"], {}),
             reasons=_json_loads(row["reasons"], []),
+            calibrated_at=row["calibrated_at"] or "",
         )
 
 

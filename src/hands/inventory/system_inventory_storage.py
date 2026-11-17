@@ -308,6 +308,7 @@ CREATE TABLE IF NOT EXISTS calibration_controls (
     refined_box TEXT,
     confidences TEXT NOT NULL DEFAULT '{}',
     reasons TEXT NOT NULL DEFAULT '[]',
+    calibrated_at TEXT NOT NULL DEFAULT '',
     PRIMARY KEY (profile_id, control_id),
     FOREIGN KEY (profile_id) REFERENCES calibration_profiles(profile_id) ON DELETE CASCADE,
     FOREIGN KEY (machine_id) REFERENCES machines(machine_id)

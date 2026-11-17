@@ -152,7 +152,7 @@ Estos datos solo valen para el ordenador donde se crearon. No deben copiarse a o
 - **Codigo:** `src/hands/inventory/system_inventory_storage.py` (almacenamiento) y `src/hands/inventory/system_inventory.py` (identidad del equipo y contrato).
 - **Identidad del equipo:** `generate_machine_id()` = `uuid5(NAMESPACE_DNS, "jarvis-local-<hostname>-<SO>")`. No usa MAC, numero de serie ni usuario. Si la base pertenece a otro `machine_id`, se rechaza (`InventoryIncompatibleMachineError`).
 - **Proteccion:** modo WAL, claves foraneas activas, permisos solo para el usuario, copia de seguridad con sufijo `.bak` y comprobacion de integridad antes de restaurar (`InventoryCorruptError`, `InventoryBackupError`).
-- **Version de esquema:** 5.
+- **Version de esquema:** 6.
 
 | Tabla | Para que | Columnas principales |
 |---|---|---|
@@ -163,8 +163,10 @@ Estos datos solo valen para el ordenador donde se crearon. No deben copiarse a o
 | `file_entries` | Ficheros y carpetas encontrados | `entry_id`, `scan_id`, `machine_id`, `volume`, `absolute_path`, `normalized_path`, `relative_path`, `name`, `extension`, `entry_type`, `size_bytes`, fechas, `attributes` (JSON), `excluded`, `source`, `last_checked_at` |
 | `application_candidates` | Posibles aplicaciones | `candidate_id`, `scan_id`, `machine_id`, `volume`, `name`, `absolute_path`, `launch_type`, `confidence`, `version`, `producto`, `evidencia` (JSON), `source`, `last_checked_at` |
 | `lineas_base` | Linea base por volumen (una por equipo y volumen) | `linea_id`, `machine_id`, `volume`, `fecha_base`, `estado_volumen`, `cobertura`, contadores, `scan_id`, `created_at` |
+| `calibration_profiles` | Perfiles de calibracion UI por equipo y aplicacion | `profile_id`, `machine_id`, `app_id`, `window_fingerprint`, `topology_fingerprint`, `display_id`, `scale_factor`, `dpi`, `client_width`, `client_height`, `status`, `is_active`, `absolute_cache` (JSON), `metadata` (JSON), `obsolete_reason`, `created_at`, `updated_at` |
+| `calibration_controls` | Controles calibrados de un perfil | `profile_id`, `control_id`, `machine_id`, `app_id`, `name`, `control_type`, `semantic_state`, `geometric_state`, `action_state`, `client_box_normalized`, `client_box_px`, `safe_point_normalized`, `interaction_method`, `provenance` (JSON), `detector_versions` (JSON), `original_box`, `refined_box`, `confidences` (JSON), `reasons` (JSON), `calibrated_at` |
 
-- **Migraciones:** cada paso va en su propia transaccion, se deshace si falla y comprueba que el numero de filas no cambia. v1->v2 anade `normalized_path`; v2->v3 crea `lineas_base`; v3->v4 cambia el indice unico para incluir `scan_id`; v4->v5 anade `version`, `producto` y `evidencia` a los candidatos. Si la base es mas nueva que el codigo, no se toca.
+- **Migraciones:** cada paso va en su propia transaccion, se deshace si falla y comprueba que el numero de filas no cambia. v1->v2 anade `normalized_path`; v2->v3 crea `lineas_base`; v3->v4 cambia el indice unico para incluir `scan_id`; v4->v5 anade `version`, `producto` y `evidencia` a los candidatos; v5->v6 crea las tablas de calibracion UI local (`calibration_profiles`, `calibration_controls`) y sus indices. Si la base es mas nueva que el codigo, no se toca.
 - `normalized_path` va en minusculas en sistemas de ficheros que no distinguen mayusculas (Windows, macOS).
 
 ### `data/system_inventory_manifest.json`

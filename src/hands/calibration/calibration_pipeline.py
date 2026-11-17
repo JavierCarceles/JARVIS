@@ -1654,6 +1654,7 @@ class UICalibrationPipeline:
                 refined_box=tuple(int(round(v)) for v in (work_box.left, work_box.top, work_box.right, work_box.bottom)),
                 confidences=confidences,
                 reasons=list(reasons),
+                calibrated_at=_now_iso(),
             )
             records.append(record)
 
