@@ -15,7 +15,14 @@ import time
 import webbrowser
 from typing import List, Optional, Any
 
-import pyautogui
+import sys as _sys
+
+from src.desktop.native_imports import lazy_module as _lazy_module, lazy_windll as _lazy_windll
+
+if _sys.platform == "win32":
+    import pyautogui
+else:
+    pyautogui = _lazy_module("pyautogui")  # import perezoso fuera de Windows
 
 from src.hands.actions.action_registry import ActionType, register_action
 from src.core.log import get_logger

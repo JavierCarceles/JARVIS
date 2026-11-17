@@ -843,6 +843,89 @@ class ApplicationKnowledgeIntegrator:
             return False
         return self.is_application_available(app_name)
 
+    # ------------------------------------------------------------------
+    # Capacidades planificables (accion real + SO disponible + recursos vigentes)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _planning_service(service: Any = None) -> Any:
+        if service is not None:
+            return service
+        from src.hands.planner.planning_capabilities import get_planning_capability_service
+
+        return get_planning_capability_service()
+
+    def get_plannable_capabilities(
+        self,
+        app_name: str,
+        window_id: Optional[int] = None,
+        service: Any = None,
+    ) -> List[Dict[str, Any]]:
+        """Capacidades de ``app_name`` que el Planner puede usar ahora.
+
+        Solo incluye capacidades declaradas con accion registrada en el
+        ``ActionRegistry``, capacidades del adaptador del SO en estado
+        ``DISPONIBLE`` y, si actuan sobre la interfaz, recursos calibrados
+        vigentes para la ventana ``window_id``. No modifica los nodos que
+        devuelve ``convert_application_to_nodes``.
+        """
+        try:
+            exposures = self._planning_service(service).plannable_capabilities(app_name, window_id)
+        except Exception as exc:
+            logger.warning("[APP-INTEGRATION] No se pudieron evaluar capacidades de %s: %s", app_name, exc)
+            return []
+        return [exposure.to_dict() for exposure in exposures]
+
+    def explain_missing_capability(
+        self,
+        app_name: str,
+        capability: Any,
+        window_id: Optional[int] = None,
+        service: Any = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Motivo estructurado por el que una capacidad no es planificable (o None)."""
+        try:
+            missing = self._planning_service(service).explain_missing(app_name, capability, window_id)
+        except Exception as exc:
+            logger.warning("[APP-INTEGRATION] No se pudo explicar la capacidad %s de %s: %s", capability, app_name, exc)
+            return {"app_id": app_name, "capability": self._capability_value(capability),
+                    "reason_code": "action_missing", "detail": str(exc), "instructions": ""}
+        return missing.to_dict() if missing is not None else None
+
+    def filter_plannable_nodes(
+        self,
+        nodes: Sequence[Node],
+        window_id: Optional[int] = None,
+        service: Any = None,
+    ) -> List[Node]:
+        """Filtra nodos de capacidad no planificables y anota la accion real.
+
+        Los nodos de aplicacion y de elementos se conservan; un nodo de
+        capacidad solo pasa si su capacidad es planificable ahora, y recibe en
+        ``metadata["action"]`` el nombre de la accion registrada.
+        """
+        plannable_by_app: Dict[str, Dict[str, Dict[str, Any]]] = {}
+        result: List[Node] = []
+        for node in nodes:
+            metadata = getattr(node, "metadata", None)
+            if not isinstance(metadata, dict) or metadata.get("source") != "application_knowledge" \
+                    or "capability" not in metadata:
+                result.append(node)
+                continue
+            app_name = str(metadata.get("application") or "")
+            if app_name not in plannable_by_app:
+                plannable_by_app[app_name] = {
+                    self._capability_value(item.get("capability")): item
+                    for item in self.get_plannable_capabilities(app_name, window_id, service)
+                }
+            exposure = plannable_by_app[app_name].get(self._capability_value(metadata.get("capability")))
+            if exposure is None:
+                continue
+            metadata["action"] = exposure.get("action_name")
+            metadata["plannable"] = True
+            result.append(node)
+        return result
+
     def register_application_knowledge(self, app_config: Dict[str, Any]) -> bool:
         """Registra conocimiento mediante la API publica de applications_core."""
         if not isinstance(app_config, dict):

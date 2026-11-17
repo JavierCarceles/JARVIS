@@ -26,7 +26,14 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-import pygetwindow as gw
+import sys as _sys
+
+from src.desktop.native_imports import lazy_module as _lazy_module, lazy_windll as _lazy_windll
+
+if _sys.platform == "win32":
+    import pygetwindow as gw
+else:
+    gw = _lazy_module("pygetwindow")  # import nativo perezoso fuera de Windows
 
 from src.core.log import get_logger
 from src.desktop.screen_manager import get_monitor_info, get_screen_manager
@@ -751,6 +758,173 @@ class CoordinateManager:
             return element_type in {"input", "address_bar", "field", "text"}
 
         return True
+
+    # ------------------------------------------------------------------
+    # PERFILES LOCALES VIGENTES (SQLite por machine_id y topologia)
+    # ------------------------------------------------------------------
+
+    STORE_RESOURCE_SOURCE = "calibration_profile_store"
+
+    def set_validity_service(self, service: Any) -> None:
+        """Inyecta el ``CalibrationValidityService`` (tests o adaptador propio)."""
+        self._validity_service = service
+
+    def _get_validity_service(self, validity_service: Any = None) -> Any:
+        if validity_service is not None:
+            return validity_service
+        service = getattr(self, "_validity_service", None)
+        if service is None:
+            # Import perezoso: evita ciclos al cargar src.hands.
+            from src.hands.calibration.calibration_validity import CalibrationValidityService
+
+            service = CalibrationValidityService()
+            self._validity_service = service
+        return service
+
+    def get_planner_resources(
+        self,
+        app_id: str,
+        window_id: int,
+        validity_service: Any = None,
+    ) -> List[Dict[str, Any]]:
+        """Recursos vigentes con accion real para la ventana y monitor actuales.
+
+        Fuente unica: perfiles VALIDADO del almacen SQLite local
+        (``CalibrationValidityService.resources_for_planner``), filtrados por
+        ``machine_id``, huella de ventana/escala y vigencia. No lee ni escribe
+        ``macros_coords.json``.
+        """
+        try:
+            return list(self._get_validity_service(validity_service).resources_for_planner(app_id, window_id))
+        except Exception as exc:
+            logger.warning(r"[COORDINATE-MANAGER] No se pudieron obtener recursos vigentes de %s: %s", app_id, exc)
+            return []
+
+    def calibration_required(
+        self,
+        app_id: str,
+        window_id: Optional[int] = None,
+        validity_service: Any = None,
+    ) -> bool:
+        """Unico dato de calibracion que puede exponerse al catalogo global.
+
+        Sin errores de lectura devuelve si hace falta calibrar; ante un error
+        devuelve True (nunca se asume calibrado sin evidencia).
+        """
+        try:
+            return bool(self._get_validity_service(validity_service).calibration_required(app_id, window_id))
+        except Exception as exc:
+            logger.warning(r"[COORDINATE-MANAGER] No se pudo evaluar calibration_required de %s: %s", app_id, exc)
+            return True
+
+    def publish_validated_resources(
+        self,
+        app_id: str,
+        window_id: int,
+        application_name: Optional[str] = None,
+        validity_service: Any = None,
+    ) -> List[UIResource]:
+        """Publica como ``UIResource`` solo los controles vigentes de la ventana actual.
+
+        * Sustituye los recursos publicados antes desde el almacen para esa
+          aplicacion (nunca acumula coordenadas de otra ventana o monitor).
+        * Los recursos legacy de ``macros_coords.json`` de la misma aplicacion
+          quedan no disponibles (``superseded_by_local_profile``): no tienen
+          evidencia de pertenencia a este equipo ni a esta pantalla.
+        * Un control con accion de accesibilidad sin geometria validada se
+          publica sin coordenadas (solo accion por accesibilidad).
+        """
+        app_key = str(application_name or app_id).strip().lower()
+        self.withdraw_validated_resources(app_id, reason="republicacion", application_name=application_name)
+        published: List[UIResource] = []
+        for item in self.get_planner_resources(app_id, window_id, validity_service):
+            point = item.get("point")
+            box = item.get("box")
+            coordinates: Dict[int, Tuple[int, int]] = {}
+            regions: Dict[int, Tuple[int, int, int, int]] = {}
+            if point is not None:
+                x, y = int(round(point[0])), int(round(point[1]))
+                screen = 0
+                try:
+                    monitor = self.screen_manager.get_monitor_by_point(x, y)
+                    number = self.monitor_number_from_object(monitor)
+                    screen = int(number) if number is not None else 0
+                except Exception as exc:
+                    logger.debug(r"[COORDINATE-MANAGER] Monitor del punto no determinado: %s", exc)
+                coordinates[screen] = (x, y)
+                if box is not None:
+                    regions[screen] = tuple(int(round(v)) for v in box)  # type: ignore[assignment]
+            try:
+                from src.core.ui_element_model import normalize_element_type
+
+                element_type = normalize_element_type(item.get("control_type"))
+            except Exception:
+                element_type = "element"
+            resource = UIResource(
+                id=str(item.get("resource_id")),
+                name=str(item.get("name") or item.get("control_id")),
+                resource_type=ResourceType.ELEMENT,
+                application=app_key,
+                element_type=element_type,
+                calibration_strategy=CalibrationStrategy.VISUAL_DETECTION,
+                calibrated_coordinates=coordinates,
+                calibrated_regions=regions,
+                confidence=min(
+                    [float(v) for v in (item.get("confidences") or {}).values()] or [1.0]
+                ),
+                is_available=True,
+                is_calibrated=True,
+                metadata={
+                    "source": self.STORE_RESOURCE_SOURCE,
+                    "app_id": app_id,
+                    "control_id": item.get("control_id"),
+                    "profile_id": item.get("profile_id"),
+                    "window_id": item.get("window_id"),
+                    "display_id": item.get("display_id"),
+                    "coordinate_space": item.get("coordinate_space"),
+                    "interaction_method": item.get("interaction_method"),
+                    "validity_action": item.get("validity_action"),
+                    "provenance": list(item.get("provenance") or []),
+                },
+            )
+            self.register_ui_resource(resource)
+            published.append(resource)
+
+        if published:
+            for resource in self.ui_resources.values():
+                if resource.metadata.get("source") == self.STORE_RESOURCE_SOURCE:
+                    continue
+                if str(resource.application or "").strip().lower() != app_key:
+                    continue
+                resource.is_available = False
+                resource.metadata["superseded_by_local_profile"] = True
+        logger.info(
+            r"[COORDINATE-MANAGER] %d recurso(s) vigente(s) publicados para %s (ventana %s)",
+            len(published),
+            app_id,
+            window_id,
+        )
+        return published
+
+    def withdraw_validated_resources(
+        self,
+        app_id: str,
+        reason: str = "",
+        application_name: Optional[str] = None,
+    ) -> int:
+        """Retira los recursos publicados desde el almacen para una aplicacion."""
+        removed = 0
+        for resource_id in list(self.ui_resources):
+            resource = self.ui_resources[resource_id]
+            if resource.metadata.get("source") != self.STORE_RESOURCE_SOURCE:
+                continue
+            if resource.metadata.get("app_id") != app_id:
+                continue
+            del self.ui_resources[resource_id]
+            removed += 1
+        if removed:
+            logger.info(r"[COORDINATE-MANAGER] %d recurso(s) de %s retirados: %s", removed, app_id, reason)
+        return removed
 
     # ------------------------------------------------------------------
     # MACROS_COORDS.JSON

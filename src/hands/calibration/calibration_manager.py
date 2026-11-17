@@ -24,7 +24,14 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
-import pygetwindow as gw
+import sys as _sys
+
+from src.desktop.native_imports import lazy_module as _lazy_module, lazy_windll as _lazy_windll
+
+if _sys.platform == "win32":
+    import pygetwindow as gw
+else:
+    gw = _lazy_module("pygetwindow")  # import nativo perezoso fuera de Windows
 
 from src.core.config import get_calibration_config, get_macros_coords_path
 from src.core.log import get_logger
@@ -38,9 +45,15 @@ logger = get_logger(__name__)
 # WIN32
 # ============================================================================
 
-USER32 = ctypes.windll.user32
-KERNEL32 = ctypes.windll.kernel32
-ADVAPI32 = ctypes.windll.advapi32
+if _sys.platform == "win32":
+    USER32 = ctypes.windll.user32
+    KERNEL32 = ctypes.windll.kernel32
+    ADVAPI32 = ctypes.windll.advapi32
+else:
+    # Fuera de Windows el acceso falla con NativeDependencyUnavailable explicito.
+    USER32 = _lazy_windll("user32")
+    KERNEL32 = _lazy_windll("kernel32")
+    ADVAPI32 = _lazy_windll("advapi32")
 
 GWL_STYLE = -16
 GWL_EXSTYLE = -20
@@ -322,6 +335,7 @@ class CalibrationManager:
 
         self.calibrators: Dict[str, Any] = {}
         self._register_builtin_calibrators()
+        self._calibration_pipeline: Any = None
 
         self._last_launch_before_hwnds: Set[int] = set()
         self._last_launch_before_pids: Set[int] = set()
@@ -2776,9 +2790,20 @@ $result | ConvertTo-Json -Compress -Depth 4
     # ========================================================================
 
     def is_application_calibrated(self, application: Any) -> bool:
+        """True si existe un perfil local VALIDADO para este equipo (SQLite por
+        ``machine_id``). Como compatibilidad de solo lectura, tambien acepta
+        coordenadas heredadas de ``macros_coords.json``."""
         app_key = self._get_storage_application_key(str(application.get("name", "")) if isinstance(application, dict) else str(application))
         if not app_key:
             return False
+        try:
+            pipeline = self.get_calibration_pipeline()
+            profile = pipeline.store.get_active_profile(app_key)
+            status = getattr(getattr(profile, "status", None), "value", getattr(profile, "status", None))
+            if profile is not None and str(status).upper() == "VALIDADO":
+                return True
+        except Exception as exc:
+            logger.debug("CalibrationManager.is_application_calibrated (perfil local): %s", exc)
         try:
             path = get_macros_coords_path()
             if not path.exists():
@@ -2919,138 +2944,178 @@ $result | ConvertTo-Json -Compress -Depth 4
                 error=str(exc),
             )
 
+    # ========================================================================
+    # CALIBRACION (PIPELINE UNICO)
+    # ========================================================================
+
+    def get_calibration_pipeline(self) -> Any:
+        """Pipeline unico de calibracion (``UICalibrationPipeline``), creado una vez.
+
+        Reutiliza el ``UniversalVisualCalibrator`` del gestor para Qwen3-VL y
+        aplica los filtros de calibracion del gestor (VS Code, juegos,
+        herramientas administrativas) antes de abrir nada. ApplicationPreflight
+        lo ejecuta el lanzador de produccion antes de lanzar.
+        """
+        if self._calibration_pipeline is None:
+            from src.hands.calibration.calibration_pipeline import UICalibrationPipeline
+
+            self._calibration_pipeline = UICalibrationPipeline(
+                vision=self.visual_calibrator,
+                calibration_policy_checker=self._calibration_policy_check,
+            )
+        return self._calibration_pipeline
+
+    def set_calibration_pipeline(self, pipeline: Any) -> None:
+        """Inyecta el pipeline (pruebas o configuraciones alternativas)."""
+        self._calibration_pipeline = pipeline
+
+    def _calibration_policy_check(self, application: Dict[str, Any]) -> CalibrationPreflightResult:
+        """Filtros propios de calibracion sobre nombre/identificador (sin lanzar nada)."""
+        name = str(application.get("name", "")).strip()
+        app_id = str(application.get("app_id", "")).strip()
+        if not name:
+            return CalibrationPreflightResult(False, name, app_id, "Nombre de aplicacion vacio")
+        if self._should_ignore_application(name, app_id):
+            return CalibrationPreflightResult(False, name, app_id,
+                                              "La aplicaci\u00f3n est\u00e1 bloqueada para calibraci\u00f3n",
+                                              {"internal_filters": True})
+        if self._is_game_application(name, app_id):
+            return CalibrationPreflightResult(False, name, app_id,
+                                              "La aplicaci\u00f3n est\u00e1 clasificada como juego", {"game": True})
+        return CalibrationPreflightResult(True, name, app_id, checks={"internal_filters": True},
+                                          source="calibration_policy")
+
+    def _pipeline_application(self, application: Any) -> Optional[Dict[str, Any]]:
+        """Nombre de lanzamiento y clave estable de almacenamiento de la aplicacion."""
+        if isinstance(application, dict):
+            name = str(application.get("name", "")).strip()
+            app_id = str(application.get("app_id", "")).strip()
+        else:
+            name = str(application or "").strip()
+            app_id = ""
+        if not name:
+            return None
+        return {
+            "name": name,
+            "app_id": app_id,
+            "app_key": self._get_storage_application_key(name) or name,
+        }
+
     def calibrate_application(
         self, application: Any, screen_number: Optional[int] = None
     ) -> CalibrationResult:
-        """Calibra cualquier aplicacion mediante un unico flujo universal.
+        """Calibra una aplicacion mediante el pipeline unico de calibracion.
 
-        Flujo:
-            aplicacion cerrada  -> abrir -> restaurar/maximizar -> detectar monitor
-            aplicacion minimizada -> restaurar/maximizar -> detectar monitor
-            aplicacion abierta -> maximizar -> detectar monitor
-            monitor detectado -> captura -> UniversalVisualCalibrator
+        Sin ``screen_number`` el monitor lo decide la politica de producto
+        (si la aplicacion ya esta abierta se queda en su monitor). Con
+        ``screen_number`` (``monitor_id`` de ScreenManager) se resuelve el
+        monitor por su geometria real y la ventana se mueve alli.
 
-        Cuando ``screen_number`` es None, se calibra el monitor real donde la
-        ventana queda despues de prepararla. Cuando se especifica, la ventana
-        se mueve temporalmente a ese monitor antes de capturar.
+        La resolucion, ApplicationPreflight, la apertura y la verificacion de
+        proceso/ventana las hace el lanzador de produccion dentro del pipeline;
+        este metodo no abre ni calibra por ninguna otra via. El perfil se
+        persiste en SQLite por ``machine_id`` (no en ``macros_coords.json``).
         """
-        self.screen_manager.refresh_monitors()
-        application_info = self._resolve_application(application)
-        if not application_info:
+        return self._run_calibration_pipeline(application, screen_number, depth="surface")
+
+    def calibrate_application_deep(
+        self,
+        application: Any,
+        screen_number: Optional[int] = None,
+        branch_ref: Any = None,
+        policy: str = "product",
+    ) -> CalibrationResult:
+        """Calibracion en profundidad: superficie + exploracion segura de menus,
+        pestanas y dialogos no destructivos ("calibra X a fondo").
+
+        Con ``branch_ref`` (nombre o referencia logica de un elemento) solo se
+        explora la rama necesaria para hacerlo visible (peticion del Planner).
+        """
+        depth = "branch" if branch_ref else "deep"
+        return self._run_calibration_pipeline(
+            application, screen_number, depth=depth, branch_ref=branch_ref, policy=policy
+        )
+
+    def _run_calibration_pipeline(
+        self,
+        application: Any,
+        screen_number: Optional[int],
+        depth: str,
+        branch_ref: Any = None,
+        policy: str = "product",
+    ) -> CalibrationResult:
+        app_info = self._pipeline_application(application)
+        if app_info is None:
             return CalibrationResult(
-                str(application),
-                ApplicationType.GENERIC,
-                int(screen_number or 0),
-                False,
-                0,
+                str(application), ApplicationType.GENERIC, int(screen_number or 0), False, 0,
                 error="Aplicaci\u00f3n no encontrada",
             )
-
-        app_name = application_info["name"]
+        app_name = app_info["name"]
         app_type = self._get_application_type(app_name)
-        preflight = self.preflight_application(application_info)
-        if not preflight.allowed:
-            return CalibrationResult(
-                app_name, app_type, 0, False, 0,
-                error=preflight.reason or "Aplicaci\u00f3n rechazada por preflight",
-            )
-
-        # No usamos calibradores especificos como camino principal. La misma
-        # logica de preparacion y captura se aplica a cualquier aplicacion.
-        _, launched = self.launch_application(application_info)
-        if not launched or self._last_launch_window is None:
-            return CalibrationResult(
-                app_name, app_type, 0, False, 0,
-                error="No se pudo abrir o detectar una ventana GUI",
-            )
-
-        window = self._last_launch_window
-        owned_hwnds = set(self._last_launch_owned_hwnds)
-        owned_pids = set(self._last_launch_owned_pids)
-        hwnd = self._get_window_handle(window)
-        snapshot = None if owned_hwnds else self._capture_window_state(hwnd)
-
+        monitor_reference: Any = None
+        if screen_number is not None:
+            try:
+                monitor_reference = int(screen_number)
+            except (TypeError, ValueError):
+                monitor_reference = str(screen_number)
         try:
-            window_pid = self._get_window_process_id(window)
-            if self._is_process_elevated(window_pid):
-                return CalibrationResult(
-                    app_name, app_type, 0, False, 0,
-                    error="La aplicaci\u00f3n requiere privilegios elevados",
-                )
-
-            actual_monitor = self._prepare_window_for_calibration(
-                window, app_name
+            pipeline = self.get_calibration_pipeline()
+            report = pipeline.calibrate(
+                app_info,
+                monitor_reference=monitor_reference,
+                policy=policy,
+                depth=depth,
+                branch_ref=branch_ref,
             )
-            if actual_monitor is None:
-                return CalibrationResult(
-                    app_name, app_type, 0, False, 0,
-                    error="No se pudo restaurar/maximizar la ventana ni determinar su monitor",
-                )
+        except Exception as exc:
+            logger.error(r"[CALIBRATION-MANAGER] Error en el pipeline de calibracion de %s: %s", app_name, exc)
+            return CalibrationResult(app_name, app_type, int(screen_number or 0), False, 0, error=str(exc))
+        return self._report_to_result(report, app_type, screen_number)
 
-            # Actualizar la instancia de ventana por HWND despues de restaurar/maximizar.
-            if hwnd:
-                refreshed_window = self._get_window_by_handle(hwnd)
-                if refreshed_window is not None:
-                    window = refreshed_window
+    def _report_to_result(
+        self, report: Any, app_type: ApplicationType, screen_number: Optional[int]
+    ) -> CalibrationResult:
+        """Convierte ``CalibrationReport`` en ``CalibrationResult`` (compatibilidad)."""
+        legacy_screen = 0
+        try:
+            legacy_screen = int(self.get_calibration_pipeline().legacy_screen_number(report.display or {}))
+        except Exception as exc:
+            logger.debug("CalibrationManager._report_to_result: %s", exc)
+        if not legacy_screen and screen_number is not None:
+            try:
+                legacy_screen = int(screen_number)
+            except (TypeError, ValueError):
+                legacy_screen = 0
+        elements = []
+        for element in list(getattr(report, "legacy_elements", []) or []):
+            item = dict(element)
+            item["screen"] = legacy_screen
+            elements.append(item)
+        return CalibrationResult(
+            report.app_name,
+            app_type,
+            legacy_screen,
+            bool(report.success),
+            len(elements),
+            error=None if report.success else (report.error or "La calibraci\u00f3n no produjo resultados"),
+            calibration_data={
+                "elements": elements,
+                "profile_id": report.profile_id,
+                "report": report.to_dict(),
+            },
+        )
 
-            # Los navegadores se calibran en una pestana temporal dentro de la
-            # misma ventana ya preparada. Las aplicaciones GUI normales se
-            # calibran directamente sobre su ventana.
-            if not self._last_launch_was_owned and self._is_browser_application(app_name):
-                if not self._open_temporary_browser_tab(window, app_name):
-                    return CalibrationResult(
-                        app_name, app_type, 0, False, 0,
-                        error="No se pudo abrir la pesta\u00f1a temporal de calibraci\u00f3n",
-                    )
+    def get_planner_resources(self, application: Any, window_id: int) -> List[Dict[str, Any]]:
+        """Recursos calibrados vigentes y con accion real para la ventana actual."""
+        app_info = self._pipeline_application(application)
+        if app_info is None:
+            return []
+        return self.get_calibration_pipeline().resources_for_planner(app_info["app_key"], int(window_id))
 
-            if screen_number is None:
-                target_monitors = [actual_monitor]
-                logger.info(r"[CALIBRATION-MANAGER] %s se calibrara en su monitor real: %s", app_name, getattr(actual_monitor, "monitor_id", actual_monitor))
-            else:
-                requested_monitor = self.screen_manager.get_monitor(int(screen_number))
-                if requested_monitor is None:
-                    return CalibrationResult(
-                        app_name, app_type, int(screen_number), False, 0,
-                        error=f"Monitor {screen_number} no encontrado",
-                    )
-                target_monitors = [requested_monitor]
-
-            successful: List[CalibrationResult] = []
-            errors: List[str] = []
-
-            for monitor in target_monitors:
-                result = self._calibrate_open_window(
-                    app_name, window, int(monitor.monitor_id)
-                )
-                if result.success:
-                    self._save_application_calibration(app_name, [result])
-                    successful.append(result)
-                elif result.error:
-                    errors.append(result.error)
-                    logger.warning(r"[CALIBRATION-MANAGER] %s monitor %s fallo: %s", app_name, monitor.monitor_id, result.error)
-
-            if not successful:
-                return CalibrationResult(
-                    app_name, app_type, 0, False, 0,
-                    error="; ".join(dict.fromkeys(errors))
-                    if errors else "La calibraci\u00f3n no produjo resultados",
-                )
-
-            actual_screen = successful[0].screen_number
-            return CalibrationResult(
-                app_name, app_type, actual_screen, True,
-                sum(r.elements_count for r in successful),
-                calibration_data={"results": [r.to_dict() for r in successful]},
-            )
-        finally:
-            self._close_temporary_browser_tab()
-            if owned_hwnds:
-                self._close_all_owned_windows(window, owned_hwnds, owned_pids)
-            elif hwnd and snapshot is not None:
-                if not self._restore_window_state(hwnd, snapshot):
-                    logger.warning(r"[CALIBRATION-MANAGER] No se pudo restaurar el estado original de %s | HWND=%s", app_name, hwnd)
-                else:
-                    logger.info(r"[CALIBRATION-MANAGER] Estado original restaurado para %s | HWND=%s", app_name, hwnd)
+    # ------------------------------------------------------------------
+    # Flujo heredado (sin uso en el pipeline unico). Se conserva por
+    # compatibilidad con macros_coords.json hasta su migracion.
+    # ------------------------------------------------------------------
 
     def _get_monitors_to_calibrate(self, screen_number: Optional[int]) -> List[Any]:
         self.screen_manager.refresh_monitors()

@@ -48,9 +48,9 @@ class EdgeCalibrator:
     """
 
     def __init__(self) -> None:
-        from src.hands.calibration.calibration_manager import CalibrationManager
+        from src.hands.calibration.calibration_manager import get_calibration_manager
 
-        self.calibration_manager = CalibrationManager()
+        self.calibration_manager = get_calibration_manager()
 
 
 
@@ -130,57 +130,13 @@ class EdgeCalibrator:
         No analiza elementos directamente.
         """
 
-        calibrate_method = getattr(
-            self.calibration_manager,
-            "calibrate_application",
-            None,
-        )
+        from src.hands.calibration.calibration_pipeline import delegate_legacy_calibration
 
-        if not callable(calibrate_method):
-            pass
-
-
-        application_candidates = (
-            "Microsoft Edge",
-            "Edge",
-        )
-
-        last_error: Optional[Exception] = None
-
-        for application_name in application_candidates:
-            try:
-
-
-                result = calibrate_method(application_name)
-
-                if isinstance(result, dict):
-                    result.setdefault(
-                        "application",
-                        "edge",
-                    )
-
-                    return result
-
-                return {
-                    "success": bool(result),
-                    "application": "edge",
-                    "result": result,
-                }
-
-            except Exception as e:
-                last_error = e
-
-                logger.debug("EdgeCalibrator._calibrate_edge_universal: %s", e)
-
-
-        if last_error is not None:
-
-            raise last_error
-
-
-        raise RuntimeError(
-            "No se pudo localizar Microsoft Edge mediante CalibrationManager."
-        )
+        # Una sola delegacion: el lanzador resuelve "edge" por alias en el
+        # catalogo/descubrimiento; ``success`` refleja el resultado real.
+        result = delegate_legacy_calibration("edge", manager=self.calibration_manager)
+        result["application"] = "edge"
+        return result
 
 
 # ============================================================================

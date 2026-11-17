@@ -222,7 +222,7 @@ class HTNBrainIntegration:
                     priority=1,
                 )
 
-            if any(word in input_lower for word in ("abrir", "open", "launch")):
+            if any(word in input_lower for word in ("abrir", "abre ", "open", "launch")):
                 if "chrome" in input_lower or "navegador" in input_lower:
                     return Goal(
                         id=f"open_chrome_{int(time.time())}",
@@ -239,6 +239,25 @@ class HTNBrainIntegration:
                         description="Abrir YouTube",
                         priority=1,
                     )
+                # Cualquier otra aplicacion: el nombre se resuelve despues por el
+                # flujo unico (catalogo -> resolucion local -> preflight); aqui no
+                # se decide si existe ni se lanza nada.
+                app_match = re.search(
+                    r"\b(?:abrir|abre|open|launch)\s+(?:la\s+|el\s+)?"
+                    r"(?:aplicaci(?:o|\u00f3)n\s+|app\s+|programa\s+)?(.+)",
+                    text,
+                    re.IGNORECASE,
+                )
+                if app_match:
+                    app_target = app_match.group(1).strip().rstrip(".,;:!?\"'")
+                    if app_target:
+                        return Goal(
+                            id=f"open_application_{int(time.time())}",
+                            type="open_application",
+                            target=app_target,
+                            description=f"Abrir aplicaci\u00f3n {app_target}",
+                            priority=1,
+                        )
 
             if any(word in input_lower for word in ("navegar", "navigate", "ir a")):
                 url_match = re.search(r"https?://[^\s]+", text)

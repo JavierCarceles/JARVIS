@@ -13,7 +13,6 @@ persistencia. Este modulo no abre, mueve ni cierra Chrome de forma especial.
 from __future__ import annotations
 
 import inspect
-import platform
 import re
 import sys
 import time
@@ -654,22 +653,21 @@ class EnhancedCalibrator:
             )
 
 
+        # Una sola delegacion en el pipeline unico: el perfil se guarda en
+        # geometria relativa al area cliente y se recalcula al mover la ventana
+        # a otro monitor con la misma escala, por lo que no se repite la
+        # calibracion por monitor.
         self.screen_manager.refresh_monitors()
-        monitors = list(getattr(self.screen_manager, "monitors", []) or [])
-        if not monitors:
-
-            return self._single_failure_report(app_name, "No se encontraron monitores")
-
+        monitor_count = len(getattr(self.screen_manager, "monitors", []) or [])
         results: List[Any] = []
-        for monitor in monitors:
-            try:
-                results.append(method(app_name, int(monitor.monitor_id)))
-            except Exception as exc:
-                logger.debug("EnhancedCalibrator._calibrate_single_application: %s", exc)
-
+        try:
+            results.append(method(app_name))
+        except Exception as exc:
+            logger.warning("EnhancedCalibrator._calibrate_single_application: %s", exc)
+            return self._single_failure_report(app_name, str(exc))
 
         return self._build_single_application_report(
-            app_name, results, len(monitors)
+            app_name, results, monitor_count
         )
 
     def _build_single_application_report(
@@ -695,6 +693,17 @@ class EnhancedCalibrator:
         calibrated = [app_name] if success_results else []
         failed = [] if calibrated else [app_name]
 
+        report: Dict[str, Any] = {
+            "success": bool(calibrated),
+            "application": app_name,
+            "applications_requested": 1,
+            "calibrated": calibrated,
+            "skipped": [],
+            "failed": failed,
+            "monitors_detected": int(monitor_count),
+            "total_elements": total_elements,
+            "results": [self._result_to_dict(result) for result in results],
+        }
         if errors:
             report["errors"] = list(dict.fromkeys(errors))
         return report
@@ -789,7 +798,7 @@ class EnhancedCalibrator:
                 return len(elements)
             results = calibration_data.get("results")
             if isinstance(results, list):
-                return sum(EnhancedCalibrator._extract_element_count(EnhancedCalibrator.__new__(EnhancedCalibrator), item) for item in results if isinstance(item, dict))
+                return sum(EnhancedCalibrator._extract_element_count(item) for item in results if isinstance(item, dict))
         return 0
 
     def calibrate_chrome_both_screens(self) -> Dict[str, Any]:
@@ -799,14 +808,18 @@ class EnhancedCalibrator:
         return self.calibrate_applications("chrome")
 
     def _verify_system(self) -> bool:
+        """El sistema es compatible si existe adaptador de escritorio para el SO
+        (Windows o macOS) y enumera al menos un monitor real."""
         try:
-            if platform.system().casefold() != "windows" or sys.version_info < (3, 8):
+            if sys.version_info < (3, 8):
                 return False
-            import ctypes  # noqa: F401
-            import pyautogui  # noqa: F401
-            import pygetwindow  # noqa: F401
-            self.screen_manager.refresh_monitors()
-            return len(getattr(self.screen_manager, "monitors", []) or []) > 0
+            from src.desktop.platform_contract import Capability, CapabilityStatus, get_desktop_platform
+
+            adapter = get_desktop_platform()
+            if adapter.capability_status(Capability.DISPLAY_ENUM) != CapabilityStatus.DISPONIBLE:
+                return False
+            displays = adapter.enumerate_displays()
+            return bool(displays.ok and displays.value)
         except Exception as exc:
             logger.debug("EnhancedCalibrator._verify_system: %s", exc)
 

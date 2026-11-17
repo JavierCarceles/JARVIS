@@ -24,7 +24,14 @@ from typing import Dict, Optional, Tuple
 from src.core.log import get_logger
 
 logger = get_logger(__name__)
-import pyautogui
+import sys as _sys
+
+from src.desktop.native_imports import lazy_module as _lazy_module, lazy_windll as _lazy_windll
+
+if _sys.platform == "win32":
+    import pyautogui
+else:
+    pyautogui = _lazy_module("pyautogui")  # import perezoso fuera de Windows
 from src.core.config import get_project_root
 from src.desktop.screen_manager import MonitorInfo, get_screen_manager
 

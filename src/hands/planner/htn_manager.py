@@ -34,6 +34,14 @@ except ImportError:  # pragma: no cover - depende de como se lance JARVIS.
 logger = get_logger(__name__)
 
 
+# Tarea HTN -> (accion registrada en ActionRegistry, parametro que recibe el
+# objetivo del Goal). Solo tareas con accion real; las demas (navegar, activar
+# ventana, resolver entidad...) se completan en FASES 4 y 14.
+HTN_TASK_ACTIONS = {
+    "open_application": ("open_application", "app_name"),
+}
+
+
 class HTNStatus(Enum):
     IDLE = "idle"
     DECOMPOSING = "decomposing"
@@ -646,6 +654,22 @@ class HTNManager:
         )
         metadata = self._as_dict(getattr(template, "metadata", {}))
         metadata.update({"task_type": pattern_id, "goal_id": safe_goal_id})
+        # Enlace con una accion REAL del ActionRegistry: TaskExecutor resuelve la
+        # accion por metadata["action"]. Solo se enlazan tareas con accion
+        # registrada; el resto queda marcado y falla de forma explicita.
+        if not metadata.get("action"):
+            mapping = HTN_TASK_ACTIONS.get(pattern_id)
+            target = getattr(goal, "target", None)
+            if mapping and isinstance(target, str) and target.strip():
+                action_name, parameter_name = mapping
+                metadata["action"] = action_name
+                parameters = self._as_dict(metadata.get("parameters", {}))
+                parameters.setdefault(parameter_name, target.strip())
+                metadata["parameters"] = parameters
+            elif mapping is None:
+                metadata["action_unmapped"] = (
+                    "sin accion registrada para la tarea HTN %s" % pattern_id
+                )
         # Task del modelo canonico no declara metadata/parameters, se anexan de
         # forma compatible para conservar datos auxiliares de las integraciones.
         try:

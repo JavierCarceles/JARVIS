@@ -30,7 +30,14 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-import pyautogui
+import sys as _sys
+
+from src.desktop.native_imports import lazy_module as _lazy_module, lazy_windll as _lazy_windll
+
+if _sys.platform == "win32":
+    import pyautogui
+else:
+    pyautogui = _lazy_module("pyautogui")  # import perezoso fuera de Windows
 from PIL import ImageGrab
 
 from src.memory.storage import MemoryType, get_memory_manager
@@ -423,7 +430,10 @@ class WorldState:
         )
 
 
-pyautogui.PAUSE = 0.05
+try:
+    pyautogui.PAUSE = 0.05
+except ImportError as _pyautogui_exc:  # NativeDependencyUnavailable fuera de Windows
+    logger.warning("pyautogui no disponible; no se configura su pausa: %s", _pyautogui_exc)
 
 
 # ============================================================================

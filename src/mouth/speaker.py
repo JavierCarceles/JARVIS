@@ -16,7 +16,14 @@ from typing import Dict, List, Optional
 import numpy as np
 import onnxruntime as rt
 import soundfile as sf
-import winsound
+import sys as _sys
+
+from src.desktop.native_imports import lazy_module as _lazy_module, lazy_windll as _lazy_windll
+
+if _sys.platform == "win32":
+    import winsound
+else:
+    winsound = _lazy_module("winsound", required_platform="win32")
 
 try:
     import pyttsx3

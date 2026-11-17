@@ -34,8 +34,16 @@ import webbrowser
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import pyautogui
-import pygetwindow as gw
+import sys as _sys
+
+from src.desktop.native_imports import lazy_module as _lazy_module, lazy_windll as _lazy_windll
+
+if _sys.platform == "win32":
+    import pyautogui
+    import pygetwindow as gw
+else:
+    pyautogui = _lazy_module("pyautogui")  # import perezoso fuera de Windows
+    gw = _lazy_module("pygetwindow")  # import nativo perezoso fuera de Windows
 
 from src.core.log import get_logger
 from src.desktop.screen_manager import get_screen_manager

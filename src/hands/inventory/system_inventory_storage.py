@@ -67,7 +67,7 @@ from src.hands.inventory.system_inventory import (
 )
 
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 # Detectar si el sistema de archivos es sensible a mayusculas y minusculas.
 # Windows y macOS (por defecto) son insensibles; Linux y la mayoria de Unix son sensibles.
@@ -256,12 +256,105 @@ def _migracion_v4_a_v5(conn: sqlite3.Connection) -> None:
             pass
 
 
+# Tablas de calibracion UI local (esquema v6). La geometria se guarda relativa
+# al area cliente de la ventana (CLIENT_NORMALIZED / WINDOW_CLIENT) y siempre
+# asociada al machine_id; las coordenadas absolutas solo existen como cache
+# invalidable (columna absolute_cache). Gestionadas por
+# src/hands/calibration/calibration_profile_storage.py.
+_CALIBRATION_TABLES_SQL = """
+CREATE TABLE IF NOT EXISTS calibration_profiles (
+    profile_id TEXT PRIMARY KEY,
+    machine_id TEXT NOT NULL,
+    app_id TEXT NOT NULL,
+    platform TEXT NOT NULL DEFAULT '',
+    topology_fingerprint TEXT NOT NULL DEFAULT '',
+    window_fingerprint TEXT NOT NULL DEFAULT '',
+    display_id TEXT NOT NULL DEFAULT '',
+    scale_factor REAL,
+    dpi INTEGER,
+    display_pixel_width INTEGER,
+    display_pixel_height INTEGER,
+    orientation TEXT,
+    window_state TEXT,
+    client_width INTEGER,
+    client_height INTEGER,
+    status TEXT NOT NULL,
+    is_active INTEGER NOT NULL DEFAULT 0,
+    absolute_cache TEXT NOT NULL DEFAULT '{}',
+    metadata TEXT NOT NULL DEFAULT '{}',
+    obsolete_reason TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (machine_id) REFERENCES machines(machine_id)
+);
+
+CREATE TABLE IF NOT EXISTS calibration_controls (
+    profile_id TEXT NOT NULL,
+    control_id TEXT NOT NULL,
+    machine_id TEXT NOT NULL,
+    app_id TEXT NOT NULL,
+    name TEXT NOT NULL DEFAULT '',
+    control_type TEXT NOT NULL DEFAULT 'element',
+    semantic_state TEXT NOT NULL,
+    geometric_state TEXT NOT NULL,
+    action_state TEXT NOT NULL,
+    client_box_normalized TEXT NOT NULL,
+    client_box_px TEXT,
+    safe_point_normalized TEXT,
+    interaction_method TEXT NOT NULL DEFAULT 'none',
+    provenance TEXT NOT NULL DEFAULT '[]',
+    detector_versions TEXT NOT NULL DEFAULT '{}',
+    original_box TEXT,
+    refined_box TEXT,
+    confidences TEXT NOT NULL DEFAULT '{}',
+    reasons TEXT NOT NULL DEFAULT '[]',
+    PRIMARY KEY (profile_id, control_id),
+    FOREIGN KEY (profile_id) REFERENCES calibration_profiles(profile_id) ON DELETE CASCADE,
+    FOREIGN KEY (machine_id) REFERENCES machines(machine_id)
+);
+"""
+
+_CALIBRATION_INDEXES_SQL = """
+CREATE INDEX IF NOT EXISTS idx_calibration_profiles_machine_app
+    ON calibration_profiles(machine_id, app_id);
+CREATE INDEX IF NOT EXISTS idx_calibration_profiles_machine_status
+    ON calibration_profiles(machine_id, status);
+-- Un unico perfil activo (ultimo VALIDADO) por equipo, aplicacion y huella
+-- de ventana/monitor/escala.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_calibration_profiles_unique_active
+    ON calibration_profiles(machine_id, app_id, window_fingerprint)
+    WHERE is_active = 1;
+CREATE INDEX IF NOT EXISTS idx_calibration_controls_machine_app_control
+    ON calibration_controls(machine_id, app_id, control_id);
+"""
+
+
+def _migracion_v5_a_v6(conn: sqlite3.Connection) -> None:
+    """Migracion v5 -> v6: crea las tablas de calibracion UI local.
+
+    `calibration_profiles` guarda un perfil por equipo (`machine_id`),
+    aplicacion estable y huella de ventana/monitor/escala; `calibration_controls`
+    guarda cada control calibrado con geometria relativa al area cliente,
+    estados semantico/geometrico/accion separados, procedencia y confianza por
+    dimension. Es una operacion aditiva: no modifica ni reinterpreta tablas ni
+    datos existentes del inventario.
+    """
+    for sentencia in (_CALIBRATION_TABLES_SQL + _CALIBRATION_INDEXES_SQL).split(";"):
+        sql = sentencia.strip()
+        # Las lineas de comentario se descartan; ejecutar solo sentencias reales.
+        lineas = [l for l in sql.splitlines() if not l.strip().startswith("--")]
+        sql = "\n".join(lineas).strip()
+        if sql:
+            conn.execute(sql)
+
+
 # (version_origen, version_destino, nombre, funcion_de_migracion)
 _MIGRACIONES: list[tuple[int, int, str, Callable[[sqlite3.Connection], None]]] = [
     (1, 2, "agregar normalized_path a file_entries", _migracion_v1_a_v2),
     (2, 3, "crear tabla lineas_base", _migracion_v2_a_v3),
     (3, 4, "clave unica de file_entries incluye scan_id", _migracion_v3_a_v4),
     (4, 5, "agregar version/producto/evidencia a application_candidates", _migracion_v4_a_v5),
+    (5, 6, "crear tablas de calibracion UI local", _migracion_v5_a_v6),
 ]
 
 
@@ -274,6 +367,8 @@ def _conteos_tablas(conn: sqlite3.Connection) -> dict[str, int | None]:
         "scan_runs",
         "file_entries",
         "application_candidates",
+        "calibration_profiles",
+        "calibration_controls",
     )
     conteos: dict[str, int | None] = {}
     for tabla in tablas:
@@ -283,6 +378,25 @@ def _conteos_tablas(conn: sqlite3.Connection) -> dict[str, int | None]:
         except sqlite3.OperationalError:
             conteos[tabla] = None
     return conteos
+
+
+def _conteos_equivalentes(
+    antes: dict[str, int | None], despues: dict[str, int | None]
+) -> bool:
+    """Compara conteos de filas antes y despues de migrar.
+
+    Una tabla que no existia antes (None) y que la migracion crea vacia (0)
+    no altera datos; cualquier otra diferencia indica perdida o alta
+    silenciosa de filas.
+    """
+    for tabla in set(antes) | set(despues):
+        a = antes.get(tabla)
+        d = despues.get(tabla)
+        if a is None and d in (None, 0):
+            continue
+        if a != d:
+            return False
+    return True
 
 
 def _aplicar_migraciones(
@@ -319,7 +433,7 @@ def _aplicar_migraciones(
         conn.execute("UPDATE schema_version SET version = ?", (version,))
         conn.commit()
     conteos_despues = _conteos_tablas(conn)
-    if conteos_antes != conteos_despues:
+    if not _conteos_equivalentes(conteos_antes, conteos_despues):
         raise RuntimeError(
             f"La migracion de esquema v{version_origen} a v{version_destino} "
             f"altero el volumen de datos: antes={conteos_antes}, despues={conteos_despues}"
@@ -415,7 +529,7 @@ CREATE TABLE IF NOT EXISTS lineas_base (
     created_at TEXT NOT NULL,
     FOREIGN KEY (machine_id) REFERENCES machines(machine_id)
 );
-"""
+""" + _CALIBRATION_TABLES_SQL
 
 _SCHEMA_INDEXES_SQL = """
 CREATE INDEX IF NOT EXISTS idx_file_entries_machine_volume
@@ -458,7 +572,7 @@ CREATE INDEX IF NOT EXISTS idx_scan_runs_started_at
 -- de cambios incrementales (3.8.5.1.4.5.1).
 CREATE UNIQUE INDEX IF NOT EXISTS idx_lineas_base_unique_maquina_volumen
     ON lineas_base(machine_id, volume);
-"""
+""" + _CALIBRATION_INDEXES_SQL
 
 
 class SystemInventoryStorage:

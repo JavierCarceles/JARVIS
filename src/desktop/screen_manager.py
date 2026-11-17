@@ -25,8 +25,16 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-import pyautogui
-import pygetwindow as gw
+import sys as _sys
+
+from src.desktop.native_imports import lazy_module as _lazy_module, lazy_windll as _lazy_windll
+
+if _sys.platform == "win32":
+    import pyautogui
+    import pygetwindow as gw
+else:
+    pyautogui = _lazy_module("pyautogui")  # import perezoso fuera de Windows
+    gw = _lazy_module("pygetwindow")  # import nativo perezoso fuera de Windows
 from PIL import ImageGrab
 
 from src.core.config import (
@@ -695,6 +703,26 @@ class ScreenManager:
             if monitor.contains_point(x, y):
                 return monitor
         return None
+
+    def get_platform_displays(self) -> List[Any]:
+        """Monitores reenumerados por el contrato de plataforma del SO actual.
+
+        Devuelve ``DisplayInfo`` (``src.desktop.platform_contract``) con
+        geometria completa (area util, escala, rotacion, identificador estable).
+        No modifica ``self.monitors`` ni la numeracion ``s1``/``s2`` existente.
+        Devuelve lista vacia si no hay adaptador o la enumeracion falla.
+        """
+        try:
+            from src.desktop.platform_contract import get_desktop_platform
+
+            result = get_desktop_platform().enumerate_displays()
+        except Exception as exc:
+            logger.warning("[SCREEN-MANAGER] Contrato de plataforma no disponible: %s", exc)
+            return []
+        if not result.ok:
+            logger.warning("[SCREEN-MANAGER] Enumeracion de monitores via contrato fallida: %s", result.error)
+            return []
+        return list(result.value or [])
 
     def _get_window_geometry(self, window: Any) -> Optional[Tuple[int, int, int, int]]:
         """Obtiene la geometria real de una ventana Win32.

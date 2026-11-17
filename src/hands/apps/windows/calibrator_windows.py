@@ -48,9 +48,9 @@ class WindowsCalibrator:
     """
 
     def __init__(self) -> None:
-        from src.hands.calibration.calibration_manager import CalibrationManager
+        from src.hands.calibration.calibration_manager import get_calibration_manager
 
-        self.calibration_manager = CalibrationManager()
+        self.calibration_manager = get_calibration_manager()
 
         logger.info(
             "[CALIBRATOR-WINDOWS] "
@@ -182,32 +182,14 @@ Responde \u00fanicamente con JSON v\u00e1lido.
         No realiza deteccion, captura ni calculo de coordenadas.
         """
 
-        calibrate_method = getattr(
-            self.calibration_manager,
-            "calibrate_application",
-            None,
-        )
-
-        if not callable(calibrate_method):
-            raise AttributeError(
-                "CalibrationManager no dispone de calibrate_application()."
-            )
+        from src.hands.calibration.calibration_pipeline import delegate_legacy_calibration
 
         logger.info(
-            "[CALIBRATOR-WINDOWS] Delegando '%s' al calibrador universal",
+            "[CALIBRATOR-WINDOWS] Delegando '%s' al pipeline unico de calibracion",
             app_name,
         )
-
-        result = calibrate_method(app_name)
-
-        if isinstance(result, dict):
-            return result
-
-        return {
-            "success": bool(result),
-            "application": app_name,
-            "result": result,
-        }
+        # Una sola delegacion; ``success`` refleja el resultado real.
+        return delegate_legacy_calibration(app_name, manager=self.calibration_manager)
 
 
 # ============================================================================

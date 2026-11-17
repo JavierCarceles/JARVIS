@@ -1260,6 +1260,40 @@ class ApplicationManager:
             for element in app.ui_elements
         }
 
+    def get_calibration_status(
+        self, app_name: str, window_id: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """Estado de calibracion que el catalogo puede exponer: solo ``calibration_required``.
+
+        Consulta los perfiles locales (SQLite por ``machine_id``) a traves de
+        ``CoordinateManager.calibration_required`` con la misma clave de
+        almacenamiento que usa el pipeline de calibracion
+        (``CalibrationManager._get_storage_application_key``). Nunca devuelve
+        coordenadas, monitores, escala ni identificadores de ventana. Ante
+        cualquier error se informa ``calibration_required=True``: no se asume
+        calibrado sin evidencia.
+        """
+        app = self.get_application(app_name)
+        name = app.name if app is not None else str(app_name or "").strip()
+        status: Dict[str, Any] = {
+            "application": name,
+            "registered": app is not None,
+            "calibration_required": True,
+        }
+        if not name:
+            return status
+        try:
+            from src.hands.calibration.calibration_manager import CalibrationManager
+            from src.hands.calibration.coordinate_manager import get_coordinate_manager
+
+            app_key = CalibrationManager._get_storage_application_key(name) or name
+            status["calibration_required"] = bool(
+                get_coordinate_manager().calibration_required(app_key, window_id)
+            )
+        except Exception as exc:
+            logger.warning("No se pudo consultar calibration_required de %s: %s", name, exc)
+        return status
+
     def is_application_available(self, app_name: str) -> bool:
         """Comprueba disponibilidad en tiempo de ejecucion de una aplicacion.
 
@@ -1359,25 +1393,6 @@ def get_application_manager() -> ApplicationManager:
 # CAPACIDADES REUTILIZABLES
 # ============================================================================
 
-@register_action(
-    name="open_application",
-    description="Abre una aplicaci\u00f3n gen\u00e9rica",
-    action_type=ActionType.APPLICATION,
-    category="aplicacion",
-    tags=["aplicacion", "open", "reusable"],
-    parameters={
-        "app_name": {
-            "type": "str",
-            "required": True,
-            "description": "Nombre de la aplicaci\u00f3n a abrir",
-        }
-    },
-    preconditions=["application_exists"],
-    effects=["application_open"],
-    cost=10.0,
-    capability="open_application",
-    planner_enabled=True,
-)
 def _app_knowledge_to_preflight_dict(app: ApplicationKnowledge) -> Dict[str, Any]:
     """Convierte un ApplicationKnowledge a un dict compatible con ApplicationPreflight.check().
 
@@ -1397,66 +1412,93 @@ def _app_knowledge_to_preflight_dict(app: ApplicationKnowledge) -> Dict[str, Any
     }
 
 
-def open_application(app_name: str) -> str:
-    """Abre una aplicacion conocida y valida su disponibilidad.
+def _spawn_application_process(argv: List[str]) -> Any:
+    """Crea el proceso de una aplicacion con argv estructurado (nunca por shell).
 
-    Antes de lanzar, pasa al candidato por ApplicationPreflight y las
-    politicas existentes (unidad 3.8.5.1.4.7.10). Se rechazan ejecutables
-    desconocidos, destinos ambiguos y rutas manipuladas. Cuando la aplicacion
-    ya esta abierta, se reutiliza la instancia existente si el contrato
-    (precondiciones de la capacidad OPEN) no exige que este cerrada.
+    Punto unico de creacion de procesos de ``open_application``; se pasa como
+    ``process_spawner`` al servicio de lanzamiento.
     """
+    return subprocess.Popen(list(argv))
+
+
+def _open_application_url(url: str) -> bool:
+    """Abre una URL de aplicacion web con el navegador predeterminado."""
+    return bool(webbrowser.open(url))
+
+
+def _launch_service_for_open() -> Any:
+    """Servicio unico de apertura con las dependencias de este modulo."""
+    from src.hands.apps.platform_launch import ApplicationLaunchService
+
     app_manager = get_application_manager()
-    app = app_manager.get_application(app_name)
+    return ApplicationLaunchService(
+        app_manager=app_manager,
+        preflight=get_application_preflight(),
+        process_spawner=_spawn_application_process,
+        url_opener=_open_application_url,
+        availability_checker=_check_application_available,
+        is_open_checker=lambda name, _app: app_manager.is_application_open(name),
+    )
 
-    if not app:
-        raise ValueError(f"Aplicacion no encontrada: {app_name}")
 
-    # 3.8.5.1.4.7.10: todo candidato que se pretenda abrir debe pasar por
-    # ApplicationPreflight y las politicas existentes antes de lanzarse.
-    # Se rechazan ejecutables desconocidos, destinos ambiguos y rutas manipuladas.
-    preflight = get_application_preflight()
-    preflight_result = preflight.check(_app_knowledge_to_preflight_dict(app))
-    if not preflight_result.get("allowed", False):
-        raise RuntimeError(
-            f"La aplicacion {app.name} no paso el preflight: "
-            f"{preflight_result.get('reason', 'sin motivo')} "
-            f"(bloqueado por: {preflight_result.get('blocked_by', 'desconocido')})"
-        )
+@register_action(
+    name="open_application",
+    description="Abre una aplicaci\u00f3n gen\u00e9rica",
+    action_type=ActionType.APPLICATION,
+    category="aplicacion",
+    tags=["aplicacion", "open", "reusable"],
+    parameters={
+        "app_name": {
+            "type": "str",
+            "required": True,
+            "description": "Nombre de la aplicaci\u00f3n a abrir",
+        }
+    },
+    preconditions=["application_exists"],
+    effects=["application_open"],
+    cost=10.0,
+    capability="open_application",
+    planner_enabled=True,
+)
+def open_application(app_name: str) -> str:
+    """Abre una aplicacion por el flujo unico de lanzamiento y valida el resultado.
 
-    if "application_available" in app.preflight_requirements and not _check_application_available(app):
-        raise RuntimeError(f"La aplicacion {app.name} no esta disponible")
+    Delega en ``ApplicationLaunchService.open`` (``platform_launch``):
+    catalogo global -> (si no esta o no tiene destino) resolucion local por
+    ``machine_id`` y fuentes de descubrimiento con auto-registro ->
+    ``ApplicationPreflight`` obligatorio -> reutilizacion si ya esta abierta
+    (salvo que el contrato de la capacidad OPEN exija cerrarla) -> lanzamiento
+    con argv estructurado -> verificacion de proceso/ventana. Una apertura con
+    exito no se repite mientras el proceso siga vivo.
 
-    # 3.8.5.3: si la aplicacion ya esta abierta, reutilizar la instancia
-    # existente cuando el contrato (precondiciones de la capacidad OPEN)
-    # no exige que este cerrada.
-    if app_manager.is_application_open(app_name):
-        open_cap = app.get_capability(ApplicationCapability.OPEN.value)
-        requiere_cerrado = (
-            open_cap is not None
-            and any("closed" in str(p).lower() for p in (open_cap.preconditions or []))
-        )
-        if requiere_cerrado:
-            raise RuntimeError(
-                f"La aplicacion {app.name} ya esta abierta pero su contrato "
-                f"requiere cerrarla primero (precondiciones: "
-                f"{open_cap.preconditions})"
-            )
-        return f"Aplicacion {app.name} ya esta abierta; se reutilizo la instancia existente"
+    Errores: ``ValueError`` si la aplicacion no existe en el catalogo ni en
+    este equipo (codigo ``not_found``); ``RuntimeError`` con el mensaje estructurado (preflight,
+    disponibilidad, ambiguedad, lanzamiento o verificacion) en otro caso. El
+    error estructurado completo queda en el atributo ``operation_error`` de la
+    excepcion.
+    """
+    from src.core.operation_errors import ErrorCode
 
-    try:
-        if app.executable:
-            subprocess.Popen([app.executable])
-        elif app.url:
-            if not webbrowser.open(app.url):
-                raise RuntimeError(f"No se pudo abrir la URL de {app.name}")
-        else:
-            raise RuntimeError(f"La aplicacion {app.name} no tiene ejecutable ni URL configurados")
+    service = _launch_service_for_open()
+    outcome = service.open(app_name)
+    display = outcome.app_name or str(app_name)
+    if outcome.success:
+        if outcome.reused_existing:
+            return f"Aplicacion {display} ya esta abierta; se reutilizo la instancia existente"
+        if outcome.window_verified:
+            return f"Aplicaci\u00f3n {display} abierta exitosamente (ventana verificada)"
+        return f"Aplicaci\u00f3n {display} abierta exitosamente"
 
-        return f"Aplicaci\u00f3n {app.name} abierta exitosamente"
-    except Exception as exc:
-        logger.info(f"Error abriendo aplicacion: {exc}")
-        raise
+    error = outcome.error
+    if error is not None and error.code == ErrorCode.NOT_FOUND:
+        exc: Exception = ValueError(f"Aplicacion no encontrada: {app_name}")
+    else:
+        message = error.user_message() if error is not None else f"No se pudo abrir {display}"
+        exc = RuntimeError(message)
+    setattr(exc, "operation_error", error)
+    setattr(exc, "launch_outcome", outcome)
+    logger.info("open_application(%s) fallo: %s", display, error)
+    raise exc
 
 
 def _is_process_running(process_name: str) -> bool:

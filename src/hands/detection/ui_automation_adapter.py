@@ -19,8 +19,16 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from pywinauto import application
-from pywinauto.uia_element_info import UIAElementInfo
+import sys as _sys
+
+from src.desktop.native_imports import lazy_module as _lazy_module, lazy_windll as _lazy_windll
+
+if _sys.platform == "win32":
+    from pywinauto import application
+    from pywinauto.uia_element_info import UIAElementInfo
+else:
+    application = _lazy_module("pywinauto.application", required_platform="win32")
+    UIAElementInfo = Any  # solo se usa en anotaciones fuera de Windows
 
 from src.core.log import get_logger
 from src.desktop.screen_manager import ScreenManager

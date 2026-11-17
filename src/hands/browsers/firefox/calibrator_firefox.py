@@ -32,7 +32,7 @@ NO:
 from src.core.log import get_logger
 from typing import Any, Dict
 
-from src.hands.calibration.calibration_manager import CalibrationManager
+from src.hands.calibration.calibration_manager import get_calibration_manager
 
 
 logger = get_logger(__name__)
@@ -51,7 +51,7 @@ class FirefoxCalibrator:
     """
 
     def __init__(self) -> None:
-        self.calibration_manager = CalibrationManager()
+        self.calibration_manager = get_calibration_manager()
 
 
 
@@ -127,59 +127,13 @@ class FirefoxCalibrator:
         No realiza ninguna operacion de pantalla directamente.
         """
 
-        manager = self.calibration_manager
+        from src.hands.calibration.calibration_pipeline import delegate_legacy_calibration
 
-        # El metodo universal previsto por CalibrationManager es
-        # calibrate_application().
-        calibrate_method = getattr(
-            manager,
-            "calibrate_application",
-            None,
-        )
-
-        if not callable(calibrate_method):
-            raise AttributeError(
-                "CalibrationManager no dispone de calibrate_application()"
-            )
-
-        # Firefox puede aparecer en Get-StartApps como Mozilla Firefox.
-        application_candidates = (
-            "Mozilla Firefox",
-            "Firefox",
-        )
-
-        last_error = None
-
-        for application_name in application_candidates:
-            try:
-
-
-                result = calibrate_method(application_name)
-
-                if isinstance(result, dict):
-                    result.setdefault(
-                        "application",
-                        "firefox",
-                    )
-
-                    return result
-
-                return {
-                    "success": bool(result),
-                    "application": "firefox",
-                    "result": result,
-                }
-
-            except Exception as e:
-                last_error = e
-
-                logger.debug("FirefoxCalibrator._calibrate_firefox_universal: %s", e)
-
-
-        if last_error is not None:
-            raise last_error
-
-        raise RuntimeError("No se pudo localizar Firefox mediante CalibrationManager.")
+        # Una sola delegacion: el lanzador resuelve "firefox" por alias en el
+        # catalogo/descubrimiento; ``success`` refleja el resultado real.
+        result = delegate_legacy_calibration("firefox", manager=self.calibration_manager)
+        result["application"] = "firefox"
+        return result
 
 
 # ============================================================================

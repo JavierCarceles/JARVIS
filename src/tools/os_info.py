@@ -26,7 +26,14 @@ from dataclasses import dataclass
 from enum import Enum
 
 import psutil
-import pygetwindow as gw
+import sys as _sys
+
+from src.desktop.native_imports import lazy_module as _lazy_module, lazy_windll as _lazy_windll
+
+if _sys.platform == "win32":
+    import pygetwindow as gw
+else:
+    gw = _lazy_module("pygetwindow")  # import nativo perezoso fuera de Windows
 
 from src.core.log import get_logger
 

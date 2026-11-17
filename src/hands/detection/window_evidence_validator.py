@@ -26,7 +26,14 @@ from src.desktop.screen_manager import MonitorInfo, ScreenManager
 
 logger = get_logger(__name__)
 
-user32 = ctypes.windll.user32
+import sys as _sys
+
+from src.desktop.native_imports import lazy_module as _lazy_module, lazy_windll as _lazy_windll
+
+if _sys.platform == "win32":
+    user32 = ctypes.windll.user32
+else:
+    user32 = _lazy_windll("user32")  # falla con error explicito si se usa fuera de Windows
 
 Rect = Tuple[int, int, int, int]
 
@@ -42,9 +49,30 @@ RECOGNIZED_COORDINATE_SPACES = frozenset({
 })
 
 # Umbral de solapamiento (IoU) por encima del cual dos candidatos de identidad
-# distinta se consideran solapados de forma ambigua. Umbral de partida;
-# la unidad de umbrales (3.8.6.4.3) lo ajusta a partir de resultados medidos.
+# distinta se consideran solapados de forma ambigua. Valor por defecto; si
+# existe un fichero de umbrales medidos (config/detection_thresholds.json,
+# gestionado por calibration_quality_gate.DetectionThresholds), se usa el
+# valor configurado. Sin fichero se usa siempre esta constante.
 IOU_SOLAPAMIENTO_AMBIGUO = 0.30
+
+
+def umbral_solapamiento_ambiguo(control_type: Optional[str] = None) -> float:
+    """Umbral IoU de solapamiento ambiguo vigente.
+
+    Devuelve el valor de los umbrales configurables cuando proceden de un
+    fichero de umbrales (medidos en la fixture); en otro caso, la constante
+    ``IOU_SOLAPAMIENTO_AMBIGUO`` del modulo (que sigue siendo el valor por
+    defecto y la referencia del contrato).
+    """
+    try:
+        from src.hands.detection.calibration_quality_gate import get_active_thresholds
+
+        thresholds = get_active_thresholds()
+        if getattr(thresholds, "source", "defaults") != "defaults":
+            return float(thresholds.ambiguous_iou(control_type))
+    except Exception as exc:
+        logger.debug("Umbrales configurables no disponibles; se usa el valor por defecto: %s", exc)
+    return IOU_SOLAPAMIENTO_AMBIGUO
 
 
 def _iou_rect(a: Optional[Rect], b: Optional[Rect]) -> float:
@@ -616,6 +644,7 @@ class WindowEvidenceValidator:
         image_rect: Optional[Rect] = None,
         window_rect: Optional[Rect] = None,
         otros_candidatos: Optional[List[Any]] = None,
+        umbral_solapamiento: Optional[float] = None,
     ) -> WindowEvidenceValidation:
         """Valida la calidad geometrica de un candidato de deteccion.
 
@@ -633,6 +662,8 @@ class WindowEvidenceValidator:
                 el rectangulo de la ventana objetivo del validador.
             otros_candidatos: lista de los demas candidatos para detectar
                 solapamiento ambiguo.
+            umbral_solapamiento: IoU de ambiguedad a aplicar. Si no se da, se
+                usa ``umbral_solapamiento_ambiguo(tipo del candidato)``.
 
         Retorna:
             WindowEvidenceValidation con valid=True solo si la caja supera todas
@@ -709,6 +740,11 @@ class WindowEvidenceValidator:
 
         # 6. No solapamiento ambiguo con otro candidato de identidad distinta.
         checks["no_solapamiento_ambiguo"] = True
+        if umbral_solapamiento is None:
+            umbral_solapamiento = umbral_solapamiento_ambiguo(
+                self._candidate_field(cand, "type")
+            )
+        details["umbral_solapamiento"] = float(umbral_solapamiento)
         if br is not None:
             for otro in list(otros_candidatos or []):
                 if otro is cand:
@@ -717,7 +753,7 @@ class WindowEvidenceValidator:
                 if otro_br is None:
                     continue
                 iou = _iou_rect(br, otro_br)
-                if iou > IOU_SOLAPAMIENTO_AMBIGUO and not self._misma_identidad_candidato(
+                if iou > umbral_solapamiento and not self._misma_identidad_candidato(
                     cand, otro
                 ):
                     checks["no_solapamiento_ambiguo"] = False
@@ -839,6 +875,8 @@ __all__ = [
     "WindowEvidenceValidator",
     "WindowEvidenceValidation",
     "validate_evidence_for_window",
+    "umbral_solapamiento_ambiguo",
+    "IOU_SOLAPAMIENTO_AMBIGUO",
     "_as_rect",
     "_contains_rect",
 ]

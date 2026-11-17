@@ -43,7 +43,14 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Optional, Callable
 
-import pyautogui
+import sys as _sys
+
+from src.desktop.native_imports import lazy_module as _lazy_module, lazy_windll as _lazy_windll
+
+if _sys.platform == "win32":
+    import pyautogui
+else:
+    pyautogui = _lazy_module("pyautogui")  # import perezoso fuera de Windows
 
 from src.core.config import get_keyboard_config
 from src.core.log import get_logger
@@ -58,8 +65,11 @@ logger = get_logger(__name__)
 
 # Configuracion global de PyAutoGUI segun config.json.
 keyboard_config = get_keyboard_config()
-pyautogui.FAILSAFE = keyboard_config.fail_safe_enabled
-pyautogui.PAUSE = keyboard_config.pause_between_actions
+try:
+    pyautogui.FAILSAFE = keyboard_config.fail_safe_enabled
+    pyautogui.PAUSE = keyboard_config.pause_between_actions
+except ImportError as _pyautogui_exc:  # NativeDependencyUnavailable fuera de Windows
+    logger.warning("pyautogui no disponible; el teclado no podra enviar entradas: %s", _pyautogui_exc)
 
 
 # ============================================================================

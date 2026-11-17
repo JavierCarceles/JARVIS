@@ -419,7 +419,14 @@ class Brain:
             if goal_type == "navigate" and target:
                 return {"type": "legacy_action", "action": "navigate_to_url", "parameters": {"url": target}, "reasoning": f"Navegando a: {target}"}
             if goal_type == "open_application":
-                return {"type": "legacy_action", "action": f"open_{target.lower().replace(' ', '_')}", "parameters": {}, "reasoning": f"Abriendo aplicaci\u00f3n: {target}"}
+                # Si existe una accion registrada especifica (p. ej. open_chrome ->
+                # abrir_chrome) se conserva; en otro caso, la accion generica
+                # registrada open_application, que usa el flujo unico de apertura.
+                specific = f"open_{str(target).lower().replace(' ', '_')}"
+                normalized = self._normalize_action_name(specific)
+                if normalized and self.action_registry.get_action(normalized) is not None:
+                    return {"type": "legacy_action", "action": specific, "parameters": {}, "reasoning": f"Abriendo aplicaci\u00f3n: {target}"}
+                return {"type": "legacy_action", "action": "open_application", "parameters": {"app_name": str(target)}, "reasoning": f"Abriendo aplicaci\u00f3n: {target}"}
             return {"type": "error", "message": f"Objetivo '{goal_type}' a\u00fan no implementado en el sistema legacy", "goal_data": goal_dict}
         except Exception as exc:
             logger.debug("Brain.execute_goal: %s", exc)
@@ -436,9 +443,15 @@ class Brain:
                 results = []
                 htn_results = []
                 for goal in goals:
+                    legacy = self.execute_goal(goal)
                     if self.htn_integration:
                         htn_results.append(self.htn_integration.process_goal_through_htn(goal, {}))
-                    results.append(self.execute_goal(goal))
+                        # El objetivo ya paso por HTN -> TaskExecutor -> accion
+                        # registrada: el descriptor legado es solo informativo y
+                        # no debe ejecutarse otra vez (sin doble ejecucion).
+                        if isinstance(legacy, dict):
+                            legacy = dict(legacy, execution_route="htn", executable=False)
+                    results.append(legacy)
                 result_data = {
                     "type": "htn_execution_results" if self.htn_integration and htn_results else "execution_results",
                     "legacy_results": results,
@@ -867,6 +880,11 @@ class Brain:
                 intent=goal.type,
                 entities=[goal.target] if goal.target else [],
             )
+            open_command = self._open_application_command(goal)
+            if open_command:
+                # Abrir una aplicacion usa la misma accion registrada que el
+                # ejecutor de main.py (sin ruta paralela).
+                return open_command
             return f"Objetivo registrado: {goal.description}. El sistema lo procesar\u00e1 pr\u00f3ximamente."
 
         if interpretation["type"] == "action":
@@ -891,6 +909,26 @@ class Brain:
             return f"[CMD: {action_name}]"
 
         return "No entend\u00ed tu solicitud. \u00bfPodr\u00edas repetirla de otra manera?"
+
+    _SAFE_CMD_ARGUMENT = re.compile(r"^[A-Za-z0-9 ._+\-\u00c0-\u024f]{1,80}$")
+
+    def _open_application_command(self, goal: Any) -> Optional[str]:
+        """``[CMD: open_application(<nombre>)]`` para objetivos de apertura.
+
+        Solo si el objetivo es ``open_application`` y el nombre es un argumento
+        simple que el parser ``[CMD:...]`` del ejecutor no puede malinterpretar.
+        La resolucion, el preflight y el lanzamiento los hace la accion
+        registrada ``open_application``.
+        """
+        if str(getattr(goal, "type", "") or "") != "open_application":
+            return None
+        target = getattr(goal, "target", None)
+        if not isinstance(target, str):
+            return None
+        name = target.strip()
+        if not name or not self._SAFE_CMD_ARGUMENT.match(name):
+            return None
+        return f"[CMD: open_application({name})]"
 
     def _execute_legacy_action(self, action_name: str, parameters: Dict[str, Any]) -> str:
         try:

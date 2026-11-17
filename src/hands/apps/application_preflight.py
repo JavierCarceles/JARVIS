@@ -25,7 +25,9 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
+import sys
 import unicodedata
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
@@ -158,6 +160,186 @@ class ApplicationPreflight:
         posiblemente incorrecta (unidad 3.8.3.5).
         """
 
+        blocked = self._policy_gate(application, ambiguous)
+        if blocked is not None:
+            return blocked
+
+        name = str(application.get("name", "")).strip()
+        app_id = str(application.get("app_id", "")).strip()
+        login_required = self._optional_bool(application.get("login_required"))
+        logged_in = self._optional_bool(application.get("logged_in"))
+        resources_available = self._resolve_resources_status(application)
+
+        if sys.platform == "darwin":
+            # En macOS no hay PowerShell, shell:AppsFolder ni .exe: el destino es
+            # un bundle .app resuelto por el adaptador de lanzamiento macOS.
+            return self._check_macos_application(
+                application, login_required, logged_in, resources_available
+            )
+
+        executable_path = self.resolve_executable(
+            name=name,
+            app_id=app_id,
+        )
+
+        if not executable_path:
+            # 3.8.3.5: rechazar rutas inexistentes y destinos no verificables.
+            # Una aplicacion solo puede abrirse si se resuelve un ejecutable
+            # existente O si tiene un URI de aplicacion valido como destino.
+            url = str(application.get("url", "")).strip()
+            if url:
+                url_validation = self.validate_launch_destination(url)
+                if url_validation["valid"]:
+                    return self._result(
+                        allowed=True,
+                        reason=(
+                            "No se pudo resolver el ejecutable; se permite URI de "
+                            "aplicacion como destino de lanzamiento"
+                        ),
+                        executable_path=None,
+                        requires_elevation=False,
+                        confidence="medium",
+                        availability="available",
+                        login_required=login_required,
+                        logged_in=logged_in,
+                        resources_available=resources_available,
+                    )
+            # 3.8.5.1.2: admitir lanzamiento por paquete cuando el app_id
+            # procede del descubrimiento y se verifica contra shell:AppsFolder.
+            if app_id and self.verify_app_id_in_apps_folder(app_id):
+                return self._result(
+                    allowed=True,
+                    reason=(
+                        "No se pudo resolver el ejecutable; se admite "
+                        "lanzamiento por paquete (AppX/UWP) verificado en "
+                        "shell:AppsFolder"
+                    ),
+                    executable_path=None,
+                    requires_elevation=False,
+                    confidence="high",
+                    availability="available",
+                    login_required=login_required,
+                    logged_in=logged_in,
+                    resources_available=resources_available,
+                    blocked_by=None,
+                )
+
+            return self._result(
+                allowed=False,
+                reason=(
+                    "No se pudo resolver el ejecutable y no hay destino de "
+                    "lanzamiento verificable"
+                ),
+                executable_path=None,
+                requires_elevation=False,
+                confidence="high",
+                availability="unknown",
+                login_required=login_required,
+                logged_in=logged_in,
+                resources_available=resources_available,
+                blocked_by="executable_not_resolved",
+            )
+
+        return self._executable_decision(
+            executable_path, login_required, logged_in, resources_available
+        )
+
+    def _executable_decision(
+        self,
+        executable_path: str,
+        login_required: Optional[bool],
+        logged_in: Optional[bool],
+        resources_available: Optional[bool],
+    ) -> Dict[str, Any]:
+        """Valida un ejecutable resuelto: destino admitido y manifest sin elevacion/uiAccess."""
+        # 3.8.3.5: validar que el destino resuelto sea verificable y admisible.
+        launch_validation = self.validate_launch_destination(executable_path)
+        if not launch_validation["valid"]:
+            return self._result(
+                allowed=False,
+                reason=f"Destino de lanzamiento no verificable: {launch_validation['reason']}",
+                executable_path=executable_path,
+                requires_elevation=False,
+                confidence="high",
+                availability="unknown",
+                login_required=login_required,
+                logged_in=logged_in,
+                resources_available=resources_available,
+                blocked_by="launch_destination_invalid",
+            )
+
+        manifest_info = self.inspect_executable_manifest(executable_path)
+
+        if not manifest_info.get("found"):
+            return self._result(
+                allowed=True,
+                reason="Manifest no disponible o sin nivel de elevaci\u00f3n detectable",
+                executable_path=executable_path,
+                requires_elevation=False,
+                confidence="medium",
+                availability="available",
+                login_required=login_required,
+                logged_in=logged_in,
+                resources_available=resources_available,
+            )
+
+        requested_level = str(
+            manifest_info.get("requested_execution_level", "") or ""
+        ).casefold()
+        ui_access = bool(manifest_info.get("ui_access", False))
+
+        if requested_level in self.RISKY_EXECUTION_LEVELS:
+            return self._result(
+                allowed=False,
+                reason=f"Manifest solicita requestedExecutionLevel={requested_level}",
+                executable_path=executable_path,
+                requires_elevation=True,
+                confidence="high",
+                availability="available",
+                login_required=login_required,
+                logged_in=logged_in,
+                resources_available=resources_available,
+                blocked_by="elevation_manifest",
+            )
+
+        if ui_access:
+            return self._result(
+                allowed=False,
+                reason="Manifest solicita uiAccess=true",
+                executable_path=executable_path,
+                requires_elevation=True,
+                confidence="high",
+                availability="available",
+                login_required=login_required,
+                logged_in=logged_in,
+                resources_available=resources_available,
+                blocked_by="ui_access",
+            )
+
+        return self._result(
+            allowed=True,
+            reason="No se detectaron requisitos de elevaci\u00f3n ni bloqueos de preflight",
+            executable_path=executable_path,
+            requires_elevation=False,
+            confidence="high",
+            availability="available",
+            login_required=login_required,
+            logged_in=logged_in,
+            resources_available=resources_available,
+        )
+
+    def _policy_gate(
+        self,
+        application: Any,
+        ambiguous: bool = False,
+    ) -> Optional[Dict[str, Any]]:
+        """Politica comun previa a resolver el destino.
+
+        Datos validos, nombre no vacio, resolucion no ambigua, nombre/AppID no
+        bloqueados, login y recursos. Devuelve el resultado de bloqueo o
+        ``None`` si la politica permite continuar. Lo usan ``check`` y
+        ``check_launch_target`` para no duplicar la politica.
+        """
         if not isinstance(application, dict):
             return self._result(
                 allowed=False,
@@ -262,143 +444,266 @@ class ApplicationPreflight:
                 blocked_by="resources_unavailable",
             )
 
-        executable_path = self.resolve_executable(
-            name=name,
-            app_id=app_id,
-        )
+        return None
 
-        if not executable_path:
-            # 3.8.3.5: rechazar rutas inexistentes y destinos no verificables.
-            # Una aplicacion solo puede abrirse si se resuelve un ejecutable
-            # existente O si tiene un URI de aplicacion valido como destino.
-            url = str(application.get("url", "")).strip()
-            if url:
-                url_validation = self.validate_launch_destination(url)
-                if url_validation["valid"]:
-                    return self._result(
-                        allowed=True,
-                        reason=(
-                            "No se pudo resolver el ejecutable; se permite URI de "
-                            "aplicacion como destino de lanzamiento"
-                        ),
-                        executable_path=None,
-                        requires_elevation=False,
-                        confidence="medium",
-                        availability="available",
-                        login_required=login_required,
-                        logged_in=logged_in,
-                        resources_available=resources_available,
-                    )
-            # 3.8.5.1.2: admitir lanzamiento por paquete cuando el app_id
-            # procede del descubrimiento y se verifica contra shell:AppsFolder.
-            if app_id and self.verify_app_id_in_apps_folder(app_id):
-                return self._result(
-                    allowed=True,
-                    reason=(
-                        "No se pudo resolver el ejecutable; se admite "
-                        "lanzamiento por paquete (AppX/UWP) verificado en "
-                        "shell:AppsFolder"
-                    ),
-                    executable_path=None,
-                    requires_elevation=False,
-                    confidence="high",
-                    availability="available",
-                    login_required=login_required,
-                    logged_in=logged_in,
-                    resources_available=resources_available,
-                    blocked_by=None,
-                )
+    def check_launch_target(
+        self,
+        application: Dict[str, Any],
+        destination: str,
+        target_type: Optional[str] = None,
+        ambiguous: bool = False,
+    ) -> Dict[str, Any]:
+        """Preflight de un destino YA resuelto en este equipo (no lo lanza).
 
-            return self._result(
-                allowed=False,
-                reason=(
-                    "No se pudo resolver el ejecutable y no hay destino de "
-                    "lanzamiento verificable"
-                ),
-                executable_path=None,
-                requires_elevation=False,
-                confidence="high",
-                availability="unknown",
-                login_required=login_required,
-                logged_in=logged_in,
-                resources_available=resources_available,
-                blocked_by="executable_not_resolved",
-            )
+        Aplica la misma politica que ``check`` (datos, ambiguedad, nombres y
+        AppID bloqueados, login, recursos) y despues valida el destino concreto
+        segun su tipo, sin volver a resolverlo por nombre:
 
-        # 3.8.3.5: validar que el destino resuelto sea verificable y admisible.
-        launch_validation = self.validate_launch_destination(executable_path)
-        if not launch_validation["valid"]:
-            return self._result(
-                allowed=False,
-                reason=f"Destino de lanzamiento no verificable: {launch_validation['reason']}",
-                executable_path=executable_path,
-                requires_elevation=False,
-                confidence="high",
-                availability="unknown",
-                login_required=login_required,
-                logged_in=logged_in,
-                resources_available=resources_available,
-                blocked_by="launch_destination_invalid",
-            )
+        * ``exe``: destino admitido + manifest sin elevacion ni uiAccess.
+        * ``command``: nombre de comando resuelto por PATH (``shutil.which``) y
+          tratado como ``exe``.
+        * ``lnk``: acceso directo existente; si su destino se resuelve a un
+          ejecutable, tambien se inspecciona su manifest.
+        * ``aumid``: paquete verificado en ``shell:AppsFolder``.
+        * ``uri``/``url``: esquema admitido (``url`` solo http/https).
+        * ``bundle`` (macOS): bundle existente, identidad coherente y
+          Gatekeeper/cuarentena como motivo de bloqueo (nunca se elude).
 
-        manifest_info = self.inspect_executable_manifest(executable_path)
+        Devuelve el mismo diccionario que ``check``.
+        """
+        blocked = self._policy_gate(application, ambiguous)
+        if blocked is not None:
+            return blocked
 
-        if not manifest_info.get("found"):
-            return self._result(
-                allowed=True,
-                reason="Manifest no disponible o sin nivel de elevaci\u00f3n detectable",
-                executable_path=executable_path,
-                requires_elevation=False,
-                confidence="medium",
-                availability="available",
-                login_required=login_required,
-                logged_in=logged_in,
-                resources_available=resources_available,
-            )
-
-        requested_level = str(
-            manifest_info.get("requested_execution_level", "") or ""
-        ).casefold()
-        ui_access = bool(manifest_info.get("ui_access", False))
-
-        if requested_level in self.RISKY_EXECUTION_LEVELS:
-            return self._result(
-                allowed=False,
-                reason=f"Manifest solicita requestedExecutionLevel={requested_level}",
-                executable_path=executable_path,
-                requires_elevation=True,
-                confidence="high",
-                availability="available",
-                login_required=login_required,
-                logged_in=logged_in,
-                resources_available=resources_available,
-                blocked_by="elevation_manifest",
-            )
-
-        if ui_access:
-            return self._result(
-                allowed=False,
-                reason="Manifest solicita uiAccess=true",
-                executable_path=executable_path,
-                requires_elevation=True,
-                confidence="high",
-                availability="available",
-                login_required=login_required,
-                logged_in=logged_in,
-                resources_available=resources_available,
-                blocked_by="ui_access",
-            )
-
-        return self._result(
-            allowed=True,
-            reason="No se detectaron requisitos de elevaci\u00f3n ni bloqueos de preflight",
-            executable_path=executable_path,
-            requires_elevation=False,
-            confidence="high",
-            availability="available",
+        login_required = self._optional_bool(application.get("login_required"))
+        logged_in = self._optional_bool(application.get("logged_in"))
+        resources_available = self._resolve_resources_status(application)
+        common = dict(
             login_required=login_required,
             logged_in=logged_in,
             resources_available=resources_available,
+        )
+        target = str(destination or "").strip()
+        ttype = str(target_type or "").strip().lower()
+        if not target:
+            return self._result(
+                allowed=False,
+                reason="Destino de lanzamiento vacio",
+                confidence="high",
+                blocked_by="launch_destination_invalid",
+                **common,
+            )
+
+        if ttype == "bundle" or (sys.platform == "darwin" and target.casefold().endswith(".app")):
+            return self._check_bundle_target(application, target, **common)
+
+        if ttype == "aumid":
+            if self.verify_app_id_in_apps_folder(target):
+                return self._result(
+                    allowed=True,
+                    reason="Paquete (AppX/UWP) verificado en shell:AppsFolder",
+                    confidence="high",
+                    availability="available",
+                    **common,
+                )
+            return self._result(
+                allowed=False,
+                reason="El identificador de paquete no existe en shell:AppsFolder",
+                confidence="high",
+                blocked_by="package_not_verified",
+                **common,
+            )
+
+        if ttype == "url":
+            scheme = self._uri_scheme(target)
+            if scheme not in ("http", "https"):
+                return self._result(
+                    allowed=False,
+                    reason="Solo se admiten URL http/https como destino web",
+                    confidence="high",
+                    blocked_by="unsupported_uri",
+                    **common,
+                )
+
+        if ttype == "command":
+            resolved = shutil.which(target)
+            if not resolved:
+                return self._result(
+                    allowed=False,
+                    reason="El comando no se resuelve en PATH en este equipo",
+                    confidence="high",
+                    blocked_by="executable_not_resolved",
+                    **common,
+                )
+            target = resolved
+
+        validation = self.validate_launch_destination(target)
+        if not validation.get("valid"):
+            scheme = self._uri_scheme(target)
+            return self._result(
+                allowed=False,
+                reason="Destino de lanzamiento no verificable: %s" % validation.get("reason", ""),
+                confidence="high",
+                blocked_by="unsupported_uri" if scheme else "launch_destination_invalid",
+                **common,
+            )
+
+        launch_type = validation.get("launch_type")
+        if launch_type == self.LAUNCH_TYPE_URI:
+            return self._result(
+                allowed=True,
+                reason=str(validation.get("reason", "URI admitida")),
+                confidence="high",
+                availability="available",
+                **common,
+            )
+        if launch_type == self.LAUNCH_TYPE_SHORTCUT:
+            lnk_target = None
+            try:
+                from src.hands.apps.application_launch_classifier import resolver_target_acceso_directo
+
+                lnk_target = resolver_target_acceso_directo(validation.get("destination") or target)
+            except Exception as exc:
+                logger.debug("No se pudo resolver el destino del acceso directo: %s", exc)
+            if lnk_target:
+                return self._executable_decision(lnk_target, login_required, logged_in, resources_available)
+            return self._result(
+                allowed=True,
+                reason="Acceso directo existente admitido; destino interno no inspeccionable",
+                confidence="medium",
+                availability="available",
+                **common,
+            )
+        return self._executable_decision(
+            str(validation.get("destination") or target),
+            login_required,
+            logged_in,
+            resources_available,
+        )
+
+    def _check_macos_application(
+        self,
+        application: Dict[str, Any],
+        login_required: Optional[bool],
+        logged_in: Optional[bool],
+        resources_available: Optional[bool],
+    ) -> Dict[str, Any]:
+        """Rama macOS de ``check``: bundle id/ruta de bundle o URL admitida."""
+        common = dict(
+            login_required=login_required,
+            logged_in=logged_in,
+            resources_available=resources_available,
+        )
+        bundle_path = str(application.get("bundle_path", "") or "").strip()
+        bundle_id = str(application.get("bundle_id", "") or "").strip()
+        if bundle_path or bundle_id:
+            return self._check_bundle_target(application, bundle_path or bundle_id, **common)
+        url = str(application.get("url", "") or "").strip()
+        if url and self.validate_launch_destination(url).get("valid"):
+            return self._result(
+                allowed=True,
+                reason="Se permite URI de aplicacion como destino de lanzamiento",
+                confidence="medium",
+                availability="available",
+                **common,
+            )
+        return self._result(
+            allowed=False,
+            reason=(
+                "En macOS el destino debe ser un bundle .app resuelto por el "
+                "adaptador de lanzamiento (bundle id); no hay ejecutable resuelto"
+            ),
+            confidence="high",
+            availability="unknown",
+            blocked_by="executable_not_resolved",
+            **common,
+        )
+
+    def _check_bundle_target(
+        self,
+        application: Dict[str, Any],
+        bundle: str,
+        login_required: Optional[bool] = None,
+        logged_in: Optional[bool] = None,
+        resources_available: Optional[bool] = None,
+    ) -> Dict[str, Any]:
+        """Valida un bundle macOS y su estado de Gatekeeper/cuarentena.
+
+        No elude Gatekeeper: una app en cuarentena o rechazada por ``spctl``
+        queda bloqueada con instrucciones para que el usuario la abra el mismo
+        una vez desde Finder.
+        """
+        common = dict(
+            login_required=login_required,
+            logged_in=logged_in,
+            resources_available=resources_available,
+        )
+        try:
+            from src.hands.apps.launch_macos import inspect_bundle_for_preflight
+
+            info = inspect_bundle_for_preflight(
+                bundle, expected_bundle_id=str(application.get("bundle_id", "") or "") or None
+            )
+        except Exception as exc:
+            logger.warning("No se pudo inspeccionar el bundle macOS: %s", exc)
+            return self._result(
+                allowed=False,
+                reason="No se pudo inspeccionar el bundle: %s" % exc,
+                confidence="medium",
+                blocked_by="bundle_not_inspectable",
+                **common,
+            )
+        if not info.get("exists"):
+            return self._result(
+                allowed=False,
+                reason="El bundle de la aplicacion no existe en este equipo",
+                confidence="high",
+                blocked_by="bundle_not_found",
+                **common,
+            )
+        if info.get("identity_mismatch"):
+            return self._result(
+                allowed=False,
+                reason="El bundle id del destino no coincide con la identidad esperada",
+                confidence="high",
+                blocked_by="bundle_identity_mismatch",
+                **common,
+            )
+        if info.get("quarantined"):
+            return self._result(
+                allowed=False,
+                reason=(
+                    "La aplicacion esta en cuarentena de Gatekeeper. JARVIS no la "
+                    "abre ni elude la proteccion: abrela tu una vez desde Finder "
+                    "(clic derecho > Abrir) y confirma el aviso del sistema"
+                ),
+                confidence="high",
+                availability="available",
+                blocked_by="gatekeeper_quarantine",
+                **common,
+            )
+        if info.get("gatekeeper_ok") is False:
+            return self._result(
+                allowed=False,
+                reason=(
+                    "Gatekeeper rechaza la aplicacion (spctl --assess). JARVIS no "
+                    "elude esta proteccion"
+                ),
+                confidence="high",
+                availability="available",
+                blocked_by="gatekeeper_rejected",
+                **common,
+            )
+        return self._result(
+            allowed=True,
+            reason=(
+                "Bundle existente sin cuarentena"
+                + ("" if info.get("gatekeeper_ok") else "; evaluacion de Gatekeeper no disponible")
+            ),
+            executable_path=info.get("executable_path"),
+            confidence="high" if info.get("gatekeeper_ok") else "medium",
+            availability="available",
+            **common,
         )
 
     def check_application(
@@ -1028,6 +1333,19 @@ if ($found) { exit 0 } else { exit 1 }
                 "launch_type": None,
                 "destination": resolved,
                 "reason": "El destino no existe",
+            }
+
+        if (
+            sys.platform == "darwin"
+            and resolved.casefold().endswith(".app")
+            and os.path.isdir(resolved)
+            and os.path.isfile(os.path.join(resolved, "Contents", "Info.plist"))
+        ):
+            return {
+                "valid": True,
+                "launch_type": self.LAUNCH_TYPE_BUNDLE,
+                "destination": resolved,
+                "reason": "Bundle de aplicacion macOS existente admitido",
             }
 
         if os.path.isdir(resolved):
