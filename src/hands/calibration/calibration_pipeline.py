@@ -61,6 +61,7 @@ from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 from src.core.log import get_logger
+from src.desktop.monitor_topology import TopologyWatcher
 from src.desktop.platform_contract import (
     Capability,
     CapabilityStatus,
@@ -271,6 +272,7 @@ class _RunContext:
     initial_pointer: Optional[Tuple[float, float]] = None
     pointer_moved: bool = False
     launch_outcome: Any = None
+    topology_watcher: Any = None
 
 
 # ============================================================================
@@ -585,6 +587,8 @@ class UICalibrationPipeline:
         self._timed(report, STAGE_MONITOR, t)
 
         t = time.monotonic()
+        if ctx.topology_watcher is not None and not ctx.topology_watcher.assert_unchanged(topology.fingerprint):
+            raise _StageFailure(STAGE_WINDOW, "la topologia de monitores cambio antes de preparar la ventana")
         window = self._stage_prepare_window(adapter, window, display, topology)
         ctx.window = window
         report.window = self._window_summary(window)
@@ -615,6 +619,8 @@ class UICalibrationPipeline:
         self._timed(report, STAGE_ACCESSIBILITY, t)
 
         t = time.monotonic()
+        if ctx.topology_watcher is not None and not ctx.topology_watcher.assert_unchanged(topology.fingerprint):
+            raise _StageFailure(STAGE_CAPTURE, "la topologia de monitores cambio antes de capturar")
         capture, image_path = self._stage_capture(adapter, window, capture_ok, ctx, report)
         self._timed(report, STAGE_CAPTURE, t)
 
@@ -644,6 +650,8 @@ class UICalibrationPipeline:
         self._timed(report, STAGE_QUALITY_GATE, t)
 
         t = time.monotonic()
+        if ctx.topology_watcher is not None and not ctx.topology_watcher.assert_unchanged(topology.fingerprint):
+            raise _StageFailure(STAGE_POINTER, "la topologia de monitores cambio antes de verificar el puntero")
         records = self._stage_transform_and_verify(
             app_info, gate_result, transformer, work_space, window, display, snapshot, ctx, report
         )
@@ -793,6 +801,14 @@ class UICalibrationPipeline:
             raise _StageFailure(STAGE_MONITOR, "no se pudo enumerar la topologia de monitores: %s" % exc)
         report.topology_fingerprint = str(getattr(topology, "fingerprint", "") or "")
         report.metrics["displays"] = len(getattr(topology, "displays", []) or [])
+        # Establecer la topologia de referencia para detectar cambios antes de
+        # cada accion espacial (mover ventana, capturar, mover puntero).
+        try:
+            watcher = TopologyWatcher(adapter)
+            watcher.baseline()
+            ctx.topology_watcher = watcher
+        except Exception as exc:
+            logger.warning("[CALIBRATION-PIPELINE] no se pudo establecer el baseline de topologia: %s", exc)
 
         display: Optional[DisplayInfo] = None
         source = ""

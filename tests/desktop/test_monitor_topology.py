@@ -18,18 +18,23 @@ solo lee la topologia del equipo sin modificarla.
 
 from __future__ import annotations
 
-from typing import List
+from typing import List, Optional
 
 import pytest
 
 from src.desktop.monitor_topology import (
+    AMBIGUOUS,
     DIRECTION_ABOVE,
     DIRECTION_BELOW,
     DIRECTION_LEFT,
     DIRECTION_RIGHT,
+    MonitorReferenceResult,
     MonitorTopology,
+    NOT_FOUND,
+    RESOLVED,
     compute_topology_fingerprint,
     get_current_topology,
+    resolve_monitor_reference,
 )
 from src.desktop.native_imports import is_windows
 from src.desktop.platform_contract import DESKTOP_PIXELS, DisplayInfo, Rect
@@ -364,3 +369,315 @@ class TestGetCurrentTopologyEntornoReal:
         # Dos enumeraciones consecutivas dan la misma huella sin cambios de hardware.
         t2 = get_current_topology()
         assert t.fingerprint == t2.fingerprint
+
+
+# ---------------------------------------------------------------------------
+# Resolucion de referencias del usuario a monitores (unidad 3.8.6.6.3)
+# ---------------------------------------------------------------------------
+
+
+def _ref_result(t: MonitorTopology, text: str, current_id: Optional[str] = None) -> MonitorReferenceResult:
+    return resolve_monitor_reference(text, t, current_display_id=current_id)
+
+
+class TestResolucionReferenciasMonitor:
+    """Tests unitarios de resolve_monitor_reference con geometria sintetica."""
+
+    def _dos_lado_a_lado(self) -> MonitorTopology:
+        a = _disp("a", "Dell A", 0, 0, 1920, 1080, primary=True)
+        b = _disp("b", "Samsung B", 1920, 0, 3840, 1080)
+        return _topologia([a, b])
+
+    def _dos_apilados(self) -> MonitorTopology:
+        arriba = _disp("up", "Monitor Arriba", 0, -1080, 1920, 0)
+        abajo = _disp("down", "Monitor Abajo", 0, 0, 1920, 1080, primary=True)
+        return _topologia([arriba, abajo])
+
+    def _tres_en_fila(self) -> MonitorTopology:
+        a = _disp("a", "Monitor A", 0, 0, 1920, 1080)
+        b = _disp("b", "Monitor B", 1920, 0, 3840, 1080, primary=True)
+        c = _disp("c", "Monitor C", 3840, 0, 5760, 1080)
+        return _topologia([a, b, c])
+
+    def _diferentes_tamanos(self) -> MonitorTopology:
+        pequena = _disp("p", "Pequena", 0, 0, 800, 600)
+        grande = _disp("g", "Grande", 800, 0, 2720, 1080, primary=True)
+        return _topologia([pequena, grande])
+
+    # ---------------- Direcciones ----------------
+
+    def test_resuelve_derecha(self) -> None:
+        t = self._dos_lado_a_lado()
+        r = _ref_result(t, "derecha")
+        assert r.resolved is True
+        assert r.display is not None
+        assert r.display.display_id == "b"
+        assert r.status == RESOLVED
+
+    def test_resuelve_izquierda(self) -> None:
+        t = self._dos_lado_a_lado()
+        r = _ref_result(t, "izquierda")
+        assert r.resolved is True
+        assert r.display is not None
+        assert r.display.display_id == "a"
+
+    def test_resuelve_arriba(self) -> None:
+        t = self._dos_apilados()
+        r = _ref_result(t, "arriba")
+        assert r.resolved is True
+        assert r.display is not None
+        assert r.display.display_id == "up"
+
+    def test_resuelve_abajo(self) -> None:
+        t = self._dos_apilados()
+        r = _ref_result(t, "abajo")
+        assert r.resolved is True
+        assert r.display is not None
+        assert r.display.display_id == "down"
+
+    def test_direccion_izquierda_y_derecha_a_la_vez_no_se_resuelve(self) -> None:
+        t = self._dos_lado_a_lado()
+        r = _ref_result(t, "izquierda y derecha")
+        assert r.status == NOT_FOUND
+        assert r.display is None
+
+    def test_direccion_arriba_y_abajo_a_la_vez_no_se_resuelve(self) -> None:
+        t = self._dos_apilados()
+        r = _ref_result(t, "arriba y abajo")
+        assert r.status == NOT_FOUND
+        assert r.display is None
+
+    # ---------------- Tamano ----------------
+
+    def test_resuelve_grande(self) -> None:
+        t = self._diferentes_tamanos()
+        r = _ref_result(t, "grande")
+        assert r.resolved is True
+        assert r.display is not None
+        assert r.display.display_id == "g"
+
+    def test_resuelve_pequena(self) -> None:
+        t = self._diferentes_tamanos()
+        r = _ref_result(t, "pequena")
+        assert r.resolved is True
+        assert r.display is not None
+        assert r.display.display_id == "p"
+
+    def test_grande_con_empate_devuelve_ambiguo(self) -> None:
+        t = self._dos_lado_a_lado()
+        r = _ref_result(t, "grande")
+        assert r.status == AMBIGUOUS
+        assert r.display is None
+        assert len(r.candidates) == 2
+
+    # ---------------- Orientacion ----------------
+
+    def test_resuelve_vertical(self) -> None:
+        paisaje = _disp("p", "Paisaje", 0, 0, 1920, 1080)
+        retrato = _disp("r", "Retrato", 1920, 0, 3000, 1920)
+        t = _topologia([paisaje, retrato])
+        r = _ref_result(t, "vertical")
+        assert r.resolved is True
+        assert r.display is not None
+        assert r.display.display_id == "r"
+
+    def test_resuelve_horizontal(self) -> None:
+        paisaje = _disp("p", "Paisaje", 0, 0, 1920, 1080)
+        retrato = _disp("r", "Retrato", 1920, 0, 3000, 1920)
+        t = _topologia([paisaje, retrato])
+        r = _ref_result(t, "horizontal")
+        assert r.resolved is True
+        assert r.display is not None
+        assert r.display.display_id == "p"
+
+    # ---------------- Principal / secundaria / otra ----------------
+
+    def test_resuelve_principal(self) -> None:
+        t = self._dos_lado_a_lado()
+        r = _ref_result(t, "principal")
+        assert r.resolved is True
+        assert r.display is not None
+        assert r.display.display_id == "a"
+
+    def test_resuelve_secundaria(self) -> None:
+        t = self._dos_lado_a_lado()
+        r = _ref_result(t, "secundaria")
+        assert r.resolved is True
+        assert r.display is not None
+        assert r.display.display_id == "b"
+
+    def test_no_hay_secundaria_con_un_solo_monitor(self) -> None:
+        a = _disp("a", "Unico", 0, 0, 1920, 1080, primary=True)
+        t = _topologia([a])
+        r = _ref_result(t, "secundaria")
+        assert r.status == NOT_FOUND
+        assert r.display is None
+
+    def test_resuelve_otra_con_actual(self) -> None:
+        t = self._dos_lado_a_lado()
+        r = _ref_result(t, "otra", current_id="a")
+        assert r.resolved is True
+        assert r.display is not None
+        assert r.display.display_id == "b"
+
+    def test_resuelve_esta_actual(self) -> None:
+        t = self._dos_lado_a_lado()
+        r = _ref_result(t, "la actual", current_id="b")
+        assert r.resolved is True
+        assert r.display is not None
+        assert r.display.display_id == "b"
+
+    def test_esta_sin_actual_conocida_no_se_resuelve(self) -> None:
+        t = self._dos_lado_a_lado()
+        r = _ref_result(t, "esta")
+        assert r.status == NOT_FOUND
+        assert r.display is None
+
+    # ---------------- Numero ----------------
+
+    def test_resuelve_numero_digito(self) -> None:
+        t = self._tres_en_fila()
+        r = _ref_result(t, "la 2")
+        assert r.resolved is True
+        assert r.display is not None
+        assert r.display.display_id == "b"
+
+    def test_resuelve_numero_palabra_ordinal(self) -> None:
+        t = self._tres_en_fila()
+        r = _ref_result(t, "la segunda")
+        assert r.resolved is True
+        assert r.display is not None
+        assert r.display.display_id == "b"
+
+    def test_numero_fuera_de_rango_no_se_resuelve(self) -> None:
+        t = self._tres_en_fila()
+        r = _ref_result(t, "pantalla 5")
+        assert r.status == NOT_FOUND
+        assert r.display is None
+
+    # ---------------- Nombre del monitor ----------------
+
+    def test_resuelve_por_nombre_monitor(self) -> None:
+        t = self._dos_lado_a_lado()
+        r = _ref_result(t, "samsung")
+        assert r.resolved is True
+        assert r.display is not None
+        assert r.display.display_id == "b"
+
+    # ---------------- Combinaciones ----------------
+
+    def test_resuelve_grande_de_la_derecha(self) -> None:
+        t = self._tres_en_fila()
+        r = _ref_result(t, "la grande de la derecha")
+        assert r.resolved is True
+        assert r.display is not None
+        assert r.display.display_id == "c"
+
+    # ---------------- Relativas al actual ----------------
+
+    def test_resuelve_a_la_izquierda_de_esta(self) -> None:
+        t = self._tres_en_fila()
+        r = _ref_result(t, "a la izquierda de esta", current_id="b")
+        assert r.resolved is True
+        assert r.display is not None
+        assert r.display.display_id == "a"
+
+    def test_resuelve_a_la_derecha_de_esta(self) -> None:
+        t = self._tres_en_fila()
+        r = _ref_result(t, "a la derecha de esta", current_id="a")
+        assert r.resolved is True
+        assert r.display is not None
+        assert r.display.display_id == "b"
+
+    def test_relativa_sin_actual_no_se_resuelve(self) -> None:
+        t = self._tres_en_fila()
+        r = _ref_result(t, "la de al lado")
+        assert r.status == NOT_FOUND
+        assert r.display is None
+
+    # ---------------- Ambiguedad y no encontrado ----------------
+
+    def test_derecha_con_dos_monitores_en_la_misma_columna_devuelve_ambiguo(self) -> None:
+        a = _disp("a", "A", 0, 0, 1920, 1080)
+        b = _disp("b", "B", 0, 1080, 1920, 2160)
+        t = _topologia([a, b])
+        r = _ref_result(t, "derecha")
+        assert r.status == AMBIGUOUS
+        assert r.display is None
+        assert len(r.candidates) >= 1
+
+    def test_referencia_vacia_no_se_resuelve(self) -> None:
+        t = self._dos_lado_a_lado()
+        r = _ref_result(t, "")
+        assert r.status == NOT_FOUND
+        assert r.display is None
+
+    def test_referencia_no_reconocida_no_se_resuelve(self) -> None:
+        t = self._dos_lado_a_lado()
+        r = _ref_result(t, "alguna cosa rara que no significa nada")
+        assert r.status == NOT_FOUND
+        assert r.display is None
+
+    def test_topologia_vacia_no_se_resuelve(self) -> None:
+        t = _topologia([])
+        r = _ref_result(t, "derecha")
+        assert r.status == NOT_FOUND
+        assert r.display is None
+
+    def test_ambiguo_devuelve_candidatos(self) -> None:
+        t = self._dos_lado_a_lado()
+        r = _ref_result(t, "grande")
+        assert r.status == AMBIGUOUS
+        assert r.display is None
+        assert len(r.candidates) == 2
+        assert {c.display_id for c in r.candidates} == {"a", "b"}
+
+    def test_resultado_contiene_criterios(self) -> None:
+        t = self._dos_lado_a_lado()
+        r = _ref_result(t, "derecha")
+        assert r.resolved is True
+        assert "right" in r.criteria
+
+    # ---------------- Casos con negacion ----------------
+
+    def test_no_es_la_principal_devuelve_secundaria(self) -> None:
+        t = self._dos_lado_a_lado()
+        r = _ref_result(t, "no es la principal")
+        assert r.resolved is True
+        assert r.display is not None
+        assert r.display.display_id == "b"
+
+
+# ---------------------------------------------------------------------------
+# Integracion real en Windows (solo lectura de la topologia del equipo)
+# ---------------------------------------------------------------------------
+
+
+class TestResolucionReferenciasMonitorEntornoReal:
+    @pytest.mark.skipif(not is_windows(), reason="Solo Windows: adaptador de escritorio real")
+    def test_resuelve_principal_en_equipo_real(self) -> None:
+        t = get_current_topology()
+        r = _ref_result(t, "principal")
+        assert r.resolved is True
+        assert r.display is not None
+        assert r.display.is_primary is True
+
+    @pytest.mark.skipif(not is_windows(), reason="Solo Windows: adaptador de escritorio real")
+    def test_resuelve_derecha_en_equipo_real(self) -> None:
+        t = get_current_topology()
+        r = _ref_result(t, "derecha")
+        if len(t.displays) == 1:
+            assert r.resolved is True
+            assert r.display is not None
+        else:
+            # Con varios monitores, "derecha" debe devolver uno resuelto o ambiguo
+            assert r.status in (RESOLVED, AMBIGUOUS, NOT_FOUND)
+            if r.resolved:
+                assert r.display is not None
+
+    @pytest.mark.skipif(not is_windows(), reason="Solo Windows: adaptador de escritorio real")
+    def test_no_adivina_referencia_inexistente_en_equipo_real(self) -> None:
+        t = get_current_topology()
+        r = _ref_result(t, "monitor numero noventa y nueve")
+        assert r.status == NOT_FOUND
+        assert r.display is None
