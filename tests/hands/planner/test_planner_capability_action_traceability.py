@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
-"""Tests de verificación de la hoja 3.3.3.3 — "Verificar trazabilidad
+"""Tests de verificacion de la hoja 3.3.3.3 - "Verificar trazabilidad
 aplicacion -> capability -> accion".
 
-La trazabilidad documenta, para cada capability expuesta por una aplicación,
-los nodos de acción que la proporcionan y si la acción efectiva está registrada
+La trazabilidad documenta, para cada capability expuesta por una aplicacion,
+los nodos de accion que la proporcionan y si la accion efectiva esta registrada
 en el ``ActionRegistry``.  Se ejerce contra el modelo REAL: el ``ActionRegistry``
-global registrado durante la importación de ``src.hands``.
+global registrado durante la importacion de ``src.hands``.
 
 La trazabilidad reutiliza los mecanismos de 3.3.3.1 (``get_application_capabilities_as_list``)
 y 3.3.3.2 (``action_exists`` / ``_resolve_node_action_name`` /
-``_node_provides_capability``), sin duplicar lógica ni tocar el estado de
-planificación (no aplica el filtro ``can_execute`` de `_find_nodes_for_capability`).
+``_node_provides_capability``), sin duplicar logica ni tocar el estado de
+planificacion (no aplica el filtro ``can_execute`` de `_find_nodes_for_capability`).
 """
 
 import json
@@ -18,7 +18,7 @@ import logging
 from unittest.mock import patch
 
 # ---------------------------------------------------------------------------
-# SUPRESIÓN DE LOG DE SISTEMA (antes de importar src/)
+# SUPRESION DE LOG DE SISTEMA (antes de importar src/)
 # ---------------------------------------------------------------------------
 logging.disable(logging.CRITICAL)
 
@@ -30,10 +30,10 @@ from src.hands.planner.planner import Planner  # noqa: E402
 # Capacidades verificables contra el modelo real
 # ---------------------------------------------------------------------------
 CHROME_CAPABILITIES = ["open", "navigate", "search"]
-# Acción registrada que respalda la capability "open" de Chrome (nodo de
+# Accion registrada que respalda la capability "open" de Chrome (nodo de
 # compatibilidad chrome.open tiene action_category == "open_application").
 OPEN_REGISTERED_ACTION = "open_application"
-# Nodo de conocimiento de aplicación cuyo id no es una acción registrada.
+# Nodo de conocimiento de aplicacion cuyo id no es una accion registrada.
 CHROME_OPEN_KNOWN_NODE_ID = "chrome_open"
 CHROME_OPEN_COMPAT_NODE_ID = "chrome.open"
 
@@ -126,7 +126,7 @@ class TestTraceChromeCapabilities:
         assert [c["capability"] for c in result["capabilities"]] == CHROME_CAPABILITIES
 
     def test_open_capability_is_covered_by_registered_action(self):
-        """La capability 'open' de Chrome está cubierta por la acción registrada
+        """La capability 'open' de Chrome esta cubierta por la accion registrada
         'open_application' (nodo chrome.open, action_category registrada)."""
         entry = self._entry("open")
         assert entry["covered"] is True
@@ -141,7 +141,7 @@ class TestTraceChromeCapabilities:
         assert node_ids == {CHROME_OPEN_COMPAT_NODE_ID, CHROME_OPEN_KNOWN_NODE_ID}
 
     def test_open_compat_node_category_is_registered(self):
-        """chrome.open: action_category 'open_application' está registrada, el
+        """chrome.open: action_category 'open_application' esta registrada, el
         propio id 'chrome.open' no (verificado read-only contra el registry)."""
         entry = self._entry("open")
         compat = next(
@@ -149,12 +149,12 @@ class TestTraceChromeCapabilities:
         )
         assert compat["action_category"] == OPEN_REGISTERED_ACTION
         assert compat["category_action_exists"] is True
-        # El id del nodo con '.' no es el nombre de una acción registrada.
+        # El id del nodo con '.' no es el nombre de una accion registrada.
         assert self.planner.action_exists(compat["action_name"]) is False
         assert compat["action_exists"] is False
 
     def test_open_known_node_not_registered(self):
-        """chrome_open: el id no es una acción registrada; su categoría
+        """chrome_open: el id no es una accion registrada; su categoria
         'application_capability' tampoco lo es."""
         entry = self._entry("open")
         known = next(
@@ -167,9 +167,9 @@ class TestTraceChromeCapabilities:
         assert known["source"] == "application_knowledge"
 
     def test_navigate_capability_not_backed_by_registered_action(self):
-        """Hecho real verificable: la capability 'navigate' de Chrome sólo está
-        provista por el nodo declarativo chrome_navigate cuya categoría
-        'application_capability' no está registrada → no cubierta."""
+        """Hecho real verificable: la capability 'navigate' de Chrome solo esta
+        provista por el nodo declarativo chrome_navigate cuya categoria
+        'application_capability' no esta registrada -> no cubierta."""
         entry = self._entry("navigate")
         assert entry["covered"] is False
         assert entry["implemented_actions"] == []
@@ -177,8 +177,8 @@ class TestTraceChromeCapabilities:
         assert [n["node_id"] for n in entry["providing_nodes"]] == ["chrome_navigate"]
 
     def test_search_capability_not_backed_by_registered_action(self):
-        """Hecho real verificable: 'search' está provista por search_google
-        (categoría 'search', no registrada) y chrome_search → no cubierta."""
+        """Hecho real verificable: 'search' esta provista por search_google
+        (categoria 'search', no registrada) y chrome_search -> no cubierta."""
         entry = self._entry("search")
         assert entry["covered"] is False
         assert entry["implemented_actions"] == []
@@ -197,7 +197,7 @@ class TestTraceChromeCapabilities:
 
 
 class TestTraceSingleCapability:
-    """El parámetro ``capability`` restringe la trazabilidad a una sola
+    """El parametro ``capability`` restringe la trazabilidad a una sola
     capability sin alterar el resto de la estructura."""
 
     @pytest.fixture(autouse=True)
@@ -230,12 +230,12 @@ class TestTraceSingleCapability:
 
 
 # ---------------------------------------------------------------------------
-# Aplicación ausente
+# Aplicacion ausente
 # ---------------------------------------------------------------------------
 
 
 class TestTraceNonexistentApplication:
-    """Una aplicación desconocida no expone capabilities."""
+    """Una aplicacion desconocida no expone capabilities."""
 
     @pytest.fixture(autouse=True)
     def _setup_planner(self):
@@ -254,13 +254,13 @@ class TestTraceNonexistentApplication:
 
 
 # ---------------------------------------------------------------------------
-# Reutilización del ActionRegistry (3.3.3.2)
+# Reutilizacion del ActionRegistry (3.3.3.2)
 # ---------------------------------------------------------------------------
 
 
 class TestTraceReusesActionRegistry:
     """La trazabilidad depende directamente de ``action_exists`` (3.3.3.2):
-    los nodos cuya acción/categoría está registrada se marcan como existentes
+    los nodos cuya accion/categoria esta registrada se marcan como existentes
     y aparecen en ``implemented_actions``."""
 
     @pytest.fixture(autouse=True)
@@ -268,15 +268,15 @@ class TestTraceReusesActionRegistry:
         self.planner = _planner()
 
     def test_registered_action_reflected_in_trace(self):
-        """'open_application' está registrada → la capability 'open' se marca
-        cubierta y la acción aparece en implemented_actions."""
+        """'open_application' esta registrada -> la capability 'open' se marca
+        cubierta y la accion aparece en implemented_actions."""
         assert self.planner.action_exists(OPEN_REGISTERED_ACTION) is True
         entry = self._entry("open")
         assert OPEN_REGISTERED_ACTION in entry["implemented_actions"]
         assert entry["covered"] is True
 
     def test_nonexistent_action_reflected_in_trace(self):
-        """'chrome_open' no está registrada → action_exists False y no aparece
+        """'chrome_open' no esta registrada -> action_exists False y no aparece
         en implemented_actions (solo como nodo proveedor no registrado)."""
         assert self.planner.action_exists(CHROME_OPEN_KNOWN_NODE_ID) is False
         entry = self._entry("open")
@@ -294,7 +294,7 @@ class TestTraceReusesActionRegistry:
             result = self.planner.trace_application_capability_to_action("chrome", "open")
         assert mocked.called
         entry = result["capabilities"][0]
-        # Con action_exists forzada a True, la categoría 'open_application' y el
+        # Con action_exists forzada a True, la categoria 'open_application' y el
         # id 'chrome.open' aparecen como acciones implementadas.
         assert OPEN_REGISTERED_ACTION in entry["implemented_actions"]
         assert "chrome.open" in entry["implemented_actions"]
@@ -306,13 +306,13 @@ class TestTraceReusesActionRegistry:
 
 
 # ---------------------------------------------------------------------------
-# Idempotencia y no mutación
+# Idempotencia y no mutacion
 # ---------------------------------------------------------------------------
 
 
 class TestTraceIdempotentAndPure:
-    """La trazabilidad es un método de solo-lectura: no muta el modelo de
-    nodos y produce resultados idénticos entre invocaciones."""
+    """La trazabilidad es un metodo de solo-lectura: no muta el modelo de
+    nodos y produce resultados identicos entre invocaciones."""
 
     @pytest.fixture(autouse=True)
     def _setup_planner(self):
@@ -324,7 +324,7 @@ class TestTraceIdempotentAndPure:
         assert first == second
 
     def test_does_not_mutate_available_nodes(self):
-        self.planner._get_available_nodes()  # calienta la caché de nodos
+        self.planner._get_available_nodes()  # calienta la cache de nodos
         before = set(self.planner.available_nodes.keys())
         self.planner.trace_application_capability_to_action("chrome")
         after = set(self.planner.available_nodes.keys())

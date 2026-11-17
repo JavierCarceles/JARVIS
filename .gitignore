@@ -1,11 +1,11 @@
 # =============================================================================
-# .gitignore — JARVIS
+# .gitignore - JARVIS
 # Archivos y directorios que NO deben ir al control de versiones.
-# Datos locales, caché, logs, entornos virtuales y configuración específica
+# Datos locales, cache, logs, entornos virtuales y configuracion especifica
 # de cada equipo (machine_id, rutas absolutas, calibraciones, etc.).
 # =============================================================================
 
-# --- Base de datos local del inventario (machine_id específico del equipo) ---
+# --- Base de datos local del inventario (machine_id especifico del equipo) ---
 data/system_inventory.sqlite3
 data/system_inventory.sqlite3-wal
 data/system_inventory.sqlite3-shm
@@ -29,7 +29,7 @@ venv/
 .env
 .venv
 
-# --- Caché y pruebas ---
+# --- Cache y pruebas ---
 .cache/
 .pytest_cache/
 .coverage
@@ -49,7 +49,7 @@ temp/
 .DS_Store
 Thumbs.db
 
-# --- Macros del root (configuración/local) ---
+# --- Macros del root (configuracion/local) ---
 macro_mejoraActual.json
 macro_recorder.py
 macro_runner.py

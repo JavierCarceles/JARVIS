@@ -1,11 +1,11 @@
 """
-Fachada de ejecución compatible para JARVIS.
+Fachada de ejecucion compatible para JARVIS.
 
-Esta capa conserva la API histórica de src.tools.executor, pero delega la
-resolución y ejecución de acciones en ActionRegistry para evitar duplicar la
-lógica de ejecución entre src.tools y src.hands.
+Esta capa conserva la API historica de src.tools.executor, pero delega la
+resolucion y ejecucion de acciones en ActionRegistry para evitar duplicar la
+logica de ejecucion entre src.tools y src.hands.
 
-Arquitectura de transición:
+Arquitectura de transicion:
 
     Brain / legacy [CMD:...]
 
@@ -17,13 +17,13 @@ Arquitectura de transición:
             v
     ActionRegistry
             |
-            +--> validación de parámetros
-            +--> comprobación opcional de precondiciones
-            +--> ejecución de la acción
-            +--> verificación opcional del resultado
+            +--> validacion de parametros
+            +--> comprobacion opcional de precondiciones
+            +--> ejecucion de la accion
+            +--> verificacion opcional del resultado
 
-La planificación de rutas no pertenece a este módulo. En la arquitectura
-objetivo será responsabilidad del Planner.
+La planificacion de rutas no pertenece a este modulo. En la arquitectura
+objetivo sera responsabilidad del Planner.
 """
 
 from __future__ import annotations
@@ -33,8 +33,8 @@ import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
-from src.hands.action_registry import ActionInfo, get_action_registry
-from src.utils.logger import get_logger
+from src.hands.actions.action_registry import ActionInfo, get_action_registry
+from src.core.log import get_logger
 
 logger = get_logger(__name__)
 
@@ -43,8 +43,8 @@ class UnifiedExecutor:
     """
     Fachada unificada para ejecutar acciones registradas.
 
-    Mantiene compatibilidad con el formato histórico [CMD:...], pero utiliza
-    ActionRegistry como fuente única de verdad para localizar y ejecutar
+    Mantiene compatibilidad con el formato historico [CMD:...], pero utiliza
+    ActionRegistry como fuente unica de verdad para localizar y ejecutar
     acciones.
     """
 
@@ -54,11 +54,11 @@ class UnifiedExecutor:
     )
 
     def __init__(self) -> None:
-        """Inicializa la fachada de ejecución."""
+        """Inicializa la fachada de ejecucion."""
         self.registry = get_action_registry()
         self.command_history: List[Dict[str, Any]] = []
         self.logger = logger
-        logger._print_log("info", r"[EXECUTOR] Fachada de ejecución unificada inicializada. [file:executor.py, method:__init__, line:61]", "executor.py", "method", 61)
+        logger.info(r"[EXECUTOR] Fachada de ejecucion unificada inicializada.")
 
     # ======================================================================
     # PROCESAMIENTO LEGACY DEL LLM
@@ -72,8 +72,8 @@ class UnifiedExecutor:
         """
         Procesa una respuesta del LLM y ejecuta el primer comando detectado.
 
-        El parámetro ``state`` es opcional y permite que la ejecución futura o
-        actual compruebe precondiciones de la acción antes de ejecutarla.
+        El parametro ``state`` es opcional y permite que la ejecucion futura o
+        actual compruebe precondiciones de la accion antes de ejecutarla.
 
         El formato legacy sigue siendo compatible:
             [CMD:nombre]
@@ -88,13 +88,12 @@ class UnifiedExecutor:
         args = command_match["args"]
         clean_text = command_match["clean_text"]
 
-        logger._print_log("info", "Procesando solicitud", "executor.py", "method", 91)
 
         try:
             action_info = self.registry.get_action(command_name)
             if action_info is None:
                 # Permitir que ActionRegistry/aliases resuelvan nombres si la
-                # implementación concreta expone un resolvedor equivalente.
+                # implementacion concreta expone un resolvedor equivalente.
                 normalized_name = self._normalize_action_name(command_name)
                 if normalized_name != command_name:
                     action_info = self.registry.get_action(normalized_name)
@@ -129,8 +128,8 @@ class UnifiedExecutor:
             return result if result else clean_text
 
         except TypeError as exc:
-            logger._print_log("info", "Procesando solicitud: " + str(exc), "executor.py", "process_and_execute", 135)
-            result = "Error en la ejecución: argumentos incorrectos."
+            logger.info("Procesando solicitud: " + str(exc))
+            result = "Error en la ejecuci\u00f3n: argumentos incorrectos."
             self._record_history(
                 command_name=command_name,
                 args=args,
@@ -140,7 +139,7 @@ class UnifiedExecutor:
             return clean_text if clean_text else result
 
         except ValueError as exc:
-            logger._print_log("info", "Procesando solicitud: " + str(exc), "executor.py", "process_and_execute", 150)
+            logger.info("Procesando solicitud: " + str(exc))
             result = f"Error en los argumentos del comando: {exc}"
             self._record_history(
                 command_name=command_name,
@@ -151,8 +150,8 @@ class UnifiedExecutor:
             return clean_text if clean_text else result
 
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud: " + str(exc), "executor.py", "process_and_execute", 165)
-            result = f"Error en la ejecución: {exc}"
+            logger.info("Procesando solicitud: " + str(exc))
+            result = f"Error en la ejecuci\u00f3n: {exc}"
             self._record_history(
                 command_name=command_name,
                 args=args,
@@ -185,7 +184,7 @@ class UnifiedExecutor:
 
     @staticmethod
     def _normalize_action_name(action_name: str) -> str:
-        """Normaliza pequeñas variaciones de nombre sin cambiar su semántica."""
+        """Normaliza pequenas variaciones de nombre sin cambiar su semantica."""
         normalized = str(action_name or "").strip().lower()
         aliases = {
             "calibrate_applications": "calibrar_aplicaciones",
@@ -193,7 +192,7 @@ class UnifiedExecutor:
         return aliases.get(normalized, normalized)
 
     # ======================================================================
-    # EJECUCIÓN CENTRALIZADA
+    # EJECUCION CENTRALIZADA
     # ======================================================================
 
     def execute_action(
@@ -204,21 +203,21 @@ class UnifiedExecutor:
         verify_success: bool = True,
     ) -> Any:
         """
-        Ejecuta una acción registrada.
+        Ejecuta una accion registrada.
 
         ``state`` permite comprobar precondiciones cuando existe un estado
-        explícito. La planificación no se realiza aquí.
+        explicito. La planificacion no se realiza aqui.
         """
         resolved_action_name = self._normalize_action_name(action_name)
         action_info = self.registry.get_action(resolved_action_name)
         if action_info is None:
-            # También aceptar exactamente el nombre recibido por si el
-            # registro distingue alias de nombre canónico.
+            # Tambien aceptar exactamente el nombre recibido por si el
+            # registro distingue alias de nombre canonico.
             resolved_action_name = action_name
             action_info = self.registry.get_action(resolved_action_name)
 
         if action_info is None:
-            raise ValueError(f"Acción no encontrada: {action_name}")
+            raise ValueError(f"Accion no encontrada: {action_name}")
 
         safe_parameters = dict(parameters or {})
 
@@ -227,15 +226,14 @@ class UnifiedExecutor:
             safe_parameters,
         ):
             raise ValueError(
-                f"Parámetros inválidos para la acción: {resolved_action_name}"
+                f"Parametros invalidos para la accion: {resolved_action_name}"
             )
 
         if state is not None and not action_info.matches_preconditions(state):
             raise ValueError(
-                f"Precondiciones no satisfechas para la acción: {resolved_action_name}"
+                f"Precondiciones no satisfechas para la accion: {resolved_action_name}"
             )
 
-        logger._print_log("info", "Procesando solicitud", "executor.py", "method", 91)
 
         result = self.registry.execute_action(
             resolved_action_name,
@@ -249,11 +247,10 @@ class UnifiedExecutor:
             )
             if not success:
                 raise RuntimeError(
-                    f"La acción '{resolved_action_name}' se ejecutó, pero su resultado "
-                    "no superó la comprobación de éxito."
+                    f"La accion '{resolved_action_name}' se ejecuto, pero su resultado "
+                    "no supero la comprobacion de exito."
                 )
 
-        logger._print_log("info", "Procesando solicitud", "executor.py", "method", 91)
         return result
 
     def can_execute(
@@ -262,7 +259,7 @@ class UnifiedExecutor:
         parameters: Optional[Dict[str, Any]] = None,
         state: Any = None,
     ) -> bool:
-        """Comprueba si una acción puede ejecutarse en el estado indicado."""
+        """Comprueba si una accion puede ejecutarse en el estado indicado."""
         resolved_action_name = self._normalize_action_name(action_name)
         if self.registry.get_action(resolved_action_name) is None:
             resolved_action_name = action_name
@@ -281,10 +278,10 @@ class UnifiedExecutor:
         state: Any = None,
     ) -> Any:
         """
-        Punto de entrada explícito para un futuro Planner.
+        Punto de entrada explicito para un futuro Planner.
 
-        No crea planes ni decide la siguiente acción; simplemente ejecuta un
-        paso ya decidido por la capa de planificación.
+        No crea planes ni decide la siguiente accion; simplemente ejecuta un
+        paso ya decidido por la capa de planificacion.
         """
         return self.execute_action(
             action_name,
@@ -324,8 +321,8 @@ class UnifiedExecutor:
                 return parsed
             return (parsed,)
         except (ValueError, SyntaxError, TypeError) as exc:
-            logger._print_log("info", "Procesando solicitud: " + str(exc), "executor.py", "_parse_args", 349)
-            raise ValueError(f"Argumentos no válidos: {text}") from exc
+            logger.info("Procesando solicitud: " + str(exc))
+            raise ValueError(f"Argumentos no validos: {text}") from exc
 
     @staticmethod
     def _args_to_dict(
@@ -333,7 +330,7 @@ class UnifiedExecutor:
         parameters: Dict[str, Any],
     ) -> Dict[str, Any]:
         """
-        Convierte argumentos posicionales legacy a parámetros nombrados.
+        Convierte argumentos posicionales legacy a parametros nombrados.
 
         El orden utilizado es el orden del esquema almacenado en ActionInfo.
         """
@@ -341,12 +338,12 @@ class UnifiedExecutor:
             return {}
 
         if not parameters:
-            raise ValueError("La acción no acepta parámetros")
+            raise ValueError("La accion no acepta parametros")
 
         parameter_names = list(parameters.keys())
         if len(args) > len(parameter_names):
             raise ValueError(
-                "Se han recibido más argumentos de los parámetros definidos"
+                "Se han recibido mas argumentos de los parametros definidos"
             )
 
         return {parameter_names[index]: value for index, value in enumerate(args)}
@@ -363,8 +360,8 @@ class UnifiedExecutor:
         """
         Obtiene sugerencias simples a partir de acciones registradas.
 
-        Esta función conserva compatibilidad con el sistema antiguo. No decide
-        rutas de planificación ni sustituye al Planner.
+        Esta funcion conserva compatibilidad con el sistema antiguo. No decide
+        rutas de planificacion ni sustituye al Planner.
         """
         del context
 
@@ -414,7 +411,7 @@ class UnifiedExecutor:
             return suggestions[:5]
 
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "executor.py", "method", 91)
+            logger.debug("UnifiedExecutor.get_command_suggestions: %s", exc)
             return []
 
     @staticmethod
@@ -422,7 +419,7 @@ class UnifiedExecutor:
         action_info: ActionInfo,
         score: float,
     ) -> Dict[str, Any]:
-        """Convierte ActionInfo al formato histórico de sugerencias."""
+        """Convierte ActionInfo al formato historico de sugerencias."""
         if score >= 0.8:
             confidence = "ALTA"
         elif score >= 0.6:
@@ -451,7 +448,7 @@ class UnifiedExecutor:
         result: Any,
         success: bool,
     ) -> None:
-        """Registra una ejecución para compatibilidad y diagnóstico."""
+        """Registra una ejecucion para compatibilidad y diagnostico."""
         self.command_history.append(
             {
                 "command": command_name,
@@ -469,10 +466,10 @@ class UnifiedExecutor:
     def clear_command_history(self) -> None:
         """Limpia el historial de comandos."""
         self.command_history.clear()
-        logger._print_log("info", r"[EXECUTOR] Historial de comandos limpiado [file:executor.py, method:clear_command_history, line:502]", "executor.py", "method", 488)
+        logger.info(r"[EXECUTOR] Historial de comandos limpiado")
 
     # ======================================================================
-    # INFORMACIÓN DE ACCIONES
+    # INFORMACION DE ACCIONES
     # ======================================================================
 
     def list_available_commands(
@@ -485,14 +482,14 @@ class UnifiedExecutor:
                 return self.registry.get_actions_for_planner()
             return self.registry.get_actions_for_llama()
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "executor.py", "method", 91)
+            logger.debug("UnifiedExecutor.list_available_commands: %s", exc)
             return []
 
     def get_command_info(
         self,
         command_name: str,
     ) -> Dict[str, Any]:
-        """Obtiene información detallada de una acción registrada."""
+        """Obtiene informacion detallada de una accion registrada."""
         try:
             resolved_name = self._normalize_action_name(command_name)
             action_info = self.registry.get_action(resolved_name)
@@ -502,18 +499,18 @@ class UnifiedExecutor:
                 return {}
             return action_info.to_dict()
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "executor.py", "method", 91)
+            logger.debug("UnifiedExecutor.get_command_info: %s", exc)
             return {}
 
     def get_action_cost(self, action_name: str) -> float:
-        """Obtiene el coste declarado de una acción para el planificador."""
+        """Obtiene el coste declarado de una accion para el planificador."""
         resolved_name = self._normalize_action_name(action_name)
         if self.registry.get_action(resolved_name) is None:
             resolved_name = action_name
         return self.registry.get_action_cost(resolved_name)
 
     def get_plannable_commands(self) -> List[Dict[str, Any]]:
-        """Obtiene las acciones habilitadas para planificación."""
+        """Obtiene las acciones habilitadas para planificacion."""
         return self.registry.get_actions_for_planner()
 
     # ======================================================================
@@ -552,7 +549,7 @@ def process_and_execute(
     llm_response: str,
 ) -> str:
     """
-    Función de compatibilidad para código existente.
+    Funcion de compatibilidad para codigo existente.
 
     Delega en la instancia global de UnifiedExecutor.
     """

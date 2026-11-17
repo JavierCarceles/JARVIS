@@ -1,29 +1,29 @@
 # -*- coding: utf-8 -*-
 """
-Tests de verificación para la conexión Application Knowledge → Goal (unidad 3.7.2.1).
+Tests de verificacion para la conexion Application Knowledge -> Goal (unidad 3.7.2.1).
 
 Verifica que el conocimiento estructurado de aplicaciones (ApplicationKnowledge
 en applications_core.py) se traduce correctamente en objetivos (Goal en node.py)
-cuando el usuario pide abrir/navegar/cerrar una aplicación, incluyendo
+cuando el usuario pide abrir/navegar/cerrar una aplicacion, incluyendo
 capabilities y required_capabilities.
 
-HALLAGOS DE VERIFICACIÓN DOCUMENTADOS:
+HALLAGOS DE VERIFICACION DOCUMENTADOS:
 1. Discrepancia de nomenclatura: Goal.get_required_capabilities() retorna
    "open_application", "close_application", "activate_window", "focus_element",
-   "type_text", "press_key" — mientras que ApplicationCapability enum declara
+   "type_text", "press_key" - mientras que ApplicationCapability enum declara
    "open", "close", "navigate", "search", "type", "click". No coinciden
    directamente. Existe un mapeo parcial unidireccional en heuristic.py
-   (de AppCap → nombre de Goal), pero no hay mapeo inverso.
+   (de AppCap -> nombre de Goal), pero no hay mapeo inverso.
 
-2. is_capability_available() retorna False correctamente cuando la aplicación
-   no está disponible en tiempo de ejecución (Chrome no instalado en esta
-   máquina). Es comportamiento esperado, no un bug.
+2. is_capability_available() retorna False correctamente cuando la aplicacion
+   no esta disponible en tiempo de ejecucion (Chrome no instalado en esta
+   maquina). Es comportamiento esperado, no un bug.
 """
 
 import unittest
 from unittest.mock import patch
 
-from src.hands.applications_core import (
+from src.hands.apps.applications_core import (
     ApplicationCapability,
     ApplicationManager,
     get_application_manager,
@@ -137,7 +137,7 @@ class TestGoalVsApplicationKnowledgeNaming(unittest.TestCase):
         goal_caps = {"open_application", "close_application", "activate_window",
                      "focus_element", "type_text", "press_key", "navigate"}
         appcap_values = {c.value for c in ApplicationCapability}
-        # 'navigate' sí coincide, pero el resto no
+        # 'navigate' si coincide, pero el resto no
         non_matching = goal_caps - appcap_values
         self.assertGreaterEqual(len(non_matching), 5,
                                 f"Esperaba al menos 5 capacidades de Goal sin coincidencia directa, "
@@ -153,22 +153,22 @@ class TestApplicationKnowledgeIntegratorAvailability(unittest.TestCase):
     distinga correctamente entre capacidad declarada y disponible en runtime."""
 
     def test_is_capability_available_false_when_app_not_installed(self):
-        """is_capability_available retorna False para Chrome cuando no está
-        instalado en esta máquina (declarado pero no disponible en runtime)."""
+        """is_capability_available retorna False para Chrome cuando no esta
+        instalado en esta maquina (declarado pero no disponible en runtime)."""
         integrator = _make_integrator_with_manager(get_application_manager())
         result = integrator.is_capability_available("chrome", ApplicationCapability.OPEN)
         self.assertFalse(result,
-            "Chrome no está instalado en esta máquina de prueba, por lo que "
-            "is_capability_available debe retornar False aunque esté declarado")
+            "Chrome no est\u00e1 instalado en esta m\u00e1quina de prueba, por lo que "
+            "is_capability_available debe retornar False aunque est\u00e9 declarado")
 
     def test_is_capability_available_false_for_unknown_app(self):
-        """is_capability_available retorna False para aplicación inexistente."""
+        """is_capability_available retorna False para aplicacion inexistente."""
         integrator = _make_integrator_with_manager(get_application_manager())
         result = integrator.is_capability_available("nonexistent_app_xyz", ApplicationCapability.OPEN)
         self.assertFalse(result)
 
     def test_get_application_capabilities_returns_dict(self):
-        """get_application_capabilities retorna un dict no vacío para Chrome."""
+        """get_application_capabilities retorna un dict no vacio para Chrome."""
         integrator = _make_integrator_with_manager(get_application_manager())
         caps = integrator.get_application_capabilities("chrome")
         self.assertIsInstance(caps, dict)
@@ -181,7 +181,7 @@ class TestApplicationKnowledgeIntegratorAvailability(unittest.TestCase):
 
 class TestBrainApplicationKnowledgeIntegration(unittest.TestCase):
     """Verifica que Brain._get_application_knowledge exponga datos para
-    creación de Goals."""
+    creacion de Goals."""
 
     @patch("src.brain.llm.ollama.chat")
     def test_get_application_knowledge_structure(self, mock_chat):
@@ -193,7 +193,7 @@ class TestBrainApplicationKnowledgeIntegration(unittest.TestCase):
         self.assertIn("supported_capabilities", knowledge)
         self.assertGreaterEqual(knowledge["total_applications"], 1)
 
-        # Cada aplicación debe tener capabilities, declared, available, capability_available
+        # Cada aplicacion debe tener capabilities, declared, available, capability_available
         for app_name, app_data in knowledge["applications"].items():
             self.assertIn("capabilities", app_data)
             self.assertIn("declared", app_data)
@@ -202,7 +202,7 @@ class TestBrainApplicationKnowledgeIntegration(unittest.TestCase):
 
     @patch("src.brain.llm.ollama.chat")
     def test_create_goal_from_user_input_application(self, mock_chat):
-        """create_goal_from_user_input con 'abre chrome' crea un Goal válido."""
+        """create_goal_from_user_input con 'abre chrome' crea un Goal valido."""
         from src.brain.llm import Brain
         brain = Brain(model="llama3")
         goal = brain.create_goal_from_user_input("abre chrome")
@@ -222,10 +222,10 @@ class TestBrainApplicationKnowledgeIntegration(unittest.TestCase):
 
     @patch("src.brain.llm.ollama.chat")
     def test_goal_required_capabilities_from_interpret_intent(self, mock_chat):
-        """El Goal creado por interpret_intent tiene required_capabilities vía
+        """El Goal creado por interpret_intent tiene required_capabilities via
         get_required_capabilities(). NOTA: metadata.required_capabilities solo
         se popula para navigate/navigate_stream (no para open_application),
-        ver _create_goal_from_entity en llm.py líneas 671-678."""
+        ver _create_goal_from_entity en llm.py lineas 671-678."""
         from src.brain.llm import Brain
         brain = Brain(model="llama3")
         result = brain.interpret_intent("abre chrome")

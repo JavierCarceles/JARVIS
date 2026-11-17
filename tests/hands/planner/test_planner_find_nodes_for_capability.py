@@ -1,17 +1,17 @@
 # -*- coding: utf-8 -*-
-"""Tests de verificación de la hoja 3.3.4.1 — «Caso de aplicacion con varias
-capacidades».
+"""Tests de verificacion de la hoja 3.3.4.1 - "Caso de aplicacion con varias
+capacidades".
 
-Verifica el **camino de planificación** de las capabilities, complementario a la
+Verifica el **camino de planificacion** de las capabilities, complementario a la
 hoja 3.3.3.3 (trazabilidad). Mientras
 ``trace_application_capability_to_action`` documenta los nodos proveedores
-*ignorando* el estado, ``_find_nodes_for_capability`` —usado por
-``_build_hierarchical_plan``— aplica el filtro de estado ``can_execute`` y solo
+*ignorando* el estado, ``_find_nodes_for_capability`` -usado por
+``_build_hierarchical_plan``- aplica el filtro de estado ``can_execute`` y solo
 devuelve los nodos **ejecutables** para la capability solicitada en el estado
 actual.
 
-Chrome es la aplicación de referencia de «varias capabilities» : expone
-``open``, ``navigate`` y ``search``, cada una proveída por nodos distintos
+Chrome es la aplicacion de referencia de "varias capabilities" : expone
+``open``, ``navigate`` y ``search``, cada una proveida por nodos distintos
 (``chrome.open``, ``chrome_open``, ``chrome_navigate``, ``search_google``,
 ``chrome_search``). Los tests se ejercitan contra el modelo REAL: no escriben ni
 alteran ``entities.json`` ni el ``ActionRegistry`` global.
@@ -21,7 +21,7 @@ import logging
 from typing import Dict
 
 # ---------------------------------------------------------------------------
-# SUPRESIÓN DE LOG DE SISTEMA (antes de importar src/)
+# SUPRESION DE LOG DE SISTEMA (antes de importar src/)
 # ---------------------------------------------------------------------------
 # Importar Planner inicializa componentes del sistema (PerformanceOptimizer,
 # SelfImprovementSystem, etc.) que escriben a stdout.
@@ -33,24 +33,24 @@ from src.hands.planner.planner import Planner  # noqa: E402
 from src.hands.planner.node import Node, NodeType  # noqa: E402
 
 
-# Capacidades canónicas que expone Chrome (verificado contra el modelo real).
+# Capacidades canonicas que expone Chrome (verificado contra el modelo real).
 CHROME_CAPABILITIES = ["open", "navigate", "search"]
 
-# Aplicación conocida en el modelo pero SIN capacities declaradas
-# (verificado contra el modelo real: YouTube está en entities.json con
+# Aplicacion conocida en el modelo pero SIN capacities declaradas
+# (verificado contra el modelo real: YouTube esta en entities.json con
 # type=video_platform y sin campo capabilities, por lo que
 # ApplicationKnowledge.capabilities == []).
 NO_CAP_APP = "youtube"
 NO_CAP_APP_NAME = "YouTube"
 
-# Capacidades canónicas que un planner solicita por defecto (ver
+# Capacidades canonicas que un planner solicita por defecto (ver
 # Goal.get_required_capabilities / Planner._node_provides_capability aliases).
 CANONICAL_CAPABILITIES = ["open", "navigate", "search"]
 
-# Capability totalmente desconocida: no es canónica (open/navigate/search), no
-# está en el mapa de aliases de _node_provides_capability, ni es declarada por
-# ninguna aplicación ni nodo del modelo real. Verificado read-only contra el
-# modelo real: ningún nodo la provee.
+# Capability totalmente desconocida: no es canonica (open/navigate/search), no
+# esta en el mapa de aliases de _node_provides_capability, ni es declarada por
+# ninguna aplicacion ni nodo del modelo real. Verificado read-only contra el
+# modelo real: ningun nodo la provee.
 UNKNOWN_CAPABILITY = "teleportar"
 
 # Estado que satisface las precondiciones declarativas de los nodos ejecutables
@@ -73,7 +73,7 @@ CHROME_EXECUTABLE_STATE = {
 
 @pytest.fixture(autouse=True, scope="session")
 def _suppress_system_logs():
-    """Mantiene ``logging.disable(CRITICAL)`` activo durante toda la sesión."""
+    """Mantiene ``logging.disable(CRITICAL)`` activo durante toda la sesion."""
     logging.disable(logging.CRITICAL)
     yield
 
@@ -84,8 +84,8 @@ def _planner() -> Planner:
 
 
 def _chrome_nodes(planner: Planner):
-    """Nodos cuya aplicación normaliza a 'chrome' (equivalente a la scoping que
-    aplica ``build_application_aware_plan`` al filtrar por aplicación objetivo)."""
+    """Nodos cuya aplicacion normaliza a 'chrome' (equivalente a la scoping que
+    aplica ``build_application_aware_plan`` al filtrar por aplicacion objetivo)."""
     nodes = planner._get_available_nodes()
     return {
         nid: node
@@ -100,8 +100,8 @@ def _chrome_nodes(planner: Planner):
 
 
 class TestFindNodesForCapabilityMultipleCapabilities:
-    """El camino de planificación (``_find_nodes_for_capability``) resuelve CADA
-    capability de una aplicación con varias capacidades a su/s nodo/s ejecutable,
+    """El camino de planificacion (``_find_nodes_for_capability``) resuelve CADA
+    capability de una aplicacion con varias capacidades a su/s nodo/s ejecutable,
     aplicando la puerta ``can_execute`` que la trazabilidad de 3.3.3.3 no aplica."""
 
     @pytest.fixture(autouse=True)
@@ -109,14 +109,14 @@ class TestFindNodesForCapabilityMultipleCapabilities:
         self.planner = _planner()
 
     def test_app_with_several_exposes_more_than_one_capability(self):
-        """Premisa: Chrome expone más de una capability canónica."""
+        """Premisa: Chrome expone mas de una capability canonica."""
         caps = self.planner.get_application_capabilities_as_list("chrome")
         assert caps == CHROME_CAPABILITIES
         assert len(caps) > 1
 
     def test_each_capability_resolves_to_distinct_executable_nodes(self):
         """En un estado que las habilita, cada capability de Chrome resuelve a su
-        nodo ejecutable concreto (varias capabilities → nodos distintos)."""
+        nodo ejecutable concreto (varias capabilities -> nodos distintos)."""
         chrome_nodes = _chrome_nodes(self.planner)
 
         open_nodes = [
@@ -147,9 +147,9 @@ class TestFindNodesForCapabilityMultipleCapabilities:
         assert set(search_nodes) == {"search_google", "chrome_search"}
 
     def test_empty_state_excludes_all_providers_via_can_execute(self):
-        """Contraste con 3.3.3.3: la planificación aplica ``can_execute`` y, con
-        un estado inicial vacío, ninguna capability de Chrome resuelve nodos
-        ejecutables (mientras la trazabilidad los documenta aun así)."""
+        """Contraste con 3.3.3.3: la planificacion aplica ``can_execute`` y, con
+        un estado inicial vacio, ninguna capability de Chrome resuelve nodos
+        ejecutables (mientras la trazabilidad los documenta aun asi)."""
         chrome_nodes = _chrome_nodes(self.planner)
         for capability in CHROME_CAPABILITIES:
             assert (
@@ -161,7 +161,7 @@ class TestFindNodesForCapabilityMultipleCapabilities:
 
     def test_open_excludes_non_executable_provider_found_by_trace(self):
         """``chrome_open`` es proveedor de 'open' (lo documenta la trazabilidad de
-        3.3.3.3), pero no es ejecutable en el estado actual → planificación lo
+        3.3.3.3), pero no es ejecutable en el estado actual -> planificacion lo
         descarta, devolviendo exclusivamente ``chrome.open``."""
         all_nodes = self.planner._get_available_nodes()
         result = [
@@ -181,12 +181,12 @@ class TestFindNodesForCapabilityMultipleCapabilities:
 
 
 def _no_cap_app_nodes(planner: Planner) -> Dict[str, Node]:
-    """Nodos cuya aplicación es conocida pero carece de capabilities.
+    """Nodos cuya aplicacion es conocida pero carece de capabilities.
 
     Equivalente al scoping que ``build_application_aware_plan`` aplica al
-    filtrar por aplicación objetivo: solo los nodos cuya
+    filtrar por aplicacion objetivo: solo los nodos cuya
     ``application`` normaliza al nombre de la app objetivo. Para una app
-    sin capabilities el único nodo resultante es el nodo APPLICATION
+    sin capabilities el unico nodo resultante es el nodo APPLICATION
     declarativo (no action/task), que ``_find_nodes_for_capability``
     descarta por tipo.
     """
@@ -200,21 +200,21 @@ def _no_cap_app_nodes(planner: Planner) -> Dict[str, Node]:
 
 
 class TestFindNodesForCapabilityNoCapabilities:
-    """El camino de planificación ``_find_nodes_for_capability`` debe manejar
-    correctamente una aplicación **conocida pero sin capabilities** declaradas.
+    """El camino de planificacion ``_find_nodes_for_capability`` debe manejar
+    correctamente una aplicacion **conocida pero sin capabilities** declaradas.
 
     Complementario al caso 3.3.4.1 (app con varias capabilities). Para una
     app sin capabilities:
 
     * ``get_application_capabilities_as_list`` expone ``[]`` (ausente).
     * ``trace_application_capability_to_action`` devuelve ``available: False``
-      con lista de capabilities vacía (contrario a 3.3.3.3 donde Chrome sí
+      con lista de capabilities vacia (contrario a 3.3.3.3 donde Chrome si
       expone capabilities).
-    * ``convert_application_to_nodes`` produce **únicamente** el nodo
+    * ``convert_application_to_nodes`` produce **unicamente** el nodo
       APPLICATION declarativo (no action/task), lo que prueba que la app
       *existe* en el modelo aunque no declare capabilities.
     * ``_find_nodes_for_capability`` devuelve ``[]`` para toda capability,
-      tanto en estado ejecutable como vacío, porque el único nodo es de tipo
+      tanto en estado ejecutable como vacio, porque el unico nodo es de tipo
       APPLICATION (excluido por la puerta de tipo ``action/task``) y no
       proporciona ninguna capability.
     """
@@ -224,13 +224,13 @@ class TestFindNodesForCapabilityNoCapabilities:
         self.planner = _planner()
 
     def test_known_app_without_capabilities_exposes_empty_list(self):
-        """YouTube (app conocida sin capabilities) expone ``[]`` — distinto de
+        """YouTube (app conocida sin capabilities) expone ``[]`` - distinto de
         Chrome que expone varias. Confirma que la app es conocida pero carece
         de capabilities declaradas."""
         result = self.planner.get_application_capabilities_as_list(NO_CAP_APP)
         assert isinstance(result, list)
         assert result == []
-        # La app sí existe en el modelo: get_application no devuelve None.
+        # La app si existe en el modelo: get_application no devuelve None.
         manager = getattr(
             self.planner.application_integrator, "application_manager", None
         )
@@ -241,7 +241,7 @@ class TestFindNodesForCapabilityNoCapabilities:
 
     def test_known_app_without_capabilities_trace_returns_available_false(self):
         """La trazabilidad (3.3.3.3) devuelve ``available: False`` y capabilities
-        vacía para una app conocida sin capabilities — la app existe pero no
+        vacia para una app conocida sin capabilities - la app existe pero no
         expone capabilities que trazar."""
         result = self.planner.trace_application_capability_to_action(NO_CAP_APP)
         assert result["application"] == NO_CAP_APP
@@ -276,12 +276,12 @@ class TestFindNodesForCapabilityNoCapabilities:
 
     def test_find_nodes_returns_empty_for_all_capabilities(self):
         """``_find_nodes_for_capability`` devuelve ``[]`` para toda capability
-        canónica cuando se le pasan los nodos de una app sin capabilities, en un
+        canonica cuando se le pasan los nodos de una app sin capabilities, en un
         estado ejecutable. El nodo APPLICATION es excluido por la puerta de tipo
         ``action/task`` y no proporciona ninguna capability."""
         app_nodes = _no_cap_app_nodes(self.planner)
         assert app_nodes, "La app conocida debe producir al menos su nodo APPLICATION"
-        # El único nodo es APPLICATION (no action/task).
+        # El unico nodo es APPLICATION (no action/task).
         assert all(
             getattr(n, "type", None) == NodeType.APPLICATION for n in app_nodes.values()
         )
@@ -293,9 +293,9 @@ class TestFindNodesForCapabilityNoCapabilities:
             assert all(n.type != NodeType.ACTION for n in result)
 
     def test_find_nodes_returns_empty_with_empty_state(self):
-        """Con estado inicial vacío, ``_find_nodes_for_capability`` devuelve ``[]``
+        """Con estado inicial vacio, ``_find_nodes_for_capability`` devuelve ``[]``
         para toda capability de una app sin capabilities (doble filtro: tipo
-        APPLICATION + can_execute vacío)."""
+        APPLICATION + can_execute vacio)."""
         app_nodes = _no_cap_app_nodes(self.planner)
         for capability in CANONICAL_CAPABILITIES:
             assert (
@@ -314,8 +314,8 @@ class TestFindNodesForCapabilityNoCapabilities:
 
     def test_node_provides_capability_false_for_application_node(self):
         """``_node_provides_capability`` devuelve ``False`` para el nodo
-        APPLICATION de una app sin capabilities, para toda capability canónica:
-        el nodo no declara capabilities ni coincide por id/alias/categoría."""
+        APPLICATION de una app sin capabilities, para toda capability canonica:
+        el nodo no declara capabilities ni coincide por id/alias/categoria."""
         app_nodes = _no_cap_app_nodes(self.planner)
         app_node = next(iter(app_nodes.values()))
         for capability in CANONICAL_CAPABILITIES:
@@ -328,16 +328,16 @@ class TestFindNodesForCapabilityNoCapabilities:
 
 
 class TestFindNodesForCapabilityUnknownCapability:
-    """El camino de planificación ``_find_nodes_for_capability`` y las utilidades
-    asociadas deben manejar una **capability desconocida** —una capability que no
-    es canónica (open/navigate/search), no está en el mapa de aliases de
-    ``_node_provides_capability`` y no es declarada por ninguna aplicación ni
-    nodo— de forma determinista y segura, devolviendo ausencia de proveedores
+    """El camino de planificacion ``_find_nodes_for_capability`` y las utilidades
+    asociadas deben manejar una **capability desconocida** -una capability que no
+    es canonica (open/navigate/search), no esta en el mapa de aliases de
+    ``_node_provides_capability`` y no es declarada por ninguna aplicacion ni
+    nodo- de forma determinista y segura, devolviendo ausencia de proveedores
     sin falsear disponibilidad.
 
     Complementario a 3.3.4.1 (app con varias capabilities) y 3.3.4.2 (app
-    conocida sin capabilities). Aquí el foco es la **capability** desconocida
-    solicitada contra la app más capaz del modelo (Chrome).
+    conocida sin capabilities). Aqui el foco es la **capability** desconocida
+    solicitada contra la app mas capaz del modelo (Chrome).
     """
 
     @pytest.fixture(autouse=True)
@@ -346,8 +346,8 @@ class TestFindNodesForCapabilityUnknownCapability:
         self.chrome_nodes = _chrome_nodes(self.planner)
 
     def test_unknown_capability_resolves_no_nodes_on_capable_app(self):
-        """Una capability desconocida no resuelve ningún nodo, ni siquiera contra
-        la app más capaz (Chrome) en un estado que habilita todas sus actions.
+        """Una capability desconocida no resuelve ningun nodo, ni siquiera contra
+        la app mas capaz (Chrome) en un estado que habilita todas sus actions.
         Contrasta con 3.3.4.1 donde 'open'/'navigate'/'search' resuelven nodos."""
         result = self.planner._find_nodes_for_capability(
             UNKNOWN_CAPABILITY, self.chrome_nodes, CHROME_EXECUTABLE_STATE
@@ -355,7 +355,7 @@ class TestFindNodesForCapabilityUnknownCapability:
         assert result == []
 
     def test_unknown_capability_resolves_no_nodes_with_empty_state(self):
-        """Una capability desconocida no resuelve nodos con estado inicial vacío
+        """Una capability desconocida no resuelve nodos con estado inicial vacio
         tampoco: el doble filtro (tipo action/task + can_execute) y la
         ausencia de matching por capability convergen a ``[]``."""
         result = self.planner._find_nodes_for_capability(
@@ -364,7 +364,7 @@ class TestFindNodesForCapabilityUnknownCapability:
         assert result == []
 
     def test_unknown_capability_resolves_no_nodes_on_all_nodes(self):
-        """Ningún nodo del modelo completo provee una capability desconocida:
+        """Ningun nodo del modelo completo provee una capability desconocida:
         ``_find_nodes_for_capability`` devuelve ``[]`` contra *todos* los nodos
         disponibles en un estado ejecutable."""
         result = self.planner._find_nodes_for_capability(
@@ -377,7 +377,7 @@ class TestFindNodesForCapabilityUnknownCapability:
     def test_node_provides_capability_false_for_unknown_against_all_chrome_nodes(self):
         """``_node_provides_capability`` devuelve ``False`` para una capability
         desconocida contra TODOS los nodos action/task de Chrome, incluido el
-        nodo ejecutable ``chrome.open`` que SÍ provee la capability canónica
+        nodo ejecutable ``chrome.open`` que SI provee la capability canonica
         'open'."""
         chrome_action_nodes = {
             nid: n
@@ -408,13 +408,13 @@ class TestFindNodesForCapabilityUnknownCapability:
         assert caps == CHROME_CAPABILITIES
 
     def test_trace_unknown_capability_returns_no_providers(self):
-        """Trazando explícitamente una capability desconocida contra Chrome, el
+        """Trazando explicitamente una capability desconocida contra Chrome, el
         entry resultante documenta: ``providing_nodes: []``, ``covered: False``,
         ``covering_action: None``, ``implemented_actions: []``.
 
-        Nota semántica verificada: ``available`` es ``True`` porque se trazó una
-        capability explícita (la lista ``[capability]`` es no vacía); ``available``
-        indica *«se solicitó trazar»*, no *«está cubierta»*. La ausencia de
+        Nota semantica verificada: ``available`` es ``True`` porque se trazo una
+        capability explicita (la lista ``[capability]`` es no vacia); ``available``
+        indica *"se solicito trazar"*, no *"esta cubierta"*. La ausencia de
         proveedores queda reflejada por ``covered: False`` y
         ``providing_nodes: []``.
         """
@@ -435,7 +435,7 @@ class TestFindNodesForCapabilityUnknownCapability:
     def test_trace_without_capability_never_exposes_unknown(self):
         """Trazando todas las capabilities de Chrome (sin pasar capability),
         ``trace_application_capability_to_action`` solo expone capabilities
-        canónicas declaradas, nunca la capability desconocida."""
+        canonicas declaradas, nunca la capability desconocida."""
         result = self.planner.trace_application_capability_to_action("chrome")
         traced = [c["capability"] for c in result["capabilities"]]
         assert UNKNOWN_CAPABILITY not in traced

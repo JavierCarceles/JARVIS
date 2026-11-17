@@ -1,7 +1,7 @@
 # src/ear/listener.py
 """
-Percepción auditiva y transcripción de voz usando Whisper.
-Integrado con el nuevo sistema de planificación jerárquica.
+Percepcion auditiva y transcripcion de voz usando Whisper.
+Integrado con el nuevo sistema de planificacion jerarquica.
 """
 import queue
 import time
@@ -11,8 +11,8 @@ from faster_whisper import WhisperModel
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
 
-from src.utils.config import get_timeout_config
-from src.utils.logger import get_logger
+from src.core.config import get_timeout_config
+from src.core.log import get_logger
 from src.memory.conversation import ConversationMemory
 
 logger = get_logger(__name__)
@@ -34,11 +34,11 @@ class AudioCapabilities:
 
 class AudioNode:
     """
-    Nodo básico para procesamiento de audio.
+    Nodo basico para procesamiento de audio.
     """
     
     def __init__(self, name: str):
-        logger._print_log("INFO", "Initializing " + name + " audio node", "listener.py", "__init__", 41)
+        logger.info("Initializing " + name + " audio node")
         self.name = name
         self.capabilities = AudioCapabilities()
         
@@ -79,20 +79,20 @@ class AudioNode:
 
 class CalibrationNode(AudioNode):
     """
-    Nodo para calibración de audio.
+    Nodo para calibracion de audio.
     """
     
     def execute(self, audio_queue: queue.Queue) -> Dict[str, Any]:
         """
-        Calibra el umbral de detección de voz.
+        Calibra el umbral de deteccion de voz.
         
         Args:
             audio_queue: Cola de audio
             
         Returns:
-            Resultado de calibración
+            Resultado de calibracion
         """
-        logger._print_log("DEBUG", "Calibrando umbral de detección de voz...", "listener.py", "execute", 96)
+        logger.debug("Calibrando umbral de deteccion de voz...")
         levels = []
         
         for _ in range(20):
@@ -102,13 +102,12 @@ class CalibrationNode(AudioNode):
             levels.append(self._rms(chunk.flatten()))
         
         if not levels:
-            logger._print_log("DEBUG", "No se detectó audio durante calibración, usando valor por defecto", "listener.py", "execute", 105)
+            logger.debug("No se detecto audio durante calibracion, usando valor por defecto")
             threshold = 0.01
         else:
             noise_level = np.median(levels)
             threshold = max(noise_level * self.capabilities.sensitivity_multiplier, 0.01)
         
-        logger._print_log("info", "Procesando solicitud", "listener.py", "method", 110)
         
         return {
             "node": self.name,
@@ -128,7 +127,7 @@ class CalibrationNode(AudioNode):
 
 class TranscriptionNode(AudioNode):
     """
-    Nodo para transcripción de audio a texto.
+    Nodo para transcripcion de audio a texto.
     """
     
     def __init__(self, name: str, model_size: str = "medium", language: str = "es"):
@@ -139,23 +138,22 @@ class TranscriptionNode(AudioNode):
         self._load_model()
         
     def _load_model(self):
-        logger._print_log("info", "Procesando solicitud", "listener.py", "method", 110)
         """
         Carga el modelo Whisper.
         """
         try:
-            logger._print_log("INFO", r"Intentando cargar modelo Whisper... [file:listener.py, method:_load_model, line:142]", "listener.py", "_load_model", 147)
+            logger.info(r"Intentando cargar modelo Whisper...")
             self.model = WhisperModel(
                 self.model_size,
                 device="cpu",  # Usar CPU en lugar de CUDA para evitar problemas
                 compute_type="int8"
             )
-            logger._print_log("info", r"Modelo Whisper listo [file:listener.py, method:_load_model, line:150]", "listener.py", "method", 153)
+            logger.info(r"Modelo Whisper listo")
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "listener.py", "method", 110)
+            logger.debug("TranscriptionNode._load_model: %s", e)
             # Si falla el modelo, crear un modelo nulo para testing
             self.model = None
-            logger._print_log("warning", r"Usando modo de prueba sin modelo Whisper [file:listener.py, method:_load_model, line:155]", "listener.py", "method", 158)
+            logger.warning(r"Usando modo de prueba sin modelo Whisper")
     
     def execute(self, audio: np.ndarray) -> Dict[str, Any]:
         """
@@ -165,19 +163,21 @@ class TranscriptionNode(AudioNode):
             audio: Array de audio
             
         Returns:
-            Resultado de transcripción
+            Resultado de transcripcion
         """
         try:
             if self.model is None:
                 self._load_model()
                 if self.model is None:
-                    # Modo de prueba / fallback: sin modelo Whisper disponible
-                    # se devuelve una transcripción de referencia fija.
+                    # Sin modelo Whisper no se puede transcribir: se informa del
+                    # fallo en lugar de inventar un texto que se ejecutaria
+                    # como si el usuario lo hubiera dicho.
                     return {
                         "node": self.name,
-                        "success": True,
-                        "text": "hola jarvis",
-                        "confidence": 0.8,
+                        "success": False,
+                        "text": "",
+                        "confidence": 0.0,
+                        "error": "Modelo Whisper no disponible",
                     }
             
             segments, info = self.model.transcribe(
@@ -185,8 +185,8 @@ class TranscriptionNode(AudioNode):
                 beam_size=5,
                 language=self.language,
                 initial_prompt=(
-                    "Jarvis, señor, abrir, YouTube, Google, LoL, Spotify, comando, "
-                    "asistente, tecnología."
+                    "Jarvis, se\u00f1or, abrir, YouTube, Google, LoL, Spotify, comando, "
+                    "asistente, tecnolog\u00eda."
                 ),
             )
             
@@ -195,7 +195,6 @@ class TranscriptionNode(AudioNode):
                 texto_final += segment.text
             
             result = texto_final.strip()
-            logger._print_log("info", "Procesando solicitud", "listener.py", "method", 110)
             
             return {
                 "node": self.name,
@@ -205,7 +204,7 @@ class TranscriptionNode(AudioNode):
             }
         
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "listener.py", "method", 110)
+            logger.debug("TranscriptionNode.execute: %s", e)
             return {
                 "node": self.name,
                 "success": False,
@@ -216,7 +215,7 @@ class TranscriptionNode(AudioNode):
 
 class DetectionNode(AudioNode):
     """
-    Nodo para detección de voz en audio.
+    Nodo para deteccion de voz en audio.
     """
     
     def execute(self, audio_queue: queue.Queue, threshold: float) -> Dict[str, Any]:
@@ -225,12 +224,12 @@ class DetectionNode(AudioNode):
         
         Args:
             audio_queue: Cola de audio
-            threshold: Umbral de detección
+            threshold: Umbral de deteccion
             
         Returns:
-            Resultado de detección
+            Resultado de deteccion
         """
-        logger._print_log("info", r"Buscando voz en audio... [file:listener.py, method:execute, line:216]", "listener.py", "method", 232)
+        logger.info(r"Buscando voz en audio...")
         
         # Esperar a detectar voz con timeout
         start_time = time.time()
@@ -241,7 +240,7 @@ class DetectionNode(AudioNode):
                 time.sleep(0.01)
                 # Verificar timeout
                 if time.time() - start_time > timeout:
-                    logger._print_log("info", r"Timeout esperando voz [file:listener.py, method:execute, line:226]", "listener.py", "method", 243)
+                    logger.info(r"Timeout esperando voz")
                     return {
                         "node": self.name,
                         "success": False,
@@ -252,7 +251,7 @@ class DetectionNode(AudioNode):
             
             chunk = audio_queue.get().flatten()
             if self._rms(chunk) > threshold:
-                logger._print_log("info", r"Habla detectada [file:listener.py, method:execute, line:226]", "listener.py", "method", 254)
+                logger.info(r"Habla detectada")
                 return {
                     "node": self.name,
                     "success": True,
@@ -271,7 +270,7 @@ class DetectionNode(AudioNode):
 
 class RecordingNode(AudioNode):
     """
-    Nodo para grabación de audio.
+    Nodo para grabacion de audio.
     """
     
     def execute(self, audio_queue: queue.Queue, threshold: float) -> Dict[str, Any]:
@@ -280,10 +279,10 @@ class RecordingNode(AudioNode):
         
         Args:
             audio_queue: Cola de audio
-            threshold: Umbral de detección
+            threshold: Umbral de deteccion
             
         Returns:
-            Resultado de grabación
+            Resultado de grabacion
         """
         speech_chunks = []
         silence_time = 0
@@ -334,17 +333,16 @@ class RecordingNode(AudioNode):
 
 class Ear:
     """
-    Sistema de percepción auditiva integrado con la arquitectura de planificación jerárquica.
+    Sistema de percepcion auditiva integrado con la arquitectura de planificacion jerarquica.
     """
     
     def __init__(self, model_size: str = "medium", language: str = "es"):
-        logger._print_log("info", "Procesando solicitud", "listener.py", "method", 110)
         """
         Inicializa el sistema auditivo con capacidades modulares.
         
         Args:
-            model_size: Tamaño del modelo Whisper (tiny, base, small, medium, large)
-            language: Idioma para transcripción
+            model_size: Tamano del modelo Whisper (tiny, base, small, medium, large)
+            language: Idioma para transcripcion
         """
         self.model_size = model_size
         self.language = language
@@ -360,10 +358,9 @@ class Ear:
             language
         )
         
-        logger._print_log("info", r"Sistema auditivo inicializado [file:listener.py, method:__init__, line:325]", "listener.py", "method", 357)
+        logger.info(r"Sistema auditivo inicializado")
     
     def _load_model(self):
-        logger._print_log("info", "Procesando solicitud", "listener.py", "method", 110)
         """Carga el modelo Whisper."""
         try:
             self.model = WhisperModel(
@@ -371,9 +368,9 @@ class Ear:
                 device="cuda",
                 compute_type="float16"
             )
-            logger._print_log("info", r"Oído listo [file:listener.py, method:_load_model, line:336]", "listener.py", "method", 368)
+            logger.info(r"Oido listo")
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "listener.py", "method", 110)
+            logger.debug("Ear._load_model: %s", e)
             raise
     
     def get_audio_pipeline(self) -> List[AudioNode]:
@@ -413,18 +410,17 @@ class Ear:
     
     def _load_model(self):
         """
-        Carga el modelo Whisper (método heredado para compatibilidad).
+        Carga el modelo Whisper (metodo heredado para compatibilidad).
         """
         try:
-            logger._print_log("info", "Procesando solicitud", "listener.py", "method", 110)
             self.model = WhisperModel(
                 self.model_size,
                 device="cuda",
                 compute_type="float16"
             )
-            logger._print_log("info", r"[+] Oído listo. [file:listener.py, method:_load_model, line:387]", "listener.py", "method", 419)
+            logger.info(r"[+] Oido listo.")
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "listener.py", "method", 110)
+            logger.debug("Ear._load_model: %s", e)
             raise
     
     def listen(self, activation_word: bool = False) -> Optional[str]:
@@ -442,10 +438,10 @@ class Ear:
         def callback(indata, frames, time_info, status):
             """Callback para captura de audio."""
             if status:
-                logger._print_log("info", "Procesando solicitud", "listener.py", "method", 110)
+                pass
             audio_queue.put(indata.copy())
         
-        logger._print_log("info", r"Escuchando continuamente... (procesando todo audio detectado) [file:listener.py, method:listen, line:410]", "listener.py", "method", 442)
+        logger.info(r"Escuchando continuamente... (procesando todo audio detectado)")
         
         try:
             with sd.InputStream(
@@ -456,74 +452,69 @@ class Ear:
                            self.calibration_node.capabilities.block_duration),
                 callback=callback,
             ):
-                # Paso 1: Calibración (solo una vez al inicio)
-                logger._print_log("info", r"Calibrando umbral de audio... [file:listener.py, method:listen, line:425]", "listener.py", "method", 454)
+                # Paso 1: Calibracion (solo una vez al inicio)
+                logger.info(r"Calibrando umbral de audio...")
                 calibration_result = self.calibration_node.execute(audio_queue)
                 if not calibration_result["success"]:
-                    logger._print_log("error", r"Fallo en calibración de audio [file:listener.py, method:listen, line:427]", "listener.py", "method", 457)
+                    logger.error(r"Fallo en calibracion de audio")
                     return None
                 
                 threshold = calibration_result["threshold"]
                 noise_level = calibration_result.get("noise_level", 0.0)
-                logger._print_log("INFO", "Procesando solicitud", "listener.py", "method", 431)
                 
                 # Bucle infinito de escucha continua - Jarvis siempre alerta
-                logger._print_log("info", "Sistema listo para recibir comandos de voz (modo alerta continua)...", "listener.py", "listen", 465)
+                logger.info("Sistema listo para recibir comandos de voz (modo alerta continua)...")
                 
                 while True:
                     try:
-                        # Paso 2: Detección de voz
-                        logger._print_log("debug", r"Esperando detección de voz... [file:listener.py, method:listen, line:440]", "listener.py", "method", 470)
+                        # Paso 2: Deteccion de voz
+                        logger.debug(r"Esperando deteccion de voz...")
                         detection_result = self.detection_node.execute(audio_queue, threshold)
                         if not detection_result["success"]:
-                            logger._print_log("INFO", "Procesando solicitud", "listener.py", "listen", 444)
                             continue
                         
-                        # Paso 3: Grabación de audio
-                        logger._print_log("info", r"Voz detectada, grabando audio... [file:listener.py, method:listen, line:448]", "listener.py", "method", 477)
+                        # Paso 3: Grabacion de audio
+                        logger.info(r"Voz detectada, grabando audio...")
                         recording_result = self.recording_node.execute(audio_queue, threshold)
                         if not recording_result["success"]:
-                            logger._print_log("INFO", "Procesando solicitud", "listener.py", "listen", 452)
                             continue
                         
-                        # Paso 4: Transcripción
-                        logger._print_log("info", r"Audio grabado, transcribiendo... [file:listener.py, method:listen, line:456]", "listener.py", "method", 484)
+                        # Paso 4: Transcripcion
+                        logger.info(r"Audio grabado, transcribiendo...")
                         transcription_result = self.transcription_node.execute(recording_result["audio"])
                         if not transcription_result["success"]:
-                            logger._print_log("info", "Procesando solicitud", "listener.py", "method", 110)
                             continue
                         
                         texto_final = transcription_result["text"]
                         
                         if not texto_final:
-                            logger._print_log("warning", r"Transcripción vacía, continuando... [file:listener.py, method:listen, line:465]", "listener.py", "method", 493)
+                            logger.warning(r"Transcripcion vacia, continuando...")
                             continue
                         
-                        logger._print_log("info", "Procesando solicitud", "listener.py", "method", 110)
                         
-                        # Verificación de palabra de activación si está habilitada
+                        # Verificacion de palabra de activacion si esta habilitada
                         if activation_word:
                             if not self._check_activation_word(texto_final):
-                                logger._print_log("debug", r"Ignorado: No se escuchó el nombre de Jarvis en la frase. [file:listener.py, method:listen, line:473]", "listener.py", "method", 501)
+                                logger.debug(r"Ignorado: No se escucho el nombre de Jarvis en la frase.")
                                 continue
                         
                         # Guardar en memoria conversacional
                         try:
                             self.conversation_memory.add_user_message(texto_final)
                         except Exception as e:
-                            logger._print_log("info", "Procesando solicitud", "listener.py", "method", 110)
-                            # Continuar igualmente, no es crítico
+                            logger.debug("Ear.listen: %s", e)
+                            # Continuar igualmente, no es critico
                         
                         # Devolver el texto transcrito y volver a empezar para seguir escuchando
-                        logger._print_log("debug", r"Comando procesado, volviendo a modo alerta... [file:listener.py, method:listen, line:485]", "listener.py", "method", 512)
+                        logger.debug(r"Comando procesado, volviendo a modo alerta...")
                         return texto_final
                     
                     except Exception as e:
-                        logger._print_log("info", "Procesando solicitud", "listener.py", "method", 110)
+                        logger.debug("Ear.listen: %s", e)
                         continue
                     
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud: " + str(e), "listener.py", "listen", 495)
+            logger.info("Procesando solicitud: " + str(e))
             return None
     
     def _check_activation_word(self, text: str) -> bool:
@@ -534,7 +525,7 @@ class Ear:
             text: Texto a verificar
             
         Returns:
-            True si se encontró una palabra de activación
+            True si se encontro una palabra de activacion
         """
         texto_minusculas = text.lower()
         variantes_jarvis = [
@@ -564,11 +555,10 @@ class Ear:
             if transcription_result["success"]:
                 return transcription_result["text"]
             else:
-                logger._print_log("info", "Procesando solicitud", "listener.py", "method", 110)
                 return None
         
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud: " + str(e), "listener.py", "process_audio_batch", 520)
+            logger.info("Procesando solicitud: " + str(e))
             return None
     
     def get_audio_status(self) -> Dict[str, Any]:

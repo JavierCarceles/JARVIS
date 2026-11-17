@@ -1,13 +1,13 @@
 """
 
-Única fuente de verdad para:
-- NodeType: Tipos de nodos en el sistema de planificación
-- Node: Modelo conceptual común para todos los elementos
+Unica fuente de verdad para:
+- NodeType: Tipos de nodos en el sistema de planificacion
+- Node: Modelo conceptual comun para todos los elementos
 - Goal: Objetivos que el sistema debe alcanzar
-- Task: Tareas jerárquicas descomponibles
-- TaskStatus: Estados de ejecución de tareas
+- Task: Tareas jerarquicas descomponibles
+- TaskStatus: Estados de ejecucion de tareas
 
-Las funciones/callbacks no se serializan. Las reglas declarativas sí.
+Las funciones/callbacks no se serializan. Las reglas declarativas si.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set, Union
 
-from src.utils.logger import get_logger
+from src.core.log import get_logger
 
 logger = get_logger(__name__)
 
@@ -29,7 +29,7 @@ EffectLike = Union[str, Dict[str, Any], Any]
 
 
 class NodeType(Enum):
-    """Tipos de nodos en el sistema de planificación."""
+    """Tipos de nodos en el sistema de planificacion."""
 
     INTENTION = "intention"
     GOAL = "goal"
@@ -45,7 +45,7 @@ class NodeType(Enum):
 
 
 class TaskStatus(Enum):
-    """Estado de ejecución de tareas."""
+    """Estado de ejecucion de tareas."""
 
     PENDING = "pending"
     EXECUTING = "executing"
@@ -63,13 +63,13 @@ def _copy_state(state: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         return deepcopy(state)
     except Exception:
         # Algunos estados pueden contener objetos externos no copiables. En ese caso
-        # conservamos al menos una copia del nivel superior en vez de abortar la acción.
-        logger.debug("No se pudo copiar profundamente el estado; se usará una copia superficial.")
+        # conservamos al menos una copia del nivel superior en vez de abortar la accion.
+        logger.debug("No se pudo copiar profundamente el estado; se usara una copia superficial.")
         return dict(state)
 
 
 def _safe_float(value: Any, default: float = 0.0) -> float:
-    """Convierte un valor a float finito y devuelve el valor por defecto si no es válido."""
+    """Convierte un valor a float finito y devuelve el valor por defecto si no es valido."""
     try:
         result = float(value)
         return result if math.isfinite(result) else default
@@ -109,21 +109,21 @@ def _serialize_value(value: Any, _seen: Optional[Set[int]] = None) -> Any:
             seen.discard(identity)
 
     # Los callbacks no se guardan como texto repr (que puede contener direcciones de
-    # memoria y nunca permitiría reconstruir la función).
+    # memoria y nunca permitiria reconstruir la funcion).
     if callable(value):
         return "<non-serializable-callable>"
 
-    # Los objetos externos no tienen un contrato común de reconstrucción.
+    # Los objetos externos no tienen un contrato comun de reconstruccion.
     return repr(value)
 
 
 @dataclass
 class Node:
     """
-    Modelo conceptual común para todos los elementos del sistema.
+    Modelo conceptual comun para todos los elementos del sistema.
 
-    Un nodo puede representar objetivo, tarea, acción, condición, estado,
-    recurso, aplicación, elemento UI, resultado o plan.
+    Un nodo puede representar objetivo, tarea, accion, condicion, estado,
+    recurso, aplicacion, elemento UI, resultado o plan.
     """
 
     id: str
@@ -209,7 +209,7 @@ class Node:
                 setattr(self, field_name, {})
 
     def _evaluate_precondition(self, precondition: ConditionLike, current_state: Dict[str, Any]) -> bool:
-        """Evalúa una precondición declarativa o funcional sin acoplarse a otro módulo."""
+        """Evalua una precondicion declarativa o funcional sin acoplarse a otro modulo."""
         if isinstance(precondition, str):
             return bool(current_state.get(precondition, False))
 
@@ -398,7 +398,7 @@ class Node:
             execution_result = result if isinstance(result, dict) else {"result": result}
 
             # Los callbacks legacy suelen devolver un diccionario con "success".
-            # Un resultado explícitamente fallido no debe aplicar efectos ni cambiar estado.
+            # Un resultado explicitamente fallido no debe aplicar efectos ni cambiar estado.
             callback_success = result is not False
             if isinstance(result, dict) and "success" in result:
                 success_value = result["success"]
@@ -412,9 +412,9 @@ class Node:
                     "success": False,
                     "result": result,
                     "error": (
-                        str(result.get("error") or "El callback indicó que la ejecución falló.")
+                        str(result.get("error") or "El callback indic\u00f3 que la ejecuci\u00f3n fall\u00f3.")
                         if isinstance(result, dict)
-                        else "El callback devolvió False."
+                        else "El callback devolvi\u00f3 False."
                     ),
                     "execution_time": execution_time,
                     "timestamp": time.time(),
@@ -436,7 +436,7 @@ class Node:
                 if isinstance(candidate, dict):
                     new_state = candidate
 
-            # Las modificaciones declarativas son el último paso y prevalecen.
+            # Las modificaciones declarativas son el ultimo paso y prevalecen.
             if self.state_modifications:
                 new_state.update(self.state_modifications)
 
@@ -467,12 +467,12 @@ class Node:
                 "parameters_used": _serialize_value(kwargs),
                 "final_state": _serialize_value(current_state),
             }
-            logger.exception("Falló la ejecución del nodo %s (%s).", self.id, self.name)
+            logger.exception("Fallo la ejecucion del nodo %s (%s).", self.id, self.name)
             record_attempt(record)
             return {**record, "new_state": current_state}
 
     def _update_learning_metrics(self, execution_record: Dict[str, Any]) -> None:
-        """Recalcula métricas desde los registros válidos del histórico acumulado."""
+        """Recalcula metricas desde los registros validos del historico acumulado."""
         records = [record for record in self.execution_history if isinstance(record, dict)]
         if not records:
             self.success_rate = 0.0
@@ -491,13 +491,13 @@ class Node:
         self.average_execution_time = sum(durations) / len(durations) if durations else 0.0
 
     def verify_success(self, result: Any = None, **kwargs) -> bool:
-        """Verifica el éxito mediante el criterio configurado."""
+        """Verifica el exito mediante el criterio configurado."""
         if self.success_criteria is None:
             return True
         try:
             return bool(self.success_criteria(result, **kwargs))
         except Exception:
-            logger.debug("Falló el criterio de éxito del nodo %s.", self.id, exc_info=True)
+            logger.debug("Fallo el criterio de exito del nodo %s.", self.id, exc_info=True)
             return False
 
     def to_dict(self) -> Dict[str, Any]:
@@ -586,7 +586,7 @@ class Node:
         return cls(**normalized)
 
     def add_edge(self, target_node_id: str, cost: float = 1.0) -> None:
-        """Añade o actualiza una transición saliente y su coste finito no negativo."""
+        """Anade o actualiza una transicion saliente y su coste finito no negativo."""
         if target_node_id is None or not str(target_node_id).strip():
             return
         target_id = str(target_node_id)
@@ -596,14 +596,14 @@ class Node:
         self.edge_costs[target_id] = normalized_cost
 
     def add_in_edge(self, source_node_id: str, cost: float = 1.0) -> None:
-        """Registra una transición entrante; el coste canónico reside en el emisor."""
+        """Registra una transicion entrante; el coste canonico reside en el emisor."""
         if source_node_id is not None and str(source_node_id).strip():
             source_id = str(source_node_id)
             if source_id not in self.in_edges:
                 self.in_edges.append(source_id)
 
     def get_edge_cost(self, target_node_id: str) -> Optional[float]:
-        """Obtiene el coste de una transición."""
+        """Obtiene el coste de una transicion."""
         return self.edge_costs.get(target_node_id)
 
     def get_valid_transitions(self, current_state: Dict[str, Any], all_nodes: Dict[str, "Node"]) -> List[str]:
@@ -616,12 +616,12 @@ class Node:
         return valid_transitions
 
     def add_precondition_function(self, precond_func: Callable[[Dict[str, Any]], bool]) -> None:
-        """Añade una precondición funcional."""
+        """Anade una precondicion funcional."""
         if callable(precond_func):
             self.preconditions_functions.append(precond_func)
 
     def add_effect_function(self, effect_func: Callable[..., Dict[str, Any]]) -> None:
-        """Añade un efecto funcional."""
+        """Anade un efecto funcional."""
         if callable(effect_func):
             self.effects_functions.append(effect_func)
 
@@ -630,16 +630,16 @@ class Node:
         self.state_requirements[key] = value
 
     def set_state_modification(self, key: str, value: Any) -> None:
-        """Define una modificación de estado esperada."""
+        """Define una modificacion de estado esperada."""
         self.state_modifications[key] = value
 
     def mark_as_reusable_action(self, category: str) -> None:
-        """Marca el nodo como acción reutilizable."""
+        """Marca el nodo como accion reutilizable."""
         self.reusable_action = True
         self.action_category = category
 
     def get_execution_stats(self) -> Dict[str, Any]:
-        """Devuelve estadísticas agregadas sin fallar ante entradas históricas malformadas."""
+        """Devuelve estadisticas agregadas sin fallar ante entradas historicas malformadas."""
         records = [record for record in self.execution_history if isinstance(record, dict)]
         if not records:
             return {
@@ -672,7 +672,7 @@ class Node:
 
 @dataclass
 class Goal:
-    """Objetivo de alto nivel alcanzable mediante planificación."""
+    """Objetivo de alto nivel alcanzable mediante planificacion."""
 
     id: str
     type: str
@@ -746,7 +746,7 @@ class Goal:
             try:
                 return bool(criteria_func(state))
             except Exception:
-                logger.debug("Falló el criterio de logro del objetivo %s.", self.id, exc_info=True)
+                logger.debug("Fallo el criterio de logro del objetivo %s.", self.id, exc_info=True)
                 return False
 
         target_state = metadata.get("target_state")
@@ -802,7 +802,7 @@ class Goal:
         return base_cost * complexity_factor
 
     def is_expired(self) -> bool:
-        """Indica si se ha superado el deadline válido del objetivo."""
+        """Indica si se ha superado el deadline valido del objetivo."""
         return self.deadline is not None and time.time() > _safe_float(self.deadline, float("inf"))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -835,7 +835,7 @@ class Goal:
 
 @dataclass
 class Task:
-    """Tarea jerárquica descomponible en otras tareas o nodos."""
+    """Tarea jerarquica descomponible en otras tareas o nodos."""
 
     id: str
     name: str
@@ -878,7 +878,7 @@ class Task:
         all_nodes: Dict[str, Any],
         current_state: Dict[str, Any],
     ) -> bool:
-        """Comprueba una dependencia usando la semántica disponible en el modelo."""
+        """Comprueba una dependencia usando la semantica disponible en el modelo."""
         if not isinstance(all_nodes, dict):
             return False
         dependency = all_nodes.get(dependency_id)
@@ -892,13 +892,13 @@ class Task:
         return False
 
     def can_execute(self, current_state: Dict[str, Any], all_nodes: Dict[str, Any]) -> bool:
-        """Verifica dependencias y disponibilidad de hijos, evitando ciclos jerárquicos."""
+        """Verifica dependencias y disponibilidad de hijos, evitando ciclos jerarquicos."""
         state = current_state if isinstance(current_state, dict) else {}
         nodes = all_nodes if isinstance(all_nodes, dict) else {}
 
         def _can_execute(task: "Task", active_path: Set[str]) -> bool:
             if task.id in active_path:
-                logger.warning("Ciclo detectado en la jerarquía de tareas: %s.", task.id)
+                logger.warning("Ciclo detectado en la jerarquia de tareas: %s.", task.id)
                 return False
 
             if any(
@@ -947,7 +947,7 @@ class Task:
         return _decompose(self, set())
 
     def get_execution_plan(self, current_state: Dict[str, Any], all_nodes: Dict[str, Any]) -> List[str]:
-        """Obtiene candidatos ejecutables en el orden declarado y sin recursión cíclica."""
+        """Obtiene candidatos ejecutables en el orden declarado y sin recursion ciclica."""
         if self.status == TaskStatus.COMPLETED:
             return []
 
@@ -975,7 +975,7 @@ class Task:
         return _build_plan(self, set())
 
     def estimate_task_cost(self, current_state: Dict[str, Any], all_nodes: Dict[str, Any]) -> float:
-        """Estima el coste de los hijos ejecutables sin contar ramas cíclicas."""
+        """Estima el coste de los hijos ejecutables sin contar ramas ciclicas."""
         if self.status == TaskStatus.COMPLETED:
             return 0.0
 
@@ -1038,7 +1038,7 @@ def create_action_node(
     cost: float = 1.0,
     **kwargs,
 ) -> Node:
-    """Crea un nodo de acción reutilizable."""
+    """Crea un nodo de accion reutilizable."""
     kwargs.setdefault("reusable_action", True)
     kwargs.setdefault("action_category", "basic_action")
     return Node(
@@ -1053,7 +1053,7 @@ def create_action_node(
 
 
 def create_application_node(id: str, name: str, app_name: str, **kwargs) -> Node:
-    """Crea un nodo que representa una aplicación."""
+    """Crea un nodo que representa una aplicacion."""
     return Node(id=id, type=NodeType.APPLICATION, name=name, application=app_name, **kwargs)
 
 
@@ -1070,7 +1070,7 @@ def create_condition_node(
     condition_func: Callable[[Dict[str, Any]], bool],
     **kwargs,
 ) -> Node:
-    """Crea un nodo de condición mediante callback."""
+    """Crea un nodo de condicion mediante callback."""
     functions = list(kwargs.pop("preconditions_functions", []) or [])
     functions.append(condition_func)
     return Node(id=id, type=NodeType.CONDITION, name=name, preconditions_functions=functions, **kwargs)
@@ -1079,10 +1079,10 @@ def create_condition_node(
 @dataclass
 class WorldState:
     """
-    Estado del mundo canónico para planificación.
+    Estado del mundo canonico para planificacion.
 
     Es un contenedor deliberadamente ligero para el estado utilizado por el
-    grafo y el planner; no sustituye estructuras más ricas de memoria.
+    grafo y el planner; no sustituye estructuras mas ricas de memoria.
     """
 
     state: Dict[str, Any] = field(default_factory=dict)
@@ -1111,7 +1111,7 @@ class WorldState:
         return WorldState(state=_copy_state(self.state))
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convierte el estado a una representación serializable."""
+        """Convierte el estado a una representacion serializable."""
         return {"state": _serialize_value(self.state)}
 
     @classmethod

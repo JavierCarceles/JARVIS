@@ -1,9 +1,9 @@
 """
-Tests de inicialización para el módulo Brain 2.8.13.5
+Tests de inicializacion para el modulo Brain 2.8.13.5
 
 Verifica que el paquete src.brain exporta correctamente sus componentes
-públicos (Brain, HTNBrainIntegration, get_htn_integration) y que
-HTNIntegrationResult está disponible como dataclass auxiliar.
+publicos (Brain, HTNBrainIntegration, get_htn_integration) y que
+HTNIntegrationResult esta disponible como dataclass auxiliar.
 """
 
 import unittest
@@ -19,7 +19,7 @@ from src.brain.htn_integration import HTNIntegrationResult
 
 
 class TestBrainInitExports(unittest.TestCase):
-    """2.8.13.5.1 — Verificar exports del paquete Brain"""
+    """2.8.13.5.1 - Verificar exports del paquete Brain"""
 
     def test_2_8_13_5_1_brain_exported(self):
         """Brain debe estar exportado y ser una clase."""

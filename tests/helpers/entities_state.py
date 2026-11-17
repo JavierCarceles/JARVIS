@@ -2,7 +2,7 @@
 """Helper reutilizable para capturar y comparar el estado exacto de un
 entities.json antes y despues de una operacion.
 
-Unidad 3.8.4.4.3 (padre 3.8.4.4, FASE 3.8 — CONOCIMIENTO DINAMICO SIN ALTERAR
+Unidad 3.8.4.4.3 (padre 3.8.4.4, FASE 3.8 - CONOCIMIENTO DINAMICO SIN ALTERAR
 ENTITIES.JSON).
 
 El helper cumple estrictamente con el requisito de la unidad:

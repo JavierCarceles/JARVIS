@@ -5,11 +5,11 @@ Responsabilidades:
 - Recibir Goal, estado actual y nodos disponibles.
 - Construir/usar el StateGraph para obtener rutas.
 - Mantener compatibilidad con HTN, conocimiento de aplicaciones,
-  optimización, aprendizaje y CoordinateManager.
+  optimizacion, aprendizaje y CoordinateManager.
 - Devolver un PlanningResult estructurado.
 
-La planificación no ejecuta acciones físicas. La ejecución, cuando se solicita
-explícitamente por compatibilidad, se delega a un executor externo.
+La planificacion no ejecuta acciones fisicas. La ejecucion, cuando se solicita
+explicitamente por compatibilidad, se delega a un executor externo.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
-# El proyecto ha usado ambas convenciones de importación. Se acepta la ruta
+# El proyecto ha usado ambas convenciones de importacion. Se acepta la ruta
 # instalada y la ruta relativa al directorio src para evitar fallos de arranque.
 try:
     from src.hands.planner.node import Goal, Node, NodeType
@@ -37,8 +37,8 @@ try:
     from src.hands.planner.application_integration import (
         get_application_knowledge_integrator,
     )
-    from src.hands.coordinate_manager import get_coordinate_manager
-    from src.utils.logger import get_logger
+    from src.hands.calibration.coordinate_manager import get_coordinate_manager
+    from src.core.log import get_logger
 except ImportError:  # pragma: no cover - depende del layout del proyecto
     from src.hands.planner.node import Goal, Node, NodeType
     from src.hands.planner.graph import (
@@ -51,8 +51,8 @@ except ImportError:  # pragma: no cover - depende del layout del proyecto
     from src.hands.planner.application_integration import (
         get_application_knowledge_integrator,
     )
-    from src.hands.coordinate_manager import get_coordinate_manager
-    from src.utils.logger import get_logger
+    from src.hands.calibration.coordinate_manager import get_coordinate_manager
+    from src.core.log import get_logger
 
 logger = get_logger(__name__)
 
@@ -75,7 +75,7 @@ class PlanQuality(Enum):
 
 @dataclass
 class PlanningResult:
-    """Resultado estructurado de una solicitud de planificación."""
+    """Resultado estructurado de una solicitud de planificacion."""
 
     status: PlannerStatus
     plan: List[Dict[str, Any]] = field(default_factory=list)
@@ -115,7 +115,7 @@ class PlanningResult:
 
 
 class Planner:
-    """Planificador central de JARVIS; no ejecuta físicamente sus planes."""
+    """Planificador central de JARVIS; no ejecuta fisicamente sus planes."""
 
     def __init__(self, executor: Any = None) -> None:
         self.executor = executor
@@ -141,7 +141,7 @@ class Planner:
             self.application_integrator = None
         self.htn_manager: Optional[Any] = None
         try:
-            from src.hands.calibrator import get_enhanced_calibrator
+            from src.hands.calibration.calibrator import get_enhanced_calibrator
 
             self.calibrator = get_enhanced_calibrator()
         except Exception as exc:
@@ -229,7 +229,7 @@ class Planner:
         self.learning_system.enable_learning(bool(enabled))
 
     # ==================================================================
-    # HTN (solo descomposición/planificación, nunca ejecución física)
+    # HTN (solo descomposicion/planificacion, nunca ejecucion fisica)
     # ==================================================================
 
     def initialize_htn_manager(self) -> None:
@@ -296,9 +296,9 @@ class Planner:
             self._record_planning_history(goal, state, result, "htn_graph_integration")
             return result
         except Exception as exc:
-            logger.exception("[PLANNER] Error en planificación HTN + grafo")
+            logger.exception("[PLANNER] Error en planificacion HTN + grafo")
             return self._failure_result(
-                f"Error en planificación integrada: {exc}", goal, state, started
+                f"Error en planificaci\u00f3n integrada: {exc}", goal, state, started
             )
 
     def _plan_with_graph_optimized(
@@ -329,8 +329,8 @@ class Planner:
             return self._create_plan(
                 goal, current_state, available_nodes, max_planning_time
             )
-        # Solo se invocan APIs de descomposición o planificación. Los métodos cuyo
-        # nombre indica ejecución se excluyen para mantener este módulo no ejecutor.
+        # Solo se invocan APIs de descomposicion o planificacion. Los metodos cuyo
+        # nombre indica ejecucion se excluyen para mantener este modulo no ejecutor.
         for method_name in (
             "plan_goal",
             "decompose_and_plan",
@@ -349,7 +349,7 @@ class Planner:
                 if result is not None:
                     return result
             except Exception as exc:
-                logger.warning("[PLANNER] HTN %s falló: %s", method_name, exc)
+                logger.warning("[PLANNER] HTN %s fallo: %s", method_name, exc)
         return self._create_plan(
             goal, current_state, available_nodes, max_planning_time
         )
@@ -384,7 +384,7 @@ class Planner:
                         return result
                 except Exception as exc:
                     logger.warning(
-                        "[PLANNER] Descomposición HTN %s falló: %s", method_name, exc
+                        "[PLANNER] Descomposicion HTN %s fallo: %s", method_name, exc
                     )
         if self.state_graph is not None:
             result = self._create_plan_astar(
@@ -433,8 +433,8 @@ class Planner:
                 )
             return method(*full_args[:count])
         except (ValueError, AttributeError):
-            # Algunos callables C/extensión no exponen firma introspectable. Solo
-            # en ese caso se usa una llamada conservadora y única.
+            # Algunos callables C/extension no exponen firma introspectable. Solo
+            # en ese caso se usa una llamada conservadora y unica.
             return method(goal, current_state)
 
     def _coerce_htn_result(
@@ -542,7 +542,7 @@ class Planner:
                     )
             else:
                 logger.warning(
-                    "[PLANNER] Se omite paso HTN no interpretable en posición %s", index
+                    "[PLANNER] Se omite paso HTN no interpretable en posicion %s", index
                 )
         return normalized
 
@@ -618,7 +618,7 @@ class Planner:
                 continue
             node_id = getattr(node, "id", None)
             if not isinstance(node_id, str) or not node_id.strip():
-                logger.warning("[PLANNER] Se ignora un nodo sin ID válido: %r", key)
+                logger.warning("[PLANNER] Se ignora un nodo sin ID valido: %r", key)
                 continue
             if key != node_id:
                 logger.debug(
@@ -638,7 +638,7 @@ class Planner:
         return graph
 
     def _build_graph_edges(self, graph: StateGraph, nodes: Dict[str, Node]) -> None:
-        """Genera solo transiciones respaldadas por dependencias o semántica."""
+        """Genera solo transiciones respaldadas por dependencias o semantica."""
         if graph is None:
             return
         for source_id, source_node in nodes.items():
@@ -669,13 +669,13 @@ class Planner:
                     )
 
     def _should_create_edge(self, source_node: Node, target_node: Node) -> bool:
-        """No conecta nodos solo por compartir tipo o aplicación."""
+        """No conecta nodos solo por compartir tipo o aplicacion."""
         source_id = str(getattr(source_node, "id", ""))
         target_id = str(getattr(target_node, "id", ""))
         source_type = self._node_type_value(source_node)
         target_type = self._node_type_value(target_node)
 
-        # Dependencias y jerarquía declaradas tienen prioridad semántica.
+        # Dependencias y jerarquia declaradas tienen prioridad semantica.
         target_dependencies = _as_values(getattr(target_node, "dependencies", []))
         if source_id in {
             str(getattr(item, "id", item)) for item in target_dependencies
@@ -711,8 +711,8 @@ class Planner:
         if self._facts_support_conditions(source_facts, target_preconditions):
             return True
 
-        # Un estado puede habilitar una acción si sus hechos declarados satisfacen
-        # sus precondiciones; no existe conexión automática state->action.
+        # Un estado puede habilitar una accion si sus hechos declarados satisfacen
+        # sus precondiciones; no existe conexion automatica state->action.
         if source_type == "state" and target_type == "action":
             return self._facts_support_conditions(
                 self._node_state_facts(source_node), target_preconditions
@@ -750,7 +750,7 @@ class Planner:
                     method(*args)
                 except Exception:
                     logger.exception(
-                        "[PLANNER] Falló la integración del grafo mediante %s",
+                        "[PLANNER] Fallo la integracion del grafo mediante %s",
                         method_name,
                     )
 
@@ -776,7 +776,7 @@ class Planner:
                 errors.append(f"Nodo no encontrado en grafo: {node_id}")
         for method_name in ("add_node", "add_edge"):
             if not callable(getattr(self.state_graph, method_name, None)):
-                errors.append(f"Método requerido no encontrado en grafo: {method_name}")
+                errors.append(f"M\u00e9todo requerido no encontrado en grafo: {method_name}")
         if not hasattr(self.state_graph, "edges"):
             errors.append("Propiedad requerida no encontrada en grafo: edges")
         return errors
@@ -790,7 +790,7 @@ class Planner:
                 try:
                     graph_stats = stats_method()
                 except Exception as exc:
-                    errors.append(f"Error obteniendo estadísticas: {exc}")
+                    errors.append(f"Error obteniendo estad\u00edsticas: {exc}")
         return {
             "graph_configured": self.state_graph is not None,
             "htn_manager_available": self.htn_manager is not None,
@@ -800,7 +800,7 @@ class Planner:
         }
 
     # ==================================================================
-    # CONFIGURACIÓN DEL GRAFO / A*
+    # CONFIGURACION DEL GRAFO / A*
     # ==================================================================
 
     def configure_astar_planning(
@@ -816,7 +816,7 @@ class Planner:
             self.heuristic = Heuristic(heuristic_type, weight)
         except Exception as exc:
             logger.warning(
-                "[PLANNER] Heurística no válida; se usa coste uniforme: %s", exc
+                "[PLANNER] Heuristica no valida; se usa coste uniforme: %s", exc
             )
             self.heuristic = Heuristic(HeuristicType.UNIFORM_COST)
 
@@ -836,7 +836,7 @@ class Planner:
                 self._build_graph_edges(graph, self.available_nodes)
             self.set_state_graph(graph)
         except Exception as exc:
-            logger.exception("[PLANNER] Falló la construcción del grafo %s", graph_type)
+            logger.exception("[PLANNER] Fallo la construccion del grafo %s", graph_type)
             raise RuntimeError(
                 f"No se pudo configurar el grafo {graph_type}: {exc}"
             ) from exc
@@ -852,7 +852,7 @@ class Planner:
         self.set_state_graph(graph)
 
     # ==================================================================
-    # PLANIFICACIÓN PRINCIPAL
+    # PLANIFICACION PRINCIPAL
     # ==================================================================
 
     def plan(
@@ -908,9 +908,9 @@ class Planner:
             self._record_planning_history(goal, state, result, "planner")
             return result
         except Exception as exc:
-            logger.exception("[PLANNER] Error de planificación")
+            logger.exception("[PLANNER] Error de planificacion")
             return self._failure_result(
-                f"Error de planificación: {exc}", goal, state, started
+                f"Error de planificaci\u00f3n: {exc}", goal, state, started
             )
 
     def _plan_with_optional_optimization(
@@ -944,7 +944,7 @@ class Planner:
                         )
                 except Exception as exc:
                     logger.warning(
-                        "[PLANNER] Optimización no disponible; continúa planificación base: %s",
+                        "[PLANNER] Optimizacion no disponible; continua planificacion base: %s",
                         exc,
                     )
         if self.state_graph is not None and self.use_astar:
@@ -1027,7 +1027,7 @@ class Planner:
             fallback = self._create_plan(
                 goal, current_state, available_nodes, max_planning_time
             )
-            fallback.warnings.insert(0, "No se encontró una ruta con A*")
+            fallback.warnings.insert(0, "No se encontr\u00f3 una ruta con A*")
             fallback.metadata.setdefault("algorithm_fallback", "deterministic")
             fallback.metadata.update({"start_node": start_id, "goal_node": goal_id})
             return fallback
@@ -1101,7 +1101,7 @@ class Planner:
                 status=PlannerStatus.FAILED,
                 goal=goal,
                 current_state=dict(current_state),
-                warnings=["No se pudo construir un plan válido"],
+                warnings=["No se pudo construir un plan v\u00e1lido"],
                 metadata={
                     "algorithm": "deterministic",
                     "capabilities_requested": required_capabilities,
@@ -1110,7 +1110,7 @@ class Planner:
         # 3.3.3.2: verificar que las acciones del plan existen en el
         # ActionRegistry.  Se reportan como advertencias pero no se eliminan
         # (compatibilidad con nodos legacy/UI que el executor resuelve por otros
-        # medios).  La trazabilidad capability -> acción llegará en 3.3.3.3.
+        # medios).  La trazabilidad capability -> accion llegara en 3.3.3.3.
         verification = self.validate_plan_actions(plan)
         warnings: List[str] = []
         if verification["nonexistent_actions"]:
@@ -1152,7 +1152,7 @@ class Planner:
         return dict(self.available_nodes)
 
     def _create_compatibility_nodes(self) -> Dict[str, Node]:
-        """Nodos mínimos de compatibilidad; no representan ejecución ya realizada."""
+        """Nodos minimos de compatibilidad; no representan ejecucion ya realizada."""
         return {
             "chrome.closed": Node(
                 id="chrome.closed",
@@ -1186,7 +1186,7 @@ class Planner:
             "focus_address_bar": Node(
                 id="focus_address_bar",
                 type=NodeType.ACTION,
-                name="Enfocar barra de dirección",
+                name="Enfocar barra de direcci\u00f3n",
                 preconditions=["chrome_active"],
                 effects=["address_bar_focused"],
                 cost=1.0,
@@ -1197,7 +1197,7 @@ class Planner:
             "click_address_bar": Node(
                 id="click_address_bar",
                 type=NodeType.ACTION,
-                name="Click en barra de dirección",
+                name="Click en barra de direcci\u00f3n",
                 preconditions=["chrome_active"],
                 effects=["address_bar_focused"],
                 cost=1.5,
@@ -1264,7 +1264,7 @@ class Planner:
             else "chrome"
         )
 
-        # Priorizar estados explícitos del contexto en vez de elegir el primer nodo.
+        # Priorizar estados explicitos del contexto en vez de elegir el primer nodo.
         state_candidates: List[Tuple[int, str]] = []
         for node_id, node in nodes.items():
             if self._node_type_value(node) != "state":
@@ -1354,7 +1354,7 @@ class Planner:
                 "ui_element",
             }:
                 # Un nodo Goal no se considera destino salvo que tenga una
-                # transición entrante explícita y no haya mejor terminal de acción.
+                # transicion entrante explicita y no haya mejor terminal de accion.
                 if node_type == "goal" and self._has_incoming_edge(node_id):
                     pass
                 else:
@@ -1483,7 +1483,7 @@ class Planner:
             best = self._select_best_node(candidates, simulated_state)
             if best is None:
                 # Una capacidad puede ser redundante si el estado actual ya
-                # demuestra su efecto; no se inventa una acción para suplirla.
+                # demuestra su efecto; no se inventa una accion para suplirla.
                 if self._capability_already_satisfied(capability, simulated_state):
                     continue
                 continue
@@ -1523,8 +1523,8 @@ class Planner:
                 if callable(checker) and not checker(current_state):
                     continue
             except Exception:
-                # Una API legacy de validación no debe convertir una excepción
-                # en permiso para añadir la acción al plan.
+                # Una API legacy de validacion no debe convertir una excepcion
+                # en permiso para anadir la accion al plan.
                 continue
             if self._node_provides_capability(node, capability):
                 result.append(node)
@@ -1564,8 +1564,8 @@ class Planner:
         )
         if any(alias in tokens for alias in accepted):
             return True
-        # La aplicación solo identifica al proveedor; no implica que toda acción
-        # de esa aplicación implemente cualquier capacidad solicitada.
+        # La aplicacion solo identifica al proveedor; no implica que toda accion
+        # de esa aplicacion implemente cualquier capacidad solicitada.
         return False
 
     def _select_best_node(
@@ -1609,8 +1609,8 @@ class Planner:
         self, plan: List[Dict[str, Any]], current_state: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
         del current_state
-        # Solo se quitan pasos idénticos consecutivos. Repetir una acción en otra
-        # posición puede ser deliberado y por tanto no es una redundancia segura.
+        # Solo se quitan pasos identicos consecutivos. Repetir una accion en otra
+        # posicion puede ser deliberado y por tanto no es una redundancia segura.
         result: List[Dict[str, Any]] = []
         previous_signature = None
         for node in plan:
@@ -1676,12 +1676,12 @@ class Planner:
                 can_calibrate = False
             if can_calibrate:
                 result["recommendations"].append(
-                    f"Calibrar automáticamente: {resource_id}"
+                    f"Calibrar autom\u00e1ticamente: {resource_id}"
                 )
             else:
                 result["needs_manual_calibration"].append(resource_id)
                 result["recommendations"].append(
-                    f"Requiere calibración manual: {resource_id}"
+                    f"Requiere calibraci\u00f3n manual: {resource_id}"
                 )
         return result
 
@@ -1770,11 +1770,11 @@ class Planner:
         return resolved
 
     def get_calibration_requirements(self, goal: Any = None) -> List[str]:
-        '''Expone los requisitos de calibración de un goal al planificador.'''
+        '''Expone los requisitos de calibracion de un goal al planificador.'''
         calibrator = self.calibrator
         if calibrator is None:
             try:
-                from src.hands.calibrator import get_enhanced_calibrator
+                from src.hands.calibration.calibrator import get_enhanced_calibrator
 
                 calibrator = get_enhanced_calibrator()
                 self.calibrator = calibrator
@@ -1846,7 +1846,7 @@ class Planner:
                         )
                     else:
                         readiness["recommendations"].append(
-                            f"Requiere calibración manual: {resource_id}"
+                            f"Requiere calibraci\u00f3n manual: {resource_id}"
                         )
                     if manager is not None:
                         readiness["alternative_strategies"].extend(
@@ -1977,7 +1977,7 @@ class Planner:
         self, plan: List[Dict[str, Any]], current_state: Dict[str, Any]
     ) -> float:
         # Simula efectos declarativos en una copia para no puntuar cada paso contra
-        # un estado congelado que aún no incluye los efectos de pasos anteriores.
+        # un estado congelado que aun no incluye los efectos de pasos anteriores.
         state = copy.deepcopy(current_state)
         checks = matches = 0
         for node in plan:
@@ -2022,11 +2022,11 @@ class Planner:
                 isinstance(ui, dict) and condition[3:] in ui and bool(ui[condition[3:]])
             )
         # Desconocido no equivale a verdadero: una alternativa con precondiciones
-        # que no se pueden comprobar no obtiene una puntuación artificial.
+        # que no se pueden comprobar no obtiene una puntuacion artificial.
         return False
 
     # ==================================================================
-    # REPLANIFICACIÓN
+    # REPLANIFICACION
     # ==================================================================
 
     def replan(
@@ -2042,7 +2042,7 @@ class Planner:
                 status=PlannerStatus.FAILED,
                 goal=goal,
                 current_state=state,
-                warnings=["Índice de nodo fallido inválido"],
+                warnings=["\u00cdndice de nodo fallido inv\u00e1lido"],
             )
         failed_node = failed_plan[failed_node_index]
         alternatives = self._find_alternatives_for_node(
@@ -2074,7 +2074,7 @@ class Planner:
                     },
                 )
         logger.info(
-            "[PLANNER] Sin alternativa local; se intenta una planificación completa"
+            "[PLANNER] Sin alternativa local; se intenta una planificacion completa"
         )
         return self.plan(
             goal,
@@ -2196,7 +2196,7 @@ class Planner:
                         self.available_nodes[node_id] = node
             except Exception as exc:
                 logger.warning(
-                    "[PLANNER] Error cargando aplicación %s: %s", app_name, exc
+                    "[PLANNER] Error cargando aplicacion %s: %s", app_name, exc
                 )
 
     def get_applications_by_capability(self, capability_name: str) -> List[str]:
@@ -2205,13 +2205,13 @@ class Planner:
             return []
         try:
             try:
-                from src.hands.applications_core import ApplicationCapability
+                from src.hands.apps.applications_core import ApplicationCapability
             except ImportError:
-                from src.hands.applications_core import ApplicationCapability
+                from src.hands.apps.applications_core import ApplicationCapability
             capability = ApplicationCapability(capability_name)
             return list(integrator.get_applications_by_capability(capability) or [])
         except Exception as exc:
-            logger.warning("[PLANNER] Capacidad no válida %s: %s", capability_name, exc)
+            logger.warning("[PLANNER] Capacidad no valida %s: %s", capability_name, exc)
             try:
                 return list(
                     integrator.get_applications_by_capability(capability_name) or []
@@ -2234,19 +2234,19 @@ class Planner:
             return {}
 
     def get_application_capabilities_as_list(self, app_name: str) -> List[str]:
-        """Expone las capacidades de una aplicación en formato consumible por el
-        planificador: una lista de identificadores canónicos de capacidad.
+        """Expone las capacidades de una aplicacion en formato consumible por el
+        planificador: una lista de identificadores canonicos de capacidad.
 
-        Reutiliza el contrato canónico :meth:`get_application_capabilities` (no
-        duplica lógica) y transforma ese dict —cuyas claves son nombres
-        específicos de la aplicación— a una lista de los identificadores
-        canónicos de capacidad (``descriptor["capability"]``) que el planificador
-        consume en la fase de planificación. Normaliza con :func:`_slug` para
-        coincidir con el vocabulario canónico usado en
+        Reutiliza el contrato canonico :meth:`get_application_capabilities` (no
+        duplica logica) y transforma ese dict -cuyas claves son nombres
+        especificos de la aplicacion- a una lista de los identificadores
+        canonicos de capacidad (``descriptor["capability"]``) que el planificador
+        consume en la fase de planificacion. Normaliza con :func:`_slug` para
+        coincidir con el vocabulario canonico usado en
         :meth:`_node_provides_capability`.
 
-        Maneja el ausente —integrador no disponible, aplicación desconocida o
-        aplicación conocida sin capacidades declaradas— devolviendo ``[]`` en
+        Maneja el ausente -integrador no disponible, aplicacion desconocida o
+        aplicacion conocida sin capacidades declaradas- devolviendo ``[]`` en
         lugar de lanzar ni devolver estructuras parciales.
         """
         capabilities = self.get_application_capabilities(app_name)
@@ -2271,37 +2271,37 @@ class Planner:
         """Trazabilidad aplicacion -> capability -> accion.
 
         Documenta, para cada capability expuesta por ``app_name``, los nodos de
-        acción que la proporcionan y si la acción efectiva está registrada en
+        accion que la proporcionan y si la accion efectiva esta registrada en
         el ``ActionRegistry``.
 
-        Es la unión de las verificaciones ya existentes, sin duplicar lógica:
+        Es la union de las verificaciones ya existentes, sin duplicar logica:
 
         * ``get_application_capabilities_as_list`` (3.3.3.1) expone los
-          identificadores canónicos de capability de la aplicación.
+          identificadores canonicos de capability de la aplicacion.
         * ``_node_provides_capability`` resuelve el matching capability -> nodo.
         * ``_resolve_node_action_name`` y ``action_exists`` (3.3.3.2) verifican
-          que la acción efectiva del nodo está registrada.
+          que la accion efectiva del nodo esta registrada.
 
         A diferencia de ``_find_nodes_for_capability``, esta trazabilidad NO
-        aplica el filtro de estado (``can_execute``): documenta qué capacidades
-        y acciones *existen*, no cuáles son ejecutables en un estado concreto.
-        Los nodos se restringen a la aplicación solicitada (normalización
-        insensible a mayúsculas/minúsculas) para evitar fugas entre aplicaciones
+        aplica el filtro de estado (``can_execute``): documenta que capacidades
+        y acciones *existen*, no cuales son ejecutables en un estado concreto.
+        Los nodos se restringen a la aplicacion solicitada (normalizacion
+        insensible a mayusculas/minusculas) para evitar fugas entre aplicaciones
         (p.ej. ``spotify_open`` al trazar la capability ``open`` de Chrome).
 
         Args:
-            app_name: Nombre de la aplicación a trazar.
+            app_name: Nombre de la aplicacion a trazar.
             capability: Si se pasa, traza solo esa capability en lugar de todas
-                las expuestas por la aplicación.
+                las expuestas por la aplicacion.
 
         Returns:
-            Dict con ``application``, ``available`` (True si la aplicación
+            Dict con ``application``, ``available`` (True si la aplicacion
             expone capabilities) y ``capabilities``: lista ordenada de entries,
             cada una con ``capability``, ``providing_nodes``
             (cada nodo: ``node_id``, ``action_name``, ``action_exists``,
             ``action_category``, ``category_action_exists``, ``source``),
             ``implemented_actions`` (acciones registradas que la cuben) y
-            ``covered`` (``True`` si alguna acción registrada implementa la
+            ``covered`` (``True`` si alguna accion registrada implementa la
             capability).
         """
         result: Dict[str, Any] = {
@@ -2403,7 +2403,7 @@ class Planner:
                         except Exception:
                             continue
         except Exception as exc:
-            logger.debug("[PLANNER] Error buscando aplicación: %s", exc)
+            logger.debug("[PLANNER] Error buscando aplicacion: %s", exc)
         return None
 
     def build_application_aware_plan(
@@ -2439,15 +2439,15 @@ class Planner:
         return result
 
     # ==================================================================
-    # VERIFICACIÓN DE ACCIONES EXISTENTES (3.3.3.2)
+    # VERIFICACION DE ACCIONES EXISTENTES (3.3.3.2)
     # ==================================================================
 
     def _get_action_registry(self) -> Optional[Any]:
-        """Obtiene el ActionRegistry disponible a través del executor o directamente.
+        """Obtiene el ActionRegistry disponible a traves del executor o directamente.
 
         Reutiliza el registro del executor cuando existe; en caso contrario
-        intenta resolverlo mediante la función de acceso global.  Si en ningún
-        caso está disponible, devuelve ``None`` para que los llamadores
+        intenta resolverlo mediante la funcion de acceso global.  Si en ningun
+        caso esta disponible, devuelve ``None`` para que los llamadores
         preserven el plan sin filtrar (modo paso seguro).
         """
         registry = (
@@ -2458,7 +2458,7 @@ class Planner:
         if registry is not None:
             return registry
         try:
-            from src.hands.action_registry import get_action_registry
+            from src.hands.actions.action_registry import get_action_registry
 
             return get_action_registry()
         except Exception as exc:  # pragma: no cover - zona defensiva
@@ -2466,7 +2466,7 @@ class Planner:
             return None
 
     def action_exists(self, action_name: str) -> bool:
-        """Verifica si *action_name* está registrada en el ActionRegistry."""
+        """Verifica si *action_name* esta registrada en el ActionRegistry."""
         if not isinstance(action_name, str) or not action_name.strip():
             return False
         registry = self._get_action_registry()
@@ -2475,17 +2475,17 @@ class Planner:
         try:
             return registry.get_action(action_name) is not None
         except Exception as exc:
-            logger.debug("[PLANNER] Error verificando acción %s: %s", action_name, exc)
+            logger.debug("[PLANNER] Error verificando accion %s: %s", action_name, exc)
             return False
 
     @staticmethod
     def _resolve_node_action_name(node: Dict[str, Any]) -> Optional[str]:
-        """Determina el nombre de acción efectivo de un paso de plan.
+        """Determina el nombre de accion efectivo de un paso de plan.
 
-        Replica la lógica de resolución de ``Executor._execute_node_action``:
+        Replica la logica de resolucion de ``Executor._execute_node_action``:
 
         * Si el nodo dispone de ``execute_callback``, no necesita estar en el
-          ActionRegistry → devuelve ``None``.
+          ActionRegistry -> devuelve ``None``.
         * En caso contrario, resuelve el nombre mediante
           ``metadata["action_name"]`` / ``metadata["action"]`` (cuando el
           ``action`` del nodo coincide con su ``id``) o, por defecto, el
@@ -2516,12 +2516,12 @@ class Planner:
     ) -> Dict[str, Any]:
         """Verifica que las acciones de *plan* existen en el ActionRegistry.
 
-        Un paso se considera **válido** cuando:
+        Un paso se considera **valido** cuando:
 
-        * Tiene ``execute_callback`` (ejecutable sin registro), ó
-        * Su nombre de acción efectivo está registrado en el ActionRegistry.
+        * Tiene ``execute_callback`` (ejecutable sin registro), o
+        * Su nombre de accion efectivo esta registrado en el ActionRegistry.
 
-        Devuelve un diccionario con la información de verificación.
+        Devuelve un diccionario con la informacion de verificacion.
         """
         steps = plan if isinstance(plan, list) else []
         total_steps = len(steps)
@@ -2563,7 +2563,7 @@ class Planner:
         """Filtra los pasos de *plan* cuyas acciones no existen en el ActionRegistry.
 
         Conserva los pasos que tienen ``execute_callback`` o cuyo nombre de
-        acción efectivo está registrado.  El plan original no se modifica.
+        accion efectivo esta registrado.  El plan original no se modifica.
         """
         filtered, _ = self._filter_plan_actions(plan)
         return filtered
@@ -2574,7 +2574,7 @@ class Planner:
         """Filtra pasos con acciones inexistentes del plan.
 
         Retorna una tupla ``(plan_filtrado, acciones_eliminadas)``.  Cuando el
-        ActionRegistry no está disponible, el plan se conserva sin cambios.
+        ActionRegistry no esta disponible, el plan se conserva sin cambios.
         """
         registry = self._get_action_registry()
         if registry is None:
@@ -2594,7 +2594,7 @@ class Planner:
             else:
                 removed.append(action_name)
                 logger.warning(
-                    "[PLANNER] Acción inexistente filtrada del plan: %s",
+                    "[PLANNER] Accion inexistente filtrada del plan: %s",
                     action_name,
                 )
         return filtered, removed
@@ -2602,9 +2602,9 @@ class Planner:
     def is_application_available(self, app_name: str) -> bool:
         try:
             try:
-                from src.hands.application_preflight import ApplicationPreflight
+                from src.hands.apps.application_preflight import ApplicationPreflight
             except ImportError:
-                from src.hands.application_preflight import ApplicationPreflight
+                from src.hands.apps.application_preflight import ApplicationPreflight
             result = ApplicationPreflight().check(
                 {"name": app_name, "app_id": ""}
             )
@@ -2620,7 +2620,7 @@ class Planner:
             return []
         try:
             try:
-                from src.hands.applications_core import ApplicationCapability
+                from src.hands.apps.applications_core import ApplicationCapability
 
                 capability_obj: Any = ApplicationCapability(capability)
             except (ImportError, ValueError, TypeError):
@@ -2636,7 +2636,7 @@ class Planner:
             return []
 
     # ==================================================================
-    # ESTADÍSTICAS / DELEGACIÓN DE EJECUCIÓN COMPATIBLE
+    # ESTADISTICAS / DELEGACION DE EJECUCION COMPATIBLE
     # ==================================================================
 
     def get_planning_stats(self) -> Dict[str, Any]:
@@ -2671,7 +2671,7 @@ class Planner:
     def execute_plan(
         self, plan: List[Dict[str, Any]], plan_id: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Delegación explícita legacy. Nunca ejecuta acciones dentro del Planner."""
+        """Delegacion explicita legacy. Nunca ejecuta acciones dentro del Planner."""
         if self.executor is None:
             return {
                 "plan_id": plan_id,
@@ -2701,7 +2701,7 @@ class Planner:
             else:
                 success = bool(raw)
                 elapsed = 0.0
-                error = None if success else "El executor no confirmó el éxito"
+                error = None if success else "El executor no confirm\u00f3 el \u00e9xito"
             return {
                 "plan_id": plan_id,
                 "execution_status": "success" if success else "failed",
@@ -2710,7 +2710,7 @@ class Planner:
                 "error": error,
             }
         except Exception as exc:
-            logger.exception("[PLANNER] El executor externo falló")
+            logger.exception("[PLANNER] El executor externo fallo")
             return {
                 "plan_id": plan_id,
                 "execution_status": "failed",
@@ -2726,7 +2726,7 @@ class Planner:
         success: bool,
         context: Dict[str, Any],
     ) -> None:
-        """Registra feedback tras una ejecución externa real; plan() no lo simula."""
+        """Registra feedback tras una ejecucion externa real; plan() no lo simula."""
         elapsed = _finite_nonnegative(execution_time, 0.0)
         if self.optimization_manager is not None and callable(
             getattr(self.optimization_manager, "record_execution_result", None)
@@ -2806,7 +2806,7 @@ class Planner:
             selected = OptimizationType(optimization_type)
             self.optimization_manager.enable_optimization(selected, bool(enabled))
         except Exception as exc:
-            logger.warning("[PLANNER] Error configurando optimización: %s", exc)
+            logger.warning("[PLANNER] Error configurando optimizacion: %s", exc)
 
     def export_optimization_data(self, filepath: str) -> None:
         method = (
@@ -2832,7 +2832,7 @@ class Planner:
         if stats.get("cache_hit_rate", 0) < 0.1 and stats.get(
             "optimization_available", True
         ):
-            recommendations.append("Revisar la reutilización de rutas en caché")
+            recommendations.append("Revisar la reutilizaci\u00f3n de rutas en cach\u00e9")
         return recommendations
 
     # ==================================================================
@@ -2861,8 +2861,8 @@ class Planner:
             "plan_id": result.plan_id,
         }
         self.planning_history.append(record)
-        # Importante: no se llama a record_plan_execution aquí. Que exista un plan
-        # no demuestra que haya sido ejecutado ni que sus acciones hayan tenido éxito.
+        # Importante: no se llama a record_plan_execution aqui. Que exista un plan
+        # no demuestra que haya sido ejecutado ni que sus acciones hayan tenido exito.
 
     def _get_default_state(self) -> Dict[str, Any]:
         return {
@@ -3156,7 +3156,7 @@ class Planner:
     # ==================================================================
 
     def _create_sequential_navigation_edges(self) -> None:
-        """Añade secuencia legacy únicamente cuando los nodos existen."""
+        """Anade secuencia legacy unicamente cuando los nodos existen."""
         if self.state_graph is None:
             return
         sequences = [
@@ -3175,8 +3175,8 @@ class Planner:
                 or target not in self.state_graph.nodes
             ):
                 continue
-            # La secuencia histórica solo se usa cuando el grafo contiene alguno
-            # de los nodos de compatibilidad, no como atajo genérico entre apps.
+            # La secuencia historica solo se usa cuando el grafo contiene alguno
+            # de los nodos de compatibilidad, no como atajo generico entre apps.
             if source.startswith("chrome.") or target in {
                 "focus_address_bar",
                 "hotkey_ctrl_l",
@@ -3191,25 +3191,25 @@ class Planner:
                         edge_lookup.add((source, target))
                     except Exception:
                         logger.debug(
-                            "[PLANNER] No se pudo añadir transición legacy",
+                            "[PLANNER] No se pudo anadir transicion legacy",
                             exc_info=True,
                         )
 
     # ==================================================================
-    # HELPERS ADICIONALES DE INTEGRACIÓN
+    # HELPERS ADICIONALES DE INTEGRACION
     # ==================================================================
 
     def _validate_goal_request(
         self, goal: Goal, max_planning_time: float
     ) -> Optional[str]:
         if goal is None or not str(getattr(goal, "id", "") or "").strip():
-            return "Objetivo inválido: falta un ID"
+            return "Objetivo inv\u00e1lido: falta un ID"
         try:
             budget = float(max_planning_time)
             if not math.isfinite(budget) or budget <= 0:
-                return "max_planning_time debe ser un número finito mayor que cero"
+                return "max_planning_time debe ser un n\u00famero finito mayor que cero"
         except (TypeError, ValueError, OverflowError):
-            return "max_planning_time no es válido"
+            return "max_planning_time no es v\u00e1lido"
         if self._is_goal_expired(goal):
             return "El objetivo ha expirado"
         return None
@@ -3360,9 +3360,9 @@ class Planner:
             for effect in _as_values(step.get("effects", [])):
                 state[str(getattr(effect, "value", effect))] = True
         preconditions = _as_values(getattr(node, "preconditions", []))
-        # Si no existe una representación de estado suficiente, no descartamos
-        # automáticamente la alternativa: el executor/precondition manager puede
-        # validar las condiciones dinámicas reales antes de ejecutarla.
+        # Si no existe una representacion de estado suficiente, no descartamos
+        # automaticamente la alternativa: el executor/precondition manager puede
+        # validar las condiciones dinamicas reales antes de ejecutarla.
         known_state = bool(state)
         return (
             all(

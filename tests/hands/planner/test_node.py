@@ -1052,7 +1052,7 @@ class TestTask:
         task = Task(id="t1", name="t1", description="d", children=["t2"])
         task2 = Task(id="t2", name="t2", description="d", children=["t1"])
         all_nodes = {"t1": task, "t2": task2}
-        # Should not hang — returns False due to cycle detection
+        # Should not hang - returns False due to cycle detection
         assert task.can_execute({}, all_nodes) is False
 
     def test_decompose_task_leaf(self):
@@ -1073,7 +1073,7 @@ class TestTask:
         task2 = Task(id="t2", name="t2", description="d", children=["t1"])
         all_nodes = {"t1": task, "t2": task2}
         result = task.decompose_task(all_nodes)
-        # Should not hang — cycle detection returns partial result
+        # Should not hang - cycle detection returns partial result
         assert "t1" not in result or "t2" in result  # doesn't crash
 
     def test_get_execution_plan_not_completed(self):

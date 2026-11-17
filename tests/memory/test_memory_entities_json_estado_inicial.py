@@ -18,7 +18,7 @@ Contrato definido (RECHAZO):
       datos silenciosamente.
 
 Registro 3.2.3.1 documenta que con fichero corrupto register_application
-lo dejaba en [] (pérdida silenciosa). Este test impide que eso vuelva a
+lo dejaba en [] (perdida silenciosa). Este test impide que eso vuelva a
 suceder.
 
 Trabaja SIEMPRE sobre copias en directorios temporales (tmp_path). Nunca
@@ -90,7 +90,7 @@ class TestContratoRechazoEstadoInicialEntitiesJson:
         assert manager.get_entity("ent-uno") is not None
 
     def test_sobre_lista_vacia_preserva_y_anade(self, tmp_path: Path):
-        """Fichero con []: no hay datos validos que perder, se añade la entidad."""
+        """Fichero con []: no hay datos validos que perder, se anade la entidad."""
         memoria_dir = tmp_path / "memory"
         memoria_dir.mkdir(parents=True, exist_ok=True)
         entities_json = memoria_dir / "entities.json"
@@ -143,7 +143,7 @@ class TestContratoRechazoEstadoInicialEntitiesJson:
         self, tmp_path: Path
     ):
         """Regresion 3.8.4.6.3: fichero valido con entidades previas se
-        fusiona sin perder ninguna al añadir una nueva."""
+        fusiona sin perder ninguna al anadir una nueva."""
         memoria_dir = tmp_path / "memory"
         memoria_dir.mkdir(parents=True, exist_ok=True)
         entities_json = memoria_dir / "entities.json"

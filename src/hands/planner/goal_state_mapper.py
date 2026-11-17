@@ -4,10 +4,10 @@ Responsabilidades:
 - Convertir un Goal en nodos del StateGraph.
 - Representar el World State en nodos del StateGraph.
 - Mapear capacidades reutilizables a acciones del grafo.
-- Crear relaciones explícitas entre objetivos, capacidades, acciones y estado.
+- Crear relaciones explicitas entre objetivos, capacidades, acciones y estado.
 - Mantener trazabilidad del mapeo mediante MappingResult e historial.
 
-Este módulo prepara la entrada estructurada que utilizará la siguiente fase
+Este modulo prepara la entrada estructurada que utilizara la siguiente fase
 (6.5.3) para construir rutas/planes. No ejecuta acciones ni convierte rutas
 en planes ejecutables.
 """
@@ -22,7 +22,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from src.hands.planner.graph import StateGraph
 from src.hands.planner.node import Goal, Node, NodeType, WorldState as WorldStateData
-from src.utils.logger import get_logger
+from src.core.log import get_logger
 
 logger = get_logger(__name__)
 
@@ -38,7 +38,7 @@ class MappingType(Enum):
 
 @dataclass
 class MappingResult:
-    """Resultado de una operación de mapeo."""
+    """Resultado de una operacion de mapeo."""
 
     mapping_type: MappingType
     created_nodes: List[str] = field(default_factory=list)
@@ -52,13 +52,13 @@ class GoalStateMapper:
     """
     Mapea Goal y World State al StateGraph.
 
-    El mapper mantiene una separación clara entre:
+    El mapper mantiene una separacion clara entre:
         - conocimiento del objetivo;
         - capacidades necesarias;
         - acciones concretas;
-        - representación del estado actual.
+        - representacion del estado actual.
 
-    No ejecuta acciones y no genera todavía un ``Plan`` ejecutable.
+    No ejecuta acciones y no genera todavia un ``Plan`` ejecutable.
     """
 
     def __init__(self, state_graph: StateGraph) -> None:
@@ -69,7 +69,7 @@ class GoalStateMapper:
         self.mapping_history: List[Dict[str, Any]] = []
 
         # Capacidades primitivas reutilizables. Los valores son plantillas para
-        # crear Nodes; no son acciones ejecutadas por este módulo.
+        # crear Nodes; no son acciones ejecutadas por este modulo.
         self.base_capabilities: Dict[str, Dict[str, Any]] = {
             "open_application": {
                 "type": NodeType.ACTION,
@@ -144,7 +144,7 @@ class GoalStateMapper:
         }
 
     # ======================================================================
-    # API PÚBLICA
+    # API PUBLICA
     # ======================================================================
 
     def map_goal_to_graph(
@@ -176,7 +176,7 @@ class GoalStateMapper:
             )
             result.mapping_quality = self._calculate_mapping_quality(goal, result.created_nodes)
         except Exception as exc:
-            logger.exception("[MAPPER] Falló el mapeo del objetivo")
+            logger.exception("[MAPPER] Fallo el mapeo del objetivo")
             result.warnings.append(f"Fallo en mapeo de objetivo: {exc}")
 
         result.execution_time = max(0.0, time.perf_counter() - started)
@@ -194,12 +194,12 @@ class GoalStateMapper:
         self,
         world_state: WorldStateData,
     ) -> MappingResult:
-        """Mapea el estado del mundo, tanto en formato canónico como legacy."""
+        """Mapea el estado del mundo, tanto en formato canonico como legacy."""
         started = time.perf_counter()
         result = MappingResult(mapping_type=MappingType.STATE_TO_NODES)
         try:
             if world_state is None:
-                result.warnings.append("World State ausente; se mapeará un estado vacío")
+                result.warnings.append("World State ausente; se mapear\u00e1 un estado vac\u00edo")
 
             app_nodes = self._create_application_state_nodes(world_state, result=result)
             resource_nodes = self._create_resource_nodes(world_state, result=result)
@@ -220,7 +220,7 @@ class GoalStateMapper:
                 ),
             )
         except Exception as exc:
-            logger.exception("[MAPPER] Falló el mapeo del estado del mundo")
+            logger.exception("[MAPPER] Fallo el mapeo del estado del mundo")
             result.warnings.append(f"Fallo en mapeo de estado: {exc}")
 
         result.execution_time = max(0.0, time.perf_counter() - started)
@@ -266,7 +266,7 @@ class GoalStateMapper:
                     "Capacidades sin plantilla base: " + ", ".join(unsupported)
                 )
         except Exception as exc:
-            logger.exception("[MAPPER] Falló el mapeo de capacidades")
+            logger.exception("[MAPPER] Fallo el mapeo de capacidades")
             result.warnings.append(f"Fallo en mapeo de capacidades: {exc}")
 
         result.execution_time = max(0.0, time.perf_counter() - started)
@@ -278,7 +278,7 @@ class GoalStateMapper:
         goal: Goal,
         world_state: WorldStateData,
     ) -> MappingResult:
-        """Realiza el mapeo híbrido y agrega sus resultados sin duplicados."""
+        """Realiza el mapeo hibrido y agrega sus resultados sin duplicados."""
         started = time.perf_counter()
         result = MappingResult(mapping_type=MappingType.HYBRID)
         goal_result = self.map_goal_to_graph(goal, world_state)
@@ -311,7 +311,7 @@ class GoalStateMapper:
         self.mapping_history.clear()
 
     # ======================================================================
-    # CREACIÓN DE NODOS DE GOAL
+    # CREACION DE NODOS DE GOAL
     # ======================================================================
 
     def _create_goal_node(
@@ -319,7 +319,7 @@ class GoalStateMapper:
         goal: Goal,
         world_state: Optional[WorldStateData] = None,
     ) -> Node:
-        """Crea el nodo raíz de un objetivo con metadatos normalizados."""
+        """Crea el nodo raiz de un objetivo con metadatos normalizados."""
         goal_id = self._get_required_id(goal, "goal")
         goal_type = self._normalize_goal_type(self._safe_getattr(goal, "type", "goal"))
         description = str(
@@ -355,7 +355,7 @@ class GoalStateMapper:
         *,
         result: Optional[MappingResult] = None,
     ) -> List[str]:
-        """Crea una única instancia de cada capacidad base reconocida."""
+        """Crea una unica instancia de cada capacidad base reconocida."""
         created_nodes: List[str] = []
         for raw_capability in self._safe_iterable(capabilities):
             if raw_capability is None:
@@ -381,7 +381,7 @@ class GoalStateMapper:
         capability: str,
         template: Dict[str, Any],
     ) -> Node:
-        """Construye una acción reutilizable a partir de una plantilla validada."""
+        """Construye una accion reutilizable a partir de una plantilla validada."""
         raw_cost = template.get("cost", 1.0)
         cost = self._safe_nonnegative_float(raw_cost, default=1.0)
         return Node(
@@ -404,11 +404,11 @@ class GoalStateMapper:
         *,
         result: Optional[MappingResult] = None,
     ) -> List[str]:
-        """Crea acciones concretas según la intención y el tipo de objetivo."""
+        """Crea acciones concretas segun la intencion y el tipo de objetivo."""
         goal_type = self._normalize_goal_type(self._safe_getattr(goal, "type", ""))
 
-        # Para búsquedas de una plataforma conocida, la secuencia especializada
-        # sustituye a la búsqueda genérica; así se evitan acciones duplicadas.
+        # Para busquedas de una plataforma conocida, la secuencia especializada
+        # sustituye a la busqueda generica; asi se evitan acciones duplicadas.
         if goal_type == "search":
             specialized = self._map_goal_specific_nodes(goal, world_state, result=result)
             if specialized:
@@ -437,7 +437,7 @@ class GoalStateMapper:
         *,
         result: Optional[MappingResult] = None,
     ) -> List[str]:
-        """Crea la secuencia lógica de abrir el navegador y navegar a un destino."""
+        """Crea la secuencia logica de abrir el navegador y navegar a un destino."""
         del world_state
         nodes: List[str] = []
         goal_id = self._get_required_id(goal, "goal")
@@ -456,7 +456,7 @@ class GoalStateMapper:
                 id=f"open_browser_for_{goal_id}",
                 type=NodeType.ACTION,
                 name="Open Browser",
-                description="Abrir navegador web para navegación",
+                description="Abrir navegador web para navegaci\u00f3n",
                 cost=5.0,
                 preconditions=["application_available"],
                 effects=["browser_open", "browser_active"],
@@ -489,7 +489,7 @@ class GoalStateMapper:
         *,
         result: Optional[MappingResult] = None,
     ) -> List[str]:
-        """Crea los nodos de abrir y activar la aplicación objetivo."""
+        """Crea los nodos de abrir y activar la aplicacion objetivo."""
         del world_state
         target = self._normalize_target_name(
             self._get_goal_target_value(
@@ -501,7 +501,7 @@ class GoalStateMapper:
         goal_id = self._get_required_id(goal, "goal")
         app_node = Node(
             id=f"open_{safe_target}", type=NodeType.ACTION,
-            name=f"Open {target}", description=f"Abrir aplicación {target}",
+            name=f"Open {target}", description=f"Abrir aplicaci\u00f3n {target}",
             cost=5.0, preconditions=["application_available"],
             effects=[f"{safe_target}_open", "application_open"],
             action_category="system", parameters={"application": target},
@@ -526,7 +526,7 @@ class GoalStateMapper:
         *,
         result: Optional[MappingResult] = None,
     ) -> List[str]:
-        """Crea la acción para cerrar la aplicación indicada por el objetivo."""
+        """Crea la accion para cerrar la aplicacion indicada por el objetivo."""
         del world_state
         target = self._normalize_target_name(
             self._get_goal_target_value(
@@ -538,7 +538,7 @@ class GoalStateMapper:
         goal_id = self._get_required_id(goal, "goal")
         close_node = Node(
             id=f"close_{safe_target}", type=NodeType.ACTION,
-            name=f"Close {target}", description=f"Cerrar aplicación {target}",
+            name=f"Close {target}", description=f"Cerrar aplicaci\u00f3n {target}",
             cost=3.0, preconditions=[f"{safe_target}_open"],
             effects=[f"{safe_target}_closed", "application_closed"],
             action_category="system", parameters={"application": target},
@@ -554,7 +554,7 @@ class GoalStateMapper:
         *,
         result: Optional[MappingResult] = None,
     ) -> List[str]:
-        """Crea la secuencia genérica de preparar navegador y realizar búsqueda."""
+        """Crea la secuencia generica de preparar navegador y realizar busqueda."""
         del world_state
         goal_id = self._get_required_id(goal, "goal")
         query = self._get_goal_target_value(
@@ -571,7 +571,7 @@ class GoalStateMapper:
                 id=f"open_browser_for_{goal_id}",
                 type=NodeType.ACTION,
                 name="Open Browser",
-                description="Abrir navegador web para realizar la búsqueda",
+                description="Abrir navegador web para realizar la b\u00fasqueda",
                 cost=5.0,
                 preconditions=["application_available"],
                 effects=["browser_open", "browser_active"],
@@ -584,7 +584,7 @@ class GoalStateMapper:
         search_node = Node(
             id=f"search_for_{goal_id}", type=NodeType.ACTION,
             name="Perform Search",
-            description=f"Realizar búsqueda: {query_text}" if query_text else "Realizar búsqueda solicitada",
+            description=f"Realizar b\u00fasqueda: {query_text}" if query_text else "Realizar b\u00fasqueda solicitada",
             cost=3.0, preconditions=["browser_open", "browser_active"],
             effects=["search_performed", f"search_results_{self._safe_id_component(goal_id)}"],
             parameters={"query": query_text} if query_text else {},
@@ -602,7 +602,7 @@ class GoalStateMapper:
         *,
         result: Optional[MappingResult] = None,
     ) -> List[str]:
-        """Añade una secuencia específica para búsquedas de plataformas conocidas."""
+        """Anade una secuencia especifica para busquedas de plataformas conocidas."""
         del world_state
         target = self._safe_getattr(goal, "target", None)
         metadata = self._get_goal_metadata(goal)
@@ -675,9 +675,9 @@ class GoalStateMapper:
         *,
         result: Optional[MappingResult] = None,
     ) -> List[str]:
-        """Compatibilidad para crear una secuencia genérica de navegador."""
-        # Mantiene el método para callers legacy, pero no interpreta el nombre
-        # "Chrome" como una URL ni genera una navegación inventada.
+        """Compatibilidad para crear una secuencia generica de navegador."""
+        # Mantiene el metodo para callers legacy, pero no interpreta el nombre
+        # "Chrome" como una URL ni genera una navegacion inventada.
         return self._create_navigation_nodes(goal, result=result)
 
     def _create_spotify_specific_nodes(
@@ -696,7 +696,7 @@ class GoalStateMapper:
         nodes: List[str] = []
         spotify_open = Node(
             id=f"open_spotify_for_{goal_id}", type=NodeType.ACTION,
-            name="Open Spotify", description="Abrir la aplicación Spotify",
+            name="Open Spotify", description="Abrir la aplicaci\u00f3n Spotify",
             cost=4.0, preconditions=["spotify_available"],
             effects=["spotify_open", "spotify_active"], action_category="system",
             parameters={"application": "Spotify"},
@@ -726,7 +726,7 @@ class GoalStateMapper:
         *,
         result: Optional[MappingResult] = None,
     ) -> List[str]:
-        """Crea nodos STATE por aplicación, aceptando objetos y diccionarios."""
+        """Crea nodos STATE por aplicacion, aceptando objetos y diccionarios."""
         nodes: List[str] = []
         applications = self._as_dict(self._world_state_field(world_state, "applications", {}))
         for app_name, app_info in applications.items():
@@ -782,7 +782,7 @@ class GoalStateMapper:
             node = Node(
                 id=f"monitor_{safe_monitor}_available", type=NodeType.RESOURCE,
                 name=f"Monitor {monitor_id} Available",
-                description=f"Monitor {monitor_id} está disponible", cost=0.0,
+                description=f"Monitor {monitor_id} est\u00e1 disponible", cost=0.0,
                 metadata={"monitor_id": monitor_id, "available": True, "mapping_phase": "6.5.2"},
             )
             self._add_node(node, result)
@@ -852,7 +852,7 @@ class GoalStateMapper:
         *,
         result: Optional[MappingResult] = None,
     ) -> None:
-        """Crea enlaces dirigidos de descomposición sin introducir ciclos."""
+        """Crea enlaces dirigidos de descomposicion sin introducir ciclos."""
         goal_id = self._safe_getattr(goal, "id", "")
         valid_capabilities = [
             node_id for node_id in capability_nodes if self._get_graph_node(node_id) is not None
@@ -871,11 +871,11 @@ class GoalStateMapper:
             elif not valid_capabilities:
                 self._add_edge(goal_node_id, specific_node, cost=1.0, result=result)
             else:
-                # Una acción sin capacidad compatible sigue siendo accesible desde
+                # Una accion sin capacidad compatible sigue siendo accesible desde
                 # el objetivo, en vez de quedarse aislada.
                 self._add_edge(goal_node_id, specific_node, cost=1.0, result=result)
 
-        # Los nodos específicos se crean en orden lógico; conservar la secuencia
+        # Los nodos especificos se crean en orden logico; conservar la secuencia
         # permite al planificador descubrir el flujo de acciones del mismo objetivo.
         for previous_node, next_node in zip(valid_specific, valid_specific[1:]):
             self._add_edge(previous_node, next_node, cost=0.1, result=result)
@@ -887,7 +887,7 @@ class GoalStateMapper:
         node_id: str,
         goal: Goal,
     ) -> Optional[str]:
-        """Relaciona una acción concreta con la capacidad declarativa adecuada."""
+        """Relaciona una accion concreta con la capacidad declarativa adecuada."""
         node = self._get_graph_node(node_id)
         node_name = str(node_id).casefold()
         goal_type = self._normalize_goal_type(self._safe_getattr(goal, "type", ""))
@@ -942,7 +942,7 @@ class GoalStateMapper:
         *,
         result: Optional[MappingResult] = None,
     ) -> None:
-        """Relaciona estado y recursos solo con identificadores semánticamente asociados."""
+        """Relaciona estado y recursos solo con identificadores semanticamente asociados."""
         del world_state
         resource_ids = set(resource_nodes)
         for calibrated_node_id in calibrated_nodes:
@@ -972,7 +972,7 @@ class GoalStateMapper:
         goal: Goal,
         created_nodes: Sequence[str],
     ) -> float:
-        """Calcula cobertura del mapeo de Goal sin puntuar ejecución."""
+        """Calcula cobertura del mapeo de Goal sin puntuar ejecucion."""
         if not created_nodes:
             return 0.0
 
@@ -1040,13 +1040,13 @@ class GoalStateMapper:
         """Inserta un nodo solo si falta y registra el nodo usado por el mapeo."""
         node_id = self._safe_getattr(node, "id", None)
         if not isinstance(node_id, str) or not node_id.strip():
-            raise ValueError("No se puede mapear un nodo sin id válido")
+            raise ValueError("No se puede mapear un nodo sin id valido")
         existing = self._get_graph_node(node_id)
         if existing is None:
             self.state_graph.add_node(node)
         elif self._safe_getattr(existing, "type", None) != self._safe_getattr(node, "type", None):
             raise ValueError(
-                f"Colisión de id '{node_id}': el nodo existente tiene tipo incompatible"
+                f"Colision de id '{node_id}': el nodo existente tiene tipo incompatible"
             )
         elif self._safe_getattr(node, "type", None) in {
             NodeType.STATE, NodeType.RESOURCE, NodeType.UI_ELEMENT
@@ -1055,7 +1055,7 @@ class GoalStateMapper:
             # conservar valores antiguos al volver a mapear el estado.
             self.state_graph.add_node(node)
         if result is not None and node_id not in result.created_nodes:
-            # Históricamente este campo se utiliza como conjunto de nodos del
+            # Historicamente este campo se utiliza como conjunto de nodos del
             # mapeo, incluidos los que ya estaban en el grafo.
             result.created_nodes.append(node_id)
 
@@ -1067,7 +1067,7 @@ class GoalStateMapper:
         cost: float = 1.0,
         result: Optional[MappingResult] = None,
     ) -> None:
-        """Añade una arista válida y reporta únicamente las transiciones nuevas."""
+        """Anade una arista valida y reporta unicamente las transiciones nuevas."""
         if not source_id or not target_id or source_id == target_id:
             return
         if self._get_graph_node(source_id) is None or self._get_graph_node(target_id) is None:
@@ -1075,15 +1075,15 @@ class GoalStateMapper:
         numeric_cost = self._safe_nonnegative_float(cost, default=float("nan"))
         if not (numeric_cost >= 0.0 and numeric_cost < float("inf")):
             if result is not None:
-                result.warnings.append(f"Coste de arista inválido: {source_id} -> {target_id}")
+                result.warnings.append(f"Coste de arista inv\u00e1lido: {source_id} -> {target_id}")
             return
 
         edge_key = (source_id, target_id)
         if edge_key in self._iter_graph_edges():
             return
         added = self.state_graph.add_edge(source_id, target_id, cost=numeric_cost)
-        # Algunos grafos legacy no devuelven bool; comprobamos la fuente canónica
-        # después de la llamada en vez de asumir que la transición se añadió.
+        # Algunos grafos legacy no devuelven bool; comprobamos la fuente canonica
+        # despues de la llamada en vez de asumir que la transicion se anadio.
         exists_after = edge_key in self._iter_graph_edges()
         if exists_after and added is not False and result is not None and edge_key not in result.created_edges:
             result.created_edges.append(edge_key)
@@ -1124,7 +1124,7 @@ class GoalStateMapper:
                 if source is not None and target is not None:
                     collected.add((str(source), str(target)))
         except TypeError:
-            logger.debug("La representación de aristas del grafo no es iterable")
+            logger.debug("La representacion de aristas del grafo no es iterable")
         return collected
 
     # ======================================================================
@@ -1137,7 +1137,7 @@ class GoalStateMapper:
         capability_nodes: Sequence[str],
         specific_nodes: Sequence[str],
     ) -> None:
-        """Compatibilidad: asegura que los nodos indicados están en el grafo."""
+        """Compatibilidad: asegura que los nodos indicados estan en el grafo."""
         del capability_nodes, specific_nodes
         self._add_node(goal_node)
 
@@ -1151,7 +1151,7 @@ class GoalStateMapper:
         del app_nodes, resource_nodes, calibrated_nodes
 
     def _get_required_capabilities(self, goal: Goal) -> List[str]:
-        """Obtiene capacidades declaradas y añade las necesarias por intención."""
+        """Obtiene capacidades declaradas y anade las necesarias por intencion."""
         try:
             capabilities = goal.get_required_capabilities()
         except (AttributeError, TypeError):
@@ -1190,7 +1190,7 @@ class GoalStateMapper:
         return f"Goal: {goal_type}"
 
     def _get_state_value(self, app_info: Any) -> str:
-        """Normaliza el estado de aplicación cuando llega como enum, objeto o dict."""
+        """Normaliza el estado de aplicacion cuando llega como enum, objeto o dict."""
         state = self._read_field(app_info, "state", "unknown")
         value = self._read_field(state, "value", state)
         if value is None or not str(value).strip():
@@ -1295,7 +1295,7 @@ class GoalStateMapper:
         """Valida y normaliza el identificador requerido para un objeto."""
         value = obj.get("id") if isinstance(obj, dict) else getattr(obj, "id", None)
         if value is None or not str(value).strip():
-            raise ValueError(f"{kind} debe tener un id válido")
+            raise ValueError(f"{kind} debe tener un id valido")
         return str(value).strip()
 
     @staticmethod
@@ -1320,7 +1320,7 @@ class GoalStateMapper:
 
     @staticmethod
     def _normalize_target_name(value: Any) -> str:
-        """Extrae un nombre de aplicación razonable de cadenas o targets estructurados."""
+        """Extrae un nombre de aplicacion razonable de cadenas o targets estructurados."""
         if isinstance(value, dict):
             for key in ("app_name", "application", "program", "name", "title"):
                 candidate = value.get(key)
@@ -1346,7 +1346,7 @@ class GoalStateMapper:
         *,
         result: Optional[MappingResult] = None,
     ) -> List[str]:
-        """Representa hechos libres del estado canónico que no son colecciones."""
+        """Representa hechos libres del estado canonico que no son colecciones."""
         nodes: List[str] = []
         reserved = {"applications", "active_monitor", "available_monitors", "resources", "calibrated_elements"}
         for key, value in self._get_generic_state_entries(world_state).items():
@@ -1370,7 +1370,7 @@ class GoalStateMapper:
         return self._unique_preserve_order(nodes)
 
     def _get_generic_state_entries(self, world_state: Any) -> Dict[str, Any]:
-        """Obtiene el diccionario de hechos del WorldState canónico, si existe."""
+        """Obtiene el diccionario de hechos del WorldState canonico, si existe."""
         if isinstance(world_state, dict):
             payload = world_state.get("state", world_state)
             return payload if isinstance(payload, dict) else {}
@@ -1434,7 +1434,7 @@ class GoalStateMapper:
 
     @staticmethod
     def _first_present(*values: Any) -> Any:
-        """Retorna el primer valor no nulo/no vacío."""
+        """Retorna el primer valor no nulo/no vacio."""
         for value in values:
             if value is not None and (not isinstance(value, str) or value.strip()):
                 return value
@@ -1469,7 +1469,7 @@ class GoalStateMapper:
 
     @staticmethod
     def _normalize_conditions(value: Any) -> List[Any]:
-        """Normaliza condiciones preservando dicts y cadenas como elementos únicos."""
+        """Normaliza condiciones preservando dicts y cadenas como elementos unicos."""
         if value is None:
             return []
         if isinstance(value, list):

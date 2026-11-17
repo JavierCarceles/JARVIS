@@ -1,8 +1,8 @@
-"""Gestor de descomposición jerárquica de tareas (HTN) de JARVIS.
+"""Gestor de descomposicion jerarquica de tareas (HTN) de JARVIS.
 
-El módulo transforma objetivos en jerarquías de tareas, comprueba dependencias y
-coordina la integración opcional con StateGraph, Planner y TaskExecutor. La
-planificación no ejecuta acciones físicas por sí sola; la ejecución de tareas
+El modulo transforma objetivos en jerarquias de tareas, comprueba dependencias y
+coordina la integracion opcional con StateGraph, Planner y TaskExecutor. La
+planificacion no ejecuta acciones fisicas por si sola; la ejecucion de tareas
 primitivas se delega exclusivamente a TaskExecutor.
 """
 
@@ -16,20 +16,20 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-try:  # Compatibilidad con ejecución como paquete y desde la raíz del proyecto.
+try:  # Compatibilidad con ejecucion como paquete y desde la raiz del proyecto.
     from src.hands.planner.node import Goal, Node, NodeType, Task, TaskStatus
     from src.hands.planner.graph import StateGraph
     from src.hands.planner.application_integration import (
         get_application_knowledge_integrator,
     )
-    from src.utils.logger import get_logger
-except ImportError:  # pragma: no cover - depende de cómo se lance JARVIS.
+    from src.core.log import get_logger
+except ImportError:  # pragma: no cover - depende de como se lance JARVIS.
     from src.hands.planner.node import Goal, Node, NodeType, Task, TaskStatus
     from src.hands.planner.graph import StateGraph
     from src.hands.planner.application_integration import (
         get_application_knowledge_integrator,
     )
-    from src.utils.logger import get_logger
+    from src.core.log import get_logger
 
 logger = get_logger(__name__)
 
@@ -74,7 +74,7 @@ class HTNDecompositionRule:
 
 
 class HTNManager:
-    """Gestor central de reglas HTN y jerarquías de tareas."""
+    """Gestor central de reglas HTN y jerarquias de tareas."""
 
     def __init__(self, planner: Optional[Any] = None) -> None:
         self.planner = planner
@@ -102,13 +102,13 @@ class HTNManager:
                 "[HTN] Integrador de aplicaciones no disponible", exc_info=True
             )
 
-        # False significa que la carga se intentó y falló; evita ciclos de imports.
+        # False significa que la carga se intento y fallo; evita ciclos de imports.
         self._task_executor: Any = None
         self._lock = threading.RLock()
-        logger.info("[HTN] Gestor de descomposición jerárquica inicializado")
+        logger.info("[HTN] Gestor de descomposicion jerarquica inicializado")
 
     # ------------------------------------------------------------------
-    # CONFIGURACIÓN
+    # CONFIGURACION
     # ------------------------------------------------------------------
 
     def initialize_decomposition_rules(self) -> None:
@@ -167,7 +167,7 @@ class HTNManager:
             ),
         ]
         self.decomposition_rules = sorted(rules, key=lambda rule: rule.priority)
-        logger.info("[HTN] %s reglas de descomposición inicializadas", len(rules))
+        logger.info("[HTN] %s reglas de descomposicion inicializadas", len(rules))
 
     def set_planner(self, planner: Optional[Any]) -> None:
         self.planner = planner
@@ -191,9 +191,9 @@ class HTNManager:
     def decompose_and_execute(
         self, goal: Goal, current_state: Dict[str, Any]
     ) -> TaskExecutionResult:
-        """Compatibilidad pública: descompone y procesa la jerarquía resultante."""
+        """Compatibilidad publica: descompone y procesa la jerarquia resultante."""
         if not self._valid_goal(goal):
-            return self._failed_result("unknown", "Objetivo inválido")
+            return self._failed_result("unknown", "Objetivo inv\u00e1lido")
         state = self._normalize_state(current_state)
         if not self.use_graph_decomposition or self.state_graph is None:
             return self.execute_goal_hierarchy(goal, state)
@@ -218,7 +218,7 @@ class HTNManager:
                 return self._execute_task_hierarchy(ordered, dict(current_state))
             return self._decompose_with_graph_advanced(goal, ordered, current_state)
         except Exception as exc:
-            logger.exception("[HTN] Error en descomposición con grafo")
+            logger.exception("[HTN] Error en descomposicion con grafo")
             if htn_tasks:
                 return self._execute_task_hierarchy(htn_tasks, dict(current_state))
             return self._failed_result(goal.id, str(exc), state=current_state)
@@ -229,10 +229,10 @@ class HTNManager:
     def _decompose_with_graph_advanced(
         self, goal: Goal, htn_tasks: List[Task], current_state: Dict[str, Any]
     ) -> TaskExecutionResult:
-        """Usa las dependencias para ordenar tareas y delega ejecución a TaskExecutor.
+        """Usa las dependencias para ordenar tareas y delega ejecucion a TaskExecutor.
 
-        La integración gráfica no sustituye la jerarquía HTN por una ruta no
-        relacionada ni considera que una simple respuesta del Planner sea ejecución.
+        La integracion grafica no sustituye la jerarquia HTN por una ruta no
+        relacionada ni considera que una simple respuesta del Planner sea ejecucion.
         """
         ordered_tasks = self._order_tasks_by_dependencies(htn_tasks)
         error = self._validate_task_dependencies(ordered_tasks)
@@ -295,7 +295,7 @@ class HTNManager:
                 and not (set(task.dependencies or []) - known_ids - resolved)
             ]
             if not ready:
-                logger.warning("[HTN] Dependencias cíclicas o sin resolver en nodos HTN")
+                logger.warning("[HTN] Dependencias ciclicas o sin resolver en nodos HTN")
                 break
             for task in ready:
                 ordered.append(task.id)
@@ -370,15 +370,15 @@ class HTNManager:
     ) -> TaskExecutionResult:
         """Consulta al Planner cuando no hay tareas concretas que ejecutar.
 
-        Un resultado de planificación se etiqueta como ``planned_only``. El
-        TaskExecutor es el único responsable de ejecutar acciones físicas.
+        Un resultado de planificacion se etiqueta como ``planned_only``. El
+        TaskExecutor es el unico responsable de ejecutar acciones fisicas.
         """
         if self.planner is None:
             return self._execute_plan_directly(execution_plan, current_state, goal)
         try:
             planning_result = self._call_planner(goal, current_state)
             if planning_result is None:
-                return self._failed_result(goal.id, "El Planner no devolvió resultado", current_state)
+                return self._failed_result(goal.id, "El Planner no devolvi\u00f3 resultado", current_state)
             if isinstance(planning_result, list):
                 return TaskExecutionResult(
                     task_id=goal.id,
@@ -403,17 +403,17 @@ class HTNManager:
                 )
             warning = getattr(planning_result, "warnings", None)
             return self._failed_result(
-                goal.id, f"Planificación fallida: {warning or status or 'estado desconocido'}", current_state
+                goal.id, f"Planificaci\u00f3n fallida: {warning or status or 'estado desconocido'}", current_state
             )
         except Exception as exc:
-            logger.exception("[HTN] Falló la integración con Planner")
+            logger.exception("[HTN] Fallo la integracion con Planner")
             return self._failed_result(goal.id, str(exc), current_state)
 
     def _call_planner(self, goal: Goal, current_state: Dict[str, Any]) -> Any:
         plan_method = getattr(self.planner, "plan", None)
         if not callable(plan_method):
             raise AttributeError("El objeto Planner no dispone de plan()")
-        # La firma canónica es plan(goal, current_state). No se reintenta con
+        # La firma canonica es plan(goal, current_state). No se reintenta con
         # otra firma al capturar TypeError interno, para no ocultar bugs del Planner.
         return plan_method(goal, current_state)
 
@@ -455,7 +455,7 @@ class HTNManager:
         current_state: Dict[str, Any],
         goal: Goal,
     ) -> TaskExecutionResult:
-        """Fallback de planificación que no ejecuta ni simula acciones."""
+        """Fallback de planificacion que no ejecuta ni simula acciones."""
         state = dict(current_state or {})
         planned = [
             {"id": item.get("id"), "status": "planned", "cost": item.get("cost", 0.0)}
@@ -470,17 +470,17 @@ class HTNManager:
         )
 
     # ------------------------------------------------------------------
-    # BIBLIOTECA Y DESCOMPOSICIÓN
+    # BIBLIOTECA Y DESCOMPOSICION
     # ------------------------------------------------------------------
 
     def load_task_library(self) -> None:
         tasks = [
             Task("prepare_navigator", "Preparar navegador", "Prepara el navegador"),
             Task("navigate_to_target", "Navegar al destino", "Navega a la URL objetivo"),
-            Task("navigate_to_search_engine", "Navegar al motor de búsqueda", "Navega al motor de búsqueda"),
-            Task("perform_search", "Realizar búsqueda", "Realiza una búsqueda"),
+            Task("navigate_to_search_engine", "Navegar al motor de b\u00fasqueda", "Navega al motor de b\u00fasqueda"),
+            Task("perform_search", "Realizar b\u00fasqueda", "Realiza una b\u00fasqueda"),
             Task("check_availability", "Verificar disponibilidad", "Verifica disponibilidad"),
-            Task("open_application", "Abrir aplicación", "Abre la aplicación"),
+            Task("open_application", "Abrir aplicaci\u00f3n", "Abre la aplicaci\u00f3n"),
             Task("activate_window", "Activar ventana", "Activa la ventana"),
             Task("resolve_entity", "Resolver entidad", "Resuelve la entidad"),
         ]
@@ -489,7 +489,7 @@ class HTNManager:
 
     def decompose_goal(self, goal: Goal, current_state: Dict[str, Any]) -> List[Task]:
         if not self._valid_goal(goal):
-            logger.warning("[HTN] No se puede descomponer un objetivo inválido")
+            logger.warning("[HTN] No se puede descomponer un objetivo invalido")
             return []
         prior_status = self.status
         self.status = HTNStatus.DECOMPOSING
@@ -516,7 +516,7 @@ class HTNManager:
             tasks = self._establish_hierarchy(tasks, goal)
             dependency_error = self._validate_task_dependencies(tasks)
             if dependency_error:
-                logger.warning("[HTN] Descomposición inválida: %s", dependency_error)
+                logger.warning("[HTN] Descomposicion invalida: %s", dependency_error)
                 return []
             return tasks
         except Exception:
@@ -524,13 +524,13 @@ class HTNManager:
             return []
         finally:
             self.status = prior_status if prior_status != HTNStatus.DECOMPOSING else HTNStatus.IDLE
-            logger.debug("[HTN] Descomposición en %.4fs", time.perf_counter() - started)
+            logger.debug("[HTN] Descomposicion en %.4fs", time.perf_counter() - started)
 
     def execute_goal_hierarchy(
         self, goal: Goal, current_state: Dict[str, Any]
     ) -> TaskExecutionResult:
         if not self._valid_goal(goal):
-            return self._failed_result("unknown", "Objetivo inválido", current_state)
+            return self._failed_result("unknown", "Objetivo inv\u00e1lido", current_state)
 
         state = self._normalize_state(current_state)
         with self._lock:
@@ -556,7 +556,7 @@ class HTNManager:
             return result
         except Exception as exc:
             self.status = HTNStatus.FAILED
-            logger.exception("[HTN] Falló la jerarquía del objetivo %s", goal.id)
+            logger.exception("[HTN] Fallo la jerarquia del objetivo %s", goal.id)
             result = self._failed_result(goal.id, str(exc), state)
             self._record_execution(goal, [], result, time.perf_counter() - started)
             return result
@@ -639,14 +639,14 @@ class HTNManager:
         task = Task(
             id=f"{safe_goal_id}_{pattern_id}",
             name=str(getattr(template, "name", f"Tarea: {pattern_id}")),
-            description=str(getattr(template, "description", f"Tarea dinámica para {pattern_id}")),
+            description=str(getattr(template, "description", f"Tarea din\u00e1mica para {pattern_id}")),
             status=TaskStatus.PENDING,
             parent=parent,
             dependencies=list(getattr(template, "dependencies", []) or []),
         )
         metadata = self._as_dict(getattr(template, "metadata", {}))
         metadata.update({"task_type": pattern_id, "goal_id": safe_goal_id})
-        # Task del modelo canónico no declara metadata/parameters, se anexan de
+        # Task del modelo canonico no declara metadata/parameters, se anexan de
         # forma compatible para conservar datos auxiliares de las integraciones.
         try:
             task.metadata = metadata
@@ -658,8 +658,8 @@ class HTNManager:
         tasks: List[Task] = []
         previous: Optional[str] = None
         for pattern_id in rule.decomposition_pattern:
-            # Las tareas secuenciales son hermanas bajo el objetivo raíz; el
-            # orden se expresa mediante dependencies, no como relación padre-hijo.
+            # Las tareas secuenciales son hermanas bajo el objetivo raiz; el
+            # orden se expresa mediante dependencies, no como relacion padre-hijo.
             task = self._task_from_pattern(goal, pattern_id, goal.id)
             if previous is not None and previous not in task.dependencies:
                 task.dependencies.append(previous)
@@ -680,12 +680,12 @@ class HTNManager:
         ]
 
     def _decompose_iterative(self, goal: Goal, rule: HTNDecompositionRule) -> List[Task]:
-        # La iteración está representada como contenedor jerárquico; no se ejecuta
-        # como una acción física. El motor no inventa número de iteraciones.
+        # La iteracion esta representada como contenedor jerarquico; no se ejecuta
+        # como una accion fisica. El motor no inventa numero de iteraciones.
         root = Task(
             id=f"{goal.id}_main_loop",
             name="Bucle principal",
-            description="Contenedor de la descomposición iterativa",
+            description="Contenedor de la descomposici\u00f3n iterativa",
             parent=goal.id,
         )
         tasks = [root]
@@ -702,12 +702,12 @@ class HTNManager:
         root = Task(
             id=str(goal.id),
             name=f"Objetivo: {getattr(goal, 'description', self._goal_type(goal))}",
-            description=f"Tarea raíz para {self._goal_type(goal)}",
+            description=f"Tarea ra\u00edz para {self._goal_type(goal)}",
             parent=None,
         )
         by_id = {task.id: task for task in tasks if getattr(task, "id", None)}
         if len(by_id) != len(tasks):
-            raise ValueError("La descomposición contiene IDs de tarea vacíos o duplicados")
+            raise ValueError("La descomposicion contiene IDs de tarea vacios o duplicados")
         root.children = []
         for task in tasks:
             if task.parent in by_id and task.parent != task.id:
@@ -725,7 +725,7 @@ class HTNManager:
         return [root] + tasks
 
     # ------------------------------------------------------------------
-    # DEPENDENCIAS Y EJECUCIÓN
+    # DEPENDENCIAS Y EJECUCION
     # ------------------------------------------------------------------
 
     def _order_tasks_by_dependencies(self, tasks: List[Task]) -> List[Task]:
@@ -739,8 +739,8 @@ class HTNManager:
                 if {str(dep) for dep in (task.dependencies or []) if str(dep) in task_ids}.issubset(done)
             ]
             if not ready:
-                # No se descartan tareas; el validador posterior reportará ciclo
-                # o dependencia inválida antes de que pueda ejecutarse ninguna.
+                # No se descartan tareas; el validador posterior reportara ciclo
+                # o dependencia invalida antes de que pueda ejecutarse ninguna.
                 ordered.extend(pending)
                 break
             for task in ready:
@@ -759,7 +759,7 @@ class HTNManager:
                 return f"La tarea {task.id} depende de tareas desconocidas: {sorted(unknown)}"
             unresolved = dependencies - done
             if unresolved:
-                return f"Dependencia cíclica o fuera de orden para {task.id}: {sorted(unresolved)}"
+                return f"Dependencia c\u00edclica o fuera de orden para {task.id}: {sorted(unresolved)}"
             done.add(str(task.id))
         return None
 
@@ -779,7 +779,7 @@ class HTNManager:
     ) -> TaskExecutionResult:
         root = next((task for task in tasks if getattr(task, "parent", None) is None), None)
         if root is None:
-            return self._failed_result("unknown", "No se encontró tarea raíz", current_state)
+            return self._failed_result("unknown", "No se encontr\u00f3 tarea ra\u00edz", current_state)
 
         all_tasks = [task for task in tasks if task.id != root.id]
         ordered = self._order_tasks_by_dependencies(all_tasks)
@@ -840,7 +840,7 @@ class HTNManager:
         return TaskExecutionResult(
             task_id=root.id,
             status=TaskStatus.COMPLETED,
-            result={"message": "Jerarquía procesada", "new_state": state},
+            result={"message": "Jerarqu\u00eda procesada", "new_state": state},
             execution_time=time.perf_counter() - (self.start_time or time.perf_counter()),
             subtask_results=results,
             new_state=state,
@@ -858,7 +858,7 @@ class HTNManager:
                     task_id=task.id,
                     status=TaskStatus.FAILED,
                     execution_time=time.perf_counter() - started,
-                    error_message="TaskExecutor no disponible; no se simula éxito",
+                    error_message="TaskExecutor no disponible; no se simula \u00e9xito",
                     new_state=dict(current_state or {}),
                 )
             execute = getattr(executor, "execute_task", None)
@@ -932,9 +932,9 @@ class HTNManager:
             error = getattr(raw, "error_message", None)
 
         if status == TaskStatus.PENDING and isinstance(raw, bool) and raw:
-            # Un boolean true no demuestra que la ejecución terminara correctamente.
+            # Un boolean true no demuestra que la ejecucion terminara correctamente.
             status = TaskStatus.FAILED
-            error = error or "TaskExecutor devolvió un booleano sin estado verificable"
+            error = error or "TaskExecutor devolvi\u00f3 un booleano sin estado verificable"
         return TaskExecutionResult(
             task_id=str(task_id or task.id),
             status=status,
@@ -957,13 +957,13 @@ class HTNManager:
     def _simulate_task_execution(self, task: Task, current_state: Dict[str, Any]) -> bool:
         del current_state
         logger.warning(
-            "[HTN] _simulate_task_execution está obsoleto; no se declarará éxito ficticio para %s",
+            "[HTN] _simulate_task_execution esta obsoleto; no se declarara exito ficticio para %s",
             getattr(task, "id", "unknown"),
         )
         return False
 
     # ------------------------------------------------------------------
-    # ESTADÍSTICAS E HISTORIAL
+    # ESTADISTICAS E HISTORIAL
     # ------------------------------------------------------------------
 
     def _record_execution(

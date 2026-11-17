@@ -3,11 +3,11 @@
 
 Cubre:
 - Enums TaskExecutorStatus, TaskExecutionMode
-- Dataclass TaskExecutionConfig (normalización de valores)
-- Métodos estáticos: _task_metadata, _task_application, _task_parameters,
+- Dataclass TaskExecutionConfig (normalizacion de valores)
+- Metodos estaticos: _task_metadata, _task_application, _task_parameters,
   _normalize_execution_result, _truthy_success, _as_list, _normalize_key,
   _safe_number, _evaluate_precondition, _signature_accepts, _call_callback
-- Métodos de instancia: _calculate_task_cost, _resolve_action_name,
+- Metodos de instancia: _calculate_task_cost, _resolve_action_name,
   _check_task_preconditions, _should_execute_conditionally,
   _convert_task_to_node, _create_execution_callback, _create_success_criteria,
   _execute_node, _apply_result_to_state, _try_alternative,
@@ -43,7 +43,7 @@ from src.hands.planner.task_executor import (
 # ---------------------------------------------------------------------------
 
 def _make_task(task_id="t1", **kwargs):
-    """Crea una Task con atributos dinámicos (metadata, parameters, application)."""
+    """Crea una Task con atributos dinamicos (metadata, parameters, application)."""
     task = Task(id=task_id, name=kwargs.pop("name", task_id), description=kwargs.pop("description", ""))
     task.metadata = kwargs.pop("metadata", {})
     task.parameters = kwargs.pop("parameters", {})

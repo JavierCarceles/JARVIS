@@ -1,12 +1,12 @@
 # src/memory/entity_resolver.py
 """
-Sistema de resolución avanzada de entidades para FASE 5 - DOMAIN MEMORY.
+Sistema de resolucion avanzada de entidades para FASE 5 - DOMAIN MEMORY.
 
 Implementa:
-- Resolución de entidades con contexto
-- Manejo de ambigüedades
-- Búsqueda semántica
-- Integración con HTN y Goals
+- Resolucion de entidades con contexto
+- Manejo de ambiguedades
+- Busqueda semantica
+- Integracion con HTN y Goals
 """
 
 import re
@@ -17,7 +17,7 @@ from datetime import datetime
 from urllib.parse import urlparse, parse_qs
 import json
 
-from src.utils.logger import get_logger
+from src.core.log import get_logger
 from src.memory.storage import MemoryManager, Entity, MemoryType, UserPreference, EntityAttribute
 from src.hands.planner.node import NodeType
 
@@ -26,7 +26,7 @@ logger = get_logger(__name__)
 
 @dataclass
 class EntityResolutionResult:
-    """Resultado de la resolución de entidad."""
+    """Resultado de la resolucion de entidad."""
     entity: Entity
     confidence: float
     resolution_method: str
@@ -37,7 +37,7 @@ class EntityResolutionResult:
 
 @dataclass
 class ResolutionContext:
-    """Contexto para resolución de entidades."""
+    """Contexto para resolucion de entidades."""
     conversation_history: List[Dict[str, Any]]
     current_intent: Optional[str]
     recent_entities: List[str]
@@ -46,18 +46,18 @@ class ResolutionContext:
 
 
 class EntityResolver:
-    """Sistema avanzado de resolución de entidades."""
+    """Sistema avanzado de resolucion de entidades."""
     
     def __init__(self, memory_manager: Optional[MemoryManager] = None, app_manager: Optional[Any] = None):
         self.memory_manager = memory_manager or MemoryManager()
         self.resolution_threshold = 0.7
         self.max_alternatives = 3
         self.default_user_id = "default_user"
-        # Gestor del catálogo global de aplicaciones (ApplicationManager /
+        # Gestor del catalogo global de aplicaciones (ApplicationManager /
         # entities.json): se consulta primero para identidad, nombres y aliases
         # de aplicaciones (unidad 3.8.5.1.4.11.7). Se resuelve perezosamente
-        # en el primer uso para evitar importación circular al cargar el módulo
-        # (`src.hands.applications_core` depende de `src.memory`).
+        # en el primer uso para evitar importacion circular al cargar el modulo
+        # (`src.hands.apps.applications_core` depende de `src.memory`).
         self.app_manager = app_manager
         self._app_manager_resuelto = app_manager is not None
         
@@ -69,7 +69,7 @@ class EntityResolver:
             'website': re.compile(r'https?://[\w\.\-]+', re.IGNORECASE)
         }
         
-        # Expresiones regulares para detección y parseo de URLs
+        # Expresiones regulares para deteccion y parseo de URLs
         self.url_patterns = {
             'full_url': re.compile(r'https?://[^\s<>"]+\.[^\s<>"]+[^\s<>"]*'),
             'domain': re.compile(r'^(?:https?:\/\/)?(?:www\.)?([^\/?:]+)'),
@@ -83,30 +83,29 @@ class EntityResolver:
                       context: Optional[ResolutionContext] = None,
                       entity_type: Optional[str] = None) -> EntityResolutionResult:
         """
-        Resuelve una referencia de entidad a una entidad específica.
+        Resuelve una referencia de entidad a una entidad especifica.
         
         Args:
             entity_reference: Referencia a la entidad (nombre, alias, URL, etc.)
-            context: Contexto de resolución
-            entity_type: Tipo específico de entidad (opcional)
+            context: Contexto de resolucion
+            entity_type: Tipo especifico de entidad (opcional)
             
         Returns:
             EntityResolutionResult con la entidad resuelta y alternativas
         """
-        logger._print_log("info", "Procesando solicitud", "entity_resolver.py", "method", 89)
         
         # Normalizar la referencia
         normalized_ref = self._normalize_reference(entity_reference)
 
-        # 0. Catálogo global primero: identidad, nombres y aliases de la
+        # 0. Catalogo global primero: identidad, nombres y aliases de la
         #    entidad global (ApplicationManager / entities.json)
-        #    (unidad 3.8.5.1.4.11.7). Para referencias de aplicación (o sin
-        #    tipo declarado) se consulta el catálogo global antes de la
-        #    memoria de dominio; si no hay aplicación registrada, se sigue
-        #    con la búsqueda habitual en entidades.
+        #    (unidad 3.8.5.1.4.11.7). Para referencias de aplicacion (o sin
+        #    tipo declarado) se consulta el catalogo global antes de la
+        #    memoria de dominio; si no hay aplicacion registrada, se sigue
+        #    con la busqueda habitual en entidades.
         if entity_type is None or str(entity_type or "").strip().lower() == "application":
             if self.app_manager is None and not self._app_manager_resuelto:
-                from src.hands.applications_core import get_application_manager
+                from src.hands.apps.applications_core import get_application_manager
 
                 self.app_manager = get_application_manager()
                 self._app_manager_resuelto = True
@@ -123,19 +122,19 @@ class EntityResolver:
                     timestamp=datetime.now().isoformat(),
                 )
 
-        # 1. Búsqueda exacta
+        # 1. Busqueda exacta
         exact_matches = self._find_exact_matches(normalized_ref, entity_type)
         
         if exact_matches:
             return self._select_best_match(exact_matches, normalized_ref, context or ResolutionContext([], None, [], {}, {}))
         
-        # 2. Búsqueda por similitud
+        # 2. Busqueda por similitud
         fuzzy_matches = self._find_fuzzy_matches(normalized_ref, entity_type)
         
         if fuzzy_matches:
             return self._select_best_match(fuzzy_matches, normalized_ref, context or ResolutionContext([], None, [], {}, {}))
         
-        # 3. Búsqueda por propiedades
+        # 3. Busqueda por propiedades
         property_matches = self._find_by_properties(normalized_ref, entity_type)
         
         if property_matches:
@@ -148,7 +147,7 @@ class EntityResolver:
                               entity_references: List[str],
                               context: Optional[ResolutionContext] = None) -> List[EntityResolutionResult]:
         """
-        Resuelve múltiples entidades en lote.
+        Resuelve multiples entidades en lote.
         """
         results = []
         context = context or ResolutionContext([], None, [], {}, {})
@@ -171,7 +170,7 @@ class EntityResolver:
         # Eliminar espacios extra
         normalized = re.sub(r'\s+', ' ', reference.strip())
         
-        # Convertir a minúsculas para comparación
+        # Convertir a minusculas para comparacion
         normalized = normalized.lower()
         
         # Eliminar caracteres especiales comunes (manteniendo @ para usernames)
@@ -185,14 +184,13 @@ class EntityResolver:
         
         # Buscar por nombre exacto
         try:
-            logger._print_log("info", "Procesando solicitud", "entity_resolver.py", "method", 89)
-            logger._print_log("debug", f"Buscando coincidencias exactas para: {reference}", "entity_resolver.py", "method", 157)
-            logger._print_log("debug", "Buscando entidades por nombre exacto", "entity_resolver.py", "method", 158)
+            logger.debug(f"Buscando coincidencias exactas para: {reference}")
+            logger.debug("Buscando entidades por nombre exacto")
             entities = self.memory_manager.find_entities(reference, entity_type)
-            logger._print_log("debug", f"Encontradas {len(entities)} entidades por nombre exacto", "entity_resolver.py", "method", 160)
+            logger.debug(f"Encontradas {len(entities)} entidades por nombre exacto")
             matches.extend(entities)
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "entity_resolver.py", "method", 89)
+            logger.debug("EntityResolver._find_exact_matches: %s", e)
             import traceback
             traceback.print_exc()
         
@@ -287,7 +285,7 @@ class EntityResolver:
                 timestamp=datetime.now().isoformat()
             )
         
-        # Si hay múltiples coincidencias, usar contexto para desambiguar
+        # Si hay multiples coincidencias, usar contexto para desambiguar
         best_entity = self._disambiguate_with_context(matches, reference, context)
         
         # Obtener alternativas
@@ -306,7 +304,7 @@ class EntityResolver:
                                  matches: List[Entity], 
                                  reference: str, 
                                  context: ResolutionContext) -> Entity:
-        """Usa contexto para desambiguar entre múltiples entidades."""
+        """Usa contexto para desambiguar entre multiples entidades."""
         
         # 1. Verificar preferencias aprendidas del usuario
         user_preferences = self.memory_manager.get_user_preferences("default", "entity_preferred")
@@ -316,8 +314,7 @@ class EntityResolver:
         if preferred_entities:
             for entity in matches:
                 if entity.id in preferred_entities:
-                    logger._print_log("info", "Procesando solicitud", "entity_resolver.py", "method", 89)
-                    # Aprender de esta selección exitosa
+                    # Aprender de esta seleccion exitosa
                     self.memory_manager.learn_user_preference(self.default_user_id, entity.id, "resolution", True)
                     return entity
         
@@ -325,15 +322,13 @@ class EntityResolver:
         if context.user_preferences:
             for entity in matches:
                 if entity.id in context.user_preferences.get('preferred_entities', []):
-                    logger._print_log("info", "Procesando solicitud", "entity_resolver.py", "method", 89)
                     return entity
         
         # 3. Verificar entidades recientes
         if context.recent_entities:
             for entity in matches:
                 if entity.id in context.recent_entities:
-                    logger._print_log("info", "Procesando solicitud", "entity_resolver.py", "method", 89)
-                    # Aprender de la selección reciente
+                    # Aprender de la seleccion reciente
                     self.memory_manager.learn_user_preference(self.default_user_id, entity.id, "recent_usage", True)
                     return entity
         
@@ -341,19 +336,18 @@ class EntityResolver:
         if context.conversation_history:
             # Buscar menciones recientes en el historial
             recent_mentions = {}
-            for entry in context.conversation_history[-5:]:  # Últimas 5 entradas
+            for entry in context.conversation_history[-5:]:  # Ultimas 5 entradas
                 if 'entities' in entry:
                     for entity_id in entry['entities']:
                         if entity_id in [m.id for m in matches]:
                             recent_mentions[entity_id] = recent_mentions.get(entity_id, 0) + 1
             
             if recent_mentions:
-                # Seleccionar la más mencionada
+                # Seleccionar la mas mencionada
                 most_mentioned = max(recent_mentions.items(), key=lambda x: x[1])
                 for entity in matches:
                     if entity.id == most_mentioned[0]:
-                        logger._print_log("info", "Procesando solicitud", "entity_resolver.py", "method", 89)
-                        # Aprender de la mención frecuente
+                        # Aprender de la mencion frecuente
                         self.memory_manager.learn_user_preference(self.default_user_id, entity.id, "frequent_mention", True)
                         return entity
         
@@ -364,14 +358,12 @@ class EntityResolver:
             for attr in preference_attrs:
                 if attr.attribute_name == "user_preference_score":
                     if float(attr.attribute_value) > 0.8:
-                        logger._print_log("info", "Procesando solicitud", "entity_resolver.py", "method", 89)
                         return entity
         
         # 6. Si no hay contexto, seleccionar por confianza
         best_match = max(matches, key=lambda x: x.confidence)
-        logger._print_log("info", "Procesando solicitud", "entity_resolver.py", "method", 89)
         
-        # Aprender de esta selección por confianza
+        # Aprender de esta seleccion por confianza
         self.memory_manager.learn_user_preference(self.default_user_id, best_match.id, "confidence_selection", True)
         
         return best_match
@@ -390,7 +382,6 @@ class EntityResolver:
             tags=["temporary", "unresolved"]
         )
         
-        logger._print_log("info", "Procesando solicitud", "entity_resolver.py", "method", 89)
         
         return EntityResolutionResult(
             entity=temp_entity,
@@ -403,7 +394,7 @@ class EntityResolver:
     
     def _entidad_desde_conocimiento_aplicacion(self, app: Any) -> Entity:
         """
-        Construye una `Entity` a partir del `ApplicationKnowledge` del catálogo
+        Construye una `Entity` a partir del `ApplicationKnowledge` del catalogo
         global (`ApplicationManager` / `entities.json`).
 
         Reutiliza la identidad estable del gestor (`app_<clave normalizada>`)
@@ -411,7 +402,7 @@ class EntityResolver:
         tipo de la entidad global. Nunca incorpora rutas absolutas como base
         de la identidad (unidad 3.8.5.1.4.11.7).
         """
-        from src.hands.applications_core import ApplicationManager
+        from src.hands.apps.applications_core import ApplicationManager
 
         clave = ApplicationManager._normalize_name(app.name)
         aliases: list[str] = []
@@ -466,7 +457,7 @@ class EntityResolver:
         all_entities = self.memory_manager.find_entities() if not entity_type else self.memory_manager.get_entities_by_type(entity_type)
         
         for entity in all_entities:
-            # Verificar si el texto parcial está en el nombre, aliases o tags
+            # Verificar si el texto parcial esta en el nombre, aliases o tags
             partial_lower = partial_text.lower()
             
             if (partial_lower in entity.name.lower() or
@@ -484,21 +475,21 @@ class EntityResolver:
                    url_input: str, 
                    context: Optional[ResolutionContext] = None) -> EntityResolutionResult:
         """
-        Resuelve una URL a una entidad específica del sistema.
+        Resuelve una URL a una entidad especifica del sistema.
         
         Args:
             url_input: URL completa o parcial del usuario
-            context: Contexto de resolución
+            context: Contexto de resolucion
             
         Returns:
             EntityResolutionResult con la entidad asociada a la URL
         """
-        logger._print_log("info", f"Resolviendo URL: {url_input}", "entity_resolver.py", "method", 412)
+        logger.info(f"Resolviendo URL: {url_input}")
         
         # Normalizar la URL
         normalized_url = self._normalize_url(url_input)
         
-        # 1. Intentar parsear y extraer información de la URL
+        # 1. Intentar parsear y extraer informacion de la URL
         url_info = self._parse_url(normalized_url)
         
         # 2. Buscar entidades por URL exacta
@@ -513,19 +504,19 @@ class EntityResolver:
             if domain_matches:
                 return self._select_best_match(domain_matches, normalized_url, context or ResolutionContext([], None, [], {}, {}))
         
-        # 4. Buscar por plataforma específica
+        # 4. Buscar por plataforma especifica
         if url_info.get('platform'):
             platform_matches = self.memory_manager.find_entities_by_type(url_info['platform'])
             if platform_matches:
                 return self._select_best_match(platform_matches, normalized_url, context or ResolutionContext([], None, [], {}, {}))
         
-        # 5. Buscar por nombre de canal/usuario extraído
+        # 5. Buscar por nombre de canal/usuario extraido
         if url_info.get('channel_name'):
             channel_matches = self.memory_manager.find_entities(url_info['channel_name'])
             if channel_matches:
                 return self._select_best_match(channel_matches, normalized_url, context or ResolutionContext([], None, [], {}, {}))
         
-        # 6. Si no hay coincidencias, crear entidad temporal con información de URL
+        # 6. Si no hay coincidencias, crear entidad temporal con informacion de URL
         return self._create_entity_from_url(url_info, normalized_url, context or ResolutionContext([], None, [], {}, {}))
     
     def extract_urls_from_text(self, text: str) -> List[str]:
@@ -540,7 +531,7 @@ class EntityResolver:
         """
         urls = []
         
-        # Buscar URLs completas con expresión más conservadora
+        # Buscar URLs completas con expresion mas conservadora
         full_url_pattern = re.compile(r'https?://[^\s<>"]+\.[^\s<>"]+[^\s<>"]*')
         full_url_matches = full_url_pattern.findall(text)
         
@@ -578,7 +569,7 @@ class EntityResolver:
         if not url_input:
             return ""
         
-        # Si no tiene protocolo, añadir https://
+        # Si no tiene protocolo, anadir https://
         if not url_input.startswith(('http://', 'https://')):
             if '.' in url_input and not url_input.startswith('www.'):
                 url_input = f"https://{url_input}"
@@ -592,13 +583,13 @@ class EntityResolver:
     
     def _parse_url(self, url: str) -> Dict[str, Any]:
         """
-        Parsea una URL y extrae información estructurada.
+        Parsea una URL y extrae informacion estructurada.
         
         Args:
             url: URL normalizada
             
         Returns:
-            Diccionario con información extraída
+            Diccionario con informacion extraida
         """
         url_info = {
             'full_url': url,
@@ -640,23 +631,23 @@ class EntityResolver:
                 if path_parts:
                     url_info['path'] = path_parts[0]
             
-            # Extraer parámetros
+            # Extraer parametros
             if parsed.query:
                 url_info['params'] = parse_qs(parsed.query)
                 
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "entity_resolver.py", "method", 89)
+            logger.debug("EntityResolver._parse_url: %s", e)
         
         return url_info
     
     def _create_entity_from_url(self, url_info: Dict[str, Any], url: str, context: ResolutionContext) -> EntityResolutionResult:
         """
-        Crea una entidad basada en información de URL.
+        Crea una entidad basada en informacion de URL.
         
         Args:
-            url_info: Información parseada de la URL
+            url_info: Informacion parseada de la URL
             url: URL original
-            context: Contexto de resolución
+            context: Contexto de resolucion
             
         Returns:
             EntityResolutionResult con la entidad creada
@@ -668,14 +659,14 @@ class EntityResolver:
         else:
             entity_type = 'unknown'
         
-        # Crear propiedades básicas
+        # Crear propiedades basicas
         properties = {
             'url': url_info['full_url'],
             'domain': url_info['domain'],
             'source_url': url
         }
         
-        # Añadir información específica de plataforma
+        # Anadir informacion especifica de plataforma
         if entity_type == 'streamer':
             properties['platform'] = 'twitch'
             if url_info.get('channel_name'):
@@ -703,8 +694,7 @@ class EntityResolver:
             tags=["url_resolved", "temporary"]
         )
         
-        logger._print_log("info", "Procesando solicitud", "entity_resolver.py", "method", 89)
-        logger._print_log("info", "_create_entity_from_url", "entity_resolver.py", "method", 622)
+        logger.info("_create_entity_from_url")
         
         return EntityResolutionResult(
             entity=temp_entity,
@@ -723,7 +713,7 @@ class EntityResolver:
         
         Args:
             partial_url: URL parcial para buscar coincidencias
-            limit: Número máximo de sugerencias
+            limit: Numero maximo de sugerencias
             
         Returns:
             Lista de entidades sugeridas
@@ -734,13 +724,13 @@ class EntityResolver:
         all_entities = self.memory_manager.find_entities()
         
         for entity in all_entities:
-            # Verificar si el dominio parcial está en las propiedades de la entidad
+            # Verificar si el dominio parcial esta en las propiedades de la entidad
             if 'domain' in entity.properties:
                 domain = entity.properties['domain']
                 if partial_url.lower() in domain.lower():
                     suggestions.append(entity)
             
-            # Verificar si la URL parcial está en las propiedades
+            # Verificar si la URL parcial esta en las propiedades
             if 'url' in entity.properties:
                 url = entity.properties['url']
                 if partial_url.lower() in url.lower():
@@ -755,10 +745,10 @@ class EntityResolver:
                             result: EntityResolutionResult, 
                             user_feedback: Optional[bool] = None) -> None:
         """
-        Aprende de los resultados de resolución para mejorar futuras resoluciones.
+        Aprende de los resultados de resolucion para mejorar futuras resoluciones.
         """
         if user_feedback is not None:
-            # Ajustar confianza según feedback
+            # Ajustar confianza segun feedback
             if user_feedback:
                 result.entity.confidence = min(1.0, result.entity.confidence + 0.1)
                 # Aprender preferencia positiva
@@ -771,9 +761,9 @@ class EntityResolver:
             # Guardar entidad actualizada
             self.memory_manager.save_entity(result.entity)
             
-            logger._print_log("info", f"Actualizada confianza de entidad {result.entity.id} a {result.entity.confidence}", "entity_resolver.py", "method", 689)
+            logger.info(f"Actualizada confianza de entidad {result.entity.id} a {result.entity.confidence}")
     
-    # Métodos para gestión de preferencias (SUBFASE 5.4)
+    # Metodos para gestion de preferencias (SUBFASE 5.4)
     
     def set_user_preference(self, entity_id: str, preference_type: str, 
                           preference_value: Any, context: Optional[Dict[str, Any]] = None) -> bool:
@@ -787,15 +777,15 @@ class EntityResolver:
                 context
             )
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "entity_resolver.py", "method", 89)
+            logger.debug("EntityResolver.set_user_preference: %s", e)
             return False
     
     def get_user_preferences_for_entity(self, entity_id: str) -> List[UserPreference]:
-        """Obtiene todas las preferencias del usuario para una entidad específica."""
+        """Obtiene todas las preferencias del usuario para una entidad especifica."""
         try:
             return self.memory_manager.get_user_preferences("default", f"entity_{entity_id}")
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "entity_resolver.py", "method", 89)
+            logger.debug("EntityResolver.get_user_preferences_for_entity: %s", e)
             return []
     
     def get_preferred_entities(self, preference_type: str = None) -> List[Entity]:
@@ -812,10 +802,10 @@ class EntityResolver:
             
             return preferred_entities
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "entity_resolver.py", "method", 89)
+            logger.debug("EntityResolver.get_preferred_entities: %s", e)
             return []
     
-    # Métodos para gestión de atributos extendidos (SUBFASE 5.4)
+    # Metodos para gestion de atributos extendidos (SUBFASE 5.4)
     
     def set_entity_attribute(self, entity_id: str, attribute_name: str, 
                            attribute_value: Any, attribute_type: str = "string",
@@ -831,7 +821,7 @@ class EntityResolver:
                 metadata
             )
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "entity_resolver.py", "method", 89)
+            logger.debug("EntityResolver.set_entity_attribute: %s", e)
             return False
     
     def get_entity_attributes(self, entity_id: str) -> List[EntityAttribute]:
@@ -839,15 +829,15 @@ class EntityResolver:
         try:
             return self.memory_manager.get_entity_attributes(entity_id)
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "entity_resolver.py", "method", 89)
+            logger.debug("EntityResolver.get_entity_attributes: %s", e)
             return []
     
     def get_entities_with_attribute(self, attribute_name: str, attribute_value: Any) -> List[Entity]:
-        """Busca entidades que tienen un atributo específico."""
+        """Busca entidades que tienen un atributo especifico."""
         try:
             return self.memory_manager.get_entities_by_attribute(attribute_name, attribute_value)
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "entity_resolver.py", "method", 89)
+            logger.debug("EntityResolver.get_entities_with_attribute: %s", e)
             return []
     
     def learn_entity_interaction(self, entity_id: str, interaction_type: str, 
@@ -857,7 +847,7 @@ class EntityResolver:
             # Aprender preferencia de usuario
             self.memory_manager.learn_user_preference(self.default_user_id, entity_id, interaction_type, success)
             
-            # Actualizar atributo de interacción
+            # Actualizar atributo de interaccion
             interaction_count_key = f"interaction_count_{interaction_type}"
             current_count = 0
             
@@ -877,7 +867,7 @@ class EntityResolver:
                 {"interaction_type": interaction_type, "success": success, **(metadata or {})}
             )
             
-            # Actualizar score de preferencia si la interacción fue exitosa
+            # Actualizar score de preferencia si la interaccion fue exitosa
             if success:
                 preference_score_key = "user_preference_score"
                 current_score = 0.5  # Score base
@@ -886,7 +876,7 @@ class EntityResolver:
                 if current_score_attr:
                     current_score = float(current_score_attr.attribute_value)
                 
-                # Incrementar score con factor de atenuación
+                # Incrementar score con factor de atenuacion
                 new_score = min(1.0, current_score + 0.1)
                 self.set_entity_attribute(
                     entity_id,
@@ -897,13 +887,13 @@ class EntityResolver:
                     {"based_on": interaction_type}
                 )
             
-            logger._print_log("info", f"Interacción aprendida para entidad {entity_id}: {interaction_type} ({'success' if success else 'failure'}", "entity_resolver.py", "method", 815)
+            logger.info(f"Interaccion aprendida para entidad {entity_id}: {interaction_type} ({'success' if success else 'failure'}")
             return True
             
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "entity_resolver.py", "method", 89)
+            logger.debug("EntityResolver.learn_entity_interaction: %s", e)
             return False
 
 
-# Instancia global para uso fácil
+# Instancia global para uso facil
 entity_resolver = EntityResolver()

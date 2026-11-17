@@ -2,12 +2,12 @@
 
 Responsabilidades:
 - Inicializar y preparar el grafo.
-- Construir transiciones de planificación a partir de precondiciones/efectos.
+- Construir transiciones de planificacion a partir de precondiciones/efectos.
 - Resolver nodos inicial/final sin depender de IDs inventados.
 - Obtener una ruta del StateGraph/AdvancedStateGraph.
 - Devolver un resultado estructurado sin ejecutar acciones reales.
 
-La conversión final de una ruta a un Plan ejecutable pertenece a subfases
+La conversion final de una ruta a un Plan ejecutable pertenece a subfases
 posteriores.
 """
 
@@ -29,7 +29,7 @@ from src.hands.planner.graph import (
 )
 from src.hands.planner.heuristic import Heuristic, HeuristicType
 from src.hands.planner.node import Goal, Node, NodeType
-from src.utils.logger import get_logger
+from src.core.log import get_logger
 
 logger = get_logger(__name__)
 
@@ -62,7 +62,7 @@ class GraphPlannerIntegration:
         use_astar: bool = True,
         integration_mode: IntegrationMode | str = IntegrationMode.FULL_INTEGRATION,
     ) -> None:
-        """Inicializa el puente de planificación sin ejecutar acciones."""
+        """Inicializa el puente de planificacion sin ejecutar acciones."""
         self.use_astar = bool(use_astar)
         if isinstance(integration_mode, IntegrationMode):
             self.integration_mode = integration_mode
@@ -70,9 +70,9 @@ class GraphPlannerIntegration:
             try:
                 self.integration_mode = IntegrationMode(str(integration_mode).strip().lower())
             except ValueError as exc:
-                raise ValueError(f"Modo de integración no soportado: {integration_mode}") from exc
+                raise ValueError(f"Modo de integracion no soportado: {integration_mode}") from exc
 
-        # El grafo no aporta por sí solo una distancia admisible al objetivo.
+        # El grafo no aporta por si solo una distancia admisible al objetivo.
         # h=0 mantiene A* correcto para costes ponderados, incluidos costes 0.
         self.heuristic = Heuristic(HeuristicType.ZERO)
         self.state_graph: Optional[StateGraph] = None
@@ -84,12 +84,12 @@ class GraphPlannerIntegration:
         self._contextual_edges: List[Any] = []
 
         logger.info(
-            "[GRAPH-INTEGRATION] Integración inicializada: %s",
+            "[GRAPH-INTEGRATION] Integracion inicializada: %s",
             self.integration_mode.value,
         )
 
     # ==================================================================
-    # INICIALIZACIÓN
+    # INICIALIZACION
     # ==================================================================
 
     def initialize_graph(
@@ -101,19 +101,19 @@ class GraphPlannerIntegration:
         try:
             materialized_nodes = [node for node in nodes if node is not None]
         except TypeError as exc:
-            raise TypeError("nodes debe ser una colección iterable de Node") from exc
+            raise TypeError("nodes debe ser una coleccion iterable de Node") from exc
 
         seen_ids: Set[str] = set()
         for node in materialized_nodes:
             node_id = getattr(node, "id", None)
             if not isinstance(node_id, str) or not node_id.strip():
-                raise ValueError("Todos los nodos deben tener un id de texto no vacío")
+                raise ValueError("Todos los nodos deben tener un id de texto no vacio")
             if node_id in seen_ids:
                 raise ValueError(f"ID de nodo duplicado: {node_id}")
             seen_ids.add(node_id)
 
         # Preparar el grafo localmente evita perder el grafo vigente si la entrada
-        # no puede convertirse en un grafo válido.
+        # no puede convertirse en un grafo valido.
         graph = AdvancedStateGraph(self.heuristic)
         for node in materialized_nodes:
             graph.add_node(node)
@@ -143,7 +143,7 @@ class GraphPlannerIntegration:
         for config in self._as_sequence(edges_config):
             if not isinstance(config, dict):
                 logger.warning(
-                    "[GRAPH-INTEGRATION] Configuración de arista inválida: %r",
+                    "[GRAPH-INTEGRATION] Configuracion de arista invalida: %r",
                     config,
                 )
                 continue
@@ -170,7 +170,7 @@ class GraphPlannerIntegration:
                 cost = float("nan")
             if not math.isfinite(cost) or cost < 0:
                 logger.warning(
-                    "[GRAPH-INTEGRATION] Coste inválido en arista %s -> %s: %r",
+                    "[GRAPH-INTEGRATION] Coste invalido en arista %s -> %s: %r",
                     source_id,
                     target_id,
                     config.get("cost", 1.0),
@@ -188,7 +188,7 @@ class GraphPlannerIntegration:
             )
             if not added:
                 logger.debug(
-                    "[GRAPH-INTEGRATION] No se añadió la arista %s -> %s",
+                    "[GRAPH-INTEGRATION] No se anadio la arista %s -> %s",
                     source_id,
                     target_id,
                 )
@@ -236,7 +236,7 @@ class GraphPlannerIntegration:
             cost = self._safe_float(raw_cost, float("nan"))
             if not math.isfinite(cost) or cost < 0:
                 logger.warning(
-                    "[GRAPH-INTEGRATION] Coste inválido en transición de compatibilidad %s -> %s",
+                    "[GRAPH-INTEGRATION] Coste invalido en transicion de compatibilidad %s -> %s",
                     source_id,
                     target_id,
                 )
@@ -266,9 +266,9 @@ class GraphPlannerIntegration:
             if getattr(node, "type", None) == NodeType.ACTION
         ]
 
-        # No conectar todos los estados con todas las acciones: una conexión
-        # derivada necesita una dependencia explícita o hechos que habiliten
-        # las precondiciones de la acción.
+        # No conectar todos los estados con todas las acciones: una conexion
+        # derivada necesita una dependencia explicita o hechos que habiliten
+        # las precondiciones de la accion.
         for state_node in state_nodes:
             state_facts: Dict[str, Any] = {}
             for attribute in ("state_requirements", "state_modifications"):
@@ -380,7 +380,7 @@ class GraphPlannerIntegration:
         return bool(added)
 
     # ==================================================================
-    # PLANIFICACIÓN
+    # PLANIFICACION
     # ==================================================================
 
     def create_plan_with_graph(
@@ -409,7 +409,7 @@ class GraphPlannerIntegration:
             self._record_integration_search(False, 0, 0.0, time.monotonic() - started)
             return GraphPlanningResult(
                 status="failed",
-                warnings=["El grafo no está inicializado"],
+                warnings=["El grafo no est\u00e1 inicializado"],
                 execution_time=time.monotonic() - started,
             )
 
@@ -469,7 +469,7 @@ class GraphPlannerIntegration:
                 self._record_integration_search(False, 0, 0.0, time.monotonic() - started)
                 failure_warnings = self._as_sequence(route_data.get("warnings"))
                 if not failure_warnings:
-                    failure_warnings = ["No se encontró una ruta válida"]
+                    failure_warnings = ["No se encontr\u00f3 una ruta v\u00e1lida"]
                 return GraphPlanningResult(
                     status="failed",
                     warnings=[str(item) for item in failure_warnings],
@@ -503,7 +503,7 @@ class GraphPlannerIntegration:
                 self._record_integration_search(False, 0, 0.0, time.monotonic() - started)
                 return GraphPlanningResult(
                     status="failed",
-                    warnings=["El resultado de búsqueda contiene un coste total inválido"],
+                    warnings=["El resultado de b\u00fasqueda contiene un coste total inv\u00e1lido"],
                     path=path,
                     execution_time=time.monotonic() - started,
                 )
@@ -533,12 +533,12 @@ class GraphPlannerIntegration:
                 },
             )
         except Exception as exc:
-            logger.exception("[GRAPH-INTEGRATION] Error durante la planificación")
+            logger.exception("[GRAPH-INTEGRATION] Error durante la planificacion")
             self.failed_plans += 1
             self._record_integration_search(False, 0, 0.0, time.monotonic() - started)
             return GraphPlanningResult(
                 status="error",
-                warnings=[f"Error en planificación: {exc}"],
+                warnings=[f"Error en planificaci\u00f3n: {exc}"],
                 execution_time=time.monotonic() - started,
             )
         finally:
@@ -551,9 +551,9 @@ class GraphPlannerIntegration:
     ) -> List[str]:
         warnings: List[str] = []
         if goal is None or not getattr(goal, "id", None):
-            warnings.append("Objetivo inválido: falta un id")
+            warnings.append("Objetivo inv\u00e1lido: falta un id")
         elif not getattr(goal, "type", None):
-            warnings.append("Objetivo inválido: falta el tipo")
+            warnings.append("Objetivo inv\u00e1lido: falta el tipo")
         if not isinstance(current_state, dict):
             warnings.append("El estado actual debe ser un diccionario")
         if available_nodes is not None and not isinstance(available_nodes, dict):
@@ -561,12 +561,12 @@ class GraphPlannerIntegration:
         if available_nodes is not None and isinstance(available_nodes, dict):
             invalid_keys = [key for key in available_nodes if not isinstance(key, str) or not key]
             if invalid_keys:
-                warnings.append("available_nodes contiene claves que no son IDs de nodo válidos")
+                warnings.append("available_nodes contiene claves que no son IDs de nodo v\u00e1lidos")
         return warnings
 
     def _determine_search_strategy(self, goal: Goal, current_state: Dict[str, Any]) -> SearchStrategy:
-        # La selección por complejidad no debe cambiar a BFS en grafos ponderados:
-        # BFS minimiza número de aristas, no coste total. Sin A* se usa Dijkstra.
+        # La seleccion por complejidad no debe cambiar a BFS en grafos ponderados:
+        # BFS minimiza numero de aristas, no coste total. Sin A* se usa Dijkstra.
         if self.use_astar:
             return SearchStrategy.A_STAR
         return SearchStrategy.DIJKSTRA
@@ -594,33 +594,33 @@ class GraphPlannerIntegration:
         strategy: SearchStrategy,
         max_planning_time: float,
     ) -> Dict[str, Any]:
-        """Invoca la API de búsqueda compatible y normaliza el resultado."""
+        """Invoca la API de busqueda compatible y normaliza el resultado."""
         if not self.state_graph:
             return {"status": "failed", "warnings": ["Grafo no inicializado"]}
 
         method = self._select_search_method()
         if method is None:
-            return {"status": "failed", "warnings": ["El grafo no expone una API de búsqueda compatible"]}
+            return {"status": "failed", "warnings": ["El grafo no expone una API de b\u00fasqueda compatible"]}
 
         budget_seconds = self._safe_float(max_planning_time, 30.0)
         if not math.isfinite(budget_seconds) or budget_seconds <= 0:
-            return {"status": "failed", "warnings": ["max_planning_time debe ser un número finito mayor que cero"]}
+            return {"status": "failed", "warnings": ["max_planning_time debe ser un n\u00famero finito mayor que cero"]}
         # La API del grafo expone max_iterations, no timeout. Se usa un presupuesto
-        # acotado derivado del parámetro sin afirmar que interrumpe por tiempo real.
+        # acotado derivado del parametro sin afirmar que interrumpe por tiempo real.
         iterations = max(1, min(1_000_000, int(budget_seconds * 100)))
         kwargs = self._build_search_kwargs(method, start_node_id, goal_node_id, current_state, strategy, iterations)
         try:
             raw_result = method(**kwargs)
         except TypeError:
-            logger.debug("[GRAPH-INTEGRATION] La API rechazó kwargs; se probará invocación posicional", exc_info=True)
+            logger.debug("[GRAPH-INTEGRATION] La API rechazo kwargs; se probara invocacion posicional", exc_info=True)
             try:
                 raw_result = self._call_search_positionally(
                     method, start_node_id, goal_node_id, current_state, strategy, iterations
                 )
             except Exception as exc:
-                return {"status": "failed", "warnings": [f"API de búsqueda incompatible: {exc}"]}
+                return {"status": "failed", "warnings": [f"API de b\u00fasqueda incompatible: {exc}"]}
         except Exception as exc:
-            return {"status": "failed", "warnings": [f"Error en búsqueda: {exc}"]}
+            return {"status": "failed", "warnings": [f"Error en b\u00fasqueda: {exc}"]}
 
         return self._normalize_route_result(raw_result, strategy)
 
@@ -694,12 +694,12 @@ class GraphPlannerIntegration:
             except TypeError as exc:
                 last_error = exc
                 continue
-        raise TypeError(f"API de búsqueda incompatible: {last_error}")
+        raise TypeError(f"API de busqueda incompatible: {last_error}")
 
     def _normalize_route_result(self, raw_result: Any, strategy: SearchStrategy) -> Dict[str, Any]:
-        """Adapta RouteResult, dict, tupla y lista sin convertir errores en éxitos."""
+        """Adapta RouteResult, dict, tupla y lista sin convertir errores en exitos."""
         if raw_result is None:
-            return {"status": "failed", "warnings": ["La búsqueda no devolvió resultado"], "algorithm": strategy.value}
+            return {"status": "failed", "warnings": ["La b\u00fasqueda no devolvi\u00f3 resultado"], "algorithm": strategy.value}
 
         if isinstance(raw_result, dict):
             data = dict(raw_result)
@@ -791,7 +791,7 @@ class GraphPlannerIntegration:
         return result or [f"{src}->{dst}" for src, dst in zip(path, path[1:])]
 
     # ==================================================================
-    # RESOLUCIÓN DE NODOS
+    # RESOLUCION DE NODOS
     # ==================================================================
 
     def _prepare_contextual_planning_edges(
@@ -801,7 +801,7 @@ class GraphPlannerIntegration:
         current_state: Dict[str, Any],
         goal: Optional[Goal] = None,
     ) -> None:
-        """Añade enlaces temporales para esta búsqueda según el estado observado."""
+        """Anade enlaces temporales para esta busqueda segun el estado observado."""
         if not self.state_graph:
             return
         start_node = self.state_graph.nodes.get(start_node_id)
@@ -823,7 +823,7 @@ class GraphPlannerIntegration:
                         effects=self._as_sequence(getattr(action, "effects", [])),
                     )
 
-        # Solo se introduce el cierre si existe evidencia de que la acción puede
+        # Solo se introduce el cierre si existe evidencia de que la accion puede
         # cumplir el objetivo concreto, no solo porque ambos sean del mismo tipo.
         if goal_node.type == NodeType.GOAL:
             for action in self.state_graph.nodes.values():
@@ -857,7 +857,7 @@ class GraphPlannerIntegration:
         for explicit in explicit_candidates:
             if isinstance(explicit, str) and explicit.strip():
                 # Un ID expreso pero inexistente es una discrepancia real; no se
-                # sustituye silenciosamente por un nodo escogido por heurística.
+                # sustituye silenciosamente por un nodo escogido por heuristica.
                 return explicit if explicit in self.state_graph.nodes else None
 
         state_candidates = [
@@ -871,8 +871,8 @@ class GraphPlannerIntegration:
             tied = len(state_candidates) > 1 and state_candidates[1][0] == best_score
             if best_score > 0 and not tied:
                 return best_id
-            # Una única state-node sin datos discriminantes es una opción
-            # inequívoca; un nodo que contradice el estado observado no lo es.
+            # Una unica state-node sin datos discriminantes es una opcion
+            # inequivoca; un nodo que contradice el estado observado no lo es.
             if len(state_candidates) == 1 and best_score >= 0:
                 return best_id
 
@@ -935,7 +935,7 @@ class GraphPlannerIntegration:
             metadata = {}
         explicit_goal_id = getattr(goal, "graph_goal_node_id", None) or metadata.get("graph_goal_node_id") or metadata.get("goal_node_id")
         if isinstance(explicit_goal_id, str) and explicit_goal_id.strip():
-            # Un objetivo ligado explícitamente a un nodo ausente no debe
+            # Un objetivo ligado explicitamente a un nodo ausente no debe
             # redirigirse a otro nodo por coincidencia textual.
             return explicit_goal_id if explicit_goal_id in self.state_graph.nodes else None
 
@@ -971,8 +971,8 @@ class GraphPlannerIntegration:
                 return goal_candidates[0][1]
             return None
 
-        # Si el objetivo no tiene un nodo GOAL explícito, puede mapearse a una
-        # acción solo con coincidencia semántica suficiente y no ambigua.
+        # Si el objetivo no tiene un nodo GOAL explicito, puede mapearse a una
+        # accion solo con coincidencia semantica suficiente y no ambigua.
         action_candidates: List[Tuple[int, str]] = []
         for node_id, node in self.state_graph.nodes.items():
             if getattr(node, "type", None) != NodeType.ACTION:
@@ -1004,8 +1004,8 @@ class GraphPlannerIntegration:
             if len(action_candidates) == 1 or action_candidates[0][0] > action_candidates[1][0]:
                 return action_candidates[0][1]
 
-        # Un único nodo GOAL sigue siendo una selección no ambigua; varios nodos
-        # genéricos no se resuelven por orden de inserción.
+        # Un unico nodo GOAL sigue siendo una seleccion no ambigua; varios nodos
+        # genericos no se resuelven por orden de insercion.
         all_goal_ids = [node_id for node_id, node in self.state_graph.nodes.items() if getattr(node, "type", None) == NodeType.GOAL]
         return all_goal_ids[0] if len(all_goal_ids) == 1 else None
 
@@ -1084,8 +1084,8 @@ class GraphPlannerIntegration:
                     return True
                 return False
 
-            # Para otros objetivos, una metadata explícita puede establecer la
-            # relación; si no existe, no se infiere por coincidencia textual.
+            # Para otros objetivos, una metadata explicita puede establecer la
+            # relacion; si no existe, no se infiere por coincidencia textual.
             return False
 
         if goal_type:
@@ -1243,7 +1243,7 @@ class GraphPlannerIntegration:
                     iterations=max(1, len(plan_entries)),
                 )
             except Exception:
-                logger.debug("[GRAPH-INTEGRATION] No se pudieron registrar métricas del grafo", exc_info=True)
+                logger.debug("[GRAPH-INTEGRATION] No se pudieron registrar metricas del grafo", exc_info=True)
 
     # ==================================================================
     # PRECONDICIONES / EFECTOS
@@ -1260,10 +1260,10 @@ class GraphPlannerIntegration:
 
     @staticmethod
     def _effects_support_preconditions(effects: Any, preconditions: Any) -> bool:
-        """Indica si todos los requisitos podrían quedar garantizados por los efectos."""
+        """Indica si todos los requisitos podrian quedar garantizados por los efectos."""
         if not preconditions:
-            # Un requisito vacío no ofrece evidencia para crear una arista entre
-            # dos acciones que de otro modo no tienen relación declarada.
+            # Un requisito vacio no ofrece evidencia para crear una arista entre
+            # dos acciones que de otro modo no tienen relacion declarada.
             return False
         if isinstance(preconditions, dict) and not any(key in preconditions for key in ("type", "key", "state", "conditions", "function")):
             conditions: List[Any] = [{"type": "state_equals", "key": key, "value": value} for key, value in preconditions.items()]
@@ -1442,7 +1442,7 @@ class GraphPlannerIntegration:
         return False
 
     # ==================================================================
-    # ESTADÍSTICAS / PERSISTENCIA
+    # ESTADISTICAS / PERSISTENCIA
     # ==================================================================
 
     def _calculate_graph_metrics(self) -> None:
@@ -1542,7 +1542,7 @@ class GraphPlannerIntegration:
                 self._invalidate_graph_caches()
                 return True
         except Exception as exc:
-            logger.exception("[GRAPH-INTEGRATION] Error durante la planificación")
+            logger.exception("[GRAPH-INTEGRATION] Error durante la planificacion")
         return False
 
     def validate_graph_consistency(self) -> Dict[str, Any]:
@@ -1558,7 +1558,7 @@ class GraphPlannerIntegration:
                     errors = list(errors or [])
                     return {"valid": not errors, "errors": errors, "stats": dict(stats or {})}
             except Exception as exc:
-                logger.debug("[GRAPH-INTEGRATION] Fallo en validación avanzada", exc_info=True)
+                logger.debug("[GRAPH-INTEGRATION] Fallo en validacion avanzada", exc_info=True)
 
         validator = getattr(self.state_graph, "validate_graph", None)
         if callable(validator):
@@ -1571,11 +1571,11 @@ class GraphPlannerIntegration:
                     return {"valid": not errors, "errors": errors}
                 if isinstance(result, dict):
                     return result
-                return {"valid": bool(result), "errors": [] if result else ["Validación fallida"]}
+                return {"valid": bool(result), "errors": [] if result else ["Validaci\u00f3n fallida"]}
             except Exception as exc:
-                return {"valid": False, "errors": [f"Error en validación: {exc}"]}
+                return {"valid": False, "errors": [f"Error en validaci\u00f3n: {exc}"]}
 
-        return {"valid": True, "errors": [], "warnings": ["El grafo no expone un validador explícito"]}
+        return {"valid": True, "errors": [], "warnings": ["El grafo no expone un validador expl\u00edcito"]}
 
     @staticmethod
     def _as_sequence(value: Any) -> List[Any]:
@@ -1590,7 +1590,7 @@ class GraphPlannerIntegration:
 
     @staticmethod
     def _normalize_path(value: Any) -> List[str]:
-        """Normaliza una ruta y descarta entradas vacías/no textuales."""
+        """Normaliza una ruta y descarta entradas vacias/no textuales."""
         if isinstance(value, str):
             raw_items = [value]
         elif isinstance(value, (list, tuple)):
@@ -1607,7 +1607,7 @@ class GraphPlannerIntegration:
 
     @staticmethod
     def _goal_target_terms(target: Any) -> Set[str]:
-        """Extrae términos de target manteniendo las claves/valores existentes."""
+        """Extrae terminos de target manteniendo las claves/valores existentes."""
         if isinstance(target, dict):
             values: List[Any] = []
             for key in ("app_name", "application", "name", "url", "target_url", "entity", "query", "search_query", "streamer", "platform", "target"):
@@ -1674,7 +1674,7 @@ class GraphPlannerIntegration:
 
     @staticmethod
     def _evaluate_condition_like(condition: Any, state: Dict[str, Any]) -> bool:
-        """Evalúa condiciones declarativas compatibles, fallando de forma segura."""
+        """Evalua condiciones declarativas compatibles, fallando de forma segura."""
         snapshot = GraphPlannerIntegration._copy_state(state)
         try:
             if isinstance(condition, str):
@@ -1834,7 +1834,7 @@ class GraphPlannerIntegration:
             try:
                 revision_invalidator()
             except Exception:
-                logger.debug("No se pudo actualizar la revisión del grafo", exc_info=True)
+                logger.debug("No se pudo actualizar la revision del grafo", exc_info=True)
         self._invalidate_graph_caches()
 
     def _invalidate_graph_caches(self) -> None:
@@ -1846,14 +1846,14 @@ class GraphPlannerIntegration:
             try:
                 clear()
             except Exception:
-                logger.debug("No se pudo invalidar la caché de búsqueda", exc_info=True)
+                logger.debug("No se pudo invalidar la cache de busqueda", exc_info=True)
         heuristic = getattr(graph, "heuristic", None)
         clear_heuristic = getattr(heuristic, "clear_cache", None)
         if callable(clear_heuristic):
             try:
                 clear_heuristic()
             except Exception:
-                logger.debug("No se pudo invalidar la caché de heurística", exc_info=True)
+                logger.debug("No se pudo invalidar la cache de heuristica", exc_info=True)
 
     def _validate_route_path(
         self,
@@ -1863,7 +1863,7 @@ class GraphPlannerIntegration:
         initial_state: Dict[str, Any],
     ) -> List[str]:
         if not path:
-            return ["La búsqueda devolvió una ruta vacía"]
+            return ["La b\u00fasqueda devolvi\u00f3 una ruta vac\u00eda"]
         if path[0] != start_node_id or path[-1] != goal_node_id:
             return ["La ruta no coincide con los nodos inicial y final solicitados"]
         if not self.state_graph:
@@ -1875,7 +1875,7 @@ class GraphPlannerIntegration:
         for source_id, target_id in zip(path, path[1:]):
             edge = self._find_edge(source_id, target_id, state)
             if edge is None:
-                return [f"La ruta contiene una transición no válida en el estado actual: {source_id} -> {target_id}"]
+                return [f"La ruta contiene una transici\u00f3n no v\u00e1lida en el estado actual: {source_id} -> {target_id}"]
             try:
                 updated = edge.apply_effects(state)
                 if isinstance(updated, dict):
@@ -1897,15 +1897,15 @@ class GraphPlannerIntegration:
                 iterations=0,
             )
         except Exception:
-            logger.debug("No se pudieron registrar métricas de integración", exc_info=True)
+            logger.debug("No se pudieron registrar metricas de integracion", exc_info=True)
 
     # ==================================================================
-    # RUTAS COMPATIBLES / PÚBLICAS
+    # RUTAS COMPATIBLES / PUBLICAS
     # ==================================================================
 
     def build_route(self, *args: Any, **kwargs: Any) -> Any:
         if not self.state_graph:
-            return GraphPlanningResult(status="failed", warnings=["El grafo no está inicializado"])
+            return GraphPlanningResult(status="failed", warnings=["El grafo no est\u00e1 inicializado"])
         return self.state_graph.build_route(*args, **kwargs)
 
     @staticmethod

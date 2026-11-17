@@ -1,8 +1,8 @@
 """Ejecutor de tareas HTN integrado con las capacidades reales de JARVIS.
 
-Convierte tareas HTN en unidades ejecutables y delega la ejecución en el
-registro central de acciones o en el executor principal. No declara éxito si no
-recibe confirmación explícita y no ejecuta automáticamente tareas no soportadas.
+Convierte tareas HTN en unidades ejecutables y delega la ejecucion en el
+registro central de acciones o en el executor principal. No declara exito si no
+recibe confirmacion explicita y no ejecuta automaticamente tareas no soportadas.
 """
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from src.hands.planner.node import Node, NodeType, Task, TaskStatus
 from src.hands.planner.htn_manager import TaskExecutionResult
-from src.utils.logger import get_logger
+from src.core.log import get_logger
 
 logger = get_logger(__name__)
 
@@ -61,7 +61,7 @@ def get_executor() -> Any:
     if _executor is None:
         with _singleton_lock:
             if _executor is None:
-                from src.hands.executor import get_executor as factory
+                from src.hands.actions.executor import get_executor as factory
                 _executor = factory()
     return _executor
 
@@ -72,7 +72,7 @@ def get_action_registry() -> Any:
     if _action_registry is None:
         with _singleton_lock:
             if _action_registry is None:
-                from src.hands.action_registry import get_action_registry as factory
+                from src.hands.actions.action_registry import get_action_registry as factory
                 _action_registry = factory()
     return _action_registry
 
@@ -183,8 +183,8 @@ class TaskExecutor:
     def execute_task(self, task: Task, current_state: Dict[str, Any]) -> TaskExecutionResult:
         """Prepara y ejecuta una tarea individual.
 
-        ``timeout_per_task`` se comprueba al volver de la ejecución: no se puede
-        cancelar con seguridad una acción externa ya iniciada desde este módulo.
+        ``timeout_per_task`` se comprueba al volver de la ejecucion: no se puede
+        cancelar con seguridad una accion externa ya iniciada desde este modulo.
         """
         started = time.perf_counter()
         state = dict(current_state) if isinstance(current_state, dict) else {}
@@ -223,10 +223,10 @@ class TaskExecutor:
 
             elapsed = time.perf_counter() - started
             if self.config.timeout_per_task > 0 and elapsed > self.config.timeout_per_task:
-                # No se lanza fallback tras una acción que pudo haber tenido efectos.
+                # No se lanza fallback tras una accion que pudo haber tenido efectos.
                 return self._register_failure(
                     task,
-                    f"Tiempo límite excedido tras retornar: {elapsed:.2f}s > "
+                    f"Tiempo l\u00edmite excedido tras retornar: {elapsed:.2f}s > "
                     f"{self.config.timeout_per_task:.2f}s",
                     started,
                     result=result,
@@ -264,15 +264,15 @@ class TaskExecutor:
 
             return self._register_failure(
                 task,
-                result.get("error") or result.get("error_message") or "La ejecución ha fallado",
+                result.get("error") or result.get("error_message") or "La ejecuci\u00f3n ha fallado",
                 started,
                 result=result,
                 current_state=state,
             )
         except Exception as exc:
-            logger.exception("[TASK_EXECUTOR] Error en ejecución de tarea %s", getattr(task, "id", "unknown"))
+            logger.exception("[TASK_EXECUTOR] Error en ejecucion de tarea %s", getattr(task, "id", "unknown"))
             return self._register_failure(
-                task, f"Error en ejecución: {exc}", started,
+                task, f"Error en ejecuci\u00f3n: {exc}", started,
                 result={"success": False, "error": str(exc), "execution_attempted": False},
                 current_state=state,
             )
@@ -314,7 +314,7 @@ class TaskExecutor:
             task_id=task.id,
             status=TaskStatus.FAILED,
             result=dict(result) if isinstance(result, dict) else {"success": False},
-            error_message=error_message or "Ejecución fallida",
+            error_message=error_message or "Ejecuci\u00f3n fallida",
             execution_time=max(0.0, time.perf_counter() - started),
             new_state=state,
         )
@@ -322,7 +322,7 @@ class TaskExecutor:
     def execute_task_with_retry(
         self, task: Task, current_state: Dict[str, Any]
     ) -> TaskExecutionResult:
-        """Reintenta solo cuando la tarea declara explícitamente que es segura."""
+        """Reintenta solo cuando la tarea declara explicitamente que es segura."""
         last_result: Optional[TaskExecutionResult] = None
         metadata = self._task_metadata(task)
         retry_safe = bool(metadata.get("retry_safe", metadata.get("idempotent", False)))
@@ -365,7 +365,7 @@ class TaskExecutor:
             return self._execute_conditional(tasks, current_state)
         if mode == TaskExecutionMode.FALLBACK:
             return self._execute_with_fallback(tasks, current_state)
-        raise ValueError(f"Modo de ejecución no soportado: {mode}")
+        raise ValueError(f"Modo de ejecucion no soportado: {mode}")
 
     def _prepare_task_execution(self, task: Task, current_state: Dict[str, Any]) -> TaskExecutionResult:
         if not self._check_task_preconditions(task, current_state):
@@ -401,7 +401,7 @@ class TaskExecutor:
             available_keys = (f"{application.lower()}_available", f"{app_key}_available")
             for key in available_keys:
                 if key in current_state and not bool(current_state[key]):
-                    logger.warning("[TASK_EXECUTOR] Aplicación no disponible: %s", application)
+                    logger.warning("[TASK_EXECUTOR] Aplicacion no disponible: %s", application)
                     return False
             app_states = current_state.get("application_states", {})
             if isinstance(app_states, dict):
@@ -539,7 +539,7 @@ class TaskExecutor:
                 # Algunos callbacks aceptan solo el contexto como primer argumento.
                 if TaskExecutor._signature_accepts(signature, (kwargs,), {}):
                     return TaskExecutor._normalize_execution_result(callback(kwargs))
-                return {"success": False, "error": "La firma del callback no acepta los parámetros", "execution_attempted": False}
+                return {"success": False, "error": "La firma del callback no acepta los par\u00e1metros", "execution_attempted": False}
         except (TypeError, ValueError):
             pass
         return TaskExecutor._normalize_execution_result(callback(**kwargs))
@@ -556,7 +556,7 @@ class TaskExecutor:
 
     @staticmethod
     def _normalize_execution_result(result: Any) -> Dict[str, Any]:
-        """Normaliza respuestas y exige evidencia explícita de éxito."""
+        """Normaliza respuestas y exige evidencia explicita de exito."""
         if isinstance(result, TaskExecutionResult):
             normalized: Dict[str, Any] = {
                 "success": result.status == TaskStatus.COMPLETED,
@@ -579,7 +579,7 @@ class TaskExecutor:
         if isinstance(result, bool):
             return {"success": result}
         if result is None:
-            return {"success": False, "error": "La capacidad no devolvió confirmación de ejecución"}
+            return {"success": False, "error": "La capacidad no devolvi\u00f3 confirmaci\u00f3n de ejecuci\u00f3n"}
         explicit_success = getattr(result, "success", None)
         if explicit_success is not None:
             return {"success": TaskExecutor._truthy_success(explicit_success), "result": result}
@@ -591,11 +591,11 @@ class TaskExecutor:
         return {
             "success": False,
             "result": result,
-            "error": "La capacidad devolvió un resultado sin estado de éxito verificable",
+            "error": "La capacidad devolvi\u00f3 un resultado sin estado de \u00e9xito verificable",
         }
 
     def _execute_real_capability(self, task: Task, kwargs: Dict[str, Any]) -> Dict[str, Any]:
-        """Ejecuta una acción registrada o la delega en el executor principal."""
+        """Ejecuta una accion registrada o la delega en el executor principal."""
         action_name = self._resolve_action_name(task)
         parameters = self._task_parameters(task)
         runtime_parameters = dict(parameters)
@@ -614,19 +614,19 @@ class TaskExecutor:
             try:
                 registered = registry.get_action(action_name)
             except Exception as exc:
-                logger.warning("[TASK_EXECUTOR] Error consultando acción %s: %s", action_name, exc)
+                logger.warning("[TASK_EXECUTOR] Error consultando accion %s: %s", action_name, exc)
                 registered = None
             if registered:
                 try:
                     if not registry.can_execute(action_name, runtime_parameters, state=state):
-                        return {"success": False, "error": f"Precondiciones o parámetros no válidos para: {action_name}", "execution_attempted": False}
+                        return {"success": False, "error": f"Precondiciones o par\u00e1metros no v\u00e1lidos para: {action_name}", "execution_attempted": False}
                     raw_result = registry.execute_action(action_name, runtime_parameters)
                     normalized = self._normalize_execution_result(raw_result)
                     normalized.setdefault("action", action_name)
                     normalized["execution_attempted"] = True
                     return normalized
                 except Exception as exc:
-                    logger.exception("[TASK_EXECUTOR] Error ejecutando acción registrada %s", action_name)
+                    logger.exception("[TASK_EXECUTOR] Error ejecutando accion registrada %s", action_name)
                     return {"success": False, "error": str(exc), "action": action_name, "execution_attempted": True}
 
         try:
@@ -675,8 +675,8 @@ class TaskExecutor:
             for args, kwargs in calls:
                 if not self._signature_accepts(signature, args, kwargs):
                     continue
-                # Si el método elegido falla, la excepción se propaga: reintentar
-                # otra convención podría ejecutar dos veces una acción con efectos.
+                # Si el metodo elegido falla, la excepcion se propaga: reintentar
+                # otra convencion podria ejecutar dos veces una accion con efectos.
                 return method(*args, **kwargs)
         return None
 
@@ -711,7 +711,7 @@ class TaskExecutor:
 
     def _execute_node(self, node: Node, current_state: Dict[str, Any]) -> Dict[str, Any]:
         if not callable(node.execute_callback):
-            return {"success": False, "error": "El nodo no tiene callback de ejecución", "execution_attempted": False}
+            return {"success": False, "error": "El nodo no tiene callback de ejecuci\u00f3n", "execution_attempted": False}
         try:
             parameters = dict(getattr(node, "parameters", {}) or {})
             parameters.pop("current_state", None)
@@ -736,7 +736,7 @@ class TaskExecutor:
                     }
                     criteria_context["current_state"] = dict(new_state)
                     if not criteria(result, **criteria_context):
-                        return {**result, "success": False, "error": "El criterio de éxito del nodo no se ha cumplido"}
+                        return {**result, "success": False, "error": "El criterio de \u00e9xito del nodo no se ha cumplido"}
             return result
         except Exception as exc:
             logger.exception("[TASK_EXECUTOR] Error al ejecutar nodo %s", getattr(node, "id", "unknown"))
@@ -860,8 +860,8 @@ class TaskExecutor:
                 response["resolved_url"] = properties["url"]
             return response
         except Exception as exc:
-            logger.exception("[TASK_EXECUTOR] Error en resolución de entidad")
-            return {"success": False, "error": f"Error en resolución de entidad: {exc}", "execution_attempted": True}
+            logger.exception("[TASK_EXECUTOR] Error en resolucion de entidad")
+            return {"success": False, "error": f"Error en resoluci\u00f3n de entidad: {exc}", "execution_attempted": True}
 
     def _get_conversation_history(self) -> List[Dict[str, Any]]:
         try:
@@ -985,7 +985,7 @@ class TaskExecutor:
                 # ABORTED distingue una rama omitida de una tarea realmente ejecutada.
                 results.append(TaskExecutionResult(
                     task_id=task.id, status=TaskStatus.ABORTED,
-                    result={"message": "Tarea omitida por condición", "skipped": True},
+                    result={"message": "Tarea omitida por condici\u00f3n", "skipped": True},
                     execution_time=0.0, new_state=dict(state),
                 ))
         return results
@@ -1075,7 +1075,7 @@ _task_executor_lock = threading.RLock()
 
 
 def get_task_executor() -> TaskExecutor:
-    """Obtiene el singleton de TaskExecutor con inicialización protegida."""
+    """Obtiene el singleton de TaskExecutor con inicializacion protegida."""
     global _task_executor
     if _task_executor is None:
         with _task_executor_lock:

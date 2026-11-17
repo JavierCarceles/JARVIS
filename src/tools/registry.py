@@ -1,21 +1,21 @@
 """
-Registro unificado de acciones para Jarvis - VERSIÓN INTEGRADA.
+Registro unificado de acciones para Jarvis - VERSION INTEGRADA.
 
 Implementa un sistema de registro mediante decoradores que combina:
-- Registro básico de acciones (compatibilidad legacy)
-- Metadatos avanzados para planificación (nueva arquitectura)
-- Validación y ejecución unificadas
+- Registro basico de acciones (compatibilidad legacy)
+- Metadatos avanzados para planificacion (nueva arquitectura)
+- Validacion y ejecucion unificadas
 
 Este archivo reemplaza la duplicidad entre:
-- tools/registry.py (versión simple)
-- hands/action_registry.py (versión completa)
+- tools/registry.py (version simple)
+- hands/action_registry.py (version completa)
 """
 
 from __future__ import annotations
 
 import importlib
 import inspect
-from src.utils.logger import get_logger
+from src.core.log import get_logger
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Union, get_origin
@@ -63,7 +63,7 @@ def _get_state_value(state: Any, key: str, default: Any = None) -> Any:
 
 
 def _match_condition(state: Any, condition: Any) -> bool:
-    """Comprueba una única condición de estado."""
+    """Comprueba una unica condicion de estado."""
 
     if callable(condition):
         try:
@@ -123,7 +123,7 @@ def _matches_conditions(state: Any, conditions: Any) -> bool:
 
 @dataclass
 class ActionInfo:
-    """Metadatos completos de una acción ejecutable y planificable."""
+    """Metadatos completos de una accion ejecutable y planificable."""
 
     name: str
     description: str
@@ -146,7 +146,7 @@ class ActionInfo:
     planner_enabled: bool = True
 
     def to_dict(self) -> Dict[str, Any]:
-        """Devuelve una representación serializable de los metadatos."""
+        """Devuelve una representacion serializable de los metadatos."""
         return {
             "action": self.name,
             "description": self.description,
@@ -168,11 +168,11 @@ class ActionInfo:
         }
 
     def matches_preconditions(self, state: Any) -> bool:
-        """Comprueba las precondiciones de la acción contra un estado."""
+        """Comprueba las precondiciones de la accion contra un estado."""
         return _matches_conditions(state, self.preconditions)
 
     def verify_success(self, result: Any = None, *args: Any, **kwargs: Any) -> bool:
-        """Comprueba el éxito de la acción mediante su verificador opcional."""
+        """Comprueba el exito de la accion mediante su verificador opcional."""
         if self.success_checker is None:
             return True
 
@@ -182,7 +182,7 @@ class ActionInfo:
             return bool(self.success_checker(result))
         except Exception as exc:
             logger.warning(
-                "[ACTION-REGISTRY] Error verificando éxito de %s: %s",
+                "[ACTION-REGISTRY] Error verificando exito de %s: %s",
                 self.name,
                 exc,
             )
@@ -193,8 +193,8 @@ class ActionRegistry:
     """
     Registro unificado de acciones para Jarvis.
 
-    Combina compatibilidad legacy con metadatos avanzados para planificación.
-    Es la fuente única de verdad para las acciones del sistema.
+    Combina compatibilidad legacy con metadatos avanzados para planificacion.
+    Es la fuente unica de verdad para las acciones del sistema.
     """
 
     def __init__(self) -> None:
@@ -211,7 +211,7 @@ class ActionRegistry:
         self._registered_modules: set = set()
 
         logger.info(
-            "[ACTION-REGISTRY] Sistema de registro de acciones inicializado (versión integrada)"
+            "[ACTION-REGISTRY] Sistema de registro de acciones inicializado (version integrada)"
         )
 
     # ======================================================================
@@ -220,12 +220,12 @@ class ActionRegistry:
 
     @staticmethod
     def _normalize_name(name: str) -> str:
-        """Normaliza el nombre de una acción."""
+        """Normaliza el nombre de una accion."""
         return str(name).strip()
 
     @staticmethod
     def _normalize_description(description: str) -> str:
-        """Normaliza la descripción de una acción."""
+        """Normaliza la descripcion de una accion."""
         return str(description).strip()
 
     @staticmethod
@@ -234,7 +234,7 @@ class ActionRegistry:
         Normaliza el umbral de confianza al rango [0.0, 1.0].
 
         Se mantiene como float para que el valor entregado al LLM sea
-        consistente aunque el registro reciba un entero/string numérico.
+        consistente aunque el registro reciba un entero/string numerico.
         """
         try:
             confidence = float(value)
@@ -257,11 +257,11 @@ class ActionRegistry:
         try:
             return ActionType(str(action_type).strip().lower())
         except ValueError as exc:
-            raise ValueError(f"Tipo de acción no válido: {action_type!r}") from exc
+            raise ValueError(f"Tipo de accion no valido: {action_type!r}") from exc
 
     @staticmethod
     def _extract_parameters(func: Callable) -> Dict[str, Any]:
-        """Extrae un esquema básico de parámetros desde la firma de una función."""
+        """Extrae un esquema basico de parametros desde la firma de una funcion."""
         sig = inspect.signature(func)
         extracted_parameters: Dict[str, Any] = {}
 
@@ -314,17 +314,17 @@ class ActionRegistry:
         planner_enabled: bool = True,
     ) -> Callable:
         """
-        Decorador para registrar una acción.
+        Decorador para registrar una accion.
 
         Args:
-            name: Nombre único de la acción.
-            description: Descripción clara de la acción.
-            action_type: Tipo de acción.
-            parameters: Parámetros esperados por la acción.
+            name: Nombre unico de la accion.
+            description: Descripcion clara de la accion.
+            action_type: Tipo de accion.
+            parameters: Parametros esperados por la accion.
             confidence_threshold: Umbral de confianza entre 0 y 1.
 
         Returns:
-            Decorador que registra la función y devuelve la misma función.
+            Decorador que registra la funcion y devuelve la misma funcion.
         """
         action_name = self._normalize_name(name)
         action_description = self._normalize_description(description)
@@ -333,13 +333,13 @@ class ActionRegistry:
         normalized_confidence = self._normalize_confidence(confidence_threshold)
 
         if not action_name:
-            raise ValueError("El nombre de la acción no puede estar vacío.")
+            raise ValueError("El nombre de la accion no puede estar vacio.")
 
         def decorator(func: Callable) -> Callable:
             if not callable(func):
-                raise TypeError("register_action debe decorar una función invocable.")
+                raise TypeError("register_action debe decorar una funcion invocable.")
 
-            # Extraer parámetros si no se proporcionan
+            # Extraer parametros si no se proporcionan
             action_parameters = (
                 self._extract_parameters(func)
                 if parameters is None
@@ -350,7 +350,7 @@ class ActionRegistry:
             normalized_cost = float(cost)
             if normalized_cost < 0:
                 raise ValueError(
-                    f"El coste de una acción no puede ser negativo: {name}"
+                    f"El coste de una accion no puede ser negativo: {name}"
                 )
 
             # Si el mismo nombre ya estaba registrado, eliminamos su entrada
@@ -358,7 +358,7 @@ class ActionRegistry:
             previous = self.actions.get(action_name)
 
             if previous is not None:
-                # Eliminar de categorías anteriores
+                # Eliminar de categorias anteriores
                 if previous.category in self.categories:
                     previous_names = self.categories[previous.category]
                     if action_name in previous_names:
@@ -373,7 +373,7 @@ class ActionRegistry:
                     previous_names.remove(action_name)
 
                 logger.warning(
-                    "[ACTION-REGISTRY] Acción reemplazada: %s",
+                    "[ACTION-REGISTRY] Accion reemplazada: %s",
                     action_name,
                 )
 
@@ -399,10 +399,10 @@ class ActionRegistry:
                 planner_enabled=planner_enabled,
             )
 
-            # Almacenar acción
+            # Almacenar accion
             self.actions[action_name] = action_info
 
-            # Indexar por categoría
+            # Indexar por categoria
             if category not in self.categories:
                 self.categories[category] = []
             if action_name not in self.categories[category]:
@@ -417,7 +417,7 @@ class ActionRegistry:
                 names_for_type.append(action_name)
 
             logger.info(
-                "[ACTION-REGISTRY] Acción registrada: %s (%s | %s)",
+                "[ACTION-REGISTRY] Accion registrada: %s (%s | %s)",
                 action_name,
                 normalized_type.value,
                 category,
@@ -436,10 +436,10 @@ class ActionRegistry:
         name: str,
     ) -> Optional[ActionInfo]:
         """
-        Obtiene información de una acción por nombre.
+        Obtiene informacion de una accion por nombre.
 
         Args:
-            name: Nombre de la acción.
+            name: Nombre de la accion.
 
         Returns:
             ActionInfo o None si no existe.
@@ -456,7 +456,7 @@ class ActionRegistry:
         Mantiene compatibilidad con el formato legacy.
 
         Args:
-            action_type: Filtra por tipo de acción cuando se especifica.
+            action_type: Filtra por tipo de accion cuando se especifica.
 
         Returns:
             Lista de diccionarios describiendo las acciones.
@@ -492,7 +492,7 @@ class ActionRegistry:
     def get_actions_for_planner(self) -> List[Dict[str, Any]]:
         """
         Genera metadatos serializables de las acciones para el planificador.
-        Formato avanzado con todos los metadatos de planificación.
+        Formato avanzado con todos los metadatos de planificacion.
         """
         return [
             action_info.to_dict()
@@ -502,7 +502,7 @@ class ActionRegistry:
 
     def get_plannable_actions(self) -> Dict[str, ActionInfo]:
         """
-        Obtiene las acciones habilitadas para la capa de planificación.
+        Obtiene las acciones habilitadas para la capa de planificacion.
         """
         return {
             name: action_info
@@ -512,7 +512,7 @@ class ActionRegistry:
 
     def get_actions_by_category(self, category: str) -> List[ActionInfo]:
         """
-        Obtiene todas las acciones de una categoría.
+        Obtiene todas las acciones de una categoria.
         """
         action_names = self.categories.get(category, [])
         return [self.actions[name] for name in action_names if name in self.actions]
@@ -540,10 +540,10 @@ class ActionRegistry:
         return list(self.action_types.get(normalized_type, []))
 
     def register_module(self, module_path: str) -> None:
-        """Registra todas las acciones decoradas de un módulo."""
+        """Registra todas las acciones decoradas de un modulo."""
         if module_path in self._registered_modules:
             logger.debug(
-                "[ACTION-REGISTRY] Módulo ya registrado: %s",
+                "[ACTION-REGISTRY] Modulo ya registrado: %s",
                 module_path,
             )
             return
@@ -559,25 +559,25 @@ class ActionRegistry:
                 self._store_action_info(action_info)
 
                 logger.info(
-                    "[ACTION-REGISTRY] Acción de módulo registrada: %s",
+                    "[ACTION-REGISTRY] Accion de modulo registrada: %s",
                     action_info.name,
                 )
 
             self._registered_modules.add(module_path)
 
             logger.info(
-                "[ACTION-REGISTRY] Módulo registrado: %s",
+                "[ACTION-REGISTRY] Modulo registrado: %s",
                 module_path,
             )
 
         except ImportError as exc:
-            logger._print_log("info", "Procesando solicitud", "registry.py", "method", 574)
+            logger.debug("ActionRegistry.register_module: %s", exc)
 
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "registry.py", "method", 574)
+            logger.debug("ActionRegistry.register_module: %s", exc)
 
     def _store_action_info(self, action_info: ActionInfo) -> None:
-        """Almacena una acción manteniendo sus índices internos."""
+        """Almacena una accion manteniendo sus indices internos."""
         previous = self.actions.get(action_info.name)
         if previous is not None and previous.category != action_info.category:
             previous_names = self.categories.get(previous.category, [])
@@ -600,7 +600,7 @@ class ActionRegistry:
 
         Args:
             partial_name: Texto parcial del nombre.
-            limit: Máximo de sugerencias.
+            limit: Maximo de sugerencias.
 
         Returns:
             Lista de nombres coincidentes.
@@ -630,16 +630,16 @@ class ActionRegistry:
         return suggestions
 
     # ======================================================================
-    # EJECUCIÓN
+    # EJECUCION
     # ======================================================================
 
     # ======================================================================
-    # VALIDACIÓN AVANZADA
+    # VALIDACION AVANZADA
     # ======================================================================
 
     @staticmethod
     def _validate_value_type(value: Any, expected_type: Any) -> bool:
-        """Valida de forma segura un tipo de parámetro."""
+        """Valida de forma segura un tipo de parametro."""
 
         if expected_type in (None, "any", "Any"):
             return True
@@ -676,12 +676,12 @@ class ActionRegistry:
         action_name: str,
         parameters: Dict[str, Any],
     ) -> bool:
-        """Valida si una acción y sus parámetros son válidos."""
+        """Valida si una accion y sus parametros son validos."""
         action_info = self.get_action(action_name)
 
         if not action_info:
             logger.warning(
-                "[ACTION-REGISTRY] Acción no encontrada: %s",
+                "[ACTION-REGISTRY] Accion no encontrada: %s",
                 action_name,
             )
             return False
@@ -691,7 +691,7 @@ class ActionRegistry:
         for param_name, param_info in action_info.parameters.items():
             if param_info.get("required", False) and param_name not in parameters:
                 logger.warning(
-                    "[ACTION-REGISTRY] Parámetro requerido faltante: %s",
+                    "[ACTION-REGISTRY] Parametro requerido faltante: %s",
                     param_name,
                 )
                 return False
@@ -699,7 +699,7 @@ class ActionRegistry:
         for param_name in parameters:
             if param_name not in action_info.parameters:
                 logger.warning(
-                    "[ACTION-REGISTRY] Parámetro desconocido para %s: %s",
+                    "[ACTION-REGISTRY] Parametro desconocido para %s: %s",
                     action_name,
                     param_name,
                 )
@@ -728,10 +728,10 @@ class ActionRegistry:
         check_preconditions: bool = True,
     ) -> bool:
         """
-        Comprueba si una acción puede ejecutarse según parámetros y estado.
+        Comprueba si una accion puede ejecutarse segun parametros y estado.
 
-        La comprobación de estado es opcional para mantener compatibilidad con
-        el flujo actual de ejecución directa.
+        La comprobacion de estado es opcional para mantener compatibilidad con
+        el flujo actual de ejecucion directa.
         """
         action_info = self.get_action(action_name)
         if action_info is None:
@@ -748,15 +748,15 @@ class ActionRegistry:
         return True
 
     def get_action_cost(self, action_name: str) -> float:
-        """Obtiene el coste declarado de una acción."""
+        """Obtiene el coste declarado de una accion."""
         action_info = self.get_action(action_name)
         if action_info is None:
-            raise ValueError(f"Acción no encontrada: {action_name}")
+            raise ValueError(f"Accion no encontrada: {action_name}")
 
         return action_info.cost
 
     # ======================================================================
-    # EJECUCIÓN
+    # EJECUCION
     # ======================================================================
 
     def execute_action(
@@ -765,23 +765,23 @@ class ActionRegistry:
         parameters: Optional[Dict[str, Any]] = None,
     ) -> Any:
         """
-        Ejecuta una acción registrada con parámetros nombrados.
+        Ejecuta una accion registrada con parametros nombrados.
 
         Se conserva como punto de compatibilidad para el sistema actual.
         La futura arquitectura puede hacer que Planner/Executor utilicen la misma
-        información sin delegar la planificación al registro.
+        informacion sin delegar la planificacion al registro.
         """
         action_info = self.get_action(action_name)
 
         if not action_info:
-            raise ValueError(f"Acción no encontrada: {action_name}")
+            raise ValueError(f"Accion no encontrada: {action_name}")
 
         safe_parameters = parameters or {}
 
         if not self.validate_action(action_name, safe_parameters):
-            raise ValueError(f"Parámetros inválidos para la acción: {action_name}")
+            raise ValueError(f"Parametros invalidos para la accion: {action_name}")
 
-        # Importar aquí para evitar dependencia circular
+        # Importar aqui para evitar dependencia circular
         try:
             from src.memory.prediction import get_prediction_memory
 
@@ -793,7 +793,7 @@ class ActionRegistry:
             result = action_info.function(**safe_parameters)
 
             logger.info(
-                "[ACTION-REGISTRY] Acción ejecutada: %s",
+                "[ACTION-REGISTRY] Accion ejecutada: %s",
                 action_name,
             )
 
@@ -806,14 +806,14 @@ class ActionRegistry:
                     )
                 except Exception as memory_error:
                     logger.warning(
-                        "[ACTION-REGISTRY] No se pudo registrar el éxito en PredictionMemory: %s",
+                        "[ACTION-REGISTRY] No se pudo registrar el exito en PredictionMemory: %s",
                         memory_error,
                     )
 
             return result
 
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "registry.py", "method", 574)
+            logger.debug("ActionRegistry.execute_action: %s", exc)
 
             if prediction_memory:
                 try:
@@ -837,25 +837,25 @@ class ActionRegistry:
         **kwargs: Any,
     ) -> Any:
         """
-        Ejecuta una acción por su nombre (compatibilidad legacy).
+        Ejecuta una accion por su nombre (compatibilidad legacy).
 
         Args:
-            name: Nombre de la acción.
+            name: Nombre de la accion.
             *args: Argumentos posicionales.
             **kwargs: Argumentos con nombre.
 
         Returns:
-            Resultado de la función registrada.
+            Resultado de la funcion registrada.
         """
         action_name = self._normalize_name(name)
         action_info = self.get_action(action_name)
 
         if action_info is None:
-            raise ValueError(f"Acción no encontrada: {action_name}")
+            raise ValueError(f"Accion no encontrada: {action_name}")
 
         try:
             logger.info(
-                "[ACTION-REGISTRY] Ejecutando acción (legacy): %s",
+                "[ACTION-REGISTRY] Ejecutando accion (legacy): %s",
                 action_name,
             )
 
@@ -865,18 +865,18 @@ class ActionRegistry:
             )
 
             logger.info(
-                "[ACTION-REGISTRY] Acción %s ejecutada exitosamente",
+                "[ACTION-REGISTRY] Accion %s ejecutada exitosamente",
                 action_name,
             )
 
             return result
 
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "registry.py", "method", 574)
+            logger.debug("ActionRegistry.execute_action_legacy: %s", exc)
             raise
 
     # ======================================================================
-    # VALIDACIÓN
+    # VALIDACION
     # ======================================================================
 
     def validate_parameters(
@@ -885,27 +885,27 @@ class ActionRegistry:
         parameters: Dict[str, Any],
     ) -> bool:
         """
-        Valida los nombres de parámetros definidos por la acción.
+        Valida los nombres de parametros definidos por la accion.
 
-        Esta validación comprueba únicamente:
-        - que existan los parámetros marcados como required;
-        - que no se envíen parámetros desconocidos.
+        Esta validacion comprueba unicamente:
+        - que existan los parametros marcados como required;
+        - que no se envien parametros desconocidos.
 
-        No intenta convertir valores ni deducir tipos que no estén
-        especificados en los metadatos de la acción.
+        No intenta convertir valores ni deducir tipos que no esten
+        especificados en los metadatos de la accion.
         """
         action_info = self.get_action(name)
 
         if action_info is None:
             logger.warning(
-                "[ACTION-REGISTRY] Acción inexistente al validar: %s",
+                "[ACTION-REGISTRY] Accion inexistente al validar: %s",
                 name,
             )
             return False
 
         if not isinstance(parameters, dict):
             logger.warning(
-                "[ACTION-REGISTRY] Los parámetros de %s no son un diccionario",
+                "[ACTION-REGISTRY] Los parametros de %s no son un diccionario",
                 name,
             )
             return False
@@ -923,7 +923,7 @@ class ActionRegistry:
 
         if missing_required:
             logger.warning(
-                "[ACTION-REGISTRY] Parámetros requeridos faltantes para %s: %s",
+                "[ACTION-REGISTRY] Parametros requeridos faltantes para %s: %s",
                 name,
                 sorted(missing_required),
             )
@@ -933,7 +933,7 @@ class ActionRegistry:
 
         if unexpected_params:
             logger.warning(
-                "[ACTION-REGISTRY] Parámetros no esperados para %s: %s",
+                "[ACTION-REGISTRY] Parametros no esperados para %s: %s",
                 name,
                 sorted(unexpected_params),
             )
@@ -952,7 +952,7 @@ class ActionRegistry:
         for action_type in self.action_types:
             self.action_types[action_type].clear()
 
-        logger._print_log("info", "[ACTION-REGISTRY] Todas las acciones han sido limpiadas", "registry.py", "method", 955)
+        logger.info("[ACTION-REGISTRY] Todas las acciones han sido limpiadas")
 
 
 # ============================================================================
@@ -964,7 +964,7 @@ _registry_instance: Optional[ActionRegistry] = None
 
 
 def get_action_registry() -> ActionRegistry:
-    """Obtiene la instancia global única del registro de acciones."""
+    """Obtiene la instancia global unica del registro de acciones."""
     global _registry_instance
 
     if _registry_instance is None:
@@ -998,8 +998,8 @@ def register_action(
     planner_enabled: bool = True,
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """
-    Atajo para registrar una acción usando la instancia global.
-    Versión completa con todos los metadatos de planificación.
+    Atajo para registrar una accion usando la instancia global.
+    Version completa con todos los metadatos de planificacion.
 
     Returns:
         Decorador de registro.
@@ -1035,8 +1035,8 @@ def register_action_legacy(
     confidence_threshold: float = 0.8,
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """
-    Atajo para registrar una acción usando la instancia global.
-    Versión legacy simplificada para compatibilidad.
+    Atajo para registrar una accion usando la instancia global.
+    Version legacy simplificada para compatibilidad.
 
     Returns:
         Decorador de registro.
@@ -1066,7 +1066,7 @@ def get_action(
     name: str,
 ) -> Optional[ActionInfo]:
     """
-    Atajo para obtener una acción desde el registro global.
+    Atajo para obtener una accion desde el registro global.
     """
     registry = get_action_registry()
     return registry.get_action(name)

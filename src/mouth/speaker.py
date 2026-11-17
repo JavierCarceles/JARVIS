@@ -1,5 +1,5 @@
 """
-Síntesis de voz usando motor Kokoro ONNX.
+Sintesis de voz usando motor Kokoro ONNX.
 """
 
 from __future__ import annotations
@@ -24,20 +24,20 @@ try:
 except Exception:
     _PYTTSX3_AVAILABLE = False
 
-from src.utils.config import (
+from src.core.config import (
     get_project_root,
     get_timeout_config,
     get_voice_config,
     save_voice_preference,
 )
-from src.utils.logger import get_logger
+from src.core.log import get_logger
 
 logger = get_logger(__name__)
 
 
 class Mouth:
     """
-    Controla la síntesis de voz utilizando el motor Kokoro ONNX.
+    Controla la sintesis de voz utilizando el motor Kokoro ONNX.
     """
 
     GROUP_VOICE_IDS = {
@@ -49,7 +49,7 @@ class Mouth:
 
     def __init__(self):
         """
-        Inicializa el motor de síntesis de voz.
+        Inicializa el motor de sintesis de voz.
         """
 
         config = get_voice_config()
@@ -88,59 +88,58 @@ class Mouth:
         self._load_parameters()
 
     # ========================================================================
-    # INICIALIZACIÓN
+    # INICIALIZACION
     # ========================================================================
 
     def _initialize_session(self):
-        """Inicializa la sesión ONNX, con fallback a pyttsx3 si falla."""
+        """Inicializa la sesion ONNX, con fallback a pyttsx3 si falla."""
 
         try:
             self.session = rt.InferenceSession(str(self.ONNX_MODEL_PATH))
             self.tts_engine = "onnx"
-            logger._print_log("INFO", "[VOICE] Sesión ONNX inicializada correctamente: " + str(self.ONNX_MODEL_PATH), "speaker.py", "_initialize_session", 88)
+            logger.info("[VOICE] Sesion ONNX inicializada correctamente: " + str(self.ONNX_MODEL_PATH))
 
         except FileNotFoundError as e:
-            logger._print_log("ERROR", "[VOICE] No se encontró el modelo ONNX: " + str(self.ONNX_MODEL_PATH) + " (" + str(e) + ")", "speaker.py", "_initialize_session", 92)
+            logger.error("[VOICE] No se encontro el modelo ONNX: " + str(self.ONNX_MODEL_PATH) + " (" + str(e) + ")")
             self.session = None
             self._init_pyttsx3_fallback()
 
         except Exception as e:
-            logger._print_log("ERROR", "[VOICE] Error inicializando sesión ONNX: " + str(e), "speaker.py", "_initialize_session", 96)
+            logger.error("[VOICE] Error inicializando sesion ONNX: " + str(e))
             self.session = None
             self._init_pyttsx3_fallback()
 
     def _init_pyttsx3_fallback(self):
-        """Inicializa pyttsx3 como motor TTS de respaldo cuando ONNX no está disponible."""
+        """Inicializa pyttsx3 como motor TTS de respaldo cuando ONNX no esta disponible."""
         if not _PYTTSX3_AVAILABLE:
-            logger._print_log("ERROR", "[VOICE] pyttsx3 no está instalado. No hay motor TTS disponible.", "speaker.py", "_init_pyttsx3_fallback", 100)
+            logger.error("[VOICE] pyttsx3 no esta instalado. No hay motor TTS disponible.")
             self.tts_engine = None
             return
         try:
             self.pyttsx3_engine = pyttsx3.init()
             self.tts_engine = "pyttsx3"
-            logger._print_log("INFO", "[VOICE] Motor pyttsx3 inicializado como respaldo.", "speaker.py", "_init_pyttsx3_fallback", 106)
+            logger.info("[VOICE] Motor pyttsx3 inicializado como respaldo.")
         except Exception as e:
-            logger._print_log("ERROR", "[VOICE] No se pudo inicializar pyttsx3: " + str(e), "speaker.py", "_init_pyttsx3_fallback", 110)
+            logger.error("[VOICE] No se pudo inicializar pyttsx3: " + str(e))
             self.pyttsx3_engine = None
             self.tts_engine = None
 
     def _load_parameters(self):
-        """Carga los parámetros necesarios del motor."""
+        """Carga los parametros necesarios del motor."""
 
         if self.session is None and self.tts_engine != "pyttsx3":
-            logger._print_log("error", "[!] ADVERTENCIA: No se pudo iniciar el motor. Revisa las rutas.", "speaker.py", "method", 102)
+            logger.error("[!] ADVERTENCIA: No se pudo iniciar el motor. Revisa las rutas.")
             return
 
         self.token_map = self._load_token_map()
 
         if self.token_map is None:
-            logger._print_log("warning", "[VOICE] No se pudo cargar el mapa de tokens.", "speaker.py", "method", 108)
+            logger.warning("[VOICE] No se pudo cargar el mapa de tokens.")
             return
 
         available_voices = self.get_available_voices()
 
         if not available_voices:
-            logger._print_log("info", "Procesando solicitud", "speaker.py", "method", 93)
             return
 
         requested_voice = self.current_voice_id
@@ -162,10 +161,10 @@ class Mouth:
             requested_voice,
             persist=False,
         ):
-            logger._print_log("INFO", "Procesando solicitud", "speaker.py", "get_available_voices", 136)
+            pass
 
         else:
-            logger._print_log("ERROR", "[VOICE] No se pudo cargar ninguna voz", "speaker.py", "get_available_voices", 139)
+            logger.error("[VOICE] No se pudo cargar ninguna voz")
 
     # ========================================================================
     # VOCES
@@ -205,7 +204,7 @@ class Mouth:
             return voices
 
         except Exception as exc:
-            logger._print_log("INFO", "Error obteniendo voces disponibles: " + str(exc), "speaker.py", "get_available_voices", 179)
+            logger.info("Error obteniendo voces disponibles: " + str(exc))
             return []
 
     def has_voice(
@@ -242,7 +241,7 @@ class Mouth:
         normalized_voice_id = str(voice_id).strip()
 
         if not normalized_voice_id:
-            raise ValueError("El ID de voz está vacío")
+            raise ValueError("El ID de voz esta vacio")
 
         if normalized_voice_id.casefold() in (self.GROUP_VOICE_IDS):
             raise ValueError(
@@ -265,11 +264,11 @@ class Mouth:
         )
 
         if voice_np.size == 0:
-            raise ValueError(f"La voz está vacía: {voice_path}")
+            raise ValueError(f"La voz esta vacia: {voice_path}")
 
         if voice_np.size % 256 != 0:
             raise ValueError(
-                f"El vector de voz no tiene un tamaño compatible con 256: {voice_path}"
+                f"El vector de voz no tiene un tamano compatible con 256: {voice_path}"
             )
 
         style_vector = voice_np.reshape(
@@ -280,7 +279,7 @@ class Mouth:
 
         self._voice_cache[normalized_voice_id] = style_vector
 
-        logger._print_log("info", f"Voice style loaded: {voice_id} | path={voice_path} | shape={style_vector.shape}", "speaker.py", "method", 254)
+        logger.info(f"Voice style loaded: {voice_id} | path={voice_path} | shape={style_vector.shape}")
 
         return style_vector
 
@@ -306,7 +305,7 @@ class Mouth:
                 if not saved:
                     logger.warning(
                         "[VOICE] "
-                        "La voz se cambió correctamente, "
+                        "La voz se cambio correctamente, "
                         "pero no se pudo guardar la preferencia: %s",
                         self.current_voice_id,
                     )
@@ -314,7 +313,7 @@ class Mouth:
             return True
 
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "speaker.py", "method", 93)
+            logger.debug("Mouth._load_voice: %s", exc)
             return False
 
     def set_voice(
@@ -331,7 +330,7 @@ class Mouth:
         normalized_voice_id = str(voice_id).strip()
 
         if not normalized_voice_id:
-            logger._print_log("warning", "[VOICE] ID de voz vacío", "speaker.py", "method", 305)
+            logger.warning("[VOICE] ID de voz vacio")
             return False
 
         if not self.has_voice(normalized_voice_id):
@@ -348,7 +347,7 @@ class Mouth:
         ):
             return False
 
-        logger._print_log("INFO", "Voz configurada: " + voice_name, "speaker.py", "set_voice", 322)
+        logger.info("Voz configurada: " + normalized_voice_id)
 
         return True
 
@@ -357,7 +356,7 @@ class Mouth:
         return self.current_voice_id
 
     # ========================================================================
-    # TOKENIZACIÓN
+    # TOKENIZACION
     # ========================================================================
 
     def _load_token_map(
@@ -381,7 +380,7 @@ class Mouth:
                 return json.load(f)
 
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "speaker.py", "method", 93)
+            logger.debug("Mouth._load_token_map: %s", e)
             return None
 
     def _text_to_tokens(
@@ -399,11 +398,10 @@ class Mouth:
         )
 
         if not text or text.strip() == "":
-            logger._print_log("DEBUG", "[DEBUG TTS] El texto está vacío", "speaker.py", "_text_to_tokens", 373)
+            logger.debug("[DEBUG TTS] El texto esta vacio")
             return None
 
         if not self.tokenizer_path or not self.tokenizer_path.exists():
-            logger._print_log("info", "Procesando solicitud", "speaker.py", "method", 93)
             return None
 
         try:
@@ -480,7 +478,7 @@ class Mouth:
             )
 
             text_norm = text_norm.replace(
-                "ñ",
+                "\u00f1",
                 "nj",
             )
 
@@ -500,10 +498,10 @@ class Mouth:
             )
 
             text_norm = text_norm.replace(
-                "¿",
+                "\u00bf",
                 "",
             ).replace(
-                "¡",
+                "\u00a1",
                 "",
             )
 
@@ -535,7 +533,7 @@ class Mouth:
             token_ids.append(pad_id)
 
             if len(token_ids) <= 2:
-                logger._print_log("debug", "[DEBUG TTS] No se generó ningún token válido.", "speaker.py", "method", 509)
+                logger.debug("[DEBUG TTS] No se genero ningun token valido.")
                 return None
 
             return np.array(
@@ -544,11 +542,11 @@ class Mouth:
             )
 
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "speaker.py", "method", 93)
+            logger.debug("Mouth._text_to_tokens: %s", e)
             return None
 
     # ========================================================================
-    # SÍNTESIS
+    # SINTESIS
     # ========================================================================
 
     def speak(
@@ -564,21 +562,21 @@ class Mouth:
         """
 
         if self.tts_engine is None:
-            logger.ERROR(r"[ERROR] Motor no cargado. Imposible hablar.  [file:speaker.py, method:speak, line:573]")
+            logger.error(r"[ERROR] Motor no cargado. Imposible hablar.")
             return None
 
         if not text or not text.strip():
-            logger.DEBUG(r"[DEBUG] Texto vacío, no generando audio.  [file:speaker.py, method:speak, line:542]")
+            logger.debug(r"[DEBUG] Texto vacio, no generando audio.")
             return None
 
-        # Si ONNX no está disponible, usar pyttsx3
+        # Si ONNX no esta disponible, usar pyttsx3
         if self.tts_engine == "pyttsx3" and self.pyttsx3_engine is not None:
             return self._speak_pyttsx3(text, voice_id)
 
         selected_voice = str(voice_id).strip() if voice_id else self.current_voice_id
 
         if not selected_voice:
-            logger.ERROR(r"[VOICE] No hay una voz seleccionada.  [file:speaker.py, method:speak, line:568]")
+            logger.error(r"[VOICE] No hay una voz seleccionada.")
             return None
 
         if selected_voice != self.current_voice_id:
@@ -586,7 +584,7 @@ class Mouth:
                 return None
 
         if self.style_vector is None:
-            logger._print_log("error", "[VOICE] No hay vector de estilo cargado.", "speaker.py", "method", 556)
+            logger.error("[VOICE] No hay vector de estilo cargado.")
             return None
 
         tokens_input = self._text_to_tokens(
@@ -595,7 +593,7 @@ class Mouth:
         )
 
         if tokens_input is None:
-            logger._print_log("warning", "[FALLO] No se pueden generar tokens.", "speaker.py", "method", 565)
+            logger.warning("[FALLO] No se pueden generar tokens.")
             return None
 
         try:
@@ -609,7 +607,7 @@ class Mouth:
             )
 
             if num_tokens > max_tokens:
-                logger.WARNING(r"[ADVERTENCIA] El texto es demasiado largo. Kokoro lo truncará.  [file:speaker.py, method:speak, line:579]")
+                logger.warning(r"[ADVERTENCIA] El texto es demasiado largo. Kokoro lo truncara.")
 
                 num_tokens = max_tokens
 
@@ -669,21 +667,21 @@ class Mouth:
                 winsound.SND_FILENAME,
             )
 
-            logger.DEBUG(r"[+] Audio reproducido  [file:speaker.py, method:speak, line:639]")
+            logger.debug(r"[+] Audio reproducido")
 
             try:
                 if os.path.exists(temp_path):
                     os.remove(temp_path)
 
-                    logger._print_log("debug", "[-] Archivo de audio temporal eliminado", "speaker.py", "method", 645)
+                    logger.debug("[-] Archivo de audio temporal eliminado")
 
             except Exception as e:
-                logger._print_log("info", "Procesando solicitud", "speaker.py", "method", 93)
+                logger.debug("Mouth.speak: %s", e)
 
             return temp_path
 
         except Exception as e:
-            logger._print_log("error", f"[VOICE] Error en _synthesize_onnx: {e}", "speaker.py", "method", 653)
+            logger.error(f"[VOICE] Error en _synthesize_onnx: {e}")
             return None
 
     def _speak_pyttsx3(
@@ -709,7 +707,7 @@ class Mouth:
             return text
 
         except Exception as e:
-            logger._print_log("error", f"[VOICE] Error en _speak_pyttsx3: {e}", "speaker.py", "method", 700)
+            logger.error(f"[VOICE] Error en _speak_pyttsx3: {e}")
             return None
 
     def speak_async(
@@ -719,7 +717,7 @@ class Mouth:
         output_file: str = "output.wav",
     ):
         """
-        Versión async de speak que no bloquea.
+        Version async de speak que no bloquea.
         """
 
         def _speak():

@@ -671,7 +671,7 @@ class TestValidateGraph:
         edge = GraphEdge(source_id="a", target_id="b", cost=-1.0)
         graph.edges.append(edge)
         errors = graph.validate_graph()
-        assert any("Coste inválido" in e for e in errors)
+        assert any("Coste inv\u00e1lido" in e for e in errors)
 
     def test_out_edges_not_synchronized(self):
         graph = StateGraph()

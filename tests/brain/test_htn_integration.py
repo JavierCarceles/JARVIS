@@ -1,9 +1,9 @@
 """
-Tests de integración HTN-Brain 2.8.13.5
+Tests de integracion HTN-Brain 2.8.13.5
 
-Verifica la integración entre el sistema Brain y el planificador
-jerárquico HTN, cubriendo creación de goals, descomposición,
-ejecución, estadísticas y manejo de estados.
+Verifica la integracion entre el sistema Brain y el planificador
+jerarquico HTN, cubriendo creacion de goals, descomposicion,
+ejecucion, estadisticas y manejo de estados.
 """
 
 import unittest
@@ -16,7 +16,7 @@ from src.hands.planner.node import Goal, Task
 
 
 class TestHTNBrainIntegrationInit(unittest.TestCase):
-    """2.8.13.5.2 — Verificar inicialización de HTNBrainIntegration"""
+    """2.8.13.5.2 - Verificar inicializacion de HTNBrainIntegration"""
 
     def test_2_8_13_5_2_htn_manager_asignado(self):
         """El gestor HTN debe estar inicializado (singleton)."""
@@ -39,7 +39,7 @@ class TestHTNBrainIntegrationInit(unittest.TestCase):
         self.assertIsNotNone(integration.application_integrator)
 
     def test_2_8_13_5_2_is_enabled_por_defecto(self):
-        """La integración debe estar habilitada por defecto."""
+        """La integracion debe estar habilitada por defecto."""
         integration = HTNBrainIntegration()
         self.assertTrue(integration.is_enabled)
 
@@ -50,13 +50,13 @@ class TestHTNBrainIntegrationInit(unittest.TestCase):
 
 
 class TestHTNGGoalCreation(unittest.TestCase):
-    """2.8.13.5.3 — Verificar _create_goal_from_input"""
+    """2.8.13.5.3 - Verificar _create_goal_from_input"""
 
     def setUp(self):
         self.integration = HTNBrainIntegration()
 
     def test_2_8_13_5_3_goal_calibracion(self):
-        """Input con 'calibrar' debe crear un Goal de calibración."""
+        """Input con 'calibrar' debe crear un Goal de calibracion."""
         goal = self.integration._create_goal_from_input("necesito calibrar el navegador", {})
         self.assertIsNotNone(goal)
         self.assertEqual(goal.type, "calibrate_applications")
@@ -77,7 +77,7 @@ class TestHTNGGoalCreation(unittest.TestCase):
         self.assertEqual(goal.target, "youtube")
 
     def test_2_8_13_5_3_goal_navegar_url(self):
-        """Input con 'navegar' y URL debe crear un Goal de navegación."""
+        """Input con 'navegar' y URL debe crear un Goal de navegacion."""
         goal = self.integration._create_goal_from_input(
             "navegar a https://www.google.com", {}
         )
@@ -86,7 +86,7 @@ class TestHTNGGoalCreation(unittest.TestCase):
         self.assertEqual(goal.target, "https://www.google.com")
 
     def test_2_8_13_5_3_goal_navegar_entity(self):
-        """Input con 'navegar' sin URL debe crear un Goal de navegación de stream."""
+        """Input con 'navegar' sin URL debe crear un Goal de navegacion de stream."""
         goal = self.integration._create_goal_from_input(
             "navegar al streamer", {}
         )
@@ -94,16 +94,16 @@ class TestHTNGGoalCreation(unittest.TestCase):
         self.assertEqual(goal.type, "navigate_stream")
 
     def test_2_8_13_5_3_goal_search(self):
-        """Input con 'buscar' debe crear un Goal de búsqueda."""
+        """Input con 'buscar' debe crear un Goal de busqueda."""
         goal = self.integration._create_goal_from_input(
-            "buscar qué es el machine learning", {}
+            "buscar qu\u00e9 es el machine learning", {}
         )
         self.assertIsNotNone(goal)
         self.assertEqual(goal.type, "search")
         self.assertIn("machine learning", goal.target)
 
     def test_2_8_13_5_3_goal_generic_sin_palabras_clave(self):
-        """Input sin palabras clave debe crear un Goal genérico."""
+        """Input sin palabras clave debe crear un Goal generico."""
         goal = self.integration._create_goal_from_input(
             "hola que tal", {}
         )
@@ -111,7 +111,7 @@ class TestHTNGGoalCreation(unittest.TestCase):
         self.assertEqual(goal.type, "generic")
 
     def test_2_8_13_5_3_goal_input_vacio_retorna_none(self):
-        """Input vacío debe retornar None."""
+        """Input vacio debe retornar None."""
         self.assertIsNone(self.integration._create_goal_from_input("", {}))
         self.assertIsNone(self.integration._create_goal_from_input("   ", {}))
         self.assertIsNone(self.integration._create_goal_from_input(None, {}))
@@ -126,7 +126,7 @@ class TestHTNGGoalCreation(unittest.TestCase):
 
 
 class TestHTNIntegrationStatistics(unittest.TestCase):
-    """2.8.13.5.4 — Verificar estadísticas e integración"""
+    """2.8.13.5.4 - Verificar estadisticas e integracion"""
 
     def setUp(self):
         self.integration = HTNBrainIntegration()
@@ -149,7 +149,7 @@ class TestHTNIntegrationStatistics(unittest.TestCase):
         self.assertEqual(stats["success_rate"], 0.0)
 
     def test_2_8_13_5_4_enable_disable_integration(self):
-        """enable_integration debe alternar el estado de habilitación."""
+        """enable_integration debe alternar el estado de habilitacion."""
         self.assertTrue(self.integration.is_enabled)
         self.integration.enable_integration(False)
         self.assertFalse(self.integration.is_enabled)
@@ -192,7 +192,7 @@ class TestHTNIntegrationStatistics(unittest.TestCase):
 
 
 class TestHTNIntegrationSingleton(unittest.TestCase):
-    """2.8.13.5.5 — Verificar singleton get_htn_integration"""
+    """2.8.13.5.5 - Verificar singleton get_htn_integration"""
 
     def test_2_8_13_5_5_get_htn_integration_retorna_instancia(self):
         """get_htn_integration debe retornar una instancia de HTNBrainIntegration."""
@@ -207,7 +207,7 @@ class TestHTNIntegrationSingleton(unittest.TestCase):
 
 
 class TestHTNIntegrationSerialization(unittest.TestCase):
-    """2.8.13.5.6 — Verificar serialización de tareas y resultados"""
+    """2.8.13.5.6 - Verificar serializacion de tareas y resultados"""
 
     def setUp(self):
         self.integration = HTNBrainIntegration()
@@ -253,7 +253,7 @@ class TestHTNIntegrationSerialization(unittest.TestCase):
 
 
 class TestHTNIntegrationProcessGoal(unittest.TestCase):
-    """2.8.13.5.7 — Verificar process_goal_through_htn"""
+    """2.8.13.5.7 - Verificar process_goal_through_htn"""
 
     @classmethod
     def setUpClass(cls):
@@ -282,7 +282,7 @@ class TestHTNIntegrationProcessGoal(unittest.TestCase):
         })
 
     def test_2_8_13_5_7_process_goal_disabled(self):
-        """Si la integración está deshabilitada, debe retornar resultado de fallo."""
+        """Si la integracion esta deshabilitada, debe retornar resultado de fallo."""
         self.integration.enable_integration(False)
         result = self.integration.process_goal_through_htn(
             SimpleNamespace(id="test_goal", type="generic", target="test"),
@@ -292,13 +292,13 @@ class TestHTNIntegrationProcessGoal(unittest.TestCase):
         self.assertIn("deshabilitada", result.message.lower())
 
     def test_2_8_13_5_7_process_goal_none(self):
-        """Si el goal es None y está deshabilitado, el acceso a goal.id produce error."""
+        """Si el goal es None y esta deshabilitado, el acceso a goal.id produce error."""
         self.integration.enable_integration(False)
         with self.assertRaises(AttributeError):
             self.integration.process_goal_through_htn(None, {})
 
     def test_2_8_13_5_7_process_goal_success(self):
-        """Un Goal navegable válido debe descomponer y ejecutar exitosamente."""
+        """Un Goal navegable valido debe descomponer y ejecutar exitosamente."""
         goal = Goal(
             id="test_navigate_goal",
             type="navigate",
@@ -315,13 +315,13 @@ class TestHTNIntegrationProcessGoal(unittest.TestCase):
         self.assertGreater(len(result.decomposed_tasks), 0)
 
     def test_2_8_13_5_7_process_goal_invalid_type(self):
-        """Un Goal con id vacío debe fallar."""
+        """Un Goal con id vacio debe fallar."""
         goal = SimpleNamespace(id="", type="generic", target="test")
         result = self.integration.process_goal_through_htn(goal, {})
         self.assertFalse(result.success)
 
     def test_2_8_13_5_7_create_and_execute_empty_input(self):
-        """create_and_execute_htn_goal con input vacío debe retornar fracaso."""
+        """create_and_execute_htn_goal con input vacio debe retornar fracaso."""
         result = self.integration.create_and_execute_htn_goal("", {})
         self.assertFalse(result.success)
         self.assertIn("objetivo", result.message.lower())
@@ -332,7 +332,7 @@ class TestHTNIntegrationProcessGoal(unittest.TestCase):
         self.assertFalse(result.success)
 
     def test_2_8_13_5_7_create_and_execute_valid_input(self):
-        """create_and_execute_htn_goal con input válido debe procesar el goal."""
+        """create_and_execute_htn_goal con input valido debe procesar el goal."""
         goal = Goal(
             id="test_valid_goal",
             type="navigate",
@@ -349,7 +349,7 @@ class TestHTNIntegrationProcessGoal(unittest.TestCase):
 
 
 class TestHTNIntegrationResultDataclass(unittest.TestCase):
-    """2.8.13.5.8 — Verificar HTNIntegrationResult dataclass"""
+    """2.8.13.5.8 - Verificar HTNIntegrationResult dataclass"""
 
     def test_2_8_13_5_8_result_defaults(self):
         """HTNIntegrationResult debe retornar los valores provistos correctamente."""

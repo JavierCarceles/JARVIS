@@ -1,9 +1,9 @@
 """
-Tests del módulo Brain (LLM) 2.8.13.5
+Tests del modulo Brain (LLM) 2.8.13.5
 
-Verifica el funcionamiento del cerebro de JARVIS: normalización de alias,
-detección de acciones directas, ejecución de goals, generación de respuestas,
-interpretación de intenciones e integración con HTN.
+Verifica el funcionamiento del cerebro de JARVIS: normalizacion de alias,
+deteccion de acciones directas, ejecucion de goals, generacion de respuestas,
+interpretacion de intenciones e integracion con HTN.
 """
 
 import unittest
@@ -14,7 +14,7 @@ from src.brain.htn_integration import HTNBrainIntegration
 
 
 class TestBrainInit(unittest.TestCase):
-    """2.8.13.5.9 — Verificar inicialización del Brain"""
+    """2.8.13.5.9 - Verificar inicializacion del Brain"""
 
     @classmethod
     def setUpClass(cls):
@@ -25,7 +25,7 @@ class TestBrainInit(unittest.TestCase):
         self.assertEqual(self.brain.model, "llama3")
 
     def test_2_8_13_5_9_htn_integration_asignado(self):
-        """La integración HTN debe estar inicializada."""
+        """La integracion HTN debe estar inicializada."""
         self.assertIsInstance(self.brain.htn_integration, HTNBrainIntegration)
 
     def test_2_8_13_5_9_action_registry_asignado(self):
@@ -46,7 +46,7 @@ class TestBrainInit(unittest.TestCase):
 
 
 class TestBrainActionAliases(unittest.TestCase):
-    """2.8.13.5.10 — Verificar ACTION_ALIASES"""
+    """2.8.13.5.10 - Verificar ACTION_ALIASES"""
 
     @classmethod
     def setUpClass(cls):
@@ -69,58 +69,58 @@ class TestBrainActionAliases(unittest.TestCase):
         self.assertEqual(self.brain.ACTION_ALIASES.get("open_chrome"), "abrir_chrome")
 
     def test_2_8_13_5_10_aliases_dict_no_vacio(self):
-        """ACTION_ALIASES debe contener múltiples entradas."""
+        """ACTION_ALIASES debe contener multiples entradas."""
         self.assertGreater(len(self.brain.ACTION_ALIASES), 5)
 
 
 class TestNormalizeActionName(unittest.TestCase):
-    """2.8.13.5.11 — Verificar _normalize_action_name"""
+    """2.8.13.5.11 - Verificar _normalize_action_name"""
 
     @classmethod
     def setUpClass(cls):
         cls.brain = Brain(model="llama3")
 
     def test_2_8_13_5_11_normaliza_alias_chrome(self):
-        """'calibrate_chrome' no está registrado; alias debe resolver a 'calibrar_chrome'."""
+        """'calibrate_chrome' no esta registrado; alias debe resolver a 'calibrar_chrome'."""
         result = self.brain._normalize_action_name("calibrate_chrome")
         self.assertEqual(result, "calibrar_chrome")
 
     def test_2_8_13_5_11_normaliza_alias_aplicaciones(self):
-        """'calibrate_applications' está registrado y debe retornarse tal cual."""
+        """'calibrate_applications' esta registrado y debe retornarse tal cual."""
         result = self.brain._normalize_action_name("calibrate_applications")
         self.assertEqual(result, "calibrate_applications")
 
     def test_2_8_13_5_11_normaliza_alias_chrome_ingles(self):
-        """'calibrate_chrome' NO está registrado; el alias debe resolver a 'calibrar_chrome'."""
+        """'calibrate_chrome' NO esta registrado; el alias debe resolver a 'calibrar_chrome'."""
         result = self.brain._normalize_action_name("calibrate_chrome")
         self.assertEqual(result, "calibrar_chrome")
 
     def test_2_8_13_5_11_normaliza_accion_registrada(self):
-        """Una acción ya registrada no debe ser modificada."""
+        """Una accion ya registrada no debe ser modificada."""
         result = self.brain._normalize_action_name("calibrar_chrome")
         self.assertEqual(result, "calibrar_chrome")
 
     def test_2_8_13_5_11_retorna_candidato_para_desconocida(self):
-        """Una acción desconocida debe retornar el candidato sin cambios."""
+        """Una accion desconocida debe retornar el candidato sin cambios."""
         result = self.brain._normalize_action_name("accion_inventada")
         self.assertEqual(result, "accion_inventada")
 
     def test_2_8_13_5_11_retorna_vacio_para_no_string(self):
-        """Debe retornar cadena vacía para entrada no string."""
+        """Debe retornar cadena vacia para entrada no string."""
         self.assertEqual(self.brain._normalize_action_name(None), "")
         self.assertEqual(self.brain._normalize_action_name(123), "")
 
     def test_2_8_13_5_11_retorna_vacio_para_vacio(self):
-        """Debe retornar cadena vacía para string vacío o en blanco."""
+        """Debe retornar cadena vacia para string vacio o en blanco."""
         self.assertEqual(self.brain._normalize_action_name(""), "")
         self.assertEqual(self.brain._normalize_action_name("   "), "")
 
 
 class TestCleanJsonResponse(unittest.TestCase):
-    """2.8.13.5.12 — Verificar _clean_json_response"""
+    """2.8.13.5.12 - Verificar _clean_json_response"""
 
     def test_2_8_13_5_12_strip_markdown_fences(self):
-        """Debe eliminar bloques de código markdown."""
+        """Debe eliminar bloques de codigo markdown."""
         text = "```json\n{\"action\": \"test\"}\n```"
         result = Brain._clean_json_response(text)
         self.assertEqual(result, '{"action": "test"}')
@@ -139,11 +139,11 @@ class TestCleanJsonResponse(unittest.TestCase):
         self.assertEqual(result, text)
 
     def test_2_8_13_5_12_empty_string(self):
-        """Cadena vacía debe retornar cadena vacía."""
+        """Cadena vacia debe retornar cadena vacia."""
         self.assertEqual(Brain._clean_json_response(""), "")
 
     def test_2_8_13_5_12_none_input(self):
-        """None debe retornar cadena vacía."""
+        """None debe retornar cadena vacia."""
         self.assertEqual(Brain._clean_json_response(None), "")
 
     def test_2_8_13_5_12_nested_json_from_text(self):
@@ -155,14 +155,14 @@ class TestCleanJsonResponse(unittest.TestCase):
 
 
 class TestParseModelResponse(unittest.TestCase):
-    """2.8.13.5.13 — Verificar parse_model_response"""
+    """2.8.13.5.13 - Verificar parse_model_response"""
 
     @classmethod
     def setUpClass(cls):
         cls.brain = Brain(model="llama3")
 
     def test_2_8_13_5_13_parse_valid_json(self):
-        """Debe parsear JSON válido a diccionario."""
+        """Debe parsear JSON valido a diccionario."""
         result = self.brain.parse_model_response('{"action": "test"}')
         self.assertIsInstance(result, dict)
         self.assertEqual(result["action"], "test")
@@ -176,18 +176,18 @@ class TestParseModelResponse(unittest.TestCase):
 
     def test_2_8_13_5_13_parse_json_en_texto(self):
         """Debe extraer JSON de un texto con prefijo."""
-        text = 'Aquí está: {"action": "abrir_chrome"}'
+        text = 'Aqu\u00ed est\u00e1: {"action": "abrir_chrome"}'
         result = self.brain.parse_model_response(text)
         self.assertIsInstance(result, dict)
         self.assertEqual(result["action"], "abrir_chrome")
 
     def test_2_8_13_5_13_invalid_json_returns_none(self):
-        """JSON inválido debe retornar None."""
+        """JSON invalido debe retornar None."""
         result = self.brain.parse_model_response("not json at all")
         self.assertIsNone(result)
 
     def test_2_8_13_5_13_empty_returns_none(self):
-        """Cadena vacía debe retornar None."""
+        """Cadena vacia debe retornar None."""
         result = self.brain.parse_model_response("")
         self.assertIsNone(result)
 
@@ -198,62 +198,62 @@ class TestParseModelResponse(unittest.TestCase):
 
 
 class TestDetectDirectAction(unittest.TestCase):
-    """2.8.13.5.14 — Verificar _detect_direct_action"""
+    """2.8.13.5.14 - Verificar _detect_direct_action"""
 
     @classmethod
     def setUpClass(cls):
         cls.brain = Brain(model="llama3")
 
     def test_2_8_13_5_14_detect_chrome_calibration(self):
-        """Debe detectar calibración específica de Chrome."""
+        """Debe detectar calibracion especifica de Chrome."""
         result = self.brain._detect_direct_action("calibrar chrome")
         self.assertIsNotNone(result)
         self.assertEqual(result["type"], "action")
         self.assertEqual(result["action"]["action"], "calibrar_chrome")
 
     def test_2_8_13_5_14_detect_edge_calibration(self):
-        """Debe detectar calibración específica de Edge."""
+        """Debe detectar calibracion especifica de Edge."""
         result = self.brain._detect_direct_action("calibrar edge")
         self.assertIsNotNone(result)
         self.assertEqual(result["action"]["action"], "calibrar_edge")
 
     def test_2_8_13_5_14_detect_firefox_calibration(self):
-        """Debe detectar calibración específica de Firefox."""
+        """Debe detectar calibracion especifica de Firefox."""
         result = self.brain._detect_direct_action("calibrar firefox")
         self.assertIsNotNone(result)
         self.assertEqual(result["action"]["action"], "calibrar_firefox")
 
     def test_2_8_13_5_14_detect_global_calibration(self):
-        """Debe detectar calibración global de aplicaciones."""
+        """Debe detectar calibracion global de aplicaciones."""
         result = self.brain._detect_direct_action("calibrar aplicaciones")
         self.assertIsNotNone(result)
         self.assertEqual(result["action"]["action"], "calibrar_aplicaciones")
 
     def test_2_8_13_5_14_detect_global_calibration_programas(self):
-        """Debe detectar calibración global usando 'programas'."""
+        """Debe detectar calibracion global usando 'programas'."""
         result = self.brain._detect_direct_action("calibrar programas")
         self.assertIsNotNone(result)
         self.assertEqual(result["action"]["action"], "calibrar_aplicaciones")
 
     def test_2_8_13_5_14_browser_specific_no_global(self):
-        """'calibrar chrome' no debe interpretarse como calibración global."""
+        """'calibrar chrome' no debe interpretarse como calibracion global."""
         result = self.brain._detect_direct_action("calibrar chrome")
         self.assertIsNotNone(result)
         self.assertEqual(result["action"]["action"], "calibrar_chrome")
 
     def test_2_8_13_5_14_no_action_for_non_calibration(self):
-        """Input sin calibración no debe detectar acción directa."""
+        """Input sin calibracion no debe detectar accion directa."""
         result = self.brain._detect_direct_action("hola que tal")
         self.assertIsNone(result)
 
     def test_2_8_13_5_14_no_action_for_empty(self):
-        """Input vacío no debe detectar acción directa."""
+        """Input vacio no debe detectar accion directa."""
         self.assertIsNone(self.brain._detect_direct_action(""))
         self.assertIsNone(self.brain._detect_direct_action(None))
 
 
 class TestExecuteGoal(unittest.TestCase):
-    """2.8.13.5.15 — Verificar execute_goal"""
+    """2.8.13.5.15 - Verificar execute_goal"""
 
     @classmethod
     def setUpClass(cls):
@@ -292,14 +292,14 @@ class TestExecuteGoal(unittest.TestCase):
 
 
 class TestBrainPublicAPI(unittest.TestCase):
-    """2.8.13.5.16 — Verificar API pública del Brain"""
+    """2.8.13.5.16 - Verificar API publica del Brain"""
 
     @classmethod
     def setUpClass(cls):
         cls.brain = Brain(model="llama3")
 
     def test_2_8_13_5_16_get_current_goals_empty(self):
-        """get_current_goals debe retornar una lista vacía."""
+        """get_current_goals debe retornar una lista vacia."""
         self.assertEqual(self.brain.get_current_goals(), [])
 
     def test_2_8_13_5_16_get_system_state(self):
@@ -318,7 +318,7 @@ class TestBrainPublicAPI(unittest.TestCase):
         self.assertIsNotNone(context)
 
     def test_2_8_13_5_16_interpret_intent_empty(self):
-        """interpret_intent con input vacío debe retornar tipo unknown."""
+        """interpret_intent con input vacio debe retornar tipo unknown."""
         result = self.brain.interpret_intent("")
         self.assertEqual(result["type"], "unknown")
         self.assertIsNone(result["goal"])
@@ -330,21 +330,21 @@ class TestBrainPublicAPI(unittest.TestCase):
         self.assertEqual(result["type"], "unknown")
 
     def test_2_8_13_5_16_think_empty_prompt(self):
-        """think con prompt vacío debe retornar mensaje por defecto."""
+        """think con prompt vacio debe retornar mensaje por defecto."""
         result = self.brain.think("")
-        self.assertEqual(result, "No recibí ningún mensaje.")
+        self.assertEqual(result, "No recib\u00ed ning\u00fan mensaje.")
 
     def test_2_8_13_5_16_think_none_prompt(self):
         """think con None debe retornar mensaje por defecto."""
         result = self.brain.think(None)
-        self.assertEqual(result, "No recibí ningún mensaje.")
+        self.assertEqual(result, "No recib\u00ed ning\u00fan mensaje.")
 
     def test_2_8_13_5_16_clear_memory_no_raises(self):
-        """clear_memory no debe lanzar excepción."""
+        """clear_memory no debe lanzar excepcion."""
         try:
             self.brain.clear_memory()
         except Exception as exc:
-            self.fail(f"clear_memory lanzó excepción: {exc}")
+            self.fail(f"clear_memory lanz\u00f3 excepci\u00f3n: {exc}")
 
     def test_2_8_13_5_16_get_conversation_history_is_list(self):
         """get_conversation_history debe retornar una lista."""
@@ -367,14 +367,14 @@ class TestBrainPublicAPI(unittest.TestCase):
 
 
 class TestBrainLLMInteraction(unittest.TestCase):
-    """2.8.13.5.17 — Verificar interacción con LLM (mocked)"""
+    """2.8.13.5.17 - Verificar interaccion con LLM (mocked)"""
 
     @classmethod
     def setUpClass(cls):
         cls.brain = Brain(model="llama3")
 
     def test_2_8_13_5_17_generate_response_empty_prompt(self):
-        """generate_response con prompt vacío debe retornar cadena vacía."""
+        """generate_response con prompt vacio debe retornar cadena vacia."""
         self.assertEqual(self.brain.generate_response(""), "")
 
     @patch("src.brain.llm.ollama.chat")
@@ -397,7 +397,7 @@ class TestBrainLLMInteraction(unittest.TestCase):
 
     @patch("src.brain.llm.ollama.chat")
     def test_2_8_13_5_17_think_con_goal(self, mock_chat):
-        """think con goal debe registrar objetivo y retornar confirmación."""
+        """think con goal debe registrar objetivo y retornar confirmacion."""
         mock_chat.return_value = {"message": {"content": '{"type": "goal", "goal": {"type": "navigate", "target": "https://example.com", "description": "test"}}'}}
         result = self.brain.think("navega a example.com")
         self.assertIn("Objetivo registrado", result)
@@ -427,58 +427,58 @@ class TestBrainLLMInteraction(unittest.TestCase):
 
 
 class TestBrainExtractSearchQuery(unittest.TestCase):
-    """2.8.13.5.18 — Verificar _extract_search_query"""
+    """2.8.13.5.18 - Verificar _extract_search_query"""
 
     @classmethod
     def setUpClass(cls):
         cls.brain = Brain(model="llama3")
 
     def test_2_8_13_5_18_extract_buscar(self):
-        """Debe extraer query después de 'buscar'."""
+        """Debe extraer query despues de 'buscar'."""
         result = self.brain._extract_search_query("buscar gatos")
         self.assertEqual(result, "gatos")
 
     def test_2_8_13_5_18_extract_search_english(self):
-        """Debe extraer query después de 'search'."""
+        """Debe extraer query despues de 'search'."""
         result = self.brain._extract_search_query("search for cats")
         self.assertEqual(result, "for cats")
 
     def test_2_8_13_5_18_extract_no_match(self):
-        """Sin patrón de búsqueda debe retornar cadena vacía."""
+        """Sin patron de busqueda debe retornar cadena vacia."""
         result = self.brain._extract_search_query("hola mundo")
         self.assertEqual(result, "")
 
     def test_2_8_13_5_18_extract_empty(self):
-        """Input vacío debe retornar cadena vacía."""
+        """Input vacio debe retornar cadena vacia."""
         self.assertEqual(self.brain._extract_search_query(""), "")
 
 
 class TestBrainThinkWithImage(unittest.TestCase):
-    """2.8.13.5.19 — Verificar think_with_image y analyze_image"""
+    """2.8.13.5.19 - Verificar think_with_image y analyze_image"""
 
     @classmethod
     def setUpClass(cls):
         cls.brain = Brain(model="llama3")
 
     def test_2_8_13_5_19_think_with_image_empty_prompt(self):
-        """think_with_image con prompt vacío debe retornar mensaje."""
+        """think_with_image con prompt vacio debe retornar mensaje."""
         result = self.brain.think_with_image("", "/fake/path.png")
-        self.assertEqual(result, "No recibí instrucciones para la imagen.")
+        self.assertEqual(result, "No recib\u00ed instrucciones para la imagen.")
 
     def test_2_8_13_5_19_think_with_image_no_image(self):
         """think_with_image sin image_path debe retornar mensaje."""
         result = self.brain.think_with_image("analiza esto", "")
-        self.assertEqual(result, "No se proporcionó ninguna imagen.")
+        self.assertEqual(result, "No se proporcion\u00f3 ninguna imagen.")
 
     def test_2_8_13_5_19_analyze_image_no_image(self):
         """analyze_image sin image_path debe retornar mensaje."""
-        result = self.brain.analyze_image("", "descripción")
-        self.assertEqual(result, "No se proporcionó imagen")
+        result = self.brain.analyze_image("", "descripci\u00f3n")
+        self.assertEqual(result, "No se proporcion\u00f3 imagen")
 
     def test_2_8_13_5_19_analyze_image_no_prompt(self):
         """analyze_image sin analysis_prompt debe retornar mensaje."""
         result = self.brain.analyze_image("/fake/path.png", "")
-        self.assertEqual(result, "No se proporcionaron instrucciones para el análisis.")
+        self.assertEqual(result, "No se proporcionaron instrucciones para el an\u00e1lisis.")
 
 
 if __name__ == "__main__":

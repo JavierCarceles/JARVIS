@@ -1,4 +1,4 @@
 # src/mouth/__init__.py
-from .speaker import Mouth
+from src.mouth.speaker import Mouth
 
 __all__ = ['Mouth']

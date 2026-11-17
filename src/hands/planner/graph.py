@@ -1,9 +1,9 @@
-"""Grafo de estados y búsqueda de rutas para la planificación de JARVIS.
+"""Grafo de estados y busqueda de rutas para la planificacion de JARVIS.
 
-El módulo mantiene separadas la planificación y la ejecución de acciones reales.
+El modulo mantiene separadas la planificacion y la ejecucion de acciones reales.
 Las aristas describen transiciones declarativas; buscar una ruta no ejecuta los
 callbacks de los nodos. Las modificaciones de estado producidas por las aristas
-se simulan sobre copias para que la búsqueda no altere el estado del llamador.
+se simulan sobre copias para que la busqueda no altere el estado del llamador.
 """
 
 from __future__ import annotations
@@ -31,26 +31,26 @@ from src.hands.planner.preconditions_effects import (
     Effect,
 )
 from src.hands.planner.preconditions_effects_types import ConditionType
-from src.utils.logger import get_logger
+from src.core.log import get_logger
 
 logger = get_logger(__name__)
 
 
 class SearchStrategy(Enum):
-    """Estrategias de búsqueda soportadas por el grafo."""
+    """Estrategias de busqueda soportadas por el grafo."""
 
     A_STAR = "a_star"
     DIJKSTRA = "dijkstra"
     BFS = "bfs"
     DFS = "dfs"
     GREEDY = "greedy"
-    # Alias histórico conservado para compatibilidad.
+    # Alias historico conservado para compatibilidad.
     Dijkstra = DIJKSTRA
 
 
 @dataclass
 class GraphNode:
-    """Estado auxiliar de búsqueda asociado a un nodo canónico."""
+    """Estado auxiliar de busqueda asociado a un nodo canonico."""
 
     node: Node
     g_cost: float = float("inf")
@@ -71,7 +71,7 @@ class GraphNode:
 
 
 def _safe_float(value: Any, default: float = 0.0) -> float:
-    """Convierte a float finito y usa *default* ante datos no válidos."""
+    """Convierte a float finito y usa *default* ante datos no validos."""
     try:
         result = float(value)
     except (TypeError, ValueError, OverflowError):
@@ -99,7 +99,7 @@ def _type_value(value: Any) -> Any:
 
 @dataclass
 class GraphEdge:
-    """Transición entre dos nodos, con condiciones y efectos declarativos."""
+    """Transicion entre dos nodos, con condiciones y efectos declarativos."""
 
     source_id: str
     target_id: str
@@ -141,7 +141,7 @@ class GraphEdge:
 
     @staticmethod
     def _evaluate_raw_condition(condition: Any, state: Dict[str, Any]) -> bool:
-        """Evalúa una condición compatible sin depender de una API única."""
+        """Evalua una condicion compatible sin depender de una API unica."""
         if isinstance(condition, str):
             raw = condition.strip()
             if not raw:
@@ -285,7 +285,7 @@ class GraphEdge:
         return state
 
     def get_total_cost(self, current_state: Optional[Dict[str, Any]] = None) -> float:
-        """Calcula coste de transición y sobrecoste declarativo determinista."""
+        """Calcula coste de transicion y sobrecoste declarativo determinista."""
         del current_state
         if not math.isfinite(self.cost) or self.cost < 0:
             return float("inf")
@@ -294,7 +294,7 @@ class GraphEdge:
 
 @dataclass
 class RouteResult:
-    """Resultado estructurado de una búsqueda de ruta."""
+    """Resultado estructurado de una busqueda de ruta."""
 
     success: bool
     start_node_id: Optional[str]
@@ -409,7 +409,7 @@ def _json_safe(value: Any, _active: Optional[Set[int]] = None) -> Any:
 
 
 class StateGraph:
-    """Grafo de estados con búsqueda de rutas condicionada por el estado."""
+    """Grafo de estados con busqueda de rutas condicionada por el estado."""
 
     def __init__(self, heuristic: Optional[Heuristic] = None) -> None:
         self.nodes: Dict[str, Node] = {}
@@ -425,7 +425,7 @@ class StateGraph:
 
     @property
     def graph_revision(self) -> int:
-        """Versión monotónica del grafo, usada para invalidar cachés."""
+        """Version monotonica del grafo, usada para invalidar caches."""
         return self._graph_revision
 
     def _invalidate_search_cache(self) -> None:
@@ -439,21 +439,21 @@ class StateGraph:
             try:
                 clear_heuristic_cache()
             except Exception:
-                logger.debug("No se pudo limpiar la caché de heurística", exc_info=True)
+                logger.debug("No se pudo limpiar la cache de heuristica", exc_info=True)
 
     def add_node(self, node: Node) -> None:
         if node is None:
             raise ValueError("node no puede ser None")
         node_id = getattr(node, "id", None)
         if not isinstance(node_id, str) or not node_id.strip():
-            raise ValueError("El nodo debe tener un id válido")
+            raise ValueError("El nodo debe tener un id valido")
         node_id = node_id.strip()
         if node_id in self.nodes and self.nodes[node_id] is node:
             return
         self.nodes[node_id] = node
         self.graph_nodes[node_id] = GraphNode(node=node)
         # Si se sustituye un nodo conservando su ID, reconstruir las relaciones
-        # auxiliares desde las aristas canónicas para no dejarlo desconectado.
+        # auxiliares desde las aristas canonicas para no dejarlo desconectado.
         for edge in self.edges:
             try:
                 if edge.source_id == node_id:
@@ -461,7 +461,7 @@ class StateGraph:
                 if edge.target_id == node_id:
                     node.add_in_edge(edge.source_id)
             except Exception:
-                logger.debug("No se pudo reconstruir la relación del nodo %s", node_id, exc_info=True)
+                logger.debug("No se pudo reconstruir la relacion del nodo %s", node_id, exc_info=True)
         self._invalidate_search_cache()
 
     def get_node(self, node_id: str) -> Optional[Node]:
@@ -495,7 +495,7 @@ class StateGraph:
             effects=list(effects or []),
         )
         # Conserva las aristas paralelas si difieren en tipo/condiciones, pero evita
-        # duplicar accidentalmente la misma transición declarativa.
+        # duplicar accidentalmente la misma transicion declarativa.
         duplicate_index = next(
             (
                 index
@@ -524,7 +524,7 @@ class StateGraph:
         try:
             self.nodes[source_id].add_edge(target_id, numeric_cost)
         except Exception:
-            # La arista canónica sigue siendo la fuente de verdad del grafo.
+            # La arista canonica sigue siendo la fuente de verdad del grafo.
             logger.debug("No se pudo sincronizar out_edges de %s", source_id, exc_info=True)
         try:
             self.nodes[target_id].add_in_edge(source_id)
@@ -583,7 +583,7 @@ class StateGraph:
                 start_node_id, goal_node_id, state, limit, find_alternatives, alternatives_limit
             )
         except Exception as exc:
-            logger.exception("[GRAPH] Error durante búsqueda %s -> %s", start_node_id, goal_node_id)
+            logger.exception("[GRAPH] Error durante busqueda %s -> %s", start_node_id, goal_node_id)
             return self._route_error(start_node_id, goal_node_id, selected.value, state, str(exc), started)
         success = bool(path)
         final_state = self.apply_path_effects(path, state) if success else _copy_state(state)
@@ -600,7 +600,7 @@ class StateGraph:
             elapsed_time=time.perf_counter() - started,
             initial_state=state,
             final_state=final_state,
-            error=None if success else "No se encontró una ruta dentro de los límites indicados",
+            error=None if success else "No se encontr\u00f3 una ruta dentro de los l\u00edmites indicados",
         )
 
     @staticmethod
@@ -936,7 +936,7 @@ class StateGraph:
         path: List[str],
         current_state: Optional[Dict[str, Any]] = None,
     ) -> List[GraphEdge]:
-        """Obtiene una arista por salto; con paralelas elige la primera válida."""
+        """Obtiene una arista por salto; con paralelas elige la primera valida."""
         if len(path) < 2:
             return []
         result: List[GraphEdge] = []
@@ -962,7 +962,7 @@ class StateGraph:
             ]
             edge = next((candidate for candidate in candidates if candidate.can_traverse(state)), None)
             if edge is None:
-                logger.warning("[GRAPH] No se puede reproducir el salto %s -> %s; se detiene la simulación", source_id, target_id)
+                logger.warning("[GRAPH] No se puede reproducir el salto %s -> %s; se detiene la simulacion", source_id, target_id)
                 break
             state = edge.apply_effects(state)
         return state
@@ -1010,7 +1010,7 @@ class StateGraph:
         try:
             condition = Condition(type=condition_type, **condition_params)
         except Exception:
-            logger.exception("[GRAPH] Error creando condición para %s -> %s", source_id, target_id)
+            logger.exception("[GRAPH] Error creando condicion para %s -> %s", source_id, target_id)
             return False
         return self.add_edge(source_id, target_id, cost, [], "conditional", [condition], [])
 
@@ -1039,7 +1039,7 @@ class StateGraph:
             if edge.target_id not in self.nodes:
                 errors.append(f"Destino de arista no existe: {edge.target_id}")
             if not math.isfinite(edge.cost) or edge.cost < 0:
-                errors.append(f"Coste inválido: {edge.source_id} -> {edge.target_id} ({edge.cost})")
+                errors.append(f"Coste inv\u00e1lido: {edge.source_id} -> {edge.target_id} ({edge.cost})")
         expected_out: Dict[str, Set[str]] = {node_id: set() for node_id in self.nodes}
         expected_in: Dict[str, Set[str]] = {node_id: set() for node_id in self.nodes}
         for edge in self.edges:
@@ -1149,7 +1149,7 @@ class StateGraph:
             try:
                 clear_heuristic_cache()
             except Exception:
-                logger.debug("No se pudo limpiar la caché de heurística", exc_info=True)
+                logger.debug("No se pudo limpiar la cache de heuristica", exc_info=True)
 
     def export_to_json(self) -> Dict[str, Any]:
         return {
@@ -1166,7 +1166,7 @@ class StateGraph:
         }
 
     def import_from_json(self, data: Dict[str, Any]) -> None:
-        """Importa de manera transaccional: un documento inválido no borra el grafo actual."""
+        """Importa de manera transaccional: un documento invalido no borra el grafo actual."""
         if not isinstance(data, dict):
             raise ValueError("El contenido del grafo debe ser un dict")
         raw_nodes = data.get("nodes", [])
@@ -1193,7 +1193,7 @@ class StateGraph:
             preconditions = [self._deserialize_condition(raw) for raw in raw_preconditions]
             effects = [self._deserialize_effect(raw) for raw in raw_effects]
             if any(item is None for item in preconditions):
-                raise ValueError(f"Precondición no recuperable en arista: {source_id} -> {target_id}")
+                raise ValueError(f"Precondicion no recuperable en arista: {source_id} -> {target_id}")
             if any(item is None for item in effects):
                 raise ValueError(f"Efecto no recuperable en arista: {source_id} -> {target_id}")
             if not staged.add_edge(
@@ -1218,10 +1218,10 @@ class StateGraph:
                     _safe_float(metadata.get("heuristic_weight", 1.0), 1.0),
                 )
             except Exception:
-                logger.warning("Tipo de heurística inválido en el documento; se conserva la heurística actual")
+                logger.warning("Tipo de heuristica invalido en el documento; se conserva la heuristica actual")
                 staged.heuristic = self.heuristic
 
-        # Publicar el nuevo grafo solo después de validar todos sus componentes.
+        # Publicar el nuevo grafo solo despues de validar todos sus componentes.
         self.nodes = staged.nodes
         self.graph_nodes = staged.graph_nodes
         self.edges = staged.edges
@@ -1255,11 +1255,11 @@ class StateGraph:
                 self.import_from_json(data)
             elif fmt == "pickle":
                 # Solo importar pickle de fuentes locales de confianza: pickle puede
-                # ejecutar código durante la deserialización.
+                # ejecutar codigo durante la deserializacion.
                 with open(file_path, "rb") as stream:
                     imported = pickle.load(stream)
                 if not isinstance(imported, StateGraph):
-                    raise TypeError("El pickle no contiene un StateGraph válido")
+                    raise TypeError("El pickle no contiene un StateGraph valido")
                 self.nodes = imported.nodes
                 self.graph_nodes = imported.graph_nodes
                 self.edges = imported.edges
@@ -1286,7 +1286,7 @@ class StateGraph:
                         serialized.pop(key, None)
                     return _json_safe(serialized)
             except Exception:
-                logger.debug("Node.to_dict no disponible; usando serialización compatible", exc_info=True)
+                logger.debug("Node.to_dict no disponible; usando serializacion compatible", exc_info=True)
         return {
             "id": getattr(node, "id", ""),
             "type": _type_value(getattr(node, "type", NodeType.ACTION)),
@@ -1344,13 +1344,13 @@ class StateGraph:
     @staticmethod
     def _deserialize_node(node_data: Dict[str, Any]) -> Node:
         if not isinstance(node_data.get("id"), str) or not node_data.get("id", "").strip():
-            raise ValueError("Nodo serializado sin id válido")
+            raise ValueError("Nodo serializado sin id valido")
         from_dict = getattr(Node, "from_dict", None)
         if callable(from_dict):
             try:
                 return from_dict(dict(node_data))
             except Exception:
-                logger.debug("Node.from_dict rechazó el nodo; usando conversión compatible", exc_info=True)
+                logger.debug("Node.from_dict rechazo el nodo; usando conversion compatible", exc_info=True)
         try:
             node_type = NodeType(node_data.get("type", NodeType.ACTION.value))
         except Exception:
@@ -1402,7 +1402,7 @@ class StateGraph:
                 kwargs.pop("parameters", None)
                 return Condition(**kwargs)
         except Exception:
-            logger.exception("[GRAPH] Error al deserializar condición")
+            logger.exception("[GRAPH] Error al deserializar condicion")
             return None
 
     @staticmethod
@@ -1429,7 +1429,7 @@ class StateGraph:
 
     @staticmethod
     def _json_safe(value: Any) -> Any:
-        """Alias histórico para la conversión JSON segura."""
+        """Alias historico para la conversion JSON segura."""
         return _json_safe(value)
 
     @staticmethod
@@ -1450,7 +1450,7 @@ class StateGraph:
             }
             if raw in aliases:
                 return aliases[raw]
-        raise ValueError(f"Estrategia de búsqueda no soportada: {strategy}")
+        raise ValueError(f"Estrategia de busqueda no soportada: {strategy}")
 
     def _create_goal_from_node(self, node_id: str) -> Goal:
         node = self.nodes.get(node_id)
@@ -1468,7 +1468,7 @@ class StateGraph:
             value = _safe_float(self.heuristic.estimate_cost(node_id, current_state, goal, self.nodes), 0.0)
             return max(0.0, value)
         except Exception:
-            logger.debug("Heurística no disponible para %s", node_id, exc_info=True)
+            logger.debug("Heuristica no disponible para %s", node_id, exc_info=True)
             return 0.0
 
     @staticmethod
@@ -1487,7 +1487,7 @@ class StateGraph:
 
 
 class GraphBuilder:
-    """Constructores de grafos básicos de navegación y estado de aplicación."""
+    """Constructores de grafos basicos de navegacion y estado de aplicacion."""
 
     @staticmethod
     def build_navigation_graph(nodes: Dict[str, Node]) -> StateGraph:
@@ -1544,7 +1544,7 @@ class GraphBuilder:
 
 
 class CacheEntry:
-    """Entrada de caché con contexto, resultado y contador de accesos."""
+    """Entrada de cache con contexto, resultado y contador de accesos."""
 
     def __init__(
         self,
@@ -1577,7 +1577,7 @@ class CacheEntry:
 
 
 class PerformanceMetrics:
-    """Métricas acumuladas de búsqueda y caché."""
+    """Metricas acumuladas de busqueda y cache."""
 
     def __init__(self) -> None:
         self.search_count = 0
@@ -1633,7 +1633,7 @@ class PerformanceMetrics:
 
 
 class AdvancedStateGraph(StateGraph):
-    """StateGraph con caché acotada y métricas de rendimiento."""
+    """StateGraph con cache acotada y metricas de rendimiento."""
 
     def __init__(self, heuristic: Optional[Heuristic] = None, cache_size: int = 100, max_cache_age: float = 300) -> None:
         super().__init__(heuristic)
@@ -1755,7 +1755,7 @@ class AdvancedStateGraph(StateGraph):
             elapsed_time=time.perf_counter() - started,
             initial_state=state,
             final_state=self.apply_path_effects(path, state) if success else state,
-            error=None if success else "No se encontró una ruta dentro de los límites indicados",
+            error=None if success else "No se encontr\u00f3 una ruta dentro de los l\u00edmites indicados",
         )
 
     def build_route(self, *args: Any, **kwargs: Any) -> RouteResult:
@@ -1838,17 +1838,17 @@ class AdvancedStateGraph(StateGraph):
         }
 
     def optimize_graph_for_performance(self) -> List[str]:
-        """Limpia caché y ajusta su límite sin cambiar semántica de búsqueda."""
+        """Limpia cache y ajusta su limite sin cambiar semantica de busqueda."""
         changes: List[str] = []
         before = len(self.search_cache)
         self._cleanup_cache()
         after = len(self.search_cache)
         if before != after:
-            changes.append(f"Caché limpiada: {before} -> {after} claves")
+            changes.append(f"Cach\u00e9 limpiada: {before} -> {after} claves")
         new_size = 200 if len(self.nodes) > 100 else 150 if len(self.nodes) > 50 else 100
         if self.cache_size != new_size:
             self.cache_size = new_size
-            changes.append(f"Tamaño de caché: {new_size}")
+            changes.append(f"Tama\u00f1o de cach\u00e9: {new_size}")
         while len(self.search_cache) > self.cache_size:
             oldest_key = min(
                 self.search_cache,

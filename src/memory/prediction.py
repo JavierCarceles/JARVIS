@@ -1,12 +1,12 @@
 """
-Memoria predictiva mejorada para sistema de planificación jerárquica.
+Memoria predictiva mejorada para sistema de planificacion jerarquica.
 Integra predicciones con el nuevo sistema de intenciones y objetivos.
 
 Cumple con:
 - FASE 5: Memoria de dominio (mejorada)
 - FASE 15: Comandos de alto nivel
 - FASE 16: Compatibilidad
-- FASE 17: Optimización
+- FASE 17: Optimizacion
 - FASE 18: Aprendizaje
 """
 
@@ -21,8 +21,8 @@ from dataclasses import dataclass, field
 from collections import defaultdict, Counter
 import statistics
 
-from src.utils.config import get_project_root
-from src.utils.logger import get_logger
+from src.core.config import get_project_root
+from src.core.log import get_logger
 from src.memory.conversation import Goal, Node, Task, NodeType, TaskStatus
 
 logger = get_logger(__name__)
@@ -30,7 +30,7 @@ logger = get_logger(__name__)
 
 @dataclass
 class PredictionResult:
-    """Resultado de predicción para planificación."""
+    """Resultado de prediccion para planificacion."""
     predicted_goal: Optional[Goal] = None
     confidence: float = 0.0
     reasoning: List[str] = field(default_factory=list)
@@ -42,7 +42,7 @@ class PredictionResult:
 
 @dataclass
 class ExecutionMetrics:
-    """Métricas de ejecución para aprendizaje (FASE 18)."""
+    """Metricas de ejecucion para aprendizaje (FASE 18)."""
     goal_id: str
     success: bool
     execution_time: float
@@ -58,7 +58,7 @@ class EnhancedPredictionMemory:
     Memoria predictiva mejorada que integra:
     - Predicciones de objetivos basadas en entrada de usuario
     - Aprendizaje de rutas exitosas
-    - Optimización de costes
+    - Optimizacion de costes
     - Compatibilidad con sistema legacy
     """
 
@@ -78,7 +78,7 @@ class EnhancedPredictionMemory:
             "system_state_patterns": {},
             "events": [],
             
-            # Nuevos datos para planificación jerárquica
+            # Nuevos datos para planificacion jerarquica
             "goal_history": [],
             "execution_metrics": [],
             "goal_success_patterns": {},
@@ -97,11 +97,11 @@ class EnhancedPredictionMemory:
         )
 
     # ========================================================================
-    # CARGA Y MIGRACIÓN
+    # CARGA Y MIGRACION
     # ========================================================================
 
     def _load(self) -> None:
-        """Carga datos con migración a nuevo formato."""
+        """Carga datos con migracion a nuevo formato."""
         if not self.filepath.exists():
             self._initialize_goal_templates()
             return
@@ -132,7 +132,7 @@ class EnhancedPredictionMemory:
             self._initialize_goal_templates()
 
     def _initialize_goal_templates(self) -> None:
-        """Inicializa plantillas de objetivos para predicción rápida."""
+        """Inicializa plantillas de objetivos para prediccion rapida."""
         self.data["goal_templates"] = {
             "open_application": {
                 "type": "open_application",
@@ -236,7 +236,7 @@ class EnhancedPredictionMemory:
             return "unknown"
 
     # ========================================================================
-    # PREDICCIÓN DE OBJETIVOS (FASE 15)
+    # PREDICCION DE OBJETIVOS (FASE 15)
     # ========================================================================
 
     def predict_goal_from_input(self, user_input: str, current_state: Dict[str, Any]) -> PredictionResult:
@@ -248,22 +248,22 @@ class EnhancedPredictionMemory:
             current_state: Estado actual del sistema
             
         Returns:
-            PredictionResult con predicción y métricas
+            PredictionResult con prediccion y metricas
         """
-        logger._print_log("info", f"[PREDICTION] Prediciendo goal para: {user_input}", "prediction.py", "method", 253)
+        logger.info(f"[PREDICTION] Prediciendo goal para: {user_input}")
         
         start_time = time.time()
         
-        # 1. Análisis básico de entrada
+        # 1. Analisis basico de entrada
         normalized_input = self._normalize_input(user_input)
         
-        # 2. Predicción basada en patrones históricos
+        # 2. Prediccion basada en patrones historicos
         historical_patterns = self._analyze_historical_patterns(normalized_input)
         
-        # 3. Predicción basada en estado actual
+        # 3. Prediccion basada en estado actual
         state_influence = self._analyze_state_influence(current_state, normalized_input)
         
-        # 4. Predicción basada en entidades
+        # 4. Prediccion basada en entidades
         entity_prediction = self._predict_entity_usage(normalized_input)
         
         # 5. Combinar predicciones
@@ -274,7 +274,7 @@ class EnhancedPredictionMemory:
             entity_prediction
         )
         
-        # 6. Calcular métricas de confianza
+        # 6. Calcular metricas de confianza
         confidence = self._calculate_prediction_confidence(
             goal, historical_patterns, state_influence, entity_prediction
         )
@@ -286,7 +286,7 @@ class EnhancedPredictionMemory:
         estimated_cost = self._estimate_goal_cost(goal, current_state)
         execution_probability = self._estimate_execution_probability(goal, current_state)
         
-        # 9. Calcular tasa de éxito histórica
+        # 9. Calcular tasa de exito historica
         success_rate = self._get_historical_success_rate(goal.type)
         
         end_time = time.time()
@@ -303,13 +303,13 @@ class EnhancedPredictionMemory:
             historical_success_rate=success_rate
         )
         
-        logger._print_log("info", f"[PREDICTION] Predicción completada en {end_time - start_time:.3f}s", "prediction.py", "method", 306)
-        logger._print_log("debug", f"[PREDICTION] Resultado: {result}", "prediction.py", "method", 307)
+        logger.info(f"[PREDICTION] Prediccion completada en {end_time - start_time:.3f}s")
+        logger.debug(f"[PREDICTION] Resultado: {result}")
         
         return result
 
     def _normalize_input(self, text: str) -> str:
-        """Normaliza texto para análisis."""
+        """Normaliza texto para analisis."""
         if not isinstance(text, str):
             return ""
         
@@ -324,7 +324,7 @@ class EnhancedPredictionMemory:
         return text.strip()
 
     def _analyze_historical_patterns(self, normalized_input: str) -> Dict[str, Any]:
-        """Analiza patrones históricos para predicción."""
+        """Analiza patrones historicos para prediccion."""
         patterns = {
             "command_matches": [],
             "time_patterns": {},
@@ -332,7 +332,7 @@ class EnhancedPredictionMemory:
             "common_sequences": []
         }
         
-        # Buscar coincidencias con comandos históricos
+        # Buscar coincidencias con comandos historicos
         for command, count in self.data.get("command_usage_stats", {}).items():
             if normalized_input in command or command in normalized_input:
                 patterns["command_matches"].append({
@@ -350,7 +350,7 @@ class EnhancedPredictionMemory:
         return patterns
 
     def _analyze_state_influence(self, current_state: Dict[str, Any], normalized_input: str) -> Dict[str, Any]:
-        """Analiza cómo el estado actual influye en la predicción."""
+        """Analiza como el estado actual influye en la prediccion."""
         influence = {
             "state_factors": [],
             "confidence_boost": 0.0,
@@ -365,7 +365,7 @@ class EnhancedPredictionMemory:
                     influence["state_factors"].append("browser_available")
                     influence["confidence_boost"] += 0.1
         
-        # Analizar aplicación activa
+        # Analizar aplicacion activa
         active_window = current_state.get("active_window", "")
         if active_window:
             influence["contextual_clues"].append(f"active: {active_window}")
@@ -402,7 +402,7 @@ class EnhancedPredictionMemory:
                            state: Dict, entity: Dict) -> Optional[Goal]:
         """Combina diferentes predicciones para crear goal."""
         
-        # Determinar tipo de goal más probable
+        # Determinar tipo de goal mas probable
         goal_type = self._determine_goal_type(normalized_input, historical, state, entity)
         
         if not goal_type:
@@ -419,7 +419,7 @@ class EnhancedPredictionMemory:
             created_at=time.time()
         )
         
-        # Ajustar parámetros basados en contexto
+        # Ajustar parametros basados en contexto
         if goal_type == "navigate_stream" and entity.get("url_predictions"):
             goal.target = list(entity["url_predictions"].values())[0]
         
@@ -427,7 +427,7 @@ class EnhancedPredictionMemory:
 
     def _determine_goal_type(self, normalized_input: str, historical: Dict, 
                            state: Dict, entity: Dict) -> Optional[str]:
-        """Determina el tipo de goal más probable."""
+        """Determina el tipo de goal mas probable."""
         
         # Patrones de intenciones
         intention_patterns = {
@@ -442,24 +442,24 @@ class EnhancedPredictionMemory:
         for goal_type, keywords in intention_patterns.items():
             score = 0.0
             
-            # Puntuación por coincidencia de palabras clave
+            # Puntuacion por coincidencia de palabras clave
             for keyword in keywords:
                 if keyword in normalized_input:
                     score += 0.3
             
-            # Puntuación por patrones históricos
+            # Puntuacion por patrones historicos
             for match in historical.get("command_matches", []):
                 if goal_type in match["command"]:
                     score += match["count"] * 0.01
             
-            # Puntuación por contexto de estado
+            # Puntuacion por contexto de estado
             if "browser_available" in state.get("state_factors", []):
                 if goal_type in ["navigate", "navigate_stream"]:
                     score += 0.2
             
             scores[goal_type] = score
         
-        # Devolver tipo con mayor puntuación
+        # Devolver tipo con mayor puntuacion
         if scores:
             return max(scores, key=scores.get)
         
@@ -484,14 +484,14 @@ class EnhancedPredictionMemory:
 
     def _calculate_prediction_confidence(self, goal: Optional[Goal], historical: Dict, 
                                       state: Dict, entity: Dict) -> float:
-        """Calcula confianza en la predicción."""
+        """Calcula confianza en la prediccion."""
         
         if not goal:
             return 0.0
         
         confidence = 0.5  # Base
         
-        # Ajustar por patrones históricos
+        # Ajustar por patrones historicos
         historical_match = len(historical.get("command_matches", []))
         confidence += min(historical_match * 0.1, 0.3)
         
@@ -509,7 +509,7 @@ class EnhancedPredictionMemory:
         """Busca goals alternativos basados en entrada."""
         alternatives = []
         
-        # Generar alternativas basadas en sinónimos
+        # Generar alternativas basadas en sinonimos
         synonym_goals = self._generate_synonym_goals(normalized_input)
         alternatives.extend(synonym_goals)
         
@@ -520,7 +520,7 @@ class EnhancedPredictionMemory:
         return alternatives[:3]  # Limitar a 3 alternativas
 
     def _generate_synonym_goals(self, normalized_input: str) -> List[Goal]:
-        """Genera goals alternativos usando sinónimos."""
+        """Genera goals alternativos usando sinonimos."""
         synonyms = {
             "abrir": ["iniciar", "launch", "ejecutar"],
             "navegar": ["ir", "visitar", "abrir"],
@@ -551,7 +551,7 @@ class EnhancedPredictionMemory:
         """Genera goals alternativos basados en estado actual."""
         alternatives = []
         
-        # Si hay navegador abierto pero no se menciona, sugerir navegación
+        # Si hay navegador abierto pero no se menciona, sugerir navegacion
         if current_state.get("browser_open", False) and "navegar" not in normalized_input:
             goal_id = f"state_alt_{int(time.time())}"
             alternatives.append(Goal(
@@ -565,7 +565,7 @@ class EnhancedPredictionMemory:
         return alternatives
 
     def _estimate_goal_cost(self, goal: Optional[Goal], current_state: Dict[str, Any]) -> float:
-        """Estima coste de ejecución del goal."""
+        """Estima coste de ejecucion del goal."""
         if not goal:
             return float('inf')
         
@@ -581,18 +581,18 @@ class EnhancedPredictionMemory:
         
         # Ajustar por estado actual
         if current_state.get("browser_open", False) and goal.type in ["navigate", "navigate_stream"]:
-            cost *= 0.7  # Descuento si navegador ya está abierto
+            cost *= 0.7  # Descuento si navegador ya esta abierto
         
-        # Ajustar por costes históricos
+        # Ajustar por costes historicos
         historical_cost = self.data.get("cost_estimations", {}).get(goal.type, {})
         if historical_cost:
             avg_cost = statistics.mean(historical_cost.values())
-            cost = (cost + avg_cost) / 2  # Promedio con histórico
+            cost = (cost + avg_cost) / 2  # Promedio con historico
         
         return cost
 
     def _estimate_execution_probability(self, goal: Optional[Goal], current_state: Dict[str, Any]) -> float:
-        """Estima probabilidad de éxito del goal."""
+        """Estima probabilidad de exito del goal."""
         if not goal:
             return 0.0
         
@@ -614,7 +614,7 @@ class EnhancedPredictionMemory:
         return probability
 
     def _get_historical_success_rate(self, goal_type: str) -> float:
-        """Obtiene tasa de éxito histórica para tipo de goal."""
+        """Obtiene tasa de exito historica para tipo de goal."""
         history = self.data.get("goal_success_patterns", {}).get(goal_type, [])
         if not history:
             return 0.8  # Default
@@ -623,7 +623,7 @@ class EnhancedPredictionMemory:
         return successful / len(history)
 
     def _get_command_success_rate(self, command: str) -> float:
-        """Obtiene tasa de éxito para comando legacy."""
+        """Obtiene tasa de exito para comando legacy."""
         events = self.data.get("events", [])
         command_events = [e for e in events if e.get("command") == command]
         if not command_events:
@@ -634,7 +634,7 @@ class EnhancedPredictionMemory:
 
     def _generate_prediction_reasoning(self, goal: Optional[Goal], historical: Dict, 
                                      state: Dict) -> List[str]:
-        """Genera explicación de la predicción."""
+        """Genera explicacion de la prediccion."""
         reasoning = []
         
         if goal:
@@ -650,25 +650,25 @@ class EnhancedPredictionMemory:
         return reasoning
 
     # ========================================================================
-    # REGISTRO DE EJECUCIÓN (FASE 18)
+    # REGISTRO DE EJECUCION (FASE 18)
     # ========================================================================
 
     def record_goal_execution(self, goal: Goal, success: bool, execution_time: float,
                             actual_cost: float, context: Dict[str, Any],
                             error_message: Optional[str] = None, replanifications: int = 0) -> None:
         """
-        Registra ejecución de goal para aprendizaje (FASE 18).
+        Registra ejecucion de goal para aprendizaje (FASE 18).
         
         Args:
             goal: Goal ejecutado
-            success: Si tuvo éxito
-            execution_time: Tiempo de ejecución
+            success: Si tuvo exito
+            execution_time: Tiempo de ejecucion
             actual_cost: Coste real
-            context: Contexto de ejecución
-            error_message: Error si falló
-            replanifications: Número de replanificaciones
+            context: Contexto de ejecucion
+            error_message: Error si fallo
+            replanifications: Numero de replanificaciones
         """
-        logger._print_log("info", f"[RECORDING] Registrando ejecución de goal: {goal.id} - {'éxito' if success else 'fallo'}", "prediction.py", "method", 671)
+        logger.info(f"[RECORDING] Registrando ejecucion de goal: {goal.id} - {'exito' if success else 'fallo'}")
         
         # Registrar en historial
         execution_record = {
@@ -688,11 +688,11 @@ class EnhancedPredictionMemory:
         
         self.data["goal_history"].append(execution_record)
         
-        # Limitar tamaño del historial
+        # Limitar tamano del historial
         if len(self.data["goal_history"]) > self.MAX_GOAL_HISTORY:
             self.data["goal_history"] = self.data["goal_history"][-self.MAX_GOAL_HISTORY:]
         
-        # Actualizar métricas de ejecución
+        # Actualizar metricas de ejecucion
         metrics = ExecutionMetrics(
             goal_id=goal.id,
             success=success,
@@ -706,17 +706,17 @@ class EnhancedPredictionMemory:
         
         self.data["execution_metrics"].append(metrics.__dict__)
         
-        # Limitar métricas
+        # Limitar metricas
         if len(self.data["execution_metrics"]) > self.MAX_METRICS:
             self.data["execution_metrics"] = self.data["execution_metrics"][-self.MAX_METRICS:]
         
-        # Actualizar patrones de éxito
+        # Actualizar patrones de exito
         self._update_success_patterns(goal, success)
         
         # Actualizar estimaciones de coste
         self._update_cost_estimations(goal, actual_cost)
         
-        # Actualizar caché de rutas
+        # Actualizar cache de rutas
         self._update_path_cache(goal, success, execution_time, actual_cost)
         
         # Actualizar uso de entidades
@@ -724,10 +724,10 @@ class EnhancedPredictionMemory:
         
         self._save()
         
-        logger._print_log("info", f"[RECORDING] Ejecución registrada para goal {goal.id}", "prediction.py", "method", 727)
+        logger.info(f"[RECORDING] Ejecucion registrada para goal {goal.id}")
 
     def _update_success_patterns(self, goal: Goal, success: bool) -> None:
-        """Actualiza patrones de éxito por tipo de goal."""
+        """Actualiza patrones de exito por tipo de goal."""
         if goal.type not in self.data["goal_success_patterns"]:
             self.data["goal_success_patterns"][goal.type] = []
         
@@ -757,7 +757,7 @@ class EnhancedPredictionMemory:
                 self.data["cost_estimations"][goal.type][-max_estimations:]
 
     def _update_path_cache(self, goal: Goal, success: bool, execution_time: float, actual_cost: float) -> None:
-        """Actualiza caché de rutas exitosas."""
+        """Actualiza cache de rutas exitosas."""
         cache_key = f"{goal.type}_{goal.target}"
         
         if cache_key not in self.data["path_cache"]:
@@ -785,7 +785,7 @@ class EnhancedPredictionMemory:
         cache_entry["total_time"] += execution_time
         cache_entry["total_cost"] += actual_cost
         
-        # Limitar entradas en caché
+        # Limitar entradas en cache
         max_cache_entries = 20
         if len(cache_entry["executions"]) > max_cache_entries:
             cache_entry["executions"] = cache_entry["executions"][-max_cache_entries:]
@@ -797,8 +797,8 @@ class EnhancedPredictionMemory:
         cache_entry["success_rate"] = cache_entry["success_count"] / total_executions if total_executions > 0 else 0
 
     def _update_entity_usage(self, goal: Goal, context: Dict[str, Any]) -> None:
-        """Actualiza estadísticas de uso de entidades."""
-        # Extraer entidades del contexto si están disponibles
+        """Actualiza estadisticas de uso de entidades."""
+        # Extraer entidades del contexto si estan disponibles
         entities = context.get("entities", [])
         
         for entity_name in entities:
@@ -816,8 +816,8 @@ class EnhancedPredictionMemory:
             entity_data["usage_count"] += 1
             entity_data["associated_goals"].append(goal.id)
             
-            # Actualizar tasa de éxito
-            recent_goals = entity_data["associated_goals"][-10:]  # Últimos 10 usos
+            # Actualizar tasa de exito
+            recent_goals = entity_data["associated_goals"][-10:]  # Ultimos 10 usos
             successful_goals = sum(1 for gid in recent_goals 
                                  if any(g.get("goal_id") == gid and g.get("success") 
                                        for g in self.data["goal_history"]))
@@ -834,19 +834,19 @@ class EnhancedPredictionMemory:
         return self.data.get("goal_history", [])
 
     def get_cached_path(self, goal_type: str, target: str) -> Optional[Dict[str, Any]]:
-        """Obtiene ruta cacheada para goal específico."""
+        """Obtiene ruta cacheada para goal especifico."""
         cache_key = f"{goal_type}_{target}"
         return self.data.get("path_cache", {}).get(cache_key)
 
     def get_cost_estimation(self, goal_type: str) -> float:
-        """Obtiene estimación de coste para tipo de goal."""
+        """Obtiene estimacion de coste para tipo de goal."""
         estimations = self.data.get("cost_estimations", {}).get(goal_type, [])
         if estimations:
             return statistics.mean(estimations)
         return 1.0
 
     def get_success_rate(self, goal_type: str) -> float:
-        """Obtiene tasa de éxito para tipo de goal."""
+        """Obtiene tasa de exito para tipo de goal."""
         patterns = self.data.get("goal_success_patterns", {}).get(goal_type, [])
         if not patterns:
             return 0.8
@@ -860,10 +860,10 @@ class EnhancedPredictionMemory:
 
     def record_command(self, command: str, success: bool = True, source: str = "voice") -> Dict[str, Any]:
         """
-        Método legacy para registrar comandos (FASE 16).
+        Metodo legacy para registrar comandos (FASE 16).
         Ahora integra con nuevo sistema pero mantiene compatibilidad.
         """
-        logger._print_log("info", f"[LEGACY] Registrando comando legacy: {command}", "prediction.py", "method", 866)
+        logger.info(f"[LEGACY] Registrando comando legacy: {command}")
         
         # Registrar como evento legacy
         event = self._create_legacy_event(command, success, source)
@@ -953,7 +953,7 @@ class EnhancedPredictionMemory:
             return result
             
         except Exception as exc:
-            logger._print_log("debug", f"[PREDICTION] No se pudieron obtener ventanas: {exc}", "prediction.py", "method", 956)
+            logger.debug(f"[PREDICTION] No se pudieron obtener ventanas: {exc}")
             return []
 
     def _get_active_window(self) -> Optional[str]:
@@ -969,7 +969,7 @@ class EnhancedPredictionMemory:
             return title or None
             
         except Exception as exc:
-            logger._print_log("debug", f"[PREDICTION] No se pudo obtener ventana activa: {exc}", "prediction.py", "method", 972)
+            logger.debug(f"[PREDICTION] No se pudo obtener ventana activa: {exc}")
             return None
 
     def _get_system_state(self, open_windows: List[str], active_window: Optional[str]) -> Dict[str, Any]:
@@ -1042,7 +1042,7 @@ class EnhancedPredictionMemory:
             temp_path.replace(self.filepath)
             
         except OSError as exc:
-            logger._print_log("info", "Procesando solicitud", "prediction.py", "method", 1045)
+            logger.debug("EnhancedPredictionMemory._save: %s", exc)
 
 
 # ============================================================================
@@ -1072,10 +1072,10 @@ class PredictionMemory(EnhancedPredictionMemory):
     
     def __init__(self, filepath: str = "data/prediction_memory.json"):
         super().__init__(filepath)
-        logger._print_log("info", "[LEGACY] Usando PredictionMemory legacy (wrapper sobre EnhancedPredictionMemory)", "prediction.py", "method", 1075)
+        logger.info("[LEGACY] Usando PredictionMemory legacy (wrapper sobre EnhancedPredictionMemory)")
 
 
-# Mantener función singleton legacy
+# Mantener funcion singleton legacy
 def get_prediction_memory() -> PredictionMemory:
-    """Función singleton legacy para compatibilidad."""
+    """Funcion singleton legacy para compatibilidad."""
     return PredictionMemory()

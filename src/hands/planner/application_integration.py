@@ -1,9 +1,9 @@
-"""Integración declarativa del conocimiento de aplicaciones con el planificador.
+"""Integracion declarativa del conocimiento de aplicaciones con el planificador.
 
 Convierte aplicaciones, capacidades y elementos de interfaz conocidos en
-instancias del modelo canónico ``Node``. Este módulo no abre aplicaciones,
-interactúa con la interfaz ni ejecuta callbacks: únicamente representa
-conocimiento y ofrece consultas para las fases posteriores de planificación.
+instancias del modelo canonico ``Node``. Este modulo no abre aplicaciones,
+interactua con la interfaz ni ejecuta callbacks: unicamente representa
+conocimiento y ofrece consultas para las fases posteriores de planificacion.
 """
 
 from __future__ import annotations
@@ -14,10 +14,10 @@ import re
 import threading
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
-try:  # Convención de imports del proyecto cuando la raíz está en sys.path.
-    from src.utils.logger import get_logger
+try:  # Convencion de imports del proyecto cuando la raiz esta en sys.path.
+    from src.core.log import get_logger
 except ImportError:  # Compatibilidad al importar como paquete ``src``.
-    from src.utils.logger import get_logger
+    from src.core.log import get_logger
 
 try:
     from src.hands.planner.node import Node, NodeType
@@ -36,7 +36,7 @@ class ApplicationKnowledgeIntegrator:
     """Integra conocimiento estructurado de aplicaciones con el planificador."""
 
     def __init__(self) -> None:
-        # Importación diferida: applications_core puede depender de otros módulos
+        # Importacion diferida: applications_core puede depender de otros modulos
         # de manos/planificador durante el arranque de JARVIS.
         self.application_manager: Any = None
         self.memory_manager: Any = None
@@ -54,7 +54,7 @@ class ApplicationKnowledgeIntegrator:
         try:
             self.memory_manager = get_memory_manager()
         except Exception as exc:
-            # El conocimiento del catálogo sigue siendo útil sin memoria.
+            # El conocimiento del catalogo sigue siendo util sin memoria.
             logger.warning(
                 "[APP-INTEGRATION] No se pudo cargar memory manager: %s",
                 exc,
@@ -66,11 +66,11 @@ class ApplicationKnowledgeIntegrator:
 
     @staticmethod
     def _import_application_manager_factory() -> Any:
-        """Carga la fábrica del gestor sin imponer una única ruta de importación."""
+        """Carga la fabrica del gestor sin imponer una unica ruta de importacion."""
         errors: List[BaseException] = []
         for module_name in (
-            "src.hands.applications_core",
-            "hands.applications_core",
+            "src.hands.apps.applications_core",
+            "src.hands.apps.applications_core",
         ):
             try:
                 module = __import__(module_name, fromlist=["get_application_manager"])
@@ -81,12 +81,12 @@ class ApplicationKnowledgeIntegrator:
                 errors.append(exc)
         if errors:
             raise ImportError(
-                "No se encontró get_application_manager en applications_core"
+                "No se encontro get_application_manager en applications_core"
             ) from errors[-1]
         return None
 
     # ------------------------------------------------------------------
-    # NORMALIZACIÓN Y ACCESO SEGURO A DATOS
+    # NORMALIZACION Y ACCESO SEGURO A DATOS
     # ------------------------------------------------------------------
 
     @staticmethod
@@ -121,7 +121,7 @@ class ApplicationKnowledgeIntegrator:
         if not raw:
             return ""
         # Los signos separadores se convierten en guiones bajos; se conservan
-        # caracteres alfanuméricos Unicode para no inutilizar nombres localizados.
+        # caracteres alfanumericos Unicode para no inutilizar nombres localizados.
         text = re.sub(r"[^\w]+", "_", raw, flags=re.UNICODE)
         return re.sub(r"_+", "_", text).strip("_")
 
@@ -139,7 +139,7 @@ class ApplicationKnowledgeIntegrator:
 
     @staticmethod
     def _as_list(value: Any) -> List[Any]:
-        """Normaliza un valor o colección sin dividir strings/diccionarios."""
+        """Normaliza un valor o coleccion sin dividir strings/diccionarios."""
         if value is None:
             return []
         if isinstance(value, list):
@@ -159,7 +159,7 @@ class ApplicationKnowledgeIntegrator:
 
     @classmethod
     def _normalized_conditions(cls, value: Any) -> List[Any]:
-        """Copia precondiciones/efectos evitando mutar el catálogo de origen."""
+        """Copia precondiciones/efectos evitando mutar el catalogo de origen."""
         items = cls._as_list(value)
         normalized: List[Any] = []
         for item in items:
@@ -177,7 +177,7 @@ class ApplicationKnowledgeIntegrator:
         for node in nodes:
             node_id = str(getattr(node, "id", "") or "").strip()
             if not node_id:
-                logger.warning("[APP-INTEGRATION] Se descartó un Node sin ID")
+                logger.warning("[APP-INTEGRATION] Se descarto un Node sin ID")
                 continue
             existing = by_id.get(node_id)
             if existing is None:
@@ -200,7 +200,7 @@ class ApplicationKnowledgeIntegrator:
 
     @staticmethod
     def _safe_cost(value: Any, default: float = 1.0) -> float:
-        """Convierte costes a números finitos no negativos."""
+        """Convierte costes a numeros finitos no negativos."""
         try:
             result = float(value)
         except (TypeError, ValueError, OverflowError):
@@ -222,7 +222,7 @@ class ApplicationKnowledgeIntegrator:
                 if app is not None:
                     return app
 
-            # Compatibilidad con managers que exponen el catálogo directamente.
+            # Compatibilidad con managers que exponen el catalogo directamente.
             applications = getattr(self.application_manager, "applications", None)
             if isinstance(applications, dict):
                 direct = applications.get(lookup_name)
@@ -235,26 +235,26 @@ class ApplicationKnowledgeIntegrator:
                         return candidate
         except Exception as exc:
             logger.warning(
-                "[APP-INTEGRATION] Error obteniendo aplicación %s: %s",
+                "[APP-INTEGRATION] Error obteniendo aplicacion %s: %s",
                 lookup_name,
                 exc,
             )
         return None
 
     # ------------------------------------------------------------------
-    # CONVERSIÓN A NODOS
+    # CONVERSION A NODOS
     # ------------------------------------------------------------------
 
     def convert_application_to_nodes(self, app_name: str) -> List[Node]:
-        """Convierte una aplicación y sus capacidades en Nodes canónicos.
+        """Convierte una aplicacion y sus capacidades en Nodes canonicos.
 
-        Los nodos resultantes son declarativos. No contienen una orden implícita
-        de ejecución y no invocan acciones ni callbacks de la aplicación.
+        Los nodos resultantes son declarativos. No contienen una orden implicita
+        de ejecucion y no invocan acciones ni callbacks de la aplicacion.
         """
         app = self._get_application(app_name)
         if app is None:
             logger.info(
-                "[APP-INTEGRATION] No existe una aplicación registrada: %s",
+                "[APP-INTEGRATION] No existe una aplicacion registrada: %s",
                 app_name,
             )
             return []
@@ -287,8 +287,8 @@ class ApplicationKnowledgeIntegrator:
                 )
             nodes.extend(ui_nodes)
 
-            # parent/children representan jerarquía declarativa, no precedencias
-            # temporales. Las precondiciones/efectos conservan esa semántica aparte.
+            # parent/children representan jerarquia declarativa, no precedencias
+            # temporales. Las precondiciones/efectos conservan esa semantica aparte.
             capability_node.parent = app_node.id
             if capability_node.id not in app_node.children:
                 app_node.children.append(capability_node.id)
@@ -308,14 +308,14 @@ class ApplicationKnowledgeIntegrator:
         unique_nodes = self._unique_nodes(nodes)
         self._validate_node_references(unique_nodes)
         logger.info(
-            "[APP-INTEGRATION] Convertida aplicación %s en %s Nodes",
+            "[APP-INTEGRATION] Convertida aplicacion %s en %s Nodes",
             self._get_value(app, "name", app_name),
             len(unique_nodes),
         )
         return unique_nodes
 
     def _create_application_node(self, app: Any) -> Node:
-        """Crea el nodo declarativo principal de la aplicación."""
+        """Crea el nodo declarativo principal de la aplicacion."""
         app_name = str(self._get_value(app, "name", "application") or "application").strip()
         app_key = self._normalize_name(app_name) or "application"
         current_state = self._get_application_current_state(app_name)
@@ -343,7 +343,7 @@ class ApplicationKnowledgeIntegrator:
             id=f"app_{app_key}",
             type=NodeType.APPLICATION,
             name=app_name,
-            description=f"Aplicación {app_name}",
+            description=f"Aplicaci\u00f3n {app_name}",
             parameters=parameters,
             preconditions=self._generate_application_preconditions(app, current_state),
             effects=self._generate_application_effects(app),
@@ -354,7 +354,7 @@ class ApplicationKnowledgeIntegrator:
         )
 
     def _create_capability_node(self, app: Any, capability_def: Any) -> Node:
-        """Crea un nodo de acción reutilizable para una capacidad declarada."""
+        """Crea un nodo de accion reutilizable para una capacidad declarada."""
         app_name = str(self._get_value(app, "name", "application") or "application").strip()
         app_key = self._normalize_name(app_name) or "application"
         capability_raw = self._get_value(capability_def, "capability", capability_def)
@@ -480,7 +480,7 @@ class ApplicationKnowledgeIntegrator:
             preconditions.append(f"{app_key}_{element_key}_calibrated")
 
         # Este nodo representa conocimiento sobre el elemento; no se afirma que
-        # haya sido enfocado. El enfoque pertenece a una acción física posterior.
+        # haya sido enfocado. El enfoque pertenece a una accion fisica posterior.
         effects: List[Any] = []
         if element is not None:
             effects.append(f"{app_key}_{element_key}_available")
@@ -517,15 +517,15 @@ class ApplicationKnowledgeIntegrator:
         """Comprueba si un elemento UI tiene coordenadas calibradas.
 
         El conocimiento declarativo (``UIElement`` / dict de knowledge) no
-        almacena coordenadas; la calibración se consulta en tiempo de
-        ejecución al ``CoordinateManager``. Si el elemento es ``None`` se
+        almacena coordenadas; la calibracion se consulta en tiempo de
+        ejecucion al ``CoordinateManager``. Si el elemento es ``None`` se
         devuelve ``False``.
         """
         if element is None:
             return False
 
-        # Compatibilidad con dicts legacy que aún pueden exponer una
-        # bandera de calibración directamente.
+        # Compatibilidad con dicts legacy que aun pueden exponer una
+        # bandera de calibracion directamente.
         calibrated = cls._get_value(element, "is_calibrated")
         try:
             if callable(calibrated):
@@ -538,14 +538,14 @@ class ApplicationKnowledgeIntegrator:
         except Exception:
             return False
 
-        # Si el elemento no expone una bandera de calibración, consultar
-        # el CoordinateManager mediante el resource_id canónico
+        # Si el elemento no expone una bandera de calibracion, consultar
+        # el CoordinateManager mediante el resource_id canonico
         # "{app_key}.{element_name}".
         element_name = cls._get_value(element, "name")
         if element_name is None:
             return False
         try:
-            from src.hands.coordinate_manager import get_coordinate_manager
+            from src.hands.calibration.coordinate_manager import get_coordinate_manager
             coord_manager = get_coordinate_manager()
             if coord_manager is None:
                 return False
@@ -560,13 +560,13 @@ class ApplicationKnowledgeIntegrator:
         return False
 
     def _validate_node_references(self, nodes: Sequence[Node]) -> None:
-        """Comprueba las relaciones jerárquicas creadas durante la conversión."""
+        """Comprueba las relaciones jerarquicas creadas durante la conversion."""
         node_ids = {str(getattr(node, "id", "")) for node in nodes}
         for node in nodes:
             parent = getattr(node, "parent", None)
             if parent and parent not in node_ids:
                 logger.warning(
-                    "[APP-INTEGRATION] Parent %s de Node %s no está en el resultado",
+                    "[APP-INTEGRATION] Parent %s de Node %s no esta en el resultado",
                     parent,
                     getattr(node, "id", "unknown"),
                 )
@@ -574,7 +574,7 @@ class ApplicationKnowledgeIntegrator:
             for child_id in children or []:
                 if child_id not in node_ids:
                     logger.warning(
-                        "[APP-INTEGRATION] Child %s de Node %s no está en el resultado",
+                        "[APP-INTEGRATION] Child %s de Node %s no esta en el resultado",
                         child_id,
                         getattr(node, "id", "unknown"),
                     )
@@ -584,7 +584,7 @@ class ApplicationKnowledgeIntegrator:
     # ------------------------------------------------------------------
 
     def _get_application_current_state(self, app_name: str) -> Dict[str, Any]:
-        """Obtiene propiedades persistidas de la aplicación si existen."""
+        """Obtiene propiedades persistidas de la aplicacion si existen."""
         if self.memory_manager is None:
             return {}
         try:
@@ -606,8 +606,8 @@ class ApplicationKnowledgeIntegrator:
         app: Any,
         current_state: Optional[Dict[str, Any]] = None,
     ) -> List[Any]:
-        """Genera las condiciones de preparación declaradas para la aplicación."""
-        del current_state  # Estado observado no debe convertirse en requisito por sí solo.
+        """Genera las condiciones de preparacion declaradas para la aplicacion."""
+        del current_state  # Estado observado no debe convertirse en requisito por si solo.
         requirements = self._normalized_conditions(
             self._get_value(app, "preflight_requirements", [])
         )
@@ -630,7 +630,7 @@ class ApplicationKnowledgeIntegrator:
         return preconditions
 
     def _generate_application_effects(self, app: Any) -> List[str]:
-        """Declara que la aplicación está registrada/disponible, no abierta."""
+        """Declara que la aplicacion esta registrada/disponible, no abierta."""
         app_key = self._normalize_name(self._get_value(app, "name", "application"))
         return [f"{app_key or 'application'}_available"]
 
@@ -675,7 +675,7 @@ class ApplicationKnowledgeIntegrator:
         return names
 
     def get_application_capabilities(self, app_name: str) -> Dict[str, Any]:
-        """Obtiene capacidades en formato declarativo, con fallback al catálogo."""
+        """Obtiene capacidades en formato declarativo, con fallback al catalogo."""
         app = self._get_application(app_name)
         if app is None:
             return {}
@@ -764,7 +764,7 @@ class ApplicationKnowledgeIntegrator:
             return []
 
     def is_application_capable(self, app_name: str, capability: Any) -> bool:
-        """Comprueba una capacidad utilizando el gestor o el catálogo de la app."""
+        """Comprueba una capacidad utilizando el gestor o el catalogo de la app."""
         app = self._get_application(app_name)
         if app is None:
             return False
@@ -796,7 +796,7 @@ class ApplicationKnowledgeIntegrator:
         )
 
     def is_application_available(self, app_name: str) -> bool:
-        """Comprueba disponibilidad en tiempo de ejecución de una aplicación.
+        """Comprueba disponibilidad en tiempo de ejecucion de una aplicacion.
 
         Distingue **disponible** (ejecutable instalado / app con URL) de
         **simplemente declarada**. Delega en ``ApplicationKnowledge.is_available``
@@ -835,28 +835,28 @@ class ApplicationKnowledgeIntegrator:
     def is_capability_available(self, app_name: str, capability: Any) -> bool:
         """Distingue una capacidad **disponible** de una sola **declarada**.
 
-        Una capacidad está disponible cuando está declarada en el modelo
-        (``is_application_capable``) **y** la aplicación es disponible en
-        tiempo de ejecución (``is_application_available``).
+        Una capacidad esta disponible cuando esta declarada en el modelo
+        (``is_application_capable``) **y** la aplicacion es disponible en
+        tiempo de ejecucion (``is_application_available``).
         """
         if not self.is_application_capable(app_name, capability):
             return False
         return self.is_application_available(app_name)
 
     def register_application_knowledge(self, app_config: Dict[str, Any]) -> bool:
-        """Registra conocimiento mediante la API pública de applications_core."""
+        """Registra conocimiento mediante la API publica de applications_core."""
         if not isinstance(app_config, dict):
-            logger.warning("[APP-INTEGRATION] La configuración de aplicación debe ser un dict")
+            logger.warning("[APP-INTEGRATION] La configuracion de aplicacion debe ser un dict")
             return False
         app_name = str(app_config.get("name", "") or "").strip()
         if not app_name:
-            logger.warning("[APP-INTEGRATION] No se registra una aplicación sin nombre")
+            logger.warning("[APP-INTEGRATION] No se registra una aplicacion sin nombre")
             return False
 
         errors: List[BaseException] = []
         for module_name in (
-            "src.hands.applications_core",
-            "hands.applications_core",
+            "src.hands.apps.applications_core",
+            "src.hands.apps.applications_core",
         ):
             try:
                 module = __import__(module_name, fromlist=["register_custom_application"])
@@ -867,14 +867,14 @@ class ApplicationKnowledgeIntegrator:
                 errors.append(exc)
             except Exception as exc:
                 logger.warning(
-                    "[APP-INTEGRATION] Error registrando aplicación %s: %s",
+                    "[APP-INTEGRATION] Error registrando aplicacion %s: %s",
                     app_name,
                     exc,
                 )
                 return False
         if errors:
             logger.warning(
-                "[APP-INTEGRATION] No está disponible register_custom_application: %s",
+                "[APP-INTEGRATION] No esta disponible register_custom_application: %s",
                 errors[-1],
             )
         return False
@@ -899,13 +899,13 @@ def get_application_knowledge_integrator() -> ApplicationKnowledgeIntegrator:
 
 
 def get_applications_by_capability(capability_name: str) -> List[str]:
-    """Compatibilidad legacy; utiliza ApplicationCapability cuando está disponible."""
+    """Compatibilidad legacy; utiliza ApplicationCapability cuando esta disponible."""
     capability: Any = capability_name
     try:
         errors: List[BaseException] = []
         for module_name in (
-            "src.hands.applications_core",
-            "hands.applications_core",
+            "src.hands.apps.applications_core",
+            "src.hands.apps.applications_core",
         ):
             try:
                 module = __import__(module_name, fromlist=["ApplicationCapability"])
@@ -914,7 +914,7 @@ def get_applications_by_capability(capability_name: str) -> List[str]:
                     try:
                         capability = enum_type(capability_name)
                     except (ValueError, TypeError):
-                        # Algunos catálogos usan nombres Enum y otros usan sus values.
+                        # Algunos catalogos usan nombres Enum y otros usan sus values.
                         member = getattr(enum_type, str(capability_name), None)
                         capability = member if member is not None else capability_name
                     break
@@ -933,7 +933,7 @@ def get_applications_by_capability(capability_name: str) -> List[str]:
 
 
 def get_application_knowledge(app_name: str) -> Dict[str, Any]:
-    """Compatibilidad legacy para consultar conocimiento de una aplicación."""
+    """Compatibilidad legacy para consultar conocimiento de una aplicacion."""
     return get_application_knowledge_integrator().get_application_capabilities(app_name)
 
 

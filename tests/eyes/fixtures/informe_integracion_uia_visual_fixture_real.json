@@ -8,7 +8,7 @@
   "existentes": [],
   "omitidos_por_visual": [
     {
-      "name": "Sin título: Bloc de notas",
+      "name": "Sin titulo: Bloc de notas",
       "automation_id": "",
       "control_type": "Window",
       "patterns": [
@@ -232,7 +232,7 @@
       "motivo": "Detector visual no lo encontro en la captura"
     },
     {
-      "name": "Sin título. No modificado.",
+      "name": "Sin titulo. No modificado.",
       "automation_id": "",
       "control_type": "TabItem",
       "patterns": [
@@ -264,7 +264,7 @@
       "motivo": "Detector visual no lo encontro en la captura"
     },
     {
-      "name": "Sin título",
+      "name": "Sin titulo",
       "automation_id": "",
       "control_type": "Text",
       "patterns": [
@@ -296,7 +296,7 @@
       "motivo": "Detector visual no lo encontro en la captura"
     },
     {
-      "name": "Cerrar pestaña",
+      "name": "Cerrar pestana",
       "automation_id": "CloseButton",
       "control_type": "Button",
       "patterns": [
@@ -328,7 +328,7 @@
       "motivo": "Detector visual no lo encontro en la captura"
     },
     {
-      "name": "Agregar nueva pestaña",
+      "name": "Agregar nueva pestana",
       "automation_id": "AddButton",
       "control_type": "Button",
       "patterns": [
@@ -552,7 +552,7 @@
       "motivo": "Detector visual no lo encontro en la captura"
     },
     {
-      "name": "Títulos",
+      "name": "Titulos",
       "automation_id": "",
       "control_type": "Button",
       "patterns": [
@@ -680,7 +680,7 @@
       "motivo": "Detector visual no lo encontro en la captura"
     },
     {
-      "name": "Tachado (Ctrl+Mayús+X)",
+      "name": "Tachado (Ctrl+Mayus+X)",
       "automation_id": "",
       "control_type": "Button",
       "patterns": [
@@ -904,7 +904,7 @@
       "motivo": "Detector visual no lo encontro en la captura"
     },
     {
-      "name": "Configuración",
+      "name": "Configuracion",
       "automation_id": "SettingsButton",
       "control_type": "Button",
       "patterns": [
@@ -1000,7 +1000,7 @@
       "motivo": "Detector visual no lo encontro en la captura"
     },
     {
-      "name": "El modelo de IA local debe terminar de descargarse para usar esta función cuando se ha cerrado la sesión.",
+      "name": "El modelo de IA local debe terminar de descargarse para usar esta funcion cuando se ha cerrado la sesion.",
       "automation_id": "PsDownloadLightTeachingTip",
       "control_type": "Pane",
       "patterns": [
@@ -1096,7 +1096,7 @@
       "motivo": "Detector visual no lo encontro en la captura"
     },
     {
-      "name": "Línea 1,\nColumna 1",
+      "name": "Linea 1,\nColumna 1",
       "automation_id": "ContentTextBlock",
       "control_type": "Text",
       "patterns": [
@@ -1484,12 +1484,12 @@
   "falsos_positivos": [],
   "duplicados_uia": [
     {
-      "uia_a": "Sin título: Bloc de notas",
+      "uia_a": "Sin titulo: Bloc de notas",
       "uia_b": "",
       "iou": 0.873
     },
     {
-      "uia_a": "Sin título: Bloc de notas",
+      "uia_a": "Sin titulo: Bloc de notas",
       "uia_b": "Editor de texto",
       "iou": 0.873
     },
@@ -1515,7 +1515,7 @@
     },
     {
       "uia_a": "",
-      "uia_b": "Sin título. No modificado.",
+      "uia_b": "Sin titulo. No modificado.",
       "iou": 0.856
     },
     {
@@ -1530,7 +1530,7 @@
     },
     {
       "uia_a": "",
-      "uia_b": "Sin título. No modificado.",
+      "uia_b": "Sin titulo. No modificado.",
       "iou": 0.856
     },
     {
@@ -1540,12 +1540,12 @@
     },
     {
       "uia_a": "Tabs",
-      "uia_b": "Sin título. No modificado.",
+      "uia_b": "Sin titulo. No modificado.",
       "iou": 0.856
     },
     {
       "uia_a": "TabListView",
-      "uia_b": "Sin título. No modificado.",
+      "uia_b": "Sin titulo. No modificado.",
       "iou": 0.991
     },
     {
@@ -1568,7 +1568,7 @@
   "fusion_candidatos": [
     {
       "canonical_id": "fusion:element:sin_t_tulo_bloc_de_notas:s0:c0",
-      "name": "Sin título: Bloc de notas",
+      "name": "Sin titulo: Bloc de notas",
       "type": "element",
       "sources": [
         "uia"
@@ -1636,7 +1636,7 @@
     },
     {
       "canonical_id": "fusion:text:sin_t_tulo:s0:c6",
-      "name": "Sin título",
+      "name": "Sin titulo",
       "type": "text",
       "sources": [
         "uia"
@@ -1697,7 +1697,7 @@
     },
     {
       "canonical_id": "fusion:button:t_tulos:s0:c11",
-      "name": "Títulos",
+      "name": "Titulos",
       "type": "button",
       "sources": [
         "uia"
@@ -1741,7 +1741,7 @@
     },
     {
       "canonical_id": "fusion:button:tachado_ctrl_may_s_x:s0:c15",
-      "name": "Tachado (Ctrl+Mayús+X)",
+      "name": "Tachado (Ctrl+Mayus+X)",
       "type": "button",
       "sources": [
         "uia"

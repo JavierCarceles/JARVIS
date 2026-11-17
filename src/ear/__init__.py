@@ -1,4 +1,4 @@
 # src/ear/__init__.py
-from .listener import Ear
+from src.ear.listener import Ear
 
 __all__ = ['Ear']

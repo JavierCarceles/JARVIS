@@ -2,7 +2,7 @@
 """Tests para ApplicationKnowledgeIntegrator (src/hands/planner/application_integration.py).
 
 Verifica que el conocimiento estructurado de aplicaciones se convierte en Nodes
-canónicos para el planificador sin tocar código de producción.
+canonicos para el planificador sin tocar codigo de produccion.
 """
 
 import copy
@@ -18,7 +18,7 @@ from src.hands.planner.application_integration import (
     get_applications_by_capability as legacy_get_apps_by_cap,
     get_application_knowledge as legacy_get_app_knowledge,
 )
-from src.hands.applications_core import (
+from src.hands.apps.applications_core import (
     ApplicationCapability,
     ApplicationCapabilityDef,
     ApplicationKnowledge,
@@ -37,7 +37,7 @@ from src.memory.storage import Entity
 def _make_capability(
     capability: ApplicationCapability = ApplicationCapability.OPEN,
     name: str = "open_app",
-    description: str = "Abre la aplicación",
+    description: str = "Abre la aplicaci\u00f3n",
     required_ui_elements=None,
     preconditions=None,
     effects=None,
@@ -135,8 +135,8 @@ class TestNormalizeName:
         assert ApplicationKnowledgeIntegrator._normalize_name(None) == ""
 
     def test_unicode_preserved(self):
-        # caracteres alfanuméricos Unicode se conservan
-        result = ApplicationKnowledgeIntegrator._normalize_name("Café App")
+        # caracteres alfanumericos Unicode se conservan
+        result = ApplicationKnowledgeIntegrator._normalize_name("Caf\u00e9 App")
         assert "caf" in result.lower()
 
 
@@ -237,7 +237,7 @@ class TestCapabilityValue:
         assert ApplicationKnowledgeIntegrator._capability_value({"value": "click"}) == "click"
 
     def test_dict_without_value_key_returns_str_repr(self):
-        # dicts without 'value' key fall back to str(obj) — caller should
+        # dicts without 'value' key fall back to str(obj) - caller should
         # extract 'capability' key before calling this method
         result = ApplicationKnowledgeIntegrator._capability_value({"capability": "search"})
         assert result == str({"capability": "search"})
@@ -283,7 +283,7 @@ class TestNormalizedConditions:
 
 
 class TestUniqueNodes:
-    """_unique_nodes: deduplicación por ID con fusión de metadata."""
+    """_unique_nodes: deduplicacion por ID con fusion de metadata."""
 
     def test_dedup_by_id(self):
         n1 = Node(id="a", type=NodeType.ACTION, name="a1")
@@ -317,7 +317,7 @@ class TestUniqueNodes:
 # ---------------------------------------------------------------------------
 
 class TestGetApplication:
-    """_get_application: resolución de aplicación."""
+    """_get_application: resolucion de aplicacion."""
 
     def test_none_manager(self):
         integrator = _make_integrator_with_manager(None)
@@ -355,7 +355,7 @@ class TestGetApplication:
 # ---------------------------------------------------------------------------
 
 class TestConvertApplicationToNodes:
-    """convert_application_to_nodes: conversión declarativa a Nodes."""
+    """convert_application_to_nodes: conversion declarativa a Nodes."""
 
     def test_chrome_nodes(self):
         integrator = _make_integrator_with_manager(get_application_manager())
@@ -446,7 +446,7 @@ class TestConvertApplicationToNodes:
         manager.register_application(app)
         integrator = _make_integrator_with_manager(manager)
         nodes = integrator.convert_application_to_nodes("nocaps")
-        assert len(nodes) == 1  # solo el nodo de aplicación
+        assert len(nodes) == 1  # solo el nodo de aplicacion
         assert nodes[0].type == NodeType.APPLICATION
 
 
@@ -455,7 +455,7 @@ class TestConvertApplicationToNodes:
 # ---------------------------------------------------------------------------
 
 class TestCreateApplicationNode:
-    """_create_application_node: estructura del nodo de aplicación."""
+    """_create_application_node: estructura del nodo de aplicacion."""
 
     def test_node_structure(self):
         integrator = _make_integrator_with_manager(get_application_manager())
@@ -601,7 +601,7 @@ class TestCreateUIElementNode:
 # ---------------------------------------------------------------------------
 
 class TestIsElementCalibrated:
-    """_is_element_calibrated: detección de calibración."""
+    """_is_element_calibrated: deteccion de calibracion."""
 
     def test_none_element(self):
         assert ApplicationKnowledgeIntegrator._is_element_calibrated(None) is False
@@ -635,7 +635,7 @@ class TestIsElementCalibrated:
 # ---------------------------------------------------------------------------
 
 class TestGetCurrentState:
-    """_get_application_current_state: obtención de estado persistido."""
+    """_get_application_current_state: obtencion de estado persistido."""
 
     def test_none_manager(self):
         integrator = _make_integrator_with_manager(None)
@@ -673,7 +673,7 @@ class TestGetCurrentState:
 # ---------------------------------------------------------------------------
 
 class TestGeneratePreconditions:
-    """_generate_application_preconditions: generación de precondiciones."""
+    """_generate_application_preconditions: generacion de precondiciones."""
 
     def test_string_requirements_deduped(self):
         app = _make_app(
@@ -732,7 +732,7 @@ class TestGenerateApplicationEffects:
 # ---------------------------------------------------------------------------
 
 class TestValidateNodeReferences:
-    """_validate_node_references: validación de referencias jerárquicas."""
+    """_validate_node_references: validacion de referencias jerarquicas."""
 
     def test_valid_references(self, caplog):
         n1 = Node(id="app", type=NodeType.APPLICATION, name="app", children=["child1"])
@@ -757,7 +757,7 @@ class TestValidateNodeReferences:
 
 
 # ---------------------------------------------------------------------------
-# INSTANCIA: métodos de consulta
+# INSTANCIA: metodos de consulta
 # ---------------------------------------------------------------------------
 
 class TestQueryGetApplicationsByCapability:
@@ -782,7 +782,7 @@ class TestQueryGetApplicationsByCapability:
 
     def test_real_query_string_capability(self):
         """String capability input returns [] because ApplicationManager
-        only resolves enums — documented behavior."""
+        only resolves enums - documented behavior."""
         integrator = _make_integrator_with_manager(get_application_manager())
         result = integrator.get_applications_by_capability("navigate_to_url")
         assert isinstance(result, list)
@@ -851,7 +851,7 @@ class TestQueryGetUIElementsForCapability:
 
 
 class TestQueryIsApplicationCapable:
-    """is_application_capable: verificación de capacidad."""
+    """is_application_capable: verificacion de capacidad."""
 
     def test_app_not_found(self):
         integrator = _make_integrator_with_manager(get_application_manager())
@@ -877,7 +877,7 @@ class TestQueryIsApplicationCapable:
 # ---------------------------------------------------------------------------
 
 class TestRegisterApplicationKnowledge:
-    """register_application_knowledge: registro vía API pública."""
+    """register_application_knowledge: registro via API publica."""
 
     def test_empty_name_returns_false(self):
         integrator = _make_integrator_with_manager(get_application_manager())
@@ -947,7 +947,7 @@ class TestLegacyCompatibility:
     def test_legacy_get_app_knowledge(self):
         result = legacy_get_app_knowledge("chrome")
         assert isinstance(result, dict)
-        assert result  # no vacío para chrome
+        assert result  # no vacio para chrome
 
     def test_legacy_get_app_knowledge_not_found(self):
         result = legacy_get_app_knowledge("nonexistent_xyz")
@@ -955,11 +955,11 @@ class TestLegacyCompatibility:
 
 
 # ---------------------------------------------------------------------------
-# INTEGRACIÓN: convert_application_to_nodes con Spotify (login_required)
+# INTEGRACION: convert_application_to_nodes con Spotify (login_required)
 # ---------------------------------------------------------------------------
 
 class TestConvertSpotify:
-    """Conversión de Spotify: aplicación con login_required."""
+    """Conversion de Spotify: aplicacion con login_required."""
 
     def test_spotify_nodes(self):
         integrator = _make_integrator_with_manager(get_application_manager())

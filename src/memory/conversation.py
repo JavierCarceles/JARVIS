@@ -1,38 +1,42 @@
 """
-Memoria de conversaciones y sistema de planificación jerárquica.
-Transforma el sistema de texto→comando→función a intención→objetivo→plan→ejecución.
+Memoria de conversaciones y sistema de planificacion jerarquica.
+Transforma el sistema de texto->comando->funcion a intencion->objetivo->plan->ejecucion.
 
 Cumple con:
 - FASE 1: Modelo de nodos
-- FASE 2: Nodos jerárquicos  
+- FASE 2: Nodos jerarquicos  
 - FASE 5: Memoria de dominio
 - FASE 15: Comandos de alto nivel
 - FASE 16: Compatibilidad
 """
 
 import json
+import os
 import re
+import tempfile
+import threading
 import time
 import unicodedata
 from collections import Counter, defaultdict
 from datetime import datetime
+from pathlib import Path
 from typing import Optional, List, Dict, Any, Union, Tuple, Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from abc import ABC, abstractmethod
 
-from .storage import MemoryManager, Entity as StorageEntity, JSONStorage as Storage, MemoryType
-from src.utils.config import (
+from src.memory.storage import MemoryManager, Entity as StorageEntity, JSONStorage as Storage, MemoryType
+from src.core.config import (
     get_memory_config,
     get_predictive_config,
     get_project_root,
 )
-from src.utils.logger import get_logger
+from src.core.log import get_logger
 
 
-# Clases básicas para evitar importaciones circulares
+# Clases basicas para evitar importaciones circulares
 class NodeType(Enum):
-    """Tipos de nodos en el sistema de planificación."""
+    """Tipos de nodos en el sistema de planificacion."""
     INTENTION = "intention"
     GOAL = "goal"
     TASK = "task"
@@ -47,7 +51,7 @@ class NodeType(Enum):
 
 
 class TaskStatus(Enum):
-    """Estado de ejecución de tareas."""
+    """Estado de ejecucion de tareas."""
     PENDING = "pending"
     EXECUTING = "executing"
     COMPLETED = "completed"
@@ -57,7 +61,7 @@ class TaskStatus(Enum):
 
 @dataclass
 class Node:
-    """Modelo básico de nodo para memoria."""
+    """Modelo basico de nodo para memoria."""
     id: str
     type: NodeType
     name: str
@@ -74,7 +78,7 @@ class Node:
 
 @dataclass
 class Goal:
-    """Modelo básico de objetivo para memoria."""
+    """Modelo basico de objetivo para memoria."""
     id: str
     type: str
     target: any
@@ -86,7 +90,7 @@ class Goal:
 
 @dataclass
 class Task:
-    """Modelo básico de tarea para memoria."""
+    """Modelo basico de tarea para memoria."""
     id: str
     name: str
     description: str
@@ -102,7 +106,7 @@ logger = get_logger(__name__)
 
 @dataclass
 class Task:
-    """Tarea jerárquica (FASE 2)."""
+    """Tarea jerarquica (FASE 2)."""
     id: str
     name: str
     description: str
@@ -142,7 +146,7 @@ class DomainMemory:
     
     def load_domain_knowledge(self) -> None:
         """Carga conocimiento del dominio desde archivos."""
-        logger._print_log("info", "[DOMAIN] Cargando conocimiento del dominio...", "conversation.py", "method", 145)
+        logger.info("[DOMAIN] Cargando conocimiento del dominio...")
         
         # Cargar entidades
         try:
@@ -163,9 +167,9 @@ class DomainMemory:
                             # Use StorageEntity from storage.py
                             entity = StorageEntity.from_dict(entity_data)
                             self.entities[entity_id] = entity
-                logger._print_log("info", f"[DOMAIN] Cargadas {len(self.entities)} entidades", "conversation.py", "method", 166)
+                logger.info(f"[DOMAIN] Cargadas {len(self.entities)} entidades")
         except Exception as e:
-            logger._print_log("error", f"[DOMAIN] Error cargando entidades: {e}", "conversation.py", "method", 168)
+            logger.error(f"[DOMAIN] Error cargando entidades: {e}")
         
         # Cargar aplicaciones
         try:
@@ -173,9 +177,9 @@ class DomainMemory:
             if apps_path.exists():
                 with open(apps_path, "r", encoding="utf-8") as f:
                     self.applications = json.load(f)
-                logger._print_log("info", f"[DOMAIN] Cargadas {len(self.applications)} aplicaciones", "conversation.py", "method", 176)
+                logger.info(f"[DOMAIN] Cargadas {len(self.applications)} aplicaciones")
         except Exception as e:
-            logger._print_log("error", f"[DOMAIN] Error cargando aplicaciones: {e}", "conversation.py", "method", 178)
+            logger.error(f"[DOMAIN] Error cargando aplicaciones: {e}")
         
         # Cargar capacidades
         try:
@@ -183,9 +187,9 @@ class DomainMemory:
             if caps_path.exists():
                 with open(caps_path, "r", encoding="utf-8") as f:
                     self.capabilities = json.load(f)
-                logger._print_log("info", f"[DOMAIN] Cargadas {len(self.capabilities)} categorías de capacidades", "conversation.py", "method", 186)
+                logger.info(f"[DOMAIN] Cargadas {len(self.capabilities)} categorias de capacidades")
         except Exception as e:
-            logger._print_log("error", f"[DOMAIN] Error cargando capacidades: {e}", "conversation.py", "method", 188)
+            logger.error(f"[DOMAIN] Error cargando capacidades: {e}")
     
     def load_user_preferences(self) -> None:
         """Carga preferencias del usuario desde archivo persistente."""
@@ -194,9 +198,9 @@ class DomainMemory:
             if prefs_path.exists():
                 with open(prefs_path, "r", encoding="utf-8") as f:
                     self.preferences = json.load(f)
-                logger._print_log("info", f"[DOMAIN] Cargadas preferencias del usuario", "conversation.py", "method", 197)
+                logger.info(f"[DOMAIN] Cargadas preferencias del usuario")
         except Exception as e:
-            logger._print_log("error", f"[DOMAIN] Error cargando preferencias: {e}", "conversation.py", "method", 199)
+            logger.error(f"[DOMAIN] Error cargando preferencias: {e}")
             self.preferences = {}
     
     def save_user_preferences(self) -> bool:
@@ -205,33 +209,33 @@ class DomainMemory:
             prefs_path = get_project_root() / "data" / "user_preferences.json"
             with open(prefs_path, "w", encoding="utf-8") as f:
                 json.dump(self.preferences, f, indent=2, ensure_ascii=False)
-            logger._print_log("info", "Preferencias guardadas exitosamente", "conversation.py", "method", 208)
+            logger.info("Preferencias guardadas exitosamente")
             return True
         except Exception as e:
-            logger._print_log("error", f"Error guardando preferencias: {e}", "conversation.py", "method", 211)
+            logger.error(f"Error guardando preferencias: {e}")
             return False
     
     def get_entity(self, entity_name: str) -> Optional[Entity]:
         """Obtiene una entidad por nombre o alias."""
         for entity in self.entities.values():
             if entity.matches_name(entity_name):
-                logger._print_log("info", f"Entidad encontrada: {entity.name} ({entity.id})", "conversation.py", "method", 218)
+                logger.info(f"Entidad encontrada: {entity.name} ({entity.id})")
                 return entity
-        logger._print_log("debug", f"Entidad no encontrada: {entity_name}", "conversation.py", "method", 220)
+        logger.debug(f"Entidad no encontrada: {entity_name}")
         return None
     
     def get_application_capabilities(self, app_name: str) -> List[str]:
-        """Obtiene capacidades de una aplicación."""
+        """Obtiene capacidades de una aplicacion."""
         return self.capabilities.get(app_name, [])
     
     def get_capability_definition(self, category: str, capability: str) -> Optional[Dict[str, Any]]:
-        """Obtiene definición detallada de una capacidad."""
+        """Obtiene definicion detallada de una capacidad."""
         category_caps = self.capabilities.get(category, {})
         return category_caps.get(capability)
     
     def record_user_interaction(self, user_input: str, entity_used: Optional[str], 
                                action_taken: str, success: bool) -> None:
-        """Registra interacción del usuario para aprendizaje y preferencias."""
+        """Registra interaccion del usuario para aprendizaje y preferencias."""
         interaction = {
             "timestamp": time.time(),
             "user_input": user_input,
@@ -246,7 +250,7 @@ class DomainMemory:
         if success and entity_used:
             self._update_preferences_from_interaction(interaction)
         
-        logger._print_log("debug", f"Interacción registrada: {action_taken} (exitosa: {success})", "conversation.py", "method", 249)
+        logger.debug(f"Interaccion registrada: {action_taken} (exitosa: {success})")
     
     def _update_preferences_from_interaction(self, interaction: Dict[str, Any]) -> None:
         """Actualiza preferencias basadas en interacciones exitosas."""
@@ -305,10 +309,10 @@ class DomainMemory:
         return preferred_entities
     
     def get_preferred_application(self, action_type: str) -> Optional[str]:
-        """Obtiene aplicación preferida para un tipo de acción."""
+        """Obtiene aplicacion preferida para un tipo de accion."""
         preferred_apps = self.preferences.get("preferred_app", {})
         
-        # Obtener aplicaciones que soportan esta acción
+        # Obtener aplicaciones que soportan esta accion
         suitable_apps = []
         for app_name, app_info in preferred_apps.items():
             if app_name in self.applications:
@@ -316,7 +320,7 @@ class DomainMemory:
                 if action_type in app_caps:
                     suitable_apps.append((app_name, app_info))
         
-        # Ordenar por uso y devolver la más usada
+        # Ordenar por uso y devolver la mas usada
         suitable_apps.sort(key=lambda x: x[1]["usage_count"], reverse=True)
         
         if suitable_apps:
@@ -325,7 +329,7 @@ class DomainMemory:
         return None
     
     def add_knowledge_update(self, update_type: str, content: Dict[str, Any]) -> None:
-        """Añade actualización de conocimiento para persistencia futura."""
+        """Anade actualizacion de conocimiento para persistencia futura."""
         update = {
             "timestamp": time.time(),
             "type": update_type,
@@ -333,7 +337,7 @@ class DomainMemory:
             "verified": False
         }
         self.knowledge_updates.append(update)
-        logger._print_log("info", f"[DOMAIN] Actualización de conocimiento registrada: {update_type}", "conversation.py", "method", 336)
+        logger.info(f"[DOMAIN] Actualizacion de conocimiento registrada: {update_type}")
     
     def get_suggested_entities(self, partial_name: str, limit: int = 5) -> List[Entity]:
         """Obtiene sugerencias de entidades basadas en nombre parcial y preferencias."""
@@ -357,7 +361,7 @@ class DomainMemory:
         return matches[:limit]
     
     def reason_about_entities(self, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Realiza razonamiento básico sobre entidades basado en contexto y preferencias."""
+        """Realiza razonamiento basico sobre entidades basado en contexto y preferencias."""
         reasoning = {
             "context": context,
             "relevant_entities": [],
@@ -393,7 +397,7 @@ class DomainMemory:
         return reasoning
     
     def _normalize_text(self, text: str) -> str:
-        """Normaliza texto para búsqueda."""
+        """Normaliza texto para busqueda."""
         if not isinstance(text, str):
             return ""
         
@@ -407,11 +411,11 @@ class DomainMemory:
 
 class ConversationMemory:
     """
-    Sistema de memoria transformado para planificación jerárquica.
+    Sistema de memoria transformado para planificacion jerarquica.
     
     Implementa:
     - FASE 1: Modelo de nodos
-    - FASE 2: Nodos jerárquicos
+    - FASE 2: Nodos jerarquicos
     - FASE 5: Memoria de dominio
     - FASE 15: Comandos de alto nivel
     - FASE 16: Compatibilidad
@@ -433,7 +437,7 @@ class ConversationMemory:
         # Nueva memoria de dominio (FASE 5)
         self.domain_memory = DomainMemory()
         
-        # Sistema de planificación
+        # Sistema de planificacion
         self.goals: List[Goal] = []
         self.nodes: Dict[str, Node] = {}
         self.tasks: Dict[str, Task] = {}
@@ -444,10 +448,10 @@ class ConversationMemory:
         self.learned_aliases: Dict[str, str] = {}
         self._load_aliases()
 
-        logger._print_log("info", "Sistema de memoria inicializado para planificación jerárquica", "conversation.py", "method", 447)
+        logger.info("Sistema de memoria inicializado para planificacion jerarquica")
 
     def _normalize_text(self, text: str) -> str:
-        """Normaliza texto para búsqueda."""
+        """Normaliza texto para busqueda."""
         if not isinstance(text, str):
             return ""
 
@@ -465,38 +469,67 @@ class ConversationMemory:
             return ""
         return re.sub(r"^jarvis\s+", "", normalized).strip()
 
-    def _load_aliases(self) -> None:
-        """Carga aliases (mantener compatibilidad FASE 16)."""
-        logger._print_log("info", "[MEMORY] Cargando aliases para compatibilidad...", "conversation.py", "method", 470)
-        
-        # Cargar aliases estáticos
-        try:
-            static_storage = Storage(self.STATIC_COMMAND_ALIASES_FILE)
-            aliases = static_storage.load(MemoryType.CONVERSATIONAL)
-            
-            if isinstance(aliases, dict):
-                self.command_aliases = aliases
-                logger._print_log("info", f"[MEMORY] Cargados {len(self.command_aliases, "conversation.py", "method", 479)} aliases estáticos")
-            else:
-                self.command_aliases = {}
-        except Exception as e:
-            logger._print_log("error", f"[MEMORY] Error cargando command_aliases.json: {e}", "conversation.py", "method", 483)
-            self.command_aliases = {}
+    # Cache por proceso de los aliases estaticos: el fichero tiene decenas de
+    # miles de entradas y no cambia en ejecucion.
+    _static_alias_cache: Optional[Dict[str, Any]] = None
+    _static_alias_lock = threading.Lock()
 
-        # Cargar aliases aprendidos
+    @staticmethod
+    def _read_alias_file(path: Path) -> Dict[str, str]:
+        """Lee un fichero JSON de aliases ``{frase: comando}``.
+
+        Devuelve un diccionario vacio si el fichero no existe, no es JSON
+        valido o no tiene forma de diccionario. Ignora entradas cuyo valor no
+        sea texto.
+        """
+        if not path.is_file():
+            return {}
         try:
-            learned_storage = Storage(self.FALLBACK_LEARNED_ALIASES_FILE)
-            learned = learned_storage.load(MemoryType.CONVERSATIONAL)
-            
-            if isinstance(learned, dict):
-                self.learned_aliases = learned
-                logger._print_log("info", f"[MEMORY] Cargados {len(self.learned_aliases, "conversation.py", "method", 493)} aliases aprendidos")
-        except Exception as e:
-            logger._print_log("error", f"[MEMORY] Error cargando aliases aprendidos: {e}", "conversation.py", "method", 495)
-            self.learned_aliases = {}
+            with open(path, "r", encoding="utf-8") as handle:
+                data = json.load(handle)
+        except (OSError, ValueError) as exc:
+            logger.error(f"[MEMORY] No se pudo leer {path}: {exc}")
+            return {}
+        if not isinstance(data, dict):
+            logger.warning(f"[MEMORY] {path} no contiene un diccionario de aliases")
+            return {}
+        return {str(k): v for k, v in data.items() if isinstance(v, str) and v.strip()}
+
+    def _build_alias_index(self, aliases: Dict[str, str]) -> Dict[str, str]:
+        """Indexa los aliases por texto normalizado (sin la palabra 'jarvis')."""
+        index: Dict[str, str] = {}
+        for alias, command in aliases.items():
+            for key in (self._normalize_text(alias), self._remove_wake_word(alias)):
+                if key and key not in index:
+                    index[key] = command
+        return index
+
+    def _static_aliases_path(self) -> Path:
+        path = Path(self.STATIC_COMMAND_ALIASES_FILE)
+        return path if path.is_absolute() else get_project_root() / path
+
+    def _learned_aliases_path(self) -> Path:
+        # Ruta relativa al directorio de trabajo, igual que el resto de la
+        # memoria conversacional (en los tests queda dentro del sandbox).
+        return Path(self.FALLBACK_LEARNED_ALIASES_FILE)
+
+    def _load_aliases(self) -> None:
+        """Carga los aliases estaticos (config) y los aprendidos (data)."""
+        cls = type(self)
+        with cls._static_alias_lock:
+            if cls._static_alias_cache is None:
+                static = self._read_alias_file(self._static_aliases_path())
+                cls._static_alias_cache = {"aliases": static, "index": self._build_alias_index(static)}
+        self.command_aliases = cls._static_alias_cache["aliases"]
+        self._static_alias_index = cls._static_alias_cache["index"]
+
+        self.learned_aliases = self._read_alias_file(self._learned_aliases_path())
+        self._learned_alias_index = self._build_alias_index(self.learned_aliases)
+
+        logger.info(f"[MEMORY] Aliases cargados: {len(self.command_aliases)} estaticos, {len(self.learned_aliases)} aprendidos")
 
     # ========================================================================
-    # NUEVO SISTEMA: INTENCIÓN → OBJETIVO → PLANIFICACIÓN
+    # NUEVO SISTEMA: INTENCION -> OBJETIVO -> PLANIFICACION
     # ========================================================================
 
     def parse_user_input(self, user_input: str) -> Optional[Goal]:
@@ -504,20 +537,19 @@ class ConversationMemory:
         Transforma entrada de usuario en objetivo (FASE 15).
         
         Ejemplo:
-        "abre stream de nissaxter" → Goal(navigate, {url: "https://twitch.tv/nissaxter"})
+        "abre stream de nissaxter" -> Goal(navigate, {url: "https://twitch.tv/nissaxter"})
         """
-        logger._print_log("info", "Procesando solicitud", "conversation.py", "method", 509)
         
         # 1. Normalizar entrada
         normalized = self._normalize_text(user_input)
         
-        # 2. Extraer intención
+        # 2. Extraer intencion
         intention = self._extract_intention(normalized)
         if not intention:
-            logger._print_log("warning", f"[PARSER] No se pudo extraer intención de: {user_input}", "conversation.py", "method", 517)
+            logger.warning(f"[PARSER] No se pudo extraer intencion de: {user_input}")
             return None
         
-        logger._print_log("debug", f"[PARSER] Intención extraída: {intention}", "conversation.py", "method", 520)
+        logger.debug(f"[PARSER] Intencion extraida: {intention}")
         
         # 3. Realizar razonamiento sobre el dominio (FASE 5 mejorada)
         context = {
@@ -528,9 +560,9 @@ class ConversationMemory:
         }
         
         reasoning = self.domain_memory.reason_about_entities(context)
-        logger._print_log("debug", f"[PARSER] Razonamiento del dominio: {reasoning}", "conversation.py", "method", 531)
+        logger.debug(f"[PARSER] Razonamiento del dominio: {reasoning}")
         
-        # 4. Mejorar intención con razonamiento
+        # 4. Mejorar intencion con razonamiento
         if reasoning["relevant_entities"]:
             intention["entity_data"] = reasoning["relevant_entities"][0]
             intention["confidence"] = reasoning["confidence"]
@@ -541,31 +573,31 @@ class ConversationMemory:
         if entity_name:
             entity = self.domain_memory.get_entity(entity_name)
             if not entity and reasoning["suggested_entities"]:
-                # Si no se encontró exacto, usar sugerencias
+                # Si no se encontro exacto, usar sugerencias
                 entity = reasoning["suggested_entities"][0]
                 intention["entity_data"] = entity
                 intention["used_suggestion"] = True
-                logger._print_log("debug", f"[PARSER] Usando sugerencia: {entity.name}", "conversation.py", "method", 548)
+                logger.debug(f"[PARSER] Usando sugerencia: {entity.name}")
         
         # 6. Crear objetivo (FASE 7)
         goal = self._create_goal_from_intention(intention)
         if goal:
             self.goals.append(goal)
-            logger._print_log("info", f"[PARSER] Objetivo creado: {goal.id} - {goal.description}", "conversation.py", "method", 554)
+            logger.info(f"[PARSER] Objetivo creado: {goal.id} - {goal.description}")
             
-            # Registrar interacción para aprendizaje
+            # Registrar interaccion para aprendizaje
             self.domain_memory.record_user_interaction(
                 user_input=user_input,
                 entity_used=intention.get("entity"),
                 action_taken=goal.type,
-                success=True  # Asumir éxito por ahora, se verificará después
+                success=True  # Asumir exito por ahora, se verificara despues
             )
         
         return goal
 
     def _extract_intention(self, normalized_text: str) -> Optional[Dict[str, Any]]:
-        """Extrae intención del texto normalizado."""
-        logger._print_log("debug", f"[INTENTION] Extrayendo intención de: {normalized_text}", "conversation.py", "method", 568)
+        """Extrae intencion del texto normalizado."""
+        logger.debug(f"[INTENTION] Extrayendo intencion de: {normalized_text}")
         
         # Patrones de intenciones mejorados
         patterns = {
@@ -613,16 +645,16 @@ class ConversationMemory:
                     }
         
         if best_match:
-            logger._print_log("info", "Intención reconocida", "conversation.py", "extract_intention", 616)
+            logger.info("Intencion reconocida")
         
         return best_match
 
     def _create_goal_from_intention(self, intention: Dict[str, Any]) -> Optional[Goal]:
-        """Crea objetivo a partir de intención."""
+        """Crea objetivo a partir de intencion."""
         intent_type = intention["type"]
         entity_name = intention["entity"]
         
-        logger._print_log("info", "Entidad procesada exitosamente", "conversation.py", "learn_intention", 625)
+        logger.info("Entidad procesada exitosamente")
         
         # Caso especial: stream de entidad conocida (FASE 5)
         if intent_type == "navigate_stream" and intention.get("entity_data"):
@@ -638,7 +670,7 @@ class ConversationMemory:
                     constraints=["requires_browser", "requires_internet"]
                 )
         
-        # Aplicación conocida
+        # Aplicacion conocida
         elif intent_type == "open_application" and entity_name in self.domain_memory.applications:
             return Goal(
                 id=f"open_{entity_name}",
@@ -649,9 +681,9 @@ class ConversationMemory:
                 constraints=["requires_application_installation"]
             )
         
-        # Navegación genérica
+        # Navegacion generica
         elif intent_type in ["navigate", "search"]:
-            # Verificar si es una URL o una búsqueda
+            # Verificar si es una URL o una busqueda
             if re.match(r'https?://', entity_name):
                 return Goal(
                     id=f"navigate_{entity_name}",
@@ -671,7 +703,7 @@ class ConversationMemory:
                     constraints=["requires_browser", "requires_internet"]
                 )
         
-        # Cerrar aplicación
+        # Cerrar aplicacion
         elif intent_type == "close_application" and entity_name in self.domain_memory.applications:
             return Goal(
                 id=f"close_{entity_name}",
@@ -682,7 +714,7 @@ class ConversationMemory:
                 constraints=["requires_application_open"]
             )
         
-        logger._print_log("warning", f"[GOAL_CREATOR] No se pudo crear objetivo para: {intention}", "conversation.py", "method", 685)
+        logger.warning(f"[GOAL_CREATOR] No se pudo crear objetivo para: {intention}")
         return None
 
     def create_plan_from_goal(self, goal: Goal) -> Optional[List[str]]:
@@ -691,11 +723,11 @@ class ConversationMemory:
         
         Devuelve lista de nodos IDs que conforman el plan.
         """
-        logger._print_log("info", f"[PLANNER] Creando plan para objetivo: {goal.id}", "conversation.py", "method", 694)
+        logger.info(f"[PLANNER] Creando plan para objetivo: {goal.id}")
         
-        # Ejemplos de planes básicos
+        # Ejemplos de planes basicos
         if goal.type == "navigate_stream" and isinstance(goal.target, dict):
-            # Plan: abrir navegador → navegar a URL
+            # Plan: abrir navegador -> navegar a URL
             return [
                 "chrome.open",
                 "chrome.activate", 
@@ -705,7 +737,7 @@ class ConversationMemory:
             ]
         
         elif goal.type == "open_application":
-            # Plan: abrir aplicación
+            # Plan: abrir aplicacion
             return [f"{goal.target}.open"]
         
         elif goal.type == "navigate":
@@ -718,24 +750,23 @@ class ConversationMemory:
                 "chrome.press_enter"
             ]
         
-        logger._print_log("warning", f"[PLANNER] No se pudo crear plan para objetivo: {goal.id}", "conversation.py", "method", 721)
+        logger.warning(f"[PLANNER] No se pudo crear plan para objetivo: {goal.id}")
         return None
 
     # ========================================================================
-    # GESTIÓN DE ESTADO DEL MUNDO (FASE 3)
+    # GESTION DE ESTADO DEL MUNDO (FASE 3)
     # ========================================================================
 
     def update_world_state(self, state_update: Dict[str, Any]) -> None:
         """Actualiza el estado del mundo."""
-        logger._print_log("debug", f"[STATE] Actualizando estado: {state_update}", "conversation.py", "method", 730)
+        logger.debug(f"[STATE] Actualizando estado: {state_update}")
         self.current_state.update(state_update)
         
         # Verificar objetivos alcanzados
         self._check_achieved_goals()
     
     def add_user_message(self, user_text: str) -> None:
-        """Añade mensaje de usuario a la memoria conversacional (compatibilidad)."""
-        logger._print_log("info", "Procesando solicitud", "conversation.py", "method", 509)
+        """Anade mensaje de usuario a la memoria conversacional (compatibilidad)."""
         # Guardar en memoria conversacional
         self.save_conversation(
             user_text=user_text,
@@ -750,21 +781,21 @@ class ConversationMemory:
         return self.current_state.copy()
 
     def _check_achieved_goals(self) -> None:
-        """Verifica si algún objetivo ha sido alcanzado."""
+        """Verifica si algun objetivo ha sido alcanzado."""
         for goal in self.goals[:]:  # Copia para poder modificar
             if goal.is_achieved(self.current_state):
-                logger._print_log("info", f"[GOAL] Objetivo alcanzado: {goal.id}", "conversation.py", "method", 756)
-                # Aquí se podría notificar al sistema o ejecutar acciones
+                logger.info(f"[GOAL] Objetivo alcanzado: {goal.id}")
+                # Aqui se podria notificar al sistema o ejecutar acciones
             elif goal.is_expired():
-                logger._print_log("warning", f"[GOAL] Objetivo expirado: {goal.id}", "conversation.py", "method", 759)
+                logger.warning(f"[GOAL] Objetivo expirado: {goal.id}")
                 self.goals.remove(goal)
 
     # ========================================================================
-    # GESTIÓN DE NODOS Y TAREAS (FASE 1, 2)
+    # GESTION DE NODOS Y TAREAS (FASE 1, 2)
     # ========================================================================
 
     def create_node(self, node_config: Dict[str, Any]) -> Node:
-        """Crea un nodo en el sistema de planificación."""
+        """Crea un nodo en el sistema de planificacion."""
         node = Node(
             id=node_config["id"],
             type=NodeType(node_config["type"]),
@@ -780,11 +811,11 @@ class ConversationMemory:
             metadata=node_config.get("metadata", {})
         )
         self.nodes[node.id] = node
-        logger._print_log("debug", f"[NODE] Creado nodo: {node.id}", "conversation.py", "method", 783)
+        logger.debug(f"[NODE] Creado nodo: {node.id}")
         return node
 
     def create_task(self, task_config: Dict[str, Any]) -> Task:
-        """Crea una tarea jerárquica."""
+        """Crea una tarea jerarquica."""
         task = Task(
             id=task_config["id"],
             name=task_config["name"],
@@ -792,13 +823,13 @@ class ConversationMemory:
             dependencies=task_config.get("dependencies", [])
         )
         self.tasks[task.id] = task
-        logger._print_log("debug", f"[TASK] Creada tarea: {task.id}", "conversation.py", "method", 795)
+        logger.debug(f"[TASK] Creada tarea: {task.id}")
         return task
 
     def get_applicable_nodes(self, current_state: Dict[str, Any]) -> List[Node]:
         """Obtiene nodos aplicables en el estado actual."""
         applicable = [node for node in self.nodes.values() if node.can_execute(current_state)]
-        logger._print_log("info", f"Encontrados {len(applicable)} nodos aplicables", "conversation.py", "get_applicable_nodes", 801)
+        logger.info(f"Encontrados {len(applicable)} nodos aplicables")
         return applicable
 
 
@@ -807,47 +838,62 @@ class ConversationMemory:
 # ========================================================================
 
     def get_alias(self, transcribed_text: str) -> Optional[str]:
+        """Devuelve el comando asociado a una frase conocida, o ``None``.
+
+        Busca primero en los aliases aprendidos (los ha confirmado el uso real)
+        y despues en los estaticos. Compara el texto normalizado, con y sin la
+        palabra de activacion 'jarvis'. Siempre devuelve un nombre de comando
+        ejecutable, nunca un identificador de objetivo.
         """
-        Método de compatibilidad para aliases antiguos.
-        
-        Transforma alias antiguo a objetivo nuevo cuando sea posible.
-        """
-        logger._print_log("info", "Procesando solicitud", "conversation.py", "method", 509)
-        
-        # Lógica antigua
-        normalized = self._normalize_text(transcribed_text)
-        
-        # Buscar en aliases estáticos
-        for alias, command in self.command_aliases.items():
-            if self._normalize_text(alias) == normalized:
-                logger._print_log("info", f"Alias encontrado: {alias} -> {command}", "conversation.py", "method", 823)
-                
-                # Intentar transformar a nuevo sistema
-                goal = self.parse_user_input(transcribed_text)
-                if goal:
-                    logger._print_log("info", "Transformación a nuevo sistema exitosa", "conversation.py", "parse_command_aliases", 828)
-                    return f"GOAL:{goal.id}"
-                
-                return command
-        
-        # Buscar en aliases aprendidos
-        for alias, command in self.learned_aliases.items():
-            if self._normalize_text(alias) == normalized:
-                logger._print_log("info", "Alias aprendido procesado", "conversation.py", "parse_command_aliases", 836)
-                
-                # Intentar transformar a nuevo sistema
-                goal = self.parse_user_input(transcribed_text)
-                if goal:
-                    logger._print_log("info", "Alias aprendido transformado a sistema nuevo", "conversation.py", "parse_command_aliases", 841)
-                    return f"GOAL:{goal.id}"
-                
-                return command
-        
+        if not isinstance(transcribed_text, str) or not transcribed_text.strip():
+            return None
+        keys = [self._normalize_text(transcribed_text), self._remove_wake_word(transcribed_text)]
+        for index in (getattr(self, "_learned_alias_index", {}), getattr(self, "_static_alias_index", {})):
+            for key in keys:
+                if key and key in index:
+                    return index[key]
         return None
+
+    def save_alias(self, transcribed_text: str, command: str) -> bool:
+        """Aprende que una frase corresponde a un comando y lo guarda en disco.
+
+        No guarda nada si la frase o el comando estan vacios, si el comando no
+        es un nombre de accion simple o si la frase ya apunta a ese comando.
+        La escritura es atomica (fichero temporal + reemplazo).
+        """
+        if not isinstance(transcribed_text, str) or not isinstance(command, str):
+            return False
+        phrase = self._remove_wake_word(transcribed_text)
+        command = command.strip()
+        if not phrase or not re.fullmatch(r"[A-Za-z0-9_]+", command):
+            return False
+        if self.get_alias(phrase) == command:
+            return True
+
+        self.learned_aliases[phrase] = command
+        self._learned_alias_index[phrase] = command
+
+        path = self._learned_aliases_path()
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            fd, tmp_name = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=str(path.parent))
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                    json.dump(self.learned_aliases, handle, ensure_ascii=False, indent=2, sort_keys=True)
+                os.replace(tmp_name, path)
+            except BaseException:
+                if os.path.exists(tmp_name):
+                    os.remove(tmp_name)
+                raise
+        except OSError as exc:
+            logger.error(f"[MEMORY] No se pudo guardar el alias aprendido: {exc}")
+            return False
+        logger.info(f"[MEMORY] Alias aprendido: '{phrase}' -> {command}")
+        return True
 
     def record_command_usage(self, user_input: str, command_executed: str, success: bool = True) -> None:
         """
-        Registra uso de comando para análisis predictivo (compatibilidad).
+        Registra uso de comando para analisis predictivo (compatibilidad).
         """
         if not self.predictive_config.enabled:
             return
@@ -875,11 +921,60 @@ class ConversationMemory:
         
         self.execution_events.append(execution_event)
         
-        logger._print_log("debug", f"[COMPAT] Comando registrado: {command_executed} (exitoso: {success})", "conversation.py", "method", 878)
+        logger.debug(f"[COMPAT] Comando registrado: {command_executed} (exitoso: {success})")
 
     # ========================================================================
     # PERSISTENCIA Y CARGA
     # ========================================================================
+
+    def _chat_history_path(self) -> Path:
+        return self.chat_storage.get_file_path(MemoryType.CONVERSATIONAL)
+
+    @staticmethod
+    def _deduplicate_history(history: List[Any]) -> List[Dict[str, Any]]:
+        """Quita entradas repetidas (mismo rol, texto y marca de tiempo)."""
+        seen = set()
+        result: List[Dict[str, Any]] = []
+        for entry in history:
+            if not isinstance(entry, dict):
+                continue
+            key = (entry.get("role"), entry.get("content"), entry.get("timestamp"))
+            if key in seen:
+                continue
+            seen.add(key)
+            result.append(entry)
+        return result
+
+    def _read_chat_history(self) -> List[Dict[str, Any]]:
+        path = self._chat_history_path()
+        if not path.is_file():
+            return []
+        try:
+            with open(path, "r", encoding="utf-8") as handle:
+                data = json.load(handle)
+        except (OSError, ValueError) as exc:
+            logger.error(f"[MEMORY] Historial ilegible en {path}: {exc}")
+            return []
+        return self._deduplicate_history(data) if isinstance(data, list) else []
+
+    def _write_chat_history(self, history: List[Dict[str, Any]]) -> bool:
+        """Reemplaza el fichero de historial completo de forma atomica."""
+        path = self._chat_history_path()
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            fd, tmp_name = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=str(path.parent))
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                    json.dump(history, handle, ensure_ascii=False, indent=2, default=str)
+                os.replace(tmp_name, path)
+            except BaseException:
+                if os.path.exists(tmp_name):
+                    os.remove(tmp_name)
+                raise
+            return True
+        except OSError as exc:
+            logger.error(f"[MEMORY] No se pudo guardar el historial: {exc}")
+            return False
 
     def save_conversation(
         self,
@@ -890,28 +985,22 @@ class ConversationMemory:
         execution_result: Optional[Dict[str, Any]] = None,
     ) -> bool:
         """
-        Guarda conversación con información de planificación.
+        Anade un turno (usuario + asistente) al historial y lo guarda.
+
+        El fichero se reescribe entero con los ultimos
+        ``max_history_length * 2`` mensajes, sin duplicar entradas anteriores.
         """
         if not user_text or not assistant_text:
-            logger.WARNING(f"Intento de guardar conversación con texto vacío  [file:conversation.py, method:save_conversation, line:896]")
+            logger.warning("Intento de guardar conversacion con texto vacio")
             return False
 
         try:
-            history = self.chat_storage.load(MemoryType.CONVERSATIONAL)
-            if not isinstance(history, list):
-                history = []
-
-            config = get_memory_config()
-            max_length = config.max_history_length * 2
-
-            if len(history) >= max_length:
-                history = history[-max_length:]
-
-            # Nueva estructura con información de planificación
-            conversation_entry = {
+            history = self._read_chat_history()
+            now = time.time()
+            history.append({
                 "role": "user",
                 "content": user_text,
-                "timestamp": time.time(),
+                "timestamp": now,
                 "intention_parsed": goal is not None,
                 "goal_id": goal.id if goal else None,
                 "goal_type": goal.type if goal else None,
@@ -920,42 +1009,32 @@ class ConversationMemory:
                 "plan_steps": plan,
                 "system_state": self.current_state.copy(),
                 "active_goals": [g.id for g in self.goals]
-            }
-
-            history.append(conversation_entry)
-
+            })
             history.append({
                 "role": "assistant",
                 "content": assistant_text,
-                "timestamp": time.time(),
+                "timestamp": now,
                 "execution_result": execution_result,
                 "system_state": self.current_state.copy()
             })
 
-            return self.chat_storage.save(history, MemoryType.CONVERSATIONAL)
+            max_length = get_memory_config().max_history_length * 2
+            if max_length > 0 and len(history) > max_length:
+                history = history[-max_length:]
+
+            return self._write_chat_history(history)
 
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "conversation.py", "method", 509)
+            logger.error(f"[MEMORY] Error guardando conversacion: {e}")
             return False
 
     def get_conversation_history(self) -> List[Dict[str, Any]]:
-        """Obtiene historial con información de planificación."""
-        try:
-            history = self.chat_storage.load(MemoryType.CONVERSATIONAL)
-            if not isinstance(history, list):
-                return []
-            return history
-        except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "conversation.py", "method", 509)
-            return []
+        """Devuelve el historial guardado, sin entradas duplicadas."""
+        return self._read_chat_history()
 
     def clear_history(self) -> bool:
-        """Borra historial de conversaciones."""
-        try:
-            return self.chat_storage.save([])
-        except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "conversation.py", "method", 509)
-            return False
+        """Borra el historial de conversaciones."""
+        return self._write_chat_history([])
 
     def clear_predictive_data(self) -> bool:
         """Borra datos predictivos."""
@@ -966,7 +1045,7 @@ class ConversationMemory:
                 self.execution_events.clear()
             return self.predictive_storage.save({})
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "conversation.py", "method", 509)
+            logger.debug("ConversationMemory.clear_predictive_data: %s", e)
             return False
 
     def get_learning_insights(self) -> Dict[str, Any]:
@@ -981,7 +1060,7 @@ class ConversationMemory:
             "goals_generated": len(self.goals),
             "current_state_keys": len(self.current_state),
             
-            # Estadísticas de planificación
+            # Estadisticas de planificacion
             "total_goals_created": len(self.goals),
             "completed_goals": sum(1 for goal in self.goals if goal.is_achieved(self.current_state)),
             "expired_goals": sum(1 for goal in self.goals if goal.is_expired()),
@@ -1019,7 +1098,7 @@ class ConversationMemory:
     def save_domain_knowledge_persistence(self) -> bool:
         """
         Guarda el estado completo del conocimiento de dominio para persistencia.
-        Implementa la separación entre memoria conversacional y conocimiento permanente.
+        Implementa la separacion entre memoria conversacional y conocimiento permanente.
         """
         try:
             # Crear estructura de persistencia
@@ -1065,15 +1144,15 @@ class ConversationMemory:
             with open(persistence_path, "w", encoding="utf-8") as f:
                 json.dump(persistence_data, f, indent=2, ensure_ascii=False)
             
-            logger._print_log("info", "[DOMAIN] Conocimiento de dominio persistido exitosamente", "conversation.py", "method", 1068)
+            logger.info("[DOMAIN] Conocimiento de dominio persistido exitosamente")
             return True
             
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "conversation.py", "method", 509)
+            logger.debug("ConversationMemory.save_domain_knowledge_persistence: %s", e)
             return False
     
     def _get_most_used_entities(self) -> List[Dict[str, Any]]:
-        """Obtiene las entidades más usadas basadas en interacciones."""
+        """Obtiene las entidades mas usadas basadas en interacciones."""
         entity_usage = Counter()
         
         for interaction in self.domain_memory.user_interactions:
@@ -1086,7 +1165,7 @@ class ConversationMemory:
         ]
     
     def _get_most_used_actions(self) -> List[Dict[str, Any]]:
-        """Obtiene las acciones más usadas basadas en interacciones."""
+        """Obtiene las acciones mas usadas basadas en interacciones."""
         action_usage = Counter()
         
         for interaction in self.domain_memory.user_interactions:
@@ -1104,26 +1183,26 @@ class ConversationMemory:
         try:
             persistence_path = get_project_root() / "data" / "domain_knowledge_persistence.json"
             if not persistence_path.exists():
-                logger._print_log("info", "[DOMAIN] No existe archivo de persistencia, usando datos base", "conversation.py", "method", 1107)
+                logger.info("[DOMAIN] No existe archivo de persistencia, usando datos base")
                 return True
             
             with open(persistence_path, "r", encoding="utf-8") as f:
                 persistence_data = json.load(f)
             
-            # Cargar entidades con información de acceso
+            # Cargar entidades con informacion de acceso
             if "entities" in persistence_data:
                 for entity_id, entity_data in persistence_data["entities"].items():
                     if entity_id in self.domain_memory.entities:
-                        # Actualizar timestamp de última vez accesada
+                        # Actualizar timestamp de ultima vez accesada
                         self.domain_memory.entities[entity_id].created_at = entity_data.get("last_accessed", time.time())
             
             # Cargar preferencias actualizadas
             if "user_preferences" in persistence_data:
                 self.domain_memory.preferences.update(persistence_data["user_preferences"])
             
-            logger._print_log("info", "[DOMAIN] Conocimiento de dominio persistido cargado exitosamente", "conversation.py", "method", 1124)
+            logger.info("[DOMAIN] Conocimiento de dominio persistido cargado exitosamente")
             return True
             
         except Exception as e:
-            logger._print_log("info", "Procesando solicitud", "conversation.py", "method", 509)
+            logger.debug("ConversationMemory.load_domain_knowledge_persistence: %s", e)
             return False

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Tests de listener.py (Ear, nodos de audio, calibración, detección, grabación, transcripción)."""
+"""Tests de listener.py (Ear, nodos de audio, calibracion, deteccion, grabacion, transcripcion)."""
 
 from unittest.mock import MagicMock, patch, call
 
@@ -178,7 +178,7 @@ class TestRecordingNode:
             if not calls[0]:
                 calls[0] = True
                 return 5.0  # above threshold
-            return 0.0  # below threshold → silence accumulates
+            return 0.0  # below threshold -> silence accumulates
         node._rms = mock_rms
 
         result = node.execute(audio_queue, threshold=1.0)
@@ -199,14 +199,15 @@ class TestTranscriptionNode:
         assert node.model is None
 
     @patch("src.ear.listener.WhisperModel", side_effect=RuntimeError("no model"))
-    def test_execute_test_mode(self, _mock_model):
-        # model is None → returns fixed "hola jarvis"
+    def test_execute_sin_modelo_informa_fallo(self, _mock_model):
+        # Sin modelo Whisper no se inventa texto: se devuelve un fallo explicito.
         import numpy as np
         node = TranscriptionNode("transcription")
         result = node.execute(np.array([0.1, 0.2]))
-        assert result["success"] is True
-        assert result["text"] == "hola jarvis"
-        assert result["confidence"] == 0.8
+        assert result["success"] is False
+        assert result["text"] == ""
+        assert result["confidence"] == 0.0
+        assert "Whisper" in result["error"]
 
     def test_load_model_fallback(self):
         with patch("src.ear.listener.WhisperModel", side_effect=RuntimeError("fail")):

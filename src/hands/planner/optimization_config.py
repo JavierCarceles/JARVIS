@@ -1,7 +1,7 @@
-"""Configuración tipada y validable del sistema de optimización de JARVIS.
+"""Configuracion tipada y validable del sistema de optimizacion de JARVIS.
 
-Define parámetros por subsistema, modos predefinidos y una representación
-serializable. Este módulo no ejecuta acciones ni realiza optimizaciones.
+Define parametros por subsistema, modos predefinidos y una representacion
+serializable. Este modulo no ejecuta acciones ni realiza optimizaciones.
 """
 
 from __future__ import annotations
@@ -11,13 +11,13 @@ from dataclasses import asdict, dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Mapping, Type, TypeVar
 
-from src.utils.logger import get_logger
+from src.core.log import get_logger
 
 logger = get_logger(__name__)
 
 
 class OptimizationMode(Enum):
-    """Modos de operación del sistema de optimización."""
+    """Modos de operacion del sistema de optimizacion."""
 
     AGGRESSIVE = "aggressive"
     BALANCED = "balanced"
@@ -33,7 +33,7 @@ def _coerce_bool(value: Any, field_name: str) -> bool:
         return bool(value)
     if isinstance(value, str):
         normalized = value.strip().lower()
-        if normalized in {"true", "1", "yes", "y", "sí", "si", "on"}:
+        if normalized in {"true", "1", "yes", "y", "s\u00ed", "si", "on"}:
             return True
         if normalized in {"false", "0", "no", "n", "off"}:
             return False
@@ -54,20 +54,20 @@ def _coerce_int(value: Any, field_name: str) -> int:
 
 
 def _coerce_float(value: Any, field_name: str) -> float:
-    """Convierte a float; la validación de rangos se realiza en validate_config."""
+    """Convierte a float; la validacion de rangos se realiza en validate_config."""
     if isinstance(value, bool):
-        raise TypeError(f"'{field_name}' debe ser numérico, no booleano")
+        raise TypeError(f"'{field_name}' debe ser numerico, no booleano")
     try:
         return float(value)
     except (TypeError, ValueError, OverflowError) as exc:
-        raise TypeError(f"'{field_name}' debe ser numérico; recibido {value!r}") from exc
+        raise TypeError(f"'{field_name}' debe ser numerico; recibido {value!r}") from exc
 
 
 def _coerce_string_list(value: Any, field_name: str) -> List[str]:
     if value is None:
         return []
     if isinstance(value, str):
-        # Una cadena representa un único patrón, no una lista de caracteres.
+        # Una cadena representa un unico patron, no una lista de caracteres.
         return [value] if value else []
     if not isinstance(value, (list, tuple, set)):
         raise TypeError(f"'{field_name}' debe ser una secuencia de cadenas")
@@ -91,7 +91,7 @@ def _normalize_fields(instance: Any, integers: tuple[str, ...], floats: tuple[st
 
 @dataclass
 class RouteCacheConfig:
-    """Configuración del caché de rutas (FASE 17.1)."""
+    """Configuracion del cache de rutas (FASE 17.1)."""
 
     max_size: int = 1000
     default_ttl: float = 3600.0
@@ -110,7 +110,7 @@ class RouteCacheConfig:
 
 @dataclass
 class CostLearningConfig:
-    """Configuración del aprendizaje de costes (FASE 17.6)."""
+    """Configuracion del aprendizaje de costes (FASE 17.6)."""
 
     learning_rate: float = 0.1
     discount_factor: float = 0.95
@@ -133,7 +133,7 @@ class CostLearningConfig:
 
 @dataclass
 class RedundancyRemovalConfig:
-    """Configuración de eliminación de redundancias (FASE 17.3)."""
+    """Configuracion de eliminacion de redundancias (FASE 17.3)."""
 
     enable_state_tracking: bool = True
     enable_effect_analysis: bool = True
@@ -153,7 +153,7 @@ class RedundancyRemovalConfig:
 
 @dataclass
 class ContextAwareConfig:
-    """Configuración de optimización basada en contexto (FASE 17.5)."""
+    """Configuracion de optimizacion basada en contexto (FASE 17.5)."""
 
     enable_time_patterns: bool = True
     enable_user_patterns: bool = True
@@ -176,7 +176,7 @@ class ContextAwareConfig:
 
 @dataclass
 class AlternativeSelectionConfig:
-    """Configuración de selección de alternativas (FASE 17.4)."""
+    """Configuracion de seleccion de alternativas (FASE 17.4)."""
 
     enable_alternative_generation: bool = True
     max_alternatives_per_plan: int = 5
@@ -199,7 +199,7 @@ class AlternativeSelectionConfig:
 
 @dataclass
 class PerformanceMonitoringConfig:
-    """Configuración de monitoreo de rendimiento (FASE 17.7)."""
+    """Configuracion de monitoreo de rendimiento (FASE 17.7)."""
 
     enable_detailed_logging: bool = True
     enable_performance_metrics: bool = True
@@ -225,7 +225,7 @@ T = TypeVar("T")
 
 @dataclass
 class OptimizationConfig:
-    """Configuración completa del sistema de optimización (FASE 17)."""
+    """Configuracion completa del sistema de optimizacion (FASE 17)."""
 
     mode: OptimizationMode = OptimizationMode.BALANCED
     route_cache: RouteCacheConfig = field(default_factory=RouteCacheConfig)
@@ -271,8 +271,8 @@ class OptimizationConfig:
                 try:
                     return OptimizationMode[normalized.upper()]
                 except KeyError as exc:
-                    raise ValueError(f"Modo de optimización desconocido: {value!r}") from exc
-        raise TypeError("mode debe ser OptimizationMode o una cadena válida")
+                    raise ValueError(f"Modo de optimizacion desconocido: {value!r}") from exc
+        raise TypeError("mode debe ser OptimizationMode o una cadena valida")
 
     def _coerce_nested(self, name: str, config_type: Type[T]) -> None:
         value = getattr(self, name)
@@ -282,14 +282,14 @@ class OptimizationConfig:
             setattr(self, name, config_type(**dict(value)))
             return
         if value is None:
-            # None se interpreta como ausencia de configuración anidada.
+            # None se interpreta como ausencia de configuracion anidada.
             setattr(self, name, config_type())
             return
-        raise TypeError(f"Configuración inválida para '{name}': {type(value)!r}")
+        raise TypeError(f"Configuracion invalida para '{name}': {type(value)!r}")
 
     @classmethod
     def get_aggressive_config(cls) -> "OptimizationConfig":
-        """Obtiene configuración para modo agresivo."""
+        """Obtiene configuracion para modo agresivo."""
         config = cls()
         config.mode = OptimizationMode.AGGRESSIVE
         config.route_cache.max_size = 2000
@@ -301,7 +301,7 @@ class OptimizationConfig:
 
     @classmethod
     def get_conservative_config(cls) -> "OptimizationConfig":
-        """Obtiene configuración para modo conservador."""
+        """Obtiene configuracion para modo conservador."""
         config = cls()
         config.mode = OptimizationMode.CONSERVATIVE
         config.route_cache.max_size = 500
@@ -313,7 +313,7 @@ class OptimizationConfig:
 
     @classmethod
     def get_learning_only_config(cls) -> "OptimizationConfig":
-        """Obtiene configuración para registrar aprendizaje sin aplicar optimizaciones."""
+        """Obtiene configuracion para registrar aprendizaje sin aplicar optimizaciones."""
         config = cls()
         config.mode = OptimizationMode.LEARNING_ONLY
         config.route_cache.max_size = 100
@@ -326,7 +326,7 @@ class OptimizationConfig:
         return config
 
     def get_optimization_enabled(self) -> Dict[str, bool]:
-        """Devuelve el estado efectivo de cada técnica para el modo actual."""
+        """Devuelve el estado efectivo de cada tecnica para el modo actual."""
         global_enabled = bool(self.enable_optimization)
         learning_only = self.mode == OptimizationMode.LEARNING_ONLY
         return {
@@ -346,14 +346,14 @@ class OptimizationConfig:
         }
 
     def validate_config(self) -> List[str]:
-        """Valida rangos y coherencia; una lista vacía indica configuración válida."""
+        """Valida rangos y coherencia; una lista vacia indica configuracion valida."""
         warnings: List[str] = []
 
         def finite(name: str, value: Any, *, minimum: Optional[float] = None, maximum: Optional[float] = None, strict_minimum: bool = False) -> None:
             try:
                 number = float(value)
             except (TypeError, ValueError, OverflowError):
-                warnings.append(f"{name} debe ser numérico")
+                warnings.append(f"{name} debe ser num\u00e9rico")
                 return
             if not math.isfinite(number):
                 warnings.append(f"{name} debe ser finito")
@@ -365,34 +365,34 @@ class OptimizationConfig:
                 warnings.append(f"{name} debe ser menor o igual que {maximum:g}")
 
         rc = self.route_cache
-        finite("El tamaño del caché", rc.max_size, minimum=0, strict_minimum=True)
-        finite("El TTL del caché", rc.default_ttl, minimum=0)
+        finite("El tama\u00f1o del cach\u00e9", rc.max_size, minimum=0, strict_minimum=True)
+        finite("El TTL del cach\u00e9", rc.default_ttl, minimum=0)
 
         cl = self.cost_learning
         finite("La tasa de aprendizaje", cl.learning_rate, minimum=0, maximum=1)
         finite("El factor de descuento", cl.discount_factor, minimum=0, maximum=1)
-        finite("El mínimo de ejecuciones para el modelo", cl.min_executions_for_model, minimum=0)
-        finite("El máximo de ejecuciones por nodo", cl.max_executions_per_node, minimum=0, strict_minimum=True)
+        finite("El m\u00ednimo de ejecuciones para el modelo", cl.min_executions_for_model, minimum=0)
+        finite("El m\u00e1ximo de ejecuciones por nodo", cl.max_executions_per_node, minimum=0, strict_minimum=True)
         finite("El umbral de mejora de coste", cl.cost_threshold_improvement, minimum=0)
-        finite("El peso de éxito", cl.success_weight, minimum=0)
-        finite("La penalización por fallo", cl.failure_penalty, minimum=0)
+        finite("El peso de \u00e9xito", cl.success_weight, minimum=0)
+        finite("La penalizaci\u00f3n por fallo", cl.failure_penalty, minimum=0)
 
         rr = self.redundancy_removal
-        finite("La longitud máxima de análisis", rr.max_plan_length_for_analysis, minimum=0, strict_minimum=True)
+        finite("La longitud m\u00e1xima de an\u00e1lisis", rr.max_plan_length_for_analysis, minimum=0, strict_minimum=True)
         finite("El umbral de redundancia", rr.redundancy_threshold, minimum=0, maximum=1)
-        finite("La profundidad de búsqueda de alternativas", rr.alternative_search_depth, minimum=0)
+        finite("La profundidad de b\u00fasqueda de alternativas", rr.alternative_search_depth, minimum=0)
 
         ca = self.context_aware
         finite("El historial de patrones", ca.pattern_history_size, minimum=0, strict_minimum=True)
         finite("La ventana temporal", ca.time_window_hours, minimum=0, strict_minimum=True)
         context_weights = (ca.user_preference_weight, ca.time_pattern_weight, ca.success_pattern_weight)
-        for name, weight in zip(("Peso de preferencia del usuario", "Peso de patrón temporal", "Peso de patrón de éxito"), context_weights):
+        for name, weight in zip(("Peso de preferencia del usuario", "Peso de patr\u00f3n temporal", "Peso de patr\u00f3n de \u00e9xito"), context_weights):
             finite(name, weight, minimum=0)
 
         alt = self.alternative_selection
-        finite("El número máximo de alternativas", alt.max_alternatives_per_plan, minimum=0)
+        finite("El n\u00famero m\u00e1ximo de alternativas", alt.max_alternatives_per_plan, minimum=0)
         weights = (alt.cost_weight, alt.success_rate_weight, alt.execution_time_weight)
-        for name, weight in zip(("Peso de coste", "Peso de tasa de éxito", "Peso de tiempo de ejecución"), weights):
+        for name, weight in zip(("Peso de coste", "Peso de tasa de \u00e9xito", "Peso de tiempo de ejecuci\u00f3n"), weights):
             finite(name, weight, minimum=0)
         try:
             numeric_weights = [float(weight) for weight in weights]
@@ -400,44 +400,44 @@ class OptimizationConfig:
         except (TypeError, ValueError, OverflowError):
             weights_valid = False
         if weights_valid and abs(sum(numeric_weights) - 1.0) > 0.01:
-            warnings.append("La suma de pesos de selección de alternativas debe ser 1.0")
-        finite("El umbral mínimo de éxito", alt.min_success_rate_threshold, minimum=0, maximum=1)
+            warnings.append("La suma de pesos de selecci\u00f3n de alternativas debe ser 1.0")
+        finite("El umbral m\u00ednimo de \u00e9xito", alt.min_success_rate_threshold, minimum=0, maximum=1)
 
         perf = self.performance_monitoring
-        finite("El intervalo de recopilación", perf.metrics_collection_interval, minimum=0, strict_minimum=True)
+        finite("El intervalo de recopilaci\u00f3n", perf.metrics_collection_interval, minimum=0, strict_minimum=True)
         finite("El umbral de advertencia", perf.performance_threshold_warning, minimum=0)
-        finite("El umbral crítico", perf.performance_threshold_critical, minimum=0)
+        finite("El umbral cr\u00edtico", perf.performance_threshold_critical, minimum=0)
         try:
             warning_threshold = float(perf.performance_threshold_warning)
             critical_threshold = float(perf.performance_threshold_critical)
             if (math.isfinite(warning_threshold)
                     and math.isfinite(critical_threshold)
                     and critical_threshold <= warning_threshold):
-                warnings.append("El umbral crítico debe ser mayor que el umbral de advertencia")
+                warnings.append("El umbral cr\u00edtico debe ser mayor que el umbral de advertencia")
         except (TypeError, ValueError, OverflowError):
             # Los errores de tipo ya se reportan en los chequeos finite anteriores.
             pass
-        finite("La sensibilidad de ajuste automático", perf.auto_adjustment_sensitivity, minimum=0)
+        finite("La sensibilidad de ajuste autom\u00e1tico", perf.auto_adjustment_sensitivity, minimum=0)
 
-        finite("El timeout de optimización", self.optimization_timeout, minimum=0, strict_minimum=True)
-        finite("El límite de memoria", self.max_memory_usage_mb, minimum=0, strict_minimum=True)
+        finite("El timeout de optimizaci\u00f3n", self.optimization_timeout, minimum=0, strict_minimum=True)
+        finite("El l\u00edmite de memoria", self.max_memory_usage_mb, minimum=0, strict_minimum=True)
         return warnings
 
     def validate_or_raise(self) -> None:
         """Lanza ValueError si validate_config detecta problemas."""
         warnings = self.validate_config()
         if warnings:
-            raise ValueError("Configuración de optimización inválida: " + "; ".join(warnings))
+            raise ValueError("Configuracion de optimizacion invalida: " + "; ".join(warnings))
 
     def to_dict(self) -> Dict[str, Any]:
-        """Devuelve una copia serializable de toda la configuración."""
+        """Devuelve una copia serializable de toda la configuracion."""
         data = asdict(self)
         data["mode"] = self.mode.value
         return data
 
     @classmethod
     def from_dict(cls, config_dict: Dict[str, Any]) -> "OptimizationConfig":
-        """Construye configuración desde un diccionario parcial o completo."""
+        """Construye configuracion desde un diccionario parcial o completo."""
         if not isinstance(config_dict, dict):
             raise TypeError("config_dict debe ser un diccionario")
 
@@ -458,7 +458,7 @@ class OptimizationConfig:
             elif isinstance(value, Mapping):
                 data[key] = config_type(**dict(value))
             elif not isinstance(value, config_type):
-                raise TypeError(f"Configuración inválida para '{key}': {type(value)!r}")
+                raise TypeError(f"Configuracion invalida para '{key}': {type(value)!r}")
 
         return cls(**data)
 

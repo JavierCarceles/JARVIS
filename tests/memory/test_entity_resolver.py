@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 """
 Pruebas unitarias de `src.memory.entity_resolver.EntityResolver` con la
-integración del catálogo global de aplicaciones (unidad 3.8.5.1.4.11.7).
+integracion del catalogo global de aplicaciones (unidad 3.8.5.1.4.11.7).
 
 Objetivo verificable:
-- `resolve_entity` consulta el catálogo global
+- `resolve_entity` consulta el catalogo global
   (`ApplicationManager` / `entities.json`) PRIMERO para obtener la identidad,
-  nombres y aliases de una aplicación, antes de buscar en la memoria de dominio.
-- Cuando no hay aplicación registrada en el catálogo, se conserva el
-  comportamiento habitual de búsqueda en entidades de memoria.
+  nombres y aliases de una aplicacion, antes de buscar en la memoria de dominio.
+- Cuando no hay aplicacion registrada en el catalogo, se conserva el
+  comportamiento habitual de busqueda en entidades de memoria.
 - Nunca se incorporan rutas absolutas como base de la identidad de la entidad.
 
 Trabaja SIEMPRE sobre directorios temporales (tmp_path). No escribe ni
@@ -25,7 +25,7 @@ import pytest
 
 from src.memory.entity_resolver import EntityResolver, ResolutionContext
 from src.memory.storage import Entity, MemoryManager
-from src.hands.applications_core import ApplicationKnowledge, ApplicationState
+from src.hands.apps.applications_core import ApplicationKnowledge, ApplicationState
 
 
 def _nueva_entidad_memoria(entity_id: str, nombre: str, tipo: str) -> Entity:
@@ -49,8 +49,8 @@ def _app_conocimiento(nombre: str = "Chrome", tipo: str = "browser") -> Applicat
 
 
 class TestEntityResolverCatalogoGlobalPrimero:
-    """`resolve_entity` consulta el catálogo global (ApplicationManager) antes
-    que la memoria de dominio para referencias de aplicación."""
+    """`resolve_entity` consulta el catalogo global (ApplicationManager) antes
+    que la memoria de dominio para referencias de aplicacion."""
 
     def _resolver_con_app_manager(self, tmp_path, app_conocimiento=None):
         memoria_dir = tmp_path / "memory"
@@ -64,8 +64,8 @@ class TestEntityResolverCatalogoGlobalPrimero:
         return EntityResolver(memory_manager=mm, app_manager=app_manager), mm, app_manager
 
     def test_resolve_entity_aplicacion_resuelve_catalogo_global_primero(self, tmp_path):
-        """Referencia de aplicación: se resuelve desde el catálogo global con
-        método catalogo_global_aplicacion y confianza 1.0."""
+        """Referencia de aplicacion: se resuelve desde el catalogo global con
+        metodo catalogo_global_aplicacion y confianza 1.0."""
         resolver, _, app_manager = self._resolver_con_app_manager(
             tmp_path, _app_conocimiento("Chrome", "browser")
         )
@@ -78,19 +78,19 @@ class TestEntityResolverCatalogoGlobalPrimero:
         assert resultado.confidence == 1.0
         assert resultado.resolution_method == "catalogo_global_aplicacion"
         assert resultado.alternatives == []
-        # El catálogo global fue consultado con la referencia normalizada.
+        # El catalogo global fue consultado con la referencia normalizada.
         app_manager.get_application.assert_called()
         # La identidad es estable (`app_<clave normalizada>`) y no incorpora
         # la ruta del ejecutable.
         assert resultado.entity.id == "app_chrome"
         assert "system32" not in resultado.entity.id
         assert "windows" not in resultado.entity.id
-        # Los aliases del catálogo global se conservan en la entidad.
+        # Los aliases del catalogo global se conservan en la entidad.
         assert "chrome alias" in resultado.entity.aliases
 
     def test_resolve_entity_sin_tipo_declarado_con_app_consulta_catalogo(self, tmp_path):
-        """Sin entity_type declarado, una referencia de aplicación conocida en
-        el catálogo global se resuelve desde ahí primero."""
+        """Sin entity_type declarado, una referencia de aplicacion conocida en
+        el catalogo global se resuelve desde ahi primero."""
         resolver, _, app_manager = self._resolver_con_app_manager(
             tmp_path, _app_conocimiento("Spotify", "media")
         )
@@ -103,15 +103,15 @@ class TestEntityResolverCatalogoGlobalPrimero:
         app_manager.get_application.assert_called()
 
     def test_resolve_entity_no_app_en_catalogo_usa_memoria_de_dominio(self, tmp_path):
-        """No hay aplicación en el catálogo: se conserva la búsqueda en la
-        memoria de dominio (no regresión)."""
+        """No hay aplicacion en el catalogo: se conserva la busqueda en la
+        memoria de dominio (no regresion)."""
         memoria_dir = tmp_path / "memory"
         mm = MemoryManager(str(memoria_dir))
         mm.save_entity(_nueva_entidad_memoria("nissaxter", "Nissaxter", "streamer"))
 
         app_manager = MagicMock()
         app_manager.memory_manager = mm
-        app_manager.get_application.return_value = None  # no app en catálogo
+        app_manager.get_application.return_value = None  # no app en catalogo
 
         resolver = EntityResolver(memory_manager=mm, app_manager=app_manager)
         resultado = resolver.resolve_entity("nissaxter", entity_type=None)
@@ -120,12 +120,12 @@ class TestEntityResolverCatalogoGlobalPrimero:
         assert resultado.entity.name == "Nissaxter"
         assert resultado.entity.type == "streamer"
         assert resultado.resolution_method != "catalogo_global_aplicacion"
-        # El catálogo se consultó (entity_type None) y devolvió None, por lo
-        # que se siguió con la búsqueda en memoria de dominio.
+        # El catalogo se consulto (entity_type None) y devolvio None, por lo
+        # que se siguio con la busqueda en memoria de dominio.
         app_manager.get_application.assert_called()
 
     def test_resolve_entity_app_no_en_catalogo_ni_memoria_entidad_temporal(self, tmp_path):
-        """No hay aplicación en catálogo ni entidad en memoria: entidad temporal
+        """No hay aplicacion en catalogo ni entidad en memoria: entidad temporal
         con confianza reducida, sin fallar."""
         resolver, _, app_manager = self._resolver_con_app_manager(tmp_path, None)
 
@@ -141,7 +141,7 @@ class TestEntityResolverCatalogoGlobalPrimero:
         """Por defecto se obtiene el ApplicationManager real (singleton) y el
         resolutor se construye sin error."""
         resolver = EntityResolver(memory_manager=MemoryManager(str(tmp_path / "memory")))
-        # La resolución perezosa obtiene el ApplicationManager real al usarlo.
+        # La resolucion perezosa obtiene el ApplicationManager real al usarlo.
         ctx = ResolutionContext([], None, [], {}, {})
         resultado = resolver.resolve_entity("cualquier cosa", context=ctx)
         assert resolver.app_manager is not None

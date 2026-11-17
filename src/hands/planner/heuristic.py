@@ -1,19 +1,19 @@
 """
-Heurísticas para algoritmo de búsqueda A* (FASE 8).
+Heuristicas para algoritmo de busqueda A* (FASE 8).
 
 Proporciona estimaciones configurables para StateGraph. Las estimaciones son
-finitas y no negativas, la caché usa claves deterministas e incluye el contexto
-del objetivo y se aplican fallbacks cuando una heurística no puede evaluarse.
+finitas y no negativas, la cache usa claves deterministas e incluye el contexto
+del objetivo y se aplican fallbacks cuando una heuristica no puede evaluarse.
 
 A* utiliza:
     g(n): coste acumulado desde el inicio
-    h(n): estimación del coste restante hasta el objetivo
+    h(n): estimacion del coste restante hasta el objetivo
     f(n): g(n) + h(n)
 
-Nota: las heurísticas ponderadas, de similitud o basadas en capacidades no son
+Nota: las heuristicas ponderadas, de similitud o basadas en capacidades no son
 necesariamente admisibles. Para garantizar la optimalidad de A*, se debe usar
-una heurística admisible para el dominio (por ejemplo, ZERO o una GOAL_DISTANCE
-conservadora) y costes de transición no negativos.
+una heuristica admisible para el dominio (por ejemplo, ZERO o una GOAL_DISTANCE
+conservadora) y costes de transicion no negativos.
 """
 
 from __future__ import annotations
@@ -28,18 +28,18 @@ from enum import Enum
 from typing import Any, Callable, Dict, List, Optional
 
 from src.hands.planner.node import Node, Goal
-from src.utils.logger import get_logger
+from src.core.log import get_logger
 
 logger = get_logger(__name__)
 
 
 class HeuristicType(Enum):
-    """Tipos de heurísticas disponibles."""
+    """Tipos de heuristicas disponibles."""
 
     MANHATTAN = "manhattan"
     EUCLIDEAN = "euclidean"
     UNIFORM = "uniform"
-    # Alias de compatibilidad con código que utiliza este nombre.
+    # Alias de compatibilidad con codigo que utiliza este nombre.
     UNIFORM_COST = "uniform"
     ZERO = "zero"
     GOAL_DISTANCE = "goal_distance"
@@ -50,28 +50,10 @@ class HeuristicType(Enum):
 CustomHeuristic = Callable[[str, Dict[str, Any], Goal], float]
 
 
-def _log(level: str, message: str, method: str, line: int) -> None:
-    """Emite un log sin permitir que un fallo del logger rompa la planificación."""
-    try:
-        printer = getattr(logger, "_print_log", None)
-        if callable(printer):
-            printer(level, message, "heuristic.py", method, line)
-            return
-        standard_method = getattr(logger, str(level).lower(), None)
-        if callable(standard_method):
-            standard_method(message)
-        else:
-            logger.info(message)
-    except Exception:
-        # El logging nunca debe hacer fallar una estimación heurística.
-        try:
-            logger.info(message)
-        except Exception:
-            pass
 
 
 class Heuristic:
-    """Heurística configurable para el algoritmo A*."""
+    """Heuristica configurable para el algoritmo A*."""
 
     _DEFAULT_CACHE_SIZE = 1000
 
@@ -82,7 +64,7 @@ class Heuristic:
         custom_heuristic: Optional[CustomHeuristic] = None,
         max_cache_size: int = _DEFAULT_CACHE_SIZE,
     ) -> None:
-        """Inicializa la heurística y su caché LRU acotada."""
+        """Inicializa la heuristica y su cache LRU acotada."""
         self.heuristic_type = self._normalize_heuristic_type(heuristic_type)
         self.weight = self._normalize_weight(weight)
         self.custom_heuristic = custom_heuristic if callable(custom_heuristic) else None
@@ -92,20 +74,15 @@ class Heuristic:
             self.max_cache_size = self._DEFAULT_CACHE_SIZE
         self.heuristic_cache: "OrderedDict[str, float]" = OrderedDict()
 
-        _log(
-            "info",
-            f"Heurística inicializada: {self.heuristic_type.value} (peso: {self.weight})",
-            "__init__",
-            94,
-        )
+        logger.info(f"Heuristica inicializada: {self.heuristic_type.value} (peso: {self.weight})")
 
     # ======================================================================
-    # CONFIGURACIÓN / CACHÉ
+    # CONFIGURACION / CACHE
     # ======================================================================
 
     @staticmethod
     def _normalize_heuristic_type(value: Any) -> HeuristicType:
-        """Normaliza un enum, su valor textual o su nombre simbólico."""
+        """Normaliza un enum, su valor textual o su nombre simbolico."""
         if isinstance(value, HeuristicType):
             return value
 
@@ -127,17 +104,12 @@ class Heuristic:
             try:
                 return HeuristicType[raw.upper()]
             except KeyError:
-                _log(
-                    "warning",
-                    f"Tipo de heurística desconocido: {value!r}. Se utilizará GOAL_DISTANCE.",
-                    "_normalize_heuristic_type",
-                    125,
-                )
+                logger.warning(f"Tipo de heuristica desconocido: {value!r}. Se utilizara GOAL_DISTANCE.")
                 return HeuristicType.GOAL_DISTANCE
 
     @staticmethod
     def _normalize_weight(value: Any) -> float:
-        """Normaliza el peso a un número finito no negativo."""
+        """Normaliza el peso a un numero finito no negativo."""
         try:
             weight = float(value)
         except (TypeError, ValueError, OverflowError):
@@ -213,7 +185,7 @@ class Heuristic:
 
     @staticmethod
     def _stable_serialize(value: Any) -> str:
-        """Serializa datos de forma estable para claves de caché."""
+        """Serializa datos de forma estable para claves de cache."""
         try:
             normalized = Heuristic._normalize_for_json(value)
             return json.dumps(
@@ -241,7 +213,7 @@ class Heuristic:
         current_state: Dict[str, Any],
         goal: Goal,
     ) -> str:
-        """Construye una clave que separa nodo, contexto, objetivo y configuración."""
+        """Construye una clave que separa nodo, contexto, objetivo y configuracion."""
         goal_data: Any
         if hasattr(goal, "to_dict") and callable(getattr(goal, "to_dict", None)):
             try:
@@ -257,7 +229,7 @@ class Heuristic:
             custom_identity = {
                 "module": getattr(custom, "__module__", type(custom).__module__),
                 "qualname": getattr(custom, "__qualname__", type(custom).__qualname__),
-                # Evita reutilizar entradas si la función se sustituye en runtime.
+                # Evita reutilizar entradas si la funcion se sustituye en runtime.
                 "identity": id(custom),
             }
 
@@ -274,7 +246,7 @@ class Heuristic:
 
     @staticmethod
     def _minimal_goal_data(goal: Any) -> Dict[str, Any]:
-        """Obtiene los campos básicos del objetivo cuando no puede serializarse."""
+        """Obtiene los campos basicos del objetivo cuando no puede serializarse."""
         return {
             "id": getattr(goal, "id", ""),
             "type": getattr(getattr(goal, "type", ""), "value", getattr(goal, "type", "")),
@@ -283,7 +255,7 @@ class Heuristic:
         }
 
     def _cache_get(self, key: str) -> Optional[float]:
-        """Obtiene una estimación manteniendo el orden LRU."""
+        """Obtiene una estimacion manteniendo el orden LRU."""
         if key not in self.heuristic_cache:
             return None
         value = self.heuristic_cache.pop(key)
@@ -291,7 +263,7 @@ class Heuristic:
         return value
 
     def _cache_set(self, key: str, value: float) -> None:
-        """Guarda una estimación y elimina las entradas menos recientes."""
+        """Guarda una estimacion y elimina las entradas menos recientes."""
         if self.max_cache_size <= 0:
             return
         self.heuristic_cache.pop(key, None)
@@ -300,7 +272,7 @@ class Heuristic:
             self.heuristic_cache.popitem(last=False)
 
     # ======================================================================
-    # ESTIMACIÓN PRINCIPAL
+    # ESTIMACION PRINCIPAL
     # ======================================================================
 
     def estimate_cost(
@@ -323,7 +295,7 @@ class Heuristic:
                 return cached
 
         try:
-            # La heurística personalizada recibe una copia para que una función
+            # La heuristica personalizada recibe una copia para que una funcion
             # ajena no pueda alterar accidentalmente el estado del planificador.
             try:
                 state_for_estimate = copy.deepcopy(state)
@@ -340,12 +312,7 @@ class Heuristic:
                     all_nodes if isinstance(all_nodes, dict) else {},
                 )
         except Exception as exc:
-            _log(
-                "warning",
-                f"Error calculando h({node_id}): {exc}. Se usará 0.",
-                "estimate_cost",
-                309,
-            )
+            logger.warning(f"Error calculando h({node_id}): {exc}. Se usara 0.")
             estimated_cost = 0.0
 
         try:
@@ -370,11 +337,11 @@ class Heuristic:
         goal: Goal,
         all_nodes: Dict[str, Node],
     ) -> float:
-        """Aplica la heurística seleccionada."""
+        """Aplica la heuristica seleccionada."""
         node = all_nodes.get(node_id) if isinstance(all_nodes, dict) else None
 
         if self.heuristic_type == HeuristicType.UNIFORM:
-            # Heurística constante; la búsqueda de coste uniforme real es Dijkstra.
+            # Heuristica constante; la busqueda de coste uniforme real es Dijkstra.
             return 1.0
         if self.heuristic_type == HeuristicType.ZERO:
             return 0.0
@@ -391,7 +358,7 @@ class Heuristic:
         return 0.0
 
     # ======================================================================
-    # HEURÍSTICAS CONCRETAS
+    # HEURISTICAS CONCRETAS
     # ======================================================================
 
     def _manhattan_distance(
@@ -400,7 +367,7 @@ class Heuristic:
         goal: Goal,
         current_state: Dict[str, Any],
     ) -> float:
-        """Estimación discreta de navegación basada en el estado observable."""
+        """Estimacion discreta de navegacion basada en el estado observable."""
         del node
         goal_type = self._goal_type(goal)
         if goal_type in {"navigate", "navigate_stream", "navigate_to_entity", "streaming"}:
@@ -423,7 +390,7 @@ class Heuristic:
         goal: Goal,
         current_state: Dict[str, Any],
     ) -> float:
-        """Ajuste continuo de la estimación discreta disponible."""
+        """Ajuste continuo de la estimacion discreta disponible."""
         return self._manhattan_distance(node, goal, current_state) * 0.70710678118
 
     def _goal_distance_heuristic(
@@ -432,7 +399,7 @@ class Heuristic:
         goal: Goal,
         current_state: Dict[str, Any],
     ) -> float:
-        """Estima un límite conservador del trabajo pendiente del objetivo."""
+        """Estima un limite conservador del trabajo pendiente del objetivo."""
         del node
         try:
             if callable(getattr(goal, "is_achieved", None)) and goal.is_achieved(current_state):
@@ -440,7 +407,7 @@ class Heuristic:
         except Exception:
             pass
 
-        # Para objetivos de navegación, una URL destino observada representa
+        # Para objetivos de navegacion, una URL destino observada representa
         # estado alcanzado aunque el estado serializado difiera solo en la barra final.
         if self._goal_type(goal) in {"navigate", "navigate_stream", "navigate_to_entity"}:
             target_url = self._get_target_url(goal)
@@ -450,7 +417,7 @@ class Heuristic:
 
         required_capabilities = self._get_required_capabilities(goal)
         if not required_capabilities:
-            # Si se conoce una URL destino, aún podemos comprobar la navegación
+            # Si se conoce una URL destino, aun podemos comprobar la navegacion
             # directamente aunque el objetivo no declare capacidades.
             target_url = self._get_target_url(goal)
             current_url = self._get_current_url(current_state)
@@ -466,8 +433,8 @@ class Heuristic:
         if not missing:
             return 0.0
 
-        # El mínimo evita sumar capacidades potencialmente solapadas, manteniendo
-        # una estimación más conservadora para el modo GOAL_DISTANCE por defecto.
+        # El minimo evita sumar capacidades potencialmente solapadas, manteniendo
+        # una estimacion mas conservadora para el modo GOAL_DISTANCE por defecto.
         capability_costs = self._capability_costs()
         return min(
             self._cost_for_capability(str(capability), capability_costs)
@@ -480,7 +447,7 @@ class Heuristic:
         goal: Goal,
         current_state: Dict[str, Any],
     ) -> float:
-        """Estima el coste según las capacidades requeridas que faltan."""
+        """Estima el coste segun las capacidades requeridas que faltan."""
         del node
         required_capabilities = self._get_required_capabilities(goal)
         if not required_capabilities:
@@ -561,7 +528,7 @@ class Heuristic:
 
     @classmethod
     def _get_target_application(cls, goal: Any) -> str:
-        """Obtiene la aplicación objetivo desde el target o los metadatos."""
+        """Obtiene la aplicacion objetivo desde el target o los metadatos."""
         target = cls._target_mapping(goal)
         metadata = getattr(goal, "metadata", {})
         metadata = metadata if isinstance(metadata, dict) else {}
@@ -583,7 +550,7 @@ class Heuristic:
         goal_type = cls._goal_type(goal)
         if isinstance(raw_target, str) and goal_type in {"open_application", "close_application"}:
             return raw_target.strip().lower()
-        # Compatibilidad con el contrato legacy de navegación de JARVIS, cuyo
+        # Compatibilidad con el contrato legacy de navegacion de JARVIS, cuyo
         # navegador predeterminado documentado es Chrome cuando no se especifica.
         if goal_type in {"navigate", "navigate_stream", "navigate_to_entity", "streaming"}:
             return "chrome"
@@ -631,7 +598,7 @@ class Heuristic:
 
     @staticmethod
     def _application_flag(state: Dict[str, Any], application: str, flag: str) -> bool:
-        """Obtiene un flag de aplicación de estado plano o anidado."""
+        """Obtiene un flag de aplicacion de estado plano o anidado."""
         if not isinstance(state, dict):
             return False
         app = str(application or "").strip().lower()
@@ -679,8 +646,8 @@ class Heuristic:
         if capability_lower in {"open_application", "open", "application_open"}:
             if target_application:
                 return self._application_flag(current_state, target_application, "open")
-            # Sin aplicación objetivo solo se acepta un flag explícito global o
-            # una aplicación presente en el estado; no se inventa cuál interesa.
+            # Sin aplicacion objetivo solo se acepta un flag explicito global o
+            # una aplicacion presente en el estado; no se inventa cual interesa.
             if bool(current_state.get("application_open", False)):
                 return True
             for key, value in current_state.items():
@@ -737,7 +704,7 @@ class Heuristic:
     def _values_equal(actual: Any, expected: Any) -> bool:
         if actual == expected:
             return True
-        # Mantiene una comparación estricta para bool: True no debe equivaler a 1.
+        # Mantiene una comparacion estricta para bool: True no debe equivaler a 1.
         if isinstance(actual, bool) or isinstance(expected, bool):
             return type(actual) is type(expected) and actual == expected
         if isinstance(actual, (int, float)) and isinstance(expected, str):
@@ -776,7 +743,7 @@ class Heuristic:
 
     @classmethod
     def _get_expected_state(cls, goal: Goal) -> Dict[str, Any]:
-        """Obtiene una representación mínima y consistente del estado objetivo."""
+        """Obtiene una representacion minima y consistente del estado objetivo."""
         expected_state: Dict[str, Any] = {}
         goal_type = cls._goal_type(goal)
         target = getattr(goal, "target", None)
@@ -833,16 +800,16 @@ class Heuristic:
         return costs.get(aliases.get(name, name), 1.0)
 
     # ======================================================================
-    # API PÚBLICA DE CACHÉ / ESTADÍSTICAS
+    # API PUBLICA DE CACHE / ESTADISTICAS
     # ======================================================================
 
     def clear_cache(self) -> None:
-        """Limpia la caché de estimaciones heurísticas."""
+        """Limpia la cache de estimaciones heuristicas."""
         self.heuristic_cache.clear()
-        _log("info", "[HEURISTIC] Caché de heurísticas limpiada", "clear_cache", 627)
+        logger.info("[HEURISTIC] Cache de heuristicas limpiada")
 
     def get_cache_stats(self) -> Dict[str, Any]:
-        """Devuelve estadísticas y configuración de la caché."""
+        """Devuelve estadisticas y configuracion de la cache."""
         return {
             "cache_size": len(self.heuristic_cache),
             "cache_max_size": self.max_cache_size,
@@ -853,26 +820,26 @@ class Heuristic:
 
 
 class HeuristicFactory:
-    """Factoría para crear heurísticas con configuraciones frecuentes."""
+    """Factoria para crear heuristicas con configuraciones frecuentes."""
 
     @staticmethod
     def create_uniform_heuristic(weight: float = 1.0) -> Heuristic:
-        """Crea una heurística constante."""
+        """Crea una heuristica constante."""
         return Heuristic(HeuristicType.UNIFORM, weight)
 
     @staticmethod
     def create_goal_distance_heuristic(weight: float = 1.0) -> Heuristic:
-        """Crea una heurística basada en la distancia al objetivo."""
+        """Crea una heuristica basada en la distancia al objetivo."""
         return Heuristic(HeuristicType.GOAL_DISTANCE, weight)
 
     @staticmethod
     def create_capability_based_heuristic(weight: float = 1.0) -> Heuristic:
-        """Crea una heurística basada en capacidades pendientes."""
+        """Crea una heuristica basada en capacidades pendientes."""
         return Heuristic(HeuristicType.CAPABILITY_BASED, weight)
 
     @staticmethod
     def create_state_similarity_heuristic(weight: float = 1.0) -> Heuristic:
-        """Crea una heurística basada en similitud de estado."""
+        """Crea una heuristica basada en similitud de estado."""
         return Heuristic(HeuristicType.STATE_SIMILARITY, weight)
 
     @staticmethod
@@ -880,7 +847,7 @@ class HeuristicFactory:
         heuristic_func: CustomHeuristic,
         weight: float = 1.0,
     ) -> Heuristic:
-        """Crea una heurística personalizada validando su callback."""
+        """Crea una heuristica personalizada validando su callback."""
         if not callable(heuristic_func):
             raise TypeError("heuristic_func debe ser invocable")
         return Heuristic(HeuristicType.GOAL_DISTANCE, weight, heuristic_func)

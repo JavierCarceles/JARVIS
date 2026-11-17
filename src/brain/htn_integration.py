@@ -1,7 +1,7 @@
 """
-Integración de HTN con el Brain de JARVIS - FASE 4.
+Integracion de HTN con el Brain de JARVIS - FASE 4.
 
-Integra la descomposición jerárquica de objetivos con HTNManager y
+Integra la descomposicion jerarquica de objetivos con HTNManager y
 TaskExecutor, manteniendo compatibilidad con el Brain existente.
 """
 
@@ -17,14 +17,14 @@ from src.hands.planner.application_integration import (
     get_application_knowledge_integrator,
 )
 from src.memory.storage import get_memory_manager, Entity
-from src.utils.logger import get_logger
+from src.core.log import get_logger
 
 logger = get_logger(__name__)
 
 
 @dataclass
 class HTNIntegrationResult:
-    """Resultado de la integración HTN-Brain."""
+    """Resultado de la integracion HTN-Brain."""
 
     success: bool
     goal_id: str
@@ -38,7 +38,7 @@ class HTNIntegrationResult:
 
 
 class HTNBrainIntegration:
-    """Integra interpretación de objetivos, HTN y ejecución de tareas."""
+    """Integra interpretacion de objetivos, HTN y ejecucion de tareas."""
 
     def __init__(self) -> None:
         self.htn_manager = get_htn_manager()
@@ -51,7 +51,7 @@ class HTNBrainIntegration:
         self.total_integrations = 0
         self.successful_integrations = 0
 
-        logger._print_log("INFO", "Integración HTN-Brain inicializada", "htn_integration.py", "__init__", 54)
+        logger.info("Integracion HTN-Brain inicializada")
 
     # ====================================================================
     # FLUJO PRINCIPAL
@@ -71,18 +71,18 @@ class HTNBrainIntegration:
                 decomposed_tasks=[],
                 execution_results=[],
                 total_execution_time=0.0,
-                message="Integración HTN deshabilitada",
+                message="Integraci\u00f3n HTN deshabilitada",
                 error_message="HTN integration is disabled",
                 final_state=dict(current_state or {}),
             )
 
         start_time = time.time()
-        logger._print_log("INFO", "[HTN_INTEGRATION] Procesando objetivo HTN: " + goal.id + " (" + goal.type + ")", "htn_integration.py", "process_goal_through_htn", 80)
+        logger.info("[HTN_INTEGRATION] Procesando objetivo HTN: " + goal.id + " (" + goal.type + ")")
 
         try:
             state = dict(current_state or {})
 
-            logger._print_log("INFO", "Fase 1: Descomposición de objetivo", "htn_integration.py", "process_goal_through_htn", 87)
+            logger.info("Fase 1: Descomposicion de objetivo")
             tasks = self.htn_manager.decompose_goal(goal, state)
 
             if not tasks:
@@ -101,13 +101,13 @@ class HTNBrainIntegration:
                 )
 
             decomposed_tasks = [self._serialize_task(task) for task in tasks]
-            logger._print_log("INFO", "Objetivo descompuesto en " + str(len(tasks)) + " tareas", "htn_integration.py", "execute_htn", 104)
+            logger.info("Objetivo descompuesto en " + str(len(tasks)) + " tareas")
 
-            logger._print_log("INFO", "Fase 2: Ejecución de jerarquía", "htn_integration.py", "execute_htn", 106)
+            logger.info("Fase 2: Ejecucion de jerarquia")
             execution_result = self.htn_manager.execute_goal_hierarchy(goal, state)
             execution_results = [self._serialize_execution_result(execution_result)]
 
-            logger._print_log("INFO", "Fase 3: Procesamiento de resultados", "htn_integration.py", "execute_htn", 110)
+            logger.info("Fase 3: Procesamiento de resultados")
             final_state = self._process_execution_results(
                 goal,
                 execution_result,
@@ -119,11 +119,11 @@ class HTNBrainIntegration:
             self._record_integration(execution_time, completed)
 
             message = (
-                "Integración HTN completada exitosamente"
+                "Integraci\u00f3n HTN completada exitosamente"
                 if completed
-                else "Integración HTN completada con fallo de ejecución"
+                else "Integraci\u00f3n HTN completada con fallo de ejecuci\u00f3n"
             )
-            logger._print_log("INFO", "Integración completada: " + execution_result.status.value + " (" + str(execution_time) + "s)", "htn_integration.py", "execute_htn", 126)
+            logger.info("Integracion completada: " + execution_result.status.value + " (" + str(execution_time) + "s)")
 
             return HTNIntegrationResult(
                 success=completed,
@@ -144,7 +144,7 @@ class HTNBrainIntegration:
         except Exception as exc:
             execution_time = time.time() - start_time
             self._record_integration(execution_time, False)
-            logger._print_log("ERROR", "[HTN_INTEGRATION] Error en integración: " + str(exc), "htn_integration.py", "execute_htn", 147)
+            logger.error("[HTN_INTEGRATION] Error en integracion: " + str(exc))
             return HTNIntegrationResult(
                 success=False,
                 goal_id=goal.id,
@@ -152,7 +152,7 @@ class HTNBrainIntegration:
                 decomposed_tasks=[],
                 execution_results=[],
                 total_execution_time=execution_time,
-                message="Error en integración HTN",
+                message="Error en integraci\u00f3n HTN",
                 error_message=str(exc),
                 final_state=dict(current_state or {}),
             )
@@ -162,10 +162,10 @@ class HTNBrainIntegration:
         user_input: str,
         current_state: Dict[str, Any],
     ) -> HTNIntegrationResult:
-        """Crea un objetivo básico desde texto y lo procesa mediante HTN."""
+        """Crea un objetivo basico desde texto y lo procesa mediante HTN."""
         start_time = time.time()
         try:
-            logger._print_log("INFO", "Interpretando input del usuario", "htn_integration.py", "interpret_user_input", 168)
+            logger.info("Interpretando input del usuario")
             goal = self._create_goal_from_input(user_input, current_state)
 
             if not goal:
@@ -184,7 +184,7 @@ class HTNBrainIntegration:
             return self.process_goal_through_htn(goal, current_state)
 
         except Exception as exc:
-            logger._print_log("ERROR", "Error en flujo completo: " + str(exc), "htn_integration.py", "interpret_user_input", 187)
+            logger.error("Error en flujo completo: " + str(exc))
             return HTNIntegrationResult(
                 success=False,
                 goal_id="unknown",
@@ -198,7 +198,7 @@ class HTNBrainIntegration:
             )
 
     # ====================================================================
-    # CREACIÓN DE OBJETIVOS
+    # CREACION DE OBJETIVOS
     # ====================================================================
 
     def _create_goal_from_input(
@@ -276,12 +276,12 @@ class HTNBrainIntegration:
                 id=f"generic_goal_{int(time.time())}",
                 type="generic",
                 target=text,
-                description=f"Objetivo genérico: {text}",
+                description=f"Objetivo gen\u00e9rico: {text}",
                 priority=1,
             )
 
         except Exception as exc:
-            logger._print_log("ERROR", "[HTN_INTEGRATION] Error creando objetivo: " + str(exc), "htn_integration.py", "create_goal_from_input", 284)
+            logger.error("[HTN_INTEGRATION] Error creando objetivo: " + str(exc))
             return None
 
     # ====================================================================
@@ -323,12 +323,12 @@ class HTNBrainIntegration:
         try:
             self.memory_manager.update_world_state("last_htn_result", new_state["last_htn_goal"])
         except Exception as exc:
-            logger._print_log("DEBUG", "[HTN_INTEGRATION] No se pudo persistir last_htn_result: " + str(exc), "htn_integration.py", "persist_htn_result", 326)
+            logger.debug("[HTN_INTEGRATION] No se pudo persistir last_htn_result: " + str(exc))
 
         return new_state
 
     def _register_goal_completion(self, goal: Goal, execution_result: Any) -> None:
-        """Registra la finalización exitosa en la memoria conversacional."""
+        """Registra la finalizacion exitosa en la memoria conversacional."""
         self._register_goal_memory(goal, execution_result, success=True)
 
     def _register_goal_failure(self, goal: Goal, execution_result: Any) -> None:
@@ -369,10 +369,10 @@ class HTNBrainIntegration:
                 execution_time=execution_time,
             )
         except Exception as exc:
-            logger._print_log("ERROR", "[HTN_INTEGRATION] Error registrando resultado del objetivo: " + str(exc), "htn_integration.py", "persist_htn_result", 372)
+            logger.error("[HTN_INTEGRATION] Error registrando resultado del objetivo: " + str(exc))
 
     # ====================================================================
-    # SERIALIZACIÓN / ESTADÍSTICAS
+    # SERIALIZACION / ESTADISTICAS
     # ====================================================================
 
     @staticmethod
@@ -407,11 +407,11 @@ class HTNBrainIntegration:
             self.successful_integrations += 1
 
     # ====================================================================
-    # API PÚBLICA
+    # API PUBLICA
     # ====================================================================
 
     def get_integration_statistics(self) -> Dict[str, Any]:
-        """Obtiene estadísticas de la integración HTN-Brain."""
+        """Obtiene estadisticas de la integracion HTN-Brain."""
         success_rate = (
             self.successful_integrations / self.total_integrations
             if self.total_integrations > 0
@@ -421,13 +421,13 @@ class HTNBrainIntegration:
         try:
             htn_stats = self.htn_manager.get_execution_statistics()
         except Exception as exc:
-            logger._print_log("DEBUG", "Error obteniendo stats HTN: " + str(exc), "htn_integration.py", "get_htn_stats", 424)
+            logger.debug("Error obteniendo stats HTN: " + str(exc))
             htn_stats = {}
 
         try:
             executor_stats = self.task_executor.get_execution_statistics()
         except Exception as exc:
-            logger._print_log("DEBUG", "Error obteniendo stats Executor: " + str(exc), "htn_integration.py", "get_executor_stats", 430)
+            logger.debug("Error obteniendo stats Executor: " + str(exc))
             executor_stats = {}
 
         return {
@@ -441,12 +441,12 @@ class HTNBrainIntegration:
         }
 
     def enable_integration(self, enabled: bool = True) -> None:
-        """Habilita o deshabilita la integración HTN."""
+        """Habilita o deshabilita la integracion HTN."""
         self.is_enabled = bool(enabled)
-        logger._print_log("INFO", "Integración " + ("habilitada" if self.is_enabled else "deshabilitada"), "htn_integration.py", "is_htn_integration_enabled", 446)
+        logger.info("Integracion " + ("habilitada" if self.is_enabled else "deshabilitada"))
 
     def get_htn_insights(self) -> Dict[str, Any]:
-        """Obtiene información agregada del sistema HTN."""
+        """Obtiene informacion agregada del sistema HTN."""
         try:
             htn_insights = self.htn_manager.get_execution_statistics()
         except Exception as exc:
@@ -473,7 +473,7 @@ _htn_integration: Optional[HTNBrainIntegration] = None
 
 
 def get_htn_integration() -> HTNBrainIntegration:
-    """Obtiene la instancia global de la integración HTN-Brain."""
+    """Obtiene la instancia global de la integracion HTN-Brain."""
     global _htn_integration
     if _htn_integration is None:
         _htn_integration = HTNBrainIntegration()

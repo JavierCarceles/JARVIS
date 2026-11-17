@@ -1,8 +1,8 @@
 """Sistema de aprendizaje de JARVIS (FASE 18).
 
 Registra resultados observados de acciones, nodos, planes y replanificaciones.
-Este módulo persiste métricas y genera señales históricas; no ejecuta acciones
-ni considera que una planificación equivalga a una ejecución satisfactoria.
+Este modulo persiste metricas y genera senales historicas; no ejecuta acciones
+ni considera que una planificacion equivalga a una ejecucion satisfactoria.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
-from src.utils.logger import get_logger
+from src.core.log import get_logger
 
 logger = get_logger(__name__)
 
@@ -112,7 +112,7 @@ class LearningEvent:
             return value != 0
         if isinstance(value, str):
             normalized = value.strip().lower()
-            if normalized in {"true", "1", "yes", "si", "sí", "success", "completed", "ok"}:
+            if normalized in {"true", "1", "yes", "si", "s\u00ed", "success", "completed", "ok"}:
                 return True
             if normalized in {"false", "0", "no", "failed", "failure", "error", ""}:
                 return False
@@ -140,7 +140,7 @@ class LearningStatistics:
 
 
 class LearningSystem:
-    """Sistema centralizado, acotado y thread-safe de aprendizaje histórico."""
+    """Sistema centralizado, acotado y thread-safe de aprendizaje historico."""
 
     def __init__(self, max_memory_size: int = 10000, learning_rate: float = 0.1):
         try:
@@ -172,7 +172,7 @@ class LearningSystem:
         logger.info("[LEARNING] Sistema de aprendizaje inicializado (memoria=%s, tasa=%.3f)", self.max_memory_size, self.learning_rate)
 
     # ------------------------------------------------------------------
-    # Registro público
+    # Registro publico
     # ------------------------------------------------------------------
     def record_action_execution(
         self,
@@ -300,7 +300,7 @@ class LearningSystem:
         self, goal_id: str, success: bool, context: Optional[Dict[str, Any]] = None,
         execution_time: float = 0.0,
     ) -> None:
-        """Registra explícitamente el resultado observado de un objetivo."""
+        """Registra explicitamente el resultado observado de un objetivo."""
         if not self.learning_enabled:
             return
         event_type = LearningEventType.GOAL_ACHIEVED if success else LearningEventType.GOAL_FAILED
@@ -319,7 +319,7 @@ class LearningSystem:
             action_events = [e for e in self.events if e.event_type == LearningEventType.ACTION_EXECUTION and e.details.get("action_name") == action_name]
             learned_cost = self.learned_costs.get(action_name)
         if not action_events:
-            return {"error": "No hay datos para esta acción"}
+            return {"error": "No hay datos para esta acci\u00f3n"}
 
         successes = sum(1 for event in action_events if event.success)
         total_time = sum(event.execution_time for event in action_events)
@@ -373,10 +373,10 @@ class LearningSystem:
         }
 
     def get_cost_adjustments(self) -> Dict[str, float]:
-        """Devuelve deltas respecto al último coste estimado (no costes absolutos).
+        """Devuelve deltas respecto al ultimo coste estimado (no costes absolutos).
 
-        Planner suma estos valores al coste base; devolver aquí el coste absoluto
-        aprendido lo sumaría dos veces y distorsionaría la comparación de rutas.
+        Planner suma estos valores al coste base; devolver aqui el coste absoluto
+        aprendido lo sumaria dos veces y distorsionaria la comparacion de rutas.
         """
         with self.events_lock:
             adjustments: Dict[str, float] = {}
@@ -396,7 +396,7 @@ class LearningSystem:
             return adjustments
 
     def get_learned_costs(self) -> Dict[str, float]:
-        """Devuelve los costes absolutos aprendidos por acción."""
+        """Devuelve los costes absolutos aprendidos por accion."""
         with self.events_lock:
             return dict(self.learned_costs)
 
@@ -436,7 +436,7 @@ class LearningSystem:
                 },
             }
 
-        # Escritura atómica: un cierre inesperado no deja el JSON parcialmente escrito.
+        # Escritura atomica: un cierre inesperado no deja el JSON parcialmente escrito.
         temp_name: Optional[str] = None
         try:
             with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=str(path.parent), delete=False) as handle:
@@ -560,14 +560,14 @@ class LearningSystem:
         self.route_learning_enabled = bool(enabled)
 
     # ------------------------------------------------------------------
-    # Núcleo de aprendizaje
+    # Nucleo de aprendizaje
     # ------------------------------------------------------------------
     def _build_event(self, event_type: LearningEventType, **kwargs: Any) -> LearningEvent:
         execution_time = max(0.0, self._safe_float(kwargs.pop("execution_time", 0.0)))
         estimated_cost = max(0.0, self._safe_float(kwargs.pop("estimated_cost", 0.0)))
         actual_raw = kwargs.pop("actual_cost", None)
         # Compatibilidad heredada: si no hay medida de coste real, usamos el tiempo
-        # de ejecución como proxy. No se interpreta como una unidad monetaria.
+        # de ejecucion como proxy. No se interpreta como una unidad monetaria.
         actual_cost = max(0.0, self._safe_float(execution_time if actual_raw is None else actual_raw))
         timestamp = self._safe_float(kwargs.pop("timestamp", time.time()), time.time())
         success_value = LearningEvent._coerce_bool(kwargs.pop("success", False))
@@ -591,7 +591,7 @@ class LearningSystem:
         )
 
     def _store_event(self, event: LearningEvent) -> None:
-        """Almacena evento e incrementa contadores agregados en la misma sección crítica."""
+        """Almacena evento e incrementa contadores agregados en la misma seccion critica."""
         with self.events_lock:
             self.events.append(event)
             if len(self.events) > self.max_memory_size:
@@ -692,7 +692,7 @@ class LearningSystem:
         new = event.details.get("new_plan", [])
         reason = str(event.context.get("reason", "unknown"))
         if len(new) < len(original):
-            logger.info("[LEARNING] Ruta más corta descubierta: %s -> %s acciones", len(original), len(new))
+            logger.info("[LEARNING] Ruta mas corta descubierta: %s -> %s acciones", len(original), len(new))
         bucket = self.success_patterns[f"replanification_{reason}"]
         bucket.extend(str(item) for item in new)
         if len(bucket) > 1000:
@@ -700,7 +700,7 @@ class LearningSystem:
         self.statistics.patterns_discovered = self._count_unique_patterns()
 
     # ------------------------------------------------------------------
-    # Agregación y salud del sistema
+    # Agregacion y salud del sistema
     # ------------------------------------------------------------------
     def _calculate_improvement_trend(self, events: List[LearningEvent]) -> str:
         if len(events) < 5:
@@ -754,18 +754,18 @@ class LearningSystem:
             if success_rate < 0.3:
                 recommendations.append("Considerar revisar precondiciones de acciones frecuentes")
             if cost_accuracy < 0.3:
-                recommendations.append("Los costes estimados están muy alejados de la realidad, recalibrar")
-            recommendations.append("El sistema necesita más datos para mejorar")
+                recommendations.append("Los costes estimados est\u00e1n muy alejados de la realidad, recalibrar")
+            recommendations.append("El sistema necesita m\u00e1s datos para mejorar")
         elif status == "fair":
             if success_rate < 0.5:
-                recommendations.append("Analizar patrones de fallo para acciones específicas")
+                recommendations.append("Analizar patrones de fallo para acciones espec\u00edficas")
             recommendations.append("Continuar recopilando datos")
         elif status == "good":
-            recommendations.append("Mantener la actual configuración")
+            recommendations.append("Mantener la actual configuraci\u00f3n")
             if success_rate < 0.7:
-                recommendations.append("Buscar oportunidades de optimización")
+                recommendations.append("Buscar oportunidades de optimizaci\u00f3n")
         elif status == "excellent":
-            recommendations.extend(["Sistema funcionando óptimamente", "Considerar exportar datos para backup"])
+            recommendations.extend(["Sistema funcionando \u00f3ptimamente", "Considerar exportar datos para backup"])
         return recommendations
 
     def _build_application_insights(self, events: List[LearningEvent]) -> Dict[str, Dict[str, Any]]:
@@ -824,13 +824,13 @@ class LearningSystem:
         self.statistics.adaptations_made = sum(len(values) for values in self.cost_adjustments.values())
 
     def _count_unique_patterns(self) -> int:
-        # Cuenta patrones distintos, no todas las apariciones de cada patrón.
+        # Cuenta patrones distintos, no todas las apariciones de cada patron.
         unique_success = {(key, item) for key, values in self.success_patterns.items() for item in values}
         unique_failure = {(key, item) for key, values in self.failure_patterns.items() for item in values}
         return len(unique_success | unique_failure)
 
     # ------------------------------------------------------------------
-    # Normalización
+    # Normalizacion
     # ------------------------------------------------------------------
     @staticmethod
     def _safe_float(value: Any, default: float = 0.0) -> float:
@@ -881,7 +881,7 @@ _learning_system_lock = threading.Lock()
 
 
 def get_learning_system() -> LearningSystem:
-    """Obtiene la instancia global del sistema de aprendizaje con inicialización segura."""
+    """Obtiene la instancia global del sistema de aprendizaje con inicializacion segura."""
     global _learning_system
     if _learning_system is None:
         with _learning_system_lock:

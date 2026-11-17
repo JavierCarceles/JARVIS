@@ -1,13 +1,13 @@
 # src/memory/storage.py
 """
-Sistema de almacenamiento mejorado para soportar planificación jerárquica.
+Sistema de almacenamiento mejorado para soportar planificacion jerarquica.
 
 Implementa:
-- FASE 3: Estado del mundo con tipos específicos
+- FASE 3: Estado del mundo con tipos especificos
 - FASE 5: Memoria de dominio avanzada con entidades y relaciones
 - FASE 6-7: Soporte para planes y ejecuciones
-- FASE 18: Estadísticas de aprendizaje para optimización
-- Manejo avanzado de caché para rendimiento
+- FASE 18: Estadisticas de aprendizaje para optimizacion
+- Manejo avanzado de cache para rendimiento
 """
 
 import json
@@ -23,8 +23,8 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 import threading
 
-from src.utils.logger import get_logger
-from src.utils.config import get_project_root
+from src.core.log import get_logger
+from src.core.config import get_project_root
 
 logger = get_logger(__name__)
 
@@ -82,7 +82,7 @@ class Entity:
         return cls(**data)
 
     def matches_query(self, query: str) -> bool:
-        """Verifica si la entidad coincide con una búsqueda."""
+        """Verifica si la entidad coincide con una busqueda."""
         query_lower = query.lower()
         return (
             query_lower in self.name.lower()
@@ -142,17 +142,17 @@ class WorldState:
         return cls(**data)
 
     def get_application_state(self, app_name: str) -> Dict[str, Any]:
-        """Obtiene el estado de una aplicación específica."""
+        """Obtiene el estado de una aplicacion especifica."""
         return self.applications.get(app_name, {})
 
     def get_ui_element_state(self, element_name: str) -> Dict[str, Any]:
-        """Obtiene el estado de un elemento UI específico."""
+        """Obtiene el estado de un elemento UI especifico."""
         return self.ui_elements.get(element_name, {})
 
 
 @dataclass
 class Plan:
-    """Plan de ejecución (FASE 6-7)."""
+    """Plan de ejecucion (FASE 6-7)."""
 
     id: str
     goal: str
@@ -187,7 +187,7 @@ class Plan:
 
 @dataclass
 class ExecutionRecord:
-    """Registro de ejecución para aprendizaje (FASE 18)."""
+    """Registro de ejecucion para aprendizaje (FASE 18)."""
 
     id: str
     plan_id: str
@@ -219,7 +219,7 @@ class ExecutionRecord:
 
 @dataclass
 class LearningStat:
-    """Estadística de aprendizaje (FASE 18)."""
+    """Estadistica de aprendizaje (FASE 18)."""
 
     action_name: str
     total_executions: int = 0
@@ -229,7 +229,7 @@ class LearningStat:
     last_updated: str = ""
 
     def update(self, success: bool, execution_time: float) -> None:
-        """Actualiza estadísticas con nueva ejecución."""
+        """Actualiza estadisticas con nueva ejecucion."""
         self.total_executions += 1
 
         if success:
@@ -394,11 +394,7 @@ class JSONStorage(MemoryStorage):
             return True
 
         except Exception as e:
-            logger._print_log(
-                "error",
-                f"Error guardando {memory_type.value} en {file_path}: {e}",
-                "storage.py", "save", 396,
-            )
+            logger.error(f"Error guardando {memory_type.value} en {file_path}: {e}")
             return False
 
     def _load_existing_data(self, file_path: Path) -> Any:
@@ -418,7 +414,7 @@ class JSONStorage(MemoryStorage):
         existing_data: Any,
         memory_type: MemoryType,
     ) -> Any:
-        """Procesa datos según el tipo de memoria."""
+        """Procesa datos segun el tipo de memoria."""
         if memory_type == MemoryType.CONVERSATIONAL:
             if not isinstance(existing_data, list):
                 existing_data = []
@@ -544,12 +540,8 @@ class JSONStorage(MemoryStorage):
             file_path = self.get_file_path(memory_type)
 
             if not file_path.exists():
-                logger._print_log(
-                    "info",
-                    f"Archivo no existe, usando valor por defecto para "
-                    f"{memory_type.value}",
-                    "storage.py", "load", 542,
-                )
+                logger.info(f"Archivo no existe, usando valor por defecto para "
+                    f"{memory_type.value}")
                 return self._get_default_value(memory_type)
 
             with open(file_path, "r", encoding="utf-8") as f:
@@ -558,21 +550,13 @@ class JSONStorage(MemoryStorage):
             return data
 
         except json.JSONDecodeError as e:
-            logger._print_log(
-                "warning",
-                f"JSON invalido en {file_path} para {memory_type.value}: "
-                f"{e}. Usando valor por defecto.",
-                "storage.py", "load", 552,
-            )
+            logger.warning(f"JSON invalido en {file_path} para {memory_type.value}: "
+                f"{e}. Usando valor por defecto.")
             return self._get_default_value(memory_type)
 
         except Exception as e:
-            logger._print_log(
-                "error",
-                f"Error inesperado cargando {memory_type.value} desde "
-                f"{file_path}: {e}",
-                "storage.py", "load", 556,
-            )
+            logger.error(f"Error inesperado cargando {memory_type.value} desde "
+                f"{file_path}: {e}")
             return self._get_default_value(memory_type)
 
     def _get_default_value(self, memory_type: MemoryType) -> Any:
@@ -597,7 +581,7 @@ class JSONStorage(MemoryStorage):
 
 
 class MemoryManager:
-    """Gestor de memoria mejorado con caché y soporte completo para arquitectura."""
+    """Gestor de memoria mejorado con cache y soporte completo para arquitectura."""
 
     def __init__(self, storage_path: Optional[Union[str, Path]] = None):
         if storage_path is None:
@@ -611,7 +595,7 @@ class MemoryManager:
         self._warm_cache()
 
     def _warm_cache(self) -> None:
-        """Inicializa el caché con datos frecuentes."""
+        """Inicializa el cache con datos frecuentes."""
         try:
             entities_data = self.storage.load(MemoryType.ENTITIES)
             self._update_cache(
@@ -635,18 +619,14 @@ class MemoryManager:
             )
 
         except Exception as e:
-            logger._print_log(
-                "error",
-                f"Error inicializando caché: {e}",
-                "storage.py", "_warm_cache", 636,
-            )
+            logger.error(f"Error inicializando cache: {e}")
 
     def _get_from_cache(
         self,
         key: str,
         memory_type: MemoryType,
     ) -> Any:
-        """Obtiene datos del caché si están frescos."""
+        """Obtiene datos del cache si estan frescos."""
         with self.cache_lock:
             if key in self.cache:
                 cache_entry = self.cache[key]
@@ -664,7 +644,7 @@ class MemoryManager:
         data: Any,
         memory_type: MemoryType,
     ) -> None:
-        """Actualiza el caché con nuevos datos."""
+        """Actualiza el cache con nuevos datos."""
         with self.cache_lock:
             self.cache[key] = {
                 "data": data,
@@ -676,10 +656,10 @@ class MemoryManager:
         """Guarda una entidad en la memoria de dominio.
 
         Es resiliente ante un ``entities.json`` corrupto o ausente: en lugar de
-        rechazar la escritura, repara el fichero generando JSON válido (una lista
-        con la entidad, o vacía si no hubiera nada recuperable) de modo que el
-        catálogo nunca quede inutilizable. La escritura es atómica
-        (``_escribir_entidades_atomico``) y el upsert actúa por ID estable sin
+        rechazar la escritura, repara el fichero generando JSON valido (una lista
+        con la entidad, o vacia si no hubiera nada recuperable) de modo que el
+        catalogo nunca quede inutilizable. La escritura es atomica
+        (``_escribir_entidades_atomico``) y el upsert actua por ID estable sin
         duplicar.
         """
         try:
@@ -697,29 +677,21 @@ class MemoryManager:
                         else:
                             # Contenido JSON valido pero no es una lista: se
                             # trata como corrupto y se repara generando lista.
-                            logger._print_log(
-                                "warning",
-                                f"entities.json en {entities_path} no contiene "
-                                f"una lista JSON; se repara generando JSON valido",
-                                "storage.py", "save_entity", 674,
-                            )
+                            logger.warning(f"entities.json en {entities_path} no contiene "
+                                f"una lista JSON; se repara generando JSON valido")
                             existing_entities = []
                     else:
                         # Fichero vacio: lista vacia, nada que perder.
                         existing_entities = []
                 except (json.JSONDecodeError, OSError, ValueError):
                     # JSON corrupto o no legible: se repara generando JSON valido
-                    # con la entidad que se está guardando, para que el catalogo
+                    # con la entidad que se esta guardando, para que el catalogo
                     # quede usable en lugar de inutilizado.
-                    logger._print_log(
-                        "warning",
-                        f"entities.json corrupto o no legible en {entities_path}; "
-                        f"se repara generando JSON valido para id={entity.id}",
-                        "storage.py", "save_entity", 674,
-                    )
+                    logger.warning(f"entities.json corrupto o no legible en {entities_path}; "
+                        f"se repara generando JSON valido para id={entity.id}")
                     existing_entities = []
 
-            # Upsert por ID estable: actualiza si ya existe, añade si no.
+            # Upsert por ID estable: actualiza si ya existe, anade si no.
             existing_index = None
             for i, existing in enumerate(existing_entities):
                 if isinstance(existing, dict) and existing.get("id") == entity.id:
@@ -745,21 +717,17 @@ class MemoryManager:
             return result
 
         except Exception as e:
-            logger._print_log(
-                "error",
-                f"Error guardando entidad id={entity.id} en disco: {e}",
-                "storage.py", "save_entity", 709,
-            )
+            logger.error(f"Error guardando entidad id={entity.id} en disco: {e}")
             return False
 
     def _escribir_entidades_atomico(self, file_path: Path, entities: list) -> bool:
         """
-        Escribe la lista de entidades de forma atómica en `file_path`.
+        Escribe la lista de entidades de forma atomica en `file_path`.
 
         Serializa a un archivo temporal en el mismo directorio y lo reemplaza
-        con `os.replace` (atómico en el mismo volumen), de modo que una
-        interrupción no deje `entities.json` truncado ni corrupto. Retorna True
-        si se escribió correctamente, False en caso de error.
+        con `os.replace` (atomico en el mismo volumen), de modo que una
+        interrupcion no deje `entities.json` truncado ni corrupto. Retorna True
+        si se escribio correctamente, False en caso de error.
         """
         try:
             file_path.parent.mkdir(parents=True, exist_ok=True)
@@ -788,11 +756,7 @@ class MemoryManager:
                     pass
                 raise
         except (OSError, PermissionError, ValueError, TypeError) as e:
-            logger._print_log(
-                "error",
-                f"Error escribiendo entidades de forma atomica en {file_path}: {e}",
-                "storage.py", "_escribir_entidades_atomico",
-            )
+            logger.error(f"Error escribiendo entidades de forma atomica en {file_path}: {e}")
             return False
 
     def get_entity(self, entity_id: str) -> Optional[Entity]:
@@ -820,17 +784,13 @@ class MemoryManager:
                 try:
                     return Entity.from_dict(entity_data)
                 except Exception as exc:
-                    logger._print_log(
-                        "warning",
-                        f"Entidad invalida no puede reconstruirse (id={entity_id}): {exc}",
-                        "storage.py", "get_entity", 741,
-                    )
+                    logger.warning(f"Entidad invalida no puede reconstruirse (id={entity_id}): {exc}")
                     return None
 
         return None
 
     def get_entities_by_type(self, entity_type: str) -> List[Entity]:
-        """Obtiene todas las entidades de un tipo específico."""
+        """Obtiene todas las entidades de un tipo especifico."""
         try:
             cached_data = self._get_from_cache(
                 "entities",
@@ -848,12 +808,8 @@ class MemoryManager:
                 )
 
             if not isinstance(entities_data, list):
-                logger._print_log(
-                    "warning",
-                    f"Datos de entidades no son una lista (tipo={type(entities_data).__name__}), "
-                    f"usando [] para filtro tipo='{entity_type}'",
-                    "storage.py", "get_entities_by_type", 771,
-                )
+                logger.warning(f"Datos de entidades no son una lista (tipo={type(entities_data).__name__}), "
+                    f"usando [] para filtro tipo='{entity_type}'")
                 entities_data = []
 
             entities = []
@@ -866,21 +822,13 @@ class MemoryManager:
                     try:
                         entities.append(Entity.from_dict(entity_data))
                     except Exception as exc:
-                        logger._print_log(
-                            "warning",
-                            f"Entidad invalida omitida (id={entity_data.get('id', '?')}) "
-                            f"al cargar tipo '{entity_type}': {exc}",
-                            "storage.py", "get_entities_by_type", 784,
-                        )
+                        logger.warning(f"Entidad invalida omitida (id={entity_data.get('id', '?')}) "
+                            f"al cargar tipo '{entity_type}': {exc}")
 
             return entities
 
         except Exception as e:
-            logger._print_log(
-                "error",
-                f"Error en get_entities_by_type(type='{entity_type}'): {e}",
-                "storage.py", "get_entities_by_type", 799,
-            )
+            logger.error(f"Error en get_entities_by_type(type='{entity_type}'): {e}")
             return []
 
     def find_entities(
@@ -915,12 +863,8 @@ class MemoryManager:
                 try:
                     entity = Entity.from_dict(entity_data)
                 except Exception as exc:
-                    logger._print_log(
-                        "warning",
-                        f"Entidad invalida omitida en find_entities "
-                        f"(id={entity_data.get('id', '?')}): {exc}",
-                        "storage.py", "find_entities", 836,
-                    )
+                    logger.warning(f"Entidad invalida omitida en find_entities "
+                        f"(id={entity_data.get('id', '?')}): {exc}")
                     continue
 
                 if entity_type and entity.type != entity_type:
@@ -940,7 +884,7 @@ class MemoryManager:
         property_name: str,
         property_value: Any,
     ) -> List[Entity]:
-        """Busca entidades por propiedad específica."""
+        """Busca entidades por propiedad especifica."""
         cached_data = self._get_from_cache(
             "entities",
             MemoryType.ENTITIES,
@@ -970,12 +914,8 @@ class MemoryManager:
                 try:
                     entities.append(Entity.from_dict(entity_data))
                 except Exception as exc:
-                    logger._print_log(
-                        "warning",
-                        f"Entidad invalida omitida en find_entities_by_property "
-                        f"(id={entity_data.get('id', '?')}): {exc}",
-                        "storage.py", "find_entities_by_property", 891,
-                    )
+                    logger.warning(f"Entidad invalida omitida en find_entities_by_property "
+                        f"(id={entity_data.get('id', '?')}): {exc}")
 
         return entities
 
@@ -990,7 +930,7 @@ class MemoryManager:
         execution_time: float = 0.0,
         confidence: float = 1.0,
     ) -> bool:
-        """Añade un registro mejorado a la memoria conversacional."""
+        """Anade un registro mejorado a la memoria conversacional."""
         try:
             memory_id = f"conv_{datetime.now().timestamp()}"
 
@@ -1013,7 +953,7 @@ class MemoryManager:
             )
 
         except Exception as e:
-            logger._print_log("error", f"Error en add_conversational_memory: {e}", "storage.py", "add_conversational_memory", 935)
+            logger.error(f"Error en add_conversational_memory: {e}")
             return False
 
     def get_conversational_memory(
@@ -1042,7 +982,7 @@ class MemoryManager:
             return memories
 
         except Exception as e:
-            logger._print_log("error", f"Error en get_conversational_memory: {e}", "storage.py", "get_conversational_memory", 964)
+            logger.error(f"Error en get_conversational_memory: {e}")
             return []
 
     def save_world_state(
@@ -1070,7 +1010,7 @@ class MemoryManager:
             return result
 
         except Exception as e:
-            logger._print_log("error", f"Error en save_world_state: {e}", "storage.py", "save_world_state", 992)
+            logger.error(f"Error en save_world_state: {e}")
             return False
 
     def get_world_state(self) -> WorldState:
@@ -1096,7 +1036,7 @@ class MemoryManager:
             return world_state
 
         except Exception as e:
-            logger._print_log("error", f"Error en get_world_state: {e}", "storage.py", "get_world_state", 1018)
+            logger.error(f"Error en get_world_state: {e}")
 
             return WorldState(
                 timestamp=time.time(),
@@ -1142,7 +1082,7 @@ class MemoryManager:
             return self.save_world_state(state)
 
         except Exception as e:
-            logger._print_log("error", f"Error en update_world_state: {e}", "storage.py", "update_world_state", 1064)
+            logger.error(f"Error en update_world_state: {e}")
             return False
 
     def save_plan(self, plan: Plan) -> bool:
@@ -1171,7 +1111,7 @@ class MemoryManager:
             )
 
         except Exception as e:
-            logger._print_log("error", f"Error en save_plan: {e}", "storage.py", "save_plan", 1093)
+            logger.error(f"Error en save_plan: {e}")
             return False
 
     def get_plan(self, plan_id: str) -> Optional[Plan]:
@@ -1189,14 +1129,14 @@ class MemoryManager:
             return None
 
         except Exception as e:
-            logger._print_log("error", f"Error en get_plan: {e}", "storage.py", "get_plan", 1111)
+            logger.error(f"Error en get_plan: {e}")
             return None
 
     def save_execution_record(
         self,
         record: ExecutionRecord,
     ) -> bool:
-        """Guarda un registro de ejecución."""
+        """Guarda un registro de ejecucion."""
         try:
             executions = self.storage.load(MemoryType.EXECUTIONS)
 
@@ -1211,7 +1151,7 @@ class MemoryManager:
             )
 
         except Exception as e:
-            logger._print_log("error", f"Error en save_execution_record: {e}", "storage.py", "save_execution_record", 1133)
+            logger.error(f"Error en save_execution_record: {e}")
             return False
 
     def update_learning_stats(
@@ -1220,7 +1160,7 @@ class MemoryManager:
         success: bool,
         execution_time: float,
     ) -> bool:
-        """Actualiza estadísticas de aprendizaje para una acción."""
+        """Actualiza estadisticas de aprendizaje para una accion."""
         try:
             stats_data = self.storage.load(MemoryType.LEARNING_STATS)
 
@@ -1247,14 +1187,14 @@ class MemoryManager:
             )
 
         except Exception as e:
-            logger._print_log("error", f"Error en update_learning_stats: {e}", "storage.py", "update_learning_stats", 1169)
+            logger.error(f"Error en update_learning_stats: {e}")
             return False
 
     def get_learning_stats(
         self,
         action_name: Optional[str] = None,
     ) -> Union[LearningStat, Dict[str, LearningStat]]:
-        """Obtiene estadísticas de aprendizaje."""
+        """Obtiene estadisticas de aprendizaje."""
         try:
             stats_data = self.storage.load(MemoryType.LEARNING_STATS)
 
@@ -1270,7 +1210,7 @@ class MemoryManager:
             return {name: LearningStat(**data) for name, data in stats_data.items()}
 
         except Exception as e:
-            logger._print_log("error", f"Error en get_learning_stats: {e}", "storage.py", "get_learning_stats", 1192)
+            logger.error(f"Error en get_learning_stats: {e}")
             return {}
 
     def clear_memory(
@@ -1311,11 +1251,11 @@ class MemoryManager:
             return True
 
         except Exception as e:
-            logger._print_log("error", f"Error en clear_memory: {e}", "storage.py", "clear_memory", 1233)
+            logger.error(f"Error en clear_memory: {e}")
             return False
 
     def get_memory_stats(self) -> Dict[str, Any]:
-        """Obtiene estadísticas detalladas de la memoria."""
+        """Obtiene estadisticas detalladas de la memoria."""
         try:
             stats = {}
 
@@ -1333,7 +1273,7 @@ class MemoryManager:
                         stats[memory_type.value] = 1 if data else 0
 
                 except Exception as e:
-                    logger._print_log("error", f"Error en get_memory_stats: {e}", "storage.py", "get_memory_stats", 1255)
+                    logger.error(f"Error en get_memory_stats: {e}")
                     stats[memory_type.value] = 0
 
             with self.cache_lock:
@@ -1345,7 +1285,7 @@ class MemoryManager:
             return stats
 
         except Exception as e:
-            logger._print_log("error", f"Error en get_memory_stats: {e}", "storage.py", "get_memory_stats", 1267)
+            logger.error(f"Error en get_memory_stats: {e}")
             return {}
 
     def save_user_preference(
@@ -1388,7 +1328,7 @@ class MemoryManager:
             return result
 
         except Exception as e:
-            logger._print_log("error", f"Error en save_user_preference: {e}", "storage.py", "save_user_preference", 1310)
+            logger.error(f"Error en save_user_preference: {e}")
             return False
 
     def get_user_preference(
@@ -1397,7 +1337,7 @@ class MemoryManager:
         preference_type: str,
         preference_key: str,
     ) -> Optional[UserPreference]:
-        """Obtiene una preferencia específica del usuario."""
+        """Obtiene una preferencia especifica del usuario."""
         try:
             cached_data = self._get_from_cache(
                 "preferences",
@@ -1425,7 +1365,7 @@ class MemoryManager:
             return None
 
         except Exception as e:
-            logger._print_log("error", f"Error en get_user_preference: {e}", "storage.py", "get_user_preference", 1347)
+            logger.error(f"Error en get_user_preference: {e}")
             return None
 
     def get_user_preferences(
@@ -1475,7 +1415,7 @@ class MemoryManager:
             return preferences
 
         except Exception as e:
-            logger._print_log("error", f"Error en get_user_preferences: {e}", "storage.py", "get_user_preferences", 1397)
+            logger.error(f"Error en get_user_preferences: {e}")
             return []
 
     def update_user_preference(
@@ -1516,7 +1456,7 @@ class MemoryManager:
             return self.save_user_preference(preference)
 
         except Exception as e:
-            logger._print_log("error", f"Error en update_user_preference: {e}", "storage.py", "update_user_preference", 1438)
+            logger.error(f"Error en update_user_preference: {e}")
             return False
 
     def learn_user_preference(
@@ -1574,7 +1514,7 @@ class MemoryManager:
             return self.save_user_preference(existing_pref)
 
         except Exception as e:
-            logger._print_log("error", f"Error en learn_user_preference: {e}", "storage.py", "learn_user_preference", 1496)
+            logger.error(f"Error en learn_user_preference: {e}")
             return False
 
     def save_entity_attribute(
@@ -1607,7 +1547,7 @@ class MemoryManager:
             return result
 
         except Exception as e:
-            logger._print_log("error", f"Error en save_entity_attribute: {e}", "storage.py", "save_entity_attribute", 1529)
+            logger.error(f"Error en save_entity_attribute: {e}")
             return False
 
     def get_entity_attribute(
@@ -1615,7 +1555,7 @@ class MemoryManager:
         entity_id: str,
         attribute_name: str,
     ) -> Optional[EntityAttribute]:
-        """Obtiene un atributo específico de una entidad."""
+        """Obtiene un atributo especifico de una entidad."""
         try:
             cached_data = self._get_from_cache(
                 "entity_attributes",
@@ -1643,7 +1583,7 @@ class MemoryManager:
             return None
 
         except Exception as e:
-            logger._print_log("error", f"Error en get_entity_attribute: {e}", "storage.py", "get_entity_attribute", 1565)
+            logger.error(f"Error en get_entity_attribute: {e}")
             return None
 
     def get_entity_attributes(
@@ -1685,7 +1625,7 @@ class MemoryManager:
             return attributes
 
         except Exception as e:
-            logger._print_log("error", f"Error en get_entity_attributes: {e}", "storage.py", "get_entity_attributes", 1607)
+            logger.error(f"Error en get_entity_attributes: {e}")
             return []
 
     def update_entity_attribute(
@@ -1713,7 +1653,7 @@ class MemoryManager:
             return self.save_entity_attribute(attribute)
 
         except Exception as e:
-            logger._print_log("error", f"Error en update_entity_attribute: {e}", "storage.py", "update_entity_attribute", 1635)
+            logger.error(f"Error en update_entity_attribute: {e}")
             return False
 
     def get_entities_by_attribute(
@@ -1755,7 +1695,7 @@ class MemoryManager:
             return matching_entities
 
         except Exception as e:
-            logger._print_log("error", f"Error en get_entities_by_attribute: {e}", "storage.py", "get_entities_by_attribute", 1677)
+            logger.error(f"Error en get_entities_by_attribute: {e}")
             return []
 
     def export_memory(
@@ -1777,11 +1717,11 @@ class MemoryManager:
                     indent=2,
                 )
 
-            logger._print_log("info", f"Operacion completada en export_memory", "storage.py", "export_memory", 1699)
+            logger.info(f"Operacion completada en export_memory")
             return True
 
         except Exception as e:
-            logger._print_log("error", f"Error en export_memory: {e}", "storage.py", "export_memory", 1703)
+            logger.error(f"Error en export_memory: {e}")
             return False
 
 
@@ -1829,7 +1769,7 @@ def add_conversational_memory(
     response: str,
     **kwargs,
 ) -> bool:
-    """Añade memoria conversacional."""
+    """Anade memoria conversacional."""
     return get_memory_manager().add_conversational_memory(
         message,
         response,
@@ -1865,7 +1805,7 @@ def update_learning_stats(
     success: bool,
     execution_time: float,
 ) -> bool:
-    """Actualiza estadísticas de aprendizaje."""
+    """Actualiza estadisticas de aprendizaje."""
     return get_memory_manager().update_learning_stats(
         action_name,
         success,
@@ -1909,7 +1849,7 @@ def resolve_entity_to_url(entity: Entity) -> Optional[str]:
         return None
 
     except Exception as e:
-        logger._print_log("error", f"Error en resolve_entity_to_url: {e}", "storage.py", "resolve_entity_to_url", 1831)
+        logger.error(f"Error en resolve_entity_to_url: {e}")
         return None
 
 
@@ -1965,7 +1905,7 @@ def get_entity_attributes(entity: Entity) -> Dict[str, Any]:
         return attributes
 
     except Exception as e:
-        logger._print_log("error", f"Error en get_entity_attributes: {e}", "storage.py", "get_entity_attributes", 1887)
+        logger.error(f"Error en get_entity_attributes: {e}")
         return {}
 
 
@@ -1973,7 +1913,7 @@ def create_goal_from_entity(
     entity: Entity,
     user_input: str,
 ) -> Optional[Dict[str, Any]]:
-    """Integración entidad -> Goal."""
+    """Integracion entidad -> Goal."""
     try:
         goal_type = None
         goal_description = ""
@@ -2000,7 +1940,7 @@ def create_goal_from_entity(
 
         elif entity.type == "application":
             goal_type = "application_goal"
-            goal_description = f"Abrir aplicación {entity.name}"
+            goal_description = f"Abrir aplicaci\u00f3n {entity.name}"
 
             if "abrir" in user_input.lower() or "open" in user_input.lower():
                 return {
@@ -2032,7 +1972,7 @@ def create_goal_from_entity(
         return None
 
     except Exception as e:
-        logger._print_log("error", f"Error en create_goal_from_entity: {e}", "storage.py", "create_goal_from_entity", 1954)
+        logger.error(f"Error en create_goal_from_entity: {e}")
         return None
 
 
@@ -2050,12 +1990,12 @@ def verify_entity_integrity(
         }
 
         if not entity.id:
-            verification_result["issues"].append("ID de entidad vacío")
+            verification_result["issues"].append("ID de entidad vac\u00edo")
             verification_result["is_valid"] = False
             verification_result["score"] -= 50
 
         if not entity.name:
-            verification_result["issues"].append("Nombre de entidad vacío")
+            verification_result["issues"].append("Nombre de entidad vac\u00edo")
             verification_result["is_valid"] = False
             verification_result["score"] -= 30
 
@@ -2087,7 +2027,7 @@ def verify_entity_integrity(
             url = entity.properties["url"]
 
             if not url.startswith(("http://", "https://")):
-                verification_result["warnings"].append(f"URL no parece válida: {url}")
+                verification_result["warnings"].append(f"URL no parece v\u00e1lida: {url}")
                 verification_result["score"] -= 15
 
         type_consistency_checks = {
@@ -2114,12 +2054,12 @@ def verify_entity_integrity(
         return verification_result
 
     except Exception as e:
-        logger._print_log("error", f"Error en verify_entity_integrity: {e}", "storage.py", "verify_entity_integrity", 2036)
+        logger.error(f"Error en verify_entity_integrity: {e}")
 
         return {
             "entity_id": entity.id,
             "is_valid": False,
-            "issues": [f"Error de verificación: {str(e)}"],
+            "issues": [f"Error de verificaci\u00f3n: {str(e)}"],
             "warnings": [],
             "score": 0,
         }

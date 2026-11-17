@@ -1,10 +1,10 @@
-"""Cerebro de JARVIS y comunicación con Ollama.
+"""Cerebro de JARVIS y comunicacion con Ollama.
 
-Esta versión mantiene la arquitectura existente y corrige:
-- normalización de alias de acciones legacy;
-- ejecución coherente a través del resultado ``[CMD: ...]``;
+Esta version mantiene la arquitectura existente y corrige:
+- normalizacion de alias de acciones legacy;
+- ejecucion coherente a traves del resultado ``[CMD: ...]``;
 - uso correcto de ``context`` al guardar memoria conversacional;
-- compatibilidad con nombres de acción en inglés producidos por el LLM.
+- compatibilidad con nombres de accion en ingles producidos por el LLM.
 """
 
 import json
@@ -14,23 +14,23 @@ from typing import Any, Dict, List, Optional, Union
 
 import ollama
 
-from src.hands.action_registry import ActionType, get_action_registry
+from src.hands.actions.action_registry import ActionType, get_action_registry
 from src.hands.planner.node import Node, Goal
 from src.hands.planner.preconditions_effects import get_preconditions_effects_manager
 from src.hands.planner.application_integration import get_application_knowledge_integrator
-from src.hands.applications_core import ApplicationCapability
+from src.hands.apps.applications_core import ApplicationCapability
 from src.brain.htn_integration import get_htn_integration
 from src.memory.storage import get_memory_manager, Entity
 from src.memory.entity_resolver import EntityResolver, ResolutionContext, EntityResolutionResult
 from src.tools.os_info import get_jarvis_system_context
-from src.utils.config import get_timeout_config
-from src.utils.logger import get_logger
+from src.core.config import get_timeout_config
+from src.core.log import get_logger
 
 logger = get_logger(__name__)
 
 
 class Brain:
-    """Cerebro de JARVIS con interpretación, objetivos y compatibilidad legacy."""
+    """Cerebro de JARVIS con interpretacion, objetivos y compatibilidad legacy."""
 
     ACTION_ALIASES = {
         "calibrate_chrome": "calibrar_chrome",
@@ -46,7 +46,7 @@ class Brain:
     }
 
     def __init__(self, model: str = "llama3") -> None:
-        logger._print_log("INFO", "Inicializando cerebro con modelo: " + model, "llm.py", "__init__", 48)
+        logger.info("Inicializando cerebro con modelo: " + model)
         self.model = model
         self.memory_manager = get_memory_manager()
         self.entity_resolver = EntityResolver(self.memory_manager)
@@ -57,23 +57,23 @@ class Brain:
         try:
             from src.brain.htn_integration import get_htn_integration
             self.htn_integration = get_htn_integration()
-            logger._print_log("INFO", "Sistema HTN integrado para descomposición jerárquica de tareas", "llm.py", "__init__", 59)
+            logger.info("Sistema HTN integrado para descomposicion jerarquica de tareas")
         except ImportError:
             self.htn_integration = None
-            logger._print_log("WARNING", "Sistema HTN no disponible, FASE 4 parcialmente deshabilitada", "llm.py", "__init__", 62)
+            logger.warning("Sistema HTN no disponible, FASE 4 parcialmente deshabilitada")
 
-        logger._print_log("INFO", "Cerebro listo con sistema de planificación jerárquica mejorado.", "llm.py", "__init__", 64)
+        logger.info("Cerebro listo con sistema de planificacion jerarquica mejorado.")
         htn_status = " + FASE 4 (HTN)" if self.htn_integration else ""
-        logger._print_log("INFO", "Cerebro inicializado con FASE 15 (Objetivos) y FASE 10 (Precondiciones y Efectos)", "llm.py", "__init__", 66)
+        logger.info("Cerebro inicializado con FASE 15 (Objetivos) y FASE 10 (Precondiciones y Efectos)")
         features = [
-            "detección de entidades",
-            "creación de objetivos", 
+            "detecci\u00f3n de entidades",
+            "creaci\u00f3n de objetivos", 
             "fallback legacy",
             "precondiciones/efectos avanzados",
         ]
         if self.htn_integration:
-            features.extend(["descomposición jerárquica de tareas", "ejecución de tareas", "integración HTN"])
-        logger._print_log("INFO", "Sistema HTN integrado correctamente", "llm.py", "__init__", 75)
+            features.extend(["descomposici\u00f3n jer\u00e1rquica de tareas", "ejecuci\u00f3n de tareas", "integraci\u00f3n HTN"])
+        logger.info("Sistema HTN integrado correctamente")
 
     def _normalize_action_name(self, action_name: str) -> str:
         """Convierte nombres conocidos producidos por el LLM a nombres registrados."""
@@ -89,7 +89,6 @@ class Brain:
 
         canonical = self.ACTION_ALIASES.get(candidate.lower())
         if canonical and self.action_registry.get_action(canonical) is not None:
-            logger._print_log("INFO", "Procesando solicitud", "llm.py", "_normalize_action_name", 91)
             return canonical
 
         return candidate
@@ -99,28 +98,28 @@ class Brain:
         Detecta comandos del sistema que deben resolverse de forma
         determinista antes de consultar entidades o al LLM.
 
-        La calibración global es especialmente importante: "calibrar
-        aplicaciones" no identifica una aplicación concreta y nunca debe
+        La calibracion global es especialmente importante: "calibrar
+        aplicaciones" no identifica una aplicacion concreta y nunca debe
         terminar en ``calibrar_chrome`` ni en ``calibrate_application_ui``,
-        porque esta última exige ``app_name``.
+        porque esta ultima exige ``app_name``.
         """
         normalized = re.sub(r"\s+", " ", str(prompt or "").strip().lower())
         if not normalized:
             return None
 
-        # Detectar calibración específica de navegadores
+        # Detectar calibracion especifica de navegadores
         chrome_calibration = re.search(
-            r"\b(calibr(?:ar|a|e|ación|acion|ado|ada)|calibrate)\b.*\b(chrome|crón|crón)\b",
+            r"\b(calibr(?:ar|a|e|aci\u00f3n|acion|ado|ada)|calibrate)\b.*\b(chrome|cr\u00f3n|cr\u00f3n)\b",
             normalized,
             re.IGNORECASE,
         )
         edge_calibration = re.search(
-            r"\b(calibr(?:ar|a|e|ación|acion|ado|ada)|calibrate)\b.*\b(edge|borde)\b",
+            r"\b(calibr(?:ar|a|e|aci\u00f3n|acion|ado|ada)|calibrate)\b.*\b(edge|borde)\b",
             normalized,
             re.IGNORECASE,
         )
         firefox_calibration = re.search(
-            r"\b(calibr(?:ar|a|e|ación|acion|ado|ada)|calibrate)\b.*\b(firefox|firefox)\b",
+            r"\b(calibr(?:ar|a|e|aci\u00f3n|acion|ado|ada)|calibrate)\b.*\b(firefox|firefox)\b",
             normalized,
             re.IGNORECASE,
         )
@@ -128,7 +127,6 @@ class Brain:
         if chrome_calibration:
             canonical = self._normalize_action_name("calibrar_chrome")
             if canonical == "calibrar_chrome":
-                logger._print_log("INFO", "Procesando solicitud", "llm.py", "think", 130)
                 return {
                     "type": "action",
                     "data": {
@@ -146,7 +144,6 @@ class Brain:
         if edge_calibration:
             canonical = self._normalize_action_name("calibrar_edge")
             if canonical == "calibrar_edge":
-                logger._print_log("INFO", "Procesando solicitud", "llm.py", "detect_calibration_command", 148)
                 return {
                     "type": "action",
                     "data": {
@@ -164,7 +161,6 @@ class Brain:
         if firefox_calibration:
             canonical = self._normalize_action_name("calibrar_firefox")
             if canonical == "calibrar_firefox":
-                logger._print_log("INFO", "Procesando solicitud", "llm.py", "think", 148)
                 return {
                     "type": "action",
                     "data": {
@@ -179,24 +175,23 @@ class Brain:
                     },
                 }
 
-        # Evitar que una petición específica de navegador se interprete como
-        # calibración global.
+        # Evitar que una peticion especifica de navegador se interprete como
+        # calibracion global.
         browser_specific = re.search(
             r"\b(chrome|edge|firefox)\b",
             normalized,
             re.IGNORECASE,
         )
         global_calibration = (
-            re.search(r"\bcalibr(?:ar|a|e|ación|acion|ado|ada)\b.*\baplicacion(?:es)?\b", normalized)
-            or re.search(r"\bcalibr(?:ar|a|e|ación|acion|ado|ada)\b.*\bprogramas?\b", normalized)
-            or re.search(r"\bcalibr(?:ar|a|e|ación|acion)\b.*\btodo(?:s|as)?\b", normalized)
-            or re.search(r"\bcalibr(?:ar|a|e|ación|acion)\b.*\bglobal\b", normalized)
+            re.search(r"\bcalibr(?:ar|a|e|aci\u00f3n|acion|ado|ada)\b.*\baplicacion(?:es)?\b", normalized)
+            or re.search(r"\bcalibr(?:ar|a|e|aci\u00f3n|acion|ado|ada)\b.*\bprogramas?\b", normalized)
+            or re.search(r"\bcalibr(?:ar|a|e|aci\u00f3n|acion)\b.*\btodo(?:s|as)?\b", normalized)
+            or re.search(r"\bcalibr(?:ar|a|e|aci\u00f3n|acion)\b.*\bglobal\b", normalized)
         )
 
         if global_calibration and not browser_specific:
             canonical = self._normalize_action_name("calibrar_aplicaciones")
             if canonical == "calibrar_aplicaciones":
-                logger._print_log("INFO", "Procesando solicitud", "llm.py", "think", 198)
                 return {
                     "type": "action",
                     "data": {
@@ -227,7 +222,7 @@ class Brain:
             }
             return str(combined_context)
         except Exception as exc:
-            logger._print_log("INFO", "Procesando solicitud", "llm.py", "_build_context", 229)
+            logger.debug("Brain._get_system_context: %s", exc)
             return "{}"
 
     def _get_available_actions(self) -> List[Dict[str, Any]]:
@@ -235,7 +230,7 @@ class Brain:
             actions = self.action_registry.get_actions_for_llama()
             return list(actions) if actions else []
         except Exception as exc:
-            logger._print_log("INFO", "Procesando solicitud", "llm.py", "_get_available_actions", 237)
+            logger.debug("Brain._get_available_actions: %s", exc)
             return []
 
     def _get_application_knowledge(self) -> Dict[str, Any]:
@@ -260,7 +255,7 @@ class Brain:
                 "supported_capabilities": ["open", "navigate", "search", "play", "type", "click"],
             }
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "llm.py", "method", 256)
+            logger.debug("Brain._get_application_knowledge: %s", exc)
             return {"applications": {}, "total_applications": 0, "supported_capabilities": []}
 
     def _get_domain_entities(self) -> List[Dict[str, Any]]:
@@ -278,7 +273,7 @@ class Brain:
                 for entity in all_entities
             ]
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "llm.py", "method", 256)
+            logger.debug("Brain._get_domain_entities: %s", exc)
             return []
 
     def _build_system_instruction(self, use_legacy_mode: bool = False) -> str:
@@ -288,21 +283,21 @@ class Brain:
 
         lines = [
             "Eres Jarvis, un asistente de IA.",
-            "SOLO respondes en español.",
-            "Cuando devuelvas una acción legacy, usa EXACTAMENTE el nombre que aparece en ACCIONES DISPONIBLES.",
+            "SOLO respondes en espa\u00f1ol.",
+            "Cuando devuelvas una acci\u00f3n legacy, usa EXACTAMENTE el nombre que aparece en ACCIONES DISPONIBLES.",
             "No traduzcas ni inventes nombres de acciones.",
-            "calibrar_aplicaciones = calibración GLOBAL de las aplicaciones soportadas.",
-            "calibrar_chrome = calibración EXCLUSIVA de Google Chrome.",
-            "Nunca uses calibrar_chrome para una petición general como 'calibrar aplicaciones'.",
-            "Nunca uses calibrate_application_ui para una petición general: esa acción exige una aplicación concreta.",
+            "calibrar_aplicaciones = calibraci\u00f3n GLOBAL de las aplicaciones soportadas.",
+            "calibrar_chrome = calibraci\u00f3n EXCLUSIVA de Google Chrome.",
+            "Nunca uses calibrar_chrome para una petici\u00f3n general como 'calibrar aplicaciones'.",
+            "Nunca uses calibrate_application_ui para una petici\u00f3n general: esa acci\u00f3n exige una aplicaci\u00f3n concreta.",
             "",
         ]
 
         if use_legacy_mode:
             lines.extend([
                 "MODO COMPATIBILIDAD (acciones existentes):",
-                "Cuando el usuario solicita una acción que puede realizar JARVIS,",
-                "devuelve ÚNICAMENTE un objeto JSON válido, sin Markdown ni texto adicional.",
+                "Cuando el usuario solicita una acci\u00f3n que puede realizar JARVIS,",
+                "devuelve \u00daNICAMENTE un objeto JSON v\u00e1lido, sin Markdown ni texto adicional.",
                 "",
                 "FORMATO OBLIGATORIO:",
                 "{",
@@ -314,9 +309,9 @@ class Brain:
             ])
         else:
             lines.extend([
-                "MODO PLANIFICACIÓN JERÁRQUICA:",
-                "Intenta interpretar la intención y crear un objetivo del sistema.",
-                "Si la petición es una acción concreta que ya existe, puedes usar el formato legacy.",
+                "MODO PLANIFICACI\u00d3N JER\u00c1RQUICA:",
+                "Intenta interpretar la intenci\u00f3n y crear un objetivo del sistema.",
+                "Si la petici\u00f3n es una acci\u00f3n concreta que ya existe, puedes usar el formato legacy.",
                 "",
                 "ENTIDADES DE DOMINIO DISPONIBLES:",
             ])
@@ -333,13 +328,13 @@ class Brain:
                 '  "goal": {',
                 '    "type": "navigate|open_application|navigate_stream|search|etc",',
                 '    "target": "valor o entidad de dominio",',
-                '    "description": "Descripción del objetivo",',
+                '    "description": "Descripci\u00f3n del objetivo",',
                 '    "priority": 1,',
                 '    "constraints": []',
                 "  }",
                 "}",
                 "",
-                "FORMATO ACCIÓN LEGACY (fallback):",
+                "FORMATO ACCI\u00d3N LEGACY (fallback):",
                 "{",
                 '  "action": "nombre_de_la_accion_exacta",',
                 '  "parameters": { "parametro": "valor" }',
@@ -385,13 +380,13 @@ class Brain:
             try:
                 content = response["message"]["content"]
             except (KeyError, TypeError) as exc:
-                raise ValueError("Ollama devolvió una respuesta sin message.content") from exc
+                raise ValueError("Ollama devolvio una respuesta sin message.content") from exc
             return str(content).strip() if content else ""
         except ollama.ResponseError as exc:
-            logger._print_log("info", "Procesando solicitud", "llm.py", "method", 256)
+            logger.debug("Brain._chat_text: %s", exc)
             raise
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "llm.py", "method", 256)
+            logger.debug("Brain._chat_text: %s", exc)
             raise
 
     def generate_response(self, prompt: str, use_legacy_mode: bool = False) -> str:
@@ -402,13 +397,12 @@ class Brain:
             {"role": "system", "content": system_instruction},
             {"role": "user", "content": prompt.strip()},
         ]
-        logger._print_log("INFO", "Enviando " + str(len(messages)) + " mensajes al modelo " + self.model, "llm.py", "generate_response", 398)
+        logger.info("Enviando " + str(len(messages)) + " mensajes al modelo " + self.model)
         try:
             result = self._chat_text(messages, temperature=0.7, top_p=0.9, num_predict=500)
-            logger._print_log("info", "Procesando solicitud", "llm.py", "method", 256)
             return result
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "llm.py", "method", 256)
+            logger.debug("Brain.generate_response: %s", exc)
             return f"ERROR: {exc}"
 
     def execute_goal(self, goal_data: Union[Dict[str, Any], "Goal"]) -> Dict[str, Any]:
@@ -420,17 +414,15 @@ class Brain:
             goal_type = goal_dict.get("type", "")
             target = goal_dict.get("target", "")
             description = goal_dict.get("description", "")
-            logger._print_log("INFO", "Procesando solicitud", "llm.py", "execute_goal", 416)
             if goal_type == "navigate_stream" and target:
                 return {"type": "legacy_action", "action": "navigate_to_url", "parameters": {"url": target}, "reasoning": f"Navegando a stream: {target}"}
             if goal_type == "navigate" and target:
                 return {"type": "legacy_action", "action": "navigate_to_url", "parameters": {"url": target}, "reasoning": f"Navegando a: {target}"}
             if goal_type == "open_application":
-                return {"type": "legacy_action", "action": f"open_{target.lower().replace(' ', '_')}", "parameters": {}, "reasoning": f"Abriendo aplicación: {target}"}
-            logger._print_log("info", "Procesando solicitud", "llm.py", "method", 256)
-            return {"type": "error", "message": f"Objetivo '{goal_type}' aún no implementado en el sistema legacy", "goal_data": goal_dict}
+                return {"type": "legacy_action", "action": f"open_{target.lower().replace(' ', '_')}", "parameters": {}, "reasoning": f"Abriendo aplicaci\u00f3n: {target}"}
+            return {"type": "error", "message": f"Objetivo '{goal_type}' a\u00fan no implementado en el sistema legacy", "goal_data": goal_dict}
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "llm.py", "method", 256)
+            logger.debug("Brain.execute_goal: %s", exc)
             return {"type": "error", "message": f"Error ejecutando objetivo: {exc}", "goal_data": goal_dict}
 
     def process_intent_to_execution(self, prompt: str) -> Dict[str, Any]:
@@ -457,23 +449,22 @@ class Brain:
                     result_data["htn_results"] = [r.__dict__ for r in htn_results]
                 return result_data
             if intent_result["type"] == "action":
-                return {"type": "legacy_execution", "action": intent_result["action"], "parameters": intent_result["parameters"], "reasoning": "Acción legacy lista para ejecución"}
+                return {"type": "legacy_execution", "action": intent_result["action"], "parameters": intent_result["parameters"], "reasoning": "Acci\u00f3n legacy lista para ejecuci\u00f3n"}
             return intent_result
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "llm.py", "method", 256)
+            logger.debug("Brain.process_intent_to_execution: %s", exc)
             return {"type": "error", "message": f"Error en procesamiento: {exc}", "original_prompt": prompt}
 
     def process_with_htn(self, prompt: str) -> Dict[str, Any]:
         if not self.htn_integration:
             return {"type": "htn_error", "message": "Sistema HTN no disponible", "original_prompt": prompt}
         try:
-            logger._print_log("info", "Procesando solicitud", "llm.py", "method", 256)
             htn_result = self.htn_integration.create_and_execute_htn_goal(prompt, {})
             if htn_result.success:
-                return {"type": "htn_success", "goal_id": htn_result.goal_id, "goal_type": htn_result.goal_type, "decomposed_tasks": htn_result.decomposed_tasks, "execution_results": htn_result.execution_results, "total_execution_time": htn_result.total_execution_time, "reasoning": "Objetivo procesado exitosamente con descomposición jerárquica"}
+                return {"type": "htn_success", "goal_id": htn_result.goal_id, "goal_type": htn_result.goal_type, "decomposed_tasks": htn_result.decomposed_tasks, "execution_results": htn_result.execution_results, "total_execution_time": htn_result.total_execution_time, "reasoning": "Objetivo procesado exitosamente con descomposici\u00f3n jer\u00e1rquica"}
             return {"type": "htn_failure", "goal_id": htn_result.goal_id, "goal_type": htn_result.goal_type, "error_message": htn_result.error_message, "reasoning": "Fallo en procesamiento con HTN"}
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "llm.py", "method", 256)
+            logger.debug("Brain.process_with_htn: %s", exc)
             return {"type": "htn_error", "message": f"Error en procesamiento HTN: {exc}", "original_prompt": prompt}
 
     def get_htn_insights(self) -> Dict[str, Any]:
@@ -482,7 +473,7 @@ class Brain:
         try:
             return self.htn_integration.get_htn_insights()
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "llm.py", "method", 256)
+            logger.debug("Brain.get_htn_insights: %s", exc)
             return {"error": str(exc)}
 
     def _extract_parameters_from_input(self, user_input: str, entity: Entity) -> Dict[str, Any]:
@@ -510,7 +501,7 @@ class Brain:
                     parameters["window_mode"] = "minimized"
             return parameters
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "llm.py", "method", 256)
+            logger.debug("Brain._extract_parameters_from_input: %s", exc)
             return {}
 
     def _extract_search_query(self, user_input: str) -> str:
@@ -550,10 +541,10 @@ class Brain:
         try:
             data = json.loads(clean_response)
         except json.JSONDecodeError as exc:
-            logger._print_log("info", "Procesando solicitud", "llm.py", "method", 256)
+            logger.debug("Brain.parse_model_response: %s", exc)
             return None
         if not isinstance(data, dict):
-            logger._print_log("WARNING", "[BRAIN] El JSON del modelo no contiene un objeto.", "llm.py", "parse_model_response", 549)
+            logger.warning("[BRAIN] El JSON del modelo no contiene un objeto.")
             return None
         return data
 
@@ -572,10 +563,9 @@ class Brain:
             resolution_result = self.entity_resolver.resolve_entity(user_input, context, None)
             resolved_entities = [resolution_result.entity]
             resolved_entities.extend(resolution_result.alternatives)
-            logger._print_log("INFO", "Procesando solicitud", "llm.py", "_extract_entities_from_input", 568)
             return resolved_entities
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "llm.py", "method", 256)
+            logger.debug("Brain._extract_entities_from_input: %s", exc)
             return self._extract_entities_fallback(user_input)
 
     def _extract_entities_fallback(self, user_input: str) -> List[Entity]:
@@ -588,7 +578,7 @@ class Brain:
                     if isinstance(entities_of_type, list):
                         all_entities.extend(entities_of_type)
                 except Exception as exc:
-                    logger._print_log("info", "Procesando solicitud", "llm.py", "method", 256)
+                    logger.debug("Brain._extract_entities_fallback: %s", exc)
             user_input_lower = user_input.lower()
             for entity in all_entities:
                 entity_name_lower = entity.name.lower()
@@ -603,7 +593,7 @@ class Brain:
                 unique_entities[entity.id] = entity
             return list(unique_entities.values())
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "llm.py", "method", 256)
+            logger.debug("Brain._extract_entities_fallback: %s", exc)
             return []
 
     def _create_goal_from_entity(self, entity: Entity, user_input: str, resolution_result: Optional[EntityResolutionResult] = None) -> Optional[Goal]:
@@ -617,7 +607,7 @@ class Brain:
                 elif any(word in input_lower for word in ["buscar", "info", "datos"]):
                     goal_type = "search_streamer"
                     target = entity.name
-                    description = f"Buscar información de {entity.name}"
+                    description = f"Buscar informaci\u00f3n de {entity.name}"
                 else:
                     goal_type = "navigate_stream"
                     target = entity.properties.get("url", "")
@@ -639,19 +629,19 @@ class Brain:
                 if any(word in input_lower for word in ["abrir", "abre", "iniciar", "lanzar"]):
                     goal_type = "open_application"
                     target = entity.name
-                    description = f"Abrir aplicación {entity.name}"
+                    description = f"Abrir aplicaci\u00f3n {entity.name}"
                 elif any(word in input_lower for word in ["cerrar", "cierra", "terminar"]):
                     goal_type = "close_application"
                     target = entity.name
-                    description = f"Cerrar aplicación {entity.name}"
+                    description = f"Cerrar aplicaci\u00f3n {entity.name}"
                 else:
                     goal_type = "open_application"
                     target = entity.name
-                    description = f"Abrir aplicación {entity.name}"
+                    description = f"Abrir aplicaci\u00f3n {entity.name}"
             else:
                 goal_type = "navigate"
                 target = entity.properties.get("url", "")
-                description = f"Realizar acción con {entity.name}"
+                description = f"Realizar acci\u00f3n con {entity.name}"
 
             goal_id = f"{goal_type}_{entity.id}_{int(time.time())}"
             parameters = self._extract_parameters_from_input(user_input, entity)
@@ -702,10 +692,9 @@ class Brain:
                     "resolution_method": resolution_result.resolution_method if resolution_result else "fallback",
                 },
             )
-            logger._print_log("INFO", "Procesando solicitud", "llm.py", "_create_goal_from_entity", 698)
             return goal
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "llm.py", "method", 256)
+            logger.debug("Brain._create_goal_from_entity: %s", exc)
             return None
 
     def _get_entity_capabilities(self, entity: Entity, goal_type: str) -> List[str]:
@@ -754,7 +743,6 @@ class Brain:
         if not prompt or not prompt.strip():
             return {"type": "unknown", "data": None, "raw": "", "goal": None, "action": None}
 
-        logger._print_log("info", "Procesando solicitud", "llm.py", "method", 256)
 
         direct_action = self._detect_direct_action(prompt)
         if direct_action is not None:
@@ -774,17 +762,16 @@ class Brain:
                 session_info={"timestamp": time.time()},
             )
             resolution_result = self.entity_resolver.resolve_entity(prompt, context, None)
-            # Una entidad temporal/no resuelta no debe secuestrar una acción legacy.
+            # Una entidad temporal/no resuelta no debe secuestrar una accion legacy.
             if resolution_result.resolution_method != "temporary_creation":
                 entities = [resolution_result.entity]
                 entities.extend(resolution_result.alternatives)
                 resolution_results = [resolution_result]
-            logger._print_log("INFO", "Procesando solicitud", "llm.py", "interpret_intent", 775)
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "llm.py", "method", 256)
+            logger.debug("Brain.interpret_intent: %s", exc)
             entities = self._extract_entities_fallback(prompt)
             resolution_results = [None] * len(entities)
-            logger._print_log("INFO", "Procesando solicitud: " + str([e.name for e in entities]), "llm.py", "interpret_intent", 780)
+            logger.info("Procesando solicitud: " + str([e.name for e in entities]))
 
         if entities:
             goals: List[Goal] = []
@@ -811,18 +798,16 @@ class Brain:
                 try:
                     goal = self._create_system_goal(goal_data, prompt)
                     if goal:
-                        logger._print_log("info", "Procesando solicitud", "llm.py", "method", 256)
                         return {"type": "goal", "data": goal_data, "raw": raw_response, "goal": goal, "action": None}
                 except Exception as exc:
-                    logger._print_log("info", "Procesando solicitud", "llm.py", "method", 256)
+                    logger.debug("Brain.interpret_intent: %s", exc)
             if "action" in parsed:
                 canonical_action = self._normalize_action_name(parsed.get("action", ""))
                 if canonical_action:
                     parsed["action"] = canonical_action
-                logger._print_log("INFO", "Procesando solicitud", "llm.py", "interpret_intent", 815)
                 return {"type": "action", "data": parsed, "raw": raw_response, "goal": None, "action": parsed}
 
-        logger._print_log("INFO", "[INTERPRET] Usando modo legacy como fallback", "llm.py", "interpret_intent", 818)
+        logger.info("[INTERPRET] Usando modo legacy como fallback")
         raw_response = self.generate_response(prompt, use_legacy_mode=True)
         parsed = self.parse_model_response(raw_response)
         if parsed and "action" in parsed:
@@ -839,7 +824,6 @@ class Brain:
             target = goal_data.get("target", "")
             description = goal_data.get("description", f"Realizar: {goal_type}")
             if not goal_type or not target:
-                logger._print_log("info", "Procesando solicitud", "llm.py", "method", 256)
                 return None
             timestamp = int(time.time())
             goal_id = f"{goal_type}_{target}_{timestamp}"
@@ -865,65 +849,60 @@ class Brain:
             )
             return goal
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "llm.py", "method", 256)
+            logger.debug("Brain._create_system_goal: %s", exc)
             return None
 
     def think(self, prompt: str, use_legacy_execution: bool = False) -> str:
-        logger._print_log("info", "Procesando solicitud", "llm.py", "method", 256)
         if not prompt or not prompt.strip():
-            return "No recibí ningún mensaje."
+            return "No recib\u00ed ning\u00fan mensaje."
 
         interpretation = self.interpret_intent(prompt)
         if interpretation["type"] == "goal":
             goal = interpretation["goal"]
             if isinstance(goal, list):
                 goal = goal[0]
-            logger._print_log("info", "Procesando solicitud", "llm.py", "method", 256)
             self.memory_manager.add_conversational_memory(
                 message=prompt,
                 response=f"Objetivo creado: {goal.description}",
                 intent=goal.type,
                 entities=[goal.target] if goal.target else [],
             )
-            return f"Objetivo registrado: {goal.description}. El sistema lo procesará próximamente."
+            return f"Objetivo registrado: {goal.description}. El sistema lo procesar\u00e1 pr\u00f3ximamente."
 
         if interpretation["type"] == "action":
             action_data = interpretation["action"]
             action_name = self._normalize_action_name(action_data.get("action", ""))
             parameters = action_data.get("parameters", {}) or {}
-            logger._print_log("info", "Procesando solicitud", "llm.py", "method", 256)
 
             if not action_name:
-                return "No entendí la acción solicitada."
+                return "No entend\u00ed la acci\u00f3n solicitada."
 
             if use_legacy_execution:
                 result = self._execute_legacy_action(action_name, parameters)
                 self.memory_manager.add_conversational_memory(
                     message=prompt,
-                    response=f"Acción ejecutada: {action_name}",
+                    response=f"Acci\u00f3n ejecutada: {action_name}",
                     intent="legacy_action",
                     entities=[],
                 )
-                return f"✅ {result}"
+                return f"\u2705 {result}"
 
             # Devolver un comando ejecutable por la fachada Executor de main.py.
             return f"[CMD: {action_name}]"
 
-        logger._print_log("info", "Procesando solicitud", "llm.py", "method", 256)
-        return "No entendí tu solicitud. ¿Podrías repetirla de otra manera?"
+        return "No entend\u00ed tu solicitud. \u00bfPodr\u00edas repetirla de otra manera?"
 
     def _execute_legacy_action(self, action_name: str, parameters: Dict[str, Any]) -> str:
         try:
             action_name = self._normalize_action_name(action_name)
             is_valid = self.action_registry.validate_action(action_name, parameters)
             if not is_valid:
-                return f"❌ Acción no válida: {action_name}"
+                return f"\u274c Acci\u00f3n no v\u00e1lida: {action_name}"
             result = self.action_registry.execute_action(action_name, parameters)
-            logger._print_log("info", "Procesando solicitud", "llm.py", "method", 256)
-            return f"✅ Acción ejecutada: {action_name}. Resultado: {result}"
+            return f"\u2705 Acci\u00f3n ejecutada: {action_name}. Resultado: {result}"
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "llm.py", "method", 256)
-            return f"❌ Error ejecutando {action_name}: {exc}"
+            logger.debug("Brain._execute_legacy_action: %s", exc)
+            return f"\u274c Error ejecutando {action_name}: {exc}"
 
     def process_action_response(self, llm_response: str) -> str:
         try:
@@ -935,18 +914,17 @@ class Brain:
             if not isinstance(action_name, str) or not action_name.strip():
                 return llm_response
             if not isinstance(parameters, dict):
-                return f"❌ Parámetros incorrectos para la acción: {action_name}"
+                return f"\u274c Par\u00e1metros incorrectos para la acci\u00f3n: {action_name}"
             return self._execute_legacy_action(action_name.strip(), parameters)
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "llm.py", "method", 256)
+            logger.debug("Brain.process_action_response: %s", exc)
             return llm_response
 
     def think_with_image(self, prompt: str, image_path: str) -> str:
-        logger._print_log("info", "Procesando solicitud", "llm.py", "method", 256)
         if not prompt or not prompt.strip():
-            return "No recibí instrucciones para la imagen."
+            return "No recib\u00ed instrucciones para la imagen."
         if not image_path:
-            return "No se proporcionó ninguna imagen."
+            return "No se proporcion\u00f3 ninguna imagen."
         try:
             return self._chat_text(
                 [{"role": "user", "content": prompt.strip(), "images": [image_path]}],
@@ -957,15 +935,14 @@ class Brain:
                 repeat_penalty=1.2,
             )
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "llm.py", "method", 256)
+            logger.debug("Brain.think_with_image: %s", exc)
             return f"ERROR: {exc}"
 
     def analyze_image(self, image_path: str, analysis_prompt: str) -> str:
-        logger._print_log("info", "Procesando solicitud", "llm.py", "method", 256)
         if not image_path:
-            return "No se proporcionó imagen"
+            return "No se proporcion\u00f3 imagen"
         if not analysis_prompt or not analysis_prompt.strip():
-            return "No se proporcionaron instrucciones para el análisis."
+            return "No se proporcionaron instrucciones para el an\u00e1lisis."
         try:
             result = self._chat_text(
                 [{"role": "user", "content": analysis_prompt.strip(), "images": [image_path]}],
@@ -975,27 +952,26 @@ class Brain:
                 stop=["\n\n", "User:", "Assistant:"],
                 repeat_penalty=1.1,
             )
-            logger._print_log("INFO", "[+] Análisis de imagen completado", "llm.py", "analyze_image", 971)
-            logger._print_log("info", "Procesando solicitud", "llm.py", "method", 256)
+            logger.info("[+] Analisis de imagen completado")
             return result
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "llm.py", "method", 256)
+            logger.debug("Brain.analyze_image: %s", exc)
             return f"ERROR: {exc}"
 
     def clear_memory(self) -> None:
-        logger._print_log("INFO", "Limpiando memoria del cerebro", "llm.py", "clear_memory", 979)
+        logger.info("Limpiando memoria del cerebro")
         try:
             self.memory_manager.clear_memory()
-            logger._print_log("INFO", "[+] Memoria limpia exitosamente", "llm.py", "clear_memory", 982)
+            logger.info("[+] Memoria limpia exitosamente")
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "llm.py", "method", 256)
+            logger.debug("Brain.clear_memory: %s", exc)
 
     def get_conversation_history(self) -> List[Dict[str, Any]]:
         try:
             memories = self.memory_manager.get_conversational_memory()
             return [m.to_dict() if hasattr(m, "to_dict") else m for m in memories]
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "llm.py", "method", 256)
+            logger.debug("Brain.get_conversation_history: %s", exc)
             return []
 
     def get_available_actions(self) -> List[Dict[str, Any]]:
@@ -1030,12 +1006,11 @@ class Brain:
     def register_node(self, node_config: Dict[str, Any]) -> None:
         try:
             node = Node.from_dict(node_config)
-            logger._print_log("info", "Procesando solicitud", "llm.py", "method", 256)
         except Exception as exc:
-            logger._print_log("info", "Procesando solicitud", "llm.py", "method", 256)
+            logger.debug("Brain.register_node: %s", exc)
 
     def register_task(self, task_config: Dict[str, Any]) -> None:
-        logger._print_log("INFO", "Procesando solicitud", "llm.py", "register_task", 1031)
+        pass
 
 
 def get_jarvis_context():

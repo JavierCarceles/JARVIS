@@ -4,7 +4,7 @@ CURRENT_WORK_UNIT: 3.8.6.4.3
 CURRENT_WORK_STATUS: PENDIENTE
 LAST_COMPLETED_UNIT: 3.8.6.4.2
 
-# PROMPT PRINCIPAL JARVIS — PUNTO DE ENTRADA Y CONTINUIDAD
+# PROMPT PRINCIPAL JARVIS - PUNTO DE ENTRADA Y CONTINUIDAD
 
 ## OBJETIVO
 
@@ -18,8 +18,8 @@ El desarrollo debe producir capacidades funcionales, integradas y verificadas en
 - `mejora/prompt_JARVIS_reglas.txt`: reglas operativas, restricciones, seguridad, tests, verificacion real, entorno grafico, documentacion y transiciones de estado. Leerlo completo antes de trabajar.
 - `mejora/prompt_JARVIS_roadmap.txt`: roadmap de fases/unidades, dependencias tecnicas, jerarquia y puntuacion de dificultad (1-10) de cada unidad.
 - `mejora/prompt_JARVIS_registros.txt`: registros canonicos detallados de unidad (implementacion, verificacion, tests, discrepancias, pendientes). Consultar el registro de la unidad activa; no cargar todo el historial si no hace falta.
-- `docs/README.md`: documentacion tecnica del codigo existente. Leerlo completo antes de modificar codigo.
-- `docs/README_TESTS.md`: documentacion tecnica de los tests existentes. Consultarlo antes de modificar tests y revisar si necesita actualizarse cuando estos cambien.
+- `docs/readme/README.md`: documentacion tecnica del codigo existente. Leerlo completo antes de modificar codigo.
+- `docs/readme/README_TESTS.md`: documentacion tecnica de los tests existentes. Consultarlo antes de modificar tests y revisar si necesita actualizarse cuando estos cambien.
 
 ## PRECEDENCIA Y RESPONSABILIDAD DE LOS DOCUMENTOS
 
@@ -35,8 +35,8 @@ El desarrollo debe producir capacidades funcionales, integradas y verificadas en
 
 1. Leer los cuatro campos de ESTADO PERSISTENTE ACTUAL de este archivo. Estos campos son el unico puntero operativo.
 2. Leer COMPLETO `prompt_JARVIS_reglas.txt`. No empezar codigo ni ejecutar actuaciones de desarrollo antes de conocer todas las reglas.
-3. Leer COMPLETO `docs/README.md` para conocer la arquitectura y el comportamiento documentado del codigo existente.
-4. Consultar `docs/README_TESTS.md` para conocer la cobertura documentada de los tests que puedan verse afectados.
+3. Leer COMPLETO `docs/readme/README.md` para conocer la arquitectura y el comportamiento documentado del codigo existente.
+4. Consultar `docs/readme/README_TESTS.md` para conocer la cobertura documentada de los tests que puedan verse afectados.
 5. Abrir `prompt_JARVIS_roadmap.txt`, localizar `CURRENT_WORK_UNIT` y consultar su definicion, padre, hijas, posicion en el orden del roadmap, dependencias, criterios de aceptacion y registros/discrepancias pertinentes. No elegir otra unidad por referencias historicas.
 6. Comprobar que la unidad activa es realmente una hoja de trabajo y que sus dependencias estan disponibles. No adelantar capacidades pertenecientes a otras unidades ni duplicar implementaciones existentes.
 7. Trabajar exclusivamente `CURRENT_WORK_UNIT`.
@@ -76,20 +76,12 @@ Las reglas detalladas de verificacion, seguridad y registro se encuentran en `pr
 
 ## PROTECCION DEL ENTORNO GRAFICO Y MULTIPANTALLA
 
-El equipo dispone de dos pantallas y Visual Studio Code se ejecuta en la segunda.
+Para las pruebas graficas (detalle en la regla 5 de la cabecera de `prompt_JARVIS_roadmap.txt` y en la seccion 8 de `prompt_JARVIS_reglas.txt`):
 
-Para las pruebas graficas:
-
-- La segunda pantalla es el destino predeterminado de las ventanas de prueba.
-- La seleccion se realizara mediante la enumeracion real de monitores, no mediante indices, coordenadas o identificadores supuestos.
-- Visual Studio Code es una ventana protegida: no moverla, minimizarla, cerrarla, redimensionarla, utilizarla como ventana de prueba ni enviarle entradas.
-- No interferir con la actividad del usuario en la primera pantalla.
-- No superponer ventanas de prueba sobre VS Code.
-- Antes de introducir teclado o raton, verificar la identidad de la ventana de prueba y su foco real.
-- Si no puede garantizarse el aislamiento, detener la prueba y registrar `BLOQUEADA/NO VERIFICADA`.
-- No utilizar la primera pantalla como alternativa silenciosa.
-
-Las comprobaciones graficas detalladas se rigen por `prompt_JARVIS_reglas.txt`.
+- Destino: el monitor no principal situado mas a la derecha segun la enumeracion real de monitores; con un solo monitor, ese monitor. Nunca indices, coordenadas ni identificadores supuestos.
+- Visual Studio Code: no enviarle teclado ni raton y no moverlo, redimensionarlo, minimizarlo, cerrarlo ni tocar su workspace. La aplicacion bajo prueba SI se pone en primer plano, maximizada, encima de VS Code. La presencia de VS Code nunca justifica SKIPPED, BLOQUEADA ni NO VERIFICADA.
+- Antes de cada entrada de teclado o raton, verificar la identidad, el monitor y el primer plano real de la ventana de prueba.
+- Una aplicacion GUI por vez; cerrar solo lo que abrio la prueba.
 
 ## CONTINUIDAD Y CIERRE
 
@@ -133,9 +125,9 @@ Si el bloqueo se produce antes de realizar cualquier trabajo y no se ha iniciado
 
 ## DOCUMENTACION TECNICA
 
-Cuando se modifique de forma relevante codigo de `src/`, revisar si `docs/README.md` necesita actualizarse.
+Cuando se modifique de forma relevante codigo de `src/`, revisar si `docs/readme/README.md` necesita actualizarse.
 
-Cuando se modifiquen tests, revisar si `docs/README_TESTS.md` necesita actualizarse.
+Cuando se modifiquen tests, revisar si `docs/readme/README_TESTS.md` necesita actualizarse.
 
 La documentacion debe describir unicamente el comportamiento tecnico actual y comprobable. Nunca debe utilizarse para registrar fases, IDs de mejora, fechas, avances, historial o cierres del roadmap.
 

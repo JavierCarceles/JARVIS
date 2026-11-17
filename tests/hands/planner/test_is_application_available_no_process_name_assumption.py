@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Tests de la unidad 3.8.3.2.
 
-Verifica que ``Planner.is_application_available`` resuelve la aplicación a
+Verifica que ``Planner.is_application_available`` resuelve la aplicacion a
 partir de fuentes verificables (``ApplicationPreflight``/``resolve_executable``)
 sin asumir que el nombre del proceso coincide con el nombre comercial
 (por ejemplo, no construir ``f"{app_name.lower()}.exe"`` como ejecutable).
@@ -19,7 +19,7 @@ def test_is_application_available_no_asume_nombre_proceso_igual_nombre_comercial
     planner = Planner()
 
     with patch(
-        "src.hands.application_preflight.ApplicationPreflight.check"
+        "src.hands.apps.application_preflight.ApplicationPreflight.check"
     ) as mock_check:
         mock_check.return_value = {
             "allowed": True,
@@ -38,11 +38,11 @@ def test_is_application_available_no_asume_nombre_proceso_igual_nombre_comercial
 
 def test_is_application_available_nombre_comercial_con_espacio_no_genera_executable_falso():
     """Un nombre comercial con espacios ("Microsoft Edge") no se transforma en
-    "microsoft edge.exe"; se respeta el nombre real como origen de resolución."""
+    "microsoft edge.exe"; se respeta el nombre real como origen de resolucion."""
     planner = Planner()
 
     with patch(
-        "src.hands.application_preflight.ApplicationPreflight.check"
+        "src.hands.apps.application_preflight.ApplicationPreflight.check"
     ) as mock_check:
         mock_check.return_value = {
             "allowed": True,

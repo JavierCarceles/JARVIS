@@ -1,15 +1,15 @@
 # src/hands/__init__.py
-from .executor import Executor
-from .action_registry import get_action_registry, register_action, register_module, ActionType
-from .calibration_manager import get_calibration_manager, CalibrationManager
-from .coordinate_manager import get_coordinate_manager, CoordinateManager
-from .applications_core import get_application_manager, get_applications_by_capability, register_custom_application
-from . import chrome
-from . import keyboard  
-from . import mouse
+from src.hands.actions.executor import Executor
+from src.hands.actions.action_registry import get_action_registry, register_action, register_module, ActionType
+from src.hands.calibration.calibration_manager import get_calibration_manager, CalibrationManager
+from src.hands.calibration.coordinate_manager import get_coordinate_manager, CoordinateManager
+from src.hands.apps.applications_core import get_application_manager, get_applications_by_capability, register_custom_application
+from src.hands.browsers import chrome
+from src.hands.input import keyboard  
+from src.hands.input import mouse
 
-# Importar y registrar módulos de aplicaciones
-from . import chrome
+# Importar y registrar modulos de aplicaciones
+from src.hands.browsers import chrome
 
 __all__ = [
     'Executor', 

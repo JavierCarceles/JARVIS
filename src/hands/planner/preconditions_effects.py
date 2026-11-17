@@ -1,15 +1,15 @@
 """
-Sistema avanzado de precondiciones y efectos para planificación jerárquica.
+Sistema avanzado de precondiciones y efectos para planificacion jerarquica.
 
 Responsabilidades:
-- Construcción y reutilización de condiciones y efectos.
-- Evaluación de precondiciones simples, compuestas y funcionales.
-- Aplicación determinista y acumulativa de efectos sobre estados.
-- Integración con ActionInfo/ActionType del registro central de acciones.
+- Construccion y reutilizacion de condiciones y efectos.
+- Evaluacion de precondiciones simples, compuestas y funcionales.
+- Aplicacion determinista y acumulativa de efectos sobre estados.
+- Integracion con ActionInfo/ActionType del registro central de acciones.
 - Utilidades comunes para acciones de aplicaciones y elementos UI.
 
-El modelo canónico de Condition/Effect se mantiene en
-``preconditions_effects_types``; este módulo actúa como gestor y adaptador.
+El modelo canonico de Condition/Effect se mantiene en
+``preconditions_effects_types``; este modulo actua como gestor y adaptador.
 """
 
 from __future__ import annotations
@@ -18,13 +18,13 @@ from copy import deepcopy
 from math import isfinite
 from typing import Any, Callable, Dict, List, Optional, Union
 
-from src.hands.action_registry import ActionInfo, ActionType
+from src.hands.actions.action_registry import ActionInfo, ActionType
 from src.hands.planner.preconditions_effects_types import (
     Condition,
     ConditionType,
     Effect,
 )
-from src.utils.logger import get_logger
+from src.core.log import get_logger
 
 logger = get_logger(__name__)
 
@@ -36,7 +36,7 @@ EffectInput = Union[
 
 
 def _safe_copy(value: Any, memo: Optional[Dict[int, Any]] = None) -> Any:
-    """Copia datos incluyendo contenedores cíclicos y valores no copiables."""
+    """Copia datos incluyendo contenedores ciclicos y valores no copiables."""
     try:
         return deepcopy(value)
     except Exception:
@@ -67,8 +67,8 @@ def _safe_copy(value: Any, memo: Optional[Dict[int, Any]] = None) -> Any:
                     copied_set.add(item)
             return copied_set
         if isinstance(value, tuple):
-            # Un marcador evita recursión infinita en tuplas que participan en
-            # ciclos indirectos a través de listas/diccionarios.
+            # Un marcador evita recursion infinita en tuplas que participan en
+            # ciclos indirectos a traves de listas/diccionarios.
             memo[identity] = value
             try:
                 copied_tuple = tuple(_safe_copy(item, memo) for item in value)
@@ -107,8 +107,8 @@ class PreconditionsEffectsManager:
         for name, description, parameters in (
             ("STATE_EQUALS", "Estado igual a valor", {"expected_value": "valor"}),
             ("STATE_TRUE", "Estado es verdadero", {}),
-            ("APPLICATION_OPEN", "Aplicación abierta", {"app_name": "nombre_app"}),
-            ("APPLICATION_ACTIVE", "Aplicación activa", {"app_name": "nombre_app"}),
+            ("APPLICATION_OPEN", "Aplicaci\u00f3n abierta", {"app_name": "nombre_app"}),
+            ("APPLICATION_ACTIVE", "Aplicaci\u00f3n activa", {"app_name": "nombre_app"}),
             (
                 "UI_ELEMENT_AVAILABLE",
                 "Elemento UI disponible",
@@ -130,7 +130,7 @@ class PreconditionsEffectsManager:
         self.condition_templates = templates
         self.effect_templates = {
             "application_open": {
-                "description": "Abrir aplicación",
+                "description": "Abrir aplicaci\u00f3n",
                 "type": "application_open",
                 "parameters": {"app_name": "nombre_app"},
             },
@@ -143,7 +143,7 @@ class PreconditionsEffectsManager:
                 },
             },
             "state_increment": {
-                "description": "Incrementar estado numérico",
+                "description": "Incrementar estado num\u00e9rico",
                 "type": "state_increment",
                 "parameters": {"increment": 1},
             },
@@ -158,14 +158,14 @@ class PreconditionsEffectsManager:
         description: str = "",
         parameters: Optional[Dict[str, Any]] = None,
     ) -> Condition:
-        """Crea una condición y la registra para reutilización."""
+        """Crea una condicion y la registra para reutilizacion."""
         condition_type = self._resolve_condition_type(condition_type)
         condition = Condition(
             type=condition_type,
             key=key,
             expected_value=expected_value,
             function=function,
-            description=description or f"Condición {condition_type.value}",
+            description=description or f"Condici\u00f3n {condition_type.value}",
             parameters=dict(parameters or {}),
         )
 
@@ -183,7 +183,7 @@ class PreconditionsEffectsManager:
         parameters: Optional[Dict[str, Any]] = None,
         cumulative: bool = False,
     ) -> Effect:
-        """Crea un efecto y lo registra para reutilización."""
+        """Crea un efecto y lo registra para reutilizacion."""
         normalized_type = (
             str(getattr(effect_type, "value", effect_type)).strip().lower()
         )
@@ -211,7 +211,7 @@ class PreconditionsEffectsManager:
         operator: str = "and",
         description: str = "",
     ) -> Condition:
-        """Crea una condición compuesta AND u OR."""
+        """Crea una condicion compuesta AND u OR."""
         normalized_operator = str(operator).strip().lower()
         if normalized_operator not in {"and", "or"}:
             raise ValueError("operator debe ser 'and' u 'or'")
@@ -221,13 +221,13 @@ class PreconditionsEffectsManager:
         )
         condition_type = getattr(ConditionType, condition_type_name, None)
         if condition_type is None:
-            raise ValueError(f"ConditionType.{condition_type_name} no está definido")
+            raise ValueError(f"ConditionType.{condition_type_name} no esta definido")
 
         normalized_conditions = [self._ensure_condition(item) for item in conditions]
         return Condition(
             type=condition_type,
             key=None,
-            description=description or f"Condición compuesta {normalized_operator}",
+            description=description or f"Condici\u00f3n compuesta {normalized_operator}",
             parameters={
                 "conditions": normalized_conditions,
                 "operator": normalized_operator,
@@ -237,7 +237,7 @@ class PreconditionsEffectsManager:
     def verify_action_preconditions(
         self, action_info: ActionInfo, current_state: State
     ) -> bool:
-        """Devuelve True cuando todas las precondiciones de la acción se cumplen."""
+        """Devuelve True cuando todas las precondiciones de la accion se cumplen."""
         if action_info is None or not isinstance(current_state, dict):
             return False
 
@@ -254,7 +254,7 @@ class PreconditionsEffectsManager:
             for precondition in preconditions:
                 if not self.evaluate_condition(precondition, current_state):
                     logger.debug(
-                        "[PRECONDITIONS] Precondición no cumplida para acción: %s",
+                        "[PRECONDITIONS] Precondicion no cumplida para accion: %s",
                         getattr(action_info, "name", "<desconocida>"),
                     )
                     return False
@@ -262,13 +262,13 @@ class PreconditionsEffectsManager:
             for precondition_function in functional_preconditions:
                 if not callable(precondition_function):
                     logger.warning(
-                        "[PRECONDITIONS] Precondición funcional inválida para la acción %s",
+                        "[PRECONDITIONS] Precondicion funcional invalida para la accion %s",
                         getattr(action_info, "name", "<desconocida>"),
                     )
                     return False
                 if not bool(precondition_function(_safe_state_copy(current_state))):
                     logger.debug(
-                        "[PRECONDITIONS] Precondición funcional no cumplida para la acción %s",
+                        "[PRECONDITIONS] Precondicion funcional no cumplida para la accion %s",
                         getattr(action_info, "name", "<desconocida>"),
                     )
                     return False
@@ -276,7 +276,7 @@ class PreconditionsEffectsManager:
             return True
         except Exception:
             logger.exception(
-                "[PRECONDITIONS] Error verificando precondiciones de la acción %s",
+                "[PRECONDITIONS] Error verificando precondiciones de la accion %s",
                 getattr(action_info, "name", "<desconocida>"),
             )
             return False
@@ -284,7 +284,7 @@ class PreconditionsEffectsManager:
     def evaluate_condition(
         self, condition: ConditionInput, current_state: State
     ) -> bool:
-        """Evalúa una condición individual o funcional de forma segura."""
+        """Evalua una condicion individual o funcional de forma segura."""
         if not isinstance(current_state, dict):
             return False
 
@@ -305,11 +305,11 @@ class PreconditionsEffectsManager:
             if isinstance(condition, dict):
                 return self._dict_condition_matches(condition, safe_state)
 
-            # No convertir objetos desconocidos a bool: podría habilitar una
-            # acción accidentalmente por la mera veracidad de una instancia.
+            # No convertir objetos desconocidos a bool: podria habilitar una
+            # accion accidentalmente por la mera veracidad de una instancia.
             return False
         except Exception:
-            logger.exception("[PRECONDITIONS] Error evaluando condición")
+            logger.exception("[PRECONDITIONS] Error evaluando condicion")
             return False
 
     def _dict_condition_matches(self, condition: Dict[str, Any], state: State) -> bool:
@@ -353,7 +353,7 @@ class PreconditionsEffectsManager:
     def _dict_to_condition(self, condition_dict: Dict[str, Any]) -> Condition:
         raw_type = condition_dict.get("type")
         if raw_type is None:
-            # Las funciones y los valores esperados tienen semántica explícita;
+            # Las funciones y los valores esperados tienen semantica explicita;
             # los diccionarios que solo contienen una clave son booleanos.
             if callable(condition_dict.get("function")):
                 raw_type = "custom_function"
@@ -386,7 +386,7 @@ class PreconditionsEffectsManager:
                 .lower()
             )
             if operator not in {"and", "or"}:
-                raise ValueError("Operador compuesto no válido")
+                raise ValueError("Operador compuesto no valido")
             parameters["conditions"] = [
                 self._ensure_condition(item) for item in children
             ]
@@ -432,9 +432,9 @@ class PreconditionsEffectsManager:
             try:
                 value = getattr(ConditionType, member_name)
             except AttributeError as exc:
-                raise ValueError(f"Tipo de condición desconocido: {raw_type}") from exc
+                raise ValueError(f"Tipo de condicion desconocido: {raw_type}") from exc
             if not isinstance(value, ConditionType):
-                raise ValueError(f"Tipo de condición desconocido: {raw_type}")
+                raise ValueError(f"Tipo de condicion desconocido: {raw_type}")
             return value
 
     def apply_action_effects(
@@ -443,7 +443,7 @@ class PreconditionsEffectsManager:
         current_state: State,
         execution_result: Optional[Dict[str, Any]] = None,
     ) -> State:
-        """Aplica los efectos de la acción y devuelve un nuevo estado."""
+        """Aplica los efectos de la accion y devuelve un nuevo estado."""
         original_state = _safe_state_copy(current_state)
         state = _safe_state_copy(original_state)
         if action_info is None:
@@ -475,7 +475,7 @@ class PreconditionsEffectsManager:
             return state
         except Exception:
             logger.exception(
-                "[PRECONDITIONS] Error aplicando efectos de la acción %s",
+                "[PRECONDITIONS] Error aplicando efectos de la accion %s",
                 getattr(action_info, "name", "<desconocida>"),
             )
             # Contrato transaccional: si un efecto falla, no devolver un estado
@@ -549,8 +549,8 @@ class PreconditionsEffectsManager:
     ) -> Dict[str, Any]:
         """Extrae solo precondiciones representables como requisitos escalares.
 
-        Las condiciones compuestas, funcionales y numéricas (> / <) se omiten:
-        convertirlas a una igualdad o a un booleano alteraría su semántica.
+        Las condiciones compuestas, funcionales y numericas (> / <) se omiten:
+        convertirlas a una igualdad o a un booleano alteraria su semantica.
         """
         requirements: Dict[str, Any] = {}
         if action_info is None:
@@ -690,7 +690,7 @@ class PreconditionsEffectsManager:
     def get_state_modifications_from_action(
         self, action_info: ActionInfo
     ) -> Dict[str, Any]:
-        """Extrae modificaciones de estado estáticas de los efectos."""
+        """Extrae modificaciones de estado estaticas de los efectos."""
         modifications: Dict[str, Any] = {}
         if action_info is None:
             return modifications
@@ -849,9 +849,9 @@ class PreconditionsEffectsManager:
         try:
             normalized_cost = float(cost)
         except (TypeError, ValueError) as exc:
-            raise ValueError("El coste de una acción debe ser numérico") from exc
+            raise ValueError("El coste de una accion debe ser numerico") from exc
         if not isfinite(normalized_cost) or normalized_cost < 0:
-            raise ValueError("El coste de una acción debe ser finito y no negativo")
+            raise ValueError("El coste de una accion debe ser finito y no negativo")
 
         confidence_threshold = kwargs.get("confidence_threshold", 0.8)
         try:
@@ -896,14 +896,14 @@ class PreconditionsEffectsManager:
         )
 
         logger.info(
-            "[PRECONDITIONS-EFFECTS] Acción creada con precondiciones/efectos: %s",
+            "[PRECONDITIONS-EFFECTS] Accion creada con precondiciones/efectos: %s",
             name,
         )
         return action_info
 
     @staticmethod
     def _normalize_sequence(value: Any) -> List[Any]:
-        """Normaliza una colección sin alterar el orden de listas y tuplas."""
+        """Normaliza una coleccion sin alterar el orden de listas y tuplas."""
         if value is None:
             return []
         if isinstance(value, (list, tuple)):
@@ -937,18 +937,18 @@ class PreconditionsEffectsManager:
             return Condition(
                 type=self._resolve_condition_type("state_true"),
                 key=condition,
-                description=f"Precondición: {condition}",
+                description=f"Precondici\u00f3n: {condition}",
             )
         if callable(condition):
             function_type = getattr(ConditionType, "CUSTOM_FUNCTION", None)
             if function_type is None:
-                raise ValueError("ConditionType.CUSTOM_FUNCTION no está definido")
+                raise ValueError("ConditionType.CUSTOM_FUNCTION no esta definido")
             return Condition(
                 type=function_type,
                 function=condition,
-                description="Precondición funcional",
+                description="Precondici\u00f3n funcional",
             )
-        raise TypeError(f"Condición no soportada: {type(condition).__name__}")
+        raise TypeError(f"Condicion no soportada: {type(condition).__name__}")
 
     @staticmethod
     def _resolve_action_type(raw_type: str) -> ActionType:
@@ -974,7 +974,7 @@ def get_preconditions_effects_manager() -> PreconditionsEffectsManager:
 
 
 def create_application_open_condition(app_name: str) -> Condition:
-    """Crea una condición que representa una aplicación abierta."""
+    """Crea una condicion que representa una aplicacion abierta."""
     manager = get_preconditions_effects_manager()
     condition_type = getattr(ConditionType, "APPLICATION_OPEN", None)
     if condition_type is None:
@@ -984,19 +984,19 @@ def create_application_open_condition(app_name: str) -> Condition:
             key=f"{app_name.lower()}_open",
             expected_value=True,
             parameters={"app_name": app_name},
-            description=f"Aplicación {app_name} abierta",
+            description=f"Aplicaci\u00f3n {app_name} abierta",
         )
 
     return manager.create_condition(
         condition_type=condition_type,
         key=f"{app_name.lower()}_open",
         parameters={"app_name": app_name},
-        description=f"Aplicación {app_name} abierta",
+        description=f"Aplicaci\u00f3n {app_name} abierta",
     )
 
 
 def create_application_active_condition(app_name: str) -> Condition:
-    """Crea una condición que representa una aplicación activa."""
+    """Crea una condicion que representa una aplicacion activa."""
     manager = get_preconditions_effects_manager()
     condition_type = getattr(ConditionType, "APPLICATION_ACTIVE", None)
     if condition_type is None:
@@ -1006,21 +1006,21 @@ def create_application_active_condition(app_name: str) -> Condition:
             key=f"{app_name.lower()}_active",
             expected_value=True,
             parameters={"app_name": app_name},
-            description=f"Aplicación {app_name} activa",
+            description=f"Aplicaci\u00f3n {app_name} activa",
         )
 
     return manager.create_condition(
         condition_type=condition_type,
         key=f"{app_name.lower()}_active",
         parameters={"app_name": app_name},
-        description=f"Aplicación {app_name} activa",
+        description=f"Aplicaci\u00f3n {app_name} activa",
     )
 
 
 def create_ui_element_calibrated_condition(
     app_name: str, element_name: str
 ) -> Condition:
-    """Crea una condición que representa un elemento UI calibrado."""
+    """Crea una condicion que representa un elemento UI calibrado."""
     manager = get_preconditions_effects_manager()
     condition_type = getattr(ConditionType, "UI_ELEMENT_CALIBRATED", None)
     if condition_type is None:
@@ -1042,14 +1042,14 @@ def create_ui_element_calibrated_condition(
 
 
 def create_application_open_effect(app_name: str) -> Effect:
-    """Crea un efecto que representa una aplicación abierta."""
+    """Crea un efecto que representa una aplicacion abierta."""
     manager = get_preconditions_effects_manager()
     return manager.create_effect(
         effect_type="application_open",
         key=f"{app_name.lower()}_open",
         value=True,
         parameters={"app_name": app_name},
-        description=f"Aplicación {app_name} abierta",
+        description=f"Aplicaci\u00f3n {app_name} abierta",
     )
 
 

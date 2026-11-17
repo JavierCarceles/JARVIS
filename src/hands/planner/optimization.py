@@ -1,15 +1,15 @@
-"""Sistema de optimización del planificador de JARVIS.
+"""Sistema de optimizacion del planificador de JARVIS.
 
 Responsabilidades:
-- Caché LRU de planes válidos por objetivo y estado relevante.
-- Comparación y selección de planes alternativos.
-- Eliminación conservadora de redundancias.
-- Optimización contextual sin mutar el plan de entrada.
-- Integración con LearningSystem para ajustes de coste aprendidos.
-- Persistencia validada y atómica de los datos de optimización.
+- Cache LRU de planes validos por objetivo y estado relevante.
+- Comparacion y seleccion de planes alternativos.
+- Eliminacion conservadora de redundancias.
+- Optimizacion contextual sin mutar el plan de entrada.
+- Integracion con LearningSystem para ajustes de coste aprendidos.
+- Persistencia validada y atomica de los datos de optimizacion.
 
-Este módulo no ejecuta acciones físicas. Los resultados de ejecución deben
-registrarse desde el componente que observe la ejecución real.
+Este modulo no ejecuta acciones fisicas. Los resultados de ejecucion deben
+registrarse desde el componente que observe la ejecucion real.
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple, TYPE_CHECKING
 
 from src.hands.planner.node import Goal, Node
-from src.utils.logger import get_logger
+from src.core.log import get_logger
 
 if TYPE_CHECKING:
     from src.hands.planner.planner import Planner, PlanningResult
@@ -38,7 +38,7 @@ logger = get_logger(__name__)
 
 
 class OptimizationType(Enum):
-    """Tipos de optimización disponibles."""
+    """Tipos de optimizacion disponibles."""
 
     ROUTE_CACHE = "route_cache"
     COST_LEARNING = "cost_learning"
@@ -49,7 +49,7 @@ class OptimizationType(Enum):
 
 
 def _finite_float(value: Any, default: float = 0.0, minimum: Optional[float] = None) -> float:
-    """Convierte a float finito y aplica un límite inferior opcional."""
+    """Convierte a float finito y aplica un limite inferior opcional."""
     try:
         number = float(value)
     except (TypeError, ValueError, OverflowError):
@@ -73,7 +73,7 @@ def _string_list(value: Any) -> List[str]:
 
 @dataclass
 class RouteCacheEntry:
-    """Entrada del caché de rutas/planes."""
+    """Entrada del cache de rutas/planes."""
 
     goal_id: str
     start_state_hash: str
@@ -103,10 +103,10 @@ class RouteCacheEntry:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "RouteCacheEntry":
         if not isinstance(data, dict):
-            raise ValueError("La entrada de caché debe ser un diccionario")
+            raise ValueError("La entrada de cache debe ser un diccionario")
         raw_plan = data.get("plan", [])
         if not isinstance(raw_plan, list) or any(not isinstance(item, dict) for item in raw_plan):
-            raise ValueError("El plan del caché debe ser una lista de diccionarios")
+            raise ValueError("El plan del cache debe ser una lista de diccionarios")
         return cls(
             goal_id=str(data.get("goal_id", "")),
             start_state_hash=str(data.get("start_state_hash", "")),
@@ -154,7 +154,7 @@ class CostLearningData:
 
 @dataclass
 class ContextData:
-    """Datos contextuales usados por la optimización."""
+    """Datos contextuales usados por la optimizacion."""
 
     user_preferences: Dict[str, Any] = field(default_factory=dict)
     application_patterns: Dict[str, List[str]] = field(default_factory=dict)
@@ -163,7 +163,7 @@ class ContextData:
 
 
 class OptimizationManager:
-    """Gestor de optimización que opera sobre un Planner ya existente."""
+    """Gestor de optimizacion que opera sobre un Planner ya existente."""
 
     def __init__(self, planner: "Planner", max_cache_size: int = 1000) -> None:
         if planner is None:
@@ -198,15 +198,15 @@ class OptimizationManager:
         }
         self.optimization_enabled = {kind: True for kind in OptimizationType}
 
-        # Conectar un LearningSystem ya existente sin forzar su importación.
+        # Conectar un LearningSystem ya existente sin forzar su importacion.
         existing_learning = getattr(planner, "learning_system", None)
         if existing_learning is not None:
             self.external_learning_system = existing_learning
 
-        logger.info("[OPTIMIZATION] Gestor de optimización inicializado (LRU=%s)", self.max_cache_size)
+        logger.info("[OPTIMIZATION] Gestor de optimizacion inicializado (LRU=%s)", self.max_cache_size)
 
     # ==================================================================
-    # INTEGRACIÓN PRINCIPAL
+    # INTEGRACION PRINCIPAL
     # ==================================================================
 
     def set_learning_system(self, learning_system: Any) -> None:
@@ -232,7 +232,7 @@ class OptimizationManager:
         if goal is None:
             raise ValueError("goal es obligatorio")
         budget = _finite_float(max_planning_time, 30.0, 0.0)
-        logger.info("[OPTIMIZATION] Iniciando planificación optimizada para: %s", getattr(goal, "id", "unknown"))
+        logger.info("[OPTIMIZATION] Iniciando planificacion optimizada para: %s", getattr(goal, "id", "unknown"))
 
         if self.optimization_enabled.get(OptimizationType.ROUTE_CACHE, False):
             cached_result = self._check_route_cache(goal, state)
@@ -252,7 +252,7 @@ class OptimizationManager:
             use_optimization=False,
         )
         if planning_result is None or not hasattr(planning_result, "status"):
-            raise TypeError("Planner.plan() no devolvió un PlanningResult válido")
+            raise TypeError("Planner.plan() no devolvio un PlanningResult valido")
 
         # Trabajar siempre con copias; nunca alterar la lista de plan original.
         original_plan = copy.deepcopy(getattr(planning_result, "plan", []) or [])
@@ -280,9 +280,9 @@ class OptimizationManager:
             if self.optimization_enabled.get(OptimizationType.CONTEXT_AWARE, False):
                 optimized_plan = self._apply_context_optimization(optimized_plan, state)
 
-            # Una optimización nunca debe transformar un plan no vacío en vacío.
+            # Una optimizacion nunca debe transformar un plan no vacio en vacio.
             if original_plan and not optimized_plan:
-                logger.warning("[OPTIMIZATION] La optimización produjo un plan vacío; se restaura el plan original")
+                logger.warning("[OPTIMIZATION] La optimizacion produjo un plan vacio; se restaura el plan original")
                 optimized_plan = copy.deepcopy(original_plan)
 
             planning_result.plan = optimized_plan
@@ -311,7 +311,7 @@ class OptimizationManager:
         return planning_result
 
     # ==================================================================
-    # CACHÉ LRU
+    # CACHE LRU
     # ==================================================================
 
     def _check_route_cache(self, goal: Goal, current_state: Dict[str, Any]) -> Optional["PlanningResult"]:
@@ -373,14 +373,14 @@ class OptimizationManager:
                 self.route_cache.popitem(last=False)
 
     def record_route_execution(self, goal_id: str, current_state: Dict[str, Any], success: bool, execution_time: float = 0.0) -> bool:
-        """Actualiza métricas de la ruta cacheada después de observar su ejecución."""
+        """Actualiza metricas de la ruta cacheada despues de observar su ejecucion."""
         state_hash = self._hash_state(current_state)
         dummy_goal = type("_GoalKey", (), {"id": goal_id, "type": None, "target": None, "constraints": []})()
         cache_key = self._build_cache_key(dummy_goal, state_hash)
         with self.cache_lock:
             entry = self.route_cache.get(cache_key)
             if entry is None:
-                # Goal signatures pueden contener más campos; buscar por hash/id.
+                # Goal signatures pueden contener mas campos; buscar por hash/id.
                 matches = [e for e in self.route_cache.values() if e.goal_id == str(goal_id) and e.start_state_hash == state_hash]
                 if not matches:
                     return False
@@ -484,7 +484,7 @@ class OptimizationManager:
             effects = node.get("effects", [])
             cumulative = bool(node.get("cumulative", False))
             observable = bool(node.get("side_effects", node.get("observable", False)))
-            # No quitar nodos con efectos, parámetros distintos o efectos declarados.
+            # No quitar nodos con efectos, parametros distintos o efectos declarados.
             signature = self._stable_hash({
                 "action": action_id,
                 "parameters": node.get("parameters", {}),
@@ -635,7 +635,7 @@ class OptimizationManager:
             base = self._node_cost(node)
             if node_id in adjustments:
                 # LearningSystem expone deltas; sumarlos al coste base evita tratar
-                # una corrección relativa como un coste absoluto.
+                # una correccion relativa como un coste absoluto.
                 total += max(0.0, base + adjustments[node_id])
             else:
                 model = self.cost_models.get(node_id, {})
@@ -648,7 +648,7 @@ class OptimizationManager:
     # ==================================================================
 
     def record_execution_result(self, plan: List[Dict[str, Any]], execution_time: float, success: bool, context: Optional[Dict[str, Any]] = None) -> None:
-        """Registra un resultado observado; este método no ejecuta el plan."""
+        """Registra un resultado observado; este metodo no ejecuta el plan."""
         if not plan:
             return
         safe_context = copy.deepcopy(context) if isinstance(context, dict) else {}
@@ -662,8 +662,8 @@ class OptimizationManager:
             if not node_id:
                 continue
             estimated = self._node_cost(node)
-            # Hasta que el executor proporcione un coste real, la duración media
-            # por paso solo actúa como proxy explícito de coste.
+            # Hasta que el executor proporcione un coste real, la duracion media
+            # por paso solo actua como proxy explicito de coste.
             data = CostLearningData(
                 node_id=node_id,
                 estimated_cost=estimated,
@@ -749,7 +749,7 @@ class OptimizationManager:
             self.context_data.application_patterns[str(application)] = app_bucket[-50:]
 
     # ==================================================================
-    # ESTADÍSTICAS / CONFIGURACIÓN
+    # ESTADISTICAS / CONFIGURACION
     # ==================================================================
 
     def get_optimization_stats(self) -> Dict[str, Any]:
@@ -768,7 +768,7 @@ class OptimizationManager:
     def clear_cache(self) -> None:
         with self.cache_lock:
             self.route_cache.clear()
-        logger.info("[OPTIMIZATION] Caché de rutas limpiado")
+        logger.info("[OPTIMIZATION] Cache de rutas limpiado")
 
     def invalidate_cache_for_goal(self, goal_id: str) -> int:
         """Invalida las entradas cacheadas de un objetivo tras cambios de dominio."""
@@ -784,7 +784,7 @@ class OptimizationManager:
             try:
                 optimization_type = OptimizationType(optimization_type)
             except ValueError as exc:
-                raise ValueError(f"Tipo de optimización no soportado: {optimization_type}") from exc
+                raise ValueError(f"Tipo de optimizacion no soportado: {optimization_type}") from exc
         if not isinstance(optimization_type, OptimizationType):
             raise ValueError("optimization_type debe ser OptimizationType")
         with self.data_lock:
@@ -820,14 +820,14 @@ class OptimizationManager:
             except OSError:
                 pass
             raise
-        logger.info("[OPTIMIZATION] Datos de optimización exportados a: %s", path)
+        logger.info("[OPTIMIZATION] Datos de optimizacion exportados a: %s", path)
 
     def import_optimization_data(self, filepath: str) -> None:
         path = Path(filepath)
         with path.open("r", encoding="utf-8") as handle:
             import_data = json.load(handle)
         if not isinstance(import_data, dict):
-            raise ValueError("El archivo de optimización debe contener un objeto JSON")
+            raise ValueError("El archivo de optimizacion debe contener un objeto JSON")
 
         # Validar y construir todo en estructuras temporales antes de mutar el estado vivo.
         raw_cache = import_data.get("cache", {})

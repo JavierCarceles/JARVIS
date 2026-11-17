@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Tests de inicialización del paquete ear (src/ear/__init__.py)."""
+"""Tests de inicializacion del paquete ear (src/ear/__init__.py)."""
 
 import unittest
 

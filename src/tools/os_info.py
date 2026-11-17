@@ -1,20 +1,20 @@
 """
-Información del sistema para Jarvis con arquitectura de planificación.
+Informacion del sistema para Jarvis con arquitectura de planificacion.
 
-Este módulo proporciona información estructurada del sistema para construir
-el estado del mundo (FASE 3) y soportar la planificación jerárquica.
+Este modulo proporciona informacion estructurada del sistema para construir
+el estado del mundo (FASE 3) y soportar la planificacion jerarquica.
 
 Recoge:
 - Uso de CPU y memoria
 - Estado del disco
-- Información de ventanas y aplicaciones
+- Informacion de ventanas y aplicaciones
 - Recursos del sistema
-- Contexto para planificación
+- Contexto para planificacion
 
 Integrado con:
 - Estado del mundo (FASE 3)
 - Memoria de dominio (FASE 5)
-- Sistema de planificación
+- Sistema de planificacion
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ from enum import Enum
 import psutil
 import pygetwindow as gw
 
-from src.utils.logger import get_logger
+from src.core.log import get_logger
 
 logger = get_logger(__name__)
 
@@ -43,7 +43,7 @@ class SystemHealth(Enum):
 
 @dataclass
 class ApplicationWindow:
-    """Información de una ventana de aplicación."""
+    """Informacion de una ventana de aplicacion."""
     title: str
     process_name: str
     handle: int
@@ -101,7 +101,7 @@ class SystemResources:
 
 @dataclass
 class SystemContext:
-    """Contexto completo del sistema para planificación."""
+    """Contexto completo del sistema para planificacion."""
     resources: SystemResources
     active_windows: List[ApplicationWindow]
     focused_window: Optional[ApplicationWindow]
@@ -126,7 +126,7 @@ def _get_system_drive() -> str:
     Obtiene la unidad del sistema.
 
     En Windows utiliza SystemDrive (normalmente C:).
-    En otros sistemas utiliza la raíz '/'.
+    En otros sistemas utiliza la raiz '/'.
     """
     system_drive = os.environ.get("SystemDrive")
 
@@ -194,10 +194,10 @@ def get_system_stats() -> Dict[str, Any]:
         }
 
     except Exception as exc:
-        logger._print_log("info", "Procesando solicitud", "os_info.py", "method", 197)
+        logger.debug("get_system_stats: %s", exc)
 
         # Mantenemos la misma estructura de retorno para que el resto del
-        # proyecto pueda consumirla incluso cuando una métrica falle.
+        # proyecto pueda consumirla incluso cuando una metrica falle.
         return {
             "cpu": 0.0,
             "ram_total": 0.0,
@@ -209,7 +209,7 @@ def get_system_stats() -> Dict[str, Any]:
 
 
 def get_battery_info() -> Optional[Dict[str, Any]]:
-    """Obtiene información de la batería."""
+    """Obtiene informacion de la bateria."""
     try:
         battery = psutil.sensors_battery()
         if battery:
@@ -219,18 +219,18 @@ def get_battery_info() -> Optional[Dict[str, Any]]:
                 "secsleft": battery.secsleft
             }
     except Exception as exc:
-        logger._print_log("debug", f"No se pudo obtener información de batería: {exc}", "os_info.py", "method", 222)
+        logger.debug(f"No se pudo obtener informacion de bateria: {exc}")
     
     return None
 
 
 def get_open_windows() -> List[ApplicationWindow]:
     """
-    Obtiene información detallada de ventanas visibles.
+    Obtiene informacion detallada de ventanas visibles.
 
     Returns:
         Lista de ApplicationWindow correspondientes a ventanas visibles
-        con dimensiones válidas.
+        con dimensiones validas.
     """
     active_windows: List[ApplicationWindow] = []
 
@@ -280,7 +280,7 @@ def get_open_windows() -> List[ApplicationWindow]:
                 if width <= 0 or height <= 0:
                     continue
 
-                # Determinar monitor basado en posición
+                # Determinar monitor basado en posicion
                 monitor = _get_monitor_from_position(left, top)
 
                 # Obtener nombre del proceso
@@ -305,15 +305,15 @@ def get_open_windows() -> List[ApplicationWindow]:
                 continue
 
     except Exception as exc:
-        logger._print_log("info", "Procesando solicitud", "os_info.py", "method", 197)
+        logger.debug("get_open_windows: %s", exc)
 
     return active_windows
 
 
 def _get_monitor_from_position(x: int, y: int) -> int:
-    """Determina qué monitor contiene la posición dada."""
+    """Determina que monitor contiene la posicion dada."""
     try:
-        from src.utils.screen_manager import get_monitor_info
+        from src.desktop.screen_manager import get_monitor_info
         
         for i in range(1, 5):  # Hasta 4 monitores
             monitor = get_monitor_info(i)
@@ -322,7 +322,7 @@ def _get_monitor_from_position(x: int, y: int) -> int:
                     monitor.top <= y < monitor.bottom):
                     return i
     except Exception as exc:
-        logger._print_log("debug", f"No se pudo determinar monitor para posición ({x}, {y}): {exc}", "os_info.py", "method", 325)
+        logger.debug(f"No se pudo determinar monitor para posicion ({x}, {y}): {exc}")
     
     return 1
 
@@ -341,7 +341,7 @@ def _get_process_name(window) -> str:
                 except (psutil.NoSuchProcess, psutil.AccessDenied):
                     continue
         
-        # Fallback: usar título para inferir proceso
+        # Fallback: usar titulo para inferir proceso
         title = window.title.lower()
         if 'chrome' in title:
             return 'chrome'
@@ -357,7 +357,7 @@ def _get_process_name(window) -> str:
             return 'unknown'
             
     except Exception as exc:
-        logger._print_log("debug", f"No se pudo obtener proceso para ventana: {exc}", "os_info.py", "method", 360)
+        logger.debug(f"No se pudo obtener proceso para ventana: {exc}")
         return 'unknown'
 
 
@@ -366,19 +366,19 @@ def get_focused_window() -> Optional[ApplicationWindow]:
     try:
         active_window = gw.getActiveWindow()
         if active_window:
-            # Reutilizar la lógica de get_open_windows
+            # Reutilizar la logica de get_open_windows
             windows = get_open_windows()
             for window in windows:
                 if window.handle == active_window._hWnd:
                     return window
     except Exception as exc:
-        logger._print_log("debug", f"No se pudo obtener ventana enfocada: {exc}", "os_info.py", "method", 375)
+        logger.debug(f"No se pudo obtener ventana enfocada: {exc}")
     
     return None
 
 
 def get_running_processes() -> List[str]:
-    """Obtiene lista de procesos en ejecución."""
+    """Obtiene lista de procesos en ejecucion."""
     try:
         processes = []
         for proc in psutil.process_iter(['name']):
@@ -388,7 +388,7 @@ def get_running_processes() -> List[str]:
                 continue
         return list(set(processes))  # Eliminar duplicados
     except Exception as exc:
-        logger._print_log("info", "Procesando solicitud", "os_info.py", "method", 197)
+        logger.debug("get_running_processes: %s", exc)
         return []
 
 
@@ -418,7 +418,7 @@ def get_system_resources() -> SystemResources:
             timestamp=time.time()
         )
     except Exception as exc:
-        logger._print_log("info", "Procesando solicitud", "os_info.py", "method", 197)
+        logger.debug("get_system_resources: %s", exc)
         # Devolver recursos por defecto
         return SystemResources(
             cpu_percent=0.0,
@@ -436,7 +436,7 @@ def get_system_resources() -> SystemResources:
 
 def get_jarvis_system_context() -> str:
     """
-    Empaqueta la información del sistema en un texto para el contexto
+    Empaqueta la informacion del sistema en un texto para el contexto
     de Jarvis (mantenido para compatibilidad).
     """
     try:
@@ -462,16 +462,16 @@ def get_jarvis_system_context() -> str:
             f"- Ventana enfocada: {focused_window.title if focused_window else 'Ninguna'}\n"
         )
     except Exception as exc:
-        logger._print_log("info", "Procesando solicitud", "os_info.py", "method", 197)
-        return "[CONTEXTO DEL SISTEMA] Error al obtener información del sistema."
+        logger.debug("get_jarvis_system_context: %s", exc)
+        return "[CONTEXTO DEL SISTEMA] Error al obtener informaci\u00f3n del sistema."
 
 
 def get_system_context() -> SystemContext:
     """
-    Obtiene el contexto completo del sistema para planificación.
+    Obtiene el contexto completo del sistema para planificacion.
     
     Returns:
-        SystemContext con toda la información estructurada del sistema.
+        SystemContext con toda la informacion estructurada del sistema.
     """
     try:
         start_time = time.time()
@@ -493,11 +493,11 @@ def get_system_context() -> SystemContext:
             uptime_seconds=uptime
         )
         
-        logger._print_log("debug", f"Contexto del sistema obtenido en {time.time() - start_time:.3f}s", "os_info.py", "method", 496)
+        logger.debug(f"Contexto del sistema obtenido en {time.time() - start_time:.3f}s")
         return context
         
     except Exception as exc:
-        logger._print_log("info", "Procesando solicitud", "os_info.py", "method", 197)
+        logger.debug("get_system_context: %s", exc)
         # Devolver contexto por defecto
         return SystemContext(
             resources=SystemResources(
@@ -521,13 +521,13 @@ def get_system_context() -> SystemContext:
 
 
 if __name__ == "__main__":
-    # Mostrar contexto completo para depuración
-    logger._print_log("info", "=== CONTEXTO COMPLETO DEL SISTEMA ===", "os_info.py", "method", 525)
+    # Mostrar contexto completo para depuracion
+    logger.info("=== CONTEXTO COMPLETO DEL SISTEMA ===")
     context = get_system_context()
-    logger._print_log("info", f"Recursos: {context.resources}", "os_info.py", "method", 527)
-    logger._print_log("info", f"Ventanas activas: {len(context.active_windows)}", "os_info.py", "method", 528)
-    logger._print_log("info", f"Procesos: {len(context.running_processes)}", "os_info.py", "method", 529)
-    logger._print_log("info", f"Uptime: {context.uptime_seconds:.0f} segundos", "os_info.py", "method", 530)
+    logger.info(f"Recursos: {context.resources}")
+    logger.info(f"Ventanas activas: {len(context.active_windows)}")
+    logger.info(f"Procesos: {len(context.running_processes)}")
+    logger.info(f"Uptime: {context.uptime_seconds:.0f} segundos")
     
-    logger._print_log("info", "\n=== FORMATO LEGACY ===", "os_info.py", "method", 532)
-    logger._print_log("info", get_jarvis_system_context(), "os_info.py", "method", 533)
+    logger.info("\n=== FORMATO LEGACY ===")
+    logger.info(get_jarvis_system_context())

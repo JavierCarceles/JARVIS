@@ -1,10 +1,10 @@
 """Tipos base para el sistema de precondiciones y efectos.
 
 Evita importaciones circulares con ``action_registry`` y mantiene un contrato
-común para la evaluación de condiciones y la aplicación de efectos sobre el
+comun para la evaluacion de condiciones y la aplicacion de efectos sobre el
 estado utilizado por el grafo y el planificador.
 
-Las condiciones inválidas fallan de forma segura. Los efectos devuelven un
+Las condiciones invalidas fallan de forma segura. Los efectos devuelven un
 estado nuevo y no modifican el estado de entrada.
 """
 
@@ -16,7 +16,7 @@ from enum import Enum
 from math import isfinite
 from typing import Any, Callable, Dict, List, Optional, Set
 
-from src.utils.logger import get_logger
+from src.core.log import get_logger
 
 logger = get_logger(__name__)
 
@@ -29,7 +29,7 @@ _MAX_COMPOSITE_DEPTH = 64
 
 
 class ConditionType(Enum):
-    """Tipos de condiciones de precondición/efecto."""
+    """Tipos de condiciones de precondicion/efecto."""
 
     STATE_EQUALS = "state_equals"
     STATE_EXISTS = "state_exists"
@@ -48,9 +48,9 @@ class ConditionType(Enum):
 def _safe_copy(value: Any, memo: Optional[Dict[int, Any]] = None) -> Any:
     """Copia valores comunes de forma defensiva, tolerando objetos no copiables.
 
-    ``deepcopy`` conserva normalmente la topología de objetos y los ciclos. Si
+    ``deepcopy`` conserva normalmente la topologia de objetos y los ciclos. Si
     un objeto personalizado impide copiar el contenedor completo, se intenta
-    copiar recursivamente sus elementos; el último recurso para un objeto
+    copiar recursivamente sus elementos; el ultimo recurso para un objeto
     opaco es conservar la referencia en lugar de hacer fallar todo el estado.
     """
     if memo is None:
@@ -129,7 +129,7 @@ def _is_mapping(value: Any) -> bool:
 
 
 def _safe_number(value: Any) -> Optional[float]:
-    """Convierte a float únicamente valores numéricos finitos."""
+    """Convierte a float unicamente valores numericos finitos."""
     if isinstance(value, bool):
         return float(value)
     try:
@@ -194,7 +194,7 @@ def _get_nested_state_value(
 
 
 def _get_application_state(state: State, app_name: Any) -> Dict[str, Any]:
-    """Busca el estado de una aplicación en varios formatos compatibles."""
+    """Busca el estado de una aplicacion en varios formatos compatibles."""
     name = str(app_name or "").strip()
     normalized = _normalize_name(name)
     if not normalized:
@@ -222,7 +222,7 @@ def _get_boolean_application_flag(
     app_name: Any,
     flag: str,
 ) -> bool:
-    """Obtiene un flag de aplicación desde estado plano o anidado."""
+    """Obtiene un flag de aplicacion desde estado plano o anidado."""
     normalized_app = _normalize_name(app_name)
     if not normalized_app:
         return False
@@ -274,11 +274,11 @@ def _get_ui_element_state(
             for key, value in app_bucket.items():
                 if _normalize_name(key) == normalized_element and _is_mapping(value):
                     return value
-            # Si la aplicación está presente pero ese elemento no, no se debe
-            # aceptar por error un elemento homónimo de otra aplicación.
+            # Si la aplicacion esta presente pero ese elemento no, no se debe
+            # aceptar por error un elemento homonimo de otra aplicacion.
             return {}
 
-        # Formatos planos compuestos con la aplicación incluida en la clave.
+        # Formatos planos compuestos con la aplicacion incluida en la clave.
         for key in (
             f"{normalized_app}_{normalized_element}",
             f"{normalized_app}.{normalized_element}",
@@ -290,7 +290,7 @@ def _get_ui_element_state(
     # Formato plano legado: {elemento: {available: ..., calibrated: ...}}.
     for key, value in ui_elements.items():
         if _normalize_name(key) == normalized_element and _is_mapping(value):
-            # No interpretar como elemento una carpeta de otra aplicación.
+            # No interpretar como elemento una carpeta de otra aplicacion.
             if any(
                 prop in value
                 for prop in ("available", "calibrated", "focused", "visible")
@@ -301,10 +301,10 @@ def _get_ui_element_state(
 
 
 def _resolve_condition_type(value: Any) -> ConditionType:
-    """Convierte un enum, valor textual o alias histórico a ``ConditionType``.
+    """Convierte un enum, valor textual o alias historico a ``ConditionType``.
 
     Los tipos desconocidos se rechazan en vez de convertirse silenciosamente
-    en ``STATE_TRUE``, ya que esa conversión podría autorizar una acción por
+    en ``STATE_TRUE``, ya que esa conversion podria autorizar una accion por
     error.
     """
     if isinstance(value, ConditionType):
@@ -327,12 +327,12 @@ def _resolve_condition_type(value: Any) -> ConditionType:
         if condition_type.value == normalized:
             return condition_type
 
-    raise ValueError(f"Tipo de condición no soportado: {value!r}")
+    raise ValueError(f"Tipo de condicion no soportado: {value!r}")
 
 
 @dataclass
 class Condition:
-    """Representa una condición que debe cumplirse para ejecutar una acción."""
+    """Representa una condicion que debe cumplirse para ejecutar una accion."""
 
     type: ConditionType
     key: Optional[str] = None
@@ -342,7 +342,7 @@ class Condition:
     parameters: Dict[str, Any] = field(default_factory=dict)
 
     def evaluate(self, state: State) -> bool:
-        """Evalúa la condición contra el estado actual sin mutarlo."""
+        """Evalua la condicion contra el estado actual sin mutarlo."""
         return self._evaluate(state, set(), 0)
 
     def _evaluate(
@@ -448,7 +448,7 @@ class Condition:
             if condition_type == ConditionType.CUSTOM_FUNCTION:
                 if not callable(self.function):
                     return False
-                # Evita que una función de condición cambie el estado del plan.
+                # Evita que una funcion de condicion cambie el estado del plan.
                 return bool(self.function(_safe_copy(state)))
 
             if condition_type in {
@@ -476,13 +476,13 @@ class Condition:
 
             return False
         except Exception:
-            # Una condición inválida nunca debe habilitar una acción.
+            # Una condicion invalida nunca debe habilitar una accion.
             return False
 
 
 @dataclass
 class Effect:
-    """Representa un efecto que modifica el estado tras ejecutar una acción."""
+    """Representa un efecto que modifica el estado tras ejecutar una accion."""
 
     type: str
     key: str
@@ -640,9 +640,9 @@ class Effect:
         if effect_type == "custom_function":
             if not callable(self.function):
                 return result_state
-            # La función opera sobre una copia transaccional. Solo se acepta el
+            # La funcion opera sobre una copia transaccional. Solo se acepta el
             # estado retornado si es un diccionario; mutaciones externas del
-            # resultado de ejecución no se propagan.
+            # resultado de ejecucion no se propagan.
             transformed = self.function(
                 _safe_copy(result_state), _safe_copy(execution_result)
             )
@@ -679,7 +679,7 @@ class Effect:
 
 
 def _coerce_condition(value: Any) -> Condition:
-    """Convierte una condición soportada a ``Condition`` de forma segura."""
+    """Convierte una condicion soportada a ``Condition`` de forma segura."""
     if isinstance(value, Condition):
         return value
 
@@ -794,7 +794,7 @@ def _update_ui_element_state(
                 ):
                     value.update(_safe_copy(changes))
                     return
-            # No añadir un elemento inexistente ni actualizar otro del mismo nombre.
+            # No anadir un elemento inexistente ni actualizar otro del mismo nombre.
             return
 
     # Formato plano {elemento: {...}}.

@@ -1,31 +1,31 @@
 # -*- coding: utf-8 -*-
-"""Tests de verificación de la hoja 3.3.3.2 — "Verificar que Planner no recibe
+"""Tests de verificacion de la hoja 3.3.3.2 - "Verificar que Planner no recibe
 acciones inexistentes".
 
 El planificador debe disponer de un mecanismo para **verificar** (no eliminar)
-que las acciones de un plan existen en el ``ActionRegistry``.  La verificación
+que las acciones de un plan existen en el ``ActionRegistry``.  La verificacion
 se expone en la metadata del ``PlanningResult`` (``action_verification``) y como
 advertencias, sin romper planes que contienen nodos legacy/UI que el executor
 resuelve por otros medios.
 
-Métodos bajo prueba:
+Metodos bajo prueba:
 
 * ``Planner.action_exists(action_name)``
-* ``Planner._resolve_node_action_name(node)`` (estático)
+* ``Planner._resolve_node_action_name(node)`` (estatico)
 * ``Planner.validate_plan_actions(plan)``
 * ``Planner.filter_existing_actions(plan)``
-* Integración en ``_create_plan`` (``action_verification`` en metadata)
-* Integración en ``build_application_aware_plan``
+* Integracion en ``_create_plan`` (``action_verification`` en metadata)
+* Integracion en ``build_application_aware_plan``
 
 Se ejerce contra el modelo REAL: el ``ActionRegistry`` global registrado durante
-la importación de ``src.hands``.
+la importacion de ``src.hands``.
 """
 
 import logging
 from unittest.mock import MagicMock, patch
 
 # ---------------------------------------------------------------------------
-# SUPRESIÓN DE LOG DE SISTEMA (antes de importar src/)
+# SUPRESION DE LOG DE SISTEMA (antes de importar src/)
 # ---------------------------------------------------------------------------
 logging.disable(logging.CRITICAL)
 
@@ -96,7 +96,7 @@ def _planner() -> Planner:
 
 
 class TestActionExists:
-    """``action_exists`` verifica la presencia de una acción en el ActionRegistry."""
+    """``action_exists`` verifica la presencia de una accion en el ActionRegistry."""
 
     @pytest.fixture(autouse=True)
     def _setup_planner(self):
@@ -130,8 +130,8 @@ class TestActionExists:
 
 
 class TestResolveNodeActionName:
-    """``_resolve_node_action_name`` resuelve el nombre de acción efectivo de un
-    paso de plan, replicando la lógica del Executor."""
+    """``_resolve_node_action_name`` resuelve el nombre de accion efectivo de un
+    paso de plan, replicando la logica del Executor."""
 
     def test_node_with_action_and_id(self):
         """Cuando ``action`` coincide con ``id``, se usa el nombre del nodo."""
@@ -139,12 +139,12 @@ class TestResolveNodeActionName:
         assert Planner._resolve_node_action_name(node) == "press_enter"
 
     def test_node_id_as_action(self):
-        """Si solo hay ``id``, se usa como nombre de acción."""
+        """Si solo hay ``id``, se usa como nombre de accion."""
         node = {"id": "chrome_open"}
         assert Planner._resolve_node_action_name(node) == "chrome_open"
 
     def test_node_with_callback_returns_none(self):
-        """Un nodo con ``execute_callback`` no necesita registro → None."""
+        """Un nodo con ``execute_callback`` no necesita registro -> None."""
         callback = MagicMock()
         node = {"id": "custom_step", "execute_callback": callback}
         assert Planner._resolve_node_action_name(node) is None
@@ -159,7 +159,7 @@ class TestResolveNodeActionName:
         assert Planner._resolve_node_action_name(node) == "open_application"
 
     def test_node_with_metadata_action(self):
-        """``metadata['action']`` también se prioriza sobre el ``id`` del nodo."""
+        """``metadata['action']`` tambien se prioriza sobre el ``id`` del nodo."""
         node = {
             "id": "step_1",
             "action": "step_1",
@@ -177,7 +177,7 @@ class TestResolveNodeActionName:
         assert Planner._resolve_node_action_name(None) is None
 
     def test_callback_in_metadata_takes_precedence(self):
-        """``metadata['execute_callback']`` también invalida la búsqueda."""
+        """``metadata['execute_callback']`` tambien invalida la busqueda."""
         callback = MagicMock()
         node = {
             "id": "step_1",
@@ -187,7 +187,7 @@ class TestResolveNodeActionName:
         assert Planner._resolve_node_action_name(node) is None
 
     def test_empty_id_returns_none(self):
-        """Un nodo sin ``id`` ni ``action`` ni ``action_name`` → None."""
+        """Un nodo sin ``id`` ni ``action`` ni ``action_name`` -> None."""
         node = {}
         assert Planner._resolve_node_action_name(node) is None
 
@@ -198,14 +198,14 @@ class TestResolveNodeActionName:
 
 
 class TestValidatePlanActions:
-    """``validate_plan_actions`` produce un reporte de verificación estructurado."""
+    """``validate_plan_actions`` produce un reporte de verificacion estructurado."""
 
     @pytest.fixture(autouse=True)
     def _setup_planner(self):
         self.planner = _planner()
 
     def test_all_existing_actions(self):
-        """Un plan con solo acciones registradas → valid: True, sin inexistentes."""
+        """Un plan con solo acciones registradas -> valid: True, sin inexistentes."""
         plan = [
             {"id": "step1", "action": "open_application"},
             {"id": "step2", "action": "type_text"},
@@ -220,7 +220,7 @@ class TestValidatePlanActions:
         assert result["valid_steps"] == 3
 
     def test_mixed_existing_and_nonexistent(self):
-        """Un plan con acciones existentes y no existentes → valid: False."""
+        """Un plan con acciones existentes y no existentes -> valid: False."""
         plan = [
             {"id": "step1", "action": "open_application"},
             {"id": "press_enter", "action": "press_enter"},
@@ -235,7 +235,7 @@ class TestValidatePlanActions:
         assert result["valid_steps"] == 2
 
     def test_node_with_callback_is_valid(self):
-        """Pasos con ``execute_callback`` cuentan como válidos sin verificación."""
+        """Pasos con ``execute_callback`` cuentan como validos sin verificacion."""
         callback = MagicMock()
         plan = [
             {"id": "custom", "execute_callback": callback},
@@ -249,7 +249,7 @@ class TestValidatePlanActions:
         assert result["valid_steps"] == 1
 
     def test_all_callbacks_valid(self):
-        """Un plan donde todos los pasos tienen callback → valid: True."""
+        """Un plan donde todos los pasos tienen callback -> valid: True."""
         cb = MagicMock()
         plan = [
             {"id": "s1", "action": "whatever", "execute_callback": cb},
@@ -278,7 +278,7 @@ class TestValidatePlanActions:
         assert result["nonexistent_actions"] == []
 
     def test_resolution_via_metadata_action_name(self):
-        """``metadata['action_name']`` resuelve a una acción registrada."""
+        """``metadata['action_name']`` resuelve a una accion registrada."""
         plan = [
             {
                 "id": "step_1",
@@ -291,7 +291,7 @@ class TestValidatePlanActions:
         assert result["existing_actions"] == ["open_application"]
 
     def test_resolution_via_metadata_action(self):
-        """``metadata['action']`` resuelve a una acción registrada."""
+        """``metadata['action']`` resuelve a una accion registrada."""
         plan = [
             {
                 "id": "step_1",
@@ -373,7 +373,7 @@ class TestFilterExistingActions:
 
 
 # ---------------------------------------------------------------------------
-# Integración en _create_plan
+# Integracion en _create_plan
 # ---------------------------------------------------------------------------
 
 
@@ -425,7 +425,7 @@ class TestCreatePlanVerification:
             assert found, f"Expected warning about nonexistent actions, got: {result.warnings}"
 
     def test_plan_result_valid_when_no_actions(self):
-        """Un plan vacío (goal already achieved) → verification con 0 steps, valid True."""
+        """Un plan vacio (goal already achieved) -> verification con 0 steps, valid True."""
         goal = Goal(
             id="g-achieved",
             type="open_application",
@@ -442,7 +442,7 @@ class TestCreatePlanVerification:
 
 
 # ---------------------------------------------------------------------------
-# Integración en build_application_aware_plan
+# Integracion en build_application_aware_plan
 # ---------------------------------------------------------------------------
 
 
@@ -454,7 +454,7 @@ class TestBuildApplicationAwarePlanVerification:
         self.planner = _planner()
 
     def test_plan_metadata_includes_action_verification(self):
-        """La planificación conscious-de-aplicación incluye la verificación de
+        """La planificacion conscious-de-aplicacion incluye la verificacion de
         acciones en la metadata del resultado."""
         goal = Goal(
             id="g-app-verif",
@@ -477,20 +477,20 @@ class TestBuildApplicationAwarePlanVerification:
 
 
 class TestNoActionRegistry:
-    """Cuando el ActionRegistry no está disponible, la verificación es segura."""
+    """Cuando el ActionRegistry no esta disponible, la verificacion es segura."""
 
     @pytest.fixture(autouse=True)
     def _setup_planner(self):
         self.planner = _planner()
 
     def test_action_exists_returns_false_without_registry(self):
-        """Sin ActionRegistry → ``action_exists`` devuelve False (modo paso seguro)."""
+        """Sin ActionRegistry -> ``action_exists`` devuelve False (modo paso seguro)."""
         with patch.object(self.planner, "_get_action_registry", return_value=None):
             assert self.planner.action_exists("any_action") is False
 
     def test_validate_plan_without_registry_keeps_all_valid(self):
-        """Sin ActionRegistry, todos los pasos se conservan como válidos (no callbacks
-        necesarios).  Ninguna acción se marca como inexistente."""
+        """Sin ActionRegistry, todos los pasos se conservan como validos (no callbacks
+        necesarios).  Ninguna accion se marca como inexistente."""
         with patch.object(self.planner, "_get_action_registry", return_value=None):
             plan = [
                 {"id": "press_enter", "action": "press_enter"},

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Tests de inicialización del paquete hands (src/hands/__init__.py)."""
+"""Tests de inicializacion del paquete hands (src/hands/__init__.py)."""
 
 import unittest
 
@@ -54,15 +54,15 @@ class TestHandsPackageInit(unittest.TestCase):
         self.assertTrue(callable(register_custom_application))
 
     def test_chrome_submodule_exported(self):
-        from src.hands import chrome
+        from src.hands.browsers import chrome
         self.assertTrue(hasattr(chrome, "Chrome"))
 
     def test_keyboard_submodule_exported(self):
-        from src.hands import keyboard
+        from src.hands.input import keyboard
         self.assertTrue(hasattr(keyboard, "__name__"))
 
     def test_mouse_submodule_exported(self):
-        from src.hands import mouse
+        from src.hands.input import mouse
         self.assertTrue(hasattr(mouse, "__name__"))
 
 
