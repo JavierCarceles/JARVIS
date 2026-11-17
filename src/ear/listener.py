@@ -6,13 +6,36 @@ Integrado con el nuevo sistema de planificacion jerarquica.
 import queue
 import time
 import numpy as np
-import sounddevice as sd
-from faster_whisper import WhisperModel
 from typing import Optional, Dict, Any, List
+
+# Captura y ASR son opcionales al importar (4.5.6.13): sin ellos Ear informa
+# del motivo en lugar de romper la importacion de todo el paquete.
+try:
+    import sounddevice as sd
+    _SD_IMPORT_ERROR: Optional[Exception] = None
+except Exception as _exc:  # pragma: no cover - depende del entorno
+    sd = None
+    _SD_IMPORT_ERROR = _exc
+try:
+    from faster_whisper import WhisperModel
+except Exception as _exc:  # pragma: no cover - depende del entorno
+    WhisperModel = None
 from dataclasses import dataclass
 
 from src.core.config import get_timeout_config
 from src.core.log import get_logger
+from src.ear.asr_config import (
+    ASRConfig,
+    LEGACY_INITIAL_PROMPT,
+    load_asr_config,
+    model_kwargs,
+    transcribe_kwargs,
+)
+from src.ear.transcription import (
+    TranscriptionRecord,
+    build_transcription_record,
+    set_last_transcription,
+)
 from src.memory.conversation import ConversationMemory
 
 logger = get_logger(__name__)
@@ -130,27 +153,66 @@ class TranscriptionNode(AudioNode):
     Nodo para transcripcion de audio a texto.
     """
     
-    def __init__(self, name: str, model_size: str = "medium", language: str = "es"):
+    def __init__(
+        self,
+        name: str,
+        model_size: Optional[str] = None,
+        language: Optional[str] = None,
+        asr_config: Optional[ASRConfig] = None,
+    ):
         super().__init__(name)
-        self.model_size = model_size
-        self.language = language
+        # Configuracion en fichero (4.5.6.3); los argumentos explicitos mandan.
+        self.asr_config = asr_config or load_asr_config()
+        if model_size:
+            self.asr_config.model_size = model_size
+        if language:
+            self.asr_config.language = language
+        self.model_size = self.asr_config.model_size
+        self.language = self.asr_config.language
         self.model = None
+        self._initial_prompt: Optional[str] = None
         self._load_model()
+
+    def get_initial_prompt(self) -> str:
+        """
+        ``initial_prompt`` de Whisper (4.5.6.4): vocabulario dinamico del
+        catalogo, monitores y verbos, limitado en longitud; la lista fija
+        anterior solo si el vocabulario dinamico esta desactivado o vacio.
+        Se calcula una vez; ``refresh_vocabulary()`` lo recalcula.
+        """
+        if self._initial_prompt is None:
+            prompt = ""
+            if self.asr_config.dynamic_vocabulary:
+                try:
+                    from src.ear.vocabulary import build_initial_prompt, collect_vocabulary
+
+                    prompt = build_initial_prompt(
+                        collect_vocabulary(),
+                        max_chars=self.asr_config.initial_prompt_max_chars,
+                        max_apps=self.asr_config.max_vocabulary_apps,
+                    )
+                except Exception as exc:
+                    logger.warning("Vocabulario dinamico no disponible: %s", exc)
+            self._initial_prompt = prompt or LEGACY_INITIAL_PROMPT
+            logger.info("initial_prompt de Whisper (%s caracteres)", len(self._initial_prompt))
+        return self._initial_prompt
+
+    def refresh_vocabulary(self) -> None:
+        self._initial_prompt = None
         
     def _load_model(self):
         """
         Carga el modelo Whisper.
         """
         try:
+            if WhisperModel is None:
+                raise RuntimeError("faster_whisper no instalado")
             logger.info(r"Intentando cargar modelo Whisper...")
-            self.model = WhisperModel(
-                self.model_size,
-                device="cpu",  # Usar CPU en lugar de CUDA para evitar problemas
-                compute_type="int8"
-            )
-            logger.info(r"Modelo Whisper listo")
+            # Valores por defecto: CPU int8 (como antes); se cambian en config.
+            self.model = WhisperModel(self.model_size, **model_kwargs(self.asr_config))
+            logger.info("Modelo Whisper listo (%s, %s)", self.model_size, model_kwargs(self.asr_config))
         except Exception as e:
-            logger.debug("TranscriptionNode._load_model: %s", e)
+            logger.warning("TranscriptionNode._load_model: %s", e)
             # Si falla el modelo, crear un modelo nulo para testing
             self.model = None
             logger.warning(r"Usando modo de prueba sin modelo Whisper")
@@ -180,36 +242,45 @@ class TranscriptionNode(AudioNode):
                         "error": "Modelo Whisper no disponible",
                     }
             
+            # Parametros desde config (4.5.6.3); word_timestamps=True por
+            # defecto para la confianza real (4.5.6.5).
             segments, info = self.model.transcribe(
-                audio,
-                beam_size=5,
-                language=self.language,
-                initial_prompt=(
-                    "Jarvis, se\u00f1or, abrir, YouTube, Google, LoL, Spotify, comando, "
-                    "asistente, tecnolog\u00eda."
-                ),
+                audio, **transcribe_kwargs(self.asr_config, self.get_initial_prompt())
             )
-            
-            texto_final = ""
-            for segment in segments:
-                texto_final += segment.text
-            
-            result = texto_final.strip()
-            
+
+            # Iterar los segmentos es lo que ejecuta la transcripcion.
+            record = build_transcription_record(segments, info)
+            logger.debug(
+                "Transcripcion: confianza=%.3f (%s) avg_logprob=%s "
+                "no_speech_max=%s compression_max=%s idioma_prob=%s",
+                record.confidence,
+                record.confidence_method,
+                record.avg_logprob,
+                record.max_no_speech_prob,
+                record.max_compression_ratio,
+                record.language_probability,
+            )
+
             return {
                 "node": self.name,
                 "success": True,
-                "text": result,
-                "confidence": info.language_probability if hasattr(info, 'language_probability') else 0.0
+                "text": record.text,
+                "original_text": record.original_text,
+                # Confianza de la transcripcion, no del idioma.
+                "confidence": record.confidence,
+                "confidence_method": record.confidence_method,
+                "language_probability": record.language_probability,
+                "record": record,
             }
-        
+
         except Exception as e:
             logger.debug("TranscriptionNode.execute: %s", e)
             return {
                 "node": self.name,
                 "success": False,
                 "error": str(e),
-                "text": ""
+                "text": "",
+                "confidence": 0.0,
             }
 
 
@@ -336,7 +407,7 @@ class Ear:
     Sistema de percepcion auditiva integrado con la arquitectura de planificacion jerarquica.
     """
     
-    def __init__(self, model_size: str = "medium", language: str = "es"):
+    def __init__(self, model_size: Optional[str] = None, language: Optional[str] = None):
         """
         Inicializa el sistema auditivo con capacidades modulares.
         
@@ -344,18 +415,27 @@ class Ear:
             model_size: Tamano del modelo Whisper (tiny, base, small, medium, large)
             language: Idioma para transcripcion
         """
-        self.model_size = model_size
-        self.language = language
+        self.asr_config = load_asr_config()
+        self.model_size = model_size or self.asr_config.model_size
+        self.language = language or self.asr_config.language
         self.conversation_memory = ConversationMemory()
-        
+        # Estado de la entrada de audio (4.5.6.13): DISPONIBLE, SIN_PERMISO,
+        # NO_SOPORTADO o NO_VERIFICADO con detalle e instrucciones.
+        self.last_audio_status: Optional[Dict[str, Any]] = None
+        # Registro completo (texto original, confianza, metricas) de la ultima
+        # frase devuelta por listen() o process_audio_batch(). listen() sigue
+        # devolviendo solo el texto para no romper a sus consumidores.
+        self.last_transcription: Optional[TranscriptionRecord] = None
+
         # Crear nodos del pipeline de procesamiento
         self.calibration_node = CalibrationNode("audio_calibration")
         self.detection_node = DetectionNode("speech_detection")
         self.recording_node = RecordingNode("audio_recording")
         self.transcription_node = TranscriptionNode(
-            "speech_transcription", 
-            model_size, 
-            language
+            "speech_transcription",
+            self.model_size,
+            self.language,
+            asr_config=self.asr_config,
         )
         
         logger.info(r"Sistema auditivo inicializado")
@@ -434,7 +514,11 @@ class Ear:
             Texto transcrito o None si hay error
         """
         audio_queue = queue.Queue()
-        
+        self.last_transcription = None
+        set_last_transcription(None)
+        if not self.check_audio_input().get("available"):
+            return None
+
         def callback(indata, frames, time_info, status):
             """Callback para captura de audio."""
             if status:
@@ -483,6 +567,10 @@ class Ear:
                         logger.info(r"Audio grabado, transcribiendo...")
                         transcription_result = self.transcription_node.execute(recording_result["audio"])
                         if not transcription_result["success"]:
+                            logger.error(
+                                "Transcripcion fallida: %s",
+                                transcription_result.get("error", "error desconocido"),
+                            )
                             continue
                         
                         texto_final = transcription_result["text"]
@@ -506,6 +594,8 @@ class Ear:
                             # Continuar igualmente, no es critico
                         
                         # Devolver el texto transcrito y volver a empezar para seguir escuchando
+                        self.last_transcription = transcription_result.get("record")
+                        set_last_transcription(self.last_transcription)
                         logger.debug(r"Comando procesado, volviendo a modo alerta...")
                         return texto_final
                     
@@ -514,9 +604,52 @@ class Ear:
                         continue
                     
         except Exception as e:
-            logger.info("Procesando solicitud: " + str(e))
+            logger.error("Captura de audio fallida: %s", e)
             return None
-    
+
+    def check_audio_input(self, refresh: bool = False) -> Dict[str, Any]:
+        """
+        Comprueba la entrada de audio antes de abrir el microfono (4.5.6.13).
+
+        Usa la capacidad ``audio_input`` del adaptador de escritorio (Windows:
+        consentimiento de microfono y dispositivos de sounddevice; macOS:
+        ``AVCaptureDevice``, el permiso pertenece a la app anfitriona). Si falta
+        el permiso devuelve ``SIN_PERMISO`` con instrucciones y no se abre el
+        microfono. Un estado disponible se cachea; los demas se recalculan.
+        """
+        if not refresh and self.last_audio_status and self.last_audio_status.get("available"):
+            return self.last_audio_status
+        if sd is None:
+            status = {
+                "available": False, "status": "NO_SOPORTADO",
+                "detail": "sounddevice no disponible: %s" % _SD_IMPORT_ERROR,
+                "instructions": "Instalar sounddevice (pip install sounddevice).",
+            }
+        else:
+            status = {"available": True, "status": "NO_VERIFICADO", "detail": "", "instructions": ""}
+            try:
+                from src.desktop.platform_contract import Capability, get_desktop_platform
+
+                report = get_desktop_platform().capabilities().get(Capability.AUDIO_INPUT)
+                if report is not None:
+                    value = getattr(report.status, "value", str(report.status))
+                    status = {
+                        "available": value in ("DISPONIBLE", "NO_VERIFICADO"),
+                        "status": value,
+                        "detail": report.detail,
+                        "instructions": report.instructions,
+                    }
+            except Exception as exc:
+                # Sin adaptador se intenta abrir el microfono igualmente.
+                logger.warning("No se pudo consultar la capacidad audio_input: %s", exc)
+        if not status["available"]:
+            logger.error(
+                "Entrada de audio no disponible (%s): %s. %s",
+                status["status"], status["detail"], status["instructions"],
+            )
+        self.last_audio_status = status
+        return status
+
     def _check_activation_word(self, text: str) -> bool:
         """
         Verifica si el texto contiene una variante de "Jarvis".
@@ -545,20 +678,27 @@ class Ear:
         Returns:
             Texto transcrito o None si hay error
         """
+        self.last_transcription = None
         try:
             # Combinar chunks
             audio = np.concatenate(audio_chunks)
-            
+
             # Transcribir directamente
             transcription_result = self.transcription_node.execute(audio)
-            
+
             if transcription_result["success"]:
+                self.last_transcription = transcription_result.get("record")
+                set_last_transcription(self.last_transcription)
                 return transcription_result["text"]
             else:
+                logger.error(
+                    "Transcripcion fallida: %s",
+                    transcription_result.get("error", "error desconocido"),
+                )
                 return None
         
         except Exception as e:
-            logger.info("Procesando solicitud: " + str(e))
+            logger.error("Procesamiento de audio por lotes fallido: %s", e)
             return None
     
     def get_audio_status(self) -> Dict[str, Any]:

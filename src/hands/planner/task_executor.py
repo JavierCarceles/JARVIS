@@ -146,8 +146,79 @@ class TaskExecutor:
         self.total_attempts = 0
         self.average_execution_time = 0.0
         self._stats_lock = threading.RLock()
+        # Cancelacion cooperativa (4.7.3.1): se comprueba antes de preparar y
+        # justo antes de lanzar la accion. Una accion externa ya iniciada no se
+        # interrumpe; la cancelacion impide las siguientes.
+        self._cancel_event = threading.Event()
+        self._cancel_reason: Optional[str] = None
 
         logger.info("[TASK_EXECUTOR] Ejecutor de tareas inicializado")
+
+    # ------------------------------------------------------------------
+    # CANCELACION (4.7.3)
+    # ------------------------------------------------------------------
+
+    def cancel(self, reason: Optional[str] = None) -> bool:
+        """
+        Solicita la cancelacion. Devuelve True si habia una tarea en curso.
+        Sigue activa hasta ``clear_cancellation()``: toda tarea posterior se
+        devuelve ABORTED sin ejecutar ninguna accion.
+        """
+        self._cancel_reason = str(reason or "cancelado por el usuario")
+        self._cancel_event.set()
+        in_progress = self.current_task is not None
+        logger.info(
+            "[TASK_EXECUTOR] Cancelacion solicitada (%s); tarea en curso: %s",
+            self._cancel_reason, getattr(self.current_task, "id", None),
+        )
+        return in_progress
+
+    def clear_cancellation(self) -> None:
+        self._cancel_event.clear()
+        self._cancel_reason = None
+
+    @property
+    def is_cancelled(self) -> bool:
+        return self._cancel_event.is_set()
+
+    def _aborted_result(self, task: Task, started: float, state: Dict[str, Any], stage: str) -> TaskExecutionResult:
+        reason = self._cancel_reason or "cancelado"
+        logger.info("[TASK_EXECUTOR] Tarea %s cancelada (%s) antes de %s", getattr(task, "id", "unknown"), reason, stage)
+        return TaskExecutionResult(
+            task_id=getattr(task, "id", "unknown"),
+            status=TaskStatus.ABORTED,
+            result={"success": False, "cancelled": True, "execution_attempted": False, "stage": stage},
+            error_message=f"Tarea cancelada: {reason}",
+            execution_time=max(0.0, time.perf_counter() - started),
+            new_state=dict(state),
+        )
+
+    # ------------------------------------------------------------------
+    # VALIDACION DE TASK HOJA (4.7.1)
+    # ------------------------------------------------------------------
+
+    def validate_leaf_task(self, task: Any) -> Optional[str]:
+        """
+        Devuelve el motivo por el que ``task`` no puede despacharse a una accion
+        real, o None si es una Task hoja ejecutable (4.7.1.1-4.7.1.2):
+        - una Task con hijas o marcada como compuesta/contenedor no es hoja;
+        - una Task en estado final (completada, fallida, abortada u omitida)
+          no se vuelve a ejecutar;
+        - una Task sin accion registrada (``action_unmapped`` de HTNManager) no
+          se delega por su ID: falla de forma explicita salvo que traiga un
+          ``execute_callback`` propio.
+        """
+        if task is None or not str(getattr(task, "id", "") or "").strip():
+            return "tarea nula o sin id"
+        metadata = self._task_metadata(task)
+        if getattr(task, "children", None) or metadata.get("compound") or metadata.get("logical_container"):
+            return "la tarea %s no es hoja (es un contenedor HTN)" % task.id
+        status = getattr(task, "status", None)
+        if status in (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.ABORTED, TaskStatus.SKIPPED):
+            return "la tarea %s ya esta en estado final: %s" % (task.id, getattr(status, "value", status))
+        if metadata.get("action_unmapped") and not callable(metadata.get("execute_callback")):
+            return str(metadata["action_unmapped"])
+        return None
 
     @staticmethod
     def _safe_get(factory: Callable[[], Any], label: str) -> Any:
@@ -204,6 +275,15 @@ class TaskExecutor:
             logger.info("[TASK_EXECUTOR] Ejecutando tarea: %s", getattr(task, "id", "unknown"))
 
         try:
+            if self.is_cancelled:
+                return self._aborted_result(task, started, state, "preparar")
+            rejection = self.validate_leaf_task(task)
+            if rejection:
+                logger.warning("[TASK_EXECUTOR] Tarea rechazada: %s", rejection)
+                return self._register_failure(
+                    task, f"Tarea rechazada: {rejection}", started, current_state=state,
+                    result={"execution_attempted": False, "rejected": True},
+                )
             preparation = self._prepare_task_execution(task, state)
             if preparation.status == TaskStatus.FAILED:
                 return self._register_failure(
@@ -218,8 +298,16 @@ class TaskExecutor:
                     current_state=state, result={"execution_attempted": False},
                 )
 
+            # Ultimo punto seguro de cancelacion antes de cualquier efecto real.
+            if self.is_cancelled:
+                return self._aborted_result(task, started, state, "ejecutar")
             self.status = TaskExecutorStatus.EXECUTING
             result = self._execute_node(node, state)
+            if self.is_cancelled:
+                logger.info(
+                    "[TASK_EXECUTOR] Cancelacion recibida durante %s: la accion ya se ejecuto y se conserva su resultado",
+                    getattr(task, "id", "unknown"),
+                )
 
             elapsed = time.perf_counter() - started
             if self.config.timeout_per_task > 0 and elapsed > self.config.timeout_per_task:
@@ -277,6 +365,8 @@ class TaskExecutor:
                 current_state=state,
             )
         finally:
+            # 4.7.3.2: recursos propios del ejecutor liberados siempre (tarea en
+            # curso, estado); las acciones externas gestionan los suyos.
             elapsed = time.perf_counter() - started
             self._update_execution_statistics(elapsed)
             self.current_task = None
@@ -340,6 +430,10 @@ class TaskExecutor:
             last_result = self.execute_task(task, current_state)
             if last_result.status == TaskStatus.COMPLETED:
                 return last_result
+            result_payload = last_result.result if isinstance(last_result.result, dict) else {}
+            # Ni una cancelacion ni un rechazo de validacion se reintentan.
+            if last_result.status == TaskStatus.ABORTED or result_payload.get("rejected"):
+                break
             logger.warning(
                 "[TASK_EXECUTOR] Intento %s fallido para %s: %s",
                 attempt + 1, task.name, last_result.error_message,
@@ -554,6 +648,48 @@ class TaskExecutor:
             return value.strip().lower() in {"1", "true", "yes", "success", "completed", "ok"}
         return bool(value)
 
+    @classmethod
+    def _normalize_registered_result(cls, result: Any) -> Dict[str, Any]:
+        """
+        4.7.2.1: contrato de ``ActionRegistry.execute_action``: los fallos se
+        lanzan como excepcion, asi que un texto devuelto sin excepcion es el
+        mensaje de exito de la accion (``open_application`` devuelve
+        "Aplicacion X abierta exitosamente"). Es el mismo criterio que
+        ``Executor``. Antes se trataba como "resultado sin estado de exito
+        verificable" y la hoja HTN fallaba aunque la accion real funcionase.
+        """
+        if isinstance(result, str):
+            return {"success": True, "message": result, "result": result}
+        return cls._normalize_execution_result(result)
+
+    @staticmethod
+    def _attach_declared_effects(action_info: Any, state: Dict[str, Any], normalized: Dict[str, Any]) -> None:
+        """
+        4.7.2.3: datos para State. Solo tras una ejecucion confirmada se
+        aplican los efectos DECLARADOS de la accion (``ActionInfo.effects``)
+        y los cambios van en ``state_updates``, que ``_apply_result_to_state``
+        incorpora; no se inventan efectos.
+        """
+        apply_effects = getattr(action_info, "apply_effects", None)
+        if not callable(apply_effects):
+            return
+        try:
+            after = apply_effects(dict(state or {}), dict(normalized))
+        except Exception as exc:
+            logger.warning("[TASK_EXECUTOR] No se pudieron calcular los efectos declarados: %s", exc)
+            return
+        if not isinstance(after, dict):
+            return
+        updates = {
+            key: value for key, value in after.items()
+            if key not in (state or {}) or (state or {}).get(key) != value
+        }
+        if updates:
+            existing = normalized.get("state_updates")
+            merged = dict(existing) if isinstance(existing, dict) else {}
+            merged.update(updates)
+            normalized["state_updates"] = merged
+
     @staticmethod
     def _normalize_execution_result(result: Any) -> Dict[str, Any]:
         """Normaliza respuestas y exige evidencia explicita de exito."""
@@ -621,13 +757,24 @@ class TaskExecutor:
                     if not registry.can_execute(action_name, runtime_parameters, state=state):
                         return {"success": False, "error": f"Precondiciones o par\u00e1metros no v\u00e1lidos para: {action_name}", "execution_attempted": False}
                     raw_result = registry.execute_action(action_name, runtime_parameters)
-                    normalized = self._normalize_execution_result(raw_result)
+                    normalized = self._normalize_registered_result(raw_result)
                     normalized.setdefault("action", action_name)
                     normalized["execution_attempted"] = True
+                    if normalized.get("success"):
+                        self._attach_declared_effects(registered, state, normalized)
                     return normalized
                 except Exception as exc:
                     logger.exception("[TASK_EXECUTOR] Error ejecutando accion registrada %s", action_name)
-                    return {"success": False, "error": str(exc), "action": action_name, "execution_attempted": True}
+                    failure = {"success": False, "error": str(exc), "action": action_name, "execution_attempted": True}
+                    # 4.7.2.2: error estructurado de la accion (codigo, etapa...).
+                    operation_error = getattr(exc, "operation_error", None)
+                    to_dict = getattr(operation_error, "to_dict", None)
+                    if callable(to_dict):
+                        try:
+                            failure["operation_error"] = to_dict()
+                        except Exception as detail_exc:
+                            logger.warning("[TASK_EXECUTOR] operation_error no serializable: %s", detail_exc)
+                    return failure
 
         try:
             if self.executor is None:
@@ -933,8 +1080,8 @@ class TaskExecutor:
         for task in tasks:
             result = self.execute_task(task, state)
             results.append(result)
-            if result.status == TaskStatus.FAILED:
-                logger.warning("[TASK_EXECUTOR] Deteniendo secuencia por fallo en: %s", task.name)
+            if result.status in (TaskStatus.FAILED, TaskStatus.ABORTED):
+                logger.warning("[TASK_EXECUTOR] Deteniendo secuencia por %s en: %s", result.status.value, task.name)
                 break
             if result.new_state:
                 state = dict(result.new_state)

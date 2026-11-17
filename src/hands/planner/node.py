@@ -52,6 +52,29 @@ class TaskStatus(Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     ABORTED = "aborted"
+    # Rama condicional no elegida: no se ejecuto y no es un fallo (4.4.2).
+    SKIPPED = "skipped"
+
+
+# Transiciones validas de Task (4.2.2.2). Los estados finales no vuelven atras;
+# para repetir una tarea se crea una Task nueva.
+TASK_STATUS_TRANSITIONS: Dict[TaskStatus, Set[TaskStatus]] = {
+    TaskStatus.PENDING: {TaskStatus.EXECUTING, TaskStatus.SKIPPED, TaskStatus.ABORTED, TaskStatus.FAILED},
+    TaskStatus.EXECUTING: {TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.ABORTED},
+    TaskStatus.COMPLETED: set(),
+    TaskStatus.FAILED: set(),
+    TaskStatus.ABORTED: set(),
+    TaskStatus.SKIPPED: set(),
+}
+
+TASK_FINAL_STATUSES = frozenset(
+    {TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.ABORTED, TaskStatus.SKIPPED}
+)
+
+# Estados del ciclo de vida de un Goal (4.2.3.3). Se guardan en
+# ``Goal.metadata["status"]`` para no cambiar el constructor ni la
+# serializacion que ya consumen Brain, HTN y la memoria.
+GOAL_STATUSES = ("pending", "executing", "completed", "failed", "aborted")
 
 
 
@@ -805,6 +828,61 @@ class Goal:
         """Indica si se ha superado el deadline valido del objetivo."""
         return self.deadline is not None and time.time() > _safe_float(self.deadline, float("inf"))
 
+    # ------------------------------------------------------------------
+    # Contrato y ciclo de vida (4.1.2 y 4.2.3.3)
+    # ------------------------------------------------------------------
+
+    def validate(self) -> List[str]:
+        """Errores de contrato del Goal; lista vacia si es valido. Ver ``validate_goal``."""
+        return validate_goal(self)
+
+    def is_valid(self) -> bool:
+        return not self.validate()
+
+    @property
+    def status(self) -> str:
+        """Estado del ciclo de vida guardado en metadata (``pending`` por defecto)."""
+        metadata = self.metadata if isinstance(self.metadata, dict) else {}
+        value = str(metadata.get("status", "pending") or "pending").strip().lower()
+        return value if value in GOAL_STATUSES else "pending"
+
+    def mark_executing(self) -> None:
+        self._set_status("executing")
+
+    def record_result(
+        self,
+        success: bool,
+        *,
+        failed_task_id: Optional[str] = None,
+        error: Optional[str] = None,
+        aborted: bool = False,
+    ) -> None:
+        """
+        Propaga al Goal el resultado de su jerarquia de tareas.
+
+        Un Goal solo queda ``completed`` si la ejecucion lo confirma; el fallo
+        conserva la tarea responsable y el error.
+        """
+        status = "aborted" if aborted else ("completed" if success else "failed")
+        self._set_status(status)
+        metadata = self.metadata if isinstance(self.metadata, dict) else {}
+        metadata["last_result"] = {
+            "success": bool(success) and not aborted,
+            "status": status,
+            "failed_task_id": failed_task_id,
+            "error": error,
+            "timestamp": time.time(),
+        }
+        self.metadata = metadata
+
+    def _set_status(self, status: str) -> None:
+        if status not in GOAL_STATUSES:
+            raise ValueError(f"Estado de Goal no valido: {status}")
+        if not isinstance(self.metadata, dict):
+            self.metadata = {}
+        self.metadata["status"] = status
+        self.updated_at = time.time()
+
     def to_dict(self) -> Dict[str, Any]:
         """Convierte el objetivo a un diccionario serializable."""
         return {
@@ -833,6 +911,114 @@ class Goal:
         return cls(**normalized)
 
 
+# Campos minimos de un Goal (4.1.2.1): sin ellos HTN no puede elegir metodo ni
+# saber sobre que actua.
+GOAL_REQUIRED_FIELDS = ("id", "type", "target", "description")
+
+
+def validate_goal(goal: Any) -> List[str]:
+    """
+    Valida el contrato de un Goal (4.1.2.2) y devuelve la lista de errores.
+
+    Reglas:
+    - ``id``, ``type`` y ``description`` son texto no vacio;
+    - ``target`` es texto no vacio o un dict no vacio;
+    - ``priority`` es un entero >= 1;
+    - ``constraints`` es una lista de restricciones en texto (4.1.2.3);
+    - ``deadline``, si existe, es un numero finito;
+    - ``metadata`` es un dict.
+    No comprueba si el objetivo es alcanzable ni si existe metodo HTN: eso lo
+    decide HTNManager.
+    """
+    if goal is None:
+        return ["goal es None"]
+    errors: List[str] = []
+    for name in ("id", "type", "description"):
+        value = getattr(goal, name, None)
+        if not isinstance(value, str) or not value.strip():
+            errors.append(f"campo obligatorio vacio o no textual: {name}")
+    target = getattr(goal, "target", None)
+    if isinstance(target, str):
+        if not target.strip():
+            errors.append("campo obligatorio vacio: target")
+    elif isinstance(target, dict):
+        if not target:
+            errors.append("campo obligatorio vacio: target")
+    else:
+        errors.append("target debe ser texto o dict")
+    priority = getattr(goal, "priority", None)
+    if not isinstance(priority, int) or isinstance(priority, bool) or priority < 1:
+        errors.append("priority debe ser un entero >= 1")
+    constraints = getattr(goal, "constraints", None)
+    if not isinstance(constraints, list):
+        errors.append("constraints debe ser una lista")
+    else:
+        for item in constraints:
+            if not isinstance(item, str) or not item.strip():
+                errors.append("cada restriccion debe ser texto no vacio")
+                break
+    deadline = getattr(goal, "deadline", None)
+    if deadline is not None and not math.isfinite(_safe_float(deadline, float("nan"))):
+        errors.append("deadline debe ser un numero finito")
+    if not isinstance(getattr(goal, "metadata", None), dict):
+        errors.append("metadata debe ser un dict")
+    return errors
+
+
+def new_goal_id(prefix: str) -> str:
+    """ID unico y seguro para un Goal (sin espacios ni caracteres de ruta)."""
+    import re
+    import uuid
+
+    safe = re.sub(r"[^A-Za-z0-9_]+", "_", str(prefix or "goal")).strip("_")[:48] or "goal"
+    return f"{safe}_{int(time.time())}_{uuid.uuid4().hex[:6]}"
+
+
+def build_goal(
+    goal_type: str,
+    target: Union[str, Dict[str, Any]],
+    description: Optional[str] = None,
+    *,
+    priority: int = 1,
+    constraints: Optional[List[str]] = None,
+    metadata: Optional[Dict[str, Any]] = None,
+    source: str = "intent",
+    goal_id: Optional[str] = None,
+) -> Optional[Goal]:
+    """
+    Crea un Goal desde una intencion estructurada o una entidad (4.1.3).
+
+    Devuelve None (y registra el motivo) si el Goal no cumple el contrato de
+    ``validate_goal``; el llamador mantiene entonces su fallback legacy.
+    ``source`` queda en ``metadata["source"]`` (``intent``, ``entity``,
+    ``llm``...) para saber de donde salio el objetivo.
+    """
+    goal_type_text = str(getattr(goal_type, "value", goal_type) or "").strip()
+    if isinstance(target, str):
+        target = target.strip()
+    goal_metadata = dict(metadata or {})
+    goal_metadata.setdefault("source", source)
+    goal_metadata.setdefault("status", "pending")
+    try:
+        goal = Goal(
+            id=goal_id or new_goal_id(goal_type_text or "goal"),
+            type=goal_type_text,
+            target=target,
+            description=(description or f"{goal_type_text}: {target}").strip(),
+            priority=priority,
+            constraints=[str(item).strip() for item in (constraints or []) if str(item).strip()],
+            metadata=goal_metadata,
+        )
+    except Exception as exc:
+        logger.warning("No se pudo construir el Goal %s: %s", goal_type_text, exc)
+        return None
+    errors = validate_goal(goal)
+    if errors:
+        logger.warning("Goal %s descartado: %s", goal_type_text, "; ".join(errors))
+        return None
+    return goal
+
+
 @dataclass
 class Task:
     """Tarea jerarquica descomponible en otras tareas o nodos."""
@@ -848,12 +1034,18 @@ class Task:
     created_at: float = field(default_factory=time.time)
     started_at: Optional[float] = None
     completed_at: Optional[float] = None
+    # Datos auxiliares de la tarea (4.2.2.1): accion registrada (``action``),
+    # ``parameters``, ``task_type``, ``goal_id``, ``constraints``, ``condition``,
+    # resultado y error. Antes HTNManager lo anexaba como atributo dinamico.
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if isinstance(self.status, str):
             self.status = TaskStatus(self.status.strip().lower())
         elif not isinstance(self.status, TaskStatus):
             self.status = TaskStatus.PENDING
+        if not isinstance(self.metadata, dict):
+            self.metadata = {}
 
         for field_name in ("nodes", "children", "dependencies"):
             value = getattr(self, field_name)
@@ -871,6 +1063,65 @@ class Task:
             self.started_at = _safe_float(self.started_at, 0.0) or None
         if self.completed_at is not None:
             self.completed_at = _safe_float(self.completed_at, 0.0) or None
+
+    # ------------------------------------------------------------------
+    # Ciclo de vida (4.2.2.2 y 4.2.3.2)
+    # ------------------------------------------------------------------
+
+    @property
+    def is_leaf(self) -> bool:
+        """Una Task sin hijas es una hoja: se ejecuta mediante una accion real."""
+        return not self.children
+
+    @property
+    def is_final(self) -> bool:
+        return self.status in TASK_FINAL_STATUSES
+
+    def can_transition_to(self, new_status: TaskStatus) -> bool:
+        if isinstance(new_status, str):
+            new_status = TaskStatus(new_status.strip().lower())
+        return new_status in TASK_STATUS_TRANSITIONS.get(self.status, set())
+
+    def transition_to(self, new_status: Union[TaskStatus, str], error: Optional[str] = None) -> bool:
+        """
+        Cambia el estado si la transicion es valida; devuelve False y no toca
+        nada si no lo es (por ejemplo, completar una tarea que nunca empezo o
+        reabrir una tarea final).
+        """
+        if isinstance(new_status, str):
+            new_status = TaskStatus(new_status.strip().lower())
+        if not self.can_transition_to(new_status):
+            logger.warning(
+                "Transicion de Task no valida: %s %s -> %s",
+                self.id, self.status.value, new_status.value,
+            )
+            return False
+        now = time.time()
+        self.status = new_status
+        if new_status == TaskStatus.EXECUTING:
+            self.started_at = now
+        elif new_status in TASK_FINAL_STATUSES:
+            self.completed_at = now
+        if error:
+            self.metadata["error"] = str(error)
+        return True
+
+    def mark_executing(self) -> bool:
+        return self.transition_to(TaskStatus.EXECUTING)
+
+    def mark_completed(self) -> bool:
+        return self.transition_to(TaskStatus.COMPLETED)
+
+    def mark_failed(self, error: Optional[str] = None) -> bool:
+        return self.transition_to(TaskStatus.FAILED, error)
+
+    def mark_aborted(self, reason: Optional[str] = None) -> bool:
+        return self.transition_to(TaskStatus.ABORTED, reason)
+
+    def mark_skipped(self, reason: Optional[str] = None) -> bool:
+        if reason:
+            self.metadata["skip_reason"] = str(reason)
+        return self.transition_to(TaskStatus.SKIPPED)
 
     def _dependency_satisfied(
         self,
@@ -1013,6 +1264,7 @@ class Task:
             "created_at": self.created_at,
             "started_at": self.started_at,
             "completed_at": self.completed_at,
+            "metadata": _serialize_value(self.metadata) if self.metadata else {},
         }
 
     @classmethod
@@ -1027,6 +1279,8 @@ class Task:
         for field_name in ("nodes", "children", "dependencies"):
             if normalized.get(field_name) is None:
                 normalized[field_name] = []
+        if not isinstance(normalized.get("metadata"), dict):
+            normalized["metadata"] = {}
         return cls(**normalized)
 
 

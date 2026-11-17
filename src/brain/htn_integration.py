@@ -10,7 +10,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
-from src.hands.planner.node import Goal, TaskStatus
+from src.hands.planner.node import Goal, TaskStatus, build_goal, new_goal_id, validate_goal
 from src.hands.planner.htn_manager import get_htn_manager, HTNManager
 from src.hands.planner.task_executor import get_task_executor, TaskExecutor
 from src.hands.planner.application_integration import (
@@ -88,23 +88,33 @@ class HTNBrainIntegration:
             if not tasks:
                 execution_time = time.time() - start_time
                 self._record_integration(execution_time, False)
+                # 4.5.3.3: motivo real de la falta de metodo (4.3.2.3).
+                failure = getattr(self.htn_manager, "last_decomposition_failure", None) or {}
+                if callable(getattr(goal, "record_result", None)):
+                    goal.record_result(False, error=failure.get("message") or "Goal decomposition failed")
                 return HTNIntegrationResult(
                     success=False,
                     goal_id=goal.id,
                     goal_type=goal.type,
                     decomposed_tasks=[],
-                    execution_results=[],
+                    execution_results=[{"decomposition_failure": dict(failure)}] if failure else [],
                     total_execution_time=execution_time,
                     message="No se pudo descomponer el objetivo en tareas",
-                    error_message="Goal decomposition failed",
+                    error_message=(
+                        "Goal decomposition failed: %s" % failure["message"]
+                        if failure.get("message") else "Goal decomposition failed"
+                    ),
                     final_state=state,
                 )
 
-            decomposed_tasks = [self._serialize_task(task) for task in tasks]
             logger.info("Objetivo descompuesto en " + str(len(tasks)) + " tareas")
 
             logger.info("Fase 2: Ejecucion de jerarquia")
-            execution_result = self.htn_manager.execute_goal_hierarchy(goal, state)
+            # 4.5.3.2: se ejecutan exactamente las Tasks descompuestas (antes
+            # execute_goal_hierarchy volvia a descomponer el Goal).
+            execution_result = self.htn_manager.execute_goal_hierarchy(goal, state, tasks=tasks)
+            # Serializadas despues de ejecutar: reflejan el estado final de cada Task.
+            decomposed_tasks = [self._serialize_task(task) for task in tasks]
             execution_results = [self._serialize_execution_result(execution_result)]
 
             logger.info("Fase 3: Procesamiento de resultados")
@@ -201,6 +211,38 @@ class HTNBrainIntegration:
     # CREACION DE OBJETIVOS
     # ====================================================================
 
+    @staticmethod
+    def _make_goal(
+        goal_type: str,
+        target: Any,
+        description: str,
+        legacy_id: str,
+    ) -> Goal:
+        """
+        Crea el Goal con el constructor validado (4.1.3.1, origen ``text``).
+        Si no cumple el contrato se mantiene la construccion legacy, marcada
+        con ``source="legacy_fallback"`` y sus errores (4.1.3.3).
+        """
+        # Se conserva el prefijo historico del ID (``open_chrome``,
+        # ``generic_goal``...) con el sufijo unico de ``new_goal_id``.
+        prefix = legacy_id.rsplit("_", 1)[0] if "_" in legacy_id else goal_type
+        goal = build_goal(
+            goal_type, target, description, priority=1, source="text",
+            goal_id=new_goal_id(prefix),
+        )
+        if goal is not None:
+            return goal
+        goal = Goal(
+            id=legacy_id,
+            type=goal_type,
+            target=target,
+            description=description,
+            priority=1,
+        )
+        goal.metadata["source"] = "legacy_fallback"
+        goal.metadata["validation_errors"] = validate_goal(goal)
+        return goal
+
     def _create_goal_from_input(
         self,
         user_input: str,
@@ -214,30 +256,27 @@ class HTNBrainIntegration:
                 return None
 
             if any(word in input_lower for word in ("calibrar", "calibre", "calibration")):
-                return Goal(
-                    id=f"calibrate_applications_{int(time.time())}",
-                    type="calibrate_applications",
-                    target="applications",
-                    description="Calibrar aplicaciones",
-                    priority=1,
+                return self._make_goal(
+                    "calibrate_applications",
+                    "applications",
+                    "Calibrar aplicaciones",
+                    legacy_id=f"calibrate_applications_{int(time.time())}",
                 )
 
             if any(word in input_lower for word in ("abrir", "abre ", "open", "launch")):
                 if "chrome" in input_lower or "navegador" in input_lower:
-                    return Goal(
-                        id=f"open_chrome_{int(time.time())}",
-                        type="open_application",
-                        target="chrome",
-                        description="Abrir Google Chrome",
-                        priority=1,
+                    return self._make_goal(
+                        "open_application",
+                        "chrome",
+                        "Abrir Google Chrome",
+                        legacy_id=f"open_chrome_{int(time.time())}",
                     )
                 if "youtube" in input_lower:
-                    return Goal(
-                        id=f"open_youtube_{int(time.time())}",
-                        type="open_application",
-                        target="youtube",
-                        description="Abrir YouTube",
-                        priority=1,
+                    return self._make_goal(
+                        "open_application",
+                        "youtube",
+                        "Abrir YouTube",
+                        legacy_id=f"open_youtube_{int(time.time())}",
                     )
                 # Cualquier otra aplicacion: el nombre se resuelve despues por el
                 # flujo unico (catalogo -> resolucion local -> preflight); aqui no
@@ -251,31 +290,28 @@ class HTNBrainIntegration:
                 if app_match:
                     app_target = app_match.group(1).strip().rstrip(".,;:!?\"'")
                     if app_target:
-                        return Goal(
-                            id=f"open_application_{int(time.time())}",
-                            type="open_application",
-                            target=app_target,
-                            description=f"Abrir aplicaci\u00f3n {app_target}",
-                            priority=1,
+                        return self._make_goal(
+                            "open_application",
+                            app_target,
+                            f"Abrir aplicaci\u00f3n {app_target}",
+                            legacy_id=f"open_application_{int(time.time())}",
                         )
 
             if any(word in input_lower for word in ("navegar", "navigate", "ir a")):
                 url_match = re.search(r"https?://[^\s]+", text)
                 if url_match:
                     target = url_match.group(0).rstrip(".,);:!?\"")
-                    return Goal(
-                        id=f"navigate_{int(time.time())}",
-                        type="navigate",
-                        target=target,
-                        description=f"Navegar a {target}",
-                        priority=1,
+                    return self._make_goal(
+                        "navigate",
+                        target,
+                        f"Navegar a {target}",
+                        legacy_id=f"navigate_{int(time.time())}",
                     )
-                return Goal(
-                    id=f"navigate_entity_{int(time.time())}",
-                    type="navigate_stream",
-                    target="default_streamer",
-                    description="Navegar a stream predeterminado",
-                    priority=1,
+                return self._make_goal(
+                    "navigate_stream",
+                    "default_streamer",
+                    "Navegar a stream predeterminado",
+                    legacy_id=f"navigate_entity_{int(time.time())}",
                 )
 
             if any(word in input_lower for word in ("buscar", "search")):
@@ -283,20 +319,18 @@ class HTNBrainIntegration:
                 if query_match:
                     query = query_match.group(1).strip()
                     if query:
-                        return Goal(
-                            id=f"search_{int(time.time())}",
-                            type="search",
-                            target=query,
-                            description=f"Buscar: {query}",
-                            priority=1,
+                        return self._make_goal(
+                            "search",
+                            query,
+                            f"Buscar: {query}",
+                            legacy_id=f"search_{int(time.time())}",
                         )
 
-            return Goal(
-                id=f"generic_goal_{int(time.time())}",
-                type="generic",
-                target=text,
-                description=f"Objetivo gen\u00e9rico: {text}",
-                priority=1,
+            return self._make_goal(
+                "generic",
+                text,
+                f"Objetivo gen\u00e9rico: {text}",
+                legacy_id=f"generic_goal_{int(time.time())}",
             )
 
         except Exception as exc:
@@ -314,25 +348,48 @@ class HTNBrainIntegration:
         current_state: Dict[str, Any],
     ) -> Dict[str, Any]:
         """Procesa el resultado, actualiza el estado y registra memoria."""
-        new_state = dict(current_state or {})
+        base_state = dict(current_state or {})
+        new_state = dict(base_state)
         completed = execution_result.status == TaskStatus.COMPLETED
+
+        # 4.6.2.1-4.6.2.2: solo se aplican los cambios confirmados. El
+        # ``new_state`` de HTNManager acumula unicamente el estado devuelto por
+        # hojas COMPLETED; la hoja que falla no aporta cambios. Antes, ante un
+        # fallo se descartaban tambien los cambios ya confirmados.
+        result_value = getattr(execution_result, "result", None)
+        confirmed_state = getattr(execution_result, "new_state", None)
+        if not isinstance(confirmed_state, dict) and isinstance(result_value, dict):
+            confirmed_state = result_value.get("new_state")
+        if isinstance(confirmed_state, dict):
+            new_state.update(confirmed_state)
+        state_changes: List[str] = []
+        for key, value in new_state.items():
+            if str(key).startswith("_"):
+                continue
+            try:
+                changed = key not in base_state or base_state[key] != value
+            except Exception:
+                changed = True
+            if changed:
+                state_changes.append(str(key))
 
         state_key = f"{goal.type}_{'completed' if completed else 'failed'}"
         new_state[state_key] = True
+        payload = result_value if isinstance(result_value, dict) else {}
+        # 4.6.2.3: registro del resultado con la Task responsable y los
+        # cambios de estado aplicados.
         new_state["last_htn_goal"] = {
             "goal_id": goal.id,
             "goal_type": goal.type,
             "target": goal.target,
             "success": completed,
             "execution_time": getattr(execution_result, "execution_time", 0.0),
+            "failed_task_id": payload.get("failed_task_id"),
+            "error_message": getattr(execution_result, "error_message", None),
+            "state_changes": sorted(state_changes),
+            "state_source": base_state.get("_htn_state_source"),
             "timestamp": time.time(),
         }
-
-        result_value = getattr(execution_result, "result", None)
-        if isinstance(result_value, dict):
-            nested_state = result_value.get("new_state")
-            if isinstance(nested_state, dict):
-                new_state.update(nested_state)
 
         if completed:
             self._register_goal_completion(goal, execution_result)

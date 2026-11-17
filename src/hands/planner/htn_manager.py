@@ -42,6 +42,19 @@ HTN_TASK_ACTIONS = {
 }
 
 
+# Limite de niveles de descomposicion recursiva de Tasks compuestas (4.3.4.3).
+MAX_DECOMPOSITION_DEPTH = 6
+
+
+class HTNDecompositionError(Exception):
+    """Descomposicion imposible con el motivo estructurado en ``details``."""
+
+    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None) -> None:
+        super().__init__(message)
+        self.details: Dict[str, Any] = dict(details or {})
+        self.details.setdefault("message", message)
+
+
 class HTNStatus(Enum):
     IDLE = "idle"
     DECOMPOSING = "decomposing"
@@ -88,6 +101,15 @@ class HTNManager:
         self.planner = planner
         self.available_tasks: Dict[str, Task] = {}
         self.decomposition_rules: List[HTNDecompositionRule] = []
+        # Reglas de Tasks compuestas (4.3.4.1): ``target_type`` es el
+        # ``task_type`` de la Task, no el tipo de Goal. Se mantienen separadas
+        # de las reglas de Goal para que una tarea con el mismo nombre que un
+        # tipo de Goal (``open_application``) no se descomponga en si misma.
+        self.task_decomposition_rules: List[HTNDecompositionRule] = []
+        # Motivo de la ultima descomposicion fallida (4.3.2.3) y decisiones de
+        # ramas condicionales de la ultima descomposicion (4.4.2.4).
+        self.last_decomposition_failure: Optional[Dict[str, Any]] = None
+        self.last_branch_decisions: List[Dict[str, Any]] = []
         self.execution_history: List[Dict[str, Any]] = []
         self.current_execution: Optional[Dict[str, Any]] = None
 
@@ -495,48 +517,288 @@ class HTNManager:
         self.available_tasks = {task.id: task for task in tasks}
         logger.info("[HTN] Biblioteca de tareas cargada: %s tareas", len(tasks))
 
+    def add_task_decomposition_rule(self, rule: HTNDecompositionRule) -> None:
+        """Registra un metodo para una Task compuesta (``rule.target_type`` = task_type)."""
+        self.task_decomposition_rules.append(rule)
+        self.task_decomposition_rules.sort(key=lambda item: item.priority)
+
     def decompose_goal(self, goal: Goal, current_state: Dict[str, Any]) -> List[Task]:
+        """
+        Descompone el Goal hasta Tasks hoja.
+
+        Devuelve la lista de Tasks (raiz incluida) o ``[]``; en ese caso el
+        motivo queda en ``self.last_decomposition_failure`` (4.3.2.3) con
+        ``reason`` = ``invalid_goal`` | ``no_rule_for_type`` |
+        ``preconditions_unmet`` | ``no_branch_applicable`` |
+        ``compound_task_without_method`` | ``decomposition_cycle`` |
+        ``max_depth_exceeded`` | ``invalid_dependencies`` | ``error``.
+        """
+        self.last_decomposition_failure = None
+        self.last_branch_decisions = []
         if not self._valid_goal(goal):
             logger.warning("[HTN] No se puede descomponer un objetivo invalido")
+            self.last_decomposition_failure = {
+                "reason": "invalid_goal",
+                "message": "Objetivo inv\u00e1lido o sin id",
+            }
             return []
         prior_status = self.status
         self.status = HTNStatus.DECOMPOSING
         started = time.perf_counter()
+        state = self._normalize_state(current_state)
         try:
             if not self.decomposition_rules:
                 self.initialize_decomposition_rules()
             if not self.available_tasks:
                 self.load_task_library()
-            rule = self._find_decomposition_rule(goal, self._normalize_state(current_state))
+            selection = self.explain_method_selection(goal, state)
+            rule = selection.get("rule")
             if rule is None:
+                details = {k: v for k, v in selection.items() if k != "rule"}
+                self.last_decomposition_failure = details
+                logger.info("[HTN] Sin metodo para %s: %s", goal.id, details.get("message"))
                 return []
-            if not self._check_preconditions(rule, self._normalize_state(current_state)):
-                logger.info("[HTN] Precondiciones no satisfechas para regla %s", rule.name)
-                return []
-            if rule.strategy == TaskDecompositionStrategy.SEQUENTIAL:
-                tasks = self._decompose_sequential(goal, rule)
-            elif rule.strategy == TaskDecompositionStrategy.PARALLEL:
-                tasks = self._decompose_parallel(goal, rule)
-            elif rule.strategy == TaskDecompositionStrategy.CONDITIONAL:
-                tasks = self._decompose_conditional(goal, rule, self._normalize_state(current_state))
-            else:
-                tasks = self._decompose_iterative(goal, rule)
+            tasks = self._instantiate_rule(goal, rule, state)
+            tasks = self._expand_compound_tasks(goal, tasks, state)
             tasks = self._establish_hierarchy(tasks, goal)
             dependency_error = self._validate_task_dependencies(tasks)
             if dependency_error:
                 logger.warning("[HTN] Descomposicion invalida: %s", dependency_error)
+                self.last_decomposition_failure = {
+                    "reason": "invalid_dependencies",
+                    "rule": rule.name,
+                    "message": dependency_error,
+                }
                 return []
             return tasks
-        except Exception:
+        except HTNDecompositionError as exc:
+            logger.warning("[HTN] Descomposicion de %s detenida: %s", goal.id, exc)
+            self.last_decomposition_failure = dict(exc.details)
+            return []
+        except Exception as exc:
             logger.exception("[HTN] Error al descomponer objetivo %s", getattr(goal, "id", None))
+            self.last_decomposition_failure = {"reason": "error", "message": str(exc)}
             return []
         finally:
             self.status = prior_status if prior_status != HTNStatus.DECOMPOSING else HTNStatus.IDLE
             logger.debug("[HTN] Descomposicion en %.4fs", time.perf_counter() - started)
 
-    def execute_goal_hierarchy(
+    def explain_method_selection(
         self, goal: Goal, current_state: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Seleccion de metodo HTN (4.3.2.1-4.3.2.2).
+
+        Un metodo (regla) es aplicable si ``rule.target_type`` coincide con el
+        tipo del Goal (o es ``generic``) y TODAS sus precondiciones se cumplen
+        en el estado real recibido. Entre los aplicables gana el de menor
+        ``priority``. Devuelve ``{"rule": regla}`` o ``{"rule": None, "reason":
+        ..., "goal_type": ..., "rules_evaluated": [{"rule", "unmet_preconditions"}],
+        "message": ...}``.
+        """
+        if not self.decomposition_rules:
+            self.initialize_decomposition_rules()
+        return self._select_rule(
+            self.decomposition_rules, self._goal_type(goal), current_state, allow_generic=True
+        )
+
+    def _select_rule(
+        self,
+        rules: List[HTNDecompositionRule],
+        type_name: str,
+        current_state: Dict[str, Any],
+        allow_generic: bool = False,
+    ) -> Dict[str, Any]:
+        state = self._normalize_state(current_state)
+        matches = [rule for rule in rules if rule.target_type == type_name]
+        if allow_generic:
+            matches.extend(rule for rule in rules if rule.target_type == "generic")
+        if not matches:
+            return {
+                "rule": None,
+                "reason": "no_rule_for_type",
+                "goal_type": type_name,
+                "rules_evaluated": [],
+                "message": f"No hay regla HTN para el tipo '{type_name}'",
+            }
+        evaluated: List[Dict[str, Any]] = []
+        for rule in sorted(matches, key=lambda item: item.priority):
+            unmet = self._unmet_preconditions(rule, state)
+            if not unmet:
+                return {"rule": rule, "goal_type": type_name, "rules_evaluated": evaluated}
+            evaluated.append({"rule": rule.name, "unmet_preconditions": unmet})
+        detail = "; ".join(
+            "%s: %s" % (item["rule"], ", ".join(item["unmet_preconditions"])) for item in evaluated
+        )
+        return {
+            "rule": None,
+            "reason": "preconditions_unmet",
+            "goal_type": type_name,
+            "rules_evaluated": evaluated,
+            "message": f"Precondiciones no cumplidas para '{type_name}' ({detail})",
+        }
+
+    def _instantiate_rule(
+        self, goal: Goal, rule: HTNDecompositionRule, state: Dict[str, Any]
+    ) -> List[Task]:
+        if rule.strategy == TaskDecompositionStrategy.SEQUENTIAL:
+            return self._decompose_sequential(goal, rule)
+        if rule.strategy == TaskDecompositionStrategy.PARALLEL:
+            return self._decompose_parallel(goal, rule)
+        if rule.strategy == TaskDecompositionStrategy.CONDITIONAL:
+            return self._decompose_conditional(goal, rule, state)
+        return self._decompose_iterative(goal, rule)
+
+    # ------------------------------------------------------------------
+    # DESCOMPOSICION RECURSIVA (4.3.4)
+    # ------------------------------------------------------------------
+
+    def _is_compound_task_type(self, task_type: Optional[str]) -> bool:
+        """4.3.4.1: una Task es compuesta si existe al menos un metodo para su tipo."""
+        if not task_type:
+            return False
+        return any(rule.target_type == task_type for rule in self.task_decomposition_rules)
+
+    def _expand_compound_tasks(
+        self, goal: Goal, tasks: List[Task], state: Dict[str, Any]
+    ) -> List[Task]:
+        """
+        Expande cada Task compuesta un nivel cada vez (4.3.4.2) hasta que solo
+        queden hojas (4.3.4.3). Un ``task_type`` que reaparece en su propia
+        cadena de ancestros es un ciclo y la profundidad esta limitada por
+        ``MAX_DECOMPOSITION_DEPTH`` (4.3.4.4). Las dependencias sobre una Task
+        compuesta se trasladan a sus hojas: los contenedores no se ejecutan.
+        """
+        if not self.task_decomposition_rules:
+            return tasks
+        output: List[Task] = []
+
+        def _expand(task: Task, depth: int, path: Tuple[str, ...]) -> None:
+            output.append(task)
+            metadata = task.metadata if isinstance(getattr(task, "metadata", None), dict) else {}
+            task_type = metadata.get("task_type")
+            if task.status == TaskStatus.SKIPPED or not self._is_compound_task_type(task_type):
+                return
+            if task_type in path:
+                raise HTNDecompositionError(
+                    "Ciclo de descomposicion: %s" % " -> ".join(path + (task_type,)),
+                    {"reason": "decomposition_cycle", "task_id": task.id,
+                     "cycle": list(path + (task_type,))},
+                )
+            if depth >= MAX_DECOMPOSITION_DEPTH:
+                raise HTNDecompositionError(
+                    "Profundidad maxima de descomposicion (%s) superada en %s"
+                    % (MAX_DECOMPOSITION_DEPTH, task.id),
+                    {"reason": "max_depth_exceeded", "task_id": task.id,
+                     "max_depth": MAX_DECOMPOSITION_DEPTH, "path": list(path + (task_type,))},
+                )
+            selection = self._select_rule(self.task_decomposition_rules, task_type, state)
+            rule = selection.get("rule")
+            if rule is None:
+                details = {k: v for k, v in selection.items() if k != "rule"}
+                details["reason"] = "compound_task_without_method"
+                details["task_id"] = task.id
+                raise HTNDecompositionError(
+                    "Task compuesta %s sin metodo aplicable: %s"
+                    % (task.id, selection.get("message")),
+                    details,
+                )
+            children = self._instantiate_rule(goal, rule, state)
+            children = self._reparent_subtasks(goal, task, children)
+            # Una Task compuesta es un contenedor: nunca se despacha a una accion.
+            metadata.pop("action", None)
+            metadata.pop("action_unmapped", None)
+            metadata["compound"] = True
+            metadata["decomposition_rule"] = rule.name
+            task.metadata = metadata
+            task.children = [child.id for child in children if child.parent == task.id]
+            for child in children:
+                _expand(child, depth + 1, path + (task_type,))
+
+        for task in tasks:
+            _expand(task, 0, ())
+
+        # Las dependencias sobre un contenedor pasan a sus hojas no omitidas.
+        by_id = {task.id: task for task in output}
+
+        def _leaves(task_id: str, seen: Set[str]) -> List[str]:
+            task = by_id.get(task_id)
+            if task is None or task_id in seen:
+                return []
+            seen.add(task_id)
+            if not task.children:
+                return [] if task.status == TaskStatus.SKIPPED else [task_id]
+            leaves: List[str] = []
+            for child_id in task.children:
+                leaves.extend(_leaves(child_id, seen))
+            return leaves
+
+        def _ancestor_ids(task: Task) -> Set[str]:
+            found: Set[str] = set()
+            parent_id = task.parent
+            while parent_id in by_id and parent_id not in found:
+                found.add(parent_id)
+                parent_id = by_id[parent_id].parent
+            return found
+
+        for task in output:
+            rewritten: List[str] = []
+            ancestors = _ancestor_ids(task)
+            for dep in task.dependencies or []:
+                dep_task = by_id.get(dep)
+                # La dependencia sobre un ancestro (p. ej. el bucle iterativo)
+                # se conserva: es un contenedor y no bloquea la ejecucion.
+                if dep in ancestors or dep_task is None or not dep_task.children:
+                    targets = [dep]
+                else:
+                    targets = _leaves(dep, set())
+                for item in targets:
+                    if item not in rewritten and item != task.id:
+                        rewritten.append(item)
+            task.dependencies = rewritten
+        return output
+
+    @staticmethod
+    def _reparent_subtasks(goal: Goal, parent: Task, subtasks: List[Task]) -> List[Task]:
+        """
+        Renombra las Tasks creadas por un metodo de Task compuesta para que sus
+        IDs sean unicos bajo ``parent`` y cuelguen de el. Las que no dependen de
+        otra del mismo metodo heredan las dependencias del padre.
+        """
+        prefix = f"{goal.id}_"
+        mapping: Dict[str, str] = {}
+        for task in subtasks:
+            local = task.id[len(prefix):] if task.id.startswith(prefix) else task.id
+            mapping[task.id] = f"{parent.id}__{local}"
+        for task in subtasks:
+            task.id = mapping[task.id]
+            if task.parent in mapping:
+                task.parent = mapping[task.parent]
+            else:
+                task.parent = parent.id
+            internal = [mapping[dep] for dep in (task.dependencies or []) if dep in mapping]
+            external = [dep for dep in (task.dependencies or []) if dep not in mapping]
+            if not internal and task.parent == parent.id:
+                external = list(dict.fromkeys(external + list(parent.dependencies or [])))
+            task.dependencies = internal + external
+        by_new_id = {task.id: task for task in subtasks}
+        for task in subtasks:
+            container = by_new_id.get(task.parent)
+            if container is not None and task.id not in container.children:
+                container.children.append(task.id)
+        return subtasks
+
+    def execute_goal_hierarchy(
+        self,
+        goal: Goal,
+        current_state: Dict[str, Any],
+        tasks: Optional[List[Task]] = None,
     ) -> TaskExecutionResult:
+        """
+        Ejecuta la jerarquia del Goal. ``tasks`` permite ejecutar una
+        descomposicion ya hecha (la de ``decompose_goal``) para no descomponer
+        dos veces ni ejecutar Tasks distintas de las devueltas al llamador.
+        """
         if not self._valid_goal(goal):
             return self._failed_result("unknown", "Objetivo inv\u00e1lido", current_state)
 
@@ -549,17 +811,41 @@ class HTNManager:
             self.failed_tasks.clear()
         started = self.start_time
         try:
-            tasks = self.decompose_goal(goal, state)
             if not tasks:
-                result = self._failed_result(goal.id, "No se pudo descomponer el objetivo", state)
+                tasks = self.decompose_goal(goal, state)
+            if not tasks:
+                failure = dict(self.last_decomposition_failure or {})
+                message = "No se pudo descomponer el objetivo"
+                if failure.get("message"):
+                    message = f"{message}: {failure['message']}"
+                result = self._failed_result(goal.id, message, state)
+                result.result = {"decomposition_failure": failure}
+                if callable(getattr(goal, "record_result", None)):
+                    goal.record_result(False, error=message)
                 self.status = HTNStatus.FAILED
                 self._record_execution(goal, [], result, time.perf_counter() - started)
                 return result
 
+            if callable(getattr(goal, "mark_executing", None)):
+                goal.mark_executing()
+            branch_decisions = list(self.last_branch_decisions)
             result = self._execute_task_hierarchy(tasks, dict(state))
+            if branch_decisions:
+                if not isinstance(result.result, dict):
+                    result.result = {}
+                result.result.setdefault("branch_decisions", branch_decisions)
             elapsed = time.perf_counter() - started
             self.total_execution_time += elapsed
             self.status = HTNStatus.COMPLETED if result.status == TaskStatus.COMPLETED else HTNStatus.FAILED
+            # Propagar el resultado al Goal (4.2.3.3 / 4.3.5).
+            if callable(getattr(goal, "record_result", None)):
+                payload = result.result if isinstance(result.result, dict) else {}
+                goal.record_result(
+                    result.status == TaskStatus.COMPLETED,
+                    failed_task_id=payload.get("failed_task_id"),
+                    error=result.error_message,
+                    aborted=bool(payload.get("aborted")),
+                )
             self._record_execution(goal, tasks, result, elapsed)
             return result
         except Exception as exc:
@@ -575,13 +861,7 @@ class HTNManager:
     def _find_decomposition_rule(
         self, goal: Goal, current_state: Dict[str, Any]
     ) -> Optional[HTNDecompositionRule]:
-        goal_type = self._goal_type(goal)
-        matches = [rule for rule in self.decomposition_rules if rule.target_type == goal_type]
-        matches.extend(rule for rule in self.decomposition_rules if rule.target_type == "generic")
-        for rule in sorted(matches, key=lambda item: item.priority):
-            if self._check_preconditions(rule, current_state):
-                return rule
-        return None
+        return self.explain_method_selection(goal, current_state).get("rule")
 
     def _application_catalog_available(self) -> bool:
         try:
@@ -594,21 +874,40 @@ class HTNManager:
     def _check_preconditions(
         self, rule: HTNDecompositionRule, current_state: Dict[str, Any]
     ) -> bool:
-        state = self._normalize_state(current_state)
+        return not self._unmet_preconditions(rule, current_state)
+
+    def _condition_holds(self, condition: str, state: Dict[str, Any]) -> bool:
+        """Evalua una precondicion contra el estado real (4.3.2.2 / 4.4.2.1)."""
         special = {
-            "browser_available": self._browser_available(state),
-            "entity_available": self._entity_available(state),
-            "application_known": bool(state.get("applications_known", False)) or self._application_catalog_available(),
-            "search_engine_known": bool(state.get("search_engine_known", True)),
-            "multiple_tasks_defined": bool(state.get("multiple_tasks_defined", False)),
+            "browser_available": lambda: self._browser_available(state),
+            "entity_available": lambda: self._entity_available(state),
+            "application_known": lambda: bool(state.get("applications_known", False))
+            or self._application_catalog_available(),
+            "search_engine_known": lambda: bool(state.get("search_engine_known", True)),
+            "multiple_tasks_defined": lambda: bool(state.get("multiple_tasks_defined", False)),
         }
-        for precondition in rule.preconditions:
-            if precondition in special:
-                if not special[precondition]:
-                    return False
-            elif not self._evaluate_precondition(precondition, state):
-                return False
-        return True
+        text = str(condition or "").strip()
+        negated = text.startswith("not ")
+        if negated:
+            text = text[4:].strip()
+        if text in special:
+            value = bool(special[text]())
+        elif "==" in text:
+            key, expected = (part.strip() for part in text.split("==", 1))
+            value = str(state.get(key)) == expected if key in state else False
+        else:
+            value = self._evaluate_precondition(text, state)
+        return not value if negated else value
+
+    def _unmet_preconditions(
+        self, rule: HTNDecompositionRule, current_state: Dict[str, Any]
+    ) -> List[str]:
+        state = self._normalize_state(current_state)
+        return [
+            str(precondition)
+            for precondition in rule.preconditions
+            if not self._condition_holds(precondition, state)
+        ]
 
     @staticmethod
     def _browser_available(state: Dict[str, Any]) -> bool:
@@ -654,6 +953,14 @@ class HTNManager:
         )
         metadata = self._as_dict(getattr(template, "metadata", {}))
         metadata.update({"task_type": pattern_id, "goal_id": safe_goal_id})
+        # Las restricciones del Goal acompanan a cada tarea (4.3.3.4).
+        goal_constraints = [
+            str(item) for item in (getattr(goal, "constraints", None) or []) if str(item).strip()
+        ]
+        if goal_constraints:
+            metadata["constraints"] = list(dict.fromkeys(
+                list(metadata.get("constraints", []) or []) + goal_constraints
+            ))
         # Enlace con una accion REAL del ActionRegistry: TaskExecutor resuelve la
         # accion por metadata["action"]. Solo se enlazan tareas con accion
         # registrada; el resto queda marcado y falla de forma explicita.
@@ -697,11 +1004,72 @@ class HTNManager:
     def _decompose_conditional(
         self, goal: Goal, rule: HTNDecompositionRule, current_state: Dict[str, Any]
     ) -> List[Task]:
-        return [
-            self._task_from_pattern(goal, pattern_id, goal.id)
-            for pattern_id in rule.decomposition_pattern
-            if current_state.get(f"enable_{pattern_id}", True)
-        ]
+        """
+        Ramas condicionales (4.4.2).
+
+        Con ``rule.metadata["branches"]`` = ``[{"name", "condition", "pattern"}]``
+        se evalua cada condicion en orden contra el estado real (4.4.2.1) y se
+        elige SOLO la primera que se cumple (4.4.2.2); una rama sin
+        ``condition`` es la rama por defecto. Las Tasks de las ramas no elegidas
+        se crean en estado ``SKIPPED`` para que nunca se ejecuten (4.4.2.3) y la
+        decision queda en ``self.last_branch_decisions`` y en la metadata de
+        cada Task (4.4.2.4). Sin ``branches`` se conserva el comportamiento
+        anterior (``enable_<tarea>`` en el estado).
+        """
+        branches = rule.metadata.get("branches") if isinstance(rule.metadata, dict) else None
+        if not branches:
+            return [
+                self._task_from_pattern(goal, pattern_id, goal.id)
+                for pattern_id in rule.decomposition_pattern
+                if current_state.get(f"enable_{pattern_id}", True)
+            ]
+        evaluations: List[Dict[str, Any]] = []
+        chosen: Optional[int] = None
+        for index, branch in enumerate(branches):
+            branch = branch if isinstance(branch, dict) else {}
+            condition = branch.get("condition")
+            holds = True if condition in (None, "") else self._condition_holds(str(condition), current_state)
+            evaluations.append({
+                "branch": str(branch.get("name") or f"branch_{index}"),
+                "condition": condition,
+                "holds": holds,
+            })
+            if holds and chosen is None:
+                chosen = index
+        decision = {
+            "rule": rule.name,
+            "goal_id": goal.id,
+            "chosen_branch": evaluations[chosen]["branch"] if chosen is not None else None,
+            "evaluations": evaluations,
+        }
+        self.last_branch_decisions.append(decision)
+        logger.info(
+            "[HTN] Decision condicional %s: rama=%s evaluaciones=%s",
+            rule.name, decision["chosen_branch"], evaluations,
+        )
+        if chosen is None:
+            raise HTNDecompositionError(
+                "Ninguna rama de %s es aplicable" % rule.name,
+                {"reason": "no_branch_applicable", "rule": rule.name, "branch_decision": decision},
+            )
+        tasks: List[Task] = []
+        for index, branch in enumerate(branches):
+            branch = branch if isinstance(branch, dict) else {}
+            branch_name = evaluations[index]["branch"]
+            previous: Optional[str] = None
+            for pattern_id in self._as_list(branch.get("pattern")):
+                task = self._task_from_pattern(goal, str(pattern_id), goal.id)
+                task.id = f"{task.id}_{branch_name}"
+                task.metadata["branch"] = branch_name
+                task.metadata["branch_decision"] = decision
+                if index == chosen:
+                    if previous is not None:
+                        task.dependencies.append(previous)
+                    previous = task.id
+                else:
+                    task.mark_skipped(f"rama no elegida: {branch_name}")
+                tasks.append(task)
+        return tasks
 
     def _decompose_iterative(self, goal: Goal, rule: HTNDecompositionRule) -> List[Task]:
         # La iteracion esta representada como contenedor jerarquico; no se ejecuta
@@ -823,27 +1191,74 @@ class HTNManager:
             str(task.id) for task in all_tasks if getattr(task, "children", [])
         )
 
+        by_id = {task.id: task for task in all_tasks}
+
+        def _ancestors(task: Task) -> List[Task]:
+            chain: List[Task] = []
+            seen: Set[str] = set()
+            parent_id = getattr(task, "parent", None)
+            while parent_id in by_id and parent_id not in seen:
+                seen.add(parent_id)
+                chain.append(by_id[parent_id])
+                parent_id = getattr(by_id[parent_id], "parent", None)
+            return chain
+
+        # Los contenedores no se marcan como completados al encontrarlos: solo
+        # cuando todas sus hijas terminan (4.3.5 / 4.2.3.3). Antes se marcaban
+        # COMPLETED antes de ejecutar las hojas y un fallo posterior no los
+        # corregia.
         for task in ordered:
             if task.id in container_ids:
-                self.completed_tasks.add(task.id)
-                try:
-                    task.status = TaskStatus.COMPLETED
-                except Exception:
-                    pass
+                continue
+            # Rama condicional no elegida: no se ejecuta (4.4.2.3).
+            if getattr(task, "status", None) == TaskStatus.SKIPPED:
                 continue
 
-            result = self._execute_single_task(task, state)
-            results.append(self._result_to_dict(result))
-            if result.status != TaskStatus.COMPLETED:
+            # Una dependencia no completada bloquea la tarea (4.4.3).
+            unmet = [
+                str(dep) for dep in (task.dependencies or [])
+                if str(dep) in by_id and str(dep) not in container_ids
+                and str(dep) not in self.completed_tasks
+                and getattr(by_id[str(dep)], "status", None) != TaskStatus.SKIPPED
+            ]
+            if unmet:
+                self._mark_task(task, TaskStatus.FAILED, f"dependencias no satisfechas: {unmet}")
                 self.failed_tasks.add(task.id)
-                try:
-                    task.status = TaskStatus.FAILED
-                except Exception:
-                    pass
+                for ancestor in _ancestors(task):
+                    self._mark_task(ancestor, TaskStatus.FAILED, f"hija fallida: {task.id}")
                 return TaskExecutionResult(
                     task_id=root.id,
                     status=TaskStatus.FAILED,
-                    result=result.result,
+                    result={"failed_task_id": task.id, "unmet_dependencies": unmet},
+                    execution_time=time.perf_counter() - (self.start_time or time.perf_counter()),
+                    subtask_results=results,
+                    error_message=f"Dependencia no satisfecha para {task.id}: {unmet}",
+                    new_state=state,
+                )
+
+            self._mark_task(task, TaskStatus.EXECUTING)
+            result = self._execute_single_task(task, state)
+            results.append(self._result_to_dict(result))
+            if result.status != TaskStatus.COMPLETED:
+                aborted = result.status == TaskStatus.ABORTED
+                self.failed_tasks.add(task.id)
+                # Una cancelacion (4.7.3) deja la hoja ABORTED, no FAILED.
+                self._mark_task(task, TaskStatus.ABORTED if aborted else TaskStatus.FAILED, result.error_message)
+                # El fallo de una hoja marca como fallidos a sus contenedores
+                # y nunca deja el Goal como completado (4.3.5.2).
+                for ancestor in _ancestors(task):
+                    self._mark_task(ancestor, TaskStatus.FAILED, f"hija fallida: {task.id}")
+                failure_payload = dict(result.result) if isinstance(result.result, dict) else {}
+                failure_payload.setdefault("failed_task_id", task.id)
+                if aborted:
+                    failure_payload["aborted"] = True
+                failure_payload.setdefault(
+                    "failed_task_path", [a.id for a in reversed(_ancestors(task))] + [task.id]
+                )
+                return TaskExecutionResult(
+                    task_id=root.id,
+                    status=TaskStatus.FAILED,
+                    result=failure_payload,
                     execution_time=time.perf_counter() - (self.start_time or time.perf_counter()),
                     subtask_results=results,
                     error_message=f"Tarea fallida: {task.name}: {result.error_message or 'error desconocido'}",
@@ -851,15 +1266,31 @@ class HTNManager:
                 )
 
             self.completed_tasks.add(task.id)
-            try:
-                task.status = TaskStatus.COMPLETED
-            except Exception:
-                pass
+            self._mark_task(task, TaskStatus.COMPLETED)
             state = dict(result.new_state or state)
             completed = list(state.get("completed_tasks", []) or [])
             if task.id not in completed:
                 completed.append(task.id)
             state["completed_tasks"] = completed
+
+        # Todas las hojas terminaron: los contenedores se completan ahora.
+        # Un contenedor cuyas hojas fueron todas omitidas queda SKIPPED.
+        def _all_skipped(task: Task, seen: Set[str]) -> bool:
+            if task.id in seen:
+                return False
+            seen.add(task.id)
+            child_tasks = [by_id[c] for c in (task.children or []) if c in by_id]
+            if not child_tasks:
+                return getattr(task, "status", None) == TaskStatus.SKIPPED
+            return all(_all_skipped(child, seen) for child in child_tasks)
+
+        for task in all_tasks:
+            if task.id in container_ids:
+                if task.children and _all_skipped(task, set()):
+                    self._mark_task(task, TaskStatus.SKIPPED)
+                    continue
+                self._mark_task(task, TaskStatus.COMPLETED)
+                self.completed_tasks.add(task.id)
 
         return TaskExecutionResult(
             task_id=root.id,
@@ -869,6 +1300,31 @@ class HTNManager:
             subtask_results=results,
             new_state=state,
         )
+
+    @staticmethod
+    def _mark_task(task: Task, status: TaskStatus, error: Optional[str] = None) -> None:
+        """
+        Cambia el estado de una Task respetando sus transiciones validas.
+
+        Un contenedor pasa por EXECUTING antes de su estado final; si la Task no
+        tiene ``transition_to`` (objetos externos) se asigna directamente.
+        """
+        transition = getattr(task, "transition_to", None)
+        if not callable(transition):
+            try:
+                task.status = status
+            except Exception:
+                pass
+            return
+        current = getattr(task, "status", None)
+        if current == status:
+            return
+        if (
+            status in (TaskStatus.COMPLETED, TaskStatus.FAILED)
+            and current == TaskStatus.PENDING
+        ):
+            transition(TaskStatus.EXECUTING)
+        transition(status, error)
 
     def _execute_single_task(
         self, task: Task, current_state: Dict[str, Any]
@@ -1120,5 +1576,7 @@ __all__ = [
     "TaskDecompositionStrategy",
     "TaskExecutionResult",
     "HTNDecompositionRule",
+    "HTNDecompositionError",
+    "MAX_DECOMPOSITION_DEPTH",
     "get_htn_manager",
 ]

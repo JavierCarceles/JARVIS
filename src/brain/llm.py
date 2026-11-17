@@ -7,6 +7,7 @@ Esta version mantiene la arquitectura existente y corrige:
 - compatibilidad con nombres de accion en ingles producidos por el LLM.
 """
 
+import copy
 import json
 import time
 import re
@@ -15,7 +16,7 @@ from typing import Any, Dict, List, Optional, Union
 import ollama
 
 from src.hands.actions.action_registry import ActionType, get_action_registry
-from src.hands.planner.node import Node, Goal
+from src.hands.planner.node import Node, Goal, build_goal, new_goal_id, validate_goal
 from src.hands.planner.preconditions_effects import get_preconditions_effects_manager
 from src.hands.planner.application_integration import get_application_knowledge_integrator
 from src.hands.apps.applications_core import ApplicationCapability
@@ -442,10 +443,18 @@ class Brain:
                     goals = [goal] if goal is not None else []
                 results = []
                 htn_results = []
+                # 4.6.1: estado real disponible antes de entrar en HTN (antes {}).
+                htn_state = self.capture_htn_state() if self.htn_integration else {}
                 for goal in goals:
                     legacy = self.execute_goal(goal)
                     if self.htn_integration:
-                        htn_results.append(self.htn_integration.process_goal_through_htn(goal, {}))
+                        htn_result = self.htn_integration.process_goal_through_htn(goal, htn_state)
+                        htn_results.append(htn_result)
+                        # 4.6.2.1: el siguiente Goal parte del estado con los
+                        # cambios confirmados por la ejecucion del anterior.
+                        final_state = getattr(htn_result, "final_state", None)
+                        if isinstance(final_state, dict):
+                            htn_state = final_state
                         # El objetivo ya paso por HTN -> TaskExecutor -> accion
                         # registrada: el descriptor legado es solo informativo y
                         # no debe ejecutarse otra vez (sin doble ejecucion).
@@ -472,7 +481,7 @@ class Brain:
         if not self.htn_integration:
             return {"type": "htn_error", "message": "Sistema HTN no disponible", "original_prompt": prompt}
         try:
-            htn_result = self.htn_integration.create_and_execute_htn_goal(prompt, {})
+            htn_result = self.htn_integration.create_and_execute_htn_goal(prompt, self.capture_htn_state())
             if htn_result.success:
                 return {"type": "htn_success", "goal_id": htn_result.goal_id, "goal_type": htn_result.goal_type, "decomposed_tasks": htn_result.decomposed_tasks, "execution_results": htn_result.execution_results, "total_execution_time": htn_result.total_execution_time, "reasoning": "Objetivo procesado exitosamente con descomposici\u00f3n jer\u00e1rquica"}
             return {"type": "htn_failure", "goal_id": htn_result.goal_id, "goal_type": htn_result.goal_type, "error_message": htn_result.error_message, "reasoning": "Fallo en procesamiento con HTN"}
@@ -581,6 +590,11 @@ class Brain:
             logger.debug("Brain._extract_entities_from_input: %s", exc)
             return self._extract_entities_fallback(user_input)
 
+    _FALLBACK_IGNORED_WORDS = frozenset({
+        "abre", "abrir", "cierra", "cerrar", "busca", "buscar", "navega", "navegar",
+        "pon", "poner", "quiero", "puedes", "favor", "pantalla", "monitor", "ahora",
+    })
+
     def _extract_entities_fallback(self, user_input: str) -> List[Entity]:
         try:
             entities: List[Entity] = []
@@ -593,14 +607,25 @@ class Brain:
                 except Exception as exc:
                     logger.debug("Brain._extract_entities_fallback: %s", exc)
             user_input_lower = user_input.lower()
+            # Palabras con contenido (>= 4 letras, sin verbos de orden): antes
+            # cualquier palabra ("de", "la", "abre") contenida en una URL o
+            # propiedad hacia coincidir casi todas las entidades (4.5.2.1).
+            keywords = [
+                word for word in re.findall(r"\w+", user_input_lower)
+                if len(word) >= 4 and word not in self._FALLBACK_IGNORED_WORDS
+            ]
+            name_matches: List[Entity] = []
             for entity in all_entities:
                 entity_name_lower = entity.name.lower()
                 if entity_name_lower == user_input_lower or entity_name_lower in user_input_lower or user_input_lower in entity_name_lower:
-                    entities.append(entity)
-                elif entity.properties:
+                    name_matches.append(entity)
+                elif entity.properties and keywords:
                     properties_text = " ".join(str(v).lower() for v in entity.properties.values())
-                    if any(keyword in properties_text for keyword in user_input_lower.split() if keyword):
+                    property_words = set(re.findall(r"\w+", properties_text))
+                    if any(keyword in property_words for keyword in keywords):
                         entities.append(entity)
+            # Las coincidencias por nombre van primero: la primera es la resuelta.
+            entities = name_matches + entities
             unique_entities: Dict[str, Entity] = {}
             for entity in entities:
                 unique_entities[entity.id] = entity
@@ -682,16 +707,33 @@ class Brain:
                 enhanced_metadata["base_cost"] = self._calculate_entity_goal_cost(entity, goal_type)
                 enhanced_metadata["complexity"] = self._calculate_entity_complexity(entity, goal_type)
 
-            goal = Goal(
-                id=goal_id,
-                type=goal_type,
-                target=target,
-                description=description,
+            # 4.1.3.2: Goal desde entidad mediante el constructor validado; si no
+            # cumple el contrato (p. ej. entidad sin URL) se conserva la
+            # construccion legacy marcada con los errores (4.1.3.3).
+            goal = build_goal(
+                goal_type,
+                target,
+                description,
                 priority=1,
                 constraints=parameters.get("constraints", []),
-                nodes=[],
                 metadata=enhanced_metadata,
+                source="entity",
+                goal_id=new_goal_id(f"{goal_type}_{entity.id}"),
             )
+            if goal is None:
+                goal = Goal(
+                    id=goal_id,
+                    type=goal_type,
+                    target=target,
+                    description=description,
+                    priority=1,
+                    constraints=parameters.get("constraints", []),
+                    nodes=[],
+                    metadata=enhanced_metadata,
+                )
+                goal.metadata["source"] = "legacy_fallback"
+                goal.metadata["validation_errors"] = validate_goal(goal)
+            goal_id = goal.id
 
             self.memory_manager.add_conversational_memory(
                 message=user_input,
@@ -787,12 +829,22 @@ class Brain:
             logger.info("Procesando solicitud: " + str([e.name for e in entities]))
 
         if entities:
+            # 4.5.2.3: una peticion -> un Goal con la entidad resuelta. Antes se
+            # creaba un Goal por cada alternativa y process_intent_to_execution
+            # los ejecutaba todos. Las alternativas quedan como dato para una
+            # aclaracion (4.5.7), no como objetivos.
             goals: List[Goal] = []
-            for i, entity in enumerate(entities):
-                resolution_result = resolution_results[i] if i < len(resolution_results) else None
-                goal = self._create_goal_from_entity(entity, prompt, resolution_result)
-                if goal:
-                    goals.append(goal)
+            resolution_result = resolution_results[0] if resolution_results else None
+            goal = self._create_goal_from_entity(entities[0], prompt, resolution_result)
+            if goal:
+                alternatives = [
+                    {"id": getattr(e, "id", None), "name": getattr(e, "name", None), "type": getattr(e, "type", None)}
+                    for e in entities[1:]
+                    if getattr(e, "id", None) != getattr(entities[0], "id", None)
+                ]
+                if alternatives:
+                    goal.metadata["entity_alternatives"] = alternatives
+                goals.append(goal)
             if goals:
                 return {
                     "type": "goal",
@@ -838,18 +890,30 @@ class Brain:
             description = goal_data.get("description", f"Realizar: {goal_type}")
             if not goal_type or not target:
                 return None
-            timestamp = int(time.time())
-            goal_id = f"{goal_type}_{target}_{timestamp}"
             constraints = goal_data.get("constraints", [])
-            goal = Goal(
-                id=goal_id,
-                type=goal_type,
-                target=target,
-                description=description,
+            # 4.1.3.1: Goal desde la intencion estructurada del LLM mediante el
+            # constructor validado (ID sin espacios y unico); fallback legacy si
+            # no cumple el contrato (4.1.3.3).
+            goal = build_goal(
+                goal_type,
+                target,
+                description,
                 priority=goal_data.get("priority", 1),
-                constraints=constraints,
-                created_at=time.time(),
+                constraints=constraints if isinstance(constraints, list) else [constraints],
+                source="intent",
             )
+            if goal is None:
+                goal = Goal(
+                    id=f"{goal_type}_{target}_{int(time.time())}",
+                    type=goal_type,
+                    target=target,
+                    description=description,
+                    priority=goal_data.get("priority", 1),
+                    constraints=constraints,
+                    created_at=time.time(),
+                )
+                goal.metadata["source"] = "legacy_fallback"
+                goal.metadata["validation_errors"] = validate_goal(goal)
             self.memory_manager.add_conversational_memory(
                 message=user_input,
                 response=f"Objetivo creado: {description}",
@@ -865,9 +929,48 @@ class Brain:
             logger.debug("Brain._create_system_goal: %s", exc)
             return None
 
+    def _voice_understanding_step(self, prompt: str):
+        """
+        Devuelve ``(respuesta, texto)``: si hay que preguntar al usuario,
+        ``respuesta`` es la pregunta; si no, ``texto`` es la frase con la que
+        seguir (corregida o reanudada tras una aclaracion). Desactivado o con
+        error, devuelve ``(None, prompt)`` sin cambiar nada.
+        """
+        understanding = getattr(self, "_voice_understanding", None)
+        if understanding is None:
+            try:
+                from src.brain.voice_understanding import get_voice_understanding
+
+                understanding = get_voice_understanding(llm_model=getattr(self, "model", None))
+            except Exception as exc:
+                logger.warning("Comprension de voz no disponible: %s", exc)
+                understanding = False
+            self._voice_understanding = understanding
+        if not understanding or not understanding.enabled:
+            return None, prompt
+        try:
+            answer = understanding.handle_answer(prompt)
+            if answer is not None:
+                return (answer.reply, prompt) if answer.reply else (None, answer.text or prompt)
+            from src.ear.transcription import get_last_transcription
+
+            result = understanding.process(prompt, get_last_transcription())
+            if result.reply:
+                return result.reply, prompt
+            return None, (result.text or prompt)
+        except Exception as exc:
+            logger.warning("Comprension de voz fallida; se usa el texto original: %s", exc)
+            return None, prompt
+
     def think(self, prompt: str, use_legacy_execution: bool = False) -> str:
         if not prompt or not prompt.strip():
             return "No recib\u00ed ning\u00fan mensaje."
+
+        # 4.5.6.12: comprension robusta de la frase (una sola vez) antes de
+        # interpretar la intencion; puede devolver una pregunta (4.5.7).
+        voice_reply, prompt = self._voice_understanding_step(prompt)
+        if voice_reply:
+            return voice_reply
 
         interpretation = self.interpret_intent(prompt)
         if interpretation["type"] == "goal":
@@ -964,17 +1067,31 @@ class Brain:
         if not image_path:
             return "No se proporcion\u00f3 ninguna imagen."
         try:
-            return self._chat_text(
+            return self._perception_only(self._chat_text(
                 [{"role": "user", "content": prompt.strip(), "images": [image_path]}],
                 temperature=0.1,
                 top_p=0.9,
                 num_predict=20,
                 stop=["\n"],
                 repeat_penalty=1.2,
-            )
+            ))
         except Exception as exc:
-            logger.debug("Brain.think_with_image: %s", exc)
+            logger.warning("Brain.think_with_image: %s", exc)
             return f"ERROR: {exc}"
+
+    @staticmethod
+    def _perception_only(text: str) -> str:
+        """
+        4.5.4.3: la salida de vision es percepcion, no una decision. Si el
+        modelo devuelve un comando ``[CMD: ...]`` se neutraliza para que
+        ``Executor.process_and_execute`` nunca lo ejecute; las acciones solo
+        salen de la interpretacion de la orden del usuario.
+        """
+        value = str(text or "")
+        if re.search(r"\[\s*CMD\s*:", value, re.IGNORECASE):
+            logger.warning("Salida de vision con comando neutralizada: %s", value[:120])
+            value = re.sub(r"\[\s*CMD\s*:", "(cmd:", value, flags=re.IGNORECASE)
+        return value
 
     def analyze_image(self, image_path: str, analysis_prompt: str) -> str:
         if not image_path:
@@ -991,9 +1108,9 @@ class Brain:
                 repeat_penalty=1.1,
             )
             logger.info("[+] Analisis de imagen completado")
-            return result
+            return self._perception_only(result)
         except Exception as exc:
-            logger.debug("Brain.analyze_image: %s", exc)
+            logger.warning("Brain.analyze_image: %s", exc)
             return f"ERROR: {exc}"
 
     def clear_memory(self) -> None:
@@ -1017,6 +1134,40 @@ class Brain:
 
     def get_current_goals(self) -> List[Goal]:
         return []
+
+    def capture_htn_state(self) -> Dict[str, Any]:
+        """
+        Instantanea del estado real disponible antes de entrar en HTN (4.6.1).
+
+        La fuente es el WorldState de la memoria (``get_system_state``), que es
+        el estado que Brain conoce; se copia para que HTN no mute el original.
+        Se anotan la fuente, el momento de captura y la marca temporal del
+        WorldState (4.6.1.2) con claves ``_htn_*`` que no son precondiciones
+        ni se aplican al estado del Executor. Si no se puede leer, se devuelve
+        un estado vacio marcado como ``unavailable``; nunca se inventan datos.
+        """
+        captured_at = time.time()
+        try:
+            state = self.get_system_state()
+        except Exception as exc:
+            logger.warning("Brain.capture_htn_state: estado no disponible: %s", exc)
+            return {
+                "_htn_state_source": "unavailable",
+                "_htn_state_error": str(exc),
+                "_htn_captured_at": captured_at,
+            }
+        if not isinstance(state, dict):
+            logger.warning("Brain.capture_htn_state: estado no es un dict (%s)", type(state).__name__)
+            state = {}
+        try:
+            snapshot = copy.deepcopy(state)
+        except Exception as exc:
+            logger.warning("Brain.capture_htn_state: copia superficial del estado: %s", exc)
+            snapshot = dict(state)
+        snapshot["_htn_state_source"] = "memory_world_state" if state else "empty"
+        snapshot["_htn_captured_at"] = captured_at
+        snapshot["_htn_state_timestamp"] = state.get("timestamp")
+        return snapshot
 
     def get_system_state(self) -> Dict[str, Any]:
         state = self.memory_manager.get_world_state()

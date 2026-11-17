@@ -1,6 +1,415 @@
 --- INICIO DE LOS REGISTROS CANONICOS DE UNIDAD ---
 ## REGISTROS DETALLADOS DE UNIDAD - HISTORIAL CANONICO
 Los bloques siguientes conservan los registros de implementacion, verificacion, tests, discrepancias y pendientes. La enumeracion del roadmap aparece arriba; no copiar estos bloques dentro de la descripcion de las fases.
+## REGISTROS PREPARADOS EN MAC
+Registros con estado `PARCIALMENTE IMPLEMENTADA (MAC)` segun la seccion 23 de `prompt_JARVIS_reglas.txt`: codigo de `src/` adelantado en el Mac, pendiente de revision, tests y verificacion en Windows cuando el puntero llegue a cada unidad en su orden. Al cerrarlos en Windows se editan aqui mismo.
+
+REGISTRO DE UNIDAD: 4.5.6.1
+FECHA: 2026-11-17
+OBJETIVO: Inspeccionar el contrato real Ear -> Brain (campos, metadatos, quien consume `confidence`) y confirmar o corregir el estado actual descrito en el roadmap para 4.5.6, sin inventar metadatos.
+TIPO DE TRABAJO: INSPECCION
+CAMBIOS / HALLAZGOS: `Ear.listen()` en `src/ear/listener.py` devuelve solo `Optional[str]`; `main.py` lo consume como texto para la orden (`texto_escuchado = jarvis_ear.listen()`) y para la confirmacion de prediccion (`confirmacion = jarvis_ear.listen()` con vocabulario si/claro/ok/vale/dale/hazlo); Brain recibe texto plano mediante `jarvis_brain.think(texto_escuchado, use_legacy_execution=False)`; ningun modulo fuera de `src/ear/listener.py` consume `confidence` (solo `tests/ear/test_listener.py` en el caso sin modelo); confirmado en `TranscriptionNode`: faster-whisper `medium`, idioma `es`, `beam_size=5`, `initial_prompt` con lista fija, `device="cpu"`, `compute_type="int8"`; `confidence` era `info.language_probability` (probabilidad de idioma); `Ear.listen()` guarda el texto en `ConversationMemory.add_user_message`; otros hallazgos: `Ear._load_model` esta definido dos veces (cuda/float16) y no se usa; la rama de excepcion de `TranscriptionNode.execute` no devolvia `confidence`; un fallo de transcripcion en `listen()` se descartaba sin log.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: NA; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: NA; INTEGRACION: NA; NO REGRESION: NA
+VERIFICACION: SINTAXIS: NA; MAIN.PY: NA; COMPORTAMIENTO / INTEGRACION REAL: inspeccion estatica del codigo en el Mac; NV en Windows
+DISCREPANCIAS: El roadmap indica que sin modelo se devuelve en produccion un texto de prueba con confianza 0.8; ya no es cierto: `TranscriptionNode.execute` devuelve `success=False`, `text=""`, `confidence=0.0` y `error="Modelo Whisper no disponible"` (cubierto por `test_execute_sin_modelo_informa_fallo`).
+PENDIENTES: Revision Windows: confirmar los hallazgos contra el codigo vigente en ese momento.
+ESTADO FINAL: 4.5.6.1 - PARCIALMENTE IMPLEMENTADA (MAC)
+ORIGEN: PREPARADA EN MAC 2026-11-17; REVISION WINDOWS: PENDIENTE
+MACOS: NA
+
+REGISTRO DE UNIDAD: 4.5.6.5
+FECHA: 2026-11-17
+OBJETIVO: Confianza real de transcripcion con `avg_logprob`, `no_speech_prob`, `compression_ratio` y probabilidades por palabra (`word_timestamps=True`); sin modelo, error explicito en lugar de texto inventado.
+TIPO DE TRABAJO: IMPLEMENTACION
+CAMBIOS / HALLAZGOS: Nuevo modulo `src/ear/transcription.py` sin dependencias de microfono ni Whisper: `WordInfo`, `SegmentInfo`, `TranscriptionRecord` (dataclasses inmutables), `compute_confidence()` y `build_transcription_record(segments, info)`; confianza = media de `Word.probability` (`confidence_method="word_probability_mean"`); si no hay palabras, `exp(avg_logprob)` por segmento ponderado por numero de tokens (`"avg_logprob"`); sin segmentos 0.0 (`"sin_datos"`); `info.language_probability` se conserva aparte como `language_probability`; se exponen `avg_logprob` ponderado, `max_no_speech_prob`, `max_compression_ratio`, `min_word_probability` y el detalle por segmento y palabra; no se fijan umbrales (los fija 4.5.6.10 con el corpus de 4.5.6.2). En `src/ear/listener.py`: `transcribe(..., word_timestamps=True)`; `TranscriptionNode.execute` devuelve `text`, `original_text`, `confidence` (real), `confidence_method`, `language_probability` y `record`; la rama de excepcion devuelve `confidence=0.0`; `Ear.listen()` y `Ear.process_audio_batch()` registran con `logger.error` los fallos de transcripcion y guardan el registro de la frase devuelta en `Ear.last_transcription` (se reinicia a `None` al empezar); `listen()` sigue devolviendo solo el texto.
+ARCHIVOS MODIFICADOS: PRODUCCION: `src/ear/transcription.py` (nuevo); `src/ear/listener.py`; TESTS: NA (pendiente Windows); DOCUMENTACION: NA (pendiente Windows)
+TESTS Y RESULTADOS: UNITARIOS: NE; INTEGRACION: NE; NO REGRESION: NE
+VERIFICACION: SINTAXIS: OK en Mac con Python 3.12 (`python3.12 -m py_compile src/ear/transcription.py src/ear/listener.py`; ASCII puro comprobado); MAIN.PY: NV (el contrato de `Ear.listen()` no cambia); COMPORTAMIENTO / INTEGRACION REAL: prueba aislada en Mac de `build_transcription_record` con segmentos sinteticos: palabras 0.95 y 0.41 -> 0.68 `word_probability_mean`, `language_probability` 0.99 separada; sin palabras con `avg_logprob=-0.5` -> 0.607 `avg_logprob`; sin segmentos -> 0.0 `sin_datos`; Whisper real NV (`faster_whisper` no instalado en el Mac)
+DISCREPANCIAS: La parte "eliminar el texto de prueba inventado" ya estaba hecha antes de esta unidad (ver 4.5.6.1); se completa con el log de error en `listen()` y `process_audio_batch()`.
+PENDIENTES: Windows: crear `tests/ear/test_transcription.py` (media por palabra, fallback `avg_logprob` ponderado, sin datos, valores None/NaN, metricas maximas, `language_probability` separada); ampliar `tests/ear/test_listener.py` (`execute` con modelo simulado devuelve confianza real, `record` y `original_text`; excepcion con `confidence` 0.0; `last_transcription` en `listen()` y `process_audio_batch()`; reinicio a `None`); ejecutar `tests/ear` y no regresion de `main.py`; transcripcion real con Whisper en Windows comprobando que `word_timestamps=True` funciona con la version instalada y anotar la latencia anadida (la comparativa completa es 4.5.6.15); revisar README apartado Ear.
+ESTADO FINAL: 4.5.6.5 - PARCIALMENTE IMPLEMENTADA (MAC)
+ORIGEN: PREPARADA EN MAC 2026-11-17; REVISION WINDOWS: PENDIENTE
+MACOS: NA (codigo comun sin APIs nativas)
+
+REGISTRO DE UNIDAD: 4.5.6.6
+FECHA: 2026-11-17
+OBJETIVO: Conservar siempre el texto original reconocido; toda correccion es una representacion derivada con su procedencia.
+TIPO DE TRABAJO: IMPLEMENTACION
+CAMBIOS / HALLAZGOS: Implementada junto a 4.5.6.5 en `src/ear/transcription.py`: `TranscriptionRecord.original_text` es la concatenacion literal de los segmentos de Whisper y no se puede modificar (dataclass `frozen`); `text` es ese texto con `strip()`, no una correccion; `TextDerivation(text, source, detail, created_at)` representa cada correccion; `with_derivation(text, source, detail)` devuelve un registro nuevo con la derivacion anadida, deja intacto el original y exige `source`; `current_text` devuelve la ultima derivacion o el texto original; `to_dict()` serializa original, derivaciones y metricas. `TranscriptionNode.execute` devuelve `original_text` y `record`; `Ear.last_transcription` conserva el registro de la ultima frase. `ConversationMemory.add_user_message` sigue recibiendo el texto reconocido (todavia no existen correcciones; llegan en 4.5.6.7-4.5.6.9 y deben usar `with_derivation`).
+ARCHIVOS MODIFICADOS: PRODUCCION: `src/ear/transcription.py` (nuevo, compartido con 4.5.6.5); `src/ear/listener.py`; TESTS: NA (pendiente Windows); DOCUMENTACION: NA (pendiente Windows)
+TESTS Y RESULTADOS: UNITARIOS: NE; INTEGRACION: NE; NO REGRESION: NE
+VERIFICACION: SINTAXIS: OK en Mac con Python 3.12 (`py_compile`; ASCII puro); MAIN.PY: NV; COMPORTAMIENTO / INTEGRACION REAL: prueba aislada en Mac: tras `with_derivation("abre spotify", "correccion_determinista", ...)` el registro original conserva `original_text=' abre espotifai'` y ninguna derivacion, el nuevo devuelve `current_text='abre spotify'`; `source` vacio -> `ValueError`; asignar `original_text` -> `FrozenInstanceError`
+DISCREPANCIAS: NINGUNA
+PENDIENTES: Windows: en `tests/ear/test_transcription.py` probar inmutabilidad, `with_derivation` (original intacto, orden de derivaciones, `source` obligatorio), `current_text` y `to_dict()`; comprobar que el texto que llega a `main.py` coincide con `last_transcription.text`; revisar README apartado Ear.
+ESTADO FINAL: 4.5.6.6 - PARCIALMENTE IMPLEMENTADA (MAC)
+ORIGEN: PREPARADA EN MAC 2026-11-17; REVISION WINDOWS: PENDIENTE
+MACOS: NA (codigo comun sin APIs nativas)
+
+REGISTRO DE UNIDAD: 4.1.2 (HOJAS 4.1.2.1-4.1.2.4)
+FECHA: 2026-11-17
+OBJETIVO: Contrato de campos obligatorios, validacion, restricciones y serializacion de Goal.
+TIPO DE TRABAJO: IMPLEMENTACION
+CAMBIOS / HALLAZGOS: En `src/hands/planner/node.py`: 4.1.2.1 `GOAL_REQUIRED_FIELDS = ("id", "type", "target", "description")`; 4.1.2.2 `validate_goal(goal) -> List[str]` (texto no vacio en id/type/description, target texto o dict no vacio, `priority` entero >= 1, `constraints` lista de textos, `deadline` finito, `metadata` dict) y `Goal.validate()` / `Goal.is_valid()`; 4.1.2.3 las restricciones siguen siendo `List[str]` (formato libre ya usado por Brain, p. ej. `monitor:izquierda`), validadas como texto no vacio; 4.1.2.4 serializacion ya existente (`Goal.to_dict`/`from_dict`), sin cambios; el estado del Goal se guarda en `metadata["status"]`, que ya se serializa. Hallazgo 4.1.1.5: `src/memory/conversation.py` define sus propias clases `Goal` y `Task` duplicadas (lineas ~80-108), distintas de las de `node.py`; no se tocaron.
+ARCHIVOS MODIFICADOS: PRODUCCION: `src/hands/planner/node.py`; TESTS: NA (pendiente Windows); DOCUMENTACION: NA (pendiente Windows)
+TESTS Y RESULTADOS: UNITARIOS: NE; INTEGRACION: NE; NO REGRESION: NE
+VERIFICACION: SINTAXIS: OK en Mac (Python 3.12 `py_compile`; ASCII); MAIN.PY: NV; COMPORTAMIENTO / INTEGRACION REAL: prueba aislada en Mac con paquetes pesados sustituidos: Goal valido sin errores; Goal con id y target vacios y priority 0 -> 3 errores
+DISCREPANCIAS: NINGUNA
+PENDIENTES: Windows: tests de `validate_goal` (valido, cada campo incompleto, target dict, constraints no textuales, deadline NaN) en `tests/hands/planner/test_node.py`; decidir si la duplicacion de `Goal`/`Task` en `src/memory/conversation.py` se registra como compatibilidad (4.1.1.5).
+ESTADO FINAL: 4.1.2 - PARCIALMENTE IMPLEMENTADA (MAC)
+ORIGEN: PREPARADA EN MAC 2026-11-17; REVISION WINDOWS: PENDIENTE
+MACOS: NA (codigo comun sin APIs nativas)
+
+REGISTRO DE UNIDAD: 4.1.3 (HOJAS 4.1.3.1-4.1.3.3)
+FECHA: 2026-11-17
+OBJETIVO: Crear Goal desde una intencion estructurada o una entidad, con fallback legacy.
+TIPO DE TRABAJO: IMPLEMENTACION
+CAMBIOS / HALLAZGOS: En `src/hands/planner/node.py`: `new_goal_id(prefix)` (ID con marca de tiempo y sufijo aleatorio; antes `int(time.time())` podia repetir IDs en el mismo segundo y `Brain._create_system_goal` metia el target con espacios en el ID) y `build_goal(goal_type, target, description, priority, constraints, metadata, source, goal_id)`, que construye, valida con `validate_goal` y devuelve None si no cumple el contrato; `metadata["source"]` indica el origen. Consumidores cambiados: 4.1.3.1 `Brain._create_system_goal` (`src/brain/llm.py`, intencion del LLM) usa `build_goal(..., source="intent")` y `HTNBrainIntegration._create_goal_from_input` (`src/brain/htn_integration.py`, texto) usa el nuevo `_make_goal`, que llama a `build_goal(..., source="text")` conservando el prefijo historico del ID (`open_chrome_`, `generic_goal_`, `navigate_entity_`...); 4.1.3.2 `Brain._create_goal_from_entity` usa `build_goal(..., source="entity", metadata=<metadata de entidad>)` y el `goal_id` del contexto de memoria es el del Goal creado; 4.1.3.3 si `build_goal` devuelve None los tres conservan la construccion `Goal(...)` anterior (mismo ID legacy) y marcan `metadata["source"]="legacy_fallback"` y `metadata["validation_errors"]` (caso real: entidad `platform`/`streamer` sin `url` -> target vacio; LLM con `priority` 0).
+ARCHIVOS MODIFICADOS: PRODUCCION: `src/hands/planner/node.py`; `src/brain/llm.py`; `src/brain/htn_integration.py`; TESTS: NA (pendiente Windows); DOCUMENTACION: NA (pendiente Windows)
+TESTS Y RESULTADOS: UNITARIOS: NE; INTEGRACION: NE; NO REGRESION: NE
+VERIFICACION: SINTAXIS: OK en Mac (Python 3.12 `py_compile`; ASCII); MAIN.PY: NV; COMPORTAMIENTO / INTEGRACION REAL: prueba aislada en Mac cargando `llm.py` y `htn_integration.py` con `ollama`, memoria, registro y `task_executor` sustituidos: "abre chrome" -> `open_chrome_<ts>_<hex>` `source=text`; "abre la aplicacion bloc de notas" -> target `bloc de notas`; "navegar a https://a.com/x." -> `https://a.com/x`; "hola que tal" -> `generic_goal_...`; `_create_system_goal` con target "Visual Studio Code" -> ID sin espacios, restriccion `monitor:izquierda`, priority 2, `source=intent`; priority 0 -> fallback legacy con el error; entidad `platform` sin url -> fallback legacy `target=''`; con url -> `source=entity`, `entity_id` conservado
+DISCREPANCIAS: Los IDs de Goal pasan de `<prefijo>_<ts>` a `<prefijo>_<ts>_<hex6>` (y en `_create_system_goal` ya no contienen el target): revisar en Windows si algun test o consumidor compara el ID exacto. El fallback legacy sigue permitiendo Goals que no cumplen el contrato (asi lo pide 4.1.3.3); quedan identificados por `metadata["source"]`.
+PENDIENTES: Windows: tests en `tests/brain/test_llm.py` (intencion -> Goal valido con `source=intent`; target con espacios; priority invalida -> fallback marcado) y `tests/brain/test_htn_integration.py` (cada rama de `_create_goal_from_input`, prefijo de ID conservado, `_make_goal` con target vacio -> fallback marcado); entidad con y sin url en `_create_goal_from_entity`; no regresion de ambas suites.
+ESTADO FINAL: 4.1.3 - PARCIALMENTE IMPLEMENTADA (MAC)
+ORIGEN: PREPARADA EN MAC 2026-11-17; REVISION WINDOWS: PENDIENTE
+MACOS: NA
+
+REGISTRO DE UNIDAD: 4.2.2 (HOJAS 4.2.2.1-4.2.2.3)
+FECHA: 2026-11-17
+OBJETIVO: Contrato de identidad, estado y dependencias de Task.
+TIPO DE TRABAJO: IMPLEMENTACION
+CAMBIOS / HALLAZGOS: En `src/hands/planner/node.py`: 4.2.2.1 `Task.metadata: Dict[str, Any]` pasa a ser campo declarado (antes `HTNManager._task_from_pattern` lo anexaba como atributo dinamico), incluido en `to_dict`/`from_dict`; 4.2.2.2 nuevo estado `TaskStatus.SKIPPED` (rama condicional no elegida), tabla `TASK_STATUS_TRANSITIONS` (PENDING -> EXECUTING/SKIPPED/ABORTED/FAILED; EXECUTING -> COMPLETED/FAILED/ABORTED; estados finales sin salida), `TASK_FINAL_STATUSES`, propiedades `is_leaf`/`is_final`; 4.2.2.3 dependencias: se mantiene `dependencies: List[str]` y `_dependency_satisfied` existentes.
+ARCHIVOS MODIFICADOS: PRODUCCION: `src/hands/planner/node.py`; TESTS: NA; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: NE; INTEGRACION: NE; NO REGRESION: NE
+VERIFICACION: SINTAXIS: OK en Mac (Python 3.12); MAIN.PY: NV; COMPORTAMIENTO / INTEGRACION REAL: prueba aislada: `Task.to_dict()`/`from_dict()` conserva estado y metadata
+DISCREPANCIAS: `Task.to_dict()` incluye ahora la clave `metadata`: revisar en Windows si algun test compara el diccionario exacto.
+PENDIENTES: Windows: tests de transiciones validas e invalidas, `SKIPPED`, serializacion con metadata y compatibilidad con consumidores (`htn_integration._serialize_task`, `TaskExecutor._task_metadata`).
+ESTADO FINAL: 4.2.2 - PARCIALMENTE IMPLEMENTADA (MAC)
+ORIGEN: PREPARADA EN MAC 2026-11-17; REVISION WINDOWS: PENDIENTE
+MACOS: NA
+
+REGISTRO DE UNIDAD: 4.2.3 (HOJAS 4.2.3.1-4.2.3.3)
+FECHA: 2026-11-17
+OBJETIVO: Creacion y transicion de estado de Task con propagacion del resultado al Goal.
+TIPO DE TRABAJO: IMPLEMENTACION | CORRECCION
+CAMBIOS / HALLAZGOS: 4.2.3.1 creacion desde metodo HTN ya existente (`HTNManager._task_from_pattern`), sin cambios salvo restricciones (ver 4.3.3). 4.2.3.2 `Task.transition_to(status, error)` valida la transicion, fija `started_at`/`completed_at` y guarda el error en metadata; atajos `mark_executing/mark_completed/mark_failed/mark_aborted/mark_skipped`; `HTNManager._mark_task` los usa en lugar de asignar `task.status` directamente. 4.2.3.3 `Goal.status` (de `metadata["status"]`, valores `GOAL_STATUSES`), `Goal.mark_executing()` y `Goal.record_result(success, failed_task_id, error, aborted)`; `HTNManager.execute_goal_hierarchy` marca el Goal en ejecucion y le propaga el resultado final.
+ARCHIVOS MODIFICADOS: PRODUCCION: `src/hands/planner/node.py`; `src/hands/planner/htn_manager.py`; TESTS: NA; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: NE; INTEGRACION: NE; NO REGRESION: NE
+VERIFICACION: SINTAXIS: OK en Mac (Python 3.12); MAIN.PY: NV; COMPORTAMIENTO / INTEGRACION REAL: prueba aislada con TaskExecutor simulado: completar una Task PENDING se rechaza; jerarquia `open_application` completa -> Goal `completed`; fallo en la hoja `open_application` -> Goal `failed` con `last_result.failed_task_id`
+DISCREPANCIAS: NINGUNA
+PENDIENTES: Windows: tests de transiciones y de propagacion al Goal (exito, fallo, Goal sin metodo) en `tests/hands/planner/test_node.py` y `tests/brain/test_htn_integration.py`.
+ESTADO FINAL: 4.2.3 - PARCIALMENTE IMPLEMENTADA (MAC)
+ORIGEN: PREPARADA EN MAC 2026-11-17; REVISION WINDOWS: PENDIENTE
+MACOS: NA
+
+REGISTRO DE UNIDAD: 4.3.5 (HOJAS 4.3.5.1-4.3.5.3)
+FECHA: 2026-11-17
+OBJETIVO: Propagacion de resultados y localizacion de la Task que falla.
+TIPO DE TRABAJO: CORRECCION | IMPLEMENTACION
+CAMBIOS / HALLAZGOS: Error corregido en `HTNManager._execute_task_hierarchy` (`src/hands/planner/htn_manager.py`): las tareas contenedor se marcaban COMPLETED al encontrarlas, antes de ejecutar sus hojas, y un fallo posterior no las corregia. Ahora: 4.3.5.1 los contenedores solo se completan cuando terminan todas las hojas; 4.3.5.2 el fallo de una hoja la marca FAILED, marca FAILED a todos sus contenedores y devuelve el resultado raiz FAILED; 4.3.5.3 el resultado incluye `failed_task_id` y `failed_task_path` (cadena de contenedores hasta la hoja). Tambien (4.3.3.4) `_task_from_pattern` copia `goal.constraints` a `task.metadata["constraints"]` y (4.4.3.2-4.4.3.3) antes de ejecutar una hoja se comprueba que sus dependencias estan completadas; si no, falla sin ejecutarla.
+ARCHIVOS MODIFICADOS: PRODUCCION: `src/hands/planner/htn_manager.py`; TESTS: NA; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: NE; INTEGRACION: NE; NO REGRESION: NE
+VERIFICACION: SINTAXIS: OK en Mac (Python 3.12; ASCII); MAIN.PY: NV; COMPORTAMIENTO / INTEGRACION REAL: prueba aislada con TaskExecutor simulado: fallo en `open_application` -> se ejecutaron `check_availability` y `open_application`, NO `activate_window`, `failed_task_path` apunta a la hoja; sin fallo -> las tres hojas en orden y estado `completed`; restricciones `["c1"]` presentes en la metadata de las tareas
+DISCREPANCIAS: NINGUNA
+PENDIENTES: Windows: tests de contenedor no completado antes de sus hojas, fallo de hoja con contenedores fallidos, `failed_task_id`/`failed_task_path`, dependencia no satisfecha, propagacion de restricciones; no regresion de `tests/brain/test_htn_integration.py`, `tests/hands/planner/test_task_executor.py`, `tests/hands/planner/test_node.py`. Quedan sin tocar en Mac (actualizado 2026-11-17 tras los registros siguientes): 4.5.6.2 (corpus con grabaciones del usuario), las unidades de tests 4.1.4, 4.2.4, 4.3.6, 4.4.4, 4.5.5, 4.5.6.14-4.5.6.16, 4.5.7.7, 4.6.4 y 4.7.4, y 4.8 (regresion y verificacion real en Windows).
+ESTADO FINAL: 4.3.5 - PARCIALMENTE IMPLEMENTADA (MAC)
+ORIGEN: PREPARADA EN MAC 2026-11-17; REVISION WINDOWS: PENDIENTE
+MACOS: NA
+
+REGISTRO DE UNIDAD: 4.3.2 (HOJAS 4.3.2.1-4.3.2.3)
+FECHA: 2026-11-17
+OBJETIVO: Seleccion de metodo HTN segun condiciones reales y manejo explicito de la falta de metodo.
+TIPO DE TRABAJO: IMPLEMENTACION
+CAMBIOS / HALLAZGOS: En `src/hands/planner/htn_manager.py`: 4.3.2.1 `HTNManager.explain_method_selection(goal, state)` define el metodo aplicable: regla con `target_type` igual al tipo del Goal (o `generic`) y TODAS sus precondiciones cumplidas; gana la de menor `priority`; la logica comun esta en `_select_rule`; `_find_decomposition_rule` delega en ella. 4.3.2.2 `_unmet_preconditions(rule, state)` devuelve la lista de precondiciones no cumplidas y `_condition_holds` las evalua (especiales `browser_available`, `entity_available`, `application_known`, `search_engine_known`, `multiple_tasks_defined`; ademas `not <cond>` y `clave==valor`; cualquier otra clave del estado debe ser verdadera); `_check_preconditions` usa `_unmet_preconditions` (antes la descomposicion comprobaba dos veces las mismas precondiciones). 4.3.2.3 `decompose_goal` sigue devolviendo `[]` sin metodo, pero deja el motivo en `HTNManager.last_decomposition_failure` (`reason`: `invalid_goal`, `no_rule_for_type`, `preconditions_unmet` con `rules_evaluated=[{rule, unmet_preconditions}]`, `invalid_dependencies`, `error` y los de 4.3.4/4.4.2), y `execute_goal_hierarchy` lo usa en `error_message` ("No se pudo descomponer el objetivo: No hay regla HTN para el tipo 'x'" / "...: Precondiciones no cumplidas para 'navigate' (navigation_decomposition: browser_available)"), lo devuelve en `result["decomposition_failure"]` y marca el Goal `failed` con `record_result` (antes quedaba `pending`).
+ARCHIVOS MODIFICADOS: PRODUCCION: `src/hands/planner/htn_manager.py`; TESTS: NA; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: NE; INTEGRACION: NE; NO REGRESION: NE
+VERIFICACION: SINTAXIS: OK en Mac (Python 3.12 `py_compile`; ASCII); MAIN.PY: NV; COMPORTAMIENTO / INTEGRACION REAL: prueba aislada en Mac con `graph` y `application_integration` sustituidos y TaskExecutor simulado: tipo `bailar` -> `no_rule_for_type`, Goal `failed`; `navigate` con estado `{}` -> `preconditions_unmet` con `browser_available`; con `browser_available=True` -> se ejecutan `prepare_navigator` y `navigate_to_target`
+DISCREPANCIAS: `HTNBrainIntegration.process_goal_through_htn` llama a `decompose_goal` y despues `execute_goal_hierarchy` vuelve a descomponer (doble descomposicion previa, sin efectos externos): no se ha cambiado; si `decompose_goal` falla en la primera llamada, el mensaje de `HTNIntegrationResult` sigue siendo el generico "Goal decomposition failed" y el motivo esta en `htn_manager.last_decomposition_failure`.
+PENDIENTES: Windows: tests en `tests/brain/test_htn_integration.py` o `tests/hands/planner/` de tipo sin regla, regla con precondiciones no cumplidas (lista correcta), regla `generic`, prioridad entre reglas aplicables, Goal `failed` sin metodo y mensaje de error; decidir si `process_goal_through_htn` debe propagar `last_decomposition_failure` en `error_message` (4.5.3).
+ESTADO FINAL: 4.3.2 - PARCIALMENTE IMPLEMENTADA (MAC)
+ORIGEN: PREPARADA EN MAC 2026-11-17; REVISION WINDOWS: PENDIENTE
+MACOS: NA
+
+REGISTRO DE UNIDAD: 4.3.4 (HOJAS 4.3.4.1-4.3.4.4)
+FECHA: 2026-11-17
+OBJETIVO: Descomposicion recursiva hasta Task hoja con proteccion anti-bucle.
+TIPO DE TRABAJO: IMPLEMENTACION
+CAMBIOS / HALLAZGOS: En `src/hands/planner/htn_manager.py`: 4.3.4.1 nueva lista `HTNManager.task_decomposition_rules` (metodos de Task compuesta, `target_type` = `task_type` de la Task) y `add_task_decomposition_rule(rule)`; una Task es compuesta si existe al menos un metodo para su tipo (`_is_compound_task_type`). Se mantienen separadas de las reglas de Goal porque la tarea `open_application` tiene el mismo nombre que el tipo de Goal `open_application` y se descompondria en si misma. 4.3.4.2 `_expand_compound_tasks` expande un nivel con `_instantiate_rule` (secuencial, paralela, condicional o iterativa) y `_reparent_subtasks` (IDs `<padre>__<tarea>`, cuelgan del padre, la primera hija hereda las dependencias del padre); la Task compuesta pierde `action`/`action_unmapped` y queda `metadata["compound"]=True` con `decomposition_rule`. 4.3.4.3 se repite solo mientras la Task sea compuesta; una compuesta sin metodo aplicable falla con `compound_task_without_method` (lista de precondiciones). 4.3.4.4 ciclo: un `task_type` que reaparece en su cadena de ancestros -> `HTNDecompositionError` `decomposition_cycle` con la cadena; profundidad limitada por `MAX_DECOMPOSITION_DEPTH = 6` -> `max_depth_exceeded`. Las dependencias sobre una Task compuesta se trasladan a sus hojas no omitidas (los contenedores no se ejecutan), salvo las dependencias sobre un ancestro (bucle iterativo). `_execute_task_hierarchy` ya trataba los contenedores (4.3.5). No se ha anadido ningun metodo de Task compuesta por defecto: el flujo actual no cambia hasta que se registren.
+ARCHIVOS MODIFICADOS: PRODUCCION: `src/hands/planner/htn_manager.py`; TESTS: NA; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: NE; INTEGRACION: NE; NO REGRESION: NE
+VERIFICACION: SINTAXIS: OK en Mac (Python 3.12; ASCII); MAIN.PY: NV; COMPORTAMIENTO / INTEGRACION REAL: prueba aislada con TaskExecutor simulado: `prepare_navigator` compuesta -> hojas `..._prepare_navigator__check_availability`, `..._prepare_navigator__open_application` (con accion `open_application`) y despues `navigate_to_target`, que depende de las dos hojas; orden de ejecucion correcto y Goal `completed`; reglas `prepare_navigator -> resolve_entity -> prepare_navigator` -> `decomposition_cycle` sin ejecutar nada; profundidad 2 con tres niveles -> `max_depth_exceeded`; compuesta con precondicion `need_x` no cumplida -> `compound_task_without_method`; metodo iterativo anidado -> hojas `_loop` ejecutadas en orden; fallo en hoja anidada -> `failed_task_path` [contenedor, hoja] y Goal `failed`
+DISCREPANCIAS: NINGUNA
+PENDIENTES: Windows: tests de Task compuesta un nivel y dos niveles, hoja sin metodo, ciclo directo e indirecto, profundidad maxima, compuesta sin metodo aplicable, dependencia sobre contenedor trasladada a hojas, conservacion del orden; decidir si alguna tarea real (por ejemplo `prepare_navigator`) debe tener metodo compuesto por defecto.
+ESTADO FINAL: 4.3.4 - PARCIALMENTE IMPLEMENTADA (MAC)
+ORIGEN: PREPARADA EN MAC 2026-11-17; REVISION WINDOWS: PENDIENTE
+MACOS: NA
+
+REGISTRO DE UNIDAD: 4.4.2 (HOJAS 4.4.2.1-4.4.2.4)
+FECHA: 2026-11-17
+OBJETIVO: Evaluar condiciones reales y seleccionar de forma exclusiva la rama aplicable, registrando la decision.
+TIPO DE TRABAJO: IMPLEMENTACION
+CAMBIOS / HALLAZGOS: En `src/hands/planner/htn_manager.py`, `_decompose_conditional`: con `rule.metadata["branches"] = [{"name", "condition", "pattern"}]` 4.4.2.1 cada condicion se evalua en orden con `_condition_holds` contra el estado recibido; 4.4.2.2 se elige SOLO la primera rama que se cumple (una rama sin `condition` es la de defecto); 4.4.2.3 las Tasks de las ramas no elegidas se crean con `mark_skipped` (`TaskStatus.SKIPPED`, `metadata["skip_reason"]`) y `_execute_task_hierarchy` no las ejecuta; una dependencia sobre una Task SKIPPED no bloquea y un contenedor con todas sus hojas omitidas queda SKIPPED en lugar de COMPLETED; sin rama aplicable -> `HTNDecompositionError` `no_branch_applicable`; 4.4.2.4 la decision (`rule`, `goal_id`, `chosen_branch`, `evaluations` con `condition`/`holds`) se registra con `logger.info`, en `HTNManager.last_branch_decisions`, en `metadata["branch_decision"]` y `metadata["branch"]` de cada Task de la regla y en `result["branch_decisions"]` de `execute_goal_hierarchy`. Sin `branches` se conserva el comportamiento anterior (`enable_<tarea>`). IDs de las Tasks de rama: `<goal>_<tarea>_<rama>`.
+ARCHIVOS MODIFICADOS: PRODUCCION: `src/hands/planner/htn_manager.py`; TESTS: NA; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: NE; INTEGRACION: NE; NO REGRESION: NE
+VERIFICACION: SINTAXIS: OK en Mac (Python 3.12; ASCII); MAIN.PY: NV; COMPORTAMIENTO / INTEGRACION REAL: prueba aislada con regla condicional `smart_open` (ramas `ya_abierta` si `app_open`, `abrir` si `browser_available`): ambas condiciones ciertas -> solo `activate_window_ya_abierta` (exclusiva); solo `browser_available` -> `check_availability_abrir` y `open_application_abrir`, decision `abrir`; estado vacio -> `no_branch_applicable` sin ejecutar nada
+DISCREPANCIAS: `TaskExecutor._execute_conditional` (`src/hands/planner/task_executor.py`) sigue marcando como `ABORTED` las tareas omitidas por condicion; ahora existe `SKIPPED`. No se cambio para no romper `tests/hands/planner/test_task_executor.py`; decidir en Windows si se unifica.
+PENDIENTES: Windows: tests de condicion verdadera, falsa, varias verdaderas (solo la primera), rama por defecto, ninguna aplicable, Task SKIPPED no ejecutada ni bloqueante, contenedor todo omitido SKIPPED, decision registrada en metadata y resultado (4.4.4.2-4.4.4.3); decidir la unificacion ABORTED/SKIPPED de `_execute_conditional`.
+ESTADO FINAL: 4.4.2 - PARCIALMENTE IMPLEMENTADA (MAC)
+ORIGEN: PREPARADA EN MAC 2026-11-17; REVISION WINDOWS: PENDIENTE
+MACOS: NA
+
+REGISTRO DE UNIDAD: 4.6.1 (HOJAS 4.6.1.1-4.6.1.2)
+FECHA: 2026-11-17
+OBJETIVO: Capturar el State real disponible antes de entrar en HTN.
+TIPO DE TRABAJO: IMPLEMENTACION | CORRECCION
+CAMBIOS / HALLAZGOS: Antes `Brain.process_intent_to_execution` y `Brain.process_with_htn` (`src/brain/llm.py`) pasaban `{}` a HTN, de modo que precondiciones como `browser_available` (que lee `state["applications"]`) nunca veian el estado real. 4.6.1.1 nuevo `Brain.capture_htn_state()`: copia profunda de `get_system_state()` (WorldState de la memoria: `applications`, `ui_elements`, `system_info`, `constraints`, `last_actions`, `active_goals`, `timestamp`), que es el estado que Brain conoce; ambos metodos lo usan. 4.6.1.2 la instantanea se marca con `_htn_state_source` (`memory_world_state`, `empty` o `unavailable`), `_htn_captured_at` y `_htn_state_timestamp` (marca del WorldState, para conocer su antiguedad); claves con `_` que no son precondiciones y que `ExecutionState.update` ignora. Si la lectura falla se devuelve un estado vacio marcado `unavailable` con el error (sin inventar datos). El estado de `Executor.current_state` (`ExecutionState`) no lo ve Brain y no se mezcla.
+ARCHIVOS MODIFICADOS: PRODUCCION: `src/brain/llm.py`; TESTS: NA; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: NE; INTEGRACION: NE; NO REGRESION: NE
+VERIFICACION: SINTAXIS: OK en Mac (Python 3.12; ASCII); MAIN.PY: NV; COMPORTAMIENTO / INTEGRACION REAL: prueba aislada: WorldState sintetico con `applications.chrome.available=True` -> instantanea `memory_world_state` con su `timestamp`; modificar la instantanea no altera el original; `get_system_state` que lanza excepcion -> `unavailable` con el error y log warning
+DISCREPANCIAS: El WorldState de la memoria puede estar desactualizado respecto al sistema; se expone su marca temporal pero no se refresca con el SO (no hay API de refresco en Brain).
+PENDIENTES: Windows: tests en `tests/brain/test_llm.py` de `capture_htn_state` (copia, marcas, fallo) y de que `process_with_htn` / `process_intent_to_execution` pasan esa instantanea a HTN; comprobar con el WorldState real que `browser_available` se evalua con datos del equipo; decidir si debe combinarse con `Executor.current_state`.
+ESTADO FINAL: 4.6.1 - PARCIALMENTE IMPLEMENTADA (MAC)
+ORIGEN: PREPARADA EN MAC 2026-11-17; REVISION WINDOWS: PENDIENTE
+MACOS: NA
+
+REGISTRO DE UNIDAD: 4.6.2 (HOJAS 4.6.2.1-4.6.2.3)
+FECHA: 2026-11-17
+OBJETIVO: Aplicar al estado solo los cambios confirmados por la ejecucion y registrar el resultado HTN.
+TIPO DE TRABAJO: CORRECCION | IMPLEMENTACION
+CAMBIOS / HALLAZGOS: En `HTNBrainIntegration._process_execution_results` (`src/brain/htn_integration.py`): 4.6.2.1 se aplica `execution_result.new_state` (y como respaldo `result["new_state"]`), que HTNManager solo acumula con el estado devuelto por hojas COMPLETED; antes, ante un fallo, se descartaban tambien los cambios ya confirmados de las hojas previas. En `Brain.process_intent_to_execution` el estado final de cada Goal es el estado de partida del siguiente. 4.6.2.2 la hoja fallida no aporta cambios (HTNManager no actualiza el estado en el fallo) y la instantanea recibida no se muta. 4.6.2.3 `last_htn_goal` (persistido como `last_htn_result` en el WorldState, como antes) incluye ahora `failed_task_id`, `error_message`, `state_changes` (claves cambiadas, sin las `_htn_*`) y `state_source`. Se conserva la marca `<tipo>_completed/_failed` por compatibilidad.
+ARCHIVOS MODIFICADOS: PRODUCCION: `src/brain/htn_integration.py`; `src/brain/llm.py`; TESTS: NA; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: NE; INTEGRACION: NE; NO REGRESION: NE
+VERIFICACION: SINTAXIS: OK en Mac (Python 3.12; ASCII); MAIN.PY: NV; COMPORTAMIENTO / INTEGRACION REAL: prueba aislada: resultado FAILED con `new_state` `{notepad_open: True, completed_tasks: [t1]}` -> estado final con `notepad_open`, `state_changes=[completed_tasks, notepad_open]`, `failed_task_id=t2`, `state_source=memory_world_state`; estado base sin mutar
+DISCREPANCIAS: Los cambios confirmados no se escriben en el WorldState persistente (solo `last_htn_result`, como antes); escribir `app_<nombre>` exigiria decidir el formato y escribe en `data/memory`.
+PENDIENTES: Windows: tests de exito con cambios, fallo tras una hoja completada (cambios previos conservados, sin cambios de la hoja fallida), `state_changes` y `failed_task_id` en `last_htn_goal`, encadenado de estado entre Goals en `process_intent_to_execution`; no regresion `tests/hands/actions/test_executor_state.py` y `tests/brain/test_htn_integration.py` (4.6.4).
+ESTADO FINAL: 4.6.2 - PARCIALMENTE IMPLEMENTADA (MAC)
+ORIGEN: PREPARADA EN MAC 2026-11-17; REVISION WINDOWS: PENDIENTE
+MACOS: NA
+
+REGISTRO DE UNIDAD: 4.7.1 (HOJAS 4.7.1.1-4.7.1.3)
+FECHA: 2026-11-17
+OBJETIVO: Recibir, validar y despachar una Task hoja a la accion real.
+TIPO DE TRABAJO: IMPLEMENTACION | CORRECCION
+CAMBIOS / HALLAZGOS: En `src/hands/planner/task_executor.py`: 4.7.1.1-4.7.1.2 nuevo `TaskExecutor.validate_leaf_task(task)`, llamado al inicio de `execute_task`; rechaza (FAILED, `result={"execution_attempted": False, "rejected": True}`, error "Tarea rechazada: ...") la tarea nula o sin id, la que tiene hijas o `metadata["compound"]`/`logical_container`, la que esta en estado final (COMPLETED/FAILED/ABORTED/SKIPPED) y la que trae `metadata["action_unmapped"]` sin `execute_callback` propio. Error corregido: antes una Task HTN sin accion registrada llegaba a `_resolve_action_name`, que usaba el ID de la tarea como nombre de accion y la delegaba al Executor. `execute_task_with_retry` no reintenta un rechazo. 4.7.1.3 el despacho a ActionRegistry/Executor no cambia.
+ARCHIVOS MODIFICADOS: PRODUCCION: `src/hands/planner/task_executor.py`; TESTS: NA; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: NE; INTEGRACION: NE; NO REGRESION: NE
+VERIFICACION: SINTAXIS: OK en Mac (Python 3.12; ASCII); MAIN.PY: NV; COMPORTAMIENTO / INTEGRACION REAL: prueba aislada con ActionRegistry simulado: hoja `open_application` -> COMPLETED y una llamada al registro; contenedor con hijas, `action_unmapped` y tarea COMPLETED -> rechazadas sin llamar al registro; reintento de una rechazada -> 1 intento
+DISCREPANCIAS: Las tareas HTN sin accion (`prepare_navigator`, `navigate_to_target`, `activate_window`, `check_availability`...) fallan ahora en la validacion con el texto de `action_unmapped` en lugar de intentar la delegacion por ID; revisar si algun test de `tests/hands/planner/test_task_executor.py` o `tests/brain/test_htn_integration.py` esperaba la delegacion.
+PENDIENTES: Windows: tests de hoja valida, contenedor rechazado, estado final rechazado, `action_unmapped` rechazada, `action_unmapped` con `execute_callback` aceptada, sin reintento tras rechazo (4.7.4.1-4.7.4.2); no regresion de `tests/hands/planner/test_task_executor.py`.
+ESTADO FINAL: 4.7.1 - PARCIALMENTE IMPLEMENTADA (MAC)
+ORIGEN: PREPARADA EN MAC 2026-11-17; REVISION WINDOWS: PENDIENTE
+MACOS: NA
+
+REGISTRO DE UNIDAD: 4.7.3 (HOJAS 4.7.3.1-4.7.3.2)
+FECHA: 2026-11-17
+OBJETIVO: Cancelacion de Task y liberacion segura de los recursos propios.
+TIPO DE TRABAJO: IMPLEMENTACION
+CAMBIOS / HALLAZGOS: No existia cancelacion en TaskExecutor (solo el `future.cancel()` interno del Executor para timeouts). En `src/hands/planner/task_executor.py`: 4.7.3.1 cancelacion cooperativa con `threading.Event`: `cancel(reason)` (devuelve si habia tarea en curso), `clear_cancellation()`, `is_cancelled`; `execute_task` la comprueba antes de preparar y justo antes de `_execute_node` (ultimo punto sin efectos) y devuelve `TaskStatus.ABORTED` con `result={"cancelled": True, "execution_attempted": False, "stage": ...}`; una accion ya iniciada no se interrumpe y su resultado se conserva (log); `execute_task_with_retry` no reintenta ABORTED y `_execute_sequential` se detiene ante ABORTED. En `src/hands/planner/htn_manager.py` la hoja cancelada queda ABORTED (no FAILED), el resultado lleva `aborted=True` y el Goal queda `aborted` (`record_result(aborted=True)`). 4.7.3.2 el `finally` de `execute_task` libera siempre los recursos propios (`current_task=None`, estado IDLE); las acciones externas gestionan los suyos.
+ARCHIVOS MODIFICADOS: PRODUCCION: `src/hands/planner/task_executor.py`; `src/hands/planner/htn_manager.py`; TESTS: NA; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: NE; INTEGRACION: NE; NO REGRESION: NE
+VERIFICACION: SINTAXIS: OK en Mac (Python 3.12; ASCII); MAIN.PY: NV; COMPORTAMIENTO / INTEGRACION REAL: prueba aislada: tras `cancel()` -> tarea ABORTED sin llamar al registro, `current_task=None`, estado `idle`; secuencia de dos tareas -> solo una ABORTED; jerarquia HTN con cancelacion durante la primera hoja -> la accion ya iniciada se conserva, la segunda hoja ABORTED, `aborted=True` y Goal `aborted`
+DISCREPANCIAS: Nadie llama todavia a `TaskExecutor.cancel()` (no hay orden de voz de cancelacion); la cancelacion es persistente hasta `clear_cancellation()` y ningun flujo la limpia aun. El estado raiz de HTN sigue siendo FAILED (con `aborted=True`) porque `HTNStatus` no tiene ABORTED.
+PENDIENTES: Windows: tests de cancelacion antes de preparar, antes de ejecutar, durante la accion (resultado conservado), sin reintento, secuencia detenida, liberacion de `current_task`, Goal `aborted` (4.7.4.4); decidir quien llama a `cancel()`/`clear_cancellation()` (enlazar con 4.5.7 cuando el usuario cancela).
+ESTADO FINAL: 4.7.3 - PARCIALMENTE IMPLEMENTADA (MAC)
+ORIGEN: PREPARADA EN MAC 2026-11-17; REVISION WINDOWS: PENDIENTE
+MACOS: NA
+
+REGISTRO DE UNIDAD: 4.5.7 (HOJAS 4.5.7.1-4.5.7.6)
+FECHA: 2026-11-17
+OBJETIVO: Canal unico reutilizable de aclaracion y confirmacion con el usuario que conserve la solicitud pendiente y devuelva el dato para reanudar el Goal.
+TIPO DE TRABAJO: INSPECCION | IMPLEMENTACION
+CAMBIOS / HALLAZGOS: 4.5.7.1 inspeccion: el unico flujo existente es la confirmacion de prediccion de `main.py` (sugerencia con score >= 0.8, `jarvis_mouth.speak` + `jarvis_ear.listen()`, vocabulario si/claro/ok/vale/dale/hazlo comparado como subcadena, por lo que "si" coincide dentro de "sigue"); no conserva nada entre turnos; Brain, Ear y Mouth no tienen otro mecanismo; `ApplicationResolutionResult` (`src/hands/apps/applications_core.py`) ya trae `app`, `alternatives`, `is_ambiguous` y `ambiguity_reason`. Nuevo modulo `src/brain/clarification.py` (no ejecuta acciones, no habla ni escucha): 4.5.7.2 `ClarificationRequest` (`kind` clarification/confirmation, `reason`, `question`, `candidates`, `resume` = dato para reanudar, `request_id`, `created_at`, `ttl_seconds`, `max_attempts`, `attempts`) y `clarification_from_resolution(resolution, resume)` que toma los candidatos de `app` + `alternatives` solo si `is_ambiguous`; 4.5.7.3 `confirmation_reason(action_info, preflight)` y `confirmation_for_action(...)` usando solo campos existentes: `PreflightResult.requires_elevation` y `ActionInfo.tags` en `CONFIRMATION_TAGS` (`requires_confirmation`, `destructive`), o un `reason` explicito del llamador (confianza media de 4.5.6.10); 4.5.7.4 `ClarificationChannel` con una sola solicitud pendiente, caducidad (`DEFAULT_TTL_SECONDS=30`), una solicitud nueva reemplaza a la pendiente y la pendiente se refleja en la memoria de conversacion existente (`update_world_state({"pending_clarification": ...})` si se le pasa); 4.5.7.5 `interpret_answer` normaliza (minusculas, sin acentos ni puntuacion) y compara por palabras completas: `CONFIRMATION_WORDS` (el vocabulario de `main.py`), rechazo (no), cancelacion (cancela, olvidalo, dejalo...), eleccion por nombre (gana el nombre mas largo: "visual studio code" frente a "visual studio") u ordinal (la segunda), silencio, ambigua y peticion nueva (>= 4 palabras sin vocabulario); ante duda vuelve a preguntar hasta `DEFAULT_MAX_ATTEMPTS=2` y despues abandona (`exhausted`) sin ejecutar; 4.5.7.6 `respond()` devuelve `ClarificationOutcome` y solo `resolved` lleva `resume`; la solicitud se retira al resolverse, de modo que una segunda respuesta devuelve `no_pending` (sin doble ejecucion). `get_clarification_channel()` da la instancia compartida. Lo usa `src/brain/voice_understanding.py` (4.5.6.10-4.5.6.12, desactivado por defecto); `main.py` no.
+ARCHIVOS MODIFICADOS: PRODUCCION: `src/brain/clarification.py` (nuevo); TESTS: NA; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: NE; INTEGRACION: NE; NO REGRESION: NE
+VERIFICACION: SINTAXIS: OK en Mac (Python 3.12 `py_compile`; ASCII); MAIN.PY: NV (no se modifico); COMPORTAMIENTO / INTEGRACION REAL: prueba aislada con reloj simulado: resolucion ambigua con 3 candidatos -> "Te refieres a Visual Studio Code, Visual Studio o Spotify?"; silencio -> `reask`, segunda respuesta sin sentido -> `exhausted`; "visual studio" -> `Visual Studio`; "Visual Studio Code, por favor" -> `Visual Studio Code`; "la segunda" resuelve y repetirla -> `no_pending`; resolucion no ambigua -> None; `requires_elevation=True` -> confirmacion; tags `aplicacion, open` -> sin confirmacion; confirmacion: "Si, hazlo" (con acento) -> `resolved`, "no" -> `rejected`, "no... si" -> `reask`, "cancela" -> `cancelled`, "abre spotify en la pantalla izquierda" -> `replaced_by_new_request`, "sigue" -> `reask` (ya no se confunde con "si"); tras 31 s -> `expired`; dos `ask` seguidos -> la segunda reemplaza y la memoria guarda la ultima
+DISCREPANCIAS: No existe en el proyecto una politica de acciones con efectos externos o destructivos; 4.5.7.3 solo consume `requires_elevation` y unas etiquetas que hoy ninguna accion registrada declara (`requires_confirmation`, `destructive`), asi que en la practica solo la elevacion o un motivo explicito del llamador piden confirmacion. `main.py` sigue con su propio flujo (fuera de `src/`, no se toco).
+PENDIENTES: Windows: crear `tests/brain/test_clarification.py` (4.5.7.7: aclaracion con candidatos, ordinal, nombre contenido en otro, confirmacion aceptada/rechazada/ambigua, silencio, limite de intentos, cancelacion, peticion nueva, reemplazo, caducidad, una sola resolucion, persistencia en memoria con objeto simulado); conectar el canal en `main.py` sustituyendo la comparacion por subcadena por `interpret_answer` (vocabulario `CONFIRMATION_WORDS`) y en Brain cuando `ApplicationResolutionResult.is_ambiguous`; decidir que acciones declaran `requires_confirmation`/`destructive`; enlazar `cancelled` con `TaskExecutor.cancel()` (4.7.3); verificar con voz real cuando exista.
+ESTADO FINAL: 4.5.7 - PARCIALMENTE IMPLEMENTADA (MAC)
+ORIGEN: PREPARADA EN MAC 2026-11-17; REVISION WINDOWS: PENDIENTE
+MACOS: NA (codigo comun sin APIs nativas)
+
+REGISTRO DE UNIDAD: 4.5.6 (HOJAS 4.5.6.3-4.5.6.4)
+FECHA: 2026-11-17
+OBJETIVO: ASR configurable en fichero (solo con mejoras medidas) y vocabulario dinamico para `initial_prompt` en lugar de la lista fija.
+TIPO DE TRABAJO: IMPLEMENTACION
+CAMBIOS / HALLAZGOS: 4.5.6.3: nuevo `src/ear/asr_config.py` con `ASRConfig` y `load_asr_config()`, que leen la seccion `asr` de `config/config.json` (no se ha creado ni tocado el fichero); sin esa seccion los valores reproducen exactamente el comportamiento anterior (`medium`, `device=cpu`, `compute_type=int8`, `es`, `beam_size=5`, `vad_filter=False`, `word_timestamps=True`; `temperature` y `condition_on_previous_text` en `None` = valor por defecto de faster-whisper, no se pasan). `model_kwargs()`/`transcribe_kwargs()` construyen los argumentos. En `src/ear/listener.py` `TranscriptionNode` y `Ear` usan esa configuracion (los argumentos explicitos `model_size`/`language` siguen mandando; `main.py` pasa `model_size="medium"`). No se ha activado ninguna mejora: `vad_filter`, modelo segun hardware, `temperature` con fallback y `condition_on_previous_text=False` se activan en config solo tras medirlos contra el baseline de 4.5.6.2. 4.5.6.4: nuevo `src/ear/vocabulary.py`: `VocabularyEntry` (canonico, tipo application/monitor/command, aliases, peso de uso 0..1), `build_vocabulary(applications, usage, ...)` desde el catalogo (`ApplicationKnowledge.name` + `metadata["aliases"]`), terminos de monitor (izquierda, derecha, principal...) y verbos de orden; `build_initial_prompt(entries, max_chars, max_apps)` ordena por uso, no parte palabras y limita longitud (`initial_prompt_max_chars=400`, `max_vocabulary_apps=40`); `collect_vocabulary(usage)` carga el catalogo de `get_application_manager()` de forma perezosa. `TranscriptionNode.get_initial_prompt()` lo calcula una vez (`refresh_vocabulary()` lo recalcula) y sustituye la lista fija, que queda como `LEGACY_INITIAL_PROMPT` solo si el vocabulario dinamico esta desactivado o vacio. No se tocaron 4.5.6.1, 4.5.6.2, 4.5.6.5 y 4.5.6.6 en este registro.
+ARCHIVOS MODIFICADOS: PRODUCCION: `src/ear/asr_config.py` (nuevo); `src/ear/vocabulary.py` (nuevo); `src/ear/listener.py`; TESTS: NA; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: NE; INTEGRACION: NE; NO REGRESION: NE
+VERIFICACION: SINTAXIS: OK en Mac (Python 3.12 `py_compile`; ASCII); MAIN.PY: NV; COMPORTAMIENTO / INTEGRACION REAL: prueba aislada: `transcribe_kwargs(ASRConfig())` -> `beam_size=5, language=es, word_timestamps=True, vad_filter=False`; config sintetica con `vad_filter` y `temperature [0.0, 0.2]` -> se pasan; vocabulario con uso Chrome 50 / Spotify 30 -> prompt "Jarvis, abre, cierra, ..., Chrome, Spotify, Discord, ..." cortado en 200 caracteres sin partir palabras. `listener.py` no se pudo importar en el Mac (sin numpy/sounddevice/faster_whisper): solo `py_compile`
+DISCREPANCIAS: El roadmap pide la configuracion "en fichero": se usa `config/config.json` (seccion `asr`), que no se ha modificado por la restriccion de solo tocar `src/`. El perfil adaptativo de uso no expone hoy un contador por aplicacion consumible: `build_vocabulary` acepta `usage`, pero `collect_vocabulary()` lo recibe vacio salvo que el llamador lo pase. `TranscriptionNode` ahora pasa `vad_filter=False` explicito (mismo valor por defecto de faster-whisper) y el `initial_prompt` ya no es el texto fijo: revisar tests de `tests/ear/test_listener.py` que comparen los argumentos de `transcribe`. Con vocabulario dinamico activo, crear `TranscriptionNode` en un test carga el catalogo de aplicaciones: los tests deben fijar `dynamic_vocabulary=False` o simular `collect_vocabulary`.
+PENDIENTES: Windows: medir con el corpus de 4.5.6.2 y, solo si mejora, anadir la seccion `asr` a `config/config.json`; crear `tests/ear/test_asr_config.py` (defaults = comportamiento anterior, seccion ausente, valores invalidos, `None` no se pasa) y `tests/ear/test_vocabulary.py` (orden por uso, aliases, limite de longitud, catalogo no disponible); ampliar `tests/ear/test_listener.py` (`get_initial_prompt` dinamico y fallback legacy, argumentos de `transcribe` desde config); conectar el perfil de uso real a `collect_vocabulary(usage)`; README apartado Ear.
+ESTADO FINAL: 4.5.6 - PARCIALMENTE IMPLEMENTADA (MAC)
+ORIGEN: PREPARADA EN MAC 2026-11-17; REVISION WINDOWS: PENDIENTE
+MACOS: NA (codigo comun sin APIs nativas)
+
+REGISTRO DE UNIDAD: 4.5.6 (HOJAS 4.5.6.7-4.5.6.13)
+FECHA: 2026-11-17
+OBJETIVO: Correccion determinista, correcciones aprendidas, segunda inferencia LLM validada, politica de decision, fallback, integracion antes de la intencion y captura de audio multiplataforma.
+TIPO DE TRABAJO: IMPLEMENTACION
+CAMBIOS / HALLAZGOS: 4.5.6.7: nuevo `src/ear/correction.py`: `normalize_text` (minusculas, sin acentos ni puntuacion, numeros uno..diez opcionales), `phonetic_key` (clave fonetica espanola con anglicismos: `es`+consonante inicial, h muda, v/b, z/c/s, qu/k, ll/y, ch ante r -> k, -ai/-y finales, vocal final debil) y `similarity` (Levenshtein normalizado; usa `rapidfuzz` si esta instalado, si no implementacion propia con el mismo resultado). `correct_transcript(text, vocabulary, learned, candidate_min_score=0.72, accept_score=0.86, ambiguity_gap=0.06)` compara n-gramas de hasta 3 palabras (sin empezar ni acabar en articulo/preposicion) contra canonicos y aliases del vocabulario, pondera por uso (`USAGE_BONUS`), elige sin solapes (a igualdad, el fragmento mas largo) y solo corrige si el candidato es concluyente; si no, lo deja en `ambiguous` con sus candidatos; nunca propone nada fuera del vocabulario y una forma exacta no se altera. 4.5.6.8: nuevo `src/ear/learned_corrections.py` (`LearnedCorrections`): JSON local propio (`data/ear/learned_corrections.json` o `voice_understanding.learned_corrections_path`, escritura atomica, ASCII), par forma oida -> entidad con `count`, `first_seen`, `last_seen`; si la forma pasa a otra entidad el contador se reinicia; solo se aplican con `count >= min_evidence` (2) y con prioridad (`method=learned`); `list_all`, `delete`, `clear`; no escribe en el catalogo ni en `entities.json`. Se registra cuando el usuario elige o confirma un candidato. 4.5.6.9: nuevo `src/brain/transcript_disambiguation.py`: `llm_reasons` (criterios verificables: `confianza_baja` si hay umbral, `varios_candidatos`, `correccion_no_concluyente`, `orden_compuesta`, `texto_incompleto`), `build_prompt` (texto original, candidatos, vocabulario), `parse_response` (JSON validado: `intent` en `ALLOWED_INTENTS`, `entity` EXACTAMENTE un candidato o `desconocida`; una entidad inventada se rechaza) y `disambiguate` sobre ollama (modelo de Brain o `voice_understanding.llm_model`), sin ejecutar nada. 4.5.6.10 y 4.5.6.11: nuevo `src/brain/voice_understanding.py` (`VoiceUnderstanding.process`): correccion -> LLM solo para el primer fragmento no concluyente y si hay motivos -> decision: varios candidatos -> aclaracion con opciones; un candidato dudoso -> confirmacion breve ("Discord?"); con umbrales calibrados, confianza baja -> confirmar la frase y confianza media con correccion -> confirmar la correccion; resto -> continuar con el texto corregido, anadido como derivacion al `TranscriptionRecord` (4.5.6.6). Ante salida invalida, entidad inventada, timeout o modelo no disponible se mantiene la correccion determinista y, si no basta, se pregunta (nunca se elige por conjetura). Las preguntas usan el canal de 4.5.7; `handle_answer` reanuda con la frase completa ("abre Discord"), y si no, devuelve el mensaje de rechazo/cancelacion/caducidad. 4.5.6.12: `Brain.think` llama a `_voice_understanding_step` una sola vez antes de `interpret_intent` (respuesta pendiente -> reanudar o volver a preguntar; frase nueva -> procesar); la confianza se toma de la ultima transcripcion publicada por Ear (`set_last_transcription`/`get_last_transcription` en `src/ear/transcription.py`) si corresponde a la misma frase. Desactivado por defecto (`voice_understanding.enabled=false`) y sin umbrales (`high_confidence`/`low_confidence` en `None`) hasta calibrarlos con el corpus; desactivado o con error, `think` usa el texto original sin cambios. El monitor no se resuelve aqui: la correccion solo repara la palabra ("ezquierda" -> "izquierda") y la frase la resuelve `monitor_topology` (3.8.6.6.3). 4.5.6.13: en `src/ear/listener.py` `sounddevice` y `faster_whisper` se importan de forma protegida; `Ear.check_audio_input()` consulta la capacidad `audio_input` del adaptador de escritorio (Windows: consentimiento de microfono y dispositivos; macOS: `AVCaptureDevice`, permiso de la app anfitriona) antes de abrir el microfono y, con `SIN_PERMISO` o sin backend, registra el error con instrucciones, guarda `last_audio_status` y `listen()` devuelve None; se sustituyen los `logger.info("Procesando solicitud: ...")` de las excepciones por `logger.error` con el error real. No se tocaron 4.5.6.14-4.5.6.16.
+ARCHIVOS MODIFICADOS: PRODUCCION: `src/ear/correction.py` (nuevo); `src/ear/learned_corrections.py` (nuevo); `src/ear/asr_config.py` (seccion `voice_understanding`); `src/ear/transcription.py`; `src/ear/listener.py`; `src/brain/transcript_disambiguation.py` (nuevo); `src/brain/voice_understanding.py` (nuevo); `src/brain/llm.py`; TESTS: NA; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: NE; INTEGRACION: NE; NO REGRESION: NE
+VERIFICACION: SINTAXIS: OK en Mac (Python 3.12 `py_compile`; ASCII); MAIN.PY: NV; COMPORTAMIENTO / INTEGRACION REAL: pruebas aisladas en Mac con vocabulario sintetico: "abre espotifai" -> "abre Spotify"; "abre bisual estudio" -> "abre Visual Studio"; "abre bisual estudio cod" -> "abre Visual Studio Code"; "abre el cromo" -> "abre el Chrome"; "ponlo en la pantalla de la ezquierda" -> "... izquierda"; "abre spotify", "abre el bloc de notas", "que hora es" sin cambios; "abre discor" -> no concluyente -> confirmacion "Discord?" y "si" -> "abre Discord" con correccion aprendida x1; con 2 confirmaciones se aplica sola; borrado -> desaparece; LLM simulado: respuesta valida -> "abre Discord"; entidad inventada "Discordia Pro", texto sin JSON, timeout 0.3 s y modelo caido -> confirmacion; umbrales 0.9/0.5 con confianza 0.7 -> confirmacion "Spotify?"; derivacion `correccion_determinista` con el original intacto; `Brain.think` con Brain simulado: "abre espotifai" llega a `interpret_intent` como "abre Spotify", "abre discor" devuelve "Discord?" sin interpretar, "si" interpreta "abre Discord"; desactivado -> `(None, texto original)`. Ollama, Whisper, microfono y `listener.py` no disponibles en el Mac
+DISCREPANCIAS: Los umbrales de decision (`high_confidence`, `low_confidence`) no tienen valor: el roadmap exige fijarlos con el corpus de 4.5.6.2. Los de la correccion (`candidate_min_score`, `accept_score`, `ambiguity_gap`) tienen valores provisionales puestos a mano, configurables en `voice_understanding`, y deben recalibrarse con el corpus. `main.py` resuelve alias y predicciones ANTES de `Brain.think`, asi que esas rutas no pasan por la correccion (no se modifico `main.py`). La respuesta "no, Spotify" a una confirmacion se interpreta como rechazo; no se extrae la correccion de esa frase. Las acciones con efectos externos o destructivos se confirman con `confirmation_for_action` de 4.5.7 al ejecutarlas, no en esta capa.
+PENDIENTES: Windows: crear `tests/ear/test_correction.py` (ejemplos del roadmap, texto correcto inalterado, vacio, solo ruido, nombres cortados, orden de palabras, monitor mal transcrito, nada fuera del vocabulario), `tests/ear/test_learned_corrections.py` (evidencia minima, cambio de entidad, listar/borrar/limpiar, fichero en `tmp_path`), `tests/brain/test_transcript_disambiguation.py` (JSON invalido, entidad inventada rechazada, timeout, modelo no disponible, criterios) y `tests/brain/test_voice_understanding.py` (decisiones, fallback, reanudacion, sin doble ejecucion, integracion en `Brain.think` activada y desactivada); ampliar `tests/ear/test_listener.py` (`check_audio_input` con `SIN_PERMISO`, sin sounddevice, publicacion de la ultima transcripcion) (4.5.6.14); medir y calibrar con el corpus y activar `voice_understanding` solo si mejora (4.5.6.15); verificar 4.5.6.16 (la cadena no ejecuta, no escribe en `entities.json`, conserva el original); prueba real del permiso de microfono en macOS segun regla 3; README apartados Ear y Brain.
+ESTADO FINAL: 4.5.6 - PARCIALMENTE IMPLEMENTADA (MAC)
+ORIGEN: PREPARADA EN MAC 2026-11-17; REVISION WINDOWS: PENDIENTE
+MACOS: Comprobacion de permiso via `audio_input` del adaptador macOS escrita a ciegas, NV
+
+REGISTRO DE UNIDAD: 4.1.1 (HOJAS 4.1.1.1-4.1.1.5)
+FECHA: 2026-11-17
+OBJETIVO: Inspeccionar la estructura real de Goal y sus consumidores.
+TIPO DE TRABAJO: INSPECCION
+CAMBIOS / HALLAZGOS: 4.1.1.1 `Goal` es un dataclass en `src/hands/planner/node.py` (`id`, `type`, `target`, `description`, `priority=1`, `deadline`, `constraints: List[str]`, `nodes`, `created_at`, `updated_at`, `metadata`); 4.1.1.2 `goal_type` es `Goal.type` (texto; un Enum se normaliza a su valor en `__post_init__`); 4.1.1.3 `target` es texto o dict (`_target_value` lee `url` de un dict); 4.1.1.4 `priority` se convierte a entero, `deadline` a float finito o None, `constraints` a lista; desde 4.1.2 el estado del Goal vive en `metadata["status"]`. 4.1.1.5 compatibilidades: consumidores `src/brain/llm.py`, `src/brain/htn_integration.py`, `src/hands/actions/executor.py`, `src/hands/calibration/calibrator.py`, `src/hands/planner/{__init__,goal_state_mapper,graph,heuristic,htn_manager,optimization,planner,planner_integration}.py`; `Goal.to_dict/from_dict` es la serializacion comun; `src/memory/conversation.py` define su propia clase `Goal` (linea ~80) y DOS clases `Task` (lineas ~92 y ~108, la segunda sustituye a la primera), distintas de las de `node.py`.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: NA; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: NE; INTEGRACION: NE; NO REGRESION: NE
+VERIFICACION: SINTAXIS: NA; MAIN.PY: NV; COMPORTAMIENTO / INTEGRACION REAL: inspeccion estatica del codigo en el Mac; NV en Windows
+DISCREPANCIAS: `src/memory/conversation.py` duplica `Goal`/`Task` y define `Task` dos veces en el mismo modulo; no se ha tocado.
+PENDIENTES: Windows: confirmar la lista de consumidores contra el codigo vigente; decidir si las clases de `conversation.py` se eliminan o se documentan como compatibilidad.
+ESTADO FINAL: 4.1.1 - PARCIALMENTE IMPLEMENTADA (MAC)
+ORIGEN: PREPARADA EN MAC 2026-11-17; REVISION WINDOWS: PENDIENTE
+MACOS: NA
+
+REGISTRO DE UNIDAD: 4.2.1 (HOJAS 4.2.1.1-4.2.1.3)
+FECHA: 2026-11-17
+OBJETIVO: Inspeccionar el modelo Task y sus relaciones con Goal y Action.
+TIPO DE TRABAJO: INSPECCION
+CAMBIOS / HALLAZGOS: 4.2.1.1 `Task` (dataclass en `src/hands/planner/node.py`): `id`, `name`, `description`, `status: TaskStatus`, `nodes`, `parent`, `children`, `dependencies`, `created_at`, `started_at`, `completed_at` y, desde 4.2.2, `metadata`. 4.2.1.2 Goal -> Task: no hay un campo de tareas en Goal (`Goal.nodes` son nodos del planner); la relacion la crea `HTNManager`: la Task raiz tiene el mismo `id` que el Goal (`_establish_hierarchy`) y cada Task lleva `metadata["goal_id"]`. 4.2.1.3 Task -> Action: `metadata["action"]` + `metadata["parameters"]`, que `TaskExecutor._resolve_action_name` despacha a `ActionRegistry`; solo `open_application` esta enlazada (`HTN_TASK_ACTIONS`); el resto de tareas HTN llevan `action_unmapped`.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: NA; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: NE; INTEGRACION: NE; NO REGRESION: NE
+VERIFICACION: SINTAXIS: NA; MAIN.PY: NV; COMPORTAMIENTO / INTEGRACION REAL: inspeccion estatica del codigo en el Mac; NV en Windows
+DISCREPANCIAS: NINGUNA
+PENDIENTES: Windows: confirmar contra el codigo vigente.
+ESTADO FINAL: 4.2.1 - PARCIALMENTE IMPLEMENTADA (MAC)
+ORIGEN: PREPARADA EN MAC 2026-11-17; REVISION WINDOWS: PENDIENTE
+MACOS: NA
+
+REGISTRO DE UNIDAD: 4.3.1 (HOJAS 4.3.1.1-4.3.1.4)
+FECHA: 2026-11-17
+OBJETIVO: Inspeccionar HTNManager, TaskExecutor y los metodos de descomposicion y sus condiciones.
+TIPO DE TRABAJO: INSPECCION
+CAMBIOS / HALLAZGOS: 4.3.1.1 `HTNManager` en `src/hands/planner/htn_manager.py` (singleton `get_htn_manager()`, que inicializa reglas y biblioteca de tareas). 4.3.1.2 `TaskExecutor` en `src/hands/planner/task_executor.py` (`get_task_executor()`), cargado de forma perezosa por HTNManager para evitar el ciclo de imports. 4.3.1.3 metodos (`initialize_decomposition_rules`): `navigation_decomposition` (navigate: prepare_navigator, navigate_to_target), `stream_opening_decomposition` (navigate_stream), `application_opening_decomposition` (open_application: check_availability, open_application, activate_window), `search_decomposition` (search) y `parallel_execution_decomposition` (parallel_tasks); estrategias SEQUENTIAL/PARALLEL/CONDITIONAL/ITERATIVE. 4.3.1.4 condiciones: `rule.preconditions`, evaluadas sobre el estado recibido (`browser_available`, `entity_available`, `application_known`, `search_engine_known`, `multiple_tasks_defined` o clave del estado); desde 4.3.2 con `_condition_holds`/`_unmet_preconditions`.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: NA; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: NE; INTEGRACION: NE; NO REGRESION: NE
+VERIFICACION: SINTAXIS: NA; MAIN.PY: NV; COMPORTAMIENTO / INTEGRACION REAL: inspeccion estatica del codigo en el Mac; NV en Windows
+DISCREPANCIAS: En el metodo `application_opening_decomposition` solo `open_application` tiene accion registrada; `check_availability` y `activate_window` no existen en el ActionRegistry (acciones registradas: abrir_chrome, abrir_chrome_pantalla, calibrar_aplicaciones, calibrar_chrome, calibrate_application_ui, calibrate_applications, cerrar_chrome, close_application, maximizar_chrome, maximize_or_restore_application, move_application_to_monitor, mover_chrome_pantalla, open_application, verify_target_monitor, wait_for_application_state). Ver 4.7.2.
+PENDIENTES: Windows: confirmar contra el codigo vigente.
+ESTADO FINAL: 4.3.1 - PARCIALMENTE IMPLEMENTADA (MAC)
+ORIGEN: PREPARADA EN MAC 2026-11-17; REVISION WINDOWS: PENDIENTE
+MACOS: NA
+
+REGISTRO DE UNIDAD: 4.4.1 (HOJAS 4.4.1.1-4.4.1.4)
+FECHA: 2026-11-17
+OBJETIVO: Ejecucion ordenada de secuencias HTN y detencion tras fallo.
+TIPO DE TRABAJO: VERIFICACION
+CAMBIOS / HALLAZGOS: 4.4.1.1 una secuencia es una regla SEQUENTIAL: Tasks hermanas bajo la raiz con el orden expresado en `dependencies` (`_decompose_sequential`), no como padre-hijo. 4.4.1.2-4.4.1.3 `_execute_task_hierarchy` ordena por dependencias (`_order_tasks_by_dependencies`, estable) y solo pasa a la siguiente hoja si la anterior devuelve COMPLETED; el estado devuelto por cada hoja es la entrada de la siguiente. 4.4.1.4 el primer fallo detiene la secuencia, marca la hoja y sus contenedores como FAILED y devuelve `failed_task_id`/`failed_task_path` (4.3.5). Sin cambios de codigo en esta unidad.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: NA; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: NE; INTEGRACION: NE; NO REGRESION: NE
+VERIFICACION: SINTAXIS: NA; MAIN.PY: NV; COMPORTAMIENTO / INTEGRACION REAL: prueba aislada en Mac con TaskExecutor simulado: secuencia a -> b -> c completa en orden con el estado acumulado; fallo en b -> se ejecutan a y b, c no, `failed_task_id=b`
+DISCREPANCIAS: NINGUNA
+PENDIENTES: Windows: tests 4.4.4.1 (secuencia valida) y detencion tras fallo en `tests/hands/planner/test_task_executor.py` o `tests/brain/test_htn_integration.py`.
+ESTADO FINAL: 4.4.1 - PARCIALMENTE IMPLEMENTADA (MAC)
+ORIGEN: PREPARADA EN MAC 2026-11-17; REVISION WINDOWS: PENDIENTE
+MACOS: NA
+
+REGISTRO DE UNIDAD: 4.4.3 (HOJAS 4.4.3.1-4.4.3.3)
+FECHA: 2026-11-17
+OBJETIVO: Resolucion de dependencias y bloqueo de Tasks fuera de orden.
+TIPO DE TRABAJO: VERIFICACION | IMPLEMENTACION
+CAMBIOS / HALLAZGOS: 4.4.3.1 dependencia directa: `_order_tasks_by_dependencies` ejecuta antes la Task de la que se depende aunque venga despues en la lista, y la salida de su estado esta disponible para la dependiente (estado acumulado). 4.4.3.2-4.4.3.3 implementadas en 4.3.5 (registro 4.3.5): antes de ejecutar una hoja se comprueba que sus dependencias estan COMPLETED (una dependencia SKIPPED no bloquea, 4.4.2) y si no, falla sin ejecutarse; `_validate_task_dependencies` rechaza dependencias desconocidas y ciclos antes de ejecutar nada. Sin cambios nuevos de codigo.
+ARCHIVOS MODIFICADOS: PRODUCCION: `src/hands/planner/htn_manager.py` (cambios registrados en 4.3.5 y 4.4.2); TESTS: NA; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: NE; INTEGRACION: NE; NO REGRESION: NE
+VERIFICACION: SINTAXIS: OK en Mac (Python 3.12); MAIN.PY: NV; COMPORTAMIENTO / INTEGRACION REAL: prueba aislada: lista [b(dep a), a, c(dep b)] -> ejecucion a, b, c; ciclo a<->b -> FAILED sin ejecutar nada ("Dependencia ciclica o fuera de orden"); dependencia desconocida -> FAILED sin ejecutar
+DISCREPANCIAS: NINGUNA
+PENDIENTES: Windows: test 4.4.4.4 (dependencia incumplida), dependencia fuera de orden, ciclo y dependencia desconocida.
+ESTADO FINAL: 4.4.3 - PARCIALMENTE IMPLEMENTADA (MAC)
+ORIGEN: PREPARADA EN MAC 2026-11-17; REVISION WINDOWS: PENDIENTE
+MACOS: NA
+
+REGISTRO DE UNIDAD: 4.5.1 (HOJAS 4.5.1.1-4.5.1.4)
+FECHA: 2026-11-17
+OBJETIVO: Verificar la transformacion de intencion interpretada a Goal estructurado.
+TIPO DE TRABAJO: VERIFICACION
+CAMBIOS / HALLAZGOS: 4.5.1.1 `Brain.interpret_intent` (`src/brain/llm.py`): orden real: accion directa (`_detect_direct_action`) -> resolucion de entidad (`EntityResolver.resolve_entity`, ignorando `temporary_creation`) -> Goal desde entidad -> LLM (`generate_response`) con `goal` o `action` -> segunda llamada LLM en modo legacy -> `unknown`. 4.5.1.2 `Brain.think`: desde 4.5.6.12 pasa antes por la comprension de voz (desactivada por defecto); Goal -> `_open_application_command` (`[CMD: open_application(...)]`, la misma accion registrada que usa `main.py`) o mensaje informativo; accion -> comando legacy o registrado. 4.5.1.3 `parse_model_response` limpia bloques ``` y texto alrededor del primer objeto JSON y devuelve dict o None. 4.5.1.4 `_detect_direct_action` resuelve de forma determinista las calibraciones (chrome, edge, firefox, global) antes de consultar entidades o LLM. Sin cambios de codigo en esta unidad (las correcciones de Goal estan en 4.1.3 y 4.5.2).
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: NA; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: NE; INTEGRACION: NE; NO REGRESION: NE
+VERIFICACION: SINTAXIS: NA; MAIN.PY: NV; COMPORTAMIENTO / INTEGRACION REAL: inspeccion estatica del codigo en el Mac; NV en Windows
+DISCREPANCIAS: `interpret_intent` puede hacer dos llamadas al LLM por frase (modo normal y modo legacy) cuando la primera no da `goal` ni `action`; no se ha cambiado.
+PENDIENTES: Windows: tests 4.5.5.1 (interpretacion simple) y 4.5.5.4 (accion directa) en `tests/brain/test_llm.py`.
+ESTADO FINAL: 4.5.1 - PARCIALMENTE IMPLEMENTADA (MAC)
+ORIGEN: PREPARADA EN MAC 2026-11-17; REVISION WINDOWS: PENDIENTE
+MACOS: NA
+
+REGISTRO DE UNIDAD: 4.5.2 (HOJAS 4.5.2.1-4.5.2.3)
+FECHA: 2026-11-17
+OBJETIVO: Extraccion y resolucion de entidades para construir el Goal.
+TIPO DE TRABAJO: VERIFICACION | CORRECCION
+CAMBIOS / HALLAZGOS: Errores corregidos en `src/brain/llm.py`: 4.5.2.3 `interpret_intent` creaba un Goal por la entidad resuelta Y por cada alternativa del `EntityResolutionResult`, y `process_intent_to_execution` ejecutaba todos esos Goals (una peticion podia abrir varias cosas); ahora se crea un unico Goal con la entidad resuelta y las alternativas quedan en `goal.metadata["entity_alternatives"]` (`id`, `name`, `type`) para una aclaracion (4.5.7). 4.5.2.1 `_extract_entities_fallback` coincidia por cualquier palabra de la frase contenida como subcadena en las propiedades ("de", "la" o "abre" dentro de una URL hacian coincidir casi todas las entidades); ahora solo cuentan palabras de al menos 4 letras que no sean verbos de orden (`_FALLBACK_IGNORED_WORDS`) y como palabra completa, y las coincidencias por nombre van primero. 4.5.2.2 la resolucion sigue en `EntityResolver.resolve_entity` (sin cambios).
+ARCHIVOS MODIFICADOS: PRODUCCION: `src/brain/llm.py`; TESTS: NA; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: NE; INTEGRACION: NE; NO REGRESION: NE
+VERIFICACION: SINTAXIS: OK en Mac (Python 3.12; ASCII); MAIN.PY: NV; COMPORTAMIENTO / INTEGRACION REAL: prueba aislada con resolver simulado: "abre youtube" con alternativa "YouTube Music" -> 1 Goal (`https://youtube.com`) y la alternativa en metadata; fallback con Twitch (url `.../de`) y Kick ("streaming de videojuegos"): "abre la de twitch" -> solo Twitch (antes "de" coincidia con ambas); "pon videojuegos" -> Kick
+DISCREPANCIAS: `interpret_intent` devuelve ahora `goals` con un solo elemento cuando antes podia devolver varios: revisar tests de `tests/brain/test_llm.py` que esperen un Goal por alternativa.
+PENDIENTES: Windows: test 4.5.5.3 (entidad -> Goal unico, alternativas en metadata, fallback sin falsos positivos); enlazar `entity_alternatives` con el canal de aclaracion de 4.5.7 cuando la resolucion sea ambigua.
+ESTADO FINAL: 4.5.2 - PARCIALMENTE IMPLEMENTADA (MAC)
+ORIGEN: PREPARADA EN MAC 2026-11-17; REVISION WINDOWS: PENDIENTE
+MACOS: NA
+
+REGISTRO DE UNIDAD: 4.5.3 (HOJAS 4.5.3.1-4.5.3.3)
+FECHA: 2026-11-17
+OBJETIVO: Delegacion del Goal a HTN y propagacion del resultado de descomposicion.
+TIPO DE TRABAJO: VERIFICACION | CORRECCION
+CAMBIOS / HALLAZGOS: 4.5.3.1 `Brain` usa `get_htn_integration()`; `process_intent_to_execution` y `process_with_htn` delegan en `HTNBrainIntegration` con el estado capturado (4.6.1). 4.5.3.2 error corregido: `process_goal_through_htn` descomponia el Goal y despues `HTNManager.execute_goal_hierarchy` lo volvia a descomponer, de modo que las Tasks devueltas en `decomposed_tasks` no eran las ejecutadas; `execute_goal_hierarchy(goal, state, tasks=None)` acepta ahora la descomposicion ya hecha y la integracion se la pasa; `decomposed_tasks` se serializa despues de ejecutar (con su estado final). 4.5.3.3 sin metodo, el `error_message` incluye el motivo real (`last_decomposition_failure`, 4.3.2), `execution_results` lleva `decomposition_failure` y el Goal queda `failed`.
+ARCHIVOS MODIFICADOS: PRODUCCION: `src/brain/htn_integration.py`; `src/hands/planner/htn_manager.py`; TESTS: NA; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: NE; INTEGRACION: NE; NO REGRESION: NE
+VERIFICACION: SINTAXIS: OK en Mac (Python 3.12; ASCII); MAIN.PY: NV; COMPORTAMIENTO / INTEGRACION REAL: prueba aislada con TaskExecutor real y ActionRegistry simulado: `open_application` -> `decompose_goal` llamado 1 vez (antes 2) y `decomposed_tasks` con estados finales; tipo `bailar` -> "Goal decomposition failed: No hay regla HTN para el tipo 'bailar'"
+DISCREPANCIAS: Un doble de `execute_goal_hierarchy` en tests con firma `(goal, state)` fallaria al recibir `tasks=`: revisar `tests/brain/test_htn_integration.py`.
+PENDIENTES: Windows: test 4.5.5.2 (Goal -> HTN con una sola descomposicion, resultado y motivo de fallo).
+ESTADO FINAL: 4.5.3 - PARCIALMENTE IMPLEMENTADA (MAC)
+ORIGEN: PREPARADA EN MAC 2026-11-17; REVISION WINDOWS: PENDIENTE
+MACOS: NA
+
+REGISTRO DE UNIDAD: 4.5.4 (HOJAS 4.5.4.1-4.5.4.3)
+FECHA: 2026-11-17
+OBJETIVO: Entrada visual y su vinculacion con el Goal sin confundir percepcion con decision.
+TIPO DE TRABAJO: VERIFICACION | CORRECCION
+CAMBIOS / HALLAZGOS: 4.5.4.1-4.5.4.2 `Brain.think_with_image` (respuesta corta, `num_predict=20`) y `Brain.analyze_image` (analisis largo) llaman a ollama con la imagen; no tienen consumidores en el flujo normal (calibracion y apps usan `Vision.analyze_image` de `src/eyes/vision/`). 4.5.4.3 nuevo `Brain._perception_only`: si la salida del modelo de vision contiene `[CMD: ...]` se neutraliza (`(cmd: ...`) y se registra un warning, para que `Executor.process_and_execute` nunca ejecute una accion decidida por la percepcion; los errores pasan de `logger.debug` a `logger.warning`.
+ARCHIVOS MODIFICADOS: PRODUCCION: `src/brain/llm.py`; TESTS: NA; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: NE; INTEGRACION: NE; NO REGRESION: NE
+VERIFICACION: SINTAXIS: OK en Mac (Python 3.12; ASCII); MAIN.PY: NV; COMPORTAMIENTO / INTEGRACION REAL: prueba aislada: "Veo un boton [CMD: cerrar_app(chrome)]" -> "Veo un boton (cmd: cerrar_app(chrome)]"; modelo de vision real NV
+DISCREPANCIAS: Los metodos de imagen de Brain no se vinculan hoy a ningun Goal; no se crea esa vinculacion sin un consumidor real.
+PENDIENTES: Windows: test 4.5.5.5 (imagen sin comandos ejecutables, error informado) en `tests/brain/test_llm.py` o `tests/eyes/vision/test_vision.py`.
+ESTADO FINAL: 4.5.4 - PARCIALMENTE IMPLEMENTADA (MAC)
+ORIGEN: PREPARADA EN MAC 2026-11-17; REVISION WINDOWS: PENDIENTE
+MACOS: NA
+
+REGISTRO DE UNIDAD: 4.6.3 (HOJAS 4.6.3.1-4.6.3.2)
+FECHA: 2026-11-17
+OBJETIVO: Compatibilidad de API y serializacion del State con HTN.
+TIPO DE TRABAJO: VERIFICACION
+CAMBIOS / HALLAZGOS: 4.6.3.1 hay tres representaciones: `WorldState` de la memoria (`src/memory/storage.py`, dataclass con `applications`, `ui_elements`, `system_info`, `constraints`, `last_actions`, `active_goals`, `timestamp`), `ExecutionState` del Executor (`src/hands/actions/executor.py`, `update` ignora claves con `_` y `to_dict` es copia profunda) y `WorldState` del planner (`node.py`). HTN trabaja con un dict: `Brain.capture_htn_state` convierte el WorldState de memoria con `to_dict` (4.6.1) y HTN/TaskExecutor solo leen y devuelven dicts; las marcas `_htn_*` no interfieren con `ExecutionState.update`. 4.6.3.2 serializacion: lo unico que se persiste es `last_htn_result` con `MemoryManager.update_world_state`, que guarda las claves desconocidas en `system_info` y serializa con `WorldState.to_dict`; el resultado HTN es JSON. Sin cambios de codigo.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: NA; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: NE; INTEGRACION: NE; NO REGRESION: NE
+VERIFICACION: SINTAXIS: NA; MAIN.PY: NV; COMPORTAMIENTO / INTEGRACION REAL: prueba aislada: `last_htn_goal` y el estado final completo (con target dict) se serializan con `json.dumps`; `update_world_state` recibe `last_htn_result`
+DISCREPANCIAS: `WorldState.from_dict` de la memoria hace `cls(**data)`: falla con claves extra, asi que el estado final de HTN (dict con claves propias) NO debe pasarse nunca a `save_world_state`; hoy nadie lo hace.
+PENDIENTES: Windows: tests 4.6.4.1-4.6.4.2 y no regresion de `tests/hands/actions/test_executor_state.py`.
+ESTADO FINAL: 4.6.3 - PARCIALMENTE IMPLEMENTADA (MAC)
+ORIGEN: PREPARADA EN MAC 2026-11-17; REVISION WINDOWS: PENDIENTE
+MACOS: NA
+
+REGISTRO DE UNIDAD: 4.7.2 (HOJAS 4.7.2.1-4.7.2.3)
+FECHA: 2026-11-17
+OBJETIVO: Propagacion de exito, fallo y datos necesarios para State desde la accion real.
+TIPO DE TRABAJO: CORRECCION | IMPLEMENTACION
+CAMBIOS / HALLAZGOS: Error corregido en `src/hands/planner/task_executor.py`: `ActionRegistry.execute_action` lanza excepcion ante fallo y `open_application` devuelve un texto cuando tiene exito, pero `TaskExecutor._normalize_execution_result` trataba cualquier texto como "resultado sin estado de exito verificable", asi que una apertura real por HTN se marcaba FAILED. 4.7.2.1 nuevo `_normalize_registered_result`: un texto devuelto sin excepcion por una accion registrada es exito (`message`), el mismo criterio que `Executor`; el resto de resultados se normaliza como antes. 4.7.2.2 en el fallo se anade `operation_error` (codigo, etapa...) si la excepcion lo trae (`open_application` lo adjunta) y el estado no cambia. 4.7.2.3 tras un exito se aplican los efectos DECLARADOS de la accion (`ActionInfo.apply_effects`, p. ej. `application_open` de `open_application`) y solo los cambios van en `state_updates`, que `_apply_result_to_state` incorpora al `new_state`.
+ARCHIVOS MODIFICADOS: PRODUCCION: `src/hands/planner/task_executor.py`; TESTS: NA; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: NE; INTEGRACION: NE; NO REGRESION: NE
+VERIFICACION: SINTAXIS: OK en Mac (Python 3.12; ASCII); MAIN.PY: NV; COMPORTAMIENTO / INTEGRACION REAL: prueba aislada con ActionRegistry simulado: "Aplicacion Notepad abierta exitosamente" -> COMPLETED, `new_state` con `application_open=True` y la tarea en `completed_tasks`; excepcion con `operation_error` -> FAILED con `{code: not_found, stage: resolve}` y estado sin cambios
+DISCREPANCIAS: El metodo HTN `application_opening_decomposition` (check_availability, open_application, activate_window) nunca puede completarse: `check_availability` y `activate_window` no tienen accion registrada y desde 4.7.1 se rechazan (antes tambien fallaban, al delegarse por ID). `open_application` ya hace preflight, disponibilidad y verificacion de ventana. No se cambio la regla porque los tests actuales esperan tres tareas; propuesta: dejar el metodo en una sola hoja `open_application` (4.3.3.1) o registrar acciones reales para las otras dos. Revisar tests que esperen fallo con un texto devuelto por una accion registrada.
+PENDIENTES: Windows: decidir la propuesta sobre `application_opening_decomposition` antes de 4.8.6; tests 4.7.4.1 y 4.7.4.3 (texto de exito, excepcion con `operation_error`, `state_updates` de efectos declarados) en `tests/hands/planner/test_task_executor.py`.
+ESTADO FINAL: 4.7.2 - PARCIALMENTE IMPLEMENTADA (MAC)
+ORIGEN: PREPARADA EN MAC 2026-11-17; REVISION WINDOWS: PENDIENTE
+MACOS: NA
+
 ## REGISTROS DE IMPLEMENTACION ? 2.8.7
 REGISTRO DE UNIDAD: 2.8.7.3
 FECHA: NR
