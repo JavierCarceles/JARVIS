@@ -618,6 +618,77 @@ class TestAlmacenPerfilesSQLite:
 
 
 # ---------------------------------------------------------------------------
+# Transaccion interrumpida, rollback y reinicio del almacen (3.8.6.8.6)
+# ---------------------------------------------------------------------------
+
+class TestTransaccionYReinicioAlmacen:
+    """El almacen SQLite debe sobrevivir a una transaccion interrumpida sin
+    dejar datos parciales y conservar los perfiles tras cerrar y volver a
+    inicializar (reinicio) sobre la misma base."""
+
+    def test_transaccion_interrumpida_no_deja_datos_parciales(self, tmp_path: Path):
+        """Se abre una transaccion, se inserta una fila sin confirmar y se
+        cierra la conexion sin COMMIT: al reabrir, no debe quedar rastro parcial."""
+        db_path = tmp_path / "interrumpido.sqlite3"
+        store = _abrir_store(db_path)
+        try:
+            conn = store._connect()
+            conn.execute("BEGIN IMMEDIATE")
+            conn.execute(
+                "INSERT INTO machines(machine_id, created_at) VALUES (?, ?)",
+                ("maquina-interrumpida", "2026-01-15T10:30:00+00:00"),
+            )
+            store.close()
+            assert store._conn is None
+            assert not store._initialized
+
+            store2 = CalibrationProfileStore(db_path=db_path, machine_id=MAQUINA)
+            try:
+                assert store2.initialize() is True
+                assert store2.is_blocked is False
+                conn2 = store2._connect()
+                try:
+                    fila = conn2.execute(
+                        "SELECT 1 FROM machines WHERE machine_id = ?",
+                        ("maquina-interrumpida",),
+                    ).fetchone()
+                    assert fila is None
+                finally:
+                    conn2.close()
+            finally:
+                store2.close()
+        finally:
+            if not store.is_blocked:
+                store.close()
+
+    def test_reinicio_almacen_conserva_perfiles(self, tmp_path: Path):
+        """Cerrar el almacen y volver a inicializarlo sobre la misma base
+        conserva los perfiles ya persistidos."""
+        db_path = tmp_path / "reinicio.sqlite3"
+        store = _abrir_store(db_path)
+        try:
+            profile_id = store.save_profile(_profile())
+            assert profile_id
+            assert store.get_active_profile(APP, HUELLA) is not None
+        finally:
+            store.close()
+        assert store._conn is None
+        assert not store._initialized
+
+        store2 = CalibrationProfileStore(db_path=db_path, machine_id=MAQUINA)
+        try:
+            assert store2.initialize() is True
+            assert store2.is_blocked is False
+            perfil = store2.get_active_profile(APP, HUELLA)
+            assert perfil is not None
+            assert perfil.profile_id == profile_id
+            assert len(store2.list_profiles(APP)) == 1
+            assert len(store2.list_profiles()) == 1
+        finally:
+            store2.close()
+
+
+# ---------------------------------------------------------------------------
 # Marca de tiempo y persistencia solo de lo que pasa la puerta (3.8.6.8.4)
 # ---------------------------------------------------------------------------
 

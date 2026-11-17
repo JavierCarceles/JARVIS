@@ -7824,3 +7824,16 @@ DISCREPANCIAS: NINGUNA. Nota: los registros 3.8.6.8.2 a 3.8.6.8.4 declaraban que
 PENDIENTES: NINGUNO
 ESTADO FINAL: 3.8.6.8.5 - IMPLEMENTADA
 MACOS: NO APLICA (persistencia SQLite y logica de estados comun a ambos SO; sin APIs nativas ni interaccion GUI)
+
+REGISTRO DE UNIDAD: 3.8.6.8.6
+FECHA: 2026-11-17
+OBJETIVO: Verificar el almacen local de perfiles de calibracion UI sobre SQLite temporal real (tablas calibration_profiles y calibration_controls del esquema v6): estados separados semantico/geometrico/accion (PENDIENTE, CANDIDATO, DETECTADO, VALIDADO, OBSOLETO, NO_VERIFICADO, BLOQUEADO), puertas de calidad por control y perfil (check_control_record / check_profile), transaccion atomica con rollback ante interrupcion sin datos parciales, aislamiento estricto por machine_id, bloqueo ante base de otro equipo o corrupta, reinicio del almacen conservando perfiles, marca de tiempo calibrated_at, persistencia solo de lo que pasa la puerta de calidad de 3.8.6.4, migracion v5->v6 versionada y transaccional conservando datos preexistentes, y verificacion de que data/memory/entities.json no contiene datos fisicos ni coordenadas.
+TIPO DE TRABAJO: TEST; VERIFICACION
+CAMBIOS / HALLAZGOS: tests/hands/calibration/test_calibration_profile_storage.py revisado criticamente y ampliado con 2 pruebas (transaccion interrumpida sin datos parciales/rollback; reinicio del almacen conservando perfiles ya guardados). 60/60 tests pasan en Windows real sobre la implementacion real de CalibrationProfileStore (sin mocks que decidan el resultado), 0 FAILED/ERROR/SKIPPED. Suite tests/hands/calibration completa: 357 passed; los 2 tests GUI reales (transformaciones de coordenadas y transformacion de raton) pasan con JARVIS_TEST_GUI_REAL=1; 0 skipped. py_compile OK. Archivo ASCII puro (0 caracteres no ASCII). No se modifico codigo de produccion en src/. data/system_inventory.sqlite3 de produccion no se escribe (solo lectura); entities.json solo se lee (solo lectura). docs/readme/README_TESTS.md documenta el test.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: `tests/hands/calibration/test_calibration_profile_storage.py`; DOCUMENTACION: `docs/readme/README_TESTS.md`
+TESTS Y RESULTADOS: UNITARIOS: PASSED (60/60 en test_calibration_profile_storage.py, incl. 2 nuevos de transaccion interrumpida y reinicio); INTEGRACION: OK (SQLite temporal real: creacion de tablas v6, save/lectura/actualizacion de cache absoluta, marcaje OBSOLETO, transaccion interrumpida con rollback, reinicio, aislamiento por machine_id en bases separadas, bloqueo por maquina distinta en misma base, base corrupta bloquea sin destruir datos, perfil invalido no se escribe); NO REGRESION: PASSED (357 passed en tests/hands/calibration + 2 GUI reales con JARVIS_TEST_GUI_REAL=1; 0 FAILED/ERROR/SKIPPED)
+VERIFICACION: SINTAXIS: OK (py_compile del test); MAIN.PY: NE (no se modifica main.py ni su cadena de importacion); COMPORTAMIENTO / INTEGRACION REAL: OK (60/60 tests reales en Windows sobre implementacion de produccion; base temporal en tmp_path; base de produccion no alterada; entities.json verificada solo lectura)
+DISCREPANCIAS: NINGUNA
+PENDIENTES: NINGUNO
+ESTADO FINAL: 3.8.6.8.6 - IMPLEMENTADA
+MACOS: NO APLICA (logica de persistencia SQLite y estados comun a Windows y macOS; sin APIs nativas ni interaccion GUI)
