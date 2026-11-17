@@ -68,7 +68,7 @@ La superacion de tests automatizados no demuestra por si sola que JARVIS funcion
 - Separar siempre tests unitarios, tests de integracion y verificacion en el equipo real.
 - No considerar un test con mocks como prueba de comportamiento real del componente sustituido.
 - Comprobar resultados observables antes y despues de la operacion.
-- No declarar una unidad `IMPLEMENTADA` si una prueba real obligatoria esta pendiente.
+- No declarar una unidad `IMPLEMENTADA` si una prueba real obligatoria esta pendiente o si algun test ejecutado termina en FAILED, ERROR o SKIPPED fuera de las excepciones de la seccion 3 de `prompt_JARVIS_reglas.txt`.
 - Si una prueba real es tecnicamente imposible, insegura o esta impedida por hardware, permisos o recursos ausentes, documentarlo con evidencia y mantener la unidad sin completar.
 - Nunca inventar resultados, ejecuciones, permisos, capacidades del sistema, pruebas ni evidencias.
 
@@ -121,6 +121,8 @@ Si el bloqueo se produce antes de realizar cualquier trabajo y no se ha iniciado
 - No repetir el cierre de `LAST_COMPLETED_UNIT`.
 - No alterar los registros historicos de otras unidades.
 - No modificar unidades completadas anteriores por iniciativa propia.
+- Excepcion a las dos reglas anteriores: los caracteres no ASCII o no UTF-8 (tildes, `n` con virgulilla, rayas largas, comillas tipograficas, texto mal codificado) que se encuentren en ficheros de unidades ya completadas, registros historicos o entradas antiguas de errores se corrigen siempre, sustituyendo solo el caracter y sin cambiar el significado (seccion 18 de `prompt_JARVIS_reglas.txt`). Que no se puedan escribir acentos no impide borrar los que alguien escribio por error.
+- Las unidades con registro `PARCIALMENTE IMPLEMENTADA (MAC)` no son trabajo terminado ni una verdad comprobada: su codigo se escribio en un Mac sin ejecutarlo ni probarlo en Windows y puede tener errores. Revisarlo de forma critica y corregirlo (seccion 23 de `prompt_JARVIS_reglas.txt`).
 - Si una unidad necesita una dependencia posterior o una modificacion fuera de su alcance, documentar el problema y respetar el orden del roadmap.
 
 ## DOCUMENTACION TECNICA
@@ -131,11 +133,14 @@ Cuando se modifiquen tests, revisar si `docs/readme/README_TESTS.md` necesita ac
 
 La documentacion debe describir unicamente el comportamiento tecnico actual y comprobable. Nunca debe utilizarse para registrar fases, IDs de mejora, fechas, avances, historial o cierres del roadmap.
 
+Ningun README del proyecto puede referenciar IDs de unidades o fases en ninguna forma (entre parentesis, como origen de una politica o como remision al roadmap). Si se encuentra uno, se elimina aunque pertenezca a una unidad ya cerrada (seccion 1 de `prompt_JARVIS_reglas.txt`).
+
 ## RESTRICCIONES ABSOLUTAS
 
 - Esta prohibido ejecutar comandos Git bajo cualquier circunstancia, incluidos los comandos de solo lectura y las consultas indirectas.
 - No crear commits ni utilizar Git o `.git` como mecanismo de comparacion, respaldo, recuperacion o documentacion.
 - No debilitar tests validos para conseguir resultados positivos.
+- No cerrar una unidad con tests en FAILED, ERROR o SKIPPED, incluidos los fallos preexistentes de la no regresion. Solo pueden quedar sin ejecutar: (a) tests de otro sistema operativo distinto del que ejecuta la suite (en Windows deben pasar todos los de Windows y los multiplataforma, tambien los de contrato macOS con frontera sintetica); (b) tests que necesitan una intervencion fisica precisa del usuario, como hablar al microfono para comprobar como JARVIS guarda lo que dice, que se piden al usuario cuando la unidad los exige; (c) el escaneo completo de la seccion 17. Detalle en la seccion 3 de `prompt_JARVIS_reglas.txt`.
 - No introducir mocks que decidan artificialmente el resultado que se pretende demostrar.
 - No ejecutar operaciones destructivas sobre datos originales del usuario.
 - No ejecutar masivamente aplicaciones descubiertas ni candidatos desconocidos.

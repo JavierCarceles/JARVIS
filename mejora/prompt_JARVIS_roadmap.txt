@@ -7,6 +7,8 @@ PROMPT JARVIS - ROADMAP DE FASES Y UNIDADES
 - Los marcadores `[COMPLETADO]`/`[IMPLEMENTADA]` del arbol son historicos; nunca sustituyen al puntero ni a los registros.
 - Uso: localizar `CURRENT_WORK_UNIT`, leer su rama, padre, dependencias y criterios; consultar en registros solo lo necesario. No elegir otra unidad.
 - Las unidades con registro en `prompt_JARVIS_registros.txt` no se renumeran ni se reescriben. Las unidades sin registro pueden reordenarse cuando el usuario lo pide expresamente (esta revision lo hace en la rama pendiente de 3.8 y en 4.5.6).
+- Excepcion: los caracteres no ASCII o no UTF-8 encontrados en este archivo, en registros o en ficheros de unidades ya cerradas se corrigen siempre, cambiando solo el caracter (seccion 18 de `prompt_JARVIS_reglas.txt`).
+- Una unidad con registro `PARCIALMENTE IMPLEMENTADA (MAC)` sigue pendiente: su codigo se escribio en un Mac sin ejecutarlo ni probarlo en Windows y puede tener errores. Se revisa de forma critica al llegar a ella (seccion 23 de `prompt_JARVIS_reglas.txt`).
 
 1. OBJETIVO DE PRODUCTO (LO QUE TODO EL ROADMAP DEBE HACER POSIBLE)
 - JARVIS entiende ordenes de voz en espanol aunque la transcripcion sea mala, abre cualquier aplicacion GUI instalada, la coloca en el monitor que corresponda, la calibra en profundidad y la usa, en Windows y en macOS, con cualquier numero de monitores, resoluciones, escalas y disposiciones.
@@ -22,7 +24,7 @@ PROMPT JARVIS - ROADMAP DE FASES Y UNIDADES
 3. REGLA macOS A CIEGAS (NO HAY MAC PARA PROBAR)
 - El codigo macOS se escribe sin poder ejecutarlo. Esto es una excepcion explicita y acotada a la obligacion de verificacion real: la parte macOS de una unidad NO bloquea su cierre, pero nunca se presenta como verificada.
 - Cada unidad que toque SO implementa la parte Windows (verificada en real segun las reglas) Y la parte macOS (a ciegas), salvo que la unidad declare de forma justificada que macOS no aplica.
-- Requisitos minimos de la parte macOS: (a) usar solo APIs publicas documentadas por Apple (AppKit/NSWorkspace/NSRunningApplication/NSScreen, Quartz/CoreGraphics, ApplicationServices/AXUIElement, ScreenCaptureKit o CGWindowList, CGEvent) via `pyobjc`, o comandos del sistema documentados (`open -b`, `mdfind`) con lista de argumentos; (b) citar en comentario la API usada; (c) tests de contrato que se ejecutan en Windows sustituyendo SOLO la frontera nativa macOS por respuestas sinteticas realistas (dimensiones Retina, origenes negativos, varios monitores, permisos denegados); (d) `py_compile` y prueba de importacion con la plataforma simulada; (e) ninguna dependencia macOS rompe la instalacion en Windows.
+- Requisitos minimos de la parte macOS: (a) usar solo APIs publicas documentadas por Apple (AppKit/NSWorkspace/NSRunningApplication/NSScreen, Quartz/CoreGraphics, ApplicationServices/AXUIElement, ScreenCaptureKit o CGWindowList, CGEvent) via `pyobjc`, o comandos del sistema documentados (`open -b`, `mdfind`) con lista de argumentos; (b) citar en comentario la API usada; (c) tests de contrato que se ejecutan en Windows sustituyendo SOLO la frontera nativa macOS por respuestas sinteticas realistas (dimensiones Retina, origenes negativos, varios monitores, permisos denegados); estos tests no son de otro SO y deben ejecutarse y pasar en Windows, sin skip; (d) `py_compile` y prueba de importacion con la plataforma simulada; (e) ninguna dependencia macOS rompe la instalacion en Windows.
 - Errores tipicos de macOS que el codigo debe contemplar: coordenadas en puntos (no pixeles) y `backingScaleFactor` 2x en Retina; origen Cocoa abajo-izquierda frente a origen Quartz arriba-izquierda del monitor principal; `visibleFrame` excluye barra de menus y Dock; "maximizar" = ajustar el frame de la ventana a `visibleFrame` via AX (no pantalla completa nativa, que crea otro Space); identidad de aplicacion por bundle id, no por ruta; permisos Accesibilidad, Grabacion de pantalla, Microfono y Automatizacion se conceden a la app anfitriona (Terminal, VS Code o el binario de Python) y requieren reinicio de esa app; Gatekeeper/cuarentena; atajos con Cmd en lugar de Ctrl.
 - Permisos macOS: comprobar con `AXIsProcessTrusted`, `CGPreflightScreenCaptureAccess` y el estado de microfono; si faltan, devolver `SIN_PERMISO` con instrucciones claras para el usuario. Nunca intentar eludirlos.
 - En el registro de la unidad anadir la linea `MACOS: IMPLEMENTADO SIN VERIFICAR (<que se hizo>)` o `MACOS: NO APLICA (<motivo>)`. Mantener en `mejora/pendientes_macos.txt` (CREAR la primera vez, append-only) la lista de comprobaciones reales pendientes por unidad, con el comando exacto a ejecutar el dia que haya un Mac.
@@ -46,6 +48,7 @@ PROMPT JARVIS - ROADMAP DE FASES Y UNIDADES
 - Antes de implementar, fijar: resultado observable, ruta de produccion, dependencias reales, recursos temporales, limpieza y criterio de exito.
 - Matriz de cobertura obligatoria por capacidad: SO/version/arquitectura, numero y disposicion de monitores, resolucion, escala/DPI, tipo de aplicacion/framework, tipo de destino de lanzamiento. Cada celda: VERIFICADO, NO VERIFICADO, SIN PERMISO o NO SOPORTADO. Un caso probado no valida los demas.
 - BLOQUEADA/NO VERIFICADA solo por impedimento objetivo y documentado (hardware, permiso, aplicacion no instalada). Nunca por VS Code ni por macOS sin equipo (regla 3).
+- Tests: ninguno puede terminar en FAILED o ERROR ni quedar SKIPPED. Solo pueden quedar sin ejecutar los tests de otro SO distinto del que ejecuta la suite (en Windows pasan todos los de Windows y los multiplataforma), los que requieren una intervencion fisica precisa del usuario (por ejemplo hablar al microfono), que se le piden cuando la unidad los exige, y el escaneo completo prohibido. Detalle en la seccion 3 de `prompt_JARVIS_reglas.txt`.
 - Inventario: prohibido el escaneo completo del sistema; consultar `data/system_inventory.sqlite3` filtrando por `machine_id` actual (reglas, seccion 17).
 - Prohibicion absoluta de Git (reglas, seccion 2).
 
@@ -66,7 +69,7 @@ PROMPT JARVIS - ROADMAP DE FASES Y UNIDADES
 - Preparar una matriz de pruebas no es ejecutarla. Si una unidad necesita algo de una unidad posterior, registrar la dependencia; no simularla.
 
 9. CIERRE DE CADA UNIDAD
-- Criterio de exito observable cumplido con la implementacion de produccion en Windows real; parte macOS segun regla 3; matriz de cobertura actualizada; sin defectos reales abiertos; sin tests debilitados.
+- Criterio de exito observable cumplido con la implementacion de produccion en Windows real; parte macOS segun regla 3; matriz de cobertura actualizada; sin defectos reales abiertos; sin tests debilitados; sin tests FAILED, ERROR ni SKIPPED fuera de las excepciones de la seccion 3 de `prompt_JARVIS_reglas.txt`.
 - Funcion puramente determinista: ejecutar el codigo real con datos representativos y justificar por que no hay prueba OS/GUI.
 
 10. DIFICULTAD

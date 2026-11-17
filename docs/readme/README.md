@@ -685,7 +685,7 @@ El objetivo del proyecto es funcionar en Windows y en macOS. Hoy el codigo es pr
 
 Lo que ya es multiplataforma: oido (`sounddevice` + Whisper), vision con Ollama, el inventario de ficheros (tiene enumeracion de volumenes para macOS), `system_inventory_storage.py`, el planificador y la memoria.
 
-El plan para que todo funcione en los dos sistemas (una capa de plataforma con un adaptador Windows y otro macOS) esta en `mejora/prompt_JARVIS_roadmap.txt`, unidad 3.8.6.5 y siguientes.
+El plan para que todo funcione en los dos sistemas (una capa de plataforma con un adaptador Windows y otro macOS) esta en `mejora/prompt_JARVIS_roadmap.txt`.
 
 ## 13. Problemas conocidos
 
