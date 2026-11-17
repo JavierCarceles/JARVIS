@@ -313,6 +313,7 @@ Otros:
 | `test_calibration_requirements.py` | Requisitos de calibracion y su uso en el planificador. | Unitario |
 | `test_calibracion_descubrimiento_requisitos.py` | Del descubrimiento a los requisitos de calibracion. | Unitario |
 | `test_calibrator.py` | - | Vacio |
+| `test_coordinate_spaces.py` | Espacios de coordenadas formales (FRAME_PIXELS, MONITOR_PIXELS, DESKTOP_PIXELS, DESKTOP_POINTS, WINDOW_RECT, WINDOW_CLIENT, CLIENT_NORMALIZED), transformaciones entre espacios, punto seguro dentro de un control y redondeo de entrada; geometria sintetica de Windows y macOS, sin SO ni GUI. | Unitario |
 
 ### 11.8 Deteccion de interfaz y evidencia (`detection/`)
 
@@ -374,6 +375,7 @@ Todos unitarios, sin aplicaciones ni disco real:
 - `test_monitor_policies.py`: políticas de monitor destino (3.8.6.6.4): `TargetMonitorPolicy` (producto: usuario, aplicacion ya abierta, preferencia configurada, ventana activa, puntero, principal; orden configurable) y `TestMonitorPolicy` (pruebas GUI: monitor no principal mas a la derecha por geometria real; con un solo monitor, ese). Ninguna usa indices fijos. Unitarias con geometría sintética e integración real en Windows que solo lee la topología del equipo.
 - `test_topology_watcher.py`: deteccion de conexion/desconexion de monitores y cambios de escala en ejecucion (3.8.6.6.5): `TopologyWatcher` con baseline, check, assert_unchanged, start/stop de listener y diff_topologies; comprobacion de fingerprint antes de cada accion espacial. Unitarias con adaptador mockeado (20) e integracion real en Windows (3) sobre get_current_topology() sin modificar el equipo.
 - `test_monitor_topology_selection.py`: `resolve_monitor_reference` con topologias sinteticas (1, 2, 3 y 4 monitores, origenes negativos, vertical, escalas mixtas, referencias resueltas y ambiguas) e integracion real de solo lectura en Windows (3.8.6.6.6). Unitario, determinista, sin GUI.
+- `test_window_dpi_info_entorno_real.py`: GUI real en Windows, requiere `JARVIS_TEST_GUI_REAL=1`. Abre una unica instancia de Notepad, la mueve al monitor no principal mas a la derecha (politica de pruebas de 3.8.6.6.4) y verifica que `get_window_dpi_info` devuelve el DPI real de la ventana (`GetDpiForWindow`), el DPI del monitor (`GetDpiForMonitor`), la awareness de la ventana, la awareness del proceso y la awareness de JARVIS, sin tocar Visual Studio Code ni ventanas preexistentes del usuario. Cierra solo la ventana que abrio (3.8.6.7.2). Integracion real sobre ventana propia.
 
 ## 12. `tests/core` y `tests/experimental`
 

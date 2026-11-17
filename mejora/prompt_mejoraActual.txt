@@ -1,15 +1,15 @@
 ESTADO PERSISTENTE ACTUAL
 CURRENT_PHASE: 3.8
-CURRENT_WORK_UNIT: 3.8.6.7.1
+CURRENT_WORK_UNIT: 3.8.6.7.3
 CURRENT_WORK_STATUS: PENDIENTE
-LAST_COMPLETED_UNIT: 3.8.6.6.6
+LAST_COMPLETED_UNIT: 3.8.6.7.2
 
 # PROMPT PRINCIPAL JARVIS - PUNTO DE ENTRADA Y CONTINUIDAD
 
 ## OBJETIVO
 
 Evolucionar de `intencion -> comando -> funcion -> ejecucion` a `intencion -> Goal -> Task/HTN -> State/Knowledge -> Graph -> Planner -> Plan -> Executor -> Verification -> State actualizado -> Replan`.
-
+ el
 El desarrollo debe producir capacidades funcionales, integradas y verificadas en el entorno real. No basta con implementar estructuras, superar tests aislados o simular resultados: JARVIS debe demostrar que sus funcionalidades trabajan realmente con los componentes, recursos y APIs del sistema a los que afectan.
 
 ## ARCHIVOS QUE FORMAN EL PROMPT

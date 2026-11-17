@@ -262,7 +262,7 @@ def monitor_pixel_ratio(display: DisplayInfo, platform: str) -> Tuple[float, flo
         return (scale, scale)
     pw = float(display.pixel_width or 0)
     ph = float(display.pixel_height or 0)
-    if pw <= 0 or ph <= 0 or bounds.width <= 0 or bounds.height <= 0:
+    if bounds is None or not bounds.is_valid() or pw <= 0 or ph <= 0:
         raise CoordinateTransformError("monitor %s sin resolucion fisica valida" % display.display_id)
     if (pw > ph) != (bounds.width > bounds.height) and pw != ph and bounds.width != bounds.height:
         pw, ph = ph, pw
@@ -534,13 +534,15 @@ def pixels_to_points(value: float, scale: float) -> float:
     return float(value) / float(scale)
 
 
-def visible_window_rect(window: WindowInfo) -> Optional[Rect]:
+def visible_window_rect(window: Optional[WindowInfo]) -> Optional[Rect]:
     """Rectangulo visible de la ventana sin sombra/borde invisible.
 
     Windows: limites extendidos de DWM (``frame_bounds``) que excluyen el
     borde invisible de redimensionado; macOS: frame AX sin sombra. Si no se
-    dispone, ``bounds``.
+    dispone, ``bounds``. Devuelve ``None`` si no hay ventana.
     """
+    if window is None:
+        return None
     return window.frame_bounds or window.bounds
 
 
