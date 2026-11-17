@@ -30,6 +30,45 @@ user32 = ctypes.windll.user32
 
 Rect = Tuple[int, int, int, int]
 
+# Espacios de coordenadas reconocidos por la puerta de calidad de geometria.
+# Cualquier espacio fuera de este conjunto se considera una transformacion
+# desconocida y las cajas se rechazan.
+RECOGNIZED_COORDINATE_SPACES = frozenset({
+    "absolute_desktop",
+    "window_relative",
+    "monitor_relative",
+    "image_pixels",
+    "normalized_0_1000",
+})
+
+# Umbral de solapamiento (IoU) por encima del cual dos candidatos de identidad
+# distinta se consideran solapados de forma ambigua. Umbral de partida;
+# la unidad de umbrales (3.8.6.4.3) lo ajusta a partir de resultados medidos.
+IOU_SOLAPAMIENTO_AMBIGUO = 0.30
+
+
+def _iou_rect(a: Optional[Rect], b: Optional[Rect]) -> float:
+    """Interseccion sobre union de dos rectangulos (left, top, right, bottom)."""
+    if not a or not b:
+        return 0.0
+    ax1, ay1, ax2, ay2 = a
+    bx1, by1, bx2, by2 = b
+    ix1 = max(ax1, bx1)
+    iy1 = max(ay1, by1)
+    ix2 = min(ax2, bx2)
+    iy2 = min(ay2, by2)
+    inter_w = max(0, ix2 - ix1)
+    inter_h = max(0, iy2 - iy1)
+    inter = inter_w * inter_h
+    if inter <= 0:
+        return 0.0
+    area_a = max(0, ax2 - ax1) * max(0, ay2 - ay1)
+    area_b = max(0, bx2 - bx1) * max(0, by2 - by1)
+    union = area_a + area_b - inter
+    if union <= 0:
+        return 0.0
+    return inter / union
+
 
 @dataclass
 class WindowEvidenceValidation:
@@ -437,9 +476,13 @@ class WindowEvidenceValidator:
         Para cada candidato comprueba: window_handle igual al HWND objetivo
         (si lo declara), process_id igual al PID objetivo (si se proporciona
         y lo declara), bbox contenida en el rectangulo de la ventana y pantalla
-        coincidente (si se declara y se proporciona referencia). Un candidato
-        que no declara un campo no falla por ese campo; solo se rechazan
-        valores declarados que contradigan la ventana objetivo.
+        coincidente (si se declara y se proporciona referencia). La calidad
+        geometrica estricta (caja vacia/degenerada, fuera de imagen, control
+        obstruido, solapamiento ambiguo, espacio de coordenadas desconocido)
+        se valida de forma dedicada en validate_geometria_candidato
+        (unidad 3.8.6.4.2). Un candidato que no declara un campo no falla por
+        ese campo; solo se rechazan valores declarados que contradigan la
+        ventana objetivo.
         """
         checks: Dict[str, bool] = {}
         rejected: List[str] = []
@@ -536,6 +579,168 @@ class WindowEvidenceValidator:
             else "todos los candidatos pertenecen a la ventana objetivo"
         )
         return WindowEvidenceValidation(valid, accepted, reason, checks, rejected, details)
+
+    # ------------------------------------------------------------------
+    # Calidad de geometria de candidatos (unidad 3.8.6.4.2)
+    # ------------------------------------------------------------------
+
+    def _misma_identidad_candidato(self, a: Any, b: Any) -> bool:
+        """Devuelve True si dos candidatos refieren al mismo elemento logico.
+
+        Se considera misma identidad si comparten window_handle distinto de cero,
+        o si comparten canonical_id/nombre normalizado no vacio. Se usa para no
+        marcar como ambiguo el solapamiento de un candidato consigo mismo.
+        """
+        ca = str(
+            self._candidate_field(a, "canonical_id")
+            or self._candidate_field(a, "name")
+            or ""
+        ).strip().lower()
+        cb = str(
+            self._candidate_field(b, "canonical_id")
+            or self._candidate_field(b, "name")
+            or ""
+        ).strip().lower()
+        if ca and ca == cb:
+            return True
+        ha = int(self._candidate_field(a, "window_handle") or 0)
+        hb = int(self._candidate_field(b, "window_handle") or 0)
+        # Solo mismo control si comparten handle no vacio Y mismo nombre logico.
+        if ha and hb and ha == hb and ca and ca == cb:
+            return True
+        return False
+
+    def validate_geometria_candidato(
+        self,
+        cand: Any,
+        image_rect: Optional[Rect] = None,
+        window_rect: Optional[Rect] = None,
+        otros_candidatos: Optional[List[Any]] = None,
+    ) -> WindowEvidenceValidation:
+        """Valida la calidad geometrica de un candidato de deteccion.
+
+        Rechaza cajas vacias, degeneradas, fuera de imagen, parcialmente fuera
+        de la ventana objetivo, obstruidas (fuera de pantalla o no visibles),
+        solapadas de forma ambigua con otro candidato de identidad distinta o
+        con transformacion de coordenadas desconocida.
+
+        Argumentos:
+            cand: candidato (FusedCandidate, DetectedCandidate o UIAutomationElement).
+            image_rect: rectangulo de la captura/frame (left, top, right, bottom)
+                en el mismo espacio de coordenadas que el bbox del candidato.
+                Se omite la comprobacion si no se proporciona.
+            window_rect: rectangulo de la ventana objetivo. Si no se da, se usa
+                el rectangulo de la ventana objetivo del validador.
+            otros_candidatos: lista de los demas candidatos para detectar
+                solapamiento ambiguo.
+
+        Retorna:
+            WindowEvidenceValidation con valid=True solo si la caja supera todas
+            las puertas de calidad geometricas.
+        """
+        checks: Dict[str, bool] = {}
+        rejected: List[str] = []
+        details: Dict[str, Any] = {}
+        reason_parts: List[str] = []
+
+        cand_bbox = self._candidate_field(cand, "bbox")
+        br = _as_rect(cand_bbox)
+        details["caja"] = list(br) if br else None
+        details["caja_original"] = list(cand_bbox) if cand_bbox else None
+
+        # 1. Caja vacia, ausente o degenerada.
+        checks["caja_valida"] = br is not None
+        if br is None:
+            reason_parts.append("caja vacia, ausente o degenerada")
+            rejected.append("candidato:caja_degenerada")
+
+        # 2. Espacio de coordenadas desconocido.
+        espacio = self._candidate_field(cand, "coordinate_space")
+        details["coordinate_space"] = espacio
+        if espacio is not None and espacio not in RECOGNIZED_COORDINATE_SPACES:
+            checks["espacio_coordenadas_conocido"] = False
+            reason_parts.append(
+                "transformacion de coordenadas desconocida: %s" % espacio
+            )
+            rejected.append("candidato:espacio_coordenadas_desconocido")
+        else:
+            checks["espacio_coordenadas_conocido"] = True
+
+        # Rectangulo de referencia de la ventana objetivo.
+        if window_rect is None:
+            window_rect = self._window_rect()
+        details["window_rect"] = list(window_rect) if window_rect else None
+
+        # 3. Caja dentro de la ventana objetivo (contenimiento geometrico).
+        checks["caja_dentro_de_ventana"] = True
+        if br is not None and window_rect is not None:
+            checks["caja_dentro_de_ventana"] = _contains_rect(br, window_rect)
+            if not checks["caja_dentro_de_ventana"]:
+                reason_parts.append(
+                    "caja parcialmente o totalmente fuera de la ventana objetivo"
+                )
+                rejected.append("candidato:caja_fuera_ventana")
+
+        # 4. Caja dentro de la imagen/captura (solo si se proporciona referencia).
+        checks["caja_dentro_de_imagen"] = True
+        if br is not None and image_rect is not None:
+            checks["caja_dentro_de_imagen"] = _contains_rect(br, image_rect)
+            if not checks["caja_dentro_de_imagen"]:
+                reason_parts.append("caja fuera de la imagen o captura")
+                rejected.append("candidato:caja_fuera_imagen")
+
+        # 5. Control no obstruido (fuera de pantalla o no visible).
+        checks["control_no_obstruido"] = True
+        is_offscreen = self._candidate_field(cand, "is_offscreen")
+        visible = self._candidate_field(cand, "visible")
+        details["is_offscreen"] = is_offscreen
+        details["visible"] = visible
+        if is_offscreen is not None or visible is not None:
+            no_obstruido = bool(
+                (is_offscreen is False or is_offscreen is None)
+                and (visible is True or visible is None)
+            )
+            checks["control_no_obstruido"] = no_obstruido
+            if not no_obstruido:
+                reason_parts.append(
+                    "control obstruido, fuera de pantalla o no visible"
+                )
+                rejected.append("candidato:control_obstruido")
+
+        # 6. No solapamiento ambiguo con otro candidato de identidad distinta.
+        checks["no_solapamiento_ambiguo"] = True
+        if br is not None:
+            for otro in list(otros_candidatos or []):
+                if otro is cand:
+                    continue
+                otro_br = _as_rect(self._candidate_field(otro, "bbox"))
+                if otro_br is None:
+                    continue
+                iou = _iou_rect(br, otro_br)
+                if iou > IOU_SOLAPAMIENTO_AMBIGUO and not self._misma_identidad_candidato(
+                    cand, otro
+                ):
+                    checks["no_solapamiento_ambiguo"] = False
+                    otro_id = (
+                        self._candidate_field(otro, "canonical_id")
+                        or self._candidate_field(otro, "name")
+                        or "desconocido"
+                    )
+                    reason_parts.append(
+                        "solapamiento ambiguo con candidato %s (IoU=%.2f)"
+                        % (otro_id, iou)
+                    )
+                    rejected.append("candidato:solapamiento_ambiguo")
+                    break
+
+        valid = all(checks.values())
+        reason = (
+            "; ".join(reason_parts)
+            if reason_parts
+            else "geometria del candidato valida"
+        )
+        return WindowEvidenceValidation(valid, valid, reason, checks, rejected, details)
+
 
     # ------------------------------------------------------------------
     # Validacion combinada

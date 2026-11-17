@@ -2426,16 +2426,16 @@ Metodos de OmniParserAdapter:
 | `def detect(image, screen)` | Detecta regiones interactivas candidatas en una imagen. |
 | `def compatibility_info()` | Devuelve datos de compatibilidad del adaptador sin ejecutar el SO. |
 
-### `src/hands/window_evidence_validator.py` — Validador de pertenencia de evidencia de deteccion a una ventana objetivo.
+### `src/hands/window_evidence_validator.py` — Validador de pertenencia y calidad geometrica de evidencia de deteccion a una ventana objetivo.
 
-**Descripcion:** Puerta de seguridad previa a la calibracion y la interaccion. Valida que una captura de pantalla, un arbol de UI Automation y unos candidatos de deteccion fusionada pertenezcan a la ventana identificada por HWND/PID, y rechaza evidencia de escritorio entero cuando la ventana no puede separarse con seguridad. No captura pantalla, no enumera el escritorio y no ejecuta acciones sobre controles; solo valida identidad (HWND/PID) y geometria (contenimiento en el rectangulo de la ventana) de evidencia ya obtenida.
+**Descripcion:** Puerta de seguridad previa a la calibracion y la interaccion. Valida que una captura de pantalla, un arbol de UI Automation y unos candidatos de deteccion fusionada pertenezcan a la ventana identificada por HWND/PID, y rechaza evidencia de escritorio entero cuando la ventana no puede separarse con seguridad. Adicionalmente (puerta de calidad geometrica), rechaza cajas vacias, degeneradas, fuera de imagen, parcialmente fuera de la ventana objetivo, obstruidas (fuera de pantalla o no visibles), solapadas de forma ambiguo con otro candidato de identidad distinta o con transformacion de coordenadas desconocida. No captura pantalla, no enumera el escritorio y no ejecuta acciones sobre controles; solo valida identidad (HWND/PID) y geometria de evidencia ya obtenida. No escribe coordenadas fisicas ni geometria local en entidades; el validador es de solo lectura sobre la evidencia recibida.
 
 **Caracteristicas:**
 
 - `WindowEvidenceValidator(target_hwnd, target_pid, screen_manager)` valida un `UIAutomationTree`, una region de captura y una lista de candidatos contra la ventana objetivo.
-- `WindowEvidenceValidation` devuelve checks por comprobacion (identidad de ventana, identidad de proceso, contenimiento geometrico, ausencia de evidencia de escritorio entero), evidencia rechazada y detalles para depuracion.
+- `WindowEvidenceValidation` devuelve checks por comprobacion (identidad de ventana, identidad de proceso, contenimiento geometrico, ausencia de evidencia de escritorio entero y calidad geometrica de caja), evidencia rechazada y detalles para depuracion.
+- `validate_geometria_candidato(cand, image_rect, window_rect, otros_candidatos)` valida la calidad geometrica de un candidato individual (caja valida, dentro de ventana/imagen, control no obstruido, sin solapamiento ambiguo, espacio de coordenadas conocido).
 - `validate_evidence_for_window()` funciona de conveniencia para validar toda la evidencia de una ventana en una sola llamada.
-- No escribe coordenadas fisicas ni geometria local en entidades; el validador es de solo lectura sobre la evidencia recibida.
 
 **Importaciones:** 7.
 
@@ -2444,7 +2444,7 @@ Clases:
 | Clase | Docstring |
 |---|---|
 | `class WindowEvidenceValidation` | Resultado de validar que una evidencia pertenece a una ventana objetivo. |
-| `class WindowEvidenceValidator` | Validador de pertenencia de evidencia de deteccion a una ventana objetivo. |
+| `class WindowEvidenceValidator` | Validador de pertenencia y calidad geometrica de evidencia de deteccion a una ventana objetivo. |
 
 Metodos de WindowEvidenceValidator:
 
@@ -2454,6 +2454,7 @@ Metodos de WindowEvidenceValidator:
 | `def validate_ui_automation_tree(tree)` | Valida que un arbol UIA pertenezca a la ventana objetivo (HWND/PID). |
 | `def validate_capture_region(region, backend, source)` | Valida que una region de captura pertenezca a la ventana objetivo. |
 | `def validate_candidates(candidates, screen)` | Valida que candidatos de deteccion pertenezcan a la ventana objetivo. |
+| `def validate_geometria_candidato(cand, image_rect, window_rect, otros_candidatos)` | Valida la calidad geometrica de un candidato (caja valida, dentro de ventana/imagen, control no obstruido, sin solapamiento ambiguo, espacio de coordenadas conocido). |
 | `def validate_all(tree, capture_region, candidates, screen, backend, source)` | Valida conjuntamente arbol UIA, captura y candidatos. |
 
 Funciones a nivel modulo:

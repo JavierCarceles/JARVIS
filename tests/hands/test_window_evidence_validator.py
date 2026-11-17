@@ -18,6 +18,7 @@ Pruebas para src/hands/window_evidence_validator.py.
 from __future__ import annotations
 
 import ctypes
+from types import SimpleNamespace
 import unittest
 
 from src.hands.ui_automation_adapter import (
@@ -387,6 +388,185 @@ class TestWindowEvidenceValidatorContract(unittest.TestCase):
         self.assertEqual(d["rejected_evidence"], ["x"])
         self.assertEqual(d["details"]["k"], 1)
 
+    # ------------------------------------------------------------------
+    # Puerta de calidad geometrica de candidatos (unidad 3.8.6.4.2)
+    # ------------------------------------------------------------------
+
+    def test_geometria_caja_valida_dentro_ventana_aceptada(self):
+        cand = _candidato_fused(
+            "btn", "button", (120, 120, 200, 160),
+            window_handle=self.hwnd, process_id=self.pid, screen=0,
+        )
+        res = self.validator.validate_geometria_candidato(
+            cand, window_rect=(100, 100, 500, 400))
+        self.assertTrue(res.valid)
+        self.assertTrue(res.checks["caja_valida"])
+        self.assertTrue(res.checks["caja_dentro_de_ventana"])
+        self.assertTrue(res.checks["control_no_obstruido"])
+        self.assertTrue(res.checks["no_solapamiento_ambiguo"])
+        self.assertEqual(res.rejected_evidence, [])
+
+    def test_geometria_caja_degenerada_rechazada(self):
+        cand = _candidato_fused(
+            "btn", "button", (120, 120, 120, 160),
+            window_handle=self.hwnd, process_id=self.pid, screen=0,
+        )
+        res = self.validator.validate_geometria_candidato(
+            cand, window_rect=(100, 100, 500, 400))
+        self.assertFalse(res.valid)
+        self.assertFalse(res.checks["caja_valida"])
+        self.assertIn("candidato:caja_degenerada", res.rejected_evidence)
+
+    def test_geometria_caja_ausente_rechazada(self):
+        cand = SimpleNamespace(
+            name="btn", type="button", bbox=None,
+            canonical_id="btn", window_handle=self.hwnd,
+        )
+        res = self.validator.validate_geometria_candidato(
+            cand, window_rect=(100, 100, 500, 400))
+        self.assertFalse(res.valid)
+        self.assertFalse(res.checks["caja_valida"])
+        self.assertIn("candidato:caja_degenerada", res.rejected_evidence)
+
+    def test_geometria_caja_fuera_ventana_rechazada(self):
+        cand = _candidato_fused(
+            "btn", "button", (600, 600, 700, 700),
+            window_handle=self.hwnd, process_id=self.pid, screen=0,
+        )
+        res = self.validator.validate_geometria_candidato(
+            cand, window_rect=(100, 100, 500, 400))
+        self.assertFalse(res.valid)
+        self.assertFalse(res.checks["caja_dentro_de_ventana"])
+        self.assertIn("candidato:caja_fuera_ventana", res.rejected_evidence)
+
+    def test_geometria_caja_parcialmente_fuera_ventana_rechazada(self):
+        cand = _candidato_fused(
+            "btn", "button", (450, 350, 550, 450),
+            window_handle=self.hwnd, process_id=self.pid, screen=0,
+        )
+        res = self.validator.validate_geometria_candidato(
+            cand, window_rect=(100, 100, 500, 400))
+        self.assertFalse(res.valid)
+        self.assertFalse(res.checks["caja_dentro_de_ventana"])
+        self.assertIn("candidato:caja_fuera_ventana", res.rejected_evidence)
+
+    def test_geometria_caja_fuera_imagen_rechazada(self):
+        cand = _candidato_fused(
+            "btn", "button", (120, 120, 200, 160),
+            window_handle=self.hwnd, process_id=self.pid, screen=0,
+        )
+        res = self.validator.validate_geometria_candidato(
+            cand, image_rect=(0, 0, 150, 150), window_rect=(100, 100, 500, 400))
+        self.assertFalse(res.valid)
+        self.assertFalse(res.checks["caja_dentro_de_imagen"])
+        self.assertIn("candidato:caja_fuera_imagen", res.rejected_evidence)
+
+    def test_geometria_caja_dentro_imagen_aceptada(self):
+        cand = _candidato_fused(
+            "btn", "button", (120, 120, 200, 160),
+            window_handle=self.hwnd, process_id=self.pid, screen=0,
+        )
+        res = self.validator.validate_geometria_candidato(
+            cand, image_rect=(0, 0, 1000, 1000), window_rect=(100, 100, 500, 400))
+        self.assertTrue(res.valid)
+        self.assertTrue(res.checks["caja_dentro_de_imagen"])
+
+    def test_geometria_control_offscreen_rechazado(self):
+        cand = SimpleNamespace(
+            name="btn", type="button", bbox=(120, 120, 200, 160),
+            canonical_id="btn", window_handle=self.hwnd,
+            is_offscreen=True, visible=True,
+        )
+        res = self.validator.validate_geometria_candidato(
+            cand, window_rect=(100, 100, 500, 400))
+        self.assertFalse(res.valid)
+        self.assertFalse(res.checks["control_no_obstruido"])
+        self.assertIn("candidato:control_obstruido", res.rejected_evidence)
+
+    def test_geometria_control_no_visible_rechazado(self):
+        cand = SimpleNamespace(
+            name="btn", type="button", bbox=(120, 120, 200, 160),
+            canonical_id="btn", window_handle=self.hwnd,
+            is_offscreen=False, visible=False,
+        )
+        res = self.validator.validate_geometria_candidato(
+            cand, window_rect=(100, 100, 500, 400))
+        self.assertFalse(res.valid)
+        self.assertFalse(res.checks["control_no_obstruido"])
+
+    def test_geometria_control_visible_aceptado(self):
+        cand = SimpleNamespace(
+            name="btn", type="button", bbox=(120, 120, 200, 160),
+            canonical_id="btn", window_handle=self.hwnd,
+            is_offscreen=False, visible=True,
+        )
+        res = self.validator.validate_geometria_candidato(
+            cand, window_rect=(100, 100, 500, 400))
+        self.assertTrue(res.valid)
+        self.assertTrue(res.checks["control_no_obstruido"])
+
+    def test_geometria_solapamiento_ambiguo_rechazado(self):
+        cand_a = _candidato_fused(
+            "btn_a", "button", (100, 100, 200, 200),
+            window_handle=self.hwnd, process_id=self.pid, screen=0,
+        )
+        cand_b = _candidato_fused(
+            "btn_b", "button", (120, 120, 220, 220),
+            window_handle=self.hwnd, process_id=self.pid, screen=0,
+        )
+        res = self.validator.validate_geometria_candidato(
+            cand_a, window_rect=(100, 100, 500, 400), otros_candidatos=[cand_b])
+        self.assertFalse(res.valid)
+        self.assertFalse(res.checks["no_solapamiento_ambiguo"])
+        self.assertIn("candidato:solapamiento_ambiguo", res.rejected_evidence)
+
+    def test_geometria_solapamiento_misma_identidad_no_rechazado(self):
+        cand_a = _candidato_fused(
+            "btn", "button", (100, 100, 200, 200),
+            window_handle=self.hwnd, process_id=self.pid, screen=0,
+        )
+        cand_b = _candidato_fused(
+            "btn", "button", (120, 120, 220, 220),
+            window_handle=self.hwnd, process_id=self.pid, screen=0,
+        )
+        res = self.validator.validate_geometria_candidato(
+            cand_a, window_rect=(100, 100, 500, 400), otros_candidatos=[cand_b])
+        self.assertTrue(res.valid)
+        self.assertTrue(res.checks["no_solapamiento_ambiguo"])
+
+    def test_geometria_espacio_coordenadas_desconocido_rechazado(self):
+        cand = SimpleNamespace(
+            name="btn", type="button", bbox=(120, 120, 200, 160),
+            canonical_id="btn", window_handle=self.hwnd,
+            coordinate_space="espacio_inventado",
+        )
+        res = self.validator.validate_geometria_candidato(
+            cand, window_rect=(100, 100, 500, 400))
+        self.assertFalse(res.valid)
+        self.assertFalse(res.checks["espacio_coordenadas_conocido"])
+        self.assertIn(
+            "candidato:espacio_coordenadas_desconocido", res.rejected_evidence)
+
+    def test_geometria_espacio_coordenadas_conocido_aceptado(self):
+        cand = SimpleNamespace(
+            name="btn", type="button", bbox=(120, 120, 200, 160),
+            canonical_id="btn", window_handle=self.hwnd,
+            coordinate_space="image_pixels",
+        )
+        res = self.validator.validate_geometria_candidato(
+            cand, window_rect=(100, 100, 500, 400))
+        self.assertTrue(res.valid)
+        self.assertTrue(res.checks["espacio_coordenadas_conocido"])
+
+    def test_geometria_sin_espacio_coordenadas_no_rechazado_por_eso(self):
+        cand = _candidato_fused(
+            "btn", "button", (120, 120, 200, 160),
+            window_handle=self.hwnd, process_id=self.pid, screen=0,
+        )
+        res = self.validator.validate_geometria_candidato(
+            cand, window_rect=(100, 100, 500, 400))
+        self.assertTrue(res.valid)
+        self.assertTrue(res.checks["espacio_coordenadas_conocido"])
 
 class TestWindowEvidenceValidatorNotepadReal(TestGuiBase):
     """Integracion real con UNA ventana de Notepad compartida por sesion.
@@ -589,3 +769,82 @@ class TestWindowEvidenceValidatorNotepadReal(TestGuiBase):
         res = validator.validate_all()
         self.assertFalse(res.valid)
         self.assertEqual(res.reason, "no hay evidencia que validar")
+
+    def test_validar_geometria_candidatos_notepad_real(self):
+        """La puerta de calidad geometrica acepta candidatos UIA reales con
+        buena geometria y rechaza los degenerados u obstruidos del arbol real.
+        No se exige que todos pasen: el arbol UIA real contiene elementos sin
+        geometria util (caja (0,0,0,0) o fuera de pantalla)."""
+        adapter = UIAutomationAdapter(timeout=8.0)
+        tree = adapter.enumerate_window(self.hwnd, self.pid)
+        self.assertIsNone(tree.error)
+        self.assertGreater(int(tree.element_count or 0), 0)
+        win_rect = self._rectangulo_ventana(self.hwnd)
+        validator = WindowEvidenceValidator(self.hwnd, target_pid=self.pid)
+        aceptados = 0
+        rechazados = 0
+        for elem in tree.elements:
+            br = list(elem.bounding_rectangle)
+            cand = SimpleNamespace(
+                name=elem.name or "element",
+                type=elem.control_type or "element",
+                bbox=br,
+                canonical_id="uia_%d" % int(elem.handle or 0),
+                window_handle=int(tree.window_handle or 0),
+                is_offscreen=bool(elem.is_offscreen),
+                visible=bool(elem.visible),
+            )
+            res = validator.validate_geometria_candidato(
+                cand, window_rect=win_rect)
+            if res.valid:
+                aceptados += 1
+            else:
+                # Toda rechazada de la puerta de geometria es una razon de
+                # geometria (caja fuera de ventana, caja degenerada, control
+                # obstruido, solapamiento ambiguo o espacio desconocido).
+                rechazados += 1
+                if not br or br[2] <= br[0] or br[3] <= br[1]:
+                    self.assertIn(
+                        "candidato:caja_degenerada", res.rejected_evidence,
+                        "caja real degenerada debio rechazarse como tal: %s" % res.reason)
+        self.assertGreater(
+            aceptados, 0,
+            "la puerta de geometria debio aceptar al menos un candidato real valido")
+
+    def test_rechazar_candidato_geometria_degenerada_notepad_real(self):
+        """Un candidato sintetico con caja degenerada se rechaza con la puerta
+        de calidad geometrica sobre la ventana real de Notepad."""
+        adapter = UIAutomationAdapter(timeout=8.0)
+        tree = adapter.enumerate_window(self.hwnd, self.pid)
+        self.assertIsNone(tree.error)
+        win_rect = self._rectangulo_ventana(self.hwnd)
+        validator = WindowEvidenceValidator(self.hwnd, target_pid=self.pid)
+        # Candidato sintetico con caja degenerada (ancho cero).
+        cand = SimpleNamespace(
+            name="degenerado", type="button", bbox=[150, 150, 150, 190],
+            canonical_id="sintetico_degenerado",
+            window_handle=int(tree.window_handle or 0),
+        )
+        res = validator.validate_geometria_candidato(cand, window_rect=win_rect)
+        self.assertFalse(res.valid, "caja degenerada debio rechazarse: %s" % res.reason)
+        self.assertFalse(res.checks["caja_valida"])
+        self.assertIn("candidato:caja_degenerada", res.rejected_evidence)
+        # Un candidato real con buena geometria se acepta.
+        validos = 0
+        for elem in tree.elements:
+            br = list(elem.bounding_rectangle)
+            if br[2] > br[0] and br[3] > br[1]:
+                cand2 = SimpleNamespace(
+                    name=elem.name or "element",
+                    type=elem.control_type or "element",
+                    bbox=br,
+                    canonical_id="uia_%d" % int(elem.handle or 0),
+                    window_handle=int(tree.window_handle or 0),
+                    is_offscreen=bool(elem.is_offscreen),
+                    visible=bool(elem.visible),
+                )
+                res2 = validator.validate_geometria_candidato(
+                    cand2, window_rect=win_rect)
+                if res2.valid:
+                    validos += 1
+        self.assertGreater(validos, 0, "deben aceptarse candidatos reales validos")
