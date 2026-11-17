@@ -10,9 +10,10 @@ Las funciones publicas (``move_to_position``, ``click_element``,
 * Las coordenadas son las del escritorio nativo del SO (Windows:
   ``DESKTOP_PIXELS``; macOS: ``DESKTOP_POINTS``). El posicionamiento es absoluto
   y se comprueba leyendo la posicion real del puntero despues de moverlo.
-* ``click_element`` hace clic donde este el puntero; no comprueba que ventana
-  tiene el foco (eso corresponde a las puertas de calidad y al verificador de
-  puntero del consumidor).
+* ``click_element`` mueve el puntero al destino (absoluto), lee su posicion
+  real, comprueba la ventana y el control bajo el puntero y aborta (sin hacer
+  clic) si la diferencia supera la tolerancia medida. El DPI/CPI del raton y
+  la aceleracion no son factores de escala de pantalla.
 * Si el SO no tiene adaptador o la operacion no esta soportada, se usa
   pyautogui como respaldo. Un fallo real del adaptador (sesion bloqueada,
   permiso ausente, UIPI) NO se oculta con el respaldo: se devuelve ``False``.
@@ -27,6 +28,13 @@ import time
 from typing import Any, Optional
 
 from src.core.log import get_logger
+from src.desktop.platform_contract import DESKTOP_PIXELS
+from src.hands.calibration.coordinate_spaces import (
+    CoordinateSpace,
+    PointerVerifier,
+    SpaceBox,
+    SpacePoint,
+)
 
 logger = get_logger(__name__)
 
@@ -125,16 +133,40 @@ def move_to_position(x: float, y: float, duration: float = 0.1) -> bool:
         return False
 
 
-def click_element(button: str = "left", wait_after: float = 0.1) -> bool:
+def click_element(
+    button: str = "left",
+    wait_after: float = 0.1,
+    x: Optional[float] = None,
+    y: Optional[float] = None,
+    window_id: Optional[int] = None,
+    pid: Optional[int] = None,
+    expected_box: Optional[SpaceBox] = None,
+    pixels_per_unit: float = 1.0,
+    tolerance_px: Optional[float] = None,
+    tolerance_ratio: Optional[float] = None,
+) -> bool:
     """
-    Realiza un clic con el raton.
-    
+    Realiza un clic con el raton tras verificar el puntero.
+
+    Antes de cada clic: mueve el puntero al destino (posicionamiento absoluto),
+    lee su posicion real, comprueba la ventana y el control bajo el puntero y
+    aborta (sin hacer clic) si la diferencia supera la tolerancia medida. El
+    DPI/CPI del raton y la aceleracion no son factores de escala de pantalla.
+
     Args:
         button: Boton a usar (left, right, middle)
         wait_after: Tiempo de espera despues del clic
-        
+        x: Coordenada X absoluta del escritorio en espacio nativo del SO
+        y: Coordenada Y absoluta del escritorio en espacio nativo del SO
+        window_id: ID de ventana esperado bajo el puntero
+        pid: ID de proceso esperado de la ventana bajo el puntero
+        expected_box: Caja esperada del control, en espacio de escritorio
+        pixels_per_unit: Pixeles de escritorio por unidad (error a pixeles)
+        tolerance_px: Tolerancia absoluta de posicion en pixeles
+        tolerance_ratio: Tolerancia relativa al lado menor de la caja esperada
+
     Returns:
-        True si tuvo exito, False si fallo
+        True si se verifico el puntero y se hizo clic, False si se aborto
     """
     try:
         # Validar boton
@@ -144,21 +176,74 @@ def click_element(button: str = "left", wait_after: float = 0.1) -> bool:
             return False
 
         adapter = _desktop_platform()
-        if adapter is not None:
-            if _failsafe_triggered(adapter):
-                logger.warning("Failsafe del raton activado: clic cancelado")
-                return False
-            result = adapter.click(button=button, count=1)
-            if result.ok:
-                time.sleep(wait_after)
-                return True
-            if not _can_fallback(result):
-                logger.error("No se pudo hacer clic: %s", result.error)
-                return False
 
         # Respaldo: SO sin adaptador o operacion no soportada.
-        import pyautogui
-        pyautogui.click(button=button)
+        if adapter is None:
+            import pyautogui
+
+            pyautogui.click(button=button)
+            time.sleep(wait_after)
+            return True
+
+        if _failsafe_triggered(adapter):
+            logger.warning("Failsafe del raton activado: clic cancelado")
+            return False
+
+        desktop_space = CoordinateSpace.from_value(
+            getattr(adapter, "desktop_space", DESKTOP_PIXELS)
+        )
+
+        # Destino del clic: el pedido o la posicion real actual del puntero.
+        if x is not None and y is not None:
+            target = SpacePoint(float(x), float(y), desktop_space)
+        else:
+            position = adapter.get_pointer_position()
+            if not position.ok or position.value is None:
+                logger.error(
+                    "No se pudo leer la posicion real del puntero: %s", position.error
+                )
+                return False
+            pos = position.value
+            target = SpacePoint(float(pos.x), float(pos.y), desktop_space)
+
+        # Verificacion de puntero antes del clic: mueve el puntero
+        # (posicionamiento absoluto), lee su posicion real, comprueba la
+        # tolerancia, la ventana y el control bajo el puntero; aborta si se
+        # excede la tolerancia medida. Nunca hace clic si la verificacion
+        # falla.
+        verifier = PointerVerifier(
+            adapter=adapter,
+            tolerance_px=tolerance_px,
+            tolerance_ratio=0.15 if tolerance_ratio is None else float(tolerance_ratio),
+            default_tolerance_units=1.5,
+            require_foreground=window_id is not None,
+        )
+        verification = verifier.move_and_verify(
+            target,
+            expected_window_id=window_id,
+            expected_pid=pid,
+            expected_box=expected_box,
+            pixels_per_unit=float(pixels_per_unit or 1.0),
+        )
+        if not verification.ok:
+            logger.warning(
+                "Clic abortado por verificacion de puntero: %s (error_px=%s, ventana_ok=%s, elemento_ok=%s)",
+                verification.reason,
+                verification.error_px,
+                verification.window_ok,
+                verification.element_ok,
+            )
+            return False
+
+        click_result = adapter.click(button=button, count=1)
+        if not click_result.ok:
+            if not _can_fallback(click_result):
+                logger.error("No se pudo hacer clic: %s", click_result.error)
+                return False
+            import pyautogui
+
+            pyautogui.click(button=button)
+
         time.sleep(wait_after)
         return True
 

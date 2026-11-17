@@ -802,9 +802,13 @@ class PointerVerifier:
                 target, actual, error_px, error_ratio,
             )
         window = under.value
-        window_ok = window is not None and int(window.window_id) == int(expected_window_id)
-        if window_ok and expected_pid is not None:
-            window_ok = int(window.pid) == int(expected_pid)  # type: ignore[union-attr]
+        window_ok = True
+        if window is None:
+            window_ok = expected_window_id is None
+        elif expected_window_id is not None:
+            window_ok = int(window.window_id) == int(expected_window_id)
+            if window_ok and expected_pid is not None:
+                window_ok = int(window.pid) == int(expected_pid)  # type: ignore[union-attr]
         if not window_ok:
             return self._fail(
                 "la ventana bajo el puntero no es la objetivo",

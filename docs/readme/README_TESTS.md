@@ -314,6 +314,8 @@ Otros:
 | `test_calibracion_descubrimiento_requisitos.py` | Del descubrimiento a los requisitos de calibracion. | Unitario |
 | `test_calibrator.py` | - | Vacio |
 | `test_coordinate_spaces.py` | Espacios de coordenadas formales (FRAME_PIXELS, MONITOR_PIXELS, DESKTOP_PIXELS, DESKTOP_POINTS, WINDOW_RECT, WINDOW_CLIENT, CLIENT_NORMALIZED), transformaciones entre espacios, punto seguro dentro de un control y redondeo de entrada; geometria sintetica de Windows y macOS, sin SO ni GUI. | Unitario |
+| `test_transformaciones_coordenadas_entorno_real.py` | Transformaciones entre espacios de coordenadas con captura real de una region del monitor, ventana real de Notepad y lectura del puntero en Windows real: recorte de region, rectangulo visible (borde/sombra DWM), escritorio <-> ventana <-> zona cliente <-> normalizado 0..1 y redondeo de entrada. | GUI real, Windows; requiere `JARVIS_TEST_GUI_REAL=1`; abre y cierra una sola aplicacion propia. |
+| `test_mouse_coordinate_transform_entorno_real.py` | Mide el error de transformacion de coordenadas hasta el espacio de entrada del raton (`PointerVerifier` + `CoordinateTransformer`) en pixeles y relativo al tamano del area cliente, para cada monitor y escala reales del equipo, sobre una instancia propia de Notepad por monitor. | GUI real, Windows; requiere `JARVIS_TEST_GUI_REAL=1`; abre y cierra una sola aplicacion propia. |
 
 ### 11.8 Deteccion de interfaz y evidencia (`detection/`)
 
@@ -376,6 +378,13 @@ Todos unitarios, sin aplicaciones ni disco real:
 - `test_topology_watcher.py`: deteccion de conexion/desconexion de monitores y cambios de escala en ejecucion: `TopologyWatcher` con baseline, check, assert_unchanged, start/stop de listener y diff_topologies; comprobacion de fingerprint antes de cada accion espacial. Unitarias con adaptador mockeado (20) e integracion real en Windows (3) sobre get_current_topology() sin modificar el equipo.
 - `test_monitor_topology_selection.py`: `resolve_monitor_reference` con topologias sinteticas (1, 2, 3 y 4 monitores, origenes negativos, vertical, escalas mixtas, referencias resueltas y ambiguas) e integracion real de solo lectura en Windows. Unitario, determinista, sin GUI.
 - `test_window_dpi_info_entorno_real.py`: GUI real en Windows, requiere `JARVIS_TEST_GUI_REAL=1`. Abre una unica instancia de Notepad, la mueve al monitor no principal mas a la derecha (politica de pruebas de `TestMonitorPolicy`) y verifica que `get_window_dpi_info` devuelve el DPI real de la ventana (`GetDpiForWindow`), el DPI del monitor (`GetDpiForMonitor`), la awareness de la ventana, la awareness del proceso y la awareness de JARVIS, sin tocar Visual Studio Code ni ventanas preexistentes del usuario. Cierra solo la ventana que abrio. Integracion real sobre ventana propia.
+
+### 11.14 Input (input/)
+
+| Fichero | Que prueba | Tipo |
+|---|---|---|
+| `test_click_element_verificacion_puntero.py` | `click_element` verifica el puntero antes de cada clic: movimiento absoluto, lectura de la posicion real, ventana y control bajo el puntero, tolerancia absoluta y relativa, aborto sin clic, respaldo pyautogui y failsafe. Con adaptador de escritorio falso, sin GUI real. | Unitario |
+| `test_click_verificacion_puntero_entorno_real.py` | `click_element` contra una ventana propia de Notepad en el monitor de pruebas: clic verificado sobre el area cliente, aborto cuando la caja esperada no contiene el destino y cuando la ventana bajo el puntero no es la objetivo. Requiere `JARVIS_TEST_GUI_REAL=1`. | GUI real, Windows |
 
 ## 12. `tests/core` y `tests/experimental`
 

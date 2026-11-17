@@ -495,7 +495,7 @@ Es el contrato entre lo que JARVIS sabe hacer y quien lo pide (el ejecutor hered
 #### `input/keyboard.py` y `input/mouse.py`
 
 - **Teclado** (acciones registradas con precondiciones y coste): `type_text`, `press_key`, `execute_hotkey`, `copy_text`, `paste_text`, `cut_text`, `select_all_text`, `navigate_tab`, `navigate_enter`, `switch_window` (Alt+Tab), `close_window` (Alt+F4), `open_start_menu`, mas versiones en espanol (`escribir_texto`, `presionar_enter`...). Los atajos son de Windows (Ctrl, Alt, tecla Windows); en macOS harian falta los de Cmd. Al importarse configura `pyautogui.FAILSAFE` y `PAUSE`.
-- **Raton:** `move_to_position(x, y)`, `click_element(button)` (hace clic donde este el cursor), `scroll_at_position(x, y, clicks)`. Se registran como `move_mouse`, `click_mouse` y `scroll_mouse`. No comprueban que ventana tiene el foco.
+- **Raton:** `move_to_position(x, y)`, `click_element(button)` (mueve el puntero al destino, lee su posicion real, comprueba la ventana y el control bajo el puntero y aborta sin clic si supera la tolerancia medida), `scroll_at_position(x, y, clicks)`. Se registran como `move_mouse`, `click_mouse` y `scroll_mouse`.
 
 ## 8. Planificacion (`src/hands/planner/`)
 
