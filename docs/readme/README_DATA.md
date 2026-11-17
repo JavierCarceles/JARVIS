@@ -2,7 +2,7 @@
 
 Este documento explica que ficheros de datos usa JARVIS, para que sirve cada uno, que forma tienen, que codigo los lee y los escribe, y cuales son propios de cada ordenador. Describe el comportamiento actual del codigo.
 
-> Privacidad: varios de estos ficheros contienen conversaciones, habitos de uso y rutas del equipo. Aqui solo se describe su estructura. `.gitignore` excluye `data/memory/`, `data/knowledge/`, todos los `data/*.json` y la base `data/system_inventory.sqlite3`; solo `config/` y `models/` se versionan.
+> Privacidad: varios de estos ficheros contienen conversaciones, habitos de uso y rutas del equipo. Aqui solo se describe su estructura. En GitHub solo se suben `config/`, el conocimiento estatico de `data/knowledge/` (`applications.json`, `capabilities.json`, `entities.json`) y el modelo de voz en uso de `models/`. El resto de `data/` y todo `logs/` son locales: `.gitignore` los excluye.
 
 ## Indice
 
@@ -257,12 +257,12 @@ Modelo de sintesis de voz Kokoro en formato ONNX, usado por `src/mouth/speaker.p
 
 | Ruta | Que es |
 |---|---|
-| `models/onnx/*.onnx` | Variantes del modelo (`model`, `model_fp16`, `model_quantized`, `model_uint8`, `model_uint8f16`). Se usa la que indique `voice.onnx_model_file` (por defecto `model_fp16.onnx`). |
-| `models/voices/*.bin` | 47 voces. Nombre `<idioma><genero>_<nombre>`, por ejemplo `am_eric`, `ef_dora`. |
+| `models/onnx/model_fp16.onnx` | Modelo que se usa (`voice.onnx_model_file`). Es el unico que se sube a GitHub; si tienes otras variantes en local (`model`, `model_quantized`, `model_uint8`, `model_uint8f16`), `.gitignore` las excluye. |
+| `models/voices/*.bin` | 46 voces. Nombre `<idioma><genero>_<nombre>`, por ejemplo `am_eric`, `ef_dora`. |
 | `models/tokenizer.json`, `models/tokenizer_config.json`, `models/config.json` | Tokenizador y configuracion del modelo |
 | `models/README.md` | Ficha original del modelo, de sus autores. No es documentacion del proyecto. |
 
-Los `.onnx` se guardan con Git LFS. Si el repositorio se clona sin LFS, solo quedan ficheros de unos 134 bytes (punteros) y la voz no funciona hasta descargar los modelos reales con `git lfs pull`.
+El `.onnx` se guarda con Git LFS. Si el repositorio se clona sin LFS, solo quedan ficheros de unos 134 bytes (punteros) y la voz no funciona hasta descargar los modelos reales con `git lfs pull`.
 
 ## 10. Ficheros que se crean solos
 

@@ -1,55 +1,70 @@
 # =============================================================================
 # .gitignore - JARVIS
-# Archivos y directorios que NO deben ir al control de versiones.
-# Datos locales, cache, logs, entornos virtuales y configuracion especifica
-# de cada equipo (machine_id, rutas absolutas, calibraciones, etc.).
+# Solo se sube lo necesario para instalar y ejecutar JARVIS: codigo, tests,
+# configuracion, documentacion, conocimiento estatico y el modelo de voz en uso.
+# No se suben datos personales, datos propios de cada equipo, logs ni ficheros
+# generados.
 # =============================================================================
 
-# --- Base de datos local del inventario (machine_id especifico del equipo) ---
-data/system_inventory.sqlite3
-data/system_inventory.sqlite3-wal
-data/system_inventory.sqlite3-shm
-data/system_inventory_manifest.json
+# --- Datos locales y personales (README_DATA) --------------------------------
+# Todo data/ es local (conversaciones, preferencias, calibraciones, inventario
+# por machine_id), salvo el conocimiento estatico de data/knowledge/, que JARVIS
+# necesita para arrancar.
+data/*
+!data/knowledge/
+data/knowledge/*
+!data/knowledge/applications.json
+!data/knowledge/capabilities.json
+!data/knowledge/entities.json
 
-# --- Datos de memoria y conocimiento locales (no portables entre equipos) ---
-data/memory/
-data/knowledge/
-data/entities.json
-data/*.json
-
-# --- Logs del sistema ---
+# --- Logs (se crean al ejecutar) ----------------------------------------------
 logs/
 *.log
 
-# --- Python / entornos ---
+# --- Modelo de voz: solo la variante que usa config.json ---------------------
+models/onnx/*.onnx
+!models/onnx/model_fp16.onnx
+models/gitattributes
+
+# --- Artefactos generados por los tests ---------------------------------------
+tests/eyes/fixtures/*.json
+tests/eyes/fixtures/*.lock
+tests/**/fixtures/_tmp_*
+
+# --- Python y entornos --------------------------------------------------------
 __pycache__/
 *.py[cod]
 *$py.class
 venv/
+.venv/
 .env
-.venv
 
-# --- Cache y pruebas ---
+# --- Cache y pruebas ----------------------------------------------------------
 .cache/
 .pytest_cache/
 .coverage
 htmlcov/
 
-# --- Editor y herramientas ---
+# --- Editores y herramientas --------------------------------------------------
 .vscode/
 .idea/
 .supercomplete/
+.claude/
 
-# --- Archivos temporales del proyecto ---
+# --- Temporales ---------------------------------------------------------------
 temp/
+temp_*.png
+screenshot.png
+output.wav
 *.tmp
 *.bak
+*.bak_import
 
-# --- Archivos generados por el sistema operativo ---
+# --- Sistema operativo --------------------------------------------------------
 .DS_Store
 Thumbs.db
 
-# --- Macros del root (configuracion/local) ---
+# --- Macros locales de la raiz -------------------------------------------------
 macro_mejoraActual.json
 macro_recorder.py
 macro_runner.py
