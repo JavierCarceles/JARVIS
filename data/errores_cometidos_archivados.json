@@ -1,0 +1,44 @@
+[
+  {
+    "error_id": "err_001",
+    "error_type": "sistema",
+    "error_message": "Error recopilando datos del sistema: 'LogPredictor' object has no attribute 'get_predictions'",
+    "component": "SelfImprovementSystem",
+    "repeticiones": 7,
+    "fecha_primera_vez": "2026-10-01T08:53:14.447360",
+    "fecha_ultima_vez": "2026-10-01T08:55:18.921955",
+    "no_repetir": true,
+    "regla_agregada": true,
+    "movido_a_archivo": true,
+    "fecha_movido_a_archivo": "2026-10-21T00:41:04.295033",
+    "motivo_movido": "Repeticiones >= 4 (7). Regla de no repetir agregada a improvement_rules.json"
+  },
+  {
+    "error_id": "err_002",
+    "error_type": "aprendizaje",
+    "error_message": "Error actualizando modelos de aprendizaje: This StandardScaler instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.",
+    "component": "SelfImprovementSystem",
+    "repeticiones": 6,
+    "fecha_primera_vez": "2026-10-01T08:53:14.448166",
+    "fecha_ultima_vez": "2026-10-01T08:55:18.921955",
+    "no_repetir": true,
+    "regla_agregada": true,
+    "movido_a_archivo": true,
+    "fecha_movido_a_archivo": "2026-10-21T00:41:04.295033",
+    "motivo_movido": "Repeticiones >= 4 (6). Regla de no repetir agregada a improvement_rules.json"
+  },
+  {
+    "error_id": "err_003",
+    "error_type": "sesion",
+    "error_message": "Error finalizando sesion de aprendizaje: 'SelfImprovementSystem' object has no attribute 'learning_history'",
+    "component": "SelfImprovementSystem",
+    "repeticiones": 5,
+    "fecha_primera_vez": "2026-10-01T08:53:14.448357",
+    "fecha_ultima_vez": "2026-10-01T08:55:18.921955",
+    "no_repetir": true,
+    "regla_agregada": true,
+    "movido_a_archivo": true,
+    "fecha_movido_a_archivo": "2026-10-21T00:41:04.295033",
+    "motivo_movido": "Repeticiones >= 4 (5). Regla de no repetir agregada a improvement_rules.json"
+  }
+]

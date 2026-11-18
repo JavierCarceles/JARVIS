@@ -1,0 +1,26 @@
+[
+  {
+    "error_id": "err_004",
+    "error_type": "red",
+    "error_message": "Timeout de conexion al servicio externo",
+    "component": "NetworkClient",
+    "repeticiones": 2,
+    "fecha_primera_vez": "2026-10-01T09:02:12.805926",
+    "fecha_ultima_vez": "2026-10-01T09:02:13.450682",
+    "no_repetir": false,
+    "regla_agregada": false,
+    "movido_a_archivo": false
+  },
+  {
+    "error_id": "err_005",
+    "error_type": "archivo",
+    "error_message": "No se pudo abrir el archivo de configuracion",
+    "component": "ConfigLoader",
+    "repeticiones": 1,
+    "fecha_primera_vez": "2026-10-01T09:04:30.534674",
+    "fecha_ultima_vez": "2026-10-01T09:04:30.534674",
+    "no_repetir": false,
+    "regla_agregada": false,
+    "movido_a_archivo": false
+  }
+]

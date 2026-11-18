@@ -6,17 +6,6 @@
 # generados.
 # =============================================================================
 
-# --- Datos locales y personales (README_DATA) --------------------------------
-# Todo data/ es local (conversaciones, preferencias, calibraciones, inventario
-# por machine_id), salvo el conocimiento estatico de data/knowledge/, que JARVIS
-# necesita para arrancar.
-data/*
-!data/knowledge/
-data/knowledge/*
-!data/knowledge/applications.json
-!data/knowledge/capabilities.json
-!data/knowledge/entities.json
-
 # --- Logs (se crean al ejecutar) ----------------------------------------------
 logs/
 *.log
@@ -69,3 +58,4 @@ macro_mejoraActual.json
 macro_recorder.py
 macro_runner.py
 macro_scheduler.py
+data/system_inventory.sqlite3

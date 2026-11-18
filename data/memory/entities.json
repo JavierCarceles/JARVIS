@@ -1,0 +1,272 @@
+[
+  {
+    "id": "app_chrome",
+    "type": "application",
+    "name": "Chrome",
+    "properties": {
+      "type": "browser",
+      "executable": "chrome",
+      "url": "https://chrome.google.com",
+      "login_required": false,
+      "capabilities": [
+        "open",
+        "navigate",
+        "search"
+      ],
+      "ui_elements": [
+        {
+          "name": "address_bar",
+          "type": "input",
+          "description": "",
+          "required_capability": "navigate"
+        },
+        {
+          "name": "search_bar",
+          "type": "input",
+          "description": "",
+          "required_capability": "search"
+        },
+        {
+          "name": "new_tab_button",
+          "type": "button",
+          "description": "",
+          "required_capability": "new_tab"
+        }
+      ],
+      "states": [
+        "closed",
+        "open",
+        "active",
+        "loading"
+      ]
+    },
+    "created_at": "2026-11-17T21:53:25.786710",
+    "updated_at": "2026-11-17T21:53:25.786825",
+    "metadata": null,
+    "aliases": [],
+    "confidence": 1.0,
+    "tags": []
+  },
+  {
+    "id": "app_spotify",
+    "type": "application",
+    "name": "Spotify",
+    "properties": {
+      "type": "media",
+      "executable": "spotify",
+      "url": "https://spotify.com",
+      "login_required": true,
+      "capabilities": [
+        "open",
+        "navigate"
+      ],
+      "ui_elements": [
+        {
+          "name": "search_bar",
+          "type": "input",
+          "description": "",
+          "required_capability": "search"
+        },
+        {
+          "name": "play_button",
+          "type": "button",
+          "description": "",
+          "required_capability": "navigate"
+        }
+      ],
+      "states": [
+        "closed",
+        "open",
+        "active"
+      ]
+    },
+    "created_at": "2026-11-17T21:53:25.790511",
+    "updated_at": "2026-11-17T21:53:25.797234",
+    "metadata": null,
+    "aliases": [],
+    "confidence": 1.0,
+    "tags": []
+  },
+  {
+    "id": "app_apppruebadesc",
+    "type": "application",
+    "name": "AppPruebaDesc",
+    "properties": {
+      "type": "utilidad",
+      "executable": null,
+      "url": null,
+      "login_required": false,
+      "capabilities": [],
+      "ui_elements": [
+        {
+          "name": "btn_principal",
+          "type": "button",
+          "description": "Boton principal de la aplicacion de prueba",
+          "required_capability": "open"
+        }
+      ],
+      "states": []
+    },
+    "created_at": "2026-11-17T21:53:24.696813",
+    "updated_at": "2026-11-17T21:53:24.705453",
+    "metadata": null,
+    "aliases": [],
+    "confidence": 1.0,
+    "tags": []
+  },
+  {
+    "id": "app_appsindesc",
+    "type": "application",
+    "name": "AppSinDesc",
+    "properties": {
+      "type": "utilidad",
+      "executable": null,
+      "url": null,
+      "login_required": false,
+      "capabilities": [],
+      "ui_elements": [
+        {
+          "name": "btn_x",
+          "type": "button",
+          "description": "",
+          "required_capability": null
+        }
+      ],
+      "states": []
+    },
+    "created_at": "2026-11-17T21:53:24.729442",
+    "updated_at": "2026-11-17T21:53:24.736009",
+    "metadata": null,
+    "aliases": [],
+    "confidence": 1.0,
+    "tags": []
+  },
+  {
+    "id": "app_dupapp",
+    "type": "application",
+    "name": "DupApp",
+    "properties": {
+      "type": "utility",
+      "executable": "dupapp_exe",
+      "url": "https://example.com",
+      "login_required": false,
+      "capabilities": [
+        "navigate",
+        "search"
+      ],
+      "ui_elements": [
+        {
+          "name": "shared_elem",
+          "type": "input",
+          "description": "",
+          "required_capability": null
+        }
+      ],
+      "states": [
+        "closed"
+      ]
+    },
+    "created_at": "2026-11-17T21:24:34.066018",
+    "updated_at": "2026-11-17T21:24:34.072021",
+    "metadata": null,
+    "aliases": [],
+    "confidence": 1.0,
+    "tags": []
+  },
+  {
+    "id": "app_nocaps",
+    "type": "application",
+    "name": "NoCaps",
+    "properties": {
+      "type": "utility",
+      "executable": "nocaps_exe",
+      "url": "https://example.com",
+      "login_required": false,
+      "capabilities": [],
+      "ui_elements": [],
+      "states": [
+        "closed"
+      ]
+    },
+    "created_at": "2026-11-17T21:24:34.201937",
+    "updated_at": "2026-11-17T21:24:34.206413",
+    "metadata": null,
+    "aliases": [],
+    "confidence": 1.0,
+    "tags": []
+  },
+  {
+    "id": "app_registertestapp",
+    "type": "application",
+    "name": "RegisterTestApp",
+    "properties": {
+      "type": "utility",
+      "executable": "regtestapp",
+      "url": null,
+      "login_required": false,
+      "capabilities": [],
+      "ui_elements": [],
+      "states": []
+    },
+    "created_at": "2026-11-17T21:24:34.907053",
+    "updated_at": "2026-11-17T21:24:34.914458",
+    "metadata": null,
+    "aliases": [],
+    "confidence": 1.0,
+    "tags": []
+  },
+  {
+    "id": "app_descokapp",
+    "type": "application",
+    "name": "DescOkApp",
+    "properties": {
+      "type": "utility",
+      "executable": null,
+      "url": null,
+      "login_required": false,
+      "capabilities": [],
+      "ui_elements": [
+        {
+          "name": "btn",
+          "type": "button",
+          "description": "Un botón",
+          "required_capability": null
+        }
+      ],
+      "states": []
+    },
+    "created_at": "2026-11-17T21:42:53.626807",
+    "updated_at": "2026-11-17T21:42:53.631599",
+    "metadata": null,
+    "aliases": [],
+    "confidence": 1.0,
+    "tags": []
+  },
+  {
+    "id": "app_nodescokapp",
+    "type": "application",
+    "name": "NoDescOkApp",
+    "properties": {
+      "type": "utility",
+      "executable": null,
+      "url": null,
+      "login_required": false,
+      "capabilities": [],
+      "ui_elements": [
+        {
+          "name": "btn",
+          "type": "button",
+          "description": "",
+          "required_capability": null
+        }
+      ],
+      "states": []
+    },
+    "created_at": "2026-11-17T21:42:53.656742",
+    "updated_at": "2026-11-17T21:42:53.663511",
+    "metadata": null,
+    "aliases": [],
+    "confidence": 1.0,
+    "tags": []
+  }
+]

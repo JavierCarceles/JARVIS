@@ -1,0 +1,26 @@
+{
+  "root_pid": 25984,
+  "owned_pids": [
+    25984
+  ],
+  "owned_hwnds": [
+    460108
+  ],
+  "was_owned": true,
+  "executable_path": "C:\\Windows\\System32\\charmap.exe",
+  "app_id": "",
+  "launch_state": "proceso_iniciado",
+  "tipo_destino": "ejecutable",
+  "fuente": "ruta_directa",
+  "destino_validado": "C:\\Windows\\System32\\charmap.exe",
+  "timestamps": {
+    "inicio": 1794749054.2049787,
+    "ventana_detectada": 1794749054.6082227,
+    "fin": 1794749054.6128304,
+    "duracion_segundos": 0.4079
+  },
+  "ventana": {
+    "hwnd": 460108
+  },
+  "guardado_en": 1794749054.6128404
+}

@@ -1,0 +1,18 @@
+{
+  "version": 5,
+  "machine_id": "4de10a54-5054-515b-aa57-1b30a1feb801",
+  "volumes": [],
+  "last_scan": {
+    "scan_id": "scan-af6790bf-9aec-4644-b5a5-fcf16fd28e5e",
+    "volume": "C:",
+    "mode": "completo",
+    "started_at": "2026-11-15T04:48:20.697681",
+    "finished_at": "2026-11-15T03:55:16.373553+00:00",
+    "result": "interrumpido",
+    "entries_count": 0,
+    "errors_count": 0,
+    "exclusions_count": 0,
+    "coverage_estimate": null
+  },
+  "updated_at": "2026-11-15T04:08:52.366632+00:00"
+}
