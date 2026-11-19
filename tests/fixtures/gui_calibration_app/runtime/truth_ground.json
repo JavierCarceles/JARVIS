@@ -1,0 +1,203 @@
+{
+  "tamanio_ventana": [
+    1200,
+    800
+  ],
+  "controles": [
+    {
+      "id": "btn_aceptar",
+      "kind": "button",
+      "label": "Aceptar",
+      "geometry": [
+        20,
+        20,
+        100,
+        32
+      ],
+      "action": "accion_btn_aceptar"
+    },
+    {
+      "id": "btn_cancelar",
+      "kind": "button",
+      "label": "Cancelar",
+      "geometry": [
+        130,
+        20,
+        100,
+        32
+      ],
+      "action": "accion_btn_cancelar"
+    },
+    {
+      "id": "lbl_estado",
+      "kind": "label",
+      "label": "Estado de la prueba",
+      "geometry": [
+        20,
+        70,
+        200,
+        24
+      ],
+      "action": null
+    },
+    {
+      "id": "lnk_ayuda",
+      "kind": "link",
+      "label": "Ayuda",
+      "geometry": [
+        20,
+        105,
+        60,
+        24
+      ],
+      "action": "accion_lnk_ayuda"
+    },
+    {
+      "id": "txt_nombre",
+      "kind": "field",
+      "label": "",
+      "geometry": [
+        20,
+        145,
+        200,
+        32
+      ],
+      "action": "accion_txt_nombre"
+    },
+    {
+      "id": "chk_terminos",
+      "kind": "checkbox",
+      "label": "Aceptar terminos",
+      "geometry": [
+        20,
+        190,
+        150,
+        28
+      ],
+      "action": "accion_chk_terminos"
+    },
+    {
+      "id": "rdo_opcion_a",
+      "kind": "radio",
+      "label": "Opcion A",
+      "geometry": [
+        20,
+        228,
+        90,
+        24
+      ],
+      "action": "accion_rdo_opcion_a"
+    },
+    {
+      "id": "rdo_opcion_b",
+      "kind": "radio",
+      "label": "Opcion B",
+      "geometry": [
+        120,
+        228,
+        90,
+        24
+      ],
+      "action": "accion_rdo_opcion_b"
+    },
+    {
+      "id": "cbo_categoria",
+      "kind": "dropdown",
+      "label": "",
+      "geometry": [
+        20,
+        265,
+        180,
+        32
+      ],
+      "action": "accion_cbo_categoria"
+    },
+    {
+      "id": "lst_items",
+      "kind": "list",
+      "label": "",
+      "geometry": [
+        20,
+        310,
+        200,
+        120
+      ],
+      "action": "accion_lst_items"
+    },
+    {
+      "id": "tab_principal",
+      "kind": "tabs",
+      "label": "",
+      "geometry": [
+        240,
+        20,
+        320,
+        250
+      ],
+      "action": "accion_tab_principal"
+    },
+    {
+      "id": "scr_area",
+      "kind": "scroll",
+      "label": "",
+      "geometry": [
+        570,
+        20,
+        320,
+        400
+      ],
+      "action": "accion_scr_area"
+    },
+    {
+      "id": "menu_archivo",
+      "kind": "menu",
+      "label": "Menu: Archivo",
+      "geometry": [
+        20,
+        440,
+        140,
+        32
+      ],
+      "action": "accion_menu_archivo"
+    },
+    {
+      "id": "popup_info",
+      "kind": "popup",
+      "label": "Abrir popup",
+      "geometry": [
+        240,
+        560,
+        140,
+        32
+      ],
+      "action": "accion_popup_info"
+    },
+    {
+      "id": "grp_anidado",
+      "kind": "group",
+      "label": "Grupo anidado",
+      "geometry": [
+        240,
+        310,
+        320,
+        230
+      ],
+      "action": null
+    },
+    {
+      "id": "canvas_mano",
+      "kind": "drawing",
+      "label": "",
+      "geometry": [
+        900,
+        20,
+        200,
+        200
+      ],
+      "action": "accion_canvas_mano"
+    }
+  ],
+  "controles_sin_accesibilidad": [
+    "canvas_mano"
+  ]
+}
