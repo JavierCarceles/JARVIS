@@ -11,8 +11,9 @@ ejecucion. Por eso el test reintenta hasta MAX_INTENTOS veces y pasa si al
 menos una respuesta llega completa al decodificador JSON. No se sustituye la
 respuesta por un mock ni se declara verificado sin evidencia real.
 
-Si Ollama o el modelo configurado no estan disponibles, el test falla con el
-error real (NO se sustituye por un mock).
+Si Ollama no esta en marcha, la fixture de sesion `ollama_server` lo arranca
+y lo cierra al terminar la sesion. Si no esta instalado o falta el modelo, el
+test falla con el error real (NO se sustituye por un mock).
 """
 
 import os
@@ -22,10 +23,13 @@ import cv2
 import numpy as np
 import pytest
 
-from src.eyes.vision.vision import Vision
+from src.eyes.vision.vision import DEFAULT_VISION_MODEL, Vision
+
+pytestmark = pytest.mark.usefixtures("ollama_server")
 
 MAX_INTENTOS = 3
-MODELO = "qwen3-vl:8b"
+# Modelo por defecto de Vision (variante sin razonamiento).
+MODELO = DEFAULT_VISION_MODEL
 
 
 @pytest.fixture

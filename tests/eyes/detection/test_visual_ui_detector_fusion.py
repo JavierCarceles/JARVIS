@@ -61,6 +61,7 @@ from src.eyes.detection.visual_ui_detector_fusion import (
 from src.eyes.vision.vision import Vision
 from src.core.ui_element_model import UIElementData, normalize_element_type
 from src.desktop.screen_manager import get_screen_manager
+from tests.helpers.ollama_session import servidor_ollama_de_sesion
 
 
 # ---------------------------------------------------------------------------
@@ -899,6 +900,8 @@ class TestVisualUIDetectorFusionQwen3VLReal(TestGuiBase):
     def test_qwen3vl_salida_real_incorporada_en_fusion(self):
         """Qwen3-VL (Ollama real) interpreta un boton de Notepad y se fusiona."""
         _gui_log("TEST_INICIO: test_qwen3vl_salida_real_incorporada_en_fusion clase=TestVisualUIDetectorFusionQwen3VLReal")
+        # Servidor Ollama de la sesion (se arranca si no responde; se cierra al terminar).
+        servidor_ollama_de_sesion()
         import ollama
         from src.hands.detection.ui_automation_adapter import UIAutomationAdapter
         from src.eyes.capture.screen_capture import ScreenCapture
@@ -1349,6 +1352,7 @@ class TestIntegracionUIAVisualFixtureReal(TestGuiBase):
     def test_detector_visual_por_separado_fixture_real(self):
         """Detector visual (Vision.detect_ui_elements) sobre captura real de Notepad."""
         _gui_log("TEST_INICIO: test_detector_visual_por_separado_fixture_real")
+        servidor_ollama_de_sesion()
         from src.eyes.capture.screen_capture import ScreenCapture
         from src.eyes.vision.vision import Vision
 
@@ -1393,6 +1397,7 @@ class TestIntegracionUIAVisualFixtureReal(TestGuiBase):
         """Fusion UIA + visual sobre Notepad real, con registro de existentes,
         omitidos, duplicados, falsos positivos y UIA-inaccesibles."""
         _gui_log("TEST_INICIO: test_fusion_comparativa_uia_visual_fixture_real")
+        servidor_ollama_de_sesion()
         from src.hands.detection.ui_automation_adapter import UIAutomationAdapter
         from src.eyes.capture.screen_capture import ScreenCapture
         from src.eyes.vision.vision import Vision

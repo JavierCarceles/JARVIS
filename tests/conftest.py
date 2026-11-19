@@ -91,10 +91,32 @@ def pytest_sessionfinish(session, exitstatus):
     CWD del repo terminarian escribiendo en `logs/` de PRODUCCION.
     """
     os.chdir(_SANDBOX_DIR)
+    # Cierra el servidor Ollama de la sesion si lo arranco algun test (nunca
+    # uno que ya estuviera en marcha). Solo si algun test lo pidio.
+    _sesion_ollama = sys.modules.get("tests.helpers.ollama_session")
+    if _sesion_ollama is not None:
+        _sesion_ollama.cerrar_servidor_ollama_de_sesion()
     # Al cerrar la sesion, pytest ya ha cerrado el stream de captura: los
     # `__del__` de los singletons de `utils` loguean a un fichero cerrado y
     # Python imprime "--- Logging error ---" (ruido de apagado, no un fallo).
     logging.raiseExceptions = False
+
+
+# ---------------------------------------------------------------------------
+# SERVIDOR OLLAMA COMPARTIDO POR LA SESION
+# ---------------------------------------------------------------------------
+# Los tests que usan Ollama real piden esta fixture (o, si son GUI y solo
+# deben arrancarlo cuando de verdad se ejecutan, llaman directamente a
+# `tests.helpers.ollama_session.servidor_ollama_de_sesion`). El primero
+# arranca `ollama serve` si no responde y los demas reutilizan ese servidor;
+# se cierra en `pytest_sessionfinish`, al salir del proceso o, si pytest muere
+# de golpe, por el vigilante de `src/core/ollama_server.py`. Un servidor que
+# ya estaba en marcha se reutiliza y nunca se cierra.
+@pytest.fixture(scope="session")
+def ollama_server():
+    from tests.helpers.ollama_session import servidor_ollama_de_sesion
+
+    return servidor_ollama_de_sesion()
 
 
 # ---------------------------------------------------------------------------

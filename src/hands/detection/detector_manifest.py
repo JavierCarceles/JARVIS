@@ -58,8 +58,11 @@ DETECTORES_POR_DEFECTO = (
     SOURCE_OPENCV,
 )
 
-# Modelo Qwen3-VL por defecto usado por src/eyes/vision/vision.py
-QWEN3VL_MODEL_DEFECTO = "qwen3-vl:8b"
+# Modelo Qwen3-VL por defecto: el mismo que DEFAULT_VISION_MODEL de
+# src/eyes/vision/vision.py y UniversalVisualCalibrator.MODEL (variante
+# "instruct", sin razonamiento). No se importa de vision.py para no cargar
+# OpenCV ni Ollama al construir el manifiesto.
+QWEN3VL_MODEL_DEFECTO = "qwen3-vl:8b-instruct"
 
 # Ruta por defecto del modelo OmniParser (repositorio, no pesos locales).
 OMNIPARSER_REPO_ID = "microsoft/OmniParser-v2.0"

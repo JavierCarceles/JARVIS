@@ -1,12 +1,18 @@
 # -*- coding: utf-8 -*-
 """Tests de Vision (src/eyes/vision/vision.py)."""
 
+import io
 import json
+import os
+import tempfile
 from unittest.mock import MagicMock, patch
 
 import pytest
+from PIL import Image
 
 from src.eyes.vision.vision import (
+    DEFAULT_VISION_MODEL,
+    MODEL_IMAGE_MAX_PIXELS,
     Vision,
     VisionNode,
     VisionNodeType,
@@ -17,6 +23,12 @@ from src.eyes.vision.vision import (
 
 def json_dumps(obj):
     return json.dumps(obj)
+
+
+def _png(path, width, height, color=(240, 240, 240)):
+    """Escribe una imagen PNG real de width x height y devuelve su ruta."""
+    Image.new("RGB", (width, height), color).save(path, format="PNG")
+    return str(path)
 
 
 class TestVisionNodeType:
@@ -162,8 +174,10 @@ class TestVisionResponse:
 
 class TestVisionInit:
     def test_default_model(self):
+        # Variante sin razonamiento: la variante thinking deja content vacio.
         vision = Vision()
-        assert vision.model == "qwen3-vl:8b"
+        assert DEFAULT_VISION_MODEL == "qwen3-vl:8b-instruct"
+        assert vision.model == DEFAULT_VISION_MODEL
         assert vision.temperature == 0.0
         assert vision.screen_capture is not None
 
@@ -218,7 +232,7 @@ class TestVisionNodeQueries:
         assert "model" in caps
         assert "total_cost" in caps
         assert "available_types" in caps
-        assert caps["model"] == "qwen3-vl:8b"
+        assert caps["model"] == DEFAULT_VISION_MODEL
         assert len(caps["nodes"]) >= 6
         types = caps["available_types"]
         assert "ui_detection" in types
@@ -368,75 +382,260 @@ class TestVisionBuildVerificationPrompt:
 
 
 class TestVisionDetectUIElements:
+    """Deteccion con Ollama falso sobre imagenes PNG reales.
+
+    Qwen3-VL devuelve las cajas normalizadas 0..1000; ``detect_ui_elements``
+    las convierte a pixeles de la imagen analizada, por eso cada prueba usa
+    una imagen real de tamano conocido.
+    """
+
     def setup_method(self, _method=None):
         self.vision = Vision()
+        self._tmp = tempfile.TemporaryDirectory()
+        self.image_path = _png(os.path.join(self._tmp.name, "captura.png"), 400, 200)
+
+    def teardown_method(self, _method=None):
+        self._tmp.cleanup()
+
+    @staticmethod
+    def _content(elements):
+        return {"message": {"content": json_dumps({"elements": elements})}}
 
     @patch("src.eyes.vision.vision.ollama")
     def test_detect_ui_elements_valid(self, mock_ollama):
-        mock_ollama.chat.return_value = {
-            "message": {"content": json_dumps({"elements": [
-                {"type": "button", "text": "OK", "bbox": [10, 20, 100, 80],
-                 "center": [55, 50], "interactive": True, "confidence": 0.95}
-            ]})}
-        }
-        resp = self.vision.detect_ui_elements("/fake/image.png")
+        mock_ollama.chat.return_value = self._content([
+            {"name": "ok", "type": "button", "text": "OK", "bbox": [100, 200, 300, 600],
+             "interactive": True, "confidence": 0.95}
+        ])
+        resp = self.vision.detect_ui_elements(self.image_path)
+        assert resp.error is None
+        assert resp.image_size == [400, 200]
         assert len(resp.elements) == 1
         assert resp.elements[0].type == "button"
         assert resp.elements[0].text == "OK"
         assert resp.elements[0].confidence == 0.95
+        # 0..1000 -> pixeles de una imagen 400x200.
+        assert resp.elements[0].bbox == [40, 40, 120, 120]
+        assert resp.elements[0].center == [80, 80]
 
     @patch("src.eyes.vision.vision.ollama")
     def test_detect_ui_elements_no_response(self, mock_ollama):
         mock_ollama.chat.return_value = {"message": {"content": ""}}
-        resp = self.vision.detect_ui_elements("/fake/image.png")
+        resp = self.vision.detect_ui_elements(self.image_path)
         assert resp.elements == []
+        assert resp.error is not None
+        assert "vacia" in resp.error
 
     @patch("src.eyes.vision.vision.ollama")
     def test_detect_ui_elements_invalid_bbox(self, mock_ollama):
-        mock_ollama.chat.return_value = {
-            "message": {"content": json_dumps({"elements": [
-                {"type": "button", "text": "X", "bbox": [1, 2],  # wrong length
-                 "center": [1, 2], "interactive": True, "confidence": 0.5}
-            ]})}
-        }
-        resp = self.vision.detect_ui_elements("/fake/image.png")
+        mock_ollama.chat.return_value = self._content([
+            {"type": "button", "text": "X", "bbox": [1, 2],  # wrong length
+             "interactive": True, "confidence": 0.5}
+        ])
+        resp = self.vision.detect_ui_elements(self.image_path)
         assert len(resp.elements) == 0
+        assert resp.discarded == 1
+        assert resp.error is None
 
     @patch("src.eyes.vision.vision.ollama")
     def test_detect_ui_elements_exception(self, mock_ollama):
         mock_ollama.chat.side_effect = Exception("network error")
-        resp = self.vision.detect_ui_elements("/fake/image.png")
+        resp = self.vision.detect_ui_elements(self.image_path)
         assert resp.elements == []
+        assert resp.error is not None
+        assert "network error" in resp.error
 
     @patch("src.eyes.vision.vision.ollama")
     def test_detect_ui_elements_with_application(self, mock_ollama):
-        mock_ollama.chat.return_value = {
-            "message": {"content": json_dumps({"elements": []})}
-        }
-        self.vision.detect_ui_elements("/fake/image.png", application="chrome")
+        mock_ollama.chat.return_value = self._content([])
+        resp = self.vision.detect_ui_elements(self.image_path, application="chrome")
         call_kwargs = mock_ollama.chat.call_args.kwargs
         assert "chrome" in call_kwargs["messages"][0]["content"]
+        assert resp.error is None
+        assert resp.elements == []
+
+    @patch("src.eyes.vision.vision.ollama")
+    def test_prompt_y_esquema_piden_cajas_normalizadas(self, mock_ollama):
+        mock_ollama.chat.return_value = self._content([])
+        self.vision.detect_ui_elements(self.image_path)
+        call_kwargs = mock_ollama.chat.call_args.kwargs
+        prompt = call_kwargs["messages"][0]["content"]
+        assert "NORMALIZADAS de 0 a 1000" in prompt
+        schema = call_kwargs["format"]
+        elements_schema = schema["properties"]["elements"]
+        assert elements_schema["maxItems"] == self.vision.detection_max_elements
+        assert "bbox" in elements_schema["items"]["required"]
+        # El centro se calcula de la caja; no se pide al modelo.
+        assert "center" not in elements_schema["items"]["properties"]
+        assert call_kwargs["think"] is False
+
+    @patch("src.eyes.vision.vision.ollama")
+    def test_imagen_inexistente_devuelve_error_sin_llamar_al_modelo(self, mock_ollama):
+        resp = self.vision.detect_ui_elements(os.path.join(self._tmp.name, "no_existe.png"))
+        assert resp.elements == []
+        assert resp.error is not None
+        assert "no se pudo leer la imagen" in resp.error
+        mock_ollama.chat.assert_not_called()
+
+    @patch("src.eyes.vision.vision.ollama")
+    def test_cajas_fuera_de_rango_o_invertidas_se_descartan(self, mock_ollama):
+        mock_ollama.chat.return_value = self._content([
+            {"name": "pixeles", "type": "button", "text": "A", "bbox": [100, 200, 1200, 600],
+             "interactive": True, "confidence": 0.9},
+            {"name": "invertida", "type": "button", "text": "B", "bbox": [500, 200, 100, 600],
+             "interactive": True, "confidence": 0.9},
+            {"name": "negativa", "type": "button", "text": "C", "bbox": [-5, 200, 100, 600],
+             "interactive": True, "confidence": 0.9},
+            {"name": "valida", "type": "button", "text": "D", "bbox": [0, 0, 1000, 1000],
+             "interactive": True, "confidence": 0.9},
+        ])
+        resp = self.vision.detect_ui_elements(self.image_path)
+        assert resp.error is None
+        assert [e.name for e in resp.elements] == ["valida"]
+        assert resp.elements[0].bbox == [0, 0, 400, 200]
+        assert resp.discarded == 3
+
+    @patch("src.eyes.vision.vision.ollama")
+    def test_elementos_repetidos_se_descartan(self, mock_ollama):
+        repetido = {"name": "aceptar", "type": "button", "text": "Aceptar",
+                    "bbox": [100, 100, 300, 300], "interactive": True, "confidence": 0.9}
+        otro = dict(repetido, bbox=[600, 100, 800, 300])
+        mock_ollama.chat.return_value = self._content([repetido, dict(repetido), otro])
+        resp = self.vision.detect_ui_elements(self.image_path)
+        assert resp.error is None
+        assert len(resp.elements) == 2
+        assert resp.discarded == 1
+
+    @patch("src.eyes.vision.vision.ollama")
+    def test_maximo_de_elementos(self, mock_ollama):
+        self.vision.detection_max_elements = 2
+        mock_ollama.chat.return_value = self._content([
+            {"name": "e%d" % i, "type": "button", "text": "", "bbox": [i * 100, 0, i * 100 + 50, 50],
+             "interactive": True, "confidence": 0.9}
+            for i in range(3)
+        ])
+        resp = self.vision.detect_ui_elements(self.image_path)
+        assert len(resp.elements) == 2
+        assert resp.discarded == 1
+        assert mock_ollama.chat.call_args.kwargs["format"]["properties"]["elements"]["maxItems"] == 2
+
+    @patch("src.eyes.vision.vision.ollama")
+    def test_respuesta_cortada_recupera_elementos_completos(self, mock_ollama):
+        completos = [
+            {"name": "a", "type": "button", "text": "A", "bbox": [0, 0, 500, 500],
+             "interactive": True, "confidence": 0.9},
+            {"name": "b", "type": "link", "text": "B", "bbox": [500, 500, 1000, 1000],
+             "interactive": True, "confidence": 0.8},
+        ]
+        cortado = json_dumps({"elements": completos})[:-2] + ', {"name": "c", "ty'
+        mock_ollama.chat.return_value = {"message": {"content": cortado}, "done_reason": "length"}
+        resp = self.vision.detect_ui_elements(self.image_path)
+        assert resp.error is None
+        assert [e.name for e in resp.elements] == ["a", "b"]
+        assert resp.truncated is True
+
+    @patch("src.eyes.vision.vision.ollama")
+    def test_solo_razonamiento_devuelve_error_explicito(self, mock_ollama):
+        # Variante thinking: agota num_predict razonando y no devuelve contenido.
+        vision = Vision(model="qwen3-vl:8b")
+        mock_ollama.chat.return_value = {
+            "message": {"content": "", "thinking": "Voy a analizar la imagen... " * 50},
+            "done_reason": "length",
+        }
+        resp = vision.detect_ui_elements(self.image_path)
+        assert resp.elements == []
+        assert resp.truncated is True
+        assert "razonamiento" in resp.error
+        assert "variante sin razonamiento como %s" % DEFAULT_VISION_MODEL in resp.error
+
+    @patch("src.eyes.vision.vision.ollama")
+    def test_respuesta_sin_lista_elements_es_error(self, mock_ollama):
+        mock_ollama.chat.return_value = {"message": {"content": json_dumps({"items": []})}}
+        resp = self.vision.detect_ui_elements(self.image_path)
+        assert resp.elements == []
+        assert "elements" in resp.error
+
+    @patch("src.eyes.vision.vision.ollama")
+    def test_imagen_pequena_se_envia_sin_reducir(self, mock_ollama):
+        mock_ollama.chat.return_value = self._content([])
+        resp = self.vision.detect_ui_elements(self.image_path)
+        call_kwargs = mock_ollama.chat.call_args.kwargs
+        assert call_kwargs["messages"][0]["images"] == [self.image_path]
+        assert call_kwargs["options"]["num_ctx"] == 8192
+        assert resp.model_image_size == [400, 200]
+
+    @patch("src.eyes.vision.vision.ollama")
+    def test_captura_4k_se_reduce_y_las_cajas_vuelven_a_pixeles_originales(self, mock_ollama):
+        grande = _png(os.path.join(self._tmp.name, "captura_4k.png"), 3840, 2000)
+        mock_ollama.chat.return_value = self._content([
+            {"name": "aceptar", "type": "button", "text": "Aceptar", "bbox": [500, 500, 600, 550],
+             "interactive": True, "confidence": 0.9}
+        ])
+        resp = self.vision.detect_ui_elements(grande)
+        call_kwargs = mock_ollama.chat.call_args.kwargs
+        enviada = call_kwargs["messages"][0]["images"][0]
+        # Se envia una copia PNG reducida en memoria, no la captura original.
+        assert isinstance(enviada, bytes)
+        with Image.open(io.BytesIO(enviada)) as reducida:
+            ancho, alto = reducida.size
+        assert ancho * alto <= MODEL_IMAGE_MAX_PIXELS
+        assert abs(ancho / alto - 3840 / 2000) < 0.01
+        assert resp.image_size == [3840, 2000]
+        assert resp.model_image_size == [ancho, alto]
+        # La caja se expresa en pixeles de la captura original.
+        assert resp.error is None
+        assert resp.elements[0].bbox == [1920, 1000, 2304, 1100]
+        assert resp.elements[0].center == [2112, 1050]
+        # La imagen reducida cabe en el contexto pedido: no se amplia.
+        assert call_kwargs["options"]["num_ctx"] == 8192
+
+    @patch("src.eyes.vision.vision.ollama")
+    def test_num_ctx_se_amplia_si_la_imagen_no_cabe(self, mock_ollama):
+        grande = _png(os.path.join(self._tmp.name, "captura_4k.png"), 3840, 2160)
+        self.vision.max_image_pixels = 0  # sin reduccion
+        mock_ollama.chat.return_value = self._content([])
+        self.vision.detect_ui_elements(grande)
+        call_kwargs = mock_ollama.chat.call_args.kwargs
+        # 120 x 68 bloques de 32 px = 8160 tokens visuales + prompt + 4096 de salida.
+        assert call_kwargs["options"]["num_ctx"] > 8160 + 4096
+        assert call_kwargs["options"]["num_ctx"] % 1024 == 0
+        assert call_kwargs["messages"][0]["images"] == [grande]
 
 
 class TestVisionVerifyElementVisibility:
     def setup_method(self, _method=None):
         self.vision = Vision()
+        self._tmp = tempfile.TemporaryDirectory()
+        captura = _png(os.path.join(self._tmp.name, "monitor.png"), 1000, 500)
         self.vision.screen_capture = MagicMock()
-        self.vision.screen_capture.capture_monitor = MagicMock(return_value="/fake/img.png")
+        self.vision.screen_capture.capture_monitor = MagicMock(return_value=captura)
         self.vision.screen_capture.capture_active_window = MagicMock(return_value=None)
+
+    def teardown_method(self, _method=None):
+        self._tmp.cleanup()
 
     @patch("src.eyes.vision.vision.ollama")
     def test_element_found(self, mock_ollama):
         mock_ollama.chat.return_value = {
             "message": {"content": json_dumps({"elements": [
-                {"type": "button", "text": "Submit", "bbox": [10, 20, 100, 80],
-                 "center": [55, 50], "interactive": True, "confidence": 0.9}
+                {"name": "submit", "type": "button", "text": "Submit", "bbox": [10, 20, 100, 80],
+                 "interactive": True, "confidence": 0.9}
             ]})}
         }
         result = self.vision.verify_element_visibility("submit")
         assert result["success"] is True
         assert result["verified"] is True
         assert result["found_element"]["type"] == "button"
+        # Caja 0..1000 convertida a pixeles de la captura 1000x500.
+        assert result["found_element"]["bbox"] == [10, 10, 100, 40]
+
+    @patch("src.eyes.vision.vision.ollama")
+    def test_fallo_de_deteccion_no_se_confunde_con_elemento_ausente(self, mock_ollama):
+        mock_ollama.chat.side_effect = Exception("Ollama caido")
+        result = self.vision.verify_element_visibility("submit")
+        assert result["success"] is False
+        assert result["verified"] is False
+        assert "Ollama caido" in result["error"]
 
     @patch("src.eyes.vision.vision.ollama")
     def test_element_not_found(self, mock_ollama):

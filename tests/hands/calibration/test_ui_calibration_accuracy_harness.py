@@ -12,16 +12,41 @@ Los criterios de aceptacion estan FIJADOS ANTES de ejecutar (constantes
 CRITERIO_* al inicio de este archivo). Ninguna metrica se ajusta a posteriori
 para forzar un resultado positivo.
 
+Espacio de medida: pixeles fisicos del area cliente de la fixture. La
+geometria de referencia de la fixture es [x, y, ancho, alto] en pixeles
+logicos de Qt; se convierte a [x1, y1, x2, y2] multiplicando por la escala
+DPI real de la ventana (GetDpiForWindow / 96, leida del adaptador de
+escritorio, no de un detector). Las cajas de UIA se pasan a coordenadas del
+area cliente restando su origen en pantalla y las de vision ya estan en
+pixeles de la captura del area cliente.
+
+Ambito de la medida: las detecciones fuera del area cliente (barra de titulo),
+fuera de pantalla o que cubren casi toda la ventana (contenedores) no se
+evaluan; las que caen dentro de un control de referencia sin emparejarse
+(filas de una lista, pestanas, lineas del scroll, controles internos del
+grupo) cuentan como subelementos, no como falsos positivos. Una deteccion
+accionable sobre el control dibujado sin accesibilidad siempre es un falso
+accionable.
+
+Aserciones de la parte real: ninguna fuente termina con error; UIA cumple
+recall, IoU, error de centro y click correcto contra la referencia (valida la
+conversion de coordenadas de la medida); Qwen3-VL devuelve elementos, todas
+sus cajas caen dentro de la captura, la captura se reduce antes de enviarla al
+modelo y el centro de cada boton con texto (Aceptar, Cancelar, Abrir popup)
+cae dentro del boton; ninguna fuente supera la latencia maxima. El
+cumplimiento del resto de criterios por fuente se calcula y se guarda en el
+informe JSON (``criterios_cumplidos``) y en la salida de consola.
+
 La parte GUI real lanza UNA sola instancia de la fixture (proceso propio,
 controlado por la prueba) en el monitor no principal situado mas a la derecha
-segun la enumeracion real, la maximiza, captura su area cliente y ejecuta los
-tres pipelines de deteccion sobre esa captura. Compara los resultados contra
-la verdad-terreno de la fixture (runtime/truth_ground.json) sin que el
-detector consuma ese archivo.
+segun la enumeracion real, la maximiza, espera a que su geometria y su escala
+sean estables, captura su area cliente y ejecuta los tres pipelines de
+deteccion sobre esa captura. Compara los resultados contra la verdad-terreno
+de la fixture sin que el detector la consuma.
 
 Requiere `JARVIS_TEST_GUI_REAL=1` y Windows. Sin la variable, la parte real
 se salta; la parte offscreen (logica de metricas con datos sinteticos) siempre
-se ejecuta.
+se ejecuta, tambien fuera de Windows.
 
 Nunca cierra procesos ni ventanas preexistentes del usuario: solo cierra la
 ventana de la fixture que esta prueba abrio.
@@ -42,8 +67,6 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import psutil
 
-from pywinauto import Desktop
-
 from src.desktop.native_imports import is_windows
 from src.desktop.platform_contract import get_desktop_platform
 from src.hands.detection.ui_automation_adapter import (
@@ -54,7 +77,7 @@ from src.hands.detection.ui_automation_adapter import (
 from src.hands.detection.calibration_quality_gate import assess_candidate
 from src.hands.detection.calibration_quality_gate import DetectionThresholds
 from src.eyes.capture.screen_capture import ScreenCapture
-from src.eyes.vision.vision import Vision
+from src.eyes.vision.vision import DEFAULT_VISION_MODEL, MODEL_IMAGE_MAX_PIXELS, Vision
 from src.eyes.detection.visual_ui_detector_fusion import (
     VisualUIDetectorFusion,
     DetectedCandidate,
@@ -74,6 +97,7 @@ from tests.fixtures.gui_calibration_app.truth_ground import (
     construir_truth_ground,
     get_truth_ground,
 )
+from tests.helpers.ollama_session import servidor_ollama_de_sesion
 
 TITULO_FIXTURE = "JARVIS GUI Calibration Fixture"
 FIXTURE_RUN = os.path.abspath(
@@ -97,6 +121,15 @@ CRITERIO_CLICK_CORRECTO_MIN = 0.90     # Fraccion de controles con centro dentro
 CRITERIO_FALSOS_ACCIONABLES_MAX = 0    # canvas_mano nunca debe marcarse accionable sin evidencia
 CRITERIO_LATENCIA_MAX_S = 300.0        # Tiempo maximo por fuente de deteccion
 IOU_EMPAREJAMIENTO = 0.50              # Umbral de IoU para considerar deteccion como verdadero positivo
+
+# Botones con texto visible que cualquier detector visual debe localizar.
+BOTONES_CON_TEXTO = ("btn_aceptar", "btn_cancelar", "popup_info")
+# Una deteccion no emparejada con al menos esta fraccion de su area dentro de
+# un control de referencia es un subelemento de ese control.
+CONTENCION_SUBELEMENTO = 0.80
+# Una deteccion que cubre al menos esta fraccion del area cliente es un
+# contenedor de la ventana (raiz, area central), no un control.
+FRACCION_CONTENEDOR_VENTANA = 0.90
 
 
 def _gui_lock_activo() -> bool:
@@ -168,6 +201,8 @@ def _distancia_centro(a: Optional[List[int]], b: Optional[List[int]]) -> Optiona
 
 def _cliente_offset_pantalla(hwnd: int) -> Tuple[int, int]:
     """Devuelve (left, top) del area cliente de la ventana en coordenadas de pantalla."""
+    import ctypes.wintypes  # solo Windows
+
     user32 = ctypes.windll.user32
     punto = ctypes.wintypes.POINT(0, 0)
     if not user32.ClientToScreen(ctypes.c_void_p(int(hwnd)), ctypes.byref(punto)):
@@ -177,6 +212,8 @@ def _cliente_offset_pantalla(hwnd: int) -> Tuple[int, int]:
 
 def _area_cliente_pantalla(hwnd: int) -> Optional[Tuple[int, int, int, int]]:
     """Devuelve (left, top, right, bottom) del area cliente en coordenadas de pantalla."""
+    import ctypes.wintypes  # solo Windows
+
     user32 = ctypes.windll.user32
     rect = ctypes.wintypes.RECT()
     if not user32.GetClientRect(ctypes.c_void_p(int(hwnd)), ctypes.byref(rect)):
@@ -316,6 +353,8 @@ class ResultadoMetrica:
     error_centro_medio_px: float = 0.0
     click_correcto: float = 0.0
     falsos_accionables: List[str] = field(default_factory=list)
+    fuera_de_ambito: int = 0
+    subelementos: int = 0
     latencia_s: float = 0.0
     cpu_actual_percent: float = -1.0
     ram_actual_mb: float = -1.0
@@ -323,12 +362,16 @@ class ResultadoMetrica:
     ollama_cpu_percent: float = -1.0
     vram_mb: float = -1.0
     error: Optional[str] = None
+    detalle: Dict[str, Any] = field(default_factory=dict)
+    criterios_cumplidos: Dict[str, bool] = field(default_factory=dict)
 
     def a_dict(self) -> Dict[str, Any]:
         return {
             "fuente": self.fuente,
             "total_referencia": self.total_referencia,
             "total_detectados": self.total_detectados,
+            "fuera_de_ambito": self.fuera_de_ambito,
+            "subelementos": self.subelementos,
             "tp": self.tp,
             "fp": self.fp,
             "fn": self.fn,
@@ -346,7 +389,83 @@ class ResultadoMetrica:
             "ollama_cpu_percent": round(self.ollama_cpu_percent, 2),
             "vram_mb": self.vram_mb,
             "error": self.error,
+            "detalle": dict(self.detalle),
+            "criterios_cumplidos": dict(self.criterios_cumplidos),
         }
+
+
+def _referencia_en_pixeles(controles: List[Dict[str, Any]], escala: float) -> List[Dict[str, Any]]:
+    """Copia los controles de referencia anadiendo ``bbox`` [x1, y1, x2, y2].
+
+    ``geometry`` de la fixture es [x, y, ancho, alto] en pixeles logicos de Qt
+    relativos al area cliente; ``bbox`` es esa misma caja en pixeles fisicos
+    (``escala`` = DPI real de la ventana / 96). Sin geometria, ``bbox`` es None.
+    """
+    resultado: List[Dict[str, Any]] = []
+    for control in controles:
+        copia = dict(control)
+        geo = control.get("geometry")
+        if geo is not None and len(geo) == 4:
+            x, y, ancho, alto = [float(v) for v in geo]
+            copia["bbox"] = [
+                int(round(x * escala)),
+                int(round(y * escala)),
+                int(round((x + ancho) * escala)),
+                int(round((y + alto) * escala)),
+            ]
+        else:
+            copia["bbox"] = None
+        resultado.append(copia)
+    return resultado
+
+
+def _centro_en_zona_util(caja: Optional[List[int]], ref_bbox: Optional[List[int]]) -> bool:
+    """El centro de ``caja`` cae dentro de ``ref_bbox`` dejando un 10% de margen interno."""
+    centro = _centro(caja)
+    if centro is None or not ref_bbox or len(ref_bbox) != 4:
+        return False
+    cx, cy = centro
+    rx1, ry1, rx2, ry2 = ref_bbox
+    margen_x = (rx2 - rx1) * 0.10
+    margen_y = (ry2 - ry1) * 0.10
+    return (rx1 + margen_x <= cx <= rx2 - margen_x) and (ry1 + margen_y <= cy <= ry2 - margen_y)
+
+
+def _fuera_de_ambito(det: DetectedCandidate, tamano_cliente: Optional[Tuple[int, int]]) -> bool:
+    """Deteccion que no se evalua: sin caja, fuera de pantalla, fuera del area cliente o contenedor de la ventana."""
+    if not det.bbox or len(det.bbox) != 4:
+        return True
+    if bool((det.raw or {}).get("is_offscreen")):
+        return True
+    if tamano_cliente is None:
+        return False
+    ancho, alto = tamano_cliente
+    cx, cy = _centro(det.bbox)
+    if not (0 <= cx < ancho and 0 <= cy < alto):
+        return True
+    x1, y1, x2, y2 = det.bbox
+    area = max(0, x2 - x1) * max(0, y2 - y1)
+    return area >= FRACCION_CONTENEDOR_VENTANA * ancho * alto
+
+
+def _referencia_contenedora(caja: List[int], referencia: List[Dict[str, Any]]) -> Optional[int]:
+    """Indice del control de referencia mas pequeno que contiene la caja (>= CONTENCION_SUBELEMENTO)."""
+    x1, y1, x2, y2 = caja
+    area = max(0, x2 - x1) * max(0, y2 - y1)
+    if area <= 0:
+        return None
+    mejor: Optional[Tuple[int, int]] = None
+    for j, ref in enumerate(referencia):
+        rb = ref.get("bbox")
+        if not rb:
+            continue
+        ix = max(0, min(x2, rb[2]) - max(x1, rb[0]))
+        iy = max(0, min(y2, rb[3]) - max(y1, rb[1]))
+        if ix * iy >= CONTENCION_SUBELEMENTO * area:
+            area_ref = (rb[2] - rb[0]) * (rb[3] - rb[1])
+            if mejor is None or area_ref < mejor[1]:
+                mejor = (j, area_ref)
+    return mejor[0] if mejor else None
 
 
 def _emparejar(
@@ -354,10 +473,10 @@ def _emparejar(
     referencia: List[Dict[str, Any]],
     iou_umbral: float,
 ) -> Tuple[List[Tuple[int, int, float]], List[int], List[int]]:
-    """Empareja detectados con referencia uno a uno.
+    """Empareja detectados con referencia uno a uno (``bbox`` de la referencia).
 
     Primero por nombre (automation_id ultimo componente == id de referencia),
-    luego por IoU >= umbral para los restantes.
+    luego por IoU >= umbral para los restantes, asignando de mayor a menor IoU.
 
     Retorna (pares (idx_det, idx_ref, iou), idx_det_no_emparejados, idx_ref_no_emparejados).
     """
@@ -369,39 +488,30 @@ def _emparejar(
 
     # Paso 1: emparejar por nombre exacto (robusto a jerarquia de automation_id).
     for i, det in enumerate(detectados):
-        if i in det_usados:
-            continue
         det_nombre = str(det.element.name or "")
+        if not det_nombre:
+            continue
         for j, ref in enumerate(referencia):
             if j in ref_usados:
                 continue
-            ref_id = str(ref.get("id", ""))
-            if det_nombre and det_nombre == ref_id:
-                iou = _iou(det.bbox, ref.get("geometry")) if det.bbox and ref.get("geometry") else 0.0
-                pares.append((i, j, iou))
+            if det_nombre == str(ref.get("id", "")):
+                pares.append((i, j, _iou(det.bbox, ref.get("bbox"))))
                 det_usados.add(i)
                 ref_usados.add(j)
                 break
 
-    # Paso 2: emparejar por IoU para los restantes no emparejados.
-    mejor_para_ref: Dict[int, Tuple[int, float]] = {}
+    # Paso 2: emparejar por IoU los restantes, de mayor a menor IoU.
+    candidatos: List[Tuple[float, int, int]] = []
     for i, det in enumerate(detectados):
         if i in det_usados:
             continue
-        det_bbox = det.bbox
         for j, ref in enumerate(referencia):
-            if j in ref_usados:
+            if j in ref_usados or not ref.get("bbox"):
                 continue
-            ref_geo = ref.get("geometry")
-            if ref_geo is None or len(ref_geo) != 4:
-                continue
-            iou = _iou(det_bbox, ref_geo)
+            iou = _iou(det.bbox, ref["bbox"])
             if iou >= iou_umbral:
-                prev = mejor_para_ref.get(j)
-                if prev is None or iou > prev[1]:
-                    mejor_para_ref[j] = (i, iou)
-    for j in sorted(mejor_para_ref.keys()):
-        i, iou = mejor_para_ref[j]
+                candidatos.append((iou, i, j))
+    for iou, i, j in sorted(candidatos, key=lambda c: (-c[0], c[1], c[2])):
         if i in det_usados or j in ref_usados:
             continue
         pares.append((i, j, iou))
@@ -413,6 +523,21 @@ def _emparejar(
     return pares, det_no, ref_no
 
 
+def _evaluar_criterios(r: "ResultadoMetrica") -> Dict[str, bool]:
+    """Cumplimiento de cada criterio fijado para una fuente."""
+    hay_pares = r.tp > 0
+    return {
+        "precision": r.precision >= CRITERIO_PRECISION_MIN,
+        "recall": r.recall >= CRITERIO_RECALL_MIN,
+        "f1": r.f1 >= CRITERIO_F1_MIN,
+        "iou_medio": hay_pares and r.iou_medio >= CRITERIO_IOU_MEDIO_MIN,
+        "error_centro": hay_pares and r.error_centro_medio_px <= CRITERIO_ERROR_CENTRO_MAX_PX,
+        "click_correcto": hay_pares and r.click_correcto >= CRITERIO_CLICK_CORRECTO_MIN,
+        "falsos_accionables": len(r.falsos_accionables) <= CRITERIO_FALSOS_ACCIONABLES_MAX,
+        "latencia": r.latencia_s <= CRITERIO_LATENCIA_MAX_S,
+    }
+
+
 def _calcular_metrica(
     fuente: str,
     detectados: List[DetectedCandidate],
@@ -421,10 +546,31 @@ def _calcular_metrica(
     latencia_s: float,
     recursos: Dict[str, float],
     controles_sin_accesibilidad: List[str],
+    tamano_cliente: Optional[Tuple[int, int]] = None,
 ) -> ResultadoMetrica:
+    """Metricas de una fuente contra la referencia en pixeles (``bbox``).
+
+    Las detecciones fuera de ambito no se evaluan; las no emparejadas que caen
+    dentro de un control de referencia son subelementos; el resto de no
+    emparejadas son falsos positivos.
+    """
     pares, det_no, ref_no = _emparejar(detectados, referencia, iou_umbral)
+    fuera: List[int] = []
+    subelementos: List[Tuple[int, int]] = []
+    falsos_positivos: List[int] = []
+    for i in det_no:
+        det = detectados[i]
+        if _fuera_de_ambito(det, tamano_cliente):
+            fuera.append(i)
+            continue
+        contenedor = _referencia_contenedora(det.bbox, referencia)
+        if contenedor is not None:
+            subelementos.append((i, contenedor))
+        else:
+            falsos_positivos.append(i)
+
     tp = len(pares)
-    fp = len(det_no)
+    fp = len(falsos_positivos)
     fn = len(ref_no)
     precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
     recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
@@ -435,40 +581,29 @@ def _calcular_metrica(
 
     errores_centro: List[float] = []
     click_ok = 0
-    for (i, j, iou) in pares:
+    for (i, j, _iou_par) in pares:
         det = detectados[i]
-        ref = referencia[j]
-        ref_geo = ref.get("geometry")
-        d = _distancia_centro(det.bbox, ref_geo)
+        ref_bbox = referencia[j].get("bbox")
+        d = _distancia_centro(det.bbox, ref_bbox)
         if d is not None:
             errores_centro.append(d)
-            if ref_geo and len(ref_geo) == 4:
-                cx, cy = _centro(det.bbox)
-                if cx is not None and cy is not None:
-                    rx1, ry1, rx2, ry2 = ref_geo
-                    # Punto de clic dentro de la zona util (con 10% de margen interno)
-                    margen_x = (rx2 - rx1) * 0.10
-                    margen_y = (ry2 - ry1) * 0.10
-                    if (rx1 + margen_x <= cx <= rx2 - margen_x) and (ry1 + margen_y <= cy <= ry2 - margen_y):
-                        click_ok += 1
+            if _centro_en_zona_util(det.bbox, ref_bbox):
+                click_ok += 1
     error_centro_medio = (sum(errores_centro) / len(errores_centro)) if errores_centro else 0.0
     click_correcto = (click_ok / tp) if tp > 0 else 0.0
 
-    # Falsos accionables: detectados interactivos sin emparejar con referencia,
-    # O controles de referencia que NO deben ser interactivos (sin accesibilidad)
-    # pero detectados como interactivos.
+    # Falsos accionables: falsos positivos marcados como interactivos y
+    # cualquier deteccion interactiva sobre un control sin accesibilidad
+    # (canvas_mano), emparejada o como subelemento.
     falsos: List[str] = []
-    ids_emparejados_det = {i for (i, _, _) in pares}
-    for i in det_no:
+    for i in falsos_positivos:
         det = detectados[i]
         if bool(det.element.interactive):
             falsos.append(str(det.element.name or det.element.type or "desconocido"))
-    # canvas_mano (sin accesibilidad) no debe marcarse como interactivo
-    for (i, j, iou) in pares:
-        det = detectados[i]
-        ref = referencia[j]
-        ref_id = str(ref.get("id", ""))
-        if ref_id in controles_sin_accesibilidad and bool(det.element.interactive):
+    sobre_referencia = [(i, j) for (i, j, _) in pares] + subelementos
+    for (i, j) in sobre_referencia:
+        ref_id = str(referencia[j].get("id", ""))
+        if ref_id in controles_sin_accesibilidad and bool(detectados[i].element.interactive):
             if ref_id not in falsos:
                 falsos.append(ref_id)
 
@@ -476,6 +611,8 @@ def _calcular_metrica(
         fuente=fuente,
         total_referencia=len(referencia),
         total_detectados=len(detectados),
+        fuera_de_ambito=len(fuera),
+        subelementos=len(subelementos),
         tp=tp,
         fp=fp,
         fn=fn,
@@ -495,33 +632,51 @@ def _calcular_metrica(
     )
 
 
+_RECURSOS_VACIOS = {
+    "cpu_actual_percent": 0.0, "ram_actual_mb": 0.0, "ollama_ram_mb": 0.0,
+    "ollama_cpu_percent": 0.0, "vram_mb": -1.0,
+}
+
+
+def _det(nombre: str, caja: List[int], interactivo: bool = True, fuente: str = SOURCE_UIA,
+         raw: Optional[Dict[str, Any]] = None) -> DetectedCandidate:
+    centro = [(caja[0] + caja[2]) // 2, (caja[1] + caja[3]) // 2]
+    return DetectedCandidate(
+        source=fuente,
+        element=UIElementData(name=nombre, type="button", bbox=list(caja), center=centro,
+                              interactive=interactivo, confidence=0.9),
+        confidence=0.9, bbox=list(caja), center=centro, screen=0, raw=dict(raw or {}),
+    )
+
+
 class TestLogicaMetricasOffscreen(unittest.TestCase):
     """Valida la logica de precision/recall/F1/IoU con datos sinteticos (sin GUI real)."""
 
+    def test_referencia_xywh_logica_a_caja_fisica(self):
+        """[x, y, ancho, alto] logicos x escala DPI -> [x1, y1, x2, y2] fisicos."""
+        ref = _referencia_en_pixeles(
+            [{"id": "btn_aceptar", "geometry": [20, 20, 100, 32]}, {"id": "menu", "geometry": None}], 2.25)
+        self.assertEqual(ref[0]["bbox"], [45, 45, 270, 117])
+        self.assertEqual(ref[0]["geometry"], [20, 20, 100, 32])
+        self.assertIsNone(ref[1]["bbox"])
+        self.assertEqual(_referencia_en_pixeles([{"id": "a", "geometry": [10, 5, 30, 20]}], 1.0)[0]["bbox"],
+                         [10, 5, 40, 25])
+
     def test_emparejamiento_uno_a_uno_y_metricas(self):
-        ref = [
+        ref = _referencia_en_pixeles([
             {"id": "btn_a", "geometry": [0, 0, 100, 50]},
             {"id": "btn_b", "geometry": [200, 0, 100, 50]},
-        ]
-        det_ok = DetectedCandidate(
-            source=SOURCE_UIA,
-            element=UIElementData(name="btn_a", type="button", bbox=[10, 5, 90, 45], center=[50, 25], confidence=0.9),
-            confidence=0.9, bbox=[10, 5, 90, 45], center=[50, 25], screen=0,
-        )
-        det_fp = DetectedCandidate(
-            source=SOURCE_UIA,
-            element=UIElementData(name="fantasma", type="button", bbox=[900, 900, 50, 30], center=[925, 915], confidence=0.9),
-            confidence=0.9, bbox=[900, 900, 950, 930], center=[925, 915], screen=0,
-        )
+        ], 1.0)
+        det_ok = _det("btn_a", [10, 5, 90, 45])
+        det_fp = _det("fantasma", [900, 900, 950, 930])
         pares, det_no, ref_no = _emparejar([det_ok, det_fp], ref, IOU_EMPAREJAMIENTO)
         self.assertEqual(len(pares), 1)
         self.assertEqual(len(det_no), 1)
         self.assertEqual(len(ref_no), 1)
 
         metrica = _calcular_metrica(
-            "uia", [det_ok, det_fp], ref, IOU_EMPAREJAMIENTO, 1.0,
-            {"cpu_actual_percent": 0.0, "ram_actual_mb": 0.0, "ollama_ram_mb": 0.0, "ollama_cpu_percent": 0.0, "vram_mb": -1.0},
-            [],
+            "uia", [det_ok, det_fp], ref, IOU_EMPAREJAMIENTO, 1.0, _RECURSOS_VACIOS, [],
+            tamano_cliente=(1000, 1000),
         )
         self.assertEqual(metrica.tp, 1)
         self.assertEqual(metrica.fp, 1)
@@ -529,7 +684,101 @@ class TestLogicaMetricasOffscreen(unittest.TestCase):
         self.assertAlmostEqual(metrica.precision, 0.5)
         self.assertAlmostEqual(metrica.recall, 0.5)
         self.assertAlmostEqual(metrica.f1, 0.5)
-        self.assertGreater(metrica.iou_medio, 0.0)
+        self.assertAlmostEqual(metrica.iou_medio, (80 * 40) / (100 * 50))
+        self.assertEqual(metrica.falsos_accionables, ["fantasma"])
+
+    def test_cajas_exactas_casan_con_la_referencia_convertida(self):
+        """Cajas UIA exactas a escala 2.25: IoU 1, error 0 y click correcto (el informe
+        anterior daba IoU 0 y ~626 px de error al tratar [x, y, ancho, alto] como esquinas
+        y omitir la escala)."""
+        controles = construir_truth_ground().a_dict()["controles"]
+        ref = _referencia_en_pixeles(controles, 2.25)
+        detectados = [_det(r["id"], r["bbox"]) for r in ref]
+        metrica = _calcular_metrica(
+            "uia", detectados, ref, IOU_EMPAREJAMIENTO, 0.1, _RECURSOS_VACIOS, [],
+            tamano_cliente=(3840, 2001),
+        )
+        self.assertEqual(metrica.tp, len(controles))
+        self.assertEqual((metrica.fp, metrica.fn), (0, 0))
+        self.assertAlmostEqual(metrica.iou_medio, 1.0)
+        self.assertAlmostEqual(metrica.error_centro_medio_px, 0.0)
+        self.assertAlmostEqual(metrica.click_correcto, 1.0)
+        # Sensibilidad: la referencia sin escalar no casa con las cajas fisicas.
+        sin_escala = _calcular_metrica(
+            "uia", detectados, _referencia_en_pixeles(controles, 1.0), IOU_EMPAREJAMIENTO, 0.1,
+            _RECURSOS_VACIOS, [], tamano_cliente=(3840, 2001),
+        )
+        self.assertLess(sin_escala.iou_medio, CRITERIO_IOU_MEDIO_MIN)
+        self.assertGreater(sin_escala.error_centro_medio_px, CRITERIO_ERROR_CENTRO_MAX_PX)
+
+    def test_ambito_subelementos_y_contenedores(self):
+        ref = _referencia_en_pixeles([
+            {"id": "lst_items", "geometry": [20, 300, 200, 120]},
+            {"id": "btn_ok", "geometry": [20, 20, 100, 30]},
+        ], 1.0)
+        detectados = [
+            _det("lst_items", [20, 300, 220, 420]),          # emparejado por nombre
+            _det("Item 1", [22, 302, 218, 330]),             # fila dentro de la lista
+            _det("Cerrar", [950, -30, 990, -2]),            # barra de titulo (fuera del cliente)
+            _det("ventana", [-8, -31, 1008, 808]),          # contenedor de la ventana
+            _det("oculto", [600, 600, 650, 640], raw={"is_offscreen": True}),
+            _det("inventado", [600, 100, 700, 140]),        # falso positivo
+        ]
+        metrica = _calcular_metrica(
+            "uia", detectados, ref, IOU_EMPAREJAMIENTO, 0.1, _RECURSOS_VACIOS, [],
+            tamano_cliente=(1000, 800),
+        )
+        self.assertEqual(metrica.tp, 1)
+        self.assertEqual(metrica.subelementos, 1)
+        self.assertEqual(metrica.fuera_de_ambito, 3)
+        self.assertEqual(metrica.fp, 1)
+        self.assertEqual(metrica.fn, 1)
+        self.assertEqual(metrica.falsos_accionables, ["inventado"])
+
+    def test_control_sin_accesibilidad_marcado_accionable_es_falso(self):
+        ref = _referencia_en_pixeles([{"id": "canvas_mano", "geometry": [900, 20, 200, 200]}], 1.0)
+        dentro = _det("dibujo", [950, 60, 1050, 160], fuente=SOURCE_QWEN3VL)
+        metrica = _calcular_metrica(
+            "qwen", [dentro], ref, IOU_EMPAREJAMIENTO, 1.0, _RECURSOS_VACIOS, ["canvas_mano"],
+            tamano_cliente=(1200, 800),
+        )
+        self.assertEqual(metrica.subelementos, 1)
+        self.assertEqual(metrica.falsos_accionables, ["canvas_mano"])
+        no_accionable = _calcular_metrica(
+            "qwen", [_det("dibujo", [950, 60, 1050, 160], interactivo=False)], ref, IOU_EMPAREJAMIENTO,
+            1.0, _RECURSOS_VACIOS, ["canvas_mano"], tamano_cliente=(1200, 800),
+        )
+        self.assertEqual(no_accionable.falsos_accionables, [])
+
+    def test_emparejamiento_por_iou_no_deja_referencias_sin_par_evitables(self):
+        ref = _referencia_en_pixeles([
+            {"id": "a", "geometry": [0, 0, 100, 100]},
+            {"id": "b", "geometry": [20, 0, 100, 100]},
+        ], 1.0)
+        # det0 es la mejor deteccion para "a" y para "b" (IoU 0.82 con ambas);
+        # det1 solo solapa lo suficiente con "b" (0.74). Una asignacion por
+        # referencia dejaria "b" sin pareja; la voraz global empareja las dos.
+        det0 = _det("x", [10, 0, 110, 100], fuente=SOURCE_QWEN3VL)
+        det1 = _det("y", [35, 0, 135, 100], fuente=SOURCE_QWEN3VL)
+        pares, det_no, ref_no = _emparejar([det0, det1], ref, IOU_EMPAREJAMIENTO)
+        asignados = {referencia_j: det_i for det_i, referencia_j, _ in pares}
+        self.assertEqual(asignados, {0: 0, 1: 1})
+        self.assertEqual((det_no, ref_no), ([], []))
+
+    def test_criterios_sin_pares_no_se_cumplen(self):
+        r = ResultadoMetrica(fuente="qwen3vl_vision", latencia_s=1.0)
+        criterios = _evaluar_criterios(r)
+        self.assertFalse(criterios["iou_medio"])
+        self.assertFalse(criterios["error_centro"])
+        self.assertFalse(criterios["click_correcto"])
+        self.assertFalse(criterios["recall"])
+        self.assertTrue(criterios["latencia"])
+
+    def test_centro_en_zona_util(self):
+        self.assertTrue(_centro_en_zona_util([45, 45, 270, 117], [45, 45, 270, 117]))
+        self.assertTrue(_centro_en_zona_util([100, 60, 200, 100], [45, 45, 270, 117]))
+        self.assertFalse(_centro_en_zona_util([300, 45, 400, 117], [45, 45, 270, 117]))
+        self.assertFalse(_centro_en_zona_util(None, [45, 45, 270, 117]))
 
 
 class TestHarnessCalibracionPrecisionReal(unittest.TestCase):
@@ -542,6 +791,8 @@ class TestHarnessCalibracionPrecisionReal(unittest.TestCase):
     cliente_offset = (0, 0)
     cliente_rect = None
     tamano_cliente = (0, 0)
+    escala_ventana = None
+    escala_monitor = None
 
     @classmethod
     def setUpClass(cls):
@@ -559,6 +810,8 @@ class TestHarnessCalibracionPrecisionReal(unittest.TestCase):
         cls.cliente_offset = (0, 0)
         cls.cliente_rect = None
         cls.tamano_cliente = (0, 0)
+        cls.escala_ventana = None
+        cls.escala_monitor = None
         try:
             cls._lanzar_fixture_propietaria()
         except Exception:
@@ -572,6 +825,8 @@ class TestHarnessCalibracionPrecisionReal(unittest.TestCase):
     @classmethod
     def _lanzar_fixture_propietaria(cls):
         """Lanza la fixture y se queda con la ventana que esta prueba creo."""
+        from pywinauto import Desktop  # solo Windows
+
         cls.proc = subprocess.Popen([sys.executable, FIXTURE_RUN])
         deadline = time.time() + 25
         cls.hwnd = None
@@ -603,9 +858,40 @@ class TestHarnessCalibracionPrecisionReal(unittest.TestCase):
         ac = cls.adapter.activate_window(cls.hwnd)
         assert ac.ok is True, "No se pudo activar la fixture: %s" % ac.error
 
-        win = cls.adapter.get_window(cls.hwnd)
-        assert win.ok is True
+        # La ventana se registra para el cierre en cuanto existe, aunque falle
+        # una comprobacion posterior.
+        atexit.register(cls._cerrar_fixture_propietaria)
+
+        # Esperar (sin sleep fijo) a que la ventana este en el monitor
+        # objetivo con su escala DPI y su area cliente estables: Qt reajusta
+        # la geometria al recibir WM_DPICHANGED tras el cambio de monitor.
+        cls.escala_monitor = float(objetivo.scale_factor)
+        win = None
+        rect_anterior = None
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            win = cls.adapter.get_window(cls.hwnd)
+            rect = _area_cliente_pantalla(cls.hwnd)
+            estable = (
+                win.ok is True
+                and win.value.display_id == cls.monitor_id
+                and win.value.scale_factor is not None
+                and abs(float(win.value.scale_factor) - cls.escala_monitor) < 0.01
+                and rect is not None
+                and rect == rect_anterior
+            )
+            if estable:
+                break
+            rect_anterior = rect
+            time.sleep(0.25)
+        assert win is not None and win.ok is True, "No se pudo leer la ventana de la fixture"
         assert win.value.display_id == cls.monitor_id, "La fixture no quedo en el monitor objetivo"
+        assert win.value.scale_factor is not None, "El adaptador no devolvio la escala DPI de la ventana"
+        cls.escala_ventana = float(win.value.scale_factor)
+        assert abs(cls.escala_ventana - cls.escala_monitor) < 0.01, (
+            "La escala DPI de la ventana (%.4f) no coincide con la del monitor (%.4f): la referencia "
+            "logica de Qt no se puede convertir a pixeles fisicos" % (cls.escala_ventana, cls.escala_monitor)
+        )
 
         # Offset del area cliente en pantalla (para convertir coordenadas).
         cls.cliente_offset = _cliente_offset_pantalla(cls.hwnd)
@@ -614,13 +900,16 @@ class TestHarnessCalibracionPrecisionReal(unittest.TestCase):
             cl, ct, cr, cb = cls.cliente_rect
             cls.tamano_cliente = (cr - cl, cb - ct)
 
-        atexit.register(cls._cerrar_fixture_propietaria)
-
     def test_harness_precision_accesibilidad_vision_fusion(self):
         """Pipeline real: UIA + Qwen3-VL + fusion, metrica contra verdad-terreno."""
         self.assertIsNotNone(self.hwnd, "La fixture no se lanzo")
-        referencia = construir_truth_ground().a_dict()["controles"]
+        self.assertIsNotNone(self.escala_ventana, "Escala DPI de la fixture desconocida")
+        self.assertIsNotNone(self.cliente_rect, "Area cliente de la fixture no disponible")
+        referencia = _referencia_en_pixeles(
+            construir_truth_ground().a_dict()["controles"], self.escala_ventana
+        )
         self.assertGreaterEqual(len(referencia), 1, "La verdad-terreno no tiene controles")
+        tamano_cliente = tuple(self.tamano_cliente)
 
         recursos_iniciales = _recursos_proceso()
         resultados: List[ResultadoMetrica] = []
@@ -651,7 +940,7 @@ class TestHarnessCalibracionPrecisionReal(unittest.TestCase):
         latencia_uia = time.perf_counter() - t0
         res_uia = _calcular_metrica(
             "uia_accesibilidad", det_uia, referencia, IOU_EMPAREJAMIENTO, latencia_uia,
-            _recursos_proceso(), CONTROLES_SIN_ACCESIBILIDAD,
+            _recursos_proceso(), CONTROLES_SIN_ACCESIBILIDAD, tamano_cliente=tamano_cliente,
         )
         res_uia.error = error_uia
         resultados.append(res_uia)
@@ -661,31 +950,60 @@ class TestHarnessCalibracionPrecisionReal(unittest.TestCase):
         error_vision = None
         latencia_vision = 0.0
         t0_vision = 0.0
+        respuesta = None
+        tamano_captura = None
+        ruta_captura = None
+        servidor_ollama = None
         try:
-            if self.cliente_rect is not None:
-                cl, ct, cr, cb = self.cliente_rect
-                capturador = ScreenCapture()
-                ruta_captura = capturador.capture_region(cl, ct, cr - cl, cb - ct)
-                if ruta_captura is None:
-                    raise RuntimeError("ScreenCapture.capture_region devolvio None")
-                vision = Vision(model="qwen3-vl:8b")
-                t0_vision = time.perf_counter()
-                respuesta = vision.detect_ui_elements(ruta_captura, application="fixture", refine_with_opencv=False)
-                latencia_vision = time.perf_counter() - t0_vision
-                for elem in respuesta.elements:
-                    det = _elemento_a_candidato_vision(elem, self.hwnd, 0)
-                    det_vision.append(det)
-            else:
-                error_vision = "Area cliente de la fixture no disponible"
+            # Servidor Ollama de la sesion: se arranca si no responde y se
+            # cierra al terminar la sesion (nunca uno que ya estuviera en marcha).
+            servidor_ollama = servidor_ollama_de_sesion()
+            cl, ct, cr, cb = self.cliente_rect
+            capturador = ScreenCapture()
+            ruta_captura = capturador.capture_region(cl, ct, cr - cl, cb - ct)
+            if ruta_captura is None:
+                raise RuntimeError("ScreenCapture.capture_region devolvio None")
+            vision = Vision(model=DEFAULT_VISION_MODEL)
+            tamano_captura = Vision._image_size(ruta_captura)
+            t0_vision = time.perf_counter()
+            respuesta = vision.detect_ui_elements(ruta_captura, application="fixture", refine_with_opencv=False)
+            latencia_vision = time.perf_counter() - t0_vision
+            # detect_ui_elements nunca lanza: los fallos llegan en respuesta.error.
+            error_vision = respuesta.error
+            for elem in respuesta.elements:
+                det = _elemento_a_candidato_vision(elem, self.hwnd, 0)
+                det_vision.append(det)
         except Exception as exc:
             error_vision = str(exc)
             if t0_vision > 0:
                 latencia_vision = time.perf_counter() - t0_vision
+        finally:
+            if ruta_captura and os.path.exists(str(ruta_captura)):
+                try:
+                    os.remove(str(ruta_captura))
+                except OSError:
+                    pass
         res_vision = _calcular_metrica(
             "qwen3vl_vision", det_vision, referencia, IOU_EMPAREJAMIENTO, latencia_vision,
-            _recursos_proceso(), CONTROLES_SIN_ACCESIBILIDAD,
+            _recursos_proceso(), CONTROLES_SIN_ACCESIBILIDAD, tamano_cliente=tamano_cliente,
         )
         res_vision.error = error_vision
+        res_vision.detalle = {
+            "modelo": DEFAULT_VISION_MODEL,
+            "servidor_ollama_arrancado_por_la_sesion": (
+                servidor_ollama.started_by_us if servidor_ollama is not None else None
+            ),
+            "tamano_captura": list(tamano_captura) if tamano_captura else None,
+            "tamano_imagen_modelo": (respuesta.model_image_size if respuesta is not None else None),
+            "cajas_descartadas": (respuesta.discarded if respuesta is not None else None),
+            "salida_cortada": (respuesta.truncated if respuesta is not None else None),
+            "ollama": dict(vision.last_chat_info) if respuesta is not None else {},
+            "detecciones": [
+                {"name": d.element.name, "type": d.element.type, "bbox": d.bbox,
+                 "interactive": bool(d.element.interactive)}
+                for d in det_vision
+            ],
+        }
         resultados.append(res_vision)
 
         # ---------------- 3. Fusion (UIA + Vision) ----------------
@@ -723,10 +1041,13 @@ class TestHarnessCalibracionPrecisionReal(unittest.TestCase):
                 latencia_fusion = time.perf_counter() - t0_fusion
         res_fusion = _calcular_metrica(
             "fusion_uia_vision", det_fusion, referencia, IOU_EMPAREJAMIENTO, latencia_fusion,
-            _recursos_proceso(), CONTROLES_SIN_ACCESIBILIDAD,
+            _recursos_proceso(), CONTROLES_SIN_ACCESIBILIDAD, tamano_cliente=tamano_cliente,
         )
         res_fusion.error = error_fusion
         resultados.append(res_fusion)
+
+        for r in resultados:
+            r.criterios_cumplidos = _evaluar_criterios(r)
 
         # ---------------- Informe y aserciones contra criterios fijados ----------------
         informe = {
@@ -734,6 +1055,9 @@ class TestHarnessCalibracionPrecisionReal(unittest.TestCase):
             "fixture": TITULO_FIXTURE,
             "monitor_id": self.monitor_id,
             "tamano_cliente": list(self.tamano_cliente),
+            "escala_ventana": self.escala_ventana,
+            "escala_monitor": self.escala_monitor,
+            "espacio_coordenadas": "pixeles fisicos del area cliente",
             "total_controles_referencia": len(referencia),
             "controles_referencia": referencia,
             "criterios": {
@@ -757,43 +1081,70 @@ class TestHarnessCalibracionPrecisionReal(unittest.TestCase):
             pass
 
         # Imprimir resumen para visibilidad en consola.
-        print("\n=== HARNESS PRECISION CALIBRACION UI (3.8.6.10.3) ===")
+        print("\n=== HARNESS PRECISION CALIBRACION UI (escala %.2f, cliente %sx%s) ===" % (
+            self.escala_ventana, self.tamano_cliente[0], self.tamano_cliente[1]))
         for r in resultados:
-            print("[%s] tp=%d fp=%d fn=%d precision=%.2f recall=%.2f f1=%.2f iou=%.2f err_centro=%.1fpx click=%.2f falsos=%s lat=%.2fs cpu=%s ram=%.1fMB ollama_ram=%.1fMB vram=%s err=%s" % (
-                r.fuente, r.tp, r.fp, r.fn, r.precision, r.recall, r.f1, r.iou_medio,
-                r.error_centro_medio_px, r.click_correcto, r.falsos_accionables,
+            print("[%s] tp=%d fp=%d fn=%d sub=%d fuera=%d precision=%.2f recall=%.2f f1=%.2f iou=%.2f err_centro=%.1fpx click=%.2f falsos=%s lat=%.2fs cpu=%s ram=%.1fMB ollama_ram=%.1fMB vram=%s err=%s" % (
+                r.fuente, r.tp, r.fp, r.fn, r.subelementos, r.fuera_de_ambito, r.precision, r.recall,
+                r.f1, r.iou_medio, r.error_centro_medio_px, r.click_correcto, r.falsos_accionables,
                 r.latencia_s, r.cpu_actual_percent, r.ram_actual_mb, r.ollama_ram_mb, r.vram_mb, r.error,
             ))
-
-        # Aserciones de verificacion real (medibles en este entorno).
-        # Las mediciones de precision/F1/IoU/error-de-centro se REPORTAN en el
-        # informe pero no se aserchan como umbrales de paso/fallo porque:
-        #   - Qwen3-VL devuelve coordenadas en escala desconocida (no comparables
-        #     con la captura) y 0 elementos en imagenes grandes, por lo que su
-        #     IoU/error-de-centro no son verificables en este equipo.
-        #   - UIA reporta geometria en coordenadas de pantalla cuya conversion al
-        #     area cliente depende del offset DPI del equipo; el emparejamiento
-        #     por nombre es la medida verificable de detectabilidad.
-        # canvas_mano marcado por UIA es un hallazgo conocido (registro 3.8.6.10.2)
-        # que la puerta de calidad de unidades posteriores aborda; no se aserta
-        # en contra aqui.
+            print("    criterios cumplidos: %s" % r.criterios_cumplidos)
+        print("    vision: %s" % {k: v for k, v in res_vision.detalle.items() if k != "detecciones"})
 
         self.assertTrue(os.path.exists(informe_path), "El informe de precision no se genero")
 
-        res_uia = next((r for r in resultados if r.fuente == "uia_accesibilidad"), None)
-        self.assertIsNotNone(res_uia, "Falta el resultado de accesibilidad UIA")
-        self.assertIsNone(res_uia.error, "UIA produjo un error: %s" % res_uia.error)
+        # Ninguna fuente puede fallar en silencio.
+        for r in resultados:
+            self.assertIsNone(r.error, "%s produjo un error: %s" % (r.fuente, r.error))
+
+        # UIA da la geometria exacta de Qt: si no casa con la referencia, la
+        # conversion de coordenadas de la medida es incorrecta.
         self.assertGreaterEqual(
-            res_uia.recall, 0.80,
+            res_uia.recall, CRITERIO_RECALL_MIN,
             "UIA no detecta suficientes controles de referencia (recall=%.2f)" % res_uia.recall,
         )
+        self.assertGreaterEqual(
+            res_uia.iou_medio, CRITERIO_IOU_MEDIO_MIN,
+            "IoU medio UIA %.2f: la referencia convertida no casa con la geometria real" % res_uia.iou_medio,
+        )
+        self.assertLessEqual(
+            res_uia.error_centro_medio_px, CRITERIO_ERROR_CENTRO_MAX_PX,
+            "Error de centro UIA %.1f px" % res_uia.error_centro_medio_px,
+        )
+        self.assertGreaterEqual(
+            res_uia.click_correcto, CRITERIO_CLICK_CORRECTO_MIN,
+            "Click correcto UIA %.2f" % res_uia.click_correcto,
+        )
+
+        # Qwen3-VL detecta controles con coordenadas en pixeles de la captura.
+        self.assertGreaterEqual(res_vision.total_detectados, 1, "Qwen3-VL no detecto ningun elemento")
+        ancho_captura, alto_captura = tamano_captura
+        for d in det_vision:
+            x1, y1, x2, y2 = d.bbox
+            self.assertTrue(
+                0 <= x1 < x2 <= ancho_captura and 0 <= y1 < y2 <= alto_captura,
+                "Caja de vision fuera de la captura %sx%s: %s %s" % (ancho_captura, alto_captura, d.element.name, d.bbox),
+            )
+        tam_modelo = respuesta.model_image_size or list(tamano_captura)
+        self.assertLessEqual(
+            tam_modelo[0] * tam_modelo[1], MODEL_IMAGE_MAX_PIXELS,
+            "La captura %s no se redujo antes de enviarla al modelo (%s)" % (tamano_captura, tam_modelo),
+        )
+        ref_por_id = {r["id"]: r for r in referencia}
+        for control_id in BOTONES_CON_TEXTO:
+            ref_bbox = ref_por_id[control_id]["bbox"]
+            self.assertTrue(
+                any(_centro_en_zona_util(d.bbox, ref_bbox) for d in det_vision),
+                "Qwen3-VL no localiza %s %s; detecciones: %s" % (
+                    control_id, ref_bbox, [(d.element.name, d.bbox) for d in det_vision]),
+            )
 
         for r in resultados:
-            if r.error is None:
-                self.assertLessEqual(
-                    r.latencia_s, CRITERIO_LATENCIA_MAX_S,
-                    "Latencia excede el limite (%s): %.2f s > %.2f s" % (r.fuente, r.latencia_s, CRITERIO_LATENCIA_MAX_S),
-                )
+            self.assertLessEqual(
+                r.latencia_s, CRITERIO_LATENCIA_MAX_S,
+                "Latencia excede el limite (%s): %.2f s > %.2f s" % (r.fuente, r.latencia_s, CRITERIO_LATENCIA_MAX_S),
+            )
 
     @classmethod
     def tearDownClass(cls):
@@ -809,6 +1160,8 @@ class TestHarnessCalibracionPrecisionReal(unittest.TestCase):
     @classmethod
     def _cerrar_fixture_propietaria(cls):
         if cls.hwnd is not None and cls.adapter is not None:
+            from pywinauto import Desktop  # solo Windows
+
             try:
                 cls.adapter.close_window(cls.hwnd)
                 deadline = time.time() + 10

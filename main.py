@@ -10,6 +10,7 @@ from src.tools.executor import get_executor
 from src.memory import Memory
 from src.core.log import get_logger, setup_logging
 from src.core.config import get_macros_coords_path, get_voice_config
+from src.core.ollama_server import OllamaServerError, ensure_ollama_server
 
 try:
     from src.mouth import Mouth
@@ -112,6 +113,31 @@ def _try_change_voice(text: str, mouth) -> bool:
         return False
 
 
+def _preparar_ollama():
+    """Asegura que Ollama responde antes de crear Brain y Vision.
+
+    Si no responde, arranca `ollama serve`; ese servidor se cierra al salir
+    de JARVIS (o lo cierra su vigilante si JARVIS muere de golpe). Un servidor
+    que ya estaba en marcha se reutiliza y no se cierra.
+    """
+    try:
+        servidor = ensure_ollama_server()
+    except OllamaServerError as e:
+        logger.warning(
+            "Ollama no disponible: %s. Brain y Vision fallaran hasta que se arranque.", e
+        )
+        return None
+    if servidor.started_by_us:
+        logger.info(
+            "Ollama arrancado por JARVIS en %s (PID %s); se cerrara al salir.",
+            servidor.host,
+            servidor.pid,
+        )
+    else:
+        logger.info("Ollama ya estaba en marcha en %s.", servidor.host)
+    return servidor
+
+
 def main():
     setup_logging()
     logger.info("=" * 40)
@@ -119,6 +145,7 @@ def main():
     logger.info("=" * 40)
     try:
         logger.info("[*] Inicializando componentes...")
+        _preparar_ollama()
         jarvis_ear = Ear(model_size="medium")
         jarvis_brain = Brain(model="llama3")
         jarvis_executor = get_executor()

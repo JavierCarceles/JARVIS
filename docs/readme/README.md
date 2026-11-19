@@ -56,7 +56,8 @@ Modelos externos que necesita:
 | Modelo | Para que | Donde |
 |---|---|---|
 | `llama3` | Interpretar ordenes | Ollama |
-| `qwen3-vl:8b` y `qwen3-vl:8b-instruct` | Vision y calibracion | Ollama |
+| `qwen3-vl:8b-instruct` | Vision y calibracion | Ollama |
+| `qwen3-vl:8b` (variante con razonamiento) | Solo la `Vision` ligera de `vision_only.py` | Ollama |
 | Whisper `medium` | Voz a texto | Cache de Hugging Face (se descarga al primer uso) |
 | Kokoro ONNX + voces | Texto a voz | `models/` (Git LFS) |
 | OmniParser V2 `icon_detect_v3` | Deteccion visual (opcional, solo tests) | Cache de Hugging Face |
@@ -74,10 +75,11 @@ Modelos externos que necesita:
 ### Inicio de `main()`
 
 1. Llama a `setup_logging()`: los logs salen por consola y se guardan en `logs/jarvis.log` (seccion 11).
-2. Crea `Ear(model_size="medium")`, `Brain(model="llama3")`, el ejecutor (`get_executor()` de `src/tools/executor.py`) y `Memory()`. Si algo falla: "FALLO CRITICO" y salida.
-3. **Primer inventario del equipo:** si este ordenador no tiene ningun escaneo correcto en `data/system_inventory.sqlite3`, lanza en segundo plano un inventario completo de todos los volumenes.
-4. Comprueba si existe `data/macros_coords.json` (solo informativo).
-5. Crea la boca (`Mouth()`) y elige la voz.
+2. **Ollama** (`_preparar_ollama`, con `src/core/ollama_server.py`): si el servidor no responde y la direccion es local, arranca `ollama serve` y lo cierra al salir de JARVIS; si ya estaba en marcha, lo reutiliza y no lo cierra. Si no se puede (Ollama no instalado, direccion remota), solo deja un aviso: Brain y Vision fallaran hasta que Ollama este en marcha.
+3. Crea `Ear(model_size="medium")`, `Brain(model="llama3")`, el ejecutor (`get_executor()` de `src/tools/executor.py`) y `Memory()`. Si algo falla: "FALLO CRITICO" y salida.
+4. **Primer inventario del equipo:** si este ordenador no tiene ningun escaneo correcto en `data/system_inventory.sqlite3`, lanza en segundo plano un inventario completo de todos los volumenes.
+5. Comprueba si existe `data/macros_coords.json` (solo informativo).
+6. Crea la boca (`Mouth()`) y elige la voz.
 
 ### Bucle principal
 
@@ -106,7 +108,7 @@ texto = ear.listen()            (espera hasta oir una frase)
 ### Requisitos
 
 - **Python 3.14 o superior.** `src/memory/conversation.py` usa en anotaciones el nombre `Entity`, que no se importa. Solo funciona gracias a la evaluacion diferida de anotaciones de Python 3.14.
-- **Ollama** instalado y en marcha, con `llama3`, `qwen3-vl:8b` y `qwen3-vl:8b-instruct`.
+- **Ollama** instalado, con `llama3`, `qwen3-vl:8b` y `qwen3-vl:8b-instruct`. Si el servidor no esta en marcha, JARVIS (y la sesion de tests que lo necesite) arranca `ollama serve` y lo cierra al terminar.
 - **Git LFS** para descargar los modelos de voz de `models/onnx/`.
 - **Windows 10/11** para la mayor parte de las funciones (ver seccion 12).
 
@@ -276,13 +278,27 @@ Funciona en Windows y en macOS (`sounddevice`); en macOS hace falta permiso de m
 
 | Fichero | Que hace |
 |---|---|
-| `vision/vision.py` | `Vision(model="qwen3-vl:8b")`, la vision completa. `detect_ui_elements(imagen)` -> `VisionResponse` con elementos; `analyze_image(imagen, prompt)` -> JSON (la usa el calibrador universal); `verify_element_visibility`, `verify_action_result`, `detect_application_state` (si no hay certeza devuelve cerrada, nunca abierta), `interpret_element_semantics(imagen, recorte)`, `analyze_screen_for_world_state()`. Llama a Ollama con salida JSON, temperatura 0 y `keep_alive` de 5 minutos. `VisionOpenCVProcessor` ofrece recortes, normalizacion, deteccion de cambios y ajuste de bordes; OpenCV solo da pistas de geometria, nunca decide si algo es interactivo. |
+| `vision/vision.py` | `Vision(model=DEFAULT_VISION_MODEL)` (`qwen3-vl:8b-instruct`), la vision completa. `detect_ui_elements(imagen)` -> `VisionResponse` con elementos; `analyze_image(imagen, prompt)` -> JSON (la usa el calibrador universal); `verify_element_visibility` (un fallo de deteccion devuelve `success=False` con el error, no "no encontrado"), `verify_action_result`, `detect_application_state` (si no hay certeza devuelve cerrada, nunca abierta), `interpret_element_semantics(imagen, recorte)`, `analyze_screen_for_world_state()`. Llama a Ollama con salida JSON, `think=False`, temperatura 0 y `keep_alive` de 5 minutos. `VisionOpenCVProcessor` ofrece recortes, normalizacion, deteccion de cambios y ajuste de bordes; OpenCV solo da pistas de geometria, nunca decide si algo es interactivo. |
 | `vision/vision_only.py` | `Vision` ligera (`analyze_image`, `verify_action_result`, `detect_application_state`). Siempre captura el monitor 1. |
 | `capture/screen_capture.py` | `ScreenCapture` (`get_screen_capture()`): `capture_monitor(n)` (PNG temporal en la carpeta de trabajo, que no se borra aqui), `capture_region`, `capture_active_window`. Ademas, preparado para captura continua y solo usado por tests: `MssCapture`, `DXcamCapture` (solo Windows, con paso automatico a mss) y `AdaptiveCapture` (2 imagenes por segundo en reposo, rafagas de 15 cuando hay cambios, buffer de 8). |
 | `capture/screen.py` | Modulo heredado. Lo que se usa son sus clases de datos: `ApplicationState`, `ApplicationInfo`, `WorldState` y las funciones de comparacion entre estado declarado y observado. Tiene otra `ScreenCapture` duplicada que nadie usa. |
 | `detection/visual_ui_detector_fusion.py` | `VisualUIDetectorFusion().fuse(candidatos)` -> `FusionResult`: une los candidatos de UI Automation, OmniParser, PaddleOCR, OpenCV y Qwen3-VL sin duplicar elementos, conservando la evidencia de cada fuente y sus desacuerdos. La prioridad es UIA > Qwen3-VL > OmniParser > PaddleOCR > OpenCV. Nunca marca algo como interactivo solo por su forma. La usa `window_evidence_validator.py`; no esta conectada a la calibracion real. |
 
-Hay dos nombres de modelo en uso: `qwen3-vl:8b` (por defecto en `Vision`) y `qwen3-vl:8b-instruct` (calibrador universal y `app_utils`).
+Hay dos nombres de modelo en uso: `qwen3-vl:8b-instruct` (`DEFAULT_VISION_MODEL` de `vision.py`, calibrador universal, manifiesto de detectores y `app_utils`) y `qwen3-vl:8b` (solo la `Vision` ligera de `vision_only.py`). `qwen3-vl:8b` es la variante con razonamiento: gasta la salida en `message.thinking` y deja `message.content` vacio, por eso no se usa para respuestas JSON.
+
+Envio de imagenes a Qwen3-VL (`Vision._chat_json`, comun a todos los metodos de `vision.py`):
+
+- Qwen3-VL usa un token visual por bloque de 32x32 pixeles. Una imagen de mas de `MODEL_IMAGE_MAX_PIXELS` (1920x1080) se reduce conservando la proporcion y se envia como PNG en memoria; las mas pequenas se envian por ruta. Una captura 4K completa (unos 8000 tokens) desbordaria el contexto de 8192.
+- Si los tokens visuales estimados, el prompt y `num_predict` no caben en `num_ctx`, se usa el multiplo de 1024 suficiente.
+- `last_chat_info` guarda el tamano original y el enviado, `num_ctx`, `done_reason` y la longitud del contenido y del razonamiento. Una salida cortada (`done_reason=length`) o un contenido vacio con razonamiento se registran como aviso.
+
+`detect_ui_elements(imagen, application=None, refine_with_opencv=False)`:
+
+- Pide hasta `DETECTION_MAX_ELEMENTS` (60) elementos con `name`, `type`, `text`, `bbox`, `interactive` y `confidence`, con `bbox` en coordenadas normalizadas 0..1000 de la imagen completa (el formato de Qwen3-VL). El esquema JSON limita la lista con `maxItems`.
+- Convierte cada caja a pixeles de la imagen original y calcula el centro; `bbox` y `center` del resultado estan siempre en pixeles de la imagen analizada, aunque al modelo se le haya enviado una copia reducida.
+- Descarta cajas que no tengan 4 numeros, salgan de 0..1000, esten invertidas o queden sin area, y elementos repetidos (mismo nombre e IoU >= 0.9).
+- Si el JSON llega cortado, recupera los elementos completos de la lista y marca `truncated`.
+- `VisionResponse` lleva `elements`, `error` (None si la deteccion se completo, aunque no haya elementos), `image_size`, `model_image_size`, `discarded` y `truncated`. Imagen ilegible, error de Ollama, respuesta vacia o no interpretable dejan `elements` vacio, rellenan `error` y se registran como aviso; nunca se lanza la excepcion.
 
 ## 7. Manos: aplicaciones, calibracion y acciones (`src/hands/`)
 
@@ -456,7 +472,7 @@ Conjunto de piezas para detectar controles combinando accesibilidad, vision y OC
 | `ui_automation_adapter.py` | `UIAutomationAdapter.enumerate_window(hwnd, pid)` lee el arbol de controles de una ventana con UI Automation (`pywinauto`, y COM como respaldo). Solo lectura. `get_actionable_elements` filtra los que tienen patrones de accion (Invoke, Value, Toggle...). `classify_framework` identifica Win32, WinForms, WPF, UWP, Qt, Chromium/Electron, etc. Solo Windows. |
 | `omniparser_adapter.py` | `OmniParserAdapter(model_path).detect(imagen)` detecta regiones que parecen interactivas con OmniParser V2 `icon_detect_v3` (torch, CUDA si hay). Nunca descarga el modelo por su cuenta. |
 | `paddleocr_adapter.py` | `PaddleOCRAdapter(model_dir).detect(imagen)` lee texto con PaddleOCR (motor onnxruntime, PP-OCRv5). `associate_with_candidates` asocia etiquetas a controles cercanos sin convertir un texto en boton. |
-| `detector_manifest.py` | `build_detector_manifest()` informa de que detectores estan realmente disponibles (UIA, OmniParser, PaddleOCR, Qwen3-VL, OpenCV), con version, pesos, dispositivo y licencia. No descarga nada. |
+| `detector_manifest.py` | `build_detector_manifest()` informa de que detectores estan realmente disponibles (UIA, OmniParser, PaddleOCR, Qwen3-VL, OpenCV), con version, pesos, dispositivo y licencia. Para Qwen3-VL comprueba en Ollama el mismo modelo que usa `vision.py` (`QWEN3VL_MODEL_DEFECTO` = `qwen3-vl:8b-instruct`). No descarga nada. |
 | `window_evidence_validator.py` | `WindowEvidenceValidator(hwnd, pid).validate_all(...)` comprueba que el arbol, la captura y los candidatos pertenecen a la ventana objetivo y rechaza capturas del escritorio entero y cajas invalidas, solapadas o fuera de ventana. Solo Windows. |
 
 La fusion de todas estas fuentes esta en `src/eyes/detection/visual_ui_detector_fusion.py` (seccion 6).
@@ -596,6 +612,15 @@ Tambien resuelve URL, sugiere entidades y aprende preferencias. Lo usa `Brain`.
 | `log.py` | Sistema unico de logs (seccion 11). |
 | `ui_element_model.py` | Modelo comun de elemento de interfaz (abajo). |
 | `test_result_categorizer.py` | `TestResultCategorizer` cuenta resultados de pruebas en cuatro categorias que nunca se suman entre si: `SIMULADO`, `UNIT_MOCKS`, `INTEGRACION_OS` y `APERTURA_GUI`. |
+| `ollama_server.py` | Arranque y cierre del servidor local de Ollama (abajo). Lo usan `main.py` y los tests que necesitan Ollama real. |
+
+`ollama_server.py`:
+
+- `ensure_ollama_server(host=None, timeout=30, command=None, watch=True, register_atexit=True)` -> `OllamaServer`. La direccion sale de `host` o de `OLLAMA_HOST` (por defecto `http://127.0.0.1:11434`), con la misma regla que el cliente `ollama`. Si el servidor responde (`GET /api/version`), lo reutiliza con `started_by_us=False` y nunca lo cierra. Si no responde y la direccion es local, ejecuta `<ollama> serve` sin shell y sin ventana de consola en Windows, con `OLLAMA_HOST` = `host:puerto`, guarda su salida en un fichero temporal y espera, sin pausa fija, a que responda. Si la direccion no es local, no encuentra el ejecutable o el servidor termina o no responde en `timeout`, lanza `OllamaServerError` con el motivo y la salida de `ollama serve`.
+- El ejecutable se busca en el PATH y, si no esta, en la instalacion por usuario de Windows (`%LOCALAPPDATA%/Programs/Ollama`).
+- `OllamaServer.stop()` cierra el servidor y todos sus procesos hijos (los runners que cargan modelos), el vigilante y el fichero de salida, solo si `started_by_us`; es idempotente. Antes de terminar un proceso comprueba su PID y su hora de creacion, para no cerrar nunca un proceso que haya reutilizado el PID. `is_running()` indica si el servidor sigue disponible.
+- Un servidor arrancado aqui se cierra tambien al salir del interprete (`atexit`) y, si el proceso que lo arranco muere sin poder limpiar, lo cierra el vigilante: `python -m src.core.ollama_server --watch ...`, un proceso aparte que cada segundo comprueba que su creador sigue vivo.
+- `server_responds(host)`, `resolve_host(host)`, `is_local_host(url)` y `find_ollama_executable()` son las piezas que usa. Las comprobaciones de salud no pasan por el proxy del sistema. Nunca descarga modelos.
 
 `ui_element_model.py`:
 

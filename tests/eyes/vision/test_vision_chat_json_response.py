@@ -83,3 +83,39 @@ class TestChatJsonResponseStructure:
         with patch.object(ollama, "chat", return_value=resp):
             salida = vision._chat_json(image_path="imagen.png", prompt="analiza")
         assert salida == ""
+
+    def test_chat_json_registra_razonamiento_y_salida_cortada(self, caplog):
+        """Modelo con razonamiento que agota num_predict: content vacio, aviso y diagnostico."""
+        vision = _vision()
+        resp = ChatResponse(
+            model="qwen3-vl:8b",
+            done_reason="length",
+            message=Message(role="assistant", content="", thinking="Primero miro la imagen. " * 40),
+        )
+        with patch.object(ollama, "chat", return_value=resp):
+            with caplog.at_level("WARNING"):
+                salida = vision._chat_json(image_path="imagen.png", prompt="analiza")
+        assert salida == ""
+        info = vision.last_chat_info
+        assert info["done_reason"] == "length"
+        assert info["thinking_chars"] > 0
+        assert info["content_chars"] == 0
+        avisos = " ".join(r.getMessage() for r in caplog.records)
+        assert "razonamiento" in avisos
+        assert "num_predict" in avisos
+
+    def test_chat_json_respuesta_completa_sin_avisos(self, caplog):
+        """Respuesta normal (done_reason=stop): sin avisos y con el diagnostico relleno."""
+        vision = _vision()
+        resp = ChatResponse(
+            model="qwen3-vl:8b-instruct",
+            done_reason="stop",
+            message=Message(role="assistant", content='{"elements": []}'),
+        )
+        with patch.object(ollama, "chat", return_value=resp):
+            with caplog.at_level("WARNING"):
+                salida = vision._chat_json(image_path="imagen.png", prompt="analiza")
+        assert salida == '{"elements": []}'
+        assert vision.last_chat_info["done_reason"] == "stop"
+        assert vision.last_chat_info["content_chars"] == len(salida)
+        assert not [r for r in caplog.records if r.levelname == "WARNING"]

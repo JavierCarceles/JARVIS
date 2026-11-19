@@ -76,3 +76,48 @@ ESTADO: RESUELTO
 REPETICIONES_TIPO: 2 (vease tambien el bloque TILDE_ERROR de 2026-11-14 en este archivo)
 MEMORIA_PERSISTENTE: Todo contenido nuevo debe verificarse con un escaneo de bytes > 127 antes de cerrar cualquier unidad.
 ---
+
+ERR-0025
+FECHA_HORA: 2026-11-19T21:02:51+01:00 Europe/Madrid
+UNIDAD: correccion pedida por el usuario sobre 3.8.6.10.3 (Vision.detect_ui_elements); trabajo en Mac
+TIPO_NORMALIZADO: VISION_DETECCION_VACIA_SILENCIOSA
+HERRAMIENTA_OPERACION: Vision.detect_ui_elements con Ollama en tests/hands/calibration/test_ui_calibration_accuracy_harness.py (ejecucion Windows de 3.8.6.10.3)
+OBJETIVO: src/eyes/vision/vision.py
+SINTOMA_SALIDA: Informe tests/hands/calibration/informe_ui_calibracion_accuracy.json: qwen3vl_vision total_detectados=0, tp=0, fn=16, latencia 62.57 s, error=null, sobre una captura del area cliente de 3840x2001.
+CAUSA: (1) el harness usaba qwen3-vl:8b, variante con razonamiento que deja message.content vacio con done_reason=length (evidencia en el registro 3.8.6.3.3.1); (2) la captura completa se enviaba sin reducir: unos 7500 tokens visuales con num_ctx=8192 dejan sin sitio la salida (3.8.6.3.3.1 ya registro "request (8355 tokens) exceeds the available context size" con 3840x2160); (3) el prompt no fijaba el espacio de coordenadas y las cajas 0..1000 de Qwen3-VL se trataban como pixeles; (4) detect_ui_elements devolvia elements=[] sin error y registraba los fallos con logger.debug, invisibles con el nivel WARNING de config/config.json.
+CORRECCION: Aplicada en src/eyes/vision/vision.py: modelo por defecto DEFAULT_VISION_MODEL=qwen3-vl:8b-instruct; imagenes de mas de 1920x1080 px se reducen y se envian como PNG en memoria; num_ctx se amplia si imagen + prompt + num_predict no caben; prompt y esquema piden bbox normalizado 0..1000 (maxItems 60) y se convierte a pixeles de la imagen original; cajas invalidas y repetidas descartadas; JSON cortado recuperado; VisionResponse con error/image_size/model_image_size/discarded/truncated; avisos con logger.warning (done_reason=length, solo razonamiento, descartes); verify_element_visibility devuelve el error de deteccion. src/hands/detection/detector_manifest.py comprueba el mismo modelo.
+VERIFICACION: En Mac con Python 3.14.10 y Ollama simulado: tests/eyes/vision 184 PASSED, 1 SKIPPED (captura real de monitor no disponible en el Mac); sonda con respuestas simuladas sobre 3840x2000: cajas 0..1000 correctas sin problemas, cajas en pixeles detectadas como error, solo razonamiento -> error explicito. Modelo real y Windows: PENDIENTE (en el Mac no hay Ollama): ejecutar tests/eyes/vision/test_qwen3vl_detect_ui_elements_ollama_integration.py y el harness con JARVIS_TEST_GUI_REAL=1.
+ESTADO: ABIERTO
+REPETICIONES_TIPO: 1 (primera aparicion de TIPO_NORMALIZADO VISION_DETECCION_VACIA_SILENCIOSA en este archivo)
+MEMORIA_PERSISTENTE: No aplica (primera aparicion). Prevencion: un detector que devuelve 0 elementos debe distinguir "no hay elementos" de "fallo" (campo error) y los tests reales deben exigir deteccion, no solo latencia.
+---
+
+ERR-0026
+FECHA_HORA: 2026-11-19T21:02:51+01:00 Europe/Madrid
+UNIDAD: correccion pedida por el usuario sobre 3.8.6.10.3 (harness de precision); trabajo en Mac
+TIPO_NORMALIZADO: METRICA_TEST_ERRONEA
+HERRAMIENTA_OPERACION: revision del harness tests/hands/calibration/test_ui_calibration_accuracy_harness.py y de su informe JSON
+OBJETIVO: tests/hands/calibration/test_ui_calibration_accuracy_harness.py
+SINTOMA_SALIDA: UIA emparejo 16/16 controles por nombre pero con iou_medio=0.0, error_centro_medio_px=625.91 y click_correcto=0.0; el test pasaba porque no comprobaba la deteccion de Qwen3-VL ni la geometria (comentario: "coordenadas de vision en escala desconocida").
+CAUSA: La referencia de la fixture es [x, y, ancho, alto] en pixeles logicos de Qt y el harness la trataba como [x1, y1, x2, y2] en pixeles fisicos; la fixture corria a escala 2.25. Recalculando con esa hipotesis el error medio de centro sale 625.8 px, el valor del informe. El harness ademas contaba la barra de titulo, la ventana raiz y las filas internas de los controles como falsos positivos.
+CORRECCION: Aplicada: referencia convertida a [x1, y1, x2, y2] fisicos con la escala DPI real de la ventana (adaptador de escritorio, comprobada contra la del monitor tras esperar geometria estable); ambito (fuera del area cliente, fuera de pantalla y contenedores no se evaluan; subelementos dentro de un control no son falsos positivos); emparejamiento voraz global por IoU; criterios por fuente en el informe (criterios_cumplidos); aserciones: ninguna fuente con error, UIA dentro de recall/IoU/error de centro/click, Qwen3-VL con elementos, cajas dentro de la captura, captura reducida y centro de Aceptar, Cancelar y Abrir popup dentro de su boton; import perezoso de pywinauto para que la parte offscreen se ejecute en cualquier SO.
+VERIFICACION: En Mac con Python 3.14.10: parte offscreen 8 PASSED (incluye la reproduccion del error de 626 px y su sensibilidad), parte GUI real SKIPPED por no ser Windows. GUI real en Windows: PENDIENTE.
+ESTADO: ABIERTO
+REPETICIONES_TIPO: 1 (primera aparicion de TIPO_NORMALIZADO METRICA_TEST_ERRONEA en este archivo)
+MEMORIA_PERSISTENTE: No aplica (primera aparicion). Prevencion: antes de comparar cajas, comprobar el formato ([x, y, w, h] o [x1, y1, x2, y2]) y el espacio (logico o fisico) de cada fuente.
+---
+
+ERR-0027
+FECHA_HORA: 2026-11-19T21:02:51+01:00 Europe/Madrid
+UNIDAD: correccion pedida por el usuario sobre 3.8.6.10.3; trabajo en Mac
+TIPO_NORMALIZADO: GIT_PROHIBIDO
+HERRAMIENTA_OPERACION: shell (inspeccion inicial del proyecto)
+OBJETIVO: repositorio JARVIS
+SINTOMA_SALIDA: Se ejecuto "git log --oneline -30" (solo lectura) al inicio, antes de leer mejora/prompt_JARVIS_reglas.txt, cuya seccion 2 prohibe cualquier comando Git.
+CAUSA: Orden de lectura: se exploro el proyecto antes de leer las reglas obligatorias.
+CORRECCION: No se ejecuto ningun otro comando Git ni se uso su salida como evidencia; no se modifico el repositorio con Git.
+VERIFICACION: Unica invocacion de Git de la sesion; resto del trabajo con ficheros de trabajo y tests.
+ESTADO: RESUELTO
+REPETICIONES_TIPO: 1 (primera aparicion de TIPO_NORMALIZADO GIT_PROHIBIDO en este archivo)
+MEMORIA_PERSISTENTE: No aplica (primera aparicion). Prevencion: leer prompt_mejoraActual.txt y prompt_JARVIS_reglas.txt antes de cualquier comando.
+---

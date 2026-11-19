@@ -33,7 +33,9 @@ from src.hands.detection.detector_manifest import (
     STATUS_NO_DISPONIBLE,
     STATUS_NO_VERIFICADO,
     STATUS_VALIDOS,
+    QWEN3VL_MODEL_DEFECTO,
 )
+from src.eyes.vision.vision import DEFAULT_VISION_MODEL
 
 
 class TestDetectorManifestEstados(unittest.TestCase):
@@ -241,7 +243,10 @@ class TestDetectorManifestComprobacionReal(unittest.TestCase):
         self.assertIn(qw.status, (STATUS_DISPONIBLE, STATUS_NO_VERIFICADO))
         if qw.status == STATUS_NO_VERIFICADO:
             self.assertIsNotNone(qw.error)
-        self.assertEqual(qw.model, "qwen3-vl:8b")
+        # El manifiesto comprueba el mismo modelo que usan Vision y el
+        # calibrador universal.
+        self.assertEqual(qw.model, QWEN3VL_MODEL_DEFECTO)
+        self.assertEqual(QWEN3VL_MODEL_DEFECTO, DEFAULT_VISION_MODEL)
 
     def test_resumen_contable_coherente_con_entradas(self):
         """El resumen contable coincide con el conteo real de entradas por estado."""

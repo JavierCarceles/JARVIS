@@ -187,21 +187,29 @@ class TestVisionDetectUIElementsOpenCVRefine:
     def setup_method(self, _method=None):
         self.vision = Vision()
 
+    # El modelo devuelve cajas normalizadas 0..1000; sobre una imagen de
+    # 200x200, [50, 100, 500, 400] equivale a [10, 20, 100, 80] en pixeles.
+    _RESPUESTA = (
+        '{"elements": [{"name": "ok", "type": "button", "text": "OK", "bbox": [50, 100, 500, 400], '
+        '"interactive": true, "confidence": 0.95}]}'
+    )
+
     @patch("src.eyes.vision.vision.ollama")
     def test_detect_ui_elements_default_no_refine(self, mock_ollama):
-        mock_ollama.chat.return_value = {
-            "message": {"content": '{"elements": [{"type": "button", "text": "OK", "bbox": [10, 20, 100, 80], "center": [55, 50], "interactive": true, "confidence": 0.95}]}'}
-        }
-        resp = self.vision.detect_ui_elements("/fake/image.png")
+        mock_ollama.chat.return_value = {"message": {"content": self._RESPUESTA}}
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "img.png")
+            cv2.imwrite(path, np.zeros((200, 200, 3), dtype=np.uint8))
+            resp = self.vision.detect_ui_elements(path)
+        assert resp.error is None
         assert len(resp.elements) == 1
+        # Sin refinamiento la caja es la del modelo convertida a pixeles.
         assert resp.elements[0].bbox == [10, 20, 100, 80]
         assert resp.elements[0].interactive is True
 
     @patch("src.eyes.vision.vision.ollama")
     def test_detect_ui_elements_refine_with_opencv_interactive_unchanged(self, mock_ollama):
-        mock_ollama.chat.return_value = {
-            "message": {"content": '{"elements": [{"type": "button", "text": "OK", "bbox": [10, 20, 100, 80], "center": [55, 50], "interactive": true, "confidence": 0.95}]}'}
-        }
+        mock_ollama.chat.return_value = {"message": {"content": self._RESPUESTA}}
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "img.png")
             image = np.zeros((200, 200, 3), dtype=np.uint8)

@@ -10,7 +10,9 @@ UniversalVisualCalibrator / CalibrationManager.
 
 from __future__ import annotations
 
+import io
 import json
+import math
 import os
 import tempfile
 import time
@@ -21,6 +23,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
 import ollama
+from PIL import Image as PILImage
 from pydantic import BaseModel, Field
 
 from src.eyes.capture.screen_capture import ScreenCapture
@@ -30,6 +33,33 @@ from src.core.log import get_logger
 from src.core.ui_element_model import UIElementData, normalize_element_type
 
 logger = get_logger(__name__)
+
+# Modelo por defecto: variante "instruct" de Qwen3-VL. La variante con
+# razonamiento (``qwen3-vl:8b``) gasta el presupuesto de salida en
+# ``message.thinking`` y deja ``message.content`` vacio, por lo que no sirve
+# para respuestas JSON estructuradas.
+DEFAULT_VISION_MODEL = "qwen3-vl:8b-instruct"
+
+# Qwen3-VL codifica la imagen en parches de 16 px con fusion espacial 2x2:
+# cada token visual cubre un bloque de 32x32 pixeles de la imagen enviada.
+VISION_TOKEN_BLOCK_PX = 32
+
+# Presupuesto de pixeles de la imagen que se envia al modelo. Una captura
+# mayor se reduce (conservando la proporcion) antes de enviarla: una captura
+# 4K completa son unos 8000 tokens visuales y desborda el contexto; 1920x1080
+# son unos 2000.
+MODEL_IMAGE_MAX_PIXELS = 1920 * 1080
+
+# Qwen3-VL expresa las cajas en coordenadas relativas 0..1000 de la imagen,
+# independientes de su resolucion.
+NORMALIZED_COORD_MAX = 1000
+
+# Maximo de elementos que se piden al modelo y se aceptan por deteccion.
+DETECTION_MAX_ELEMENTS = 60
+
+# Dos detecciones con el mismo nombre y una IoU igual o superior a este valor
+# se consideran el mismo elemento repetido por el modelo.
+DUPLICATE_IOU = 0.9
 
 
 class VisionNodeType(Enum):
@@ -100,17 +130,36 @@ class UIElement(UIElementData):
 
 
 class VisionResponse(BaseModel):
-    """Respuesta estructurada de deteccion UI."""
+    """Respuesta estructurada de deteccion UI.
+
+    ``bbox`` y ``center`` de cada elemento estan en pixeles de la imagen
+    analizada (origen arriba-izquierda). ``error`` es ``None`` cuando la
+    deteccion se completo, aunque no haya elementos, y describe el fallo en
+    caso contrario. ``image_size`` y ``model_image_size`` son el tamano
+    original y el tamano enviado al modelo; ``discarded`` cuenta las cajas
+    rechazadas (fuera de rango, degeneradas o repetidas) y ``truncated``
+    indica que la salida del modelo llego cortada.
+    """
 
     elements: List[UIElement] = Field(default_factory=list)
+    error: Optional[str] = None
+    image_size: Optional[List[int]] = None
+    model_image_size: Optional[List[int]] = None
+    discarded: int = 0
+    truncated: bool = False
 
 
 class Vision:
     """Sistema de vision generico integrado con la arquitectura de Jarvis."""
 
-    def __init__(self, model: str = "qwen3-vl:8b") -> None:
+    def __init__(self, model: str = DEFAULT_VISION_MODEL) -> None:
         self.model = model
         self.temperature = 0.0
+        self.max_image_pixels = MODEL_IMAGE_MAX_PIXELS
+        self.detection_max_elements = DETECTION_MAX_ELEMENTS
+        # Datos de la ultima llamada a Ollama (tamanos, contexto,
+        # done_reason, longitud del contenido y del razonamiento).
+        self.last_chat_info: Dict[str, Any] = {}
         self.screen_capture = ScreenCapture()
         self.memory_manager = get_memory_manager()
         self._vision_nodes = self._create_vision_nodes()
@@ -421,6 +470,16 @@ Devuelve \u00daNICAMENTE JSON v\u00e1lido:
     ) -> VisionResponse:
         """Detecta elementos interactivos visibles en una imagen.
 
+        Qwen3-VL devuelve cada caja en coordenadas normalizadas 0..1000 de la
+        imagen; aqui se convierten a pixeles de la imagen original, de modo
+        que ``bbox`` y ``center`` del resultado estan siempre en pixeles de
+        ``image_path`` aunque al modelo se le envie una copia reducida (ver
+        ``_prepare_model_image``). Las cajas fuera de rango o degeneradas y
+        los elementos repetidos se descartan y se cuentan en ``discarded``.
+        Si la salida llega cortada se recuperan los elementos completos.
+        Cualquier fallo (imagen ilegible, error de Ollama, respuesta vacia o
+        no interpretable) se registra como aviso y se devuelve en ``error``.
+
         Cuando ``refine_with_opencv`` es verdadero, se prepara un recorte
         de cada elemento detectado y se refinan sus limites con OpenCV
         (bordes/contornos). Ese refinamiento es solo una pista geometrica:
@@ -428,13 +487,24 @@ Devuelve \u00daNICAMENTE JSON v\u00e1lido:
         que el elemento sea interactuable.
         """
 
+        result = VisionResponse()
+        image_size = self._image_size(image_path)
+        if image_size is None:
+            result.error = "no se pudo leer la imagen %s" % image_path
+            logger.warning("[VISION] detect_ui_elements: %s", result.error)
+            return result
+        width, height = image_size
+        result.image_size = [width, height]
+        max_elements = max(1, int(self.detection_max_elements))
+
         app_context = f" en {application}" if application else ""
         prompt = f"""
 Analiza la captura de pantalla y detecta los elementos interactivos visibles{app_context}.
 
 Incluye botones, campos de texto, b\u00fasquedas, enlaces, pesta\u00f1as, men\u00fas,
-checkboxes, radios, selects, sliders, switches, iconos pulsables y controles
-de navegaci\u00f3n. No incluyas fondos, texto decorativo ni elementos no interactivos.
+checkboxes, radios, selects, listas, sliders, switches, iconos pulsables y
+controles de navegaci\u00f3n. No incluyas fondos, texto decorativo ni elementos
+no interactivos.
 
 Devuelve exclusivamente JSON v\u00e1lido con esta estructura:
 {{
@@ -443,13 +513,19 @@ Devuelve exclusivamente JSON v\u00e1lido con esta estructura:
       "name": "boton_abrir",
       "type": "button",
       "text": "Abrir",
-      "bbox": [100, 200, 200, 250],
-      "center": [150, 225],
+      "bbox": [x1, y1, x2, y2],
       "interactive": true,
       "confidence": 0.95
     }}
   ]
 }}
+
+REGLAS:
+- bbox es la caja del elemento en coordenadas NORMALIZADAS de 0 a {NORMALIZED_COORD_MAX} relativas a TODA la imagen: x sobre el ancho, y sobre el alto.
+- x1 < x2 e y1 < y2. No uses pixeles ni coordenadas de pantalla.
+- M\u00e1ximo {max_elements} elementos; cada elemento aparece una sola vez.
+- name en min\u00fasculas y con "_" entre palabras.
+- confidence entre 0.0 y 1.0.
 """
 
         schema = {
@@ -457,19 +533,18 @@ Devuelve exclusivamente JSON v\u00e1lido con esta estructura:
             "properties": {
                 "elements": {
                     "type": "array",
+                    "maxItems": max_elements,
                     "items": {
                         "type": "object",
                         "properties": {
                             "name": {"type": "string"},
                             "type": {"type": "string"},
                             "text": {"type": "string"},
-                            "description": {"type": "string"},
                             "bbox": {"type": "array", "items": {"type": "integer"}, "minItems": 4, "maxItems": 4},
-                            "center": {"type": "array", "items": {"type": "integer"}, "minItems": 2, "maxItems": 2},
                             "interactive": {"type": "boolean"},
                             "confidence": {"type": "number"},
                         },
-                        "required": ["type", "text", "bbox", "center", "interactive", "confidence"],
+                        "required": ["name", "type", "text", "bbox", "interactive", "confidence"],
                     },
                 }
             },
@@ -485,41 +560,75 @@ Devuelve exclusivamente JSON v\u00e1lido con esta estructura:
                 num_predict=4096,
                 temperature=self.temperature,
             )
-            data = self._safe_json_loads(raw)
-            if not isinstance(data, dict):
-                return VisionResponse(elements=[])
+        except Exception as exc:
+            result.error = "fallo la llamada al modelo %s: %s" % (self.model, exc)
+            logger.warning("[VISION] detect_ui_elements: %s", result.error)
+            return result
 
+        info = dict(self.last_chat_info or {})
+        if info.get("model_image_size"):
+            result.model_image_size = list(info["model_image_size"])
+        result.truncated = info.get("done_reason") == "length"
+
+        items, parse_error, salvaged = self._parse_detection_items(raw)
+        if items is None:
+            result.error = parse_error
+            logger.warning("[VISION] detect_ui_elements: %s", result.error)
+            return result
+        if salvaged:
+            result.truncated = True
+
+        try:
             valid_elements: List[UIElement] = []
-            for item in data.get("elements", []) or []:
-                if not isinstance(item, dict):
+            accepted: List[Tuple[str, List[int]]] = []
+            discarded = 0
+            for item in items:
+                if len(valid_elements) >= max_elements or not isinstance(item, dict):
+                    discarded += 1
+                    continue
+                bbox = self._normalized_bbox_to_pixels(item.get("bbox"), width, height)
+                if bbox is None:
+                    discarded += 1
+                    continue
+                center = [(bbox[0] + bbox[2]) // 2, (bbox[1] + bbox[3]) // 2]
+                # El nombre es la clave can\u00f3nica de direccionamiento;
+                # cuando el modelo no lo devuelve se infiere de text/type.
+                element_name = (
+                    str(item.get("name") or "").strip()
+                    or str(item.get("text") or "").strip()
+                    or str(item.get("type") or "").strip()
+                )
+                name_key = element_name.lower()
+                if any(key == name_key and self._box_iou(box, bbox) >= DUPLICATE_IOU for key, box in accepted):
+                    discarded += 1
                     continue
                 try:
-                    bbox = self._normalize_int_list(item.get("bbox"), minimum=4, maximum=4)
-                    center = self._normalize_int_list(item.get("center"), minimum=2, maximum=2)
-                    if bbox is None or center is None:
-                        continue
-                    confidence = self._clamp_float(item.get("confidence", 0.0))
-                    # El nombre es la clave can\u00f3nica de direccionamiento;
-                    # cuando el modelo no lo devuelve se infiere de text/type.
-                    element_name = (
-                        str(item.get("name") or "").strip()
-                        or str(item.get("text") or "").strip()
-                        or str(item.get("type") or "").strip()
+                    element = UIElement(
+                        name=element_name or f"element_{len(valid_elements)}",
+                        type=normalize_element_type(str(item.get("type", "other"))),
+                        text=str(item.get("text", "") or ""),
+                        description=str(item.get("description", "") or ""),
+                        bbox=bbox,
+                        center=center,
+                        interactive=bool(item.get("interactive", True)),
+                        confidence=self._clamp_float(item.get("confidence", 0.0)),
                     )
-                    valid_elements.append(
-                        UIElement(
-                            name=element_name or f"element_{len(valid_elements)}",
-                            type=normalize_element_type(str(item.get("type", "other"))),
-                            text=str(item.get("text", "") or ""),
-                            description=str(item.get("description", "") or ""),
-                            bbox=bbox,
-                            center=center,
-                            interactive=bool(item.get("interactive", True)),
-                            confidence=confidence,
-                        )
-                    )
-                except Exception:
+                except Exception as exc:
+                    logger.debug("[VISION] Elemento descartado (%s): %s", element_name, exc)
+                    discarded += 1
                     continue
+                valid_elements.append(element)
+                accepted.append((name_key, bbox))
+
+            result.discarded = discarded
+            if discarded:
+                logger.warning(
+                    "[VISION] detect_ui_elements: %s de %s cajas descartadas "
+                    "(fuera de 0..%s, degeneradas, repetidas o por encima del maximo)",
+                    discarded,
+                    len(items),
+                    NORMALIZED_COORD_MAX,
+                )
 
             if refine_with_opencv:
                 image = VisionOpenCVProcessor.load_image(image_path)
@@ -541,10 +650,114 @@ Devuelve exclusivamente JSON v\u00e1lido con esta estructura:
                         refined_elements.append(element)
                     valid_elements = refined_elements
 
-            return VisionResponse(elements=valid_elements)
+            result.elements = valid_elements
+            return result
         except Exception as exc:
-            logger.debug("Vision.detect_ui_elements: %s", exc)
-            return VisionResponse(elements=[])
+            result.elements = []
+            result.error = "fallo procesando la respuesta del modelo: %s" % exc
+            logger.warning("[VISION] detect_ui_elements: %s", result.error)
+            return result
+
+    def _parse_detection_items(self, raw: Any) -> Tuple[Optional[List[Any]], Optional[str], bool]:
+        """Extrae la lista ``elements`` de la respuesta del modelo.
+
+        Devuelve ``(items, error, recuperado)``. Si el JSON no es valido pero
+        contiene objetos completos de ``elements`` (salida cortada por
+        ``num_predict``), los recupera y marca ``recuperado``.
+        """
+        text = str(raw or "").strip()
+        if not text:
+            return None, self._empty_response_error(), False
+        data = self._safe_json_loads(text)
+        if isinstance(data, dict):
+            elements = data.get("elements")
+            if isinstance(elements, list):
+                return elements, None, False
+            return None, "la respuesta del modelo %s no contiene una lista 'elements'" % self.model, False
+        salvaged = self._salvage_elements(text)
+        if salvaged:
+            logger.warning(
+                "[VISION] Respuesta JSON incompleta (%s caracteres): se recuperan %s elementos completos",
+                len(text),
+                len(salvaged),
+            )
+            return salvaged, None, True
+        return None, "respuesta del modelo %s no interpretable como JSON (%s caracteres)" % (self.model, len(text)), False
+
+    def _empty_response_error(self) -> str:
+        info = self.last_chat_info or {}
+        done_reason = info.get("done_reason")
+        thinking_chars = int(info.get("thinking_chars") or 0)
+        if thinking_chars:
+            return "el modelo %s no devolvio contenido (done_reason=%s, razonamiento de %s caracteres)%s" % (
+                self.model,
+                done_reason,
+                thinking_chars,
+                self._thinking_hint(),
+            )
+        return "el modelo %s devolvio una respuesta vacia (done_reason=%s)" % (self.model, done_reason)
+
+    @staticmethod
+    def _salvage_elements(text: str) -> List[Dict[str, Any]]:
+        """Recupera los objetos completos de la lista ``elements`` de un JSON cortado."""
+        decoder = json.JSONDecoder()
+        key = text.find('"elements"')
+        start = text.find("[", key if key >= 0 else 0)
+        if start < 0:
+            return []
+        items: List[Dict[str, Any]] = []
+        index = start + 1
+        length = len(text)
+        while index < length:
+            while index < length and text[index] in " \t\r\n,":
+                index += 1
+            if index >= length or text[index] != "{":
+                break
+            try:
+                value, index = decoder.raw_decode(text, index)
+            except json.JSONDecodeError:
+                break
+            if isinstance(value, dict):
+                items.append(value)
+        return items
+
+    @staticmethod
+    def _normalized_bbox_to_pixels(values: Any, width: int, height: int) -> Optional[List[int]]:
+        """Caja normalizada 0..1000 de Qwen3-VL -> ``[x1, y1, x2, y2]`` en pixeles de la imagen.
+
+        Devuelve ``None`` si la caja no tiene 4 numeros, sale del rango
+        0..1000, esta invertida o queda sin area al pasar a pixeles.
+        """
+        if not isinstance(values, (list, tuple)) or len(values) != 4 or width <= 0 or height <= 0:
+            return None
+        try:
+            x1, y1, x2, y2 = [float(v) for v in values]
+        except (TypeError, ValueError):
+            return None
+        for value in (x1, y1, x2, y2):
+            if math.isnan(value) or value < 0.0 or value > NORMALIZED_COORD_MAX:
+                return None
+        if x2 <= x1 or y2 <= y1:
+            return None
+        box = [
+            int(round(x1 * width / NORMALIZED_COORD_MAX)),
+            int(round(y1 * height / NORMALIZED_COORD_MAX)),
+            int(round(x2 * width / NORMALIZED_COORD_MAX)),
+            int(round(y2 * height / NORMALIZED_COORD_MAX)),
+        ]
+        if box[2] <= box[0] or box[3] <= box[1]:
+            return None
+        return box
+
+    @staticmethod
+    def _box_iou(a: List[int], b: List[int]) -> float:
+        ix = max(0, min(a[2], b[2]) - max(a[0], b[0]))
+        iy = max(0, min(a[3], b[3]) - max(a[1], b[1]))
+        inter = ix * iy
+        if inter <= 0:
+            return 0.0
+        union = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - inter
+        return float(inter) / float(union) if union > 0 else 0.0
 
     # ====================================================================
     # CALIBRACION UNIVERSAL
@@ -618,10 +831,10 @@ Devuelve exclusivamente JSON v\u00e1lido con esta estructura:
 
             return result
         except ollama.ResponseError as exc:
-            logger.debug("Vision.analyze_image: %s", exc)
+            logger.warning("[VISION] analyze_image con %s: %s", self.model, exc)
             return f"ERROR: {exc}"
         except Exception as exc:
-            logger.debug("Vision.analyze_image: %s", exc)
+            logger.warning("[VISION] analyze_image con %s: %s", self.model, exc)
             return f"ERROR: {exc}"
 
     # ====================================================================
@@ -646,6 +859,9 @@ Devuelve exclusivamente JSON v\u00e1lido con esta estructura:
                 return {"success": False, "element": element_name, "verified": False, "error": "No se pudo capturar pantalla"}
 
             ui_response = self.detect_ui_elements(image_path, application)
+            if ui_response.error:
+                # Un fallo de deteccion no equivale a "elemento no visible".
+                return {"success": False, "element": element_name, "verified": False, "error": ui_response.error}
             target = str(element_name or "").strip().lower()
 
             for element in ui_response.elements:
@@ -861,13 +1077,35 @@ Responde \u00daNICAMENTE JSON:
         num_predict: int = 4096,
         temperature: float = 0.0,
     ) -> str:
+        """Envia la imagen y el prompt a Ollama y devuelve ``message.content``.
+
+        Si la imagen supera ``max_image_pixels`` se envia una copia reducida
+        (ver ``_prepare_model_image``) y ``num_ctx`` se amplia cuando los
+        tokens visuales estimados, el prompt y ``num_predict`` no caben en el
+        contexto pedido. Los datos de la llamada quedan en
+        ``last_chat_info``; una salida cortada (``done_reason=length``) o un
+        contenido vacio con razonamiento se registran como aviso.
+        """
+        payload, image_size, model_size = self._prepare_model_image(image_path)
+        effective_ctx = self._required_num_ctx(model_size, prompt, num_ctx, num_predict)
+        info: Dict[str, Any] = {
+            "model": self.model,
+            "image_size": list(image_size) if image_size else None,
+            "model_image_size": list(model_size) if model_size else None,
+            "num_ctx": effective_ctx,
+            "num_predict": num_predict,
+            "done_reason": None,
+            "content_chars": 0,
+            "thinking_chars": 0,
+        }
+        self.last_chat_info = info
         response = ollama.chat(
             model=self.model,
             messages=[
                 {
                     "role": "user",
                     "content": prompt,
-                    "images": [image_path],
+                    "images": [payload],
                 }
             ],
             stream=False,
@@ -875,20 +1113,139 @@ Responde \u00daNICAMENTE JSON:
             format=response_format,
             options={
                 "temperature": temperature,
-                "num_ctx": num_ctx,
+                "num_ctx": effective_ctx,
                 "num_predict": num_predict,
             },
             keep_alive="5m",
         )
+        content, thinking, done_reason = self._read_chat_response(response)
+        info["done_reason"] = done_reason
+        info["content_chars"] = len(content)
+        info["thinking_chars"] = len(thinking)
+        if done_reason == "length":
+            logger.warning(
+                "[VISION] La respuesta de %s se corto al llegar a num_predict=%s "
+                "(contenido %s caracteres, razonamiento %s caracteres)",
+                self.model,
+                num_predict,
+                len(content),
+                len(thinking),
+            )
+        if not content and thinking:
+            logger.warning(
+                "[VISION] %s devolvio solo razonamiento (%s caracteres) y ningun contenido%s",
+                self.model,
+                len(thinking),
+                self._thinking_hint(),
+            )
+        return content
+
+    def _thinking_hint(self) -> str:
+        """Sugerencia de modelo cuando el actual responde solo con razonamiento."""
+        if self.model == DEFAULT_VISION_MODEL:
+            return ""
+        return "; para respuestas JSON usar una variante sin razonamiento como %s" % DEFAULT_VISION_MODEL
+
+    @staticmethod
+    def _read_chat_response(response: Any) -> Tuple[str, str, Optional[str]]:
+        """``(content, thinking, done_reason)`` de un ``ChatResponse`` o de un dict."""
         if isinstance(response, dict):
             message = response.get("message", {}) or {}
+            done_reason = response.get("done_reason")
         else:
             message = getattr(response, "message", None) or {}
+            done_reason = getattr(response, "done_reason", None)
         if isinstance(message, dict):
             content = message.get("content", "") or ""
+            thinking = message.get("thinking", "") or ""
         else:
             content = getattr(message, "content", "") or ""
-        return str(content or "").strip()
+            thinking = getattr(message, "thinking", "") or ""
+        reason = done_reason if isinstance(done_reason, str) and done_reason else None
+        return str(content or "").strip(), str(thinking or "").strip(), reason
+
+    @staticmethod
+    def _image_size(image_path: Any) -> Optional[Tuple[int, int]]:
+        """``(ancho, alto)`` en pixeles de una imagen en disco, o ``None`` si no se puede leer."""
+        try:
+            if not image_path or not os.path.isfile(str(image_path)):
+                return None
+            with PILImage.open(str(image_path)) as image:
+                width, height = image.size
+        except Exception as exc:
+            logger.debug("[VISION] No se pudo leer el tamano de %s: %s", image_path, exc)
+            return None
+        if width <= 0 or height <= 0:
+            return None
+        return int(width), int(height)
+
+    def _prepare_model_image(self, image_path: str) -> Tuple[Any, Optional[Tuple[int, int]], Optional[Tuple[int, int]]]:
+        """Imagen que se envia al modelo: ``(ruta o bytes PNG, tamano original, tamano enviado)``.
+
+        Si la imagen supera ``max_image_pixels`` se reduce conservando la
+        proporcion y se envia como bytes PNG en memoria (sin ficheros
+        temporales). Como las cajas de Qwen3-VL son relativas 0..1000, la
+        reduccion no cambia su significado. Si la imagen no se puede leer se
+        envia la ruta tal cual.
+        """
+        size = self._image_size(image_path)
+        if size is None:
+            return image_path, None, None
+        width, height = size
+        budget = int(self.max_image_pixels or 0)
+        if budget <= 0 or width * height <= budget:
+            return image_path, size, size
+        scale = math.sqrt(float(budget) / float(width * height))
+        new_size = (max(1, int(width * scale)), max(1, int(height * scale)))
+        try:
+            resample = getattr(getattr(PILImage, "Resampling", PILImage), "LANCZOS")
+            with PILImage.open(str(image_path)) as image:
+                reduced = image.convert("RGB").resize(new_size, resample)
+            buffer = io.BytesIO()
+            reduced.save(buffer, format="PNG")
+        except Exception as exc:
+            logger.warning(
+                "[VISION] No se pudo reducir la imagen %s (%sx%s); se envia sin reducir: %s",
+                image_path,
+                width,
+                height,
+                exc,
+            )
+            return image_path, size, size
+        logger.debug(
+            "[VISION] Imagen %sx%s reducida a %sx%s para %s",
+            width,
+            height,
+            new_size[0],
+            new_size[1],
+            self.model,
+        )
+        return buffer.getvalue(), size, new_size
+
+    @staticmethod
+    def _estimate_image_tokens(size: Optional[Tuple[int, int]]) -> int:
+        """Tokens visuales aproximados de una imagen (un token por bloque de 32x32 px)."""
+        if not size:
+            return 0
+        width, height = size
+        block = float(VISION_TOKEN_BLOCK_PX)
+        return int(math.ceil(width / block) * math.ceil(height / block))
+
+    def _required_num_ctx(
+        self,
+        model_size: Optional[Tuple[int, int]],
+        prompt: str,
+        num_ctx: int,
+        num_predict: int,
+    ) -> int:
+        """``num_ctx`` pedido o, si no caben imagen, prompt y salida, el multiplo de 1024 suficiente."""
+        image_tokens = self._estimate_image_tokens(model_size)
+        if image_tokens <= 0:
+            return int(num_ctx)
+        needed = image_tokens + len(prompt or "") // 3 + 64 + int(num_predict) + 256
+        if needed <= int(num_ctx):
+            return int(num_ctx)
+        return int(math.ceil(needed / 1024.0) * 1024)
 
     @staticmethod
     def _safe_json_loads(value: Any) -> Optional[Any]:

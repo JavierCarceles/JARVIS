@@ -41,6 +41,7 @@ No hay `pytest.ini`, `setup.cfg` ni `pyproject.toml`. Toda la configuracion esta
 | Rutas de los argumentos | Convierte en absolutas las rutas que pasas a pytest antes de cambiar de carpeta, asi que `pytest tests/memory` funciona desde la raiz. |
 | Catalogo de memoria de prueba | Desde `pytest_configure` (antes de recolectar y de cualquier `setUpClass`), la ruta por defecto de `MemoryManager` (`get_project_root()` de `src.memory.storage`) apunta a una carpeta temporal `jarvis_pytest_memoria_*`, cuyo `data/memory/` se restaura antes de cada test como copia de `tests/fixtures/memoria/` (`entities.json`: catalogo de referencia con 32 aplicaciones y 3 streamers; `applications.json`: `{}`). Ningun test lee ni escribe el `data/memory/` real, que es local de cada equipo y puede no existir. Los tests que leen ese `entities.json` directamente obtienen su ruta en tiempo de ejecucion con `src.memory.storage.get_project_root()`. `MemoryManager(ruta)` con ruta explicita no cambia. |
 | Singletons | Un fixture automatico pone a `None` antes y despues de cada test el gestor de aplicaciones (`src.hands.apps.applications_core`), el `MemoryManager` (`src.memory.storage`) y el integrador de aplicaciones del planificador. |
+| Servidor Ollama de la sesion | Fixture `ollama_server` (ambito de sesion) sobre `tests/helpers/ollama_session.py`. El primer test que la pide comprueba si Ollama responde: si responde (por ejemplo, el del usuario) lo reutiliza y nunca lo cierra; si no, arranca `ollama serve` con `src/core/ollama_server.py` y todos los tests de la sesion usan ese mismo servidor. `pytest_sessionfinish` lo cierra (proceso y runners) al terminar; tambien se cierra al salir del proceso y, si pytest muere de golpe, lo cierra el vigilante del servidor. Los tests GUI que usan Qwen3-VL llaman a `servidor_ollama_de_sesion()` dentro del test para no arrancarlo cuando se saltan. |
 
 No hay marcadores propios: los saltos se hacen en tiempo de ejecucion con `pytest.skip`, `unittest.skipUnless` o `unittest.SkipTest`.
 
@@ -76,7 +77,7 @@ python -m pytest tests/hands/planner
 Planificador: solo logica.
 
 ```bash
-python -m pytest tests/eyes --ignore=tests/eyes/capture/test_dxcam_capture_core.py --ignore=tests/eyes/capture/test_adaptive_capture_gui_real.py --ignore=tests/eyes/vision/test_qwen3vl_ollama_multimodal_integration.py --ignore=tests/eyes/vision/test_vision_chat_json_ollama_integration.py
+python -m pytest tests/eyes --ignore=tests/eyes/capture/test_dxcam_capture_core.py --ignore=tests/eyes/capture/test_adaptive_capture_gui_real.py --ignore=tests/eyes/vision/test_qwen3vl_ollama_multimodal_integration.py --ignore=tests/eyes/vision/test_vision_chat_json_ollama_integration.py --ignore=tests/eyes/vision/test_qwen3vl_detect_ui_elements_ollama_integration.py
 ```
 
 Vision sin hardware especial ni Ollama.
@@ -88,10 +89,10 @@ python -m pytest tests/ear
 Oido. No usa el microfono, pero cada `Ear()` intenta cargar el modelo Whisper `medium` real (puede tardar o descargarlo).
 
 ```bash
-python -m pytest tests/eyes/vision/test_qwen3vl_ollama_multimodal_integration.py tests/eyes/vision/test_vision_chat_json_ollama_integration.py
+python -m pytest tests/eyes/vision/test_qwen3vl_ollama_multimodal_integration.py tests/eyes/vision/test_vision_chat_json_ollama_integration.py tests/eyes/vision/test_qwen3vl_detect_ui_elements_ollama_integration.py
 ```
 
-Modelo real: necesita Ollama arrancado y `qwen3-vl:8b` descargado. Si no, **fallan** (no se saltan).
+Modelo real: necesita Ollama instalado y `qwen3-vl:8b-instruct` descargado. Si el servidor no esta en marcha, la fixture `ollama_server` lo arranca una vez para toda la sesion y lo cierra al terminar. Sin Ollama instalado o sin el modelo, **fallan** (no se saltan).
 
 GUI real en Windows (abre un Bloc de notas en el monitor secundario de la derecha). En PowerShell, primero:
 
@@ -170,13 +171,14 @@ Subcarpetas: `capture/`, `vision/` y `detection/`, como `src/eyes/`. Las pruebas
 | `capture/test_dxcam_capture_core.py` | `DXcamCapture`, `MssCapture`, paso de DXcam a mss, `AdaptiveCapture` y `evaluate_dxcam_backends`. | Unitario + hardware real. **Falla al cargarse si `dxcam` no esta instalado** (macOS). Las pruebas reales esperan un monitor principal 4K (3840x2160) y un segundo monitor. |
 | `capture/test_dxcam_capture_integration.py` | Lo mismo, con camara falsa para el contrato y clases reales que se saltan si falta `dxcam`/`mss`. | Unitario + hardware real |
 | `capture/test_adaptive_capture_gui_real.py` | Captura adaptativa real: rafaga al ocultar/restaurar un Bloc de notas en el monitor secundario. | GUI real, Windows. Requiere `JARVIS_TEST_GUI_REAL=1` (si no, error). Usa su propio fichero de bloqueo. |
-| `vision/test_vision.py` | `src/eyes/vision/vision.py`: tipos de nodo, `VisionNode`, `UIElement`, `VisionResponse`, metodos de `Vision`. | Unitario (Ollama falso) |
+| `vision/test_vision.py` | `src/eyes/vision/vision.py`: tipos de nodo, `VisionNode`, `UIElement`, `VisionResponse`, metodos de `Vision`. La deteccion se prueba sobre PNG reales: cajas 0..1000 convertidas a pixeles, cajas fuera de rango, invertidas o repetidas descartadas, maximo de elementos, JSON cortado recuperado, respuesta vacia o solo con razonamiento como error, imagen ilegible sin llamar al modelo, captura 4K reducida antes de enviarla (y cajas devueltas en pixeles originales) y ampliacion de `num_ctx` cuando la imagen no cabe. | Unitario (Ollama falso) |
 | `vision/test_vision_only.py` | `src/eyes/vision/vision_only.py` (vision simplificada). | Unitario |
 | `vision/test_vision_opencv.py` | `VisionOpenCVProcessor` (recortes, normalizacion, cambios, bordes, ajuste de cajas) y deteccion con OpenCV; una prueba real captura el monitor 1. | Unitario + sistema real (se salta si no hay monitor) |
-| `vision/test_vision_chat_json_response.py` | Extraccion de la respuesta de Ollama en `Vision._chat_json`. | Unitario |
-| `vision/test_vision_chat_json_ollama_integration.py` | `Vision._chat_json` contra Ollama real (`qwen3-vl:8b`), hasta 3 intentos. | Modelo real; falla si no hay Ollama |
+| `vision/test_vision_chat_json_response.py` | Extraccion de la respuesta de Ollama en `Vision._chat_json`, y registro de `done_reason`, razonamiento y avisos en `last_chat_info`. | Unitario |
+| `vision/test_vision_chat_json_ollama_integration.py` | `Vision._chat_json` contra Ollama real (modelo por defecto, `qwen3-vl:8b-instruct`), hasta 3 intentos. | Modelo real (fixture `ollama_server`); falla si no hay Ollama |
 | `vision/test_qwen3vl_semantic_interpretation.py` | `Vision.interpret_element_semantics` con Ollama falso. | Unitario |
-| `vision/test_qwen3vl_ollama_multimodal_integration.py` | La misma funcion con `qwen3-vl:8b` real. | Modelo real; falla si no hay Ollama |
+| `vision/test_qwen3vl_ollama_multimodal_integration.py` | La misma funcion con el modelo por defecto real. | Modelo real (fixture `ollama_server`); falla si no hay Ollama |
+| `vision/test_qwen3vl_detect_ui_elements_ollama_integration.py` | `Vision.detect_ui_elements` con el modelo por defecto real sobre una imagen sintetica de 3840x2000 con tres botones en posiciones conocidas: sin error, con elementos, cajas dentro de la imagen, captura reducida antes de enviarla y el centro de cada boton dentro del boton. Hasta 2 intentos; todas las comprobaciones en el mismo intento. | Modelo real (fixture `ollama_server`); falla si no hay Ollama |
 | `vision/test_vision_calibration_integration.py` | Vision -> `CoordinateManager`/`UniversalVisualCalibrator`: los elementos de Chrome se resuelven a coordenadas calibradas validas para el planificador. | Integracion; usa el fixture `tests/hands/calibration/fixtures/macros_coords_formato_oficial.json` |
 | `detection/test_visual_ui_detector_fusion.py` | `VisualUIDetectorFusion`: fusion sin duplicados de UIA, OmniParser, OCR, OpenCV y Qwen3-VL; la interactividad solo con evidencia real. | Unitario (20 tests) + GUI real y Ollama real con `JARVIS_TEST_GUI_REAL=1`. Comparte un unico Bloc de notas por sesion y usa `tests/eyes/fixtures/_gui_lock.lock`. |
 | `detection/test_element_classification_integration.py` | Clasificacion de elementos sobre el arbol UIA real del Bloc de notas. | GUI real, Windows; se salta sin `JARVIS_TEST_GUI_REAL=1` |
@@ -204,6 +206,7 @@ Todos trabajan sobre un `MemoryManager` en carpeta temporal; nunca tocan `data/m
 | `memory/test_conversation_aliases_historial.py` | Aliases (carga, normalizacion, nunca devuelve objetivos, `save_alias` persistente) e historial (sin duplicados, recorte, limpieza de ficheros antiguos duplicados). |
 | `memory/test_memory_save_entity_persist_bug.py` | Regresion de un fallo antiguo de persistencia (su docstring dice que debe fallar, pero el fallo ya esta corregido). |
 | `helpers/entities_state.py` | Utilidad: copia `entities.json` a una carpeta temporal, opera sobre la copia y demuestra con SHA-256 que el original no cambio (`verify_entities_json_unchanged`). |
+| `helpers/ollama_session.py` | Utilidad: servidor Ollama compartido por la sesion de pytest (`servidor_ollama_de_sesion()` lo arranca la primera vez o reutiliza el que ya responde; `cerrar_servidor_ollama_de_sesion()` cierra solo el arrancado por la sesion). La usan la fixture `ollama_server` y los tests GUI con Qwen3-VL. Si Ollama no esta instalado lanza `OllamaServerError` y el test falla. |
 | `helpers/test_entities_state_helper.py` | Tests de esa utilidad. |
 
 ## 11. `tests/hands`
@@ -326,7 +329,7 @@ Otros:
 | `test_gui_calibration_fixture_entorno_real.py` | Prueba GUI real de la fixture de calibracion `tests/fixtures/gui_calibration_app/`: lanza la ventana, la situa en el monitor no principal mas a la derecha y la maximiza, verifica que el arbol UI Automation expone los 16 controles con su identificador estable, que el control dibujado a mano `canvas_mano` no expone nombre semantico (sin accesibilidad) y que hacer clic en `btn_aceptar` incrementa su contador en el canal separado `runtime/action_counts.json`. | GUI real, Windows; requiere `JARVIS_TEST_GUI_REAL=1`; abre y cierra solo la instancia propia de la fixture, sin tocar Visual Studio Code ni la configuracion de monitores. |
 | `test_fixture_unit.py` (en `tests/fixtures/gui_calibration_app/`) | Construye la ventana de la fixture con Qt en modo offscreen y verifica los 16 controles: identificador estable (objectName/accessibleName), geometria de referencia exacta y acciones inocuas instrumentadas que solo incrementan un contador de memoria sin efectos secundarios. | Unitario, offscreen (Qt), sin GUI ni SO real. |
 | `test_ground_truth_canal_separado_entorno_real.py` | Verifica que la fixture expone su verdad-terreno en runtime/truth_ground.json (geometria de referencia de cada control) como canal separado y que el detector evaluado (UI Automation + VisualUIDetectorFusion) detecta los controles solo a partir del arbol de accesibilidad de la ventana, sin leer runtime/truth_ground.json. Parte offscreen de estructura de la verdad-terreno; parte GUI real lanza la fixture en el monitor no principal mas a la derecha, la maximiza, compara los controles detectados contra la verdad-terreno leida por la prueba y bloquea la lectura del canal durante la fusion para demostrar que el detector no lo consume. | Unitario (offscreen) + GUI real, Windows; requiere `JARVIS_TEST_GUI_REAL=1`; abre y cierra solo su propia instancia de la fixture. |
-| `test_ui_calibration_accuracy_harness.py` | Harness de precision de calibracion UI sobre la fixture maximizada en el monitor de pruebas. Mide, por fuente de deteccion (UIA accesibilidad, Qwen3-VL vision y fusion), precision, recall, F1, IoU, error de centro, click correcto, falsos accionables, latencia y recursos CPU/RAM/VRAM contra la verdad-terreno de la fixture. Parte offscreen valida la logica de metricas con datos sinteticos; parte GUI real lanza la fixture propia, captura su area cliente y ejecuta los tres pipelines. Genera un informe JSON con los resultados. | Unitario (offscreen) + GUI real, Windows; requiere `JARVIS_TEST_GUI_REAL=1` para la parte real; abre y cierra solo su propia instancia de la fixture. |
+| `test_ui_calibration_accuracy_harness.py` | Harness de precision de calibracion UI sobre la fixture maximizada en el monitor de pruebas. Mide, por fuente de deteccion (UIA accesibilidad, Qwen3-VL vision y fusion), precision, recall, F1, IoU, error de centro, click correcto, falsos accionables, latencia y recursos CPU/RAM/VRAM contra la verdad-terreno de la fixture, en pixeles fisicos del area cliente: la geometria de referencia [x, y, ancho, alto] logica se convierte a [x1, y1, x2, y2] con la escala DPI real de la ventana. No evalua lo que queda fuera del area cliente, fuera de pantalla o los contenedores de la ventana; lo que cae dentro de un control sin emparejarse cuenta como subelemento. La parte real exige: ninguna fuente con error; UIA con recall, IoU, error de centro y click correcto dentro de los criterios; Qwen3-VL con elementos, cajas dentro de la captura, captura reducida antes de enviarla y el centro de Aceptar, Cancelar y Abrir popup dentro de su boton; latencia maxima. El cumplimiento de cada criterio por fuente se guarda en `informe_ui_calibracion_accuracy.json` (`criterios_cumplidos`). La parte offscreen valida conversion, ambito, emparejamiento y criterios con datos sinteticos y se ejecuta en cualquier SO. | Unitario (offscreen) + GUI real, Windows; requiere `JARVIS_TEST_GUI_REAL=1` y Ollama instalado con `qwen3-vl:8b-instruct` para la parte real (usa el servidor Ollama de la sesion: lo arranca si no esta en marcha); abre y cierra solo su propia instancia de la fixture. |
 
 ### 11.8 Deteccion de interfaz y evidencia (`detection/`)
 
@@ -334,7 +337,7 @@ Otros:
 |---|---|---|
 | `test_ui_automation_adapter.py` | `UIAutomationAdapter`: contrato, enumeracion del arbol con elementos falsos y arbol real de un Bloc de notas maximizado en el monitor secundario. | Unitario + GUI real **sin variable que lo proteja**; solo Windows |
 | `test_ui_automation_framework.py` | Clasificacion por framework (Win32, WPF, Qt, Chromium...) y cobertura; parte real con Bloc de notas. | Igual que el anterior |
-| `test_detector_manifest.py` | `DetectorManifest`: estados y persistencia; una clase real exige que UIA y OpenCV esten disponibles. | Unitario + sistema real |
+| `test_detector_manifest.py` | `DetectorManifest`: estados y persistencia; una clase real exige que UIA y OpenCV esten disponibles y que la entrada de Qwen3-VL compruebe el mismo modelo que usa `Vision` (`qwen3-vl:8b-instruct`). | Unitario + sistema real |
 | `test_omniparser_adapter.py` | `OmniParserAdapter` (`icon_detect_v3`). | Unitario + modelo real. Sin el modelo, la parte real **falla** en vez de saltarse |
 | `test_paddleocr_adapter.py` | `PaddleOCRAdapter`. | Igual que el anterior |
 | `test_window_evidence_validator.py` | `WindowEvidenceValidator`: la evidencia pertenece al PID/ventana objetivo y se rechaza una captura del escritorio entero. | Unitario + GUI real con `JARVIS_TEST_GUI_REAL=1` |
@@ -408,6 +411,8 @@ Todos unitarios, sin aplicaciones ni disco real:
 | `tests/experimental/test_jarvis_logging_format.py` | Las funciones `log_jarvis_*` aceptan argumentos posicionales al estilo de `logging` y no fallan si el formato no encaja. |
 | `tests/core/test_element_classification.py` | `classify_element` y sus 8 categorias; solo `UIA_ACTIONABLE` acredita interactividad verificada. |
 | `tests/core/test_test_result_categorizer.py` | `TestResultCategorizer`: las categorias nunca se mezclan. |
+| `tests/core/test_ollama_server.py` | `src/core/ollama_server.py`: direccion (`OLLAMA_HOST`, local o remota), busqueda del ejecutable y ciclo de vida con procesos reales usando el servidor falso `tests/fixtures/ollama_falso/servidor_ollama_falso.py` en un puerto libre: arranque y espera, reutilizacion de un servidor ajeno sin cerrarlo, cierre del servidor, su runner y el vigilante, error con la salida del proceso si termina al arrancar o no responde a tiempo, y cierre por el vigilante cuando el proceso que lo arranco muere de golpe. No toca el Ollama real; se ejecuta en cualquier sistema. |
+| `tests/core/test_ollama_server_entorno_real.py` | `ollama serve` real en un puerto libre: responde con su version, el cliente `ollama` lista los modelos instalados a traves de el y al cerrarlo no queda ningun proceso; el servidor del usuario no cambia. No carga modelos. Sistema real: falla (no se salta) si Ollama no esta instalado. |
 | `test_contextual_pattern_recognizer.py` | `ContextualPatternRecognizer` (bateria actual). |
 | `test_contextual_pattern_recognizer_legacy.py` | La misma clase (bateria antigua). |
 | `test_meta_learning_system.py` | `MetaLearningSystem`. |
