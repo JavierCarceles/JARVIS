@@ -168,6 +168,11 @@ Estos datos solo valen para el ordenador donde se crearon. No deben copiarse a o
 
 - **Migraciones:** cada paso va en su propia transaccion, se deshace si falla y comprueba que el numero de filas no cambia. v1->v2 anade `normalized_path`; v2->v3 crea `lineas_base`; v3->v4 cambia el indice unico para incluir `scan_id`; v4->v5 anade `version`, `producto` y `evidencia` a los candidatos; v5->v6 crea las tablas de calibracion UI local (`calibration_profiles`, `calibration_controls`) y sus indices. Si la base es mas nueva que el codigo, no se toca.
 - `normalized_path` va en minusculas en sistemas de ficheros que no distinguen mayusculas (Windows, macOS).
+- **No se sube al repositorio** (`.gitignore` excluye `data/system_inventory*.sqlite3*` salvo la muestra). En el repositorio solo esta `data/system_inventory_sample.sqlite3`, una muestra pequena de ejemplo.
+- **Copia completa en GitHub:** `scripts/bbdd_github.py` la guarda comprimida con xz (partes de hasta 1900 MiB y `bbdd_manifest.json` con tamanos y SHA-256) en la release `bbdd` del repositorio privado `JavierCarceles/JARVIS-datos`. Usa GitHub CLI (`gh`); si falta, ofrece instalarlo e iniciar sesion.
+  - `python scripts/bbdd_github.py subir`: vuelca el WAL, comprime la base con una transaccion de lectura abierta (copia coherente) y sustituye la copia anterior de la release. Si JARVIS esta usando la base, pide cerrarlo.
+  - `python scripts/bbdd_github.py descargar`: comprueba el SHA-256 de cada parte, descomprime y pasa `PRAGMA quick_check`. Si la tabla `machines` de la copia incluye el `machine_id` del equipo actual la deja en `data/system_inventory.sqlite3` (la anterior se renombra a `.antes_descarga` tras confirmarlo); si es de otro equipo la deja en `data/system_inventory_descargada.sqlite3`, que JARVIS no usa.
+  - Sin argumentos muestra un menu; en Windows se puede abrir con doble clic.
 
 ### `data/system_inventory_manifest.json`
 
@@ -271,7 +276,7 @@ El `.onnx` se guarda con Git LFS. Si el repositorio se clona sin LFS, solo queda
 Si faltan, el codigo crea la carpeta y usa valores por defecto. Se generan al usar la funcion correspondiente:
 
 - Todos los almacenes de `data/memory/`.
-- `data/system_inventory.sqlite3` (y `-wal`, `-shm`, `.bak`) y su manifiesto.
+- `data/system_inventory.sqlite3` (y `-wal`, `-shm`, `.bak`) y su manifiesto. `scripts/bbdd_github.py` crea ademas `data/_bbdd_tmp/` mientras trabaja y, al descargar, `data/system_inventory_descargada.sqlite3` o `data/system_inventory.sqlite3.antes_descarga`.
 - `data/voice_preference.json`, `data/launch_evidence.json`, `data/errores_cometidos*.json`.
 - Los ficheros de aprendizaje de la seccion 7 y `data/prediction_memory.json`.
 - `logs/jarvis.log` (y sus copias rotadas `jarvis.log.1` ... `.5`), creado por `setup_logging()` al arrancar `main.py`. Los `.log` por clase y las bases `logs/*.db` que hubiera de versiones anteriores ya no se generan en ejecucion normal; solo los crean los modulos de `src/experimental/` si alguien los usa. Se pueden borrar.

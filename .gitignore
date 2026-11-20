@@ -58,4 +58,12 @@ macro_mejoraActual.json
 macro_recorder.py
 macro_runner.py
 macro_scheduler.py
-data/system_inventory.sqlite3
+
+# --- Inventario local del equipo (datos personales, varios GB) ----------------
+# Incluye la base, sus ficheros -wal/-shm/.bak, la copia descargada de otro
+# equipo y los temporales de scripts/bbdd_github.py. La copia completa se guarda
+# en la release privada JavierCarceles/JARVIS-datos (ver scripts/bbdd_github.py).
+# Solo se sube la muestra pequena de ejemplo.
+data/system_inventory*.sqlite3*
+!data/system_inventory_sample.sqlite3
+data/_bbdd_tmp/
