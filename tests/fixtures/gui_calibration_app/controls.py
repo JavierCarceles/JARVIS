@@ -16,6 +16,11 @@ Cada entrada de CONTROL_SPECS define un control expuesto por la ventana:
 
 Ninguna accion escribe en disco, ni abre procesos, ni modifica datos del
 usuario: todas solo incrementan un contador de memoria.
+
+CONTROL_SPECS define la linea base de 16 controles (unidades 3.8.6.10.1 a
+3.8.6.10.3). CONTROL_DINAMICO_SPEC es un control opcional que solo se crea
+cuando una variante de la matriz controlada (3.8.6.10.4) lo solicita, para
+no alterar la cuenta de referencia de la linea base.
 """
 
 TAMANIO_NOMINAL = [1200, 800]
@@ -57,8 +62,20 @@ CONTROL_SPECS = [
 
 CONTROL_BY_ID = {item["id"]: item for item in CONTROL_SPECS}
 
+# Control dinamico opcional: solo se instancia cuando la variante de la
+# matriz de pruebas lo pide (control_dinamico_visible). No pertenece a
+# CONTROL_SPECS para conservar la linea base de 16 controles.
+CONTROL_DINAMICO_SPEC = {
+    "id": "ctrl_dinamico",
+    "kind": "button",
+    "label": "Control dinamico",
+    "geometry": [900, 440, 140, 32],
+    "action": "accion_ctrl_dinamico",
+}
+
 ACCIONES_INOCUAS = sorted(
     {item["action"] for item in CONTROL_SPECS if item["action"]}
+    | {CONTROL_DINAMICO_SPEC["action"]}
 )
 
 # IDs de controles que NO deben ser reportados como accionables por los

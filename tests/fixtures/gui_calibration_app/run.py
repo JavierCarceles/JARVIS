@@ -1,12 +1,21 @@
 # -*- coding: ascii -*-
 """
 Punto de entrada para lanzar la fixture de calibracion GUI como proceso
-independente (subprocess).
+independiente (subprocess).
 
 Uso:
     python tests/fixtures/gui_calibration_app/run.py
 
-La ventana se abre, se maximiza y permanece hasta que el usuario la cierra.
+La ventana se abre segun la variante configurada por variables de entorno
+(unidad 3.8.6.10.4):
+    FIXTURE_ESTADO_VENTANA = maximizada | restaurada
+    FIXTURE_TEMA           = claro | oscuro
+    FIXTURE_TAMANIO_FUENTE = <entero>
+    FIXTURE_ZOOM_INTERNO   = <flotante>
+    FIXTURE_MENU_ABIERTO   = 1 | 0
+    FIXTURE_SCROLL_DESPLAZADO = 1 | 0
+    FIXTURE_CONTROL_DINAMICO_VISIBLE = 1 | 0
+
 Al iniciarse escribe la verdad-terreno de referencia en runtime/ y mantiene
 actualizado el recuento de acciones a medida que se interactua con los
 controles. Es el objetivo controlado de las pruebas GUI reales de calibracion.
@@ -29,7 +38,12 @@ from tests.fixtures.gui_calibration_app.app import crear_aplicacion
 
 def main():
     app, ventana = crear_aplicacion()
-    ventana.showMaximized()
+    config = ventana.config
+    if config.estado_ventana == "maximizada":
+        ventana.showMaximized()
+    else:
+        ventana.resize(1200, 800)
+        ventana.show()
     app.exec()
 
 

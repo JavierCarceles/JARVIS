@@ -9,15 +9,26 @@ Cada control expone identificador estable, geometria de referencia y una
 accion inocua instrumentada que solo incrementa un contador de memoria.
 Incluye un control dibujado a mano SIN accesibilidad para probar que los
 detectores no lo marcan como accionable por falso positivo.
+
+Para la matriz controlada (3.8.6.10.4) soporta variantes de estado
+deterministas, leidas de ``FixtureConfig`` o de variables de entorno, para
+lanzar cada variante como un proceso independiente desde las pruebas:
+  estado de ventana (maximizada / restaurada)
+  tema (claro / oscuro)
+  tamano de fuente
+  zoom interno (escala las geometrias de los controles)
+  menu abierto (menu desplegable visible)
+  scroll desplazado (area de scrolleo movida)
+  control dinamico visible / oculto
 """
 
 from __future__ import annotations
 
 import os
-from typing import Dict
+from typing import Any, Dict, Optional
 
-from PySide6.QtCore import Qt, QSize
-from PySide6.QtGui import QColor, QPainter
+from PySide6.QtCore import Qt, QSize, QTimer
+from PySide6.QtGui import QColor, QFont, QPalette, QPainter
 from PySide6.QtWidgets import (
     QApplication,
     QButtonGroup,
@@ -42,15 +53,101 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .controls import ACCIONES_INOCUAS, CONTROL_BY_ID, CONTROL_SPECS
+from .controls import ACCIONES_INOCUAS, CONTROL_BY_ID, CONTROL_SPECS, CONTROL_DINAMICO_SPEC
 from .truth_ground import (
     ACTION_COUNTS_PATH,
     TRUTH_GROUND_PATH,
+    construir_truth_ground,
     escribir_action_counts,
     escribir_truth_ground,
 )
 
 TAMANIO_VENTANA = [1200, 800]
+
+# Variables de entorno que configuran una variante de la matriz controlada.
+ENV_ESTADO_VENTANA = "FIXTURE_ESTADO_VENTANA"
+ENV_TEMA = "FIXTURE_TEMA"
+ENV_TAMANIO_FUENTE = "FIXTURE_TAMANIO_FUENTE"
+ENV_ZOOM_INTERNO = "FIXTURE_ZOOM_INTERNO"
+ENV_MENU_ABIERTO = "FIXTURE_MENU_ABIERTO"
+ENV_SCROLL_DESPLAZADO = "FIXTURE_SCROLL_DESPLAZADO"
+ENV_CONTROL_DINAMICO_VISIBLE = "FIXTURE_CONTROL_DINAMICO_VISIBLE"
+
+
+class FixtureConfig:
+    """Configuracion de una variante de la matriz controlada (3.8.6.10.4).
+
+    Los valores por defecto replican la linea base de las unidades
+    3.8.6.10.1 a 3.8.6.10.3 (ventana maximizada, tema claro, fuente 9,
+    zoom 1.0, menu cerrado, sin scroll, control dinamico oculto).
+    """
+
+    def __init__(
+        self,
+        estado_ventana: str = "maximizada",
+        tema: str = "claro",
+        tamano_fuente: int = 9,
+        zoom_interno: float = 1.0,
+        menu_abierto: bool = False,
+        scroll_desplazado: bool = False,
+        control_dinamico_visible: bool = False,
+    ) -> None:
+        self.estado_ventana = estado_ventana
+        self.tema = tema
+        self.tamano_fuente = tamano_fuente
+        self.zoom_interno = zoom_interno
+        self.menu_abierto = menu_abierto
+        self.scroll_desplazado = scroll_desplazado
+        self.control_dinamico_visible = control_dinamico_visible
+
+    @classmethod
+    def desde_entorno(cls) -> "FixtureConfig":
+        """Lee la configuracion desde las variables de entorno."""
+
+        def env_bool(nombre: str, defecto: bool) -> bool:
+            valor = os.environ.get(nombre)
+            if valor is None:
+                return defecto
+            return valor.strip().lower() in ("1", "true", "si", "yes", "on")
+
+        def env_int(nombre: str, defecto: int) -> int:
+            valor = os.environ.get(nombre)
+            if valor is None:
+                return defecto
+            try:
+                return int(valor)
+            except ValueError:
+                return defecto
+
+        def env_float(nombre: str, defecto: float) -> float:
+            valor = os.environ.get(nombre)
+            if valor is None:
+                return defecto
+            try:
+                return float(valor)
+            except ValueError:
+                return defecto
+
+        return cls(
+            estado_ventana=os.environ.get(ENV_ESTADO_VENTANA, "maximizada"),
+            tema=os.environ.get(ENV_TEMA, "claro"),
+            tamano_fuente=env_int(ENV_TAMANIO_FUENTE, 9),
+            zoom_interno=env_float(ENV_ZOOM_INTERNO, 1.0),
+            menu_abierto=env_bool(ENV_MENU_ABIERTO, False),
+            scroll_desplazado=env_bool(ENV_SCROLL_DESPLAZADO, False),
+            control_dinamico_visible=env_bool(ENV_CONTROL_DINAMICO_VISIBLE, False),
+        )
+
+    def a_dict(self) -> Dict[str, Any]:
+        return {
+            "estado_ventana": self.estado_ventana,
+            "tema": self.tema,
+            "tamano_fuente": self.tamano_fuente,
+            "zoom_interno": self.zoom_interno,
+            "menu_abierto": self.menu_abierto,
+            "scroll_desplazado": self.scroll_desplazado,
+            "control_dinamico_visible": self.control_dinamico_visible,
+        }
 
 
 class HandDrawnControl(QWidget):
@@ -85,15 +182,21 @@ class HandDrawnControl(QWidget):
 class CalibrationAppWindow(QMainWindow):
     """Ventana de prueba con todos los controles de calibracion."""
 
-    def __init__(self, tamanio=None):
+    def __init__(self, tamanio=None, config=None):
         super().__init__()
         self.setWindowTitle("JARVIS GUI Calibration Fixture")
         if tamanio is None:
             tamanio = TAMANIO_VENTANA
-        self.resize(tamanio[0], tamanio[1])
-
+        self.config = config if config is not None else FixtureConfig.desde_entorno()
+        self._tamanio_base = list(tamanio)
         self._action_counts: Dict[str, int] = {accion: 0 for accion in ACCIONES_INOCUAS}
         self._control_widgets: Dict[str, object] = {}
+        self._menu_widget = None
+        self._scroll_widget = None
+        self._dinamico_widget = None
+
+        self._aplicar_tema()
+        self._aplicar_fuente()
 
         self._central = QWidget()
         self._central.setObjectName("area_central")
@@ -104,7 +207,82 @@ class CalibrationAppWindow(QMainWindow):
         self._central.setLayout(None)
 
         self._construir_controles()
+        self._aplicar_zoom_y_geometrias()
+        # Los estados que requieren la ventana visible se aplican tras el
+        # primer show() mediante un temporizador (menu abierto, scroll).
+        QTimer.singleShot(100, self._aplicar_estados_post_show)
         self._escribir_archivos_estado()
+
+    # ------------------------------------------------------------------ configuracion
+    def _aplicar_tema(self):
+        """Aplica el tema claro u oscuro a la aplicacion."""
+        app = QApplication.instance()
+        if app is None:
+            return
+        if self.config.tema == "oscuro":
+            paleta = QPalette()
+            paleta.setColor(QPalette.Window, QColor(45, 45, 45))
+            paleta.setColor(QPalette.WindowText, Qt.white)
+            paleta.setColor(QPalette.Base, QColor(30, 30, 30))
+            paleta.setColor(QPalette.AlternateBase, QColor(45, 45, 45))
+            paleta.setColor(QPalette.ToolTipBase, Qt.white)
+            paleta.setColor(QPalette.ToolTipText, Qt.white)
+            paleta.setColor(QPalette.Text, Qt.white)
+            paleta.setColor(QPalette.Button, QColor(45, 45, 45))
+            paleta.setColor(QPalette.ButtonText, Qt.white)
+            paleta.setColor(QPalette.BrightText, Qt.red)
+            paleta.setColor(QPalette.Link, QColor(42, 130, 218))
+            paleta.setColor(QPalette.Highlight, QColor(42, 130, 218))
+            paleta.setColor(QPalette.HighlightedText, Qt.white)
+            app.setPalette(paleta)
+        else:
+            app.setPalette(QPalette())
+
+    def _aplicar_fuente(self):
+        """Aplica el tamano de fuente configurado a la aplicacion."""
+        app = QApplication.instance()
+        if app is None:
+            return
+        fuente = app.font()
+        fuente.setPointSize(max(1, int(self.config.tamano_fuente)))
+        app.setFont(fuente)
+
+    def _aplicar_zoom_y_geometrias(self):
+        """Reescala las geometrias de todos los controles por el zoom interno."""
+        zoom = float(self.config.zoom_interno)
+        for control_id, widget in self._control_widgets.items():
+            espec = CONTROL_BY_ID.get(control_id)
+            if espec is None or espec.get("geometry") is None:
+                continue
+            geo = espec["geometry"]
+            widget.setGeometry(
+                int(round(geo[0] * zoom)),
+                int(round(geo[1] * zoom)),
+                int(round(geo[2] * zoom)),
+                int(round(geo[3] * zoom)),
+            )
+        if self._dinamico_widget is not None and CONTROL_DINAMICO_SPEC.get("geometry"):
+            geo = CONTROL_DINAMICO_SPEC["geometry"]
+            self._dinamico_widget.setGeometry(
+                int(round(geo[0] * zoom)),
+                int(round(geo[1] * zoom)),
+                int(round(geo[2] * zoom)),
+                int(round(geo[3] * zoom)),
+            )
+
+    def _aplicar_estados_post_show(self):
+        """Aplica estados que requieren la ventana ya visible (menu, scroll)."""
+        if self.config.menu_abierto and self._menu_widget is not None:
+            try:
+                self._menu_widget.showMenu()
+            except Exception:
+                pass
+        if self.config.scroll_desplazado and self._scroll_widget is not None:
+            try:
+                barra = self._scroll_widget.verticalScrollBar()
+                barra.setValue(barra.maximum())
+            except Exception:
+                pass
 
     # ------------------------------------------------------------------ UI
     def _construir_menu_archivo(self):
@@ -125,6 +303,7 @@ class CalibrationAppWindow(QMainWindow):
         btn.setPopupMode(QToolButton.MenuButtonPopup)
         btn.clicked.connect(lambda: self._disparar("accion_menu_archivo"))
         self._control("menu_archivo", btn, "accion_menu_archivo")
+        self._menu_widget = btn
 
     def _control(self, control_id, widget, action=None):
         widget.setObjectName(control_id)
@@ -173,6 +352,14 @@ class CalibrationAppWindow(QMainWindow):
         if geometria is None:
             return
         widget.setGeometry(geometria[0], geometria[1], geometria[2], geometria[3])
+
+    def _crear_control_dinamico(self):
+        """Crea el control dinamico opcional solo si la variante lo pide."""
+        if not self.config.control_dinamico_visible:
+            return
+        btn = QPushButton(CONTROL_DINAMICO_SPEC["label"], self._central)
+        self._control("ctrl_dinamico", btn, CONTROL_DINAMICO_SPEC["action"])
+        self._dinamico_widget = btn
 
     def _construir_controles(self):
         x_ref = {item["id"]: item["geometry"] for item in CONTROL_SPECS}
@@ -250,13 +437,14 @@ class CalibrationAppWindow(QMainWindow):
         contenido.setFixedSize(QSize(300, 600))
         lay = QVBoxLayout(contenido)
         for i in range(15):
-            lay.addWidget(QLabel(f"Linea {i + 1}"))
+            lay.addWidget(QLabel("Linea %d" % (i + 1)))
         scroll.setWidget(contenido)
         scroll.verticalScrollBar().valueChanged.connect(
             lambda _valor: self._disparar("accion_scr_area")
         )
         self._control("scr_area", scroll, "accion_scr_area")
         self._colocar("scr_area", x_ref["scr_area"])
+        self._scroll_widget = scroll
 
         # Popup (boton que abre un dialogo modal)
         btn_popup = QPushButton("Abrir popup", self._central)
@@ -282,11 +470,12 @@ class CalibrationAppWindow(QMainWindow):
 
         # Dibujo a mano SIN accesibilidad
         canvas = HandDrawnControl(self._central)
-        # No se establece accessibleName ni objectName con el id del control,
-        # para que no exporte identificacion semantica al arbol de accesibilidad.
         canvas.setObjectName("canvas_mano")
         self._control_widgets["canvas_mano"] = canvas
         self._colocar("canvas_mano", x_ref["canvas_mano"])
+
+        # Control dinamico opcional
+        self._crear_control_dinamico()
 
     def _abrir_popup(self):
         dialogo = QDialog(self)
@@ -309,9 +498,21 @@ class CalibrationAppWindow(QMainWindow):
     def action_counts(self):
         return dict(self._action_counts)
 
+    def config_dict(self):
+        return {
+            "estado_ventana": self.config.estado_ventana,
+            "tema": self.config.tema,
+            "tamano_fuente": self.config.tamano_fuente,
+            "zoom_interno": self.config.zoom_interno,
+            "menu_abierto": self.config.menu_abierto,
+            "scroll_desplazado": self.config.scroll_desplazado,
+            "control_dinamico_visible": self.config.control_dinamico_visible,
+        }
+
     # ------------------------------------------------------------------ estado
     def _escribir_archivos_estado(self):
-        escribir_truth_ground()
+        escribir_truth_ground(zoom_interno=self.config.zoom_interno,
+                              incluir_dinamico=self.config.control_dinamico_visible)
         escribir_action_counts(self._action_counts)
 
     def get_control_geometry(self, control_id):
@@ -324,21 +525,27 @@ class CalibrationAppWindow(QMainWindow):
 
     def get_truth_ground(self):
         from .truth_ground import get_truth_ground
-        return get_truth_ground()
+        return get_truth_ground(zoom_interno=self.config.zoom_interno,
+                                incluir_dinamico=self.config.control_dinamico_visible)
 
 
-def crear_aplicacion():
+def crear_aplicacion(config=None):
     """Crea (o reutiliza) la QApplication y devuelve la ventana de la fixture."""
     app = QApplication.instance()
     if app is None:
         app = QApplication([])
-    ventana = CalibrationAppWindow()
+    ventana = CalibrationAppWindow(config=config)
     return app, ventana
 
 
 def main():
     app, ventana = crear_aplicacion()
-    ventana.show()
+    config = ventana.config
+    if config.estado_ventana == "maximizada":
+        ventana.showMaximized()
+    else:
+        ventana.resize(TAMANIO_VENTANA[0], TAMANIO_VENTANA[1])
+        ventana.show()
     app.exec()
 
 

@@ -7962,3 +7962,57 @@ DISCREPANCIAS: NINGUNA respecto al roadmap para esta unidad.
 PENDIENTES: NINGUNO
 ESTADO FINAL: 3.8.6.10.3 - IMPLEMENTADA
 MACOS: NO APLICA (logica comun de test sin APIs nativas de Windows; la parte macOS de la fixture ya se indico como sin verificar en 3.8.6.10.1, segun regla 3 del roadmap)
+
+REGISTRO DE UNIDAD: 3.8.6.10.4
+FECHA: 2026-11-20
+OBJETIVO: Matriz controlada de estados de la fixture de calibracion GUI sin tocar el equipo: ventana maximizada/restaurada, tema claro/oscuro, tamano de fuente, zoom interno, menu abierto, scroll desplazado y control dinamico visible/oculto; escalas y monitores no disponibles quedan como NO VERIFICADO.
+TIPO DE TRABAJO: TEST; VERIFICACION
+CAMBIOS / HALLAZGOS: Extendida la fixture de calibracion para soportar variantes de estado deterministas mediante variables de entorno (FIXTURE_ESTADO_VENTANA, FIXTURE_TEMA, FIXTURE_TAMANIO_FUENTE, FIXTURE_ZOOM_INTERNO, FIXTURE_MENU_ABIERTO, FIXTURE_SCROLL_DESPLAZADO, FIXTURE_CONTROL_DINAMICO_VISIBLE) con valores por defecto que replican la linea base. Anadido control dinamico opcional ctrl_dinamico y verdad-terreno parametrizada por zoom y control dinamico. Creada la clase TestMatrizControladaCalibracion en tests/hands/calibration/test_ui_calibration_accuracy_harness.py que ejecuta el pipeline UIA (y vision/fusion en la variante base) sobre 8 variantes: maximizado_claro_base, restaurado, tema_oscuro, fuente_grande, zoom_125, dinamico_visible, menu_abierto, scroll_desplazado. Resultados en Windows real (monitor secundario derecho 3840x2160 escala 2.25): UIA sin error, recall=1.00, IoU>=0.97, error de centro<=5.5 px, click correcto=1.00 en todas las variantes; vision base detecto 15 elementos y fusion recall=1.00. Generado informe_matriz_controlada_calibracion.json. Equipo con 2 monitores a escala 2.25; otras escalas y monitores documentados como NO VERIFICADO. No se modifico codigo de produccion en src/ ni se toco main.py.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: `tests/fixtures/gui_calibration_app/app.py`; `tests/fixtures/gui_calibration_app/controls.py`; `tests/fixtures/gui_calibration_app/truth_ground.py`; `tests/fixtures/gui_calibration_app/run.py`; `tests/fixtures/gui_calibration_app/test_fixture_unit.py`; `tests/hands/calibration/test_ui_calibration_accuracy_harness.py`; DOCUMENTACION: `docs/readme/README_TESTS.md`
+TESTS Y RESULTADOS: UNITARIOS: PASSED (22/22 entre test_fixture_unit y TestLogicaMetricasOffscreen, 0 FAILED/ERROR/SKIPPED); INTEGRACION: OK (8 subtests GUI real con JARVIS_TEST_GUI_REAL=1, 0 FAILED/ERROR/SKIPPED); NO REGRESION: PASSED (22/22 offscreen de calibracion y fixture)
+VERIFICACION: SINTAXIS: OK (py_compile de todos los ficheros modificados; ASCII puro); MAIN.PY: NA (no se modifica main.py ni su cadena de importacion); COMPORTAMIENTO / INTEGRACION REAL: OK (Windows real: 8 variantes de la fixture lanzadas como procesos propios en el monitor no principal mas a la derecha; pipeline UIA ejecutado sobre cada ventana real; informe JSON generado por variante)
+DISCREPANCIAS: NINGUNA
+PENDIENTES: NINGUNO
+ESTADO FINAL: 3.8.6.10.4 - IMPLEMENTADA
+MACOS: NO APLICA (logica comun de test sin APIs nativas de Windows; la parte macOS de la fixture ya se indico como sin verificar en 3.8.6.10.1, segun regla 3 del roadmap)
+
+
+REGISTRO DE UNIDAD: 3.8.6.11.1
+FECHA: 2026-11-20
+OBJETIVO: Distinguir presente en el arbol, visible, habilitado e interactuable ahora de un nodo de accesibilidad (evaluate_presence/ElementPresence de src.hands.calibration.dynamic_ui), verificable con datos representativos sin OS ni GUI.
+TIPO DE TRABAJO: INSPECCION; VERIFICACION; TEST
+CAMBIOS / HALLAZGOS: dynamic_ui.py ya implementaba evaluate_presence y ElementPresence (in_tree, visible, enabled, interactable_now + razones) sin usar APIs nativas de Windows; se inspecciono el contrato y se verifico con sintaxis OK y 13 pruebas unitarias sobre AccessibilityNode, WindowInfo y DisplayInfo sinteticos: nodo ausente (in_tree=False), fuera de pantalla / no visible / ventana minimizada u oculta (visible=False), deshabilitado (enabled=False), sin accion disponible o ventana no en primer plano (interactable_now=False), nodo completo (todo True), caja fuera de ventana o parcialmente fuera del monitor (interactable_now=False); serializacion to_dict correcta. No se modifico codigo de produccion en src/ ni se toco main.py.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: `tests/hands/calibration/test_dynamic_ui_presence.py` (nuevo); DOCUMENTACION: `docs/readme/README_TESTS.md` (seccion 11.7 Calibracion, entrada del nuevo test)
+TESTS Y RESULTADOS: UNITARIOS: PASSED (13/13 en tests/hands/calibration/test_dynamic_ui_presence.py, 0 FAILED/ERROR/SKIPPED); INTEGRACION: NA; NO REGRESION: PASSED (102/102 en tests/hands/detection/test_ui_calibration_quality_gate.py, tests/hands/detection/test_calibration_quality_gate_dimensions.py, tests/hands/detection/test_verify_before_action.py, tests/hands/calibration/test_ui_knowledge_coordinate_separation.py, tests/hands/calibration/test_calibration_requirements.py, 0 FAILED/ERROR/SKIPPED)
+VERIFICACION: SINTAXIS: OK (py_compile de dynamic_ui.py y del test nuevo; 0 caracteres no ASCII); MAIN.PY: NA (no se modifica main.py ni su cadena de importacion); COMPORTAMIENTO / INTEGRACION REAL: funcion determinista sobre estructuras de datos; verificada con datos representativos sin OS ni GUI (criterio 9 del roadmap, funcion pura)
+DISCREPANCIAS: NINGUNA
+PENDIENTES: NINGUNO
+ESTADO FINAL: 3.8.6.11.1 - IMPLEMENTADA
+MACOS: NO APLICA (logica comun sobre contratos multiplataforma sin APIs nativas de Windows; no hay parte macOS especifica que verificar)
+
+REGISTRO DE UNIDAD: 3.8.6.11.2
+FECHA: 2026-11-20
+OBJETIVO: Tratar menus, popups, tooltips, pestanas, dialogos, listas virtualizadas, scroll, hover y carga asincrona; nunca asignar coordenadas a controles no renderizados (funciones de src.hands.calibration.dynamic_ui), verificable con datos representativos sin OS ni GUI.
+TIPO DE TRABAJO: INSPECCION; CORRECCION; TEST; VERIFICACION
+CAMBIOS / HALLAZGOS: dynamic_ui.py ya implementaba (codigo previo, revisado de forma critica en Windows) classify_dynamic_element, is_transient, can_assign_coordinates, navigation_for_element, semantic_reference, frame_is_fresh, UIChangeDetector y ElementRelocator. Se compilo e importe correctamente en Windows. Comportamiento verificado con 48 pruebas unitarias sinteticas sobre AccessibilityNode, AccessibilityTree, WindowInfo y DisplayInfo. Corregido defecto: AXSheet figuraba tanto en _POPUP_ROLES como en _DIALOG_ROLES, por lo que la clasificacion dependia del orden y AXSheet se resolvia como popup; se quito AXSheet de _POPUP_ROLES (queda solo en _DIALOG_ROLES; AXPopover sigue siendo popup) para distinguir popups de dialogos. No se uso APIs nativas de Windows ni se toco main.py.
+ARCHIVOS MODIFICADOS: PRODUCCION: `src/hands/calibration/dynamic_ui.py` (AXSheet quitado de _POPUP_ROLES); TESTS: `tests/hands/calibration/test_dynamic_ui.py` (nuevo); DOCUMENTACION: `docs/readme/README_TESTS.md` (seccion 11.7 Calibracion, entrada del nuevo test)
+TESTS Y RESULTADOS: UNITARIOS: PASSED (61/61 entre tests/hands/calibration/test_dynamic_ui.py y tests/hands/calibration/test_dynamic_ui_presence.py, 0 FAILED/ERROR/SKIPPED); INTEGRACION: NA; NO REGRESION: PASSED (102/102 en tests/hands/detection/test_ui_calibration_quality_gate.py, tests/hands/detection/test_calibration_quality_gate_dimensions.py, tests/hands/detection/test_verify_before_action.py, tests/hands/calibration/test_ui_knowledge_coordinate_separation.py, tests/hands/calibration/test_calibration_requirements.py, 0 FAILED/ERROR/SKIPPED)
+VERIFICACION: SINTAXIS: OK (py_compile de dynamic_ui.py y del test nuevo; 0 caracteres no ASCII); MAIN.PY: NA (no se modifica main.py ni su cadena de importacion); COMPORTAMIENTO / INTEGRACION REAL: funciones puras deterministas sobre AccessibilityNode, AccessibilityTree, WindowInfo y DisplayInfo; verificadas con datos representativos sin OS ni GUI (criterio 9 del roadmap, funcion pura). No hay prueba OS/GUI obligatoria para esta unidad (no toca SO, procesos, ventanas, monitores, captura ni entrada de usuario).
+DISCREPANCIAS: Se encontro y corrigio ambiguedad en dynamic_ui.py: AXSheet figuraba tanto en _POPUP_ROLES como en _DIALOG_ROLES; se resuelve ahora como dialogo.
+PENDIENTES: NINGUNO
+ESTADO FINAL: 3.8.6.11.2 - IMPLEMENTADA
+MACOS: NO APLICA (logica comun sobre contratos multiplataforma sin APIs nativas de Windows; no hay parte macOS especifica que verificar)
+
+
+REGISTRO DE UNIDAD: 3.8.6.11.3
+FECHA: 2026-11-20
+OBJETIVO: Detectar cambios por eventos de accesibilidad cuando sean fiables y por comparacion de frames; captura adaptativa con limite de CPU/GPU (UIChangeDetector y AdaptiveCapture), verificable con datos representativos sin OS ni GUI.
+TIPO DE TRABAJO: INSPECCION; VERIFICACION; TEST
+CAMBIOS / HALLAZGOS: Se inspecciono de forma critica el codigo existente de src/hands/calibration/dynamic_ui.py (UIChangeDetector con notify_accessibility_event, observe, diff y wait_until_stable con limite de CPU; adaptive_capture_fn; adapter_capture_fn; frame_is_fresh) y src/eyes/capture/screen_capture.py (AdaptiveCapture con cadencia baja 2 fps, rafaga 15 fps al detectar transicion, buffer acotado de 8 frames, detencion del stream por inactividad y deteccion de transiciones entre frames). La implementacion ya cumplia el objetivo de la unidad; no se modifico codigo de produccion. Se verificaron 75 pruebas unitarias sinteticas (48 de test_dynamic_ui.py, 13 de test_dynamic_ui_presence.py, 14 de TestAdaptiveCaptureUnit en test_dxcam_capture_core.py) y 102 de no regresion, todas PASSED.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: NA; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: PASSED (75/75 en tests/hands/calibration/test_dynamic_ui.py, tests/hands/calibration/test_dynamic_ui_presence.py y tests/eyes/capture/test_dxcam_capture_core.py TestAdaptiveCaptureUnit, 0 FAILED/ERROR/SKIPPED); INTEGRACION: NA; NO REGRESION: PASSED (102/102 en tests/hands/detection/test_ui_calibration_quality_gate.py, tests/hands/detection/test_calibration_quality_gate_dimensions.py, tests/hands/detection/test_verify_before_action.py, tests/hands/calibration/test_ui_knowledge_coordinate_separation.py, tests/hands/calibration/test_calibration_requirements.py, 0 FAILED/ERROR/SKIPPED)
+VERIFICACION: SINTAXIS: OK (py_compile de dynamic_ui.py y screen_capture.py; 0 caracteres no ASCII); MAIN.PY: NA (no se modifica main.py ni su cadena de importacion); COMPORTAMIENTO / INTEGRACION REAL: funciones puras deterministas sobre frames (arrays numpy) y estructuras de datos; verificadas con datos representativos sin OS ni GUI (criterio 9 del roadmap, funcion pura). No hay prueba OS/GUI obligatoria para esta unidad (no toca SO, procesos, ventanas, monitores, captura ni entrada de usuario directamente; AdaptiveCapture se testa con camara inyectada).
+DISCREPANCIAS: NINGUNA
+PENDIENTES: NINGUNO
+ESTADO FINAL: 3.8.6.11.3 - IMPLEMENTADA
+MACOS: NO APLICA (logica comun sobre contratos multiplataforma sin APIs nativas de Windows; no hay parte macOS especifica que verificar)

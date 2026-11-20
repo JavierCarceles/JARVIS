@@ -1184,5 +1184,515 @@ class TestHarnessCalibracionPrecisionReal(unittest.TestCase):
                 pass
 
 
+# ---------------------------------------------------------------------------
+# Matriz controlada de estados de la fixture (unidad 3.8.6.10.4).
+#
+# Ejecuta el pipeline de produccion (UIA accesibilidad, y vision/fusion en la
+# variante base) sobre la fixture en distintos estados: ventana
+# maximizada/restaurada, tema claro/oscuro, tamano de fuente, zoom interno,
+# menu abierto, scroll desplazado y control dinamico visible/oculto. Todo sin
+# modificar la configuracion fisica de monitores del equipo. Las escalas o
+# monitores no disponibles en el equipo se dejan como NO VERIFICADO (se
+# documentan en el informe, no fallan la prueba).
+# ---------------------------------------------------------------------------
+
+class TestMatrizControladaCalibracion(unittest.TestCase):
+    """Matriz controlada de calibracion UI sobre la fixture."""
+
+    adapter = None
+    monitor_id = None
+
+    VARIANTES = [
+        {
+            "nombre": "maximizado_claro_base",
+            "estado_ventana": "maximizada",
+            "tema": "claro",
+            "tamano_fuente": 9,
+            "zoom_interno": 1.0,
+            "menu_abierto": False,
+            "scroll_desplazado": False,
+            "control_dinamico_visible": False,
+        },
+        {
+            "nombre": "restaurado",
+            "estado_ventana": "restaurada",
+            "tema": "claro",
+            "tamano_fuente": 9,
+            "zoom_interno": 1.0,
+            "menu_abierto": False,
+            "scroll_desplazado": False,
+            "control_dinamico_visible": False,
+        },
+        {
+            "nombre": "tema_oscuro",
+            "estado_ventana": "maximizada",
+            "tema": "oscuro",
+            "tamano_fuente": 9,
+            "zoom_interno": 1.0,
+            "menu_abierto": False,
+            "scroll_desplazado": False,
+            "control_dinamico_visible": False,
+        },
+        {
+            "nombre": "fuente_grande",
+            "estado_ventana": "maximizada",
+            "tema": "claro",
+            "tamano_fuente": 16,
+            "zoom_interno": 1.0,
+            "menu_abierto": False,
+            "scroll_desplazado": False,
+            "control_dinamico_visible": False,
+        },
+        {
+            "nombre": "zoom_125",
+            "estado_ventana": "maximizada",
+            "tema": "claro",
+            "tamano_fuente": 9,
+            "zoom_interno": 1.25,
+            "menu_abierto": False,
+            "scroll_desplazado": False,
+            "control_dinamico_visible": False,
+        },
+        {
+            "nombre": "dinamico_visible",
+            "estado_ventana": "maximizada",
+            "tema": "claro",
+            "tamano_fuente": 9,
+            "zoom_interno": 1.0,
+            "menu_abierto": False,
+            "scroll_desplazado": False,
+            "control_dinamico_visible": True,
+        },
+        {
+            "nombre": "menu_abierto",
+            "estado_ventana": "maximizada",
+            "tema": "claro",
+            "tamano_fuente": 9,
+            "zoom_interno": 1.0,
+            "menu_abierto": True,
+            "scroll_desplazado": False,
+            "control_dinamico_visible": False,
+        },
+        {
+            "nombre": "scroll_desplazado",
+            "estado_ventana": "maximizada",
+            "tema": "claro",
+            "tamano_fuente": 9,
+            "zoom_interno": 1.0,
+            "menu_abierto": False,
+            "scroll_desplazado": True,
+            "control_dinamico_visible": False,
+        },
+    ]
+
+    @classmethod
+    def setUpClass(cls):
+        if not is_windows():
+            raise unittest.SkipTest("Solo Windows")
+        if os.environ.get("JARVIS_TEST_GUI_REAL") != "1":
+            raise unittest.SkipTest("Establecer JARVIS_TEST_GUI_REAL=1 para ejecutar este harness GUI real")
+        if _gui_lock_activo():
+            raise unittest.SkipTest("Otra prueba GUI esta ejecutandose. Esperar a que termine.")
+        _adquirir_gui_lock()
+        cls.adapter = get_desktop_platform()
+        disp = cls.adapter.enumerate_displays()
+        assert disp.ok is True, "No se pudieron enumerar monitores: %s" % disp.error
+        pantallas = disp.value
+        no_principales = [p for p in pantallas if not p.is_primary]
+        objetivo = max(no_principales, key=lambda p: p.bounds.left) if no_principales else pantallas[0]
+        cls.monitor_id = objetivo.display_id
+
+    @classmethod
+    def tearDownClass(cls):
+        try:
+            _liberar_gui_lock()
+        finally:
+            cls.adapter = None
+            cls.monitor_id = None
+
+    # ------------------------------------------------------------------ lanzamiento por variante
+    def _lanzar_variante(self, variante):
+        """Lanza la fixture con la configuracion de la variante y devuelve
+        (proc, hwnd, cliente_rect, escala_ventana, tamano_cliente, cliente_offset)."""
+        from pywinauto import Desktop  # solo Windows
+
+        env = dict(os.environ)
+        env["FIXTURE_ESTADO_VENTANA"] = variante["estado_ventana"]
+        env["FIXTURE_TEMA"] = variante["tema"]
+        env["FIXTURE_TAMANIO_FUENTE"] = str(variante["tamano_fuente"])
+        env["FIXTURE_ZOOM_INTERNO"] = str(variante["zoom_interno"])
+        env["FIXTURE_MENU_ABIERTO"] = "1" if variante["menu_abierto"] else "0"
+        env["FIXTURE_SCROLL_DESPLAZADO"] = "1" if variante["scroll_desplazado"] else "0"
+        env["FIXTURE_CONTROL_DINAMICO_VISIBLE"] = "1" if variante["control_dinamico_visible"] else "0"
+        proc = subprocess.Popen([sys.executable, FIXTURE_RUN], env=env)
+        deadline = time.time() + 25
+        hwnd = None
+        escritorio = Desktop(backend="uia")
+        while time.time() < deadline:
+            try:
+                cand = escritorio.window(title=TITULO_FIXTURE)
+                if cand.exists() and cand.handle is not None:
+                    hwnd = int(cand.handle)
+                    break
+            except Exception:
+                pass
+            time.sleep(0.3)
+        if hwnd is None:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+            raise RuntimeError("No se detecto ventana de la fixture para %s" % variante["nombre"])
+
+        # Monitor destino: el no principal situado mas a la derecha (enumeracion real).
+        mv = self.adapter.move_window_to_display(hwnd, self.monitor_id)
+        assert mv.ok is True, "No se pudo mover la fixture al monitor de pruebas: %s" % mv.error
+
+        # Estado de ventana solicitado por la variante.
+        if variante["estado_ventana"] == "maximizada":
+            mx = self.adapter.maximize_window(hwnd)
+            assert mx.ok is True, "No se pudo maximizar la fixture: %s" % mx.error
+        else:
+            rs = self.adapter.restore_window(hwnd)
+            assert rs.ok is True, "No se pudo restaurar la fixture: %s" % rs.error
+
+        ac = self.adapter.activate_window(hwnd)
+        assert ac.ok is True, "No se pudo activar la fixture: %s" % ac.error
+
+        atexit.register(lambda: self._cerrar_variante(proc, hwnd))
+
+        # Esperar (sin sleep fijo) a que la ventana este en el monitor objetivo
+        # con su escala DPI y su area cliente estables.
+        escala_monitor = None
+        for p in self.adapter.enumerate_displays().value:
+            if p.display_id == self.monitor_id:
+                escala_monitor = float(p.scale_factor)
+        assert escala_monitor is not None, "No se leyo la escala del monitor de pruebas"
+        win = None
+        rect_anterior = None
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            win = self.adapter.get_window(hwnd)
+            rect = _area_cliente_pantalla(hwnd)
+            estable = (
+                win.ok is True
+                and win.value.display_id == self.monitor_id
+                and win.value.scale_factor is not None
+                and abs(float(win.value.scale_factor) - escala_monitor) < 0.01
+                and rect is not None
+                and rect == rect_anterior
+            )
+            if estable:
+                break
+            rect_anterior = rect
+            time.sleep(0.25)
+        assert win is not None and win.ok is True, "No se pudo leer la ventana de la fixture"
+        assert win.value.display_id == self.monitor_id, "La fixture no quedo en el monitor objetivo"
+        assert win.value.scale_factor is not None, "El adaptador no devolvio la escala DPI de la ventana"
+        escala_ventana = float(win.value.scale_factor)
+        assert abs(escala_ventana - escala_monitor) < 0.01, (
+            "La escala DPI de la ventana (%.4f) no coincide con la del monitor (%.4f)" % (escala_ventana, escala_monitor)
+        )
+
+        cliente_offset = _cliente_offset_pantalla(hwnd)
+        cliente_rect = _area_cliente_pantalla(hwnd)
+        if cliente_rect is not None:
+            cl, ct, cr, cb = cliente_rect
+            tamano_cliente = (cr - cl, cb - ct)
+        else:
+            tamano_cliente = (0, 0)
+
+        # Esperar a que los estados post-show (menu abierto, scroll) se apliquen.
+        time.sleep(0.5)
+        return proc, hwnd, cliente_rect, escala_ventana, tamano_cliente, cliente_offset
+
+    def _cerrar_variante(self, proc, hwnd):
+        if hwnd is not None and self.adapter is not None:
+            from pywinauto import Desktop  # solo Windows
+            try:
+                self.adapter.close_window(hwnd)
+                deadline = time.time() + 10
+                while time.time() < deadline:
+                    escritorio = Desktop(backend="uia")
+                    try:
+                        aun_existe = escritorio.window(handle=hwnd).exists()
+                    except Exception:
+                        aun_existe = False
+                    if not aun_existe:
+                        break
+                    time.sleep(0.25)
+            except Exception:
+                pass
+        if proc is not None and proc.poll() is None:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+
+    # ------------------------------------------------------------------ pipelines
+    def _ejecutar_uia(self, hwnd, cliente_offset, tamano_cliente, referencia):
+        """Ejecuta el pipeline de accesibilidad UIA y devuelve ResultadoMetrica."""
+        adapter = UIAutomationAdapter(timeout=8.0)
+        det_uia = []
+        error_uia = None
+        latencia_uia = 0.0
+        t0 = time.perf_counter()
+        try:
+            tree: UIAutomationTree = adapter.enumerate_window(hwnd)
+            if tree.error is not None:
+                error_uia = tree.error
+            else:
+                cl, ct = cliente_offset
+                for elem in tree.elements:
+                    det = _elemento_a_candidato_uia(elem, hwnd, tree.process_id)
+                    if det.bbox is not None and len(det.bbox) == 4:
+                        det.bbox = [det.bbox[0] - cl, det.bbox[1] - ct, det.bbox[2] - cl, det.bbox[3] - ct]
+                        det.center = [det.bbox[0] + (det.bbox[2] - det.bbox[0]) // 2,
+                                      det.bbox[1] + (det.bbox[3] - det.bbox[1]) // 2]
+                        det.element.bbox = list(det.bbox)
+                        det.element.center = list(det.center)
+                    det_uia.append(det)
+        except Exception as exc:
+            error_uia = str(exc)
+        latencia_uia = time.perf_counter() - t0
+        res = _calcular_metrica(
+            "uia_accesibilidad", det_uia, referencia, IOU_EMPAREJAMIENTO, latencia_uia,
+            _recursos_proceso(), CONTROLES_SIN_ACCESIBILIDAD, tamano_cliente=tamano_cliente,
+        )
+        res.error = error_uia
+        return res
+
+    def _ejecutar_vision_fusion(self, hwnd, cliente_rect, referencia, tamano_cliente):
+        """Ejecuta vision (Qwen3-VL) y fusion sobre la captura del area cliente."""
+        det_vision = []
+        error_vision = None
+        latencia_vision = 0.0
+        tamano_captura = None
+        respuesta = None
+        servidor_ollama = None
+        t0_vision = 0.0
+        try:
+            servidor_ollama = servidor_ollama_de_sesion()
+            cl, ct, cr, cb = cliente_rect
+            capturador = ScreenCapture()
+            ruta_captura = capturador.capture_region(cl, ct, cr - cl, cb - ct)
+            if ruta_captura is None:
+                raise RuntimeError("ScreenCapture.capture_region devolvio None")
+            vision = Vision(model=DEFAULT_VISION_MODEL)
+            tamano_captura = Vision._image_size(ruta_captura)
+            t0_vision = time.perf_counter()
+            respuesta = vision.detect_ui_elements(ruta_captura, application="fixture", refine_with_opencv=False)
+            latencia_vision = time.perf_counter() - t0_vision
+            error_vision = respuesta.error
+            for elem in respuesta.elements:
+                det = _elemento_a_candidato_vision(elem, hwnd, 0)
+                det_vision.append(det)
+        except Exception as exc:
+            error_vision = str(exc)
+            if t0_vision > 0:
+                latencia_vision = time.perf_counter() - t0_vision
+        finally:
+            if ruta_captura and os.path.exists(str(ruta_captura)):
+                try:
+                    os.remove(str(ruta_captura))
+                except OSError:
+                    pass
+        res_vision = _calcular_metrica(
+            "qwen3vl_vision", det_vision, referencia, IOU_EMPAREJAMIENTO, latencia_vision,
+            _recursos_proceso(), CONTROLES_SIN_ACCESIBILIDAD, tamano_cliente=tamano_cliente,
+        )
+        res_vision.error = error_vision
+        res_vision.detalle = {
+            "modelo": DEFAULT_VISION_MODEL,
+            "servidor_ollama_arrancado_por_la_sesion": (
+                servidor_ollama.started_by_us if servidor_ollama is not None else None
+            ),
+            "tamano_captura": list(tamano_captura) if tamano_captura else None,
+            "tamano_imagen_modelo": (respuesta.model_image_size if respuesta is not None else None),
+            "cajas_descartadas": (respuesta.discarded if respuesta is not None else None),
+            "salida_cortada": (respuesta.truncated if respuesta is not None else None),
+        }
+
+        # Fusion (UIA + vision)
+        # Re-ejecutar UIA para tener las entradas actuales de fusion.
+        det_uia = []
+        t0_fusion = 0.0
+        det_fusion = []
+        error_fusion = None
+        latencia_fusion = 0.0
+        try:
+            t0_fusion = time.perf_counter()
+            adapter = UIAutomationAdapter(timeout=8.0)
+            tree: UIAutomationTree = adapter.enumerate_window(hwnd)
+            if tree.error is not None:
+                error_fusion = tree.error
+            else:
+                cl, ct = _cliente_offset_pantalla(hwnd)
+                for elem in tree.elements:
+                    det = _elemento_a_candidato_uia(elem, hwnd, tree.process_id)
+                    if det.bbox is not None and len(det.bbox) == 4:
+                        det.bbox = [det.bbox[0] - cl, det.bbox[1] - ct, det.bbox[2] - cl, det.bbox[3] - ct]
+                        det.center = [det.bbox[0] + (det.bbox[2] - det.bbox[0]) // 2,
+                                      det.bbox[1] + (det.bbox[3] - det.bbox[1]) // 2]
+                        det.element.bbox = list(det.bbox)
+                        det.element.center = list(det.center)
+                    det_uia.append(det)
+        except Exception as exc:
+            error_fusion = str(exc)
+        entradas_fusion = list(det_uia) + list(det_vision)
+        try:
+            fusion = VisualUIDetectorFusion()
+            resultado_fusion = fusion.fuse(
+                entradas_fusion, window_handle=hwnd, process_id=0, screen=0,
+            )
+            latencia_fusion = time.perf_counter() - t0_fusion
+            for fc in resultado_fusion.candidates:
+                det = DetectedCandidate(
+                    source="fusion",
+                    element=fc.sources[0].element if fc.sources else UIElementData(name=fc.name, type=fc.type),
+                    confidence=fc.merged_confidence,
+                    bbox=list(fc.bbox) if fc.bbox else None,
+                    center=list(fc.center) if fc.center else None,
+                    screen=fc.screen,
+                    window_handle=fc.window_handle,
+                    process_id=fc.process_id,
+                    raw={"fusion": True, "agreement": fc.agreement, "disagreements": list(fc.disagreements)},
+                )
+                det_fusion.append(det)
+        except Exception as exc:
+            error_fusion = str(exc)
+            if t0_fusion > 0:
+                latencia_fusion = time.perf_counter() - t0_fusion
+        res_fusion = _calcular_metrica(
+            "fusion_uia_vision", det_fusion, referencia, IOU_EMPAREJAMIENTO, latencia_fusion,
+            _recursos_proceso(), CONTROLES_SIN_ACCESIBILIDAD, tamano_cliente=tamano_cliente,
+        )
+        res_fusion.error = error_fusion
+        return res_vision, res_fusion
+
+    # ------------------------------------------------------------------ prueba de matriz
+    def test_matriz_controlada_variantes(self):
+        """Ejecuta el pipeline sobre cada variante de la matriz y registra
+        metrica por variante. UIA se ejecuta en todas; vision/fusion solo en
+        la variante base (ya cubierta por la unidad 3.8.6.10.3)."""
+        resultados = []
+        variante_base = self.VARIANTES[0]["nombre"]
+        for variante in self.VARIANTES:
+            with self.subTest(variante=variante["nombre"]):
+                proc = None
+                hwnd = None
+                try:
+                    proc, hwnd, cliente_rect, escala_ventana, tamano_cliente, cliente_offset = self._lanzar_variante(variante)
+                    referencia = _referencia_en_pixeles(
+                        construir_truth_ground(
+                            zoom_interno=variante["zoom_interno"],
+                            incluir_dinamico=variante["control_dinamico_visible"],
+                        ).a_dict()["controles"],
+                        escala_ventana,
+                    )
+                    self.assertGreaterEqual(len(referencia), 1, "La verdad-terreno no tiene controles")
+
+                    res_uia = self._ejecutar_uia(hwnd, cliente_offset, tamano_cliente, referencia)
+                    resultados.append({
+                        "variante": variante["nombre"],
+                        "config": variante,
+                        "escala_ventana": escala_ventana,
+                        "tamano_cliente": list(tamano_cliente),
+                        "total_controles_referencia": len(referencia),
+                        "uia": res_uia.a_dict(),
+                    })
+
+                    # Aserciones de UIA (pipeline de accesibilidad): ninguna
+                    # fuente con error y cumplimiento de criterios geometricos.
+                    self.assertIsNone(
+                        res_uia.error, "UIA produjo un error en %s: %s" % (variante["nombre"], res_uia.error)
+                    )
+                    self.assertGreaterEqual(
+                        res_uia.recall, CRITERIO_RECALL_MIN,
+                        "UIA recall insuficiente en %s (%.2f)" % (variante["nombre"], res_uia.recall),
+                    )
+                    self.assertGreaterEqual(
+                        res_uia.iou_medio, CRITERIO_IOU_MEDIO_MIN,
+                        "UIA IoU insuficiente en %s (%.2f)" % (variante["nombre"], res_uia.iou_medio),
+                    )
+                    self.assertLessEqual(
+                        res_uia.error_centro_medio_px, CRITERIO_ERROR_CENTRO_MAX_PX,
+                        "UIA error de centro excesivo en %s (%.1f px)" % (variante["nombre"], res_uia.error_centro_medio_px),
+                    )
+                    self.assertGreaterEqual(
+                        res_uia.click_correcto, CRITERIO_CLICK_CORRECTO_MIN,
+                        "UIA click correcto insuficiente en %s (%.2f)" % (variante["nombre"], res_uia.click_correcto),
+                    )
+                    self.assertLessEqual(
+                        res_uia.latencia_s, CRITERIO_LATENCIA_MAX_S,
+                        "UIA latencia excede en %s" % variante["nombre"],
+                    )
+
+                    # Vision + fusion solo en la variante base.
+                    if variante["nombre"] == variante_base:
+                        res_vision, res_fusion = self._ejecutar_vision_fusion(
+                            hwnd, cliente_rect, referencia, tamano_cliente,
+                        )
+                        resultados[-1]["vision"] = res_vision.a_dict()
+                        resultados[-1]["fusion"] = res_fusion.a_dict()
+                        self.assertIsNone(
+                            res_vision.error, "Vision produjo un error: %s" % res_vision.error
+                        )
+                        self.assertIsNone(
+                            res_fusion.error, "Fusion produjo un error: %s" % res_fusion.error
+                        )
+                        self.assertGreaterEqual(
+                            res_vision.total_detectados, 1,
+                            "Qwen3-VL no detecto ningun elemento en la variante base",
+                        )
+                        self.assertLessEqual(
+                            res_vision.latencia_s, CRITERIO_LATENCIA_MAX_S,
+                            "Vision latencia excede el limite",
+                        )
+                        self.assertLessEqual(
+                            res_fusion.latencia_s, CRITERIO_LATENCIA_MAX_S,
+                            "Fusion latencia excede el limite",
+                        )
+                finally:
+                    self._cerrar_variante(proc, hwnd)
+
+        # Informe JSON de la matriz controlada.
+        informe = {
+            "unidad": "3.8.6.10.4",
+            "fixture": TITULO_FIXTURE,
+            "monitor_id": self.monitor_id,
+            "criterios": {
+                "recall_min": CRITERIO_RECALL_MIN,
+                "iou_medio_min": CRITERIO_IOU_MEDIO_MIN,
+                "error_centro_max_px": CRITERIO_ERROR_CENTRO_MAX_PX,
+                "click_correcto_min": CRITERIO_CLICK_CORRECTO_MIN,
+                "latencia_max_s": CRITERIO_LATENCIA_MAX_S,
+                "iou_emparejamiento": IOU_EMPAREJAMIENTO,
+            },
+            "resultados_por_variante": resultados,
+            "variantes_no_verificadas": [],
+        }
+        # Escalas/monitores no disponibles en el equipo: NOT VERIFIED.
+        # La matriz se ejecuta sobre el monitor disponible (secundario derecho)
+        # a su escala real; el zoom interno es una variante de la fixture, no
+        # una escala de monitor, por tanto se probo en todas las variantes.
+        # Se documentan como NO VERIFICADO las escalas/monitores que el equipo
+        # no posee y que la matriz no pudo cubrir.
+        disp = self.adapter.enumerate_displays()
+        if disp.ok is True:
+            escalas_vistas = sorted(set(round(float(p.scale_factor), 4) for p in disp.value))
+            num_monitores = len(disp.value)
+            informe["variantes_no_verificadas"].append(
+                "Equipo con %d monitor(es) a escala(s) %s; otras escalas y monitores no disponibles quedan NO VERIFICADO." % (
+                    num_monitores, escalas_vistas))
+        informe_path = os.path.join(os.path.dirname(__file__), "informe_matriz_controlada_calibracion.json")
+        try:
+            with open(informe_path, "w", encoding="utf-8") as f:
+                json.dump(informe, f, ensure_ascii=True, indent=2)
+        except Exception:
+            pass
+        self.assertTrue(os.path.exists(informe_path), "El informe de la matriz controlada no se genero")
+
+
 if __name__ == "__main__":
     unittest.main()

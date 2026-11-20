@@ -173,7 +173,7 @@ KIND_SCROLL_CONTAINER = "scroll_container"
 KIND_STATIC = "static"
 
 _MENU_ROLES = frozenset({"Menu", "MenuItem", "MenuBar", "AXMenu", "AXMenuItem", "AXMenuBar", "AXMenuBarItem"})
-_POPUP_ROLES = frozenset({"AXPopover", "AXSheet"})
+_POPUP_ROLES = frozenset({"AXPopover"})
 _TOOLTIP_ROLES = frozenset({"ToolTip", "AXHelpTag"})
 _TAB_ROLES = frozenset({"Tab", "TabItem", "AXTabGroup"})
 _DIALOG_ROLES = frozenset({"AXDialog", "AXSheet"})

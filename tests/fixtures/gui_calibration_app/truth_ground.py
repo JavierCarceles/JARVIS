@@ -9,6 +9,9 @@ recuento de acciones se actualiza en cada interaccion instrumentada.
 Este canal es separado y no lo consume el detector evaluado (ver unidad
 3.8.6.10.2): el detector debe llegar a las mismas conclusiones solo por
 accesibilidad/vision/fusion sobre la ventana, sin leer este archivo.
+
+Para la matriz controlada (3.8.6.10.4) la geometria puede escalarse por un
+factor de zoom interno e incluir opcionalmente el control dinamico.
 """
 
 from __future__ import annotations
@@ -16,9 +19,9 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass, field
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
-from .controls import CONTROL_SPECS, TAMANIO_NOMINAL
+from .controls import CONTROL_SPECS, CONTROL_DINAMICO_SPEC, TAMANIO_NOMINAL
 
 _RUNTIME_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "runtime")
 TRUTH_GROUND_PATH = os.path.join(_RUNTIME_DIR, "truth_ground.json")
@@ -50,8 +53,23 @@ class TruthGround:
         }
 
 
-def construir_truth_ground() -> TruthGround:
-    """Construye la verdad-terreno a partir de CONTROL_SPECS."""
+def _escalar_geometria(geo: Optional[List[int]], factor: float) -> Optional[List[int]]:
+    """Escala una geometria [x, y, ancho, alto] por ``factor`` (zoom interno)."""
+    if geo is None:
+        return None
+    return [int(round(v * factor)) for v in geo]
+
+
+def construir_truth_ground(
+    zoom_interno: float = 1.0,
+    incluir_dinamico: bool = False,
+) -> TruthGround:
+    """Construye la verdad-terreno a partir de CONTROL_SPECS.
+
+    ``zoom_interno`` escala las geometrias de referencia para que coincidan
+    con los controles reales cuando la fixture aplica un zoom interno.
+    ``incluir_dinamico`` anade el control dinamico opcional a la referencia.
+    """
     controles = []
     for item in CONTROL_SPECS:
         controles.append(
@@ -59,10 +77,14 @@ def construir_truth_ground() -> TruthGround:
                 "id": item["id"],
                 "kind": item["kind"],
                 "label": item["label"],
-                "geometry": list(item["geometry"]) if item["geometry"] is not None else None,
+                "geometry": _escalar_geometria(item["geometry"], zoom_interno),
                 "action": item["action"],
             }
         )
+    if incluir_dinamico:
+        dinamico = dict(CONTROL_DINAMICO_SPEC)
+        dinamico["geometry"] = _escalar_geometria(dinamico.get("geometry"), zoom_interno)
+        controles.append(dinamico)
     return TruthGround(
         tamanio_ventana=list(TAMANIO_NOMINAL),
         controles=controles,
@@ -75,10 +97,10 @@ def asegurar_runtime_dir() -> None:
     os.makedirs(_RUNTIME_DIR, exist_ok=True)
 
 
-def escribir_truth_ground() -> None:
+def escribir_truth_ground(zoom_interno: float = 1.0, incluir_dinamico: bool = False) -> None:
     """Persiste la verdad-terreno de referencia en runtime/truth_ground.json."""
     asegurar_runtime_dir()
-    datos = construir_truth_ground().a_dict()
+    datos = construir_truth_ground(zoom_interno=zoom_interno, incluir_dinamico=incluir_dinamico).a_dict()
     with open(TRUTH_GROUND_PATH, "w", encoding="utf-8") as f:
         json.dump(datos, f, ensure_ascii=True, indent=2)
 
@@ -102,6 +124,6 @@ def leer_action_counts() -> Dict[str, int]:
         return {}
 
 
-def get_truth_ground() -> Dict[str, Any]:
+def get_truth_ground(zoom_interno: float = 1.0, incluir_dinamico: bool = False) -> Dict[str, Any]:
     """Devuelve la verdad-terreno como diccionario (canal separado)."""
-    return construir_truth_ground().a_dict()
+    return construir_truth_ground(zoom_interno=zoom_interno, incluir_dinamico=incluir_dinamico).a_dict()
