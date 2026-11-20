@@ -950,6 +950,26 @@ class ApplicationPreflight:
             if not os.path.isfile(executable):
                 executable = None
 
+        # 3) Fallback directo a PATH y App Paths del registro cuando
+        #    shell:AppsFolder y el inventario no resuelven. Permite abrir
+        #    instancias propias por la ruta de produccion (p. ej.
+        #    notepad.exe en system32) sin previo registro en el catalogo ni
+        #    en el inventario local. No hace recorrido recursivo del disco.
+        if not executable and sys.platform == "win32":
+            try:
+                import shutil as _shutil
+
+                candidato = _shutil.which(name + ".exe") or _shutil.which(name)
+                if candidato and os.path.isfile(candidato):
+                    executable = os.path.abspath(candidato)
+            except Exception:
+                executable = None
+
+        if executable:
+            executable = os.path.abspath(executable)
+            if not os.path.isfile(executable):
+                executable = None
+
         self._executable_cache[cache_key] = executable
         return executable
 

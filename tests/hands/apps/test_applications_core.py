@@ -371,7 +371,7 @@ class TestModuleFunctions:
             assert "example.com" in result
 
     def test_navigate_to_url_empty(self):
-        with pytest.raises(ValueError, match="vac\u00eda"):
+        with pytest.raises(ValueError, match="vacia"):
             navigate_to_url("")
 
     def test_open_application_not_found(self):
@@ -379,11 +379,11 @@ class TestModuleFunctions:
             open_application("nonexistent_app_xyz")
 
     def test_close_application_empty_name(self):
-        with pytest.raises(ValueError, match="vac\u00edo"):
+        with pytest.raises(ValueError, match="vacio"):
             close_application("")
 
     def test_wait_for_application_state_empty(self):
-        with pytest.raises(ValueError, match="vac\u00edo"):
+        with pytest.raises(ValueError, match="vacio"):
             wait_for_application_state("app", "")
 
     def test_wait_for_application_state_negative_timeout(self):
@@ -891,7 +891,7 @@ class TestCloseApplication:
     """close_application: cierre de aplicaciones."""
 
     def test_close_empty_name(self):
-        with pytest.raises(ValueError, match="vac\u00edo"):
+        with pytest.raises(ValueError, match="vacio"):
             close_application("")
 
     def test_close_happy_path(self):

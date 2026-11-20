@@ -360,5 +360,83 @@ class TestCalibrateApplicationPipelineException:
         assert len(pipeline.calls) == 1
 
 
+class TestCalibrateApplicationDeep:
+    """3.8.6.12.5 - Calibracion en profundidad (profundidad bajo demanda).
+
+    Verifica que calibrate_application_deep delega en el pipeline unico con
+    depth="deep" (exploracion completa, "calibra X a fondo") o depth="branch"
+    (solo la rama necesaria para el Planner), y que rechaza nombres vacios.
+    """
+
+    def test_calibrate_application_deep_delega_con_depth_deep(self):
+        """calibrate_application_deep llama al pipeline con depth='deep' y branch_ref=None."""
+        report = CalibrationReport(app_id="testapp", app_name="TestApp")
+        report.success = True
+        manager, pipeline = _manager_con_pipeline_falso(report=report)
+        result = manager.calibrate_application_deep({"name": "TestApp", "app_id": "test"})
+        assert result.success is True
+        assert len(pipeline.calls) == 1
+        app_info, kwargs = pipeline.calls[0]
+        assert app_info["name"] == "TestApp"
+        assert app_info["app_id"] == "test"
+        assert kwargs["depth"] == "deep"
+        assert kwargs["branch_ref"] is None
+        assert kwargs["monitor_reference"] is None
+
+    def test_calibrate_application_deep_delega_con_branch_ref(self):
+        """calibrate_application_deep con branch_ref llama al pipeline con depth='branch'."""
+        report = CalibrationReport(app_id="testapp", app_name="TestApp")
+        report.success = True
+        manager, pipeline = _manager_con_pipeline_falso(report=report)
+        branch_ref = {"name": "Menu Archivo", "identifier": "menu_file"}
+        result = manager.calibrate_application_deep(
+            {"name": "TestApp", "app_id": "test"}, branch_ref=branch_ref
+        )
+        assert result.success is True
+        assert len(pipeline.calls) == 1
+        app_info, kwargs = pipeline.calls[0]
+        assert app_info["name"] == "TestApp"
+        assert kwargs["depth"] == "branch"
+        assert kwargs["branch_ref"] == branch_ref
+        assert kwargs["monitor_reference"] is None
+
+    def test_calibrate_application_deep_con_numero_de_pantalla(self):
+        """calibrate_application_deep pasa screen_number como monitor_reference al pipeline."""
+        report = CalibrationReport(app_id="testapp", app_name="TestApp")
+        report.success = True
+        manager, pipeline = _manager_con_pipeline_falso(report=report)
+        result = manager.calibrate_application_deep(
+            {"name": "TestApp", "app_id": "test"}, screen_number=2
+        )
+        assert result.success is True
+        assert len(pipeline.calls) == 1
+        assert pipeline.calls[0][1]["monitor_reference"] == 2
+        assert pipeline.calls[0][1]["depth"] == "deep"
+
+    def test_calibrate_application_deep_no_encontrada_retorna_error(self):
+        """calibrate_application_deep con nombre vacio retorna error sin tocar el pipeline."""
+        manager, pipeline = _manager_con_pipeline_falso(
+            report=_informe_fallido(STAGE_LAUNCH, "no debe usarse")
+        )
+        result = manager.calibrate_application_deep("")
+        assert isinstance(result, CalibrationResult)
+        assert result.success is False
+        assert "no encontrada" in result.error.lower()
+        assert result.elements_count == 0
+        assert pipeline.calls == []
+
+    def test_calibrate_application_deep_pipeline_excepcion_devuelve_error(self):
+        """Una excepcion del pipeline en profundidad se convierte en resultado fallido."""
+        manager, pipeline = _manager_con_pipeline_falso(
+            exc=RuntimeError("fallo interno del pipeline en profundidad")
+        )
+        result = manager.calibrate_application_deep({"name": "TestApp", "app_id": "test"})
+        assert result.success is False
+        assert result.error == "fallo interno del pipeline en profundidad"
+        assert result.elements_count == 0
+        assert len(pipeline.calls) == 1
+        assert pipeline.calls[0][1]["depth"] == "deep"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

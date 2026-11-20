@@ -452,6 +452,20 @@ class CalibrationAppWindow(QMainWindow):
         self._control("popup_info", btn_popup, "accion_popup_info")
         self._colocar("popup_info", x_ref["popup_info"])
 
+        # Boton prohibido para la exploracion profunda: nunca debe pulsarse.
+        # Se agrega fuera de CONTROL_SPECS (como canvas_mano) para no alterar
+        # la linea base de 16 controles ni la verdad-terreno de referencia.
+        btn_borrar = QToolButton(self._central)
+        btn_borrar.setText("Borrar")
+        btn_borrar.setObjectName("btn_borrar")
+        btn_borrar.setAccessibleName("btn_borrar")
+        menu_borrar = QMenu(btn_borrar)
+        menu_borrar.addAction("Opcion de menu")
+        btn_borrar.setMenu(menu_borrar)
+        btn_borrar.setPopupMode(QToolButton.MenuButtonPopup)
+        self._control("btn_borrar", btn_borrar)
+        btn_borrar.setGeometry(20, 490, 140, 32)
+
         # Grupo anidado (contiene controles dentro)
         grupo = QGroupBox("Grupo anidado", self._central)
         self._control("grp_anidado", grupo)

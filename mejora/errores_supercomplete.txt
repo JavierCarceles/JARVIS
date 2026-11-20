@@ -121,3 +121,17 @@ ESTADO: RESUELTO
 REPETICIONES_TIPO: 1 (primera aparicion de TIPO_NORMALIZADO GIT_PROHIBIDO en este archivo)
 MEMORIA_PERSISTENTE: No aplica (primera aparicion). Prevencion: leer prompt_mejoraActual.txt y prompt_JARVIS_reglas.txt antes de cualquier comando.
 ---
+ERR-0024
+FECHA_HORA: 2026-11-20T10:43:24+01:00 Europe/Madrid
+UNIDAD: 3.8.6.12.3 (cierre de unidad)
+TIPO_NORMALIZADO: MACRO_JSON_VACIO
+HERRAMIENTA_OPERACION: python macro_runner.py macro_mejoraActual.json
+OBJETIVO: macro_mejoraActual.json (script de cierre de unidad para enviar el prompt actualizado al siguiente chat)
+SINTOMA_SALIDA: Test-Path devuelve False para macro_mejoraActual.json en la raiz del proyecto y en mejora/; el archivo no existe, por lo que python macro_runner.py no puede leer un paquete de prompt valido ni ejecutarse.
+CAUSA: macro_mejoraActual.json no existe en el equipo (pertenece al flujo de SuperComplete entre chats); no corresponde a esta unidad crearlo ni rellenarlo.
+CORRECCION: Pendiente. No se ejecuta la macro de cierre porque macro_mejoraActual.json esta ausente, siguiendo el precedente ERR-0022 (unidad 3.8.6.4.1).
+VERIFICACION: La unidad 3.8.6.12.3 queda cerrada como IMPLEMENTADA en prompt_JARVIS_registros.txt y LAST_COMPLETED_UNIT; el puntero persistente apunta a 3.8.6.12.4 con estado PENDIENTE. La macro de cierre no se ejecuto por el archivo JSON ausente.
+ESTADO: BLOQUEADO
+REPETICIONES_TIPO: 2 (vea ERR-0022 y esta entrada ERR-0024)
+MEMORIA_PERSISTENTE: La unidad 3.8.6.12.3 esta cerrada como IMPLEMENTADA; el puntero avanza a 3.8.6.12.4 PENDIENTE. La macro de cierre no se ejecuto porque macro_mejoraActual.json no existe.
+---

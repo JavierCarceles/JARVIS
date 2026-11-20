@@ -203,7 +203,7 @@ Convierte lo que dice el usuario en una accion (`[CMD: nombre]`) o en un objetiv
   - si es un objetivo, lo guarda y responde "Objetivo registrado...";
   - si no entiende, responde "No entendi tu solicitud...".
 - `interpret_intent(texto)` -> diccionario con `type` (`action`, `goal` o `unknown`). Orden:
-  1. **Accion directa por patron:** "calibrar chrome/edge/firefox" -> `calibrar_chrome`... ; "calibrar aplicaciones/programas/todo" -> `calibrar_aplicaciones`.
+  1. **Accion directa por patron:** "calibrar chrome/edge/firefox" -> `calibrar_chrome`... ; "calibrar aplicaciones/programas/todo" -> `calibrar_aplicaciones`; "calibra X a fondo" -> `calibrar_aplicacion_profunda` (exploracion en profundidad de una aplicacion).
   2. **Entidad conocida:** con `EntityResolver` (streamer -> `navigate_stream`, plataforma -> `navigate`, aplicacion -> `open_application`/`close_application`).
   3. **LLM en modo planificacion:** pide JSON con un objetivo o una accion.
   4. **LLM en modo heredado.**

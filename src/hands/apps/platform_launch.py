@@ -899,16 +899,30 @@ class ApplicationLaunchService:
         preflight_raw = self.preflight.check(self.catalog_preflight_dict(app))
         decision = LaunchPreflight.from_preflight_dict(preflight_raw)
         if not decision.allowed:
-            code = ErrorCode.ELEVATION_REQUIRED if decision.requires_elevation else ErrorCode.PREFLIGHT_BLOCKED
-            return LaunchOutcome.failed(
-                OperationError(
-                    OperationStage.PREFLIGHT, code,
-                    "La aplicacion %s no paso el preflight: %s (bloqueado por: %s)"
-                    % (display, decision.reason or "sin motivo", decision.blocked_by or "desconocido"),
-                    evidence={"preflight": decision.to_dict()},
-                ),
-                app_name=display,
-            )
+            # Si el preflight bloquea porque no resuelve un ejecutable y la
+            # entidad de catalogo no tiene ejecutable ni URL propia, no fallar:
+            # caerse al descubrimiento local para localizar la ruta de
+            # produccion (p. ej. notepad.exe via PATH) en vez de rechazar la
+            # aplicacion por una entidad del catalogo con alias ambiguo.
+            executable = str(getattr(app, "executable", None) or "").strip()
+            url = str(getattr(app, "url", None) or "").strip()
+            if (not executable and not url
+                    and decision.blocked_by == "executable_not_resolved"):
+                logger.debug(
+                    "Catalogo %s sin destino propio; se cae al descubrimiento local para %s",
+                    display, name,
+                )
+            else:
+                code = ErrorCode.ELEVATION_REQUIRED if decision.requires_elevation else ErrorCode.PREFLIGHT_BLOCKED
+                return LaunchOutcome.failed(
+                    OperationError(
+                        OperationStage.PREFLIGHT, code,
+                        "La aplicacion %s no paso el preflight: %s (bloqueado por: %s)"
+                        % (display, decision.reason or "sin motivo", decision.blocked_by or "desconocido"),
+                        evidence={"preflight": decision.to_dict()},
+                    ),
+                    app_name=display,
+                )
 
         requirements = list(getattr(app, "preflight_requirements", None) or [])
         if "application_available" in requirements and not self._available(app):

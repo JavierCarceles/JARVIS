@@ -583,7 +583,7 @@ class UICalibrationPipeline:
         self._timed(report, STAGE_LAUNCH, t)
 
         t = time.monotonic()
-        topology, display = self._stage_monitor(adapter, window, monitor_reference, policy, report)
+        topology, display = self._stage_monitor(adapter, window, monitor_reference, policy, report, ctx)
         self._timed(report, STAGE_MONITOR, t)
 
         t = time.monotonic()
@@ -792,6 +792,7 @@ class UICalibrationPipeline:
         monitor_reference: Any,
         policy: str,
         report: CalibrationReport,
+        ctx: Any = None,
     ) -> Tuple[Any, DisplayInfo]:
         from src.desktop.monitor_topology import get_current_topology, resolve_monitor_reference
 

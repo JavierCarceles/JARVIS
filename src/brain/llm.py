@@ -108,6 +108,35 @@ class Brain:
         if not normalized:
             return None
 
+        # "calibra X a fondo": calibracion en profundidad de una aplicacion
+        # (exploracion completa). Se comprueba antes de las calibraciones
+        # especificas de navegador para que "calibra Chrome a fondo" no se
+        # confunda con calibrar_chrome.
+        deep_calibration = re.search(
+            r"\bcalibr(?:ar|a|e|aci\u00f3n|acion|ado|ada)\b\s+(?P<app>.+?)\s+a fondo\b",
+            normalized,
+            re.IGNORECASE,
+        )
+        if deep_calibration:
+            app_name = deep_calibration.group("app").strip()
+            # No confundir con calibracion global de aplicaciones/programas.
+            if app_name.lower() not in ("aplicaciones", "programas", "todos", "todas", "global"):
+                canonical = self._normalize_action_name("calibrar_aplicacion_profunda")
+                if canonical == "calibrar_aplicacion_profunda":
+                    return {
+                        "type": "action",
+                        "data": {
+                            "action": canonical,
+                            "parameters": {"app_name": app_name},
+                        },
+                        "raw": normalized,
+                        "goal": None,
+                        "action": {
+                            "action": canonical,
+                            "parameters": {"app_name": app_name},
+                        },
+                    }
+
         # Detectar calibracion especifica de navegadores
         chrome_calibration = re.search(
             r"\b(calibr(?:ar|a|e|aci\u00f3n|acion|ado|ada)|calibrate)\b.*\b(chrome|cr\u00f3n|cr\u00f3n)\b",

@@ -1815,6 +1815,66 @@ def calibrate_applications(force: bool = False) -> Dict[str, Any]:
     return calibrar_aplicaciones(force=force)
 
 
+@register_action(
+    name="calibrar_aplicacion_profunda",
+    description="Calibracion en profundidad de una aplicacion: exploracion completa dentro del presupuesto ('calibra X a fondo') o solo la rama necesaria para un elemento objetivo del Planner.",
+    action_type=ActionType.CALIBRATION,
+    category="calibracion",
+    tags=["calibracion", "profundidad", "exploracion", "aplicacion"],
+    parameters={
+        "app_name": {
+            "type": "str",
+            "required": True,
+            "description": "Nombre de la aplicacion a calibrar en profundidad.",
+        },
+        "branch_ref": {
+            "type": "str",
+            "required": False,
+            "default": None,
+            "description": "Referencia logica del elemento objetivo. Si se indica, solo se explora la rama necesaria para hacerlo visible (peticion del Planner).",
+        },
+        "screen_number": {
+            "type": "int",
+            "required": False,
+            "default": None,
+            "description": "Monitor destino (monitor_id de ScreenManager).",
+        },
+    },
+    preconditions=[],
+    effects=["aplicacion_explorada_profundamente"],
+    cost=60.0,
+    capability="calibrate_application_deep",
+    planner_enabled=True,
+)
+def calibrar_aplicacion_profunda(
+    app_name: str,
+    branch_ref: Optional[str] = None,
+    screen_number: Optional[int] = None,
+) -> Dict[str, Any]:
+    """Calibracion en profundidad de una aplicacion.
+
+    Ejecuta ``CalibrationManager.calibrate_application_deep``: exploracion
+    completa dentro del presupuesto cuando no se indica ``branch_ref``
+    ("calibra X a fondo"), o solo la rama necesaria para hacer visible el
+    elemento de referencia cuando el Planner lo solicita.
+    """
+    calibration_manager = get_calibration_manager()
+    result = calibration_manager.calibrate_application_deep(
+        application={"name": app_name},
+        screen_number=screen_number,
+        branch_ref=branch_ref,
+    )
+    return {
+        "success": bool(result.success),
+        "error": result.error,
+        "application": result.application_name,
+        "screen": result.screen_number,
+        "elements_count": result.elements_count,
+        "depth": "branch" if branch_ref else "deep",
+        "calibration_data": result.calibration_data,
+    }
+
+
 # ============================================================================
 # FUNCIONES AUXILIARES
 # ============================================================================

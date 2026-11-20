@@ -251,6 +251,33 @@ class TestDetectDirectAction(unittest.TestCase):
         self.assertIsNone(self.brain._detect_direct_action(""))
         self.assertIsNone(self.brain._detect_direct_action(None))
 
+    def test_2_8_13_5_14_detect_deep_calibration(self):
+        """'calibra Chrome a fondo' detecta calibracion en profundidad de Chrome."""
+        result = self.brain._detect_direct_action("calibra Chrome a fondo")
+        self.assertIsNotNone(result)
+        self.assertEqual(result["type"], "action")
+        self.assertEqual(result["action"]["action"], "calibrar_aplicacion_profunda")
+        self.assertEqual(result["action"]["parameters"]["app_name"], "chrome")
+
+    def test_2_8_13_5_14_detect_deep_calibration_es(self):
+        """'calibrar notepad a fondo' detecta calibracion en profundidad."""
+        result = self.brain._detect_direct_action("calibrar notepad a fondo")
+        self.assertIsNotNone(result)
+        self.assertEqual(result["action"]["action"], "calibrar_aplicacion_profunda")
+        self.assertEqual(result["action"]["parameters"]["app_name"], "notepad")
+
+    def test_2_8_13_5_14_deep_calibration_no_es_global(self):
+        """'calibrar aplicaciones a fondo' no es deep (termino global excluido)."""
+        result = self.brain._detect_direct_action("calibrar aplicaciones a fondo")
+        if result is not None:
+            self.assertNotEqual(result["action"]["action"], "calibrar_aplicacion_profunda")
+
+    def test_2_8_13_5_14_sin_a_fondo_no_es_deep(self):
+        """'calibrar Chrome' (sin 'a fondo') no es calibracion en profundidad."""
+        result = self.brain._detect_direct_action("calibrar Chrome")
+        self.assertIsNotNone(result)
+        self.assertEqual(result["action"]["action"], "calibrar_chrome")
+
 
 class TestExecuteGoal(unittest.TestCase):
     """2.8.13.5.15 - Verificar execute_goal"""

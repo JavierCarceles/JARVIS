@@ -653,12 +653,16 @@ class VisualUIDetectorFusion:
                 refinement = None
             if refinement and refinement.get("ok") and refinement.get("refined_bbox"):
                 opencv_hint = refinement
+                opencv_center = None
+                oc_box = _box_center(refinement["refined_bbox"])
+                if oc_box is not None:
+                    opencv_center = [int(round(c)) for c in oc_box]
                 opencv_el = UIElementData(
                     name=name or "element",
                     type=fused_type,
                     text=text,
                     bbox=list(refinement["refined_bbox"]),
-                    center=_box_center(refinement["refined_bbox"]),
+                    center=opencv_center,
                     confidence=merged_confidence,
                     calibrated=False,
                 )

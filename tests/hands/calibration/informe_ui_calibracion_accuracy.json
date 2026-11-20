@@ -6,6 +6,9 @@
     3840,
     2001
   ],
+  "escala_ventana": 2.25,
+  "escala_monitor": 2.25,
+  "espacio_coordenadas": "pixeles fisicos del area cliente",
   "total_controles_referencia": 16,
   "controles_referencia": [
     {
@@ -18,7 +21,13 @@
         100,
         32
       ],
-      "action": "accion_btn_aceptar"
+      "action": "accion_btn_aceptar",
+      "bbox": [
+        45,
+        45,
+        270,
+        117
+      ]
     },
     {
       "id": "btn_cancelar",
@@ -30,7 +39,13 @@
         100,
         32
       ],
-      "action": "accion_btn_cancelar"
+      "action": "accion_btn_cancelar",
+      "bbox": [
+        292,
+        45,
+        518,
+        117
+      ]
     },
     {
       "id": "lbl_estado",
@@ -42,7 +57,13 @@
         200,
         24
       ],
-      "action": null
+      "action": null,
+      "bbox": [
+        45,
+        158,
+        495,
+        212
+      ]
     },
     {
       "id": "lnk_ayuda",
@@ -54,7 +75,13 @@
         60,
         24
       ],
-      "action": "accion_lnk_ayuda"
+      "action": "accion_lnk_ayuda",
+      "bbox": [
+        45,
+        236,
+        180,
+        290
+      ]
     },
     {
       "id": "txt_nombre",
@@ -66,7 +93,13 @@
         200,
         32
       ],
-      "action": "accion_txt_nombre"
+      "action": "accion_txt_nombre",
+      "bbox": [
+        45,
+        326,
+        495,
+        398
+      ]
     },
     {
       "id": "chk_terminos",
@@ -78,7 +111,13 @@
         150,
         28
       ],
-      "action": "accion_chk_terminos"
+      "action": "accion_chk_terminos",
+      "bbox": [
+        45,
+        428,
+        382,
+        490
+      ]
     },
     {
       "id": "rdo_opcion_a",
@@ -90,7 +129,13 @@
         90,
         24
       ],
-      "action": "accion_rdo_opcion_a"
+      "action": "accion_rdo_opcion_a",
+      "bbox": [
+        45,
+        513,
+        248,
+        567
+      ]
     },
     {
       "id": "rdo_opcion_b",
@@ -102,7 +147,13 @@
         90,
         24
       ],
-      "action": "accion_rdo_opcion_b"
+      "action": "accion_rdo_opcion_b",
+      "bbox": [
+        270,
+        513,
+        472,
+        567
+      ]
     },
     {
       "id": "cbo_categoria",
@@ -114,7 +165,13 @@
         180,
         32
       ],
-      "action": "accion_cbo_categoria"
+      "action": "accion_cbo_categoria",
+      "bbox": [
+        45,
+        596,
+        450,
+        668
+      ]
     },
     {
       "id": "lst_items",
@@ -126,7 +183,13 @@
         200,
         120
       ],
-      "action": "accion_lst_items"
+      "action": "accion_lst_items",
+      "bbox": [
+        45,
+        698,
+        495,
+        968
+      ]
     },
     {
       "id": "tab_principal",
@@ -138,7 +201,13 @@
         320,
         250
       ],
-      "action": "accion_tab_principal"
+      "action": "accion_tab_principal",
+      "bbox": [
+        540,
+        45,
+        1260,
+        608
+      ]
     },
     {
       "id": "scr_area",
@@ -150,7 +219,13 @@
         320,
         400
       ],
-      "action": "accion_scr_area"
+      "action": "accion_scr_area",
+      "bbox": [
+        1282,
+        45,
+        2002,
+        945
+      ]
     },
     {
       "id": "menu_archivo",
@@ -162,7 +237,13 @@
         140,
         32
       ],
-      "action": "accion_menu_archivo"
+      "action": "accion_menu_archivo",
+      "bbox": [
+        45,
+        990,
+        360,
+        1062
+      ]
     },
     {
       "id": "popup_info",
@@ -174,7 +255,13 @@
         140,
         32
       ],
-      "action": "accion_popup_info"
+      "action": "accion_popup_info",
+      "bbox": [
+        540,
+        1260,
+        855,
+        1332
+      ]
     },
     {
       "id": "grp_anidado",
@@ -186,7 +273,13 @@
         320,
         230
       ],
-      "action": null
+      "action": null,
+      "bbox": [
+        540,
+        698,
+        1260,
+        1215
+      ]
     },
     {
       "id": "canvas_mano",
@@ -198,7 +291,13 @@
         200,
         200
       ],
-      "action": "accion_canvas_mano"
+      "action": "accion_canvas_mano",
+      "bbox": [
+        2025,
+        45,
+        2475,
+        495
+      ]
     }
   ],
   "criterios": {
@@ -216,120 +315,334 @@
     {
       "fuente": "uia_accesibilidad",
       "total_referencia": 16,
-      "total_detectados": 54,
+      "total_detectados": 55,
+      "fuera_de_ambito": 8,
+      "subelementos": 24,
       "tp": 16,
-      "fp": 38,
+      "fp": 7,
       "fn": 0,
-      "precision": 0.2963,
+      "precision": 0.6957,
       "recall": 1.0,
-      "f1": 0.4571,
-      "iou_medio": 0.0,
-      "error_centro_medio_px": 625.91,
-      "click_correcto": 0.0,
+      "f1": 0.8205,
+      "iou_medio": 0.9926,
+      "error_centro_medio_px": 0.31,
+      "click_correcto": 1.0,
       "falsos_accionables": [
-        "CalibrationAppWindow",
-        "element",
-        "MenuBar",
-        "Sistema",
-        "Minimizar",
-        "Restaurar",
-        "Cerrar",
-        "area_central",
-        "lst_items",
-        "lst_items",
-        "lst_items",
-        "lst_items",
-        "qt_tabwidget_stackedwidget",
-        "QWidget",
-        "qt_tabwidget_tabbar",
-        "qt_tabwidget_tabbar",
-        "qt_tabwidget_tabbar",
-        "qt_scrollarea_viewport",
         "QWidget",
         "QLabel",
         "QLabel",
         "QLabel",
         "QLabel",
         "QLabel",
-        "QLabel",
-        "QLabel",
-        "QLabel",
-        "QLabel",
-        "QLabel",
-        "QLabel",
-        "QLabel",
-        "QLabel",
-        "QLabel",
-        "QLabel",
-        "qt_scrollarea_vcontainer",
-        "QScrollBar",
-        "chk_interno",
-        "btn_interno",
+        "btn_borrar",
         "canvas_mano"
       ],
-      "latencia_s": 0.098,
+      "latencia_s": 0.097,
       "cpu_actual_percent": 0.0,
-      "ram_actual_mb": 143.27,
-      "ollama_ram_mb": 58.35,
+      "ram_actual_mb": 149.12,
+      "ollama_ram_mb": 141.2,
       "ollama_cpu_percent": 0.0,
       "vram_mb": -1.0,
-      "error": null
+      "error": null,
+      "detalle": {},
+      "criterios_cumplidos": {
+        "precision": false,
+        "recall": true,
+        "f1": true,
+        "iou_medio": true,
+        "error_centro": true,
+        "click_correcto": true,
+        "falsos_accionables": false,
+        "latencia": true
+      }
     },
     {
       "fuente": "qwen3vl_vision",
       "total_referencia": 16,
-      "total_detectados": 0,
-      "tp": 0,
-      "fp": 0,
-      "fn": 16,
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1": 0.0,
-      "iou_medio": 0.0,
-      "error_centro_medio_px": 0.0,
-      "click_correcto": 0.0,
-      "falsos_accionables": [],
-      "latencia_s": 62.569,
+      "total_detectados": 16,
+      "fuera_de_ambito": 0,
+      "subelementos": 5,
+      "tp": 8,
+      "fp": 3,
+      "fn": 8,
+      "precision": 0.7273,
+      "recall": 0.5,
+      "f1": 0.5926,
+      "iou_medio": 0.7097,
+      "error_centro_medio_px": 20.68,
+      "click_correcto": 1.0,
+      "falsos_accionables": [
+        "boton_borrar",
+        "select_borrar",
+        "enlace_ayuda"
+      ],
+      "latencia_s": 21.009,
       "cpu_actual_percent": 0.0,
-      "ram_actual_mb": 208.1,
-      "ollama_ram_mb": 58.26,
-      "ollama_cpu_percent": 0.9,
+      "ram_actual_mb": 215.04,
+      "ollama_ram_mb": 142.25,
+      "ollama_cpu_percent": 1.2,
       "vram_mb": -1.0,
-      "error": null
+      "error": null,
+      "detalle": {
+        "modelo": "qwen3-vl:8b-instruct",
+        "servidor_ollama_arrancado_por_la_sesion": false,
+        "tamano_captura": [
+          3840,
+          2001
+        ],
+        "tamano_imagen_modelo": [
+          1994,
+          1039
+        ],
+        "cajas_descartadas": 0,
+        "salida_cortada": false,
+        "ollama": {
+          "model": "qwen3-vl:8b-instruct",
+          "image_size": [
+            3840,
+            2001
+          ],
+          "model_image_size": [
+            1994,
+            1039
+          ],
+          "num_ctx": 8192,
+          "num_predict": 4096,
+          "done_reason": "stop",
+          "content_chars": 2959,
+          "thinking_chars": 0
+        },
+        "detecciones": [
+          {
+            "name": "boton_aceptar",
+            "type": "button",
+            "bbox": [
+              61,
+              48,
+              246,
+              108
+            ],
+            "interactive": true
+          },
+          {
+            "name": "boton_cancelar",
+            "type": "button",
+            "bbox": [
+              292,
+              48,
+              515,
+              108
+            ],
+            "interactive": true
+          },
+          {
+            "name": "boton_abrir_popup",
+            "type": "button",
+            "bbox": [
+              534,
+              1265,
+              856,
+              1325
+            ],
+            "interactive": true
+          },
+          {
+            "name": "boton_interno",
+            "type": "button",
+            "bbox": [
+              561,
+              1031,
+              1240,
+              1091
+            ],
+            "interactive": true
+          },
+          {
+            "name": "boton_borrar",
+            "type": "button",
+            "bbox": [
+              61,
+              1111,
+              353,
+              1171
+            ],
+            "interactive": true
+          },
+          {
+            "name": "boton_menu_archivo",
+            "type": "button",
+            "bbox": [
+              61,
+              990,
+              353,
+              1051
+            ],
+            "interactive": true
+          },
+          {
+            "name": "checkbox_aceptar_terminos",
+            "type": "checkbox",
+            "bbox": [
+              61,
+              430,
+              353,
+              490
+            ],
+            "interactive": true
+          },
+          {
+            "name": "checkbox_opcion_interna",
+            "type": "checkbox",
+            "bbox": [
+              561,
+              850,
+              856,
+              910
+            ],
+            "interactive": true
+          },
+          {
+            "name": "radio_opcion_a",
+            "type": "radio",
+            "bbox": [
+              61,
+              510,
+              353,
+              570
+            ],
+            "interactive": true
+          },
+          {
+            "name": "radio_opcion_b",
+            "type": "radio",
+            "bbox": [
+              292,
+              510,
+              584,
+              570
+            ],
+            "interactive": true
+          },
+          {
+            "name": "select_categoria_1",
+            "type": "select",
+            "bbox": [
+              61,
+              590,
+              445,
+              650
+            ],
+            "interactive": true
+          },
+          {
+            "name": "select_menu_archivo",
+            "type": "select",
+            "bbox": [
+              61,
+              990,
+              353,
+              1051
+            ],
+            "interactive": true
+          },
+          {
+            "name": "select_borrar",
+            "type": "select",
+            "bbox": [
+              61,
+              1111,
+              353,
+              1171
+            ],
+            "interactive": true
+          },
+          {
+            "name": "enlace_ayuda",
+            "type": "link",
+            "bbox": [
+              61,
+              250,
+              177,
+              310
+            ],
+            "interactive": true
+          },
+          {
+            "name": "pesta\u00f1a_1",
+            "type": "element",
+            "bbox": [
+              534,
+              48,
+              756,
+              108
+            ],
+            "interactive": true
+          },
+          {
+            "name": "pesta\u00f1a_2",
+            "type": "element",
+            "bbox": [
+              756,
+              48,
+              979,
+              108
+            ],
+            "interactive": true
+          }
+        ]
+      },
+      "criterios_cumplidos": {
+        "precision": false,
+        "recall": false,
+        "f1": false,
+        "iou_medio": true,
+        "error_centro": true,
+        "click_correcto": true,
+        "falsos_accionables": false,
+        "latencia": true
+      }
     },
     {
       "fuente": "fusion_uia_vision",
       "total_referencia": 16,
-      "total_detectados": 26,
+      "total_detectados": 41,
+      "fuera_de_ambito": 6,
+      "subelementos": 14,
       "tp": 16,
-      "fp": 10,
+      "fp": 5,
       "fn": 0,
-      "precision": 0.6154,
+      "precision": 0.7619,
       "recall": 1.0,
-      "f1": 0.7619,
-      "iou_medio": 0.0,
-      "error_centro_medio_px": 630.51,
-      "click_correcto": 0.0,
+      "f1": 0.8649,
+      "iou_medio": 0.9707,
+      "error_centro_medio_px": 14.66,
+      "click_correcto": 1.0,
       "falsos_accionables": [
-        "CalibrationAppWindow",
-        "element",
-        "MenuBar",
-        "Minimizar",
-        "Restaurar",
-        "Cerrar",
-        "qt_tabwidget_tabbar",
-        "qt_scrollarea_vcontainer",
-        "chk_interno",
-        "btn_interno",
+        "btn_borrar",
+        "boton_borrar",
+        "radio_opcion_a",
+        "radio_opcion_b",
+        "enlace_ayuda",
         "canvas_mano"
       ],
-      "latencia_s": 0.007,
+      "latencia_s": 0.005,
       "cpu_actual_percent": 0.0,
-      "ram_actual_mb": 208.52,
-      "ollama_ram_mb": 58.26,
+      "ram_actual_mb": 215.6,
+      "ollama_ram_mb": 142.25,
       "ollama_cpu_percent": 0.0,
       "vram_mb": -1.0,
-      "error": null
+      "error": null,
+      "detalle": {},
+      "criterios_cumplidos": {
+        "precision": false,
+        "recall": true,
+        "f1": true,
+        "iou_medio": true,
+        "error_centro": true,
+        "click_correcto": true,
+        "falsos_accionables": false,
+        "latencia": true
+      }
     }
   ]
 }

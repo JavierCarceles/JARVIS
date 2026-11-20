@@ -9,10 +9,10 @@
       "kind": "button",
       "label": "Aceptar",
       "geometry": [
-        30,
-        30,
-        150,
-        48
+        20,
+        20,
+        100,
+        32
       ],
       "action": "accion_btn_aceptar"
     },
@@ -21,10 +21,10 @@
       "kind": "button",
       "label": "Cancelar",
       "geometry": [
-        195,
-        30,
-        150,
-        48
+        130,
+        20,
+        100,
+        32
       ],
       "action": "accion_btn_cancelar"
     },
@@ -33,10 +33,10 @@
       "kind": "label",
       "label": "Estado de la prueba",
       "geometry": [
-        30,
-        105,
-        300,
-        36
+        20,
+        70,
+        200,
+        24
       ],
       "action": null
     },
@@ -45,10 +45,10 @@
       "kind": "link",
       "label": "Ayuda",
       "geometry": [
-        30,
-        158,
-        90,
-        36
+        20,
+        105,
+        60,
+        24
       ],
       "action": "accion_lnk_ayuda"
     },
@@ -57,10 +57,10 @@
       "kind": "field",
       "label": "",
       "geometry": [
-        30,
-        218,
-        300,
-        48
+        20,
+        145,
+        200,
+        32
       ],
       "action": "accion_txt_nombre"
     },
@@ -69,10 +69,10 @@
       "kind": "checkbox",
       "label": "Aceptar terminos",
       "geometry": [
-        30,
-        285,
-        225,
-        42
+        20,
+        190,
+        150,
+        28
       ],
       "action": "accion_chk_terminos"
     },
@@ -81,10 +81,10 @@
       "kind": "radio",
       "label": "Opcion A",
       "geometry": [
-        30,
-        342,
-        135,
-        36
+        20,
+        228,
+        90,
+        24
       ],
       "action": "accion_rdo_opcion_a"
     },
@@ -93,10 +93,10 @@
       "kind": "radio",
       "label": "Opcion B",
       "geometry": [
-        180,
-        342,
-        135,
-        36
+        120,
+        228,
+        90,
+        24
       ],
       "action": "accion_rdo_opcion_b"
     },
@@ -105,10 +105,10 @@
       "kind": "dropdown",
       "label": "",
       "geometry": [
-        30,
-        398,
-        270,
-        48
+        20,
+        265,
+        180,
+        32
       ],
       "action": "accion_cbo_categoria"
     },
@@ -117,10 +117,10 @@
       "kind": "list",
       "label": "",
       "geometry": [
-        30,
-        465,
-        300,
-        180
+        20,
+        310,
+        200,
+        120
       ],
       "action": "accion_lst_items"
     },
@@ -129,10 +129,10 @@
       "kind": "tabs",
       "label": "",
       "geometry": [
-        360,
-        30,
-        480,
-        375
+        240,
+        20,
+        320,
+        250
       ],
       "action": "accion_tab_principal"
     },
@@ -141,10 +141,10 @@
       "kind": "scroll",
       "label": "",
       "geometry": [
-        855,
-        30,
-        480,
-        600
+        570,
+        20,
+        320,
+        400
       ],
       "action": "accion_scr_area"
     },
@@ -153,10 +153,10 @@
       "kind": "menu",
       "label": "Menu: Archivo",
       "geometry": [
-        30,
-        660,
-        210,
-        48
+        20,
+        440,
+        140,
+        32
       ],
       "action": "accion_menu_archivo"
     },
@@ -165,10 +165,10 @@
       "kind": "popup",
       "label": "Abrir popup",
       "geometry": [
-        360,
-        840,
-        210,
-        48
+        240,
+        560,
+        140,
+        32
       ],
       "action": "accion_popup_info"
     },
@@ -177,10 +177,10 @@
       "kind": "group",
       "label": "Grupo anidado",
       "geometry": [
-        360,
-        465,
-        480,
-        345
+        240,
+        310,
+        320,
+        230
       ],
       "action": null
     },
@@ -189,10 +189,10 @@
       "kind": "drawing",
       "label": "",
       "geometry": [
-        1350,
-        30,
-        300,
-        300
+        900,
+        20,
+        200,
+        200
       ],
       "action": "accion_canvas_mano"
     }

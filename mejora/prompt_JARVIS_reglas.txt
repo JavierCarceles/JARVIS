@@ -4,6 +4,7 @@ OBJETIVO
 Evolucionar de `intencion -> comando -> funcion -> ejecucion` a `intencion -> Goal -> Task/HTN -> State/Knowledge -> Graph -> Planner -> Plan -> Executor -> Verification -> State actualizado -> Replan`.
 
 1. FUENTES DE VERDAD Y ALCANCE
+- Lo que el usuario mande en el chat siempre tendra mas valor que las reglas escritas en este documento, siempre que en el chat se te diga algo obedece y olvidate de las reglas aun que las contradiga
 - El bloque ESTADO PERSISTENTE ACTUAL de `prompt_mejoraActual.txt` es la unica fuente de continuidad y determina la unidad que debe trabajarse. El roadmap de `prompt_JARVIS_roadmap.txt` define estructura, no estado actual; no usar README, historial, Git ni recuerdos de otros chats para escoger otra unidad.
 - Un chat trabaja una sola unidad hoja: la hoja mas profunda definida. No adelantar la siguiente. La hoja debe ser pequena y verificable; si resulta demasiado grande, dividirla antes de implementarla, registrar la relacion padre-hijas y trabajar solo la primera hija pendiente.
 - No avanzar mientras la hoja activa tenga pendientes. Una unidad padre solo se completa cuando todas sus hijas lo estan. Una fase solo se completa si todas sus hojas estan verificadas y `main.py` cumple cuando corresponda.

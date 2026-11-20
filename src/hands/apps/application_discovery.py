@@ -945,6 +945,57 @@ class ApplicationDiscovery:
             )
 
         # ------------------------------------------------------------------
+        # Paso 2b: busqueda directa por ruta de produccion en PATH.
+        # _fuentes_primarias limita el total de candidatos recolectados (100
+        # en total entre start_menu y PATH) y puede descartar un ejecutable
+        # valido (p. ej. notepad.exe en system32) si el limite se agota con
+        # entradas de directorios anteriores. Asimismo, una entidad de
+        # catalogo con alias ambiguo (p. ej. "notepad" como alias del SO)
+        # puede poblar crudos sin destino ejecutable. Cuando ninguno de los
+        # candidatos tiene una ruta de destino valida, buscar directamente el
+        # ejecutable por nombre en cada carpeta de PATH garantiza que la ruta
+        # de produccion sea localizable sin recorrido recursivo del disco.
+        # ------------------------------------------------------------------
+        def _destino_texto(c: Any) -> str:
+            return str(c.get("destination") or c.get("absolute_path") or "").strip()
+
+        tiene_destino_valido = any(_destino_texto(c) for c in crudos)
+        if not tiene_destino_valido:
+            try:
+                raw_path = os.environ.get("PATH", "")
+                visto_destinos = {
+                    _destino_texto(c).casefold()
+                    for c in crudos
+                    if c.get("destination") or c.get("absolute_path")
+                }
+                for directory in [d for d in raw_path.split(os.pathsep) if d]:
+                    if not os.path.isdir(directory):
+                        continue
+                    for candidato_nombre in (nombre + ".exe", nombre):
+                        ruta = os.path.join(directory, candidato_nombre)
+                        if os.path.isfile(ruta):
+                            ruta_norm = os.path.normcase(os.path.abspath(ruta))
+                            if ruta_norm in visto_destinos:
+                                continue
+                            crudos.append(
+                                {
+                                    "candidate_id": ruta,
+                                    "name": candidato_nombre,
+                                    "absolute_path": ruta,
+                                    "destination": ruta,
+                                    "source": FUENTE_PATH,
+                                    "volume": None,
+                                    "fuentes_consultadas": list(fuentes_consultadas),
+                                }
+                            )
+                            visto_destinos.add(ruta_norm)
+                            break
+                    if any(_destino_texto(c) for c in crudos):
+                        break
+            except (OSError, PermissionError):
+                pass
+
+        # ------------------------------------------------------------------
         # Paso 3: inventario persistente como fuente complementaria solo si
         # el nombre no quedo resuelto por catalogo ni fuentes nativas.
         # ------------------------------------------------------------------
