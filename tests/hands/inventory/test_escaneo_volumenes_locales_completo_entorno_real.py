@@ -13,6 +13,11 @@ locales fijos y disponibles del equipo real (o solo los indicados con
   arboles enteros perdidos, por ejemplo C:\\Users o C:\\Program Files);
 - informe por carpeta de primer nivel y errores agrupados por categoria.
 
+Durante el recorrido se imprime por pantalla la carpeta que se esta escaneando
+y se silencia el ruido de permisos denegados (no se tratan como errores).
+Al final se muestra un resumen global de datos y los errores reales
+annotados uno por uno (excluyendo los permisos denegados, que no son errores).
+
 Es una prueba opt-in de entorno real: NO se ejecuta en la suite normal ni
 al arrancar JARVIS. Usa el codigo de produccion real de JARVIS
 (src/hands/inventory/system_inventory.py y
@@ -208,35 +213,61 @@ class TestEscaneoVolumenesLocalesCompletoEntornoReal(unittest.TestCase):
     """Escaneo completo de volumenes locales en el equipo real."""
 
     def _informe_progreso(self, etiqueta: str):
-        estado = {"inicio": time.time(), "ultimo": 0.0}
+        """Callback de progreso: imprime la carpeta que se esta escaneando y el
+        avance periodico, sin mostrar errores de permiso por pantalla."""
+        estado = {
+            "inicio": time.time(),
+            "ultimo": 0.0,
+            "ultima_entrada": None,
+            "ultima_impresion_carpeta": 0.0,
+        }
 
         def informe(progreso: ProgresoRecorrido) -> None:
             ahora = time.time()
-            if ahora - estado["ultimo"] < 5.0 and not progreso.completado:
-                return
-            estado["ultimo"] = ahora
-            print(
-                f"[ESCANEO {etiqueta}] entradas={progreso.entradas_procesadas} "
-                f"archivos={progreso.archivos_procesados} "
-                f"directorios={progreso.directorios_procesados} "
-                f"errores={progreso.errores} exclusiones={progreso.exclusiones} "
-                f"cobertura={progreso.cobertura:.2f}% "
-                f"tiempo={ahora - estado['inicio']:.1f}s",
-                flush=True,
-            )
+            entrada = getattr(progreso, "entrada_actual", "") or ""
+
+            # Imprimir la carpeta que se está escaneando (rate-limitado a ~1s
+            # para no saturar la consola en volumenes grandes).
+            if entrada and entrada != estado["ultima_entrada"]:
+                if ahora - estado["ultima_impresion_carpeta"] >= 1.0:
+                    print(f"[ESCANEANDO {etiqueta}] {entrada}", flush=True)
+                    estado["ultima_entrada"] = entrada
+                    estado["ultima_impresion_carpeta"] = ahora
+
+            # Progreso periodico cada 5 segundos y al completar.
+            if progreso.completado or (ahora - estado["ultimo"] >= 5.0 and not progreso.completado):
+                estado["ultimo"] = ahora
+                print(
+                    f"[PROGRESO {etiqueta}] entradas={progreso.entradas_procesadas} "
+                    f"archivos={progreso.archivos_procesados} "
+                    f"directorios={progreso.directorios_procesados} "
+                    f"errores={progreso.errores} exclusiones={progreso.exclusiones} "
+                    f"cobertura={progreso.cobertura:.2f}% "
+                    f"tiempo={ahora - estado['inicio']:.1f}s",
+                    flush=True,
+                )
+                if progreso.completado:
+                    print(
+                        f"[FINALIZADO {etiqueta}] cobertura={progreso.cobertura:.2f}% "
+                        f"entradas={progreso.entradas_procesadas} "
+                        f"duracion={ahora - estado['inicio']:.1f}s",
+                        flush=True,
+                    )
 
         return informe
 
     def _verificar_resultado(self, storage, machine_id, resultado, etiqueta, duracion):
         print(
-            f"\nESCANEO {etiqueta}: resultado={resultado.resultado} "
+            f"\n>>> RESULTADO {etiqueta}: {resultado.resultado} | "
             f"entradas={resultado.entradas_procesadas} archivos={resultado.archivos_procesados} "
-            f"directorios={resultado.directorios_procesados} errores={resultado.errores} "
-            f"exclusiones={resultado.exclusiones} cobertura={resultado.cobertura}% "
-            f"duracion={duracion:.1f}s",
+            f"directorios={resultado.directorios_procesados} "
+            f"errores={resultado.errores} exclusiones={resultado.exclusiones} "
+            f"cobertura={resultado.cobertura:.2f}% | duracion={duracion:.1f}s",
             flush=True,
         )
-        print(f"  errores por categoria: {resultado.errores_por_categoria}", flush=True)
+        if resultado.errores_por_categoria:
+            detalle = ", ".join(f"{c}={n}" for c, n in sorted(resultado.errores_por_categoria.items()))
+            print(f"    errores por categoria: {detalle}", flush=True)
 
         self.assertTrue(
             resultado.completado,
@@ -257,7 +288,7 @@ class TestEscaneoVolumenesLocalesCompletoEntornoReal(unittest.TestCase):
         persistidas = storage.connect().execute(
             "SELECT COUNT(*) FROM file_entries WHERE scan_id = ?", (resultado.scan_id,)
         ).fetchone()[0]
-        print(f"  entradas persistidas en SQLite: {persistidas}", flush=True)
+        print(f"    entradas persistidas en SQLite: {persistidas}", flush=True)
         self.assertEqual(
             persistidas,
             resultado.entradas_procesadas,
@@ -293,9 +324,18 @@ class TestEscaneoVolumenesLocalesCompletoEntornoReal(unittest.TestCase):
             ).fetchone()[0]
             print(f"\nBD: {db_path} | machine_id={machine_id} | scan_runs previos={previos}", flush=True)
 
-            total = 0
-            for ident, raiz in objetivos:
+            total_entradas = 0
+            total_archivos = 0
+            total_directorios = 0
+            errores_reales = 0
+            errores_por_categoria_global: dict[str, int] = {}
+            permiso_denegado_total = 0
+
+            for idx, (ident, raiz) in enumerate(objetivos, 1):
                 etiqueta = ident or raiz
+                print(f"\n{'='*68}")
+                print(f"VOLUMEN {idx}/{len(objetivos)}: {etiqueta}")
+                print(f"{'='*68}", flush=True)
                 t0 = time.time()
                 if ident:
                     resultado = escanear_volumen(
@@ -317,7 +357,16 @@ class TestEscaneoVolumenesLocalesCompletoEntornoReal(unittest.TestCase):
                         callback_progreso=self._informe_progreso(etiqueta),
                     )
                 self._verificar_resultado(storage, machine_id, resultado, etiqueta, time.time() - t0)
-                total += resultado.entradas_procesadas
+
+                total_entradas += resultado.entradas_procesadas
+                total_archivos += resultado.archivos_procesados
+                total_directorios += resultado.directorios_procesados
+                for cat, cnt in (resultado.errores_por_categoria or {}).items():
+                    if cat == "permiso_denegado":
+                        permiso_denegado_total += cnt
+                        continue
+                    errores_por_categoria_global[cat] = errores_por_categoria_global.get(cat, 0) + cnt
+                    errores_reales += cnt
 
                 # Contraste con el SO: ninguna carpeta de primer nivel con
                 # contenido listable puede quedar sin entradas en el inventario.
@@ -334,7 +383,25 @@ class TestEscaneoVolumenesLocalesCompletoEntornoReal(unittest.TestCase):
                     f"Carpetas listables por el SO sin ninguna entrada en el inventario: {perdidas}",
                 )
 
-            print(f"\nTOTAL ENTRADAS ESCANEADAS: {total}", flush=True)
+            # ---------- RESUMEN GLOBAL ----------
+            print(f"\n{'#'*68}")
+            print(f"RESUMEN GLOBAL DEL ESCANEO")
+            print(f"{'#'*68}", flush=True)
+            print(f"  Volumenes/rutas escaneadas : {len(objetivos)}", flush=True)
+            print(f"  Entradas totales           : {total_entradas}", flush=True)
+            print(f"  Archivos                   : {total_archivos}", flush=True)
+            print(f"  Directorios                : {total_directorios}", flush=True)
+            print(f"  Permisos denegados (no son errores) : {permiso_denegado_total}", flush=True)
+            print(f"  Errores reales             : {errores_reales}", flush=True)
+            print(f"{'#'*68}", flush=True)
+
+            if errores_por_categoria_global:
+                print("ERRORES DETECTADOS (uno por uno, sin contar permisos denegados):", flush=True)
+                for cat in sorted(errores_por_categoria_global):
+                    print(f"  - {cat}: {errores_por_categoria_global[cat]}", flush=True)
+            else:
+                print("No se detectaron errores reales (excluidos los permisos denegados).", flush=True)
+
         finally:
             storage.close()
             # La base de datos se conserva como inventario local del equipo.
