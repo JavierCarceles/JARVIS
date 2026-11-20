@@ -8016,3 +8016,45 @@ DISCREPANCIAS: NINGUNA
 PENDIENTES: NINGUNO
 ESTADO FINAL: 3.8.6.11.3 - IMPLEMENTADA
 MACOS: NO APLICA (logica comun sobre contratos multiplataforma sin APIs nativas de Windows; no hay parte macOS especifica que verificar)
+
+
+REGISTRO DE UNIDAD: 3.8.6.11.4
+FECHA: 2026-11-20
+OBJETIVO: Para controles fuera de pantalla devolver referencia semantica y la navegacion necesaria (scroll/expandir/seleccionar), nunca un punto ficticio; limite de antiguedad de frame por accion (funciones navigation_for_element y frame_is_fresh de src/hands/calibration/dynamic_ui.py), verificable con datos representativos sin OS ni GUI.
+TIPO DE TRABAJO: INSPECCION; VERIFICACION; TEST
+CAMBIOS / HALLAZGOS: dynamic_ui.py ya implementaba navigation_for_element y frame_is_fresh (codigo previo revisado críticamente en Windows en unidades 3.8.6.11.2 y 3.8.6.11.3). Se inspecciono criticamente el codigo contra la definicion de 3.8.6.11.4: navigation_for_element devuelve NavigationHint con referencia semantica (semantic_reference) y pasos de navegacion (NAV_SCROLL, NAV_EXPAND, NAV_SELECT_TAB, NAV_OPEN_MENU, NAV_FOCUS_WINDOW) para controles fuera de pantalla, nunca coordenadas; frame_is_fresh aplica limite de antiguedad por tipo de accion (FRAME_MAX_AGE_SECONDS) con valor default y limites inyectables. No se modifico codigo de produccion. Las pruebas unitarias existentes en tests/hands/calibration/test_dynamic_ui.py (TestNavigationForElement, TestFrameIsFresh, TestSemanticReference, TestElementRelocator.test_nodo_fuera_de_pantalla_devuelve_navegacion) cubren los criterios: 61/61 PASSED. No hay prueba OS/GUI obligatoria (funcion pura, sin SO, procesos, ventanas, monitores, captura ni entrada).
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: NA; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: PASSED (61/61 en tests/hands/calibration/test_dynamic_ui.py y tests/hands/calibration/test_dynamic_ui_presence.py, 0 FAILED/ERROR/SKIPPED); INTEGRACION: NA; NO REGRESION: PASSED (102/102 en tests/hands/detection/test_ui_calibration_quality_gate.py, tests/hands/detection/test_calibration_quality_gate_dimensions.py, tests/hands/detection/test_verify_before_action.py, tests/hands/calibration/test_ui_knowledge_coordinate_separation.py, tests/hands/calibration/test_calibration_requirements.py, 0 FAILED/ERROR/SKIPPED)
+VERIFICACION: SINTAXIS: OK (py_compile de dynamic_ui.py); MAIN.PY: NA (no se modifica main.py ni su cadena de importacion); COMPORTAMIENTO / INTEGRACION REAL: funciones puras deterministas sobre AccessibilityNode, AccessibilityTree, WindowInfo y DisplayInfo; verificadas con datos representativos sin OS ni GUI (criterio 9 del roadmap, funcion pura). No hay prueba OS/GUI obligatoria para esta unidad.
+DISCREPANCIAS: NINGUNA
+PENDIENTES: NINGUNO
+ESTADO FINAL: 3.8.6.11.4 - IMPLEMENTADA
+MACOS: NO APLICA (logica comun sobre contratos multiplataforma sin APIs nativas de Windows; no hay parte macOS especifica que verificar)
+
+
+REGISTRO DE UNIDAD: 3.8.6.11.5
+FECHA: 2026-11-20
+OBJETIVO: Verificar la relocalizacion dinamica de elementos de interfaz (ventana tapada/minimizada, perdida de foco, popup transitorio, control que desaparece, cambio entre deteccion y accion) sobre src.hands.calibration.dynamic_ui, con datos sinteticos y sin SO ni GUI.
+TIPO DE TRABAJO: TEST; VERIFICACION
+CAMBIOS / HALLAZGOS: Creado tests/hands/calibration/test_dynamic_ui_relocation.py con 28 pruebas unitarias deterministas que cubren ElementRelocator.relocalizacion por identificador, nombre y tipo; ignorar coordenadas en la referencia; referencia sin identidad; no encontrado; ambiguo sin ancestros; serializacion; nodo fuera de pantalla devuelve navegacion semantica sin coordenadas; ventana no en primer plano antepone enfocar ventana; control desaparecido no se relocaliza; popup/tooltip transitorios no admiten coordenadas persistentes y se distinguen con is_transient; control no renderizado devuelve referencia semantica; frame_is_fresh expira para click tras 2s y con limites inyectables; UIChangeDetector detecta cambio, evento de accesibilidad, estabilidad y agotamiento de tiempo; ventana minimizada no es visible ni admite coordenadas. No se modifico codigo de produccion en src/ ni se toco main.py.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: `tests/hands/calibration/test_dynamic_ui_relocation.py`; DOCUMENTACION: `docs/readme/README_TESTS.md`
+TESTS Y RESULTADOS: UNITARIOS: PASSED (28/28 en tests/hands/calibration/test_dynamic_ui_relocation.py, 0 FAILED/ERROR/SKIPPED); INTEGRACION: NA; NO REGRESION: PASSED (191/191 en tests/hands/calibration/test_dynamic_ui.py, tests/hands/calibration/test_dynamic_ui_presence.py, tests/hands/calibration/test_dynamic_ui_relocation.py, tests/hands/calibration/test_ui_knowledge_coordinate_separation.py, tests/hands/calibration/test_calibration_requirements.py, tests/hands/detection/test_ui_calibration_quality_gate.py, tests/hands/detection/test_calibration_quality_gate_dimensions.py, tests/hands/detection/test_verify_before_action.py, 0 FAILED/ERROR/SKIPPED)
+VERIFICACION: SINTAXIS: OK (py_compile del test nuevo; 0 caracteres no ASCII); MAIN.PY: NA (no se modifica main.py ni su cadena de importacion); COMPORTAMIENTO / INTEGRACION REAL: funciones puras deterministas sobre AccessibilityNode, AccessibilityTree, WindowInfo y DisplayInfo; verificadas con datos representativos sin OS ni GUI (criterio 9 del roadmap, funcion pura). No hay prueba OS/GUI obligatoria para esta unidad (no toca SO, procesos, ventanas, monitores, captura ni entrada de usuario).
+DISCREPANCIAS: NINGUNA
+PENDIENTES: NINGUNO
+ESTADO FINAL: 3.8.6.11.5 - IMPLEMENTADA
+MACOS: NO APLICA (logica comun sobre contratos multiplataforma sin APIs nativas de Windows; no hay parte macOS especifica que verificar)
+
+
+REGISTRO DE UNIDAD: 3.8.6.12.1
+FECHA: 2026-11-20
+OBJETIVO: Definir el mapa de estados UI: estado (huella de ventana + elementos visibles), elementos, transiciones (accion -> estado resultante) y forma de volver (Escape, cerrar dialogo, atras, clic en pestana anterior), con persistencia logica en el catalogo (sin coordenadas) y fisica en SQLite (3.8.6.8).
+TIPO DE TRABAJO: IMPLEMENTACION; TEST; VERIFICACION
+CAMBIOS / HALLAZGOS: src/hands/calibration/ui_exploration.py ya implementaba UIStateNode, UITransition, UIStateMap, element_reference y persist_state_map_logically (cubre 3.8.6.12.1-3.8.6.12.5 segun su docstring). Se verifico que: UIStateNode/UITransition/UIStateMap se crean, serializan y deserializan correctamente; add_state rechaza duplicados; path_to solo devuelve rutas con retornos verificados; to_logical_dict/from_logical_dict hace round-trip sin claves fisicas (ninguna clave de _PHYSICAL_KEYS aparece en el diccionario logico); element_reference devuelve solo identificador, nombre, control_type, native_role, parent_name y depth (sin coordenadas); ExplorationSafetyPolicy admite expand/select_tab/open_menu por defecto y rechaza acciones de escritura (type_text, toggle, set_value), controles deshabilitados/no visibles y etiquetas prohibidas (guardar, borrar, cerrar, etc. en espanol e ingles); ExplorationBudget y ExplorationCheckpoint serializan y hacen round-trip JSON; persist_state_map_logically guarda solo en entidades existentes del catalogo, normaliza la clave de aplicacion y nunca agrega claves fisicas a properties. Se creo tests/hands/calibration/test_ui_exploration_state_map.py con 38 pruebas unitarias deterministas (todas PASSED). No se modifico codigo de produccion en src/ ni se toco main.py.
+ARCHIVOS MODIFICADOS: PRODUCCION: NA; TESTS: `tests/hands/calibration/test_ui_exploration_state_map.py`; DOCUMENTACION: NA
+TESTS Y RESULTADOS: UNITARIOS: PASSED (38/38 en tests/hands/calibration/test_ui_exploration_state_map.py, 0 FAILED/ERROR/SKIPPED); INTEGRACION: NA; NO REGRESION: PASSED (245/245 en tests de calibracion relacionados: test_calibration_requirements, test_calibrate_application_universal, test_calibration_manager, test_dynamic_ui, test_dynamic_ui_presence, test_dynamic_ui_relocation, test_calibration_profile_validity, test_calibration_recompute_relocalizar, test_calibration_planner_integration, test_ui_knowledge_coordinate_separation, test_coordinate_spaces; 0 FAILED/ERROR/SKIPPED)
+VERIFICACION: SINTAXIS: OK (py_compile del test nuevo; archivo ASCII puro, 0 caracteres no ASCII); MAIN.PY: NA (no se modifica main.py ni su cadena de importacion); COMPORTAMIENTO / INTEGRACION REAL: funciones puras deterministas sobre modelos de datos de estado UI; verificadas con datos representativos sin OS ni GUI (criterio 9 del roadmap, funcion pura). No hay prueba OS/GUI obligatoria para esta unidad (no toca SO, procesos, ventanas, monitores, captura ni entrada de usuario).
+DISCREPANCIAS: NINGUNA
+PENDIENTES: NINGUNO (3.8.6.12.2 politica de seguridad, 3.8.6.12.3 algoritmo de exploracion acotado, 3.8.6.12.4 recuperacion, 3.8.6.12.5 profundidad bajo demanda, 3.8.6.12.6 tests GUI son unidades siguientes)
+ESTADO FINAL: 3.8.6.12.1 - IMPLEMENTADA
+MACOS: NO APLICA (codigo comun sin APIs nativas; sin parte macOS especifica que verificar)
