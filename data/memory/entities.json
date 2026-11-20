@@ -40,8 +40,8 @@
         "loading"
       ]
     },
-    "created_at": "2026-11-20T16:30:40.564702",
-    "updated_at": "2026-11-20T16:30:40.564972",
+    "created_at": "2026-11-20T17:49:45.042065",
+    "updated_at": "2026-11-20T17:49:45.042131",
     "metadata": null,
     "aliases": [],
     "confidence": 1.0,
@@ -80,8 +80,8 @@
         "active"
       ]
     },
-    "created_at": "2026-11-20T16:30:40.578367",
-    "updated_at": "2026-11-20T16:30:40.596917",
+    "created_at": "2026-11-20T17:49:45.043295",
+    "updated_at": "2026-11-20T17:49:45.043360",
     "metadata": null,
     "aliases": [],
     "confidence": 1.0,
@@ -268,67 +268,5 @@
     "aliases": [],
     "confidence": 1.0,
     "tags": []
-  },
-  {
-    "id": "fabprod:microsoft corporation:sistema operativo microsoft windows",
-    "type": "application",
-    "name": "sistema operativo microsoft windows",
-    "properties": {
-      "ruta_absoluta_observada": "C:\\Windows\\system32\\notepad.exe",
-      "tipo_lanzamiento_nativo": "ejecutable",
-      "estado_disponible": "available",
-      "fecha_observacion": "2026-11-20T10:56:09.194673+00:00",
-      "fuente_observacion": "path",
-      "evidencia_observacion": [
-        "version_recurso_leida",
-        "archivo_ejecutable_existente",
-        "version_recurso_leida",
-        "ubicacion_de_instalacion_real"
-      ],
-      "capacidades_verificadas": [],
-      "capacidades_no_verificadas": [],
-      "tipo_evidencia_identidad": "fabricante_producto",
-      "fusionar_por_nombre_desaconsejada": false
-    },
-    "created_at": "2026-11-20T10:42:58.115050+00:00",
-    "updated_at": "2026-11-20T11:56:09.194951",
-    "metadata": null,
-    "aliases": [
-      "notepad.exe",
-      "Sistema operativo Microsoft® Windows®",
-      "notepad",
-      "Microsoft Corporation"
-    ],
-    "confidence": 1.0,
-    "tags": [
-      "gui_aplicacion"
-    ]
-  },
-  {
-    "id": "nombre:calculadora",
-    "type": "application",
-    "name": "calculadora",
-    "properties": {
-      "ruta_absoluta_observada": null,
-      "tipo_lanzamiento_nativo": "paquete",
-      "estado_disponible": "no_disponible",
-      "fecha_observacion": "2026-11-20T15:30:53.655349+00:00",
-      "fuente_observacion": "start_menu",
-      "evidencia_observacion": [
-        "destino_vacio"
-      ],
-      "capacidades_verificadas": [],
-      "capacidades_no_verificadas": [],
-      "tipo_evidencia_identidad": "nombre_comercial",
-      "fusionar_por_nombre_desaconsejada": true
-    },
-    "created_at": "2026-11-20T15:30:53.655349+00:00",
-    "updated_at": "2026-11-20T16:30:53.661768",
-    "metadata": null,
-    "aliases": [],
-    "confidence": 1.0,
-    "tags": [
-      "desconocido"
-    ]
   }
 ]

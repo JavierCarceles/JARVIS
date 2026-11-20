@@ -179,3 +179,78 @@ ESTADO: RESUELTO
 REPETICIONES_TIPO: 2 (ERR-0027 y ERR-0030)
 MEMORIA_PERSISTENTE: No aplica (no supera 3 apariciones). Prevencion: leer prompt_mejoraActual.txt y prompt_JARVIS_reglas.txt antes de cualquier comando.
 ---
+
+ERR-0031
+FECHA_HORA: 2026-11-20T17:15:00+01:00 Europe/Madrid
+UNIDAD: 3.8.6.13.2 (revision en Mac 2, pedida por el usuario)
+TIPO_NORMALIZADO: CONSULTA_SQLITE_SIN_INDICE
+HERRAMIENTA_OPERACION: medicion de SystemInventoryStorage.search sobre la copia de la base real data/system_inventory.sqlite3 (solo lectura, immutable=1)
+OBJETIVO: averiguar por que test_application_discovery.py y la calibracion real superan los 10 min de la herramienta en Windows
+SINTOMA_SALIDA: search(name="notepad.exe", extension=".exe", tipo="file", disponible=True) 20-30 s; search(name_contains="notepad", ...) ~33 s; EXPLAIN QUERY PLAN: "SEARCH file_entries USING INDEX idx_file_entries_absolute_path (machine_id=?)" o idx_file_entries_excluded.
+CAUSA: Sin estadisticas (ANALYZE) el planificador elige recorrer el indice de absolute_path para no ordenar (ORDER BY absolute_path LIMIT n) o el de excluded, leyendo las 5,6 M filas, en lugar del indice (machine_id, lower(name)). Cada apertura hace varias busquedas (preflight con dos variantes de nombre y buscar_por_nombre).
+CORRECCION: search, search_by_name y count anteponen `+` a los terminos no selectivos y al ORDER BY cuando hay filtro por nombre; con subcadena y extension se usa el indice de extension.
+VERIFICACION: En Mac sobre la base real: nombre exacto 0,004 s, subcadena 0,09-2,6 s, search_by_name 0,001 s, count 0,000 s, mismos resultados; tests de system_inventory_storage con el mismo conjunto de fallos (Windows) que la linea base. PENDIENTE en Windows.
+ESTADO: ABIERTO
+REPETICIONES_TIPO: 1 (primera aparicion de TIPO_NORMALIZADO CONSULTA_SQLITE_SIN_INDICE en este archivo)
+MEMORIA_PERSISTENTE: No aplica (primera aparicion). Prevencion: medir con EXPLAIN QUERY PLAN sobre la base real toda consulta nueva de file_entries.
+---
+
+ERR-0032
+FECHA_HORA: 2026-11-20T17:15:00+01:00 Europe/Madrid
+UNIDAD: 3.8.6.13.2 (revision en Mac 2 del trabajo de la sesion Windows 2)
+TIPO_NORMALIZADO: DESAMBIGUACION_SILENCIOSA
+HERRAMIENTA_OPERACION: revision de WindowsLaunchAdapter._from_resolution (src/hands/apps/launch_windows.py)
+OBJETIVO: resolver Calculadora (AUMID frente a System32\calc.exe) y Bloc de notas (System32 frente a WindowsApps) sin ambiguedad
+SINTOMA_SALIDA: Reglas generales: un paquete unico ganaba frente a cualquier .exe y, si no, ganaba el destino de mayor confianza; el comentario restringia el caso a los .exe del propio Windows pero el codigo no lo comprobaba.
+CAUSA: Correccion orientada a que pasaran dos tests concretos, sin acotar el caso ni tests unitarios.
+CORRECCION: preferir_destino_de_la_misma_aplicacion: solo elige con un paquete y el resto .exe de %SystemRoot%/WindowsApps, o con un unico .exe fuera de WindowsApps y el resto copias en WindowsApps del mismo nombre; en otro caso AMBIGUOUS. Tests: tests/hands/apps/test_launch_windows_desempate.py.
+VERIFICACION: En Mac 12/12 PASSED. PENDIENTE en Windows: test_platform_launch_entorno_real.py test_01 y test_02.
+ESTADO: ABIERTO
+REPETICIONES_TIPO: 1 (primera aparicion de TIPO_NORMALIZADO DESAMBIGUACION_SILENCIOSA en este archivo)
+MEMORIA_PERSISTENTE: No aplica (primera aparicion). Prevencion: una regla de desempate debe describir exactamente cuando se aplica y tener un test de que no se aplica.
+---
+
+ERR-0033
+FECHA_HORA: 2026-11-20T18:00:00+01:00 Europe/Madrid
+UNIDAD: 3.8.6.13.2 (revision en Mac 2, peticion del usuario: "que jarvis no tenga problemas en un windows en ingles con ninguna aplicacion")
+TIPO_NORMALIZADO: DEPENDENCIA_DEL_IDIOMA_DEL_SO
+HERRAMIENTA_OPERACION: revision de application_discovery.py, application_launch_classifier.py, platform_launch.py, launch_windows.py, calibration_manager.py y data/memory/entities.json
+OBJETIVO: abrir y calibrar cualquier aplicacion en un Windows en ingles (o en espanol pidiendo el nombre en ingles)
+SINTOMA_SALIDA: (1) catalogo real con la entidad "fabprod:microsoft corporation:sistema operativo microsoft windows" (nombre "sistema operativo microsoft windows", alias notepad); (2) "calculadora" no encontraba "Calculator" (busqueda solo por subcadena del nombre traducido del menu Inicio); (3) verificacion de ventanas de paquete solo por titulo; (4) filtro de herramientas de riesgo con nombres exactos solo en espanol (Task Manager, Narrator, On-Screen Keyboard... no se filtraban).
+CAUSA: El clasificador usa ProductName como nombre comercial y la identidad fabricante+producto; en los .exe de Windows ProductName es comun a todos y esta traducido, y en Office lo comparten Word y Excel. Las fuentes del SO devuelven nombres traducidos y no habia equivalencia entre idiomas. Las listas de seguridad se escribieron mirando un Windows en espanol.
+CORRECCION: Identidad fabexe:<fabricante>:<ejecutable.exe> y paquete:<AUMID> desde el app_id de Get-StartApps; FileDescription como nombre de los .exe de %SystemRoot%; tabla aplicaciones_integradas_windows.py (nombres es/en, familia de paquete, AUMID, .exe) usada por buscar_por_nombre con coincidencia exacta; verificacion por GetApplicationUserModelId del proceso de la ventana (y de sus hijas en ApplicationFrameHost) antes del titulo; nombres en ingles en ELEVATION_RISK_EXACT_NAMES/NAME_PARTS; entidad erronea retirada del catalogo real.
+VERIFICACION: En Mac: tests/hands/apps/test_aplicaciones_integradas_windows.py y test_launch_windows_desempate.py PASSED; identidad en test_application_discovery.py PASSED. PENDIENTE en Windows: test_platform_launch_entorno_real.py (test_03 pide la Calculadora en los dos idiomas) y, si hay un equipo o cuenta con Windows en ingles, el mismo fichero alli. La lectura de AUMID por ventanas hijas de ApplicationFrameHost no esta confirmada por documentacion oficial: si falla, la verificacion sigue por titulo.
+ESTADO: ABIERTO
+REPETICIONES_TIPO: 1 (primera aparicion de TIPO_NORMALIZADO DEPENDENCIA_DEL_IDIOMA_DEL_SO en este archivo)
+MEMORIA_PERSISTENTE: No aplica (primera aparicion). Prevencion: nunca usar como identidad ni como filtro un texto que Windows traduce (menu Inicio, ProductName, titulos); usar AUMID, familia de paquete o nombre del .exe.
+---
+
+ERR-0034
+FECHA_HORA: 2026-11-20T18:40:00+01:00 Europe/Madrid
+UNIDAD: 3.8.6.13.2 (revision en Mac 2 del pipeline de calibracion, peticion del usuario)
+TIPO_NORMALIZADO: VERIFICACION_COMPLETA_EN_CADA_APERTURA
+HERRAMIENTA_OPERACION: medicion sobre la copia de la base real data/system_inventory.sqlite3 (solo lectura, immutable=1)
+OBJETIVO: explicar por que la calibracion real no terminaba (sesion Windows 2: ultima ejecucion sin resultado tras 695 s)
+SINTOMA_SALIDA: SystemInventoryStorage.initialize ejecutaba verify_integrity() (PRAGMA quick_check + integrity_check) en cada apertura; con 5,6 M filas / 14 GB: quick_check 136,0 s + integrity_check 231,3 s. CalibrationProfileStore.initialize (etapa de persistencia, despues del puntero) lo llamaba en cada calibracion.
+CAUSA: Comprobacion O(N) + O(N log N) en filas (documentacion de SQLite) pensada para bases pequenas, aplicada sin limite de tamano.
+CORRECCION: verify_integrity_al_abrir: completa hasta 256 MB o con JARVIS_INVENTARIO_VERIFICACION_COMPLETA=1; en bases mayores PRAGMA quick_check(tabla) de cada tabla con sus indices salvo file_entries (0,004 s sobre la base real). verify_integrity() sigue disponible.
+VERIFICACION: En Mac: test_verificacion_integridad_al_abrir.py 5/5 PASSED; medicion sobre la base real 0,004 s; no regresion igual a la linea base. PENDIENTE en Windows: scripts/diagnostico_calibracion_windows.py y la calibracion real.
+ESTADO: ABIERTO
+REPETICIONES_TIPO: 1 (primera aparicion de TIPO_NORMALIZADO VERIFICACION_COMPLETA_EN_CADA_APERTURA en este archivo)
+MEMORIA_PERSISTENTE: No aplica (primera aparicion). Prevencion: medir sobre la base real toda operacion que se haga al abrir el inventario.
+---
+
+ERR-0035
+FECHA_HORA: 2026-11-20T18:40:00+01:00 Europe/Madrid
+UNIDAD: 3.8.6.13.2 (revision en Mac 2 del pipeline de calibracion)
+TIPO_NORMALIZADO: LLAMADA_A_MODELO_SIN_LIMITE
+HERRAMIENTA_OPERACION: revision de src/eyes/vision/vision.py, vision_only.py, universal_visual_calibrator.py y calibration_pipeline.py
+OBJETIVO: que la deteccion visual con Qwen3-VL no bloquee ni anule la calibracion
+SINTOMA_SALIDA: (1) vision.py llamaba a ollama.chat sin limite de tiempo y pidiendo hasta 80 elementos con num_predict=4096: sin GPU (pocos tokens/s) la llamada dura muchos minutos y un Ollama colgado no vuelve nunca; (2) una respuesta cortada se descartaba entera (UniversalVisualCalibrator._parse_response devolvia None); (3) vision_only.Vision.analyze_image (usada por windows.py y app_utils.py, no por el pipeline) tenia num_predict=500, insuficiente para la lista pedida.
+CAUSA: El contrato de analyze_image no tenia presupuesto de tiempo ni recuperacion de salida parcial.
+CORRECCION: vision.py `_chat_json(timeout=)` en streaming con corte de la conexion y done_reason="timeout"; analyze_image(timeout, num_predict); pipeline con vision_timeout=300 s, vision_max_elements=40, num_predict=60*40+400 y copia de la captura con lado mayor 1600 px; _parse_response recupera los elementos completos; vision_only con num_predict=4096 y la misma lectura con limite.
+VERIFICACION: En Mac: test_qwen_robustez.py 13/13 PASSED; no regresion igual a la linea base. PENDIENTE en Windows: latencia real con scripts/diagnostico_calibracion_windows.py y metrics["qwen3vl"] de la calibracion real.
+ESTADO: ABIERTO
+REPETICIONES_TIPO: 1 (primera aparicion de TIPO_NORMALIZADO LLAMADA_A_MODELO_SIN_LIMITE en este archivo)
+MEMORIA_PERSISTENTE: No aplica (primera aparicion). Prevencion: toda llamada a un modelo local lleva presupuesto de tiempo y usa la salida parcial.
+---

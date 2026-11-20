@@ -173,11 +173,32 @@ class TestLanzamientoListaBlancaEntornoReal(unittest.TestCase):
 
     def test_01_bloc_de_notas_entorno_real(self):
         outcome = self._ciclo(("notepad",), "notepad.exe")
-        self.assertIn(outcome.target.target_type, ("exe", "command"))
+        # Windows 10: notepad.exe clasico. Windows 11: Bloc de notas es un
+        # paquete y su AUMID abre la misma aplicacion; cualquier otro paquete
+        # seria un error de resolucion.
+        if outcome.target.target_type == TARGET_AUMID:
+            self.assertTrue(
+                outcome.target.target.casefold().startswith("microsoft.windowsnotepad_8wekyb3d8bbwe!"),
+                outcome.to_dict(),
+            )
+        else:
+            self.assertIn(outcome.target.target_type, ("exe", "command"), outcome.to_dict())
 
     def test_02_calculadora_por_aumid_entorno_real(self):
         outcome = self._ciclo(("calculadora", "calculator"), "CalculatorApp.exe")
         self.assertEqual(outcome.target.target_type, TARGET_AUMID, outcome.to_dict())
+
+    def test_03_calculadora_en_el_otro_idioma_entorno_real(self):
+        # El usuario puede pedirla en espanol o en ingles sea cual sea el
+        # idioma de Windows: ambos nombres llevan al mismo paquete.
+        for nombre in ("calculator", "calculadora"):
+            with self.subTest(nombre=nombre):
+                outcome = self._ciclo((nombre,), "CalculatorApp.exe")
+                self.assertEqual(outcome.target.target_type, TARGET_AUMID, outcome.to_dict())
+                self.assertTrue(
+                    outcome.target.target.casefold().startswith("microsoft.windowscalculator_8wekyb3d8bbwe!"),
+                    outcome.to_dict(),
+                )
 
 
 if __name__ == "__main__":

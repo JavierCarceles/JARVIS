@@ -302,6 +302,10 @@ class UICalibrationPipeline:
         max_pointer_checks: maximo de controles cuyo punto seguro se verifica
             moviendo el puntero (nunca se hace click).
         stability_timeout: limite de espera de estabilidad visual (segundos).
+        vision_timeout: espera maxima de la llamada a Qwen3-VL (segundos).
+        vision_max_side: lado mayor (px) de la copia de la captura que se
+            envia a Qwen3-VL.
+        vision_max_elements: elementos que se piden a Qwen3-VL.
     """
 
     def __init__(
@@ -324,6 +328,9 @@ class UICalibrationPipeline:
         fusion: Any = None,
         pointer_verifier: Any = None,
         validity_service: Any = None,
+        vision_timeout: float = 300.0,
+        vision_max_side: int = 1600,
+        vision_max_elements: int = 40,
     ) -> None:
         self._adapter = adapter
         self._launcher = launcher
@@ -343,6 +350,17 @@ class UICalibrationPipeline:
         self._fusion = fusion
         self._pointer_verifier = pointer_verifier
         self._validity_service = validity_service
+        # Qwen3-VL: espera maxima de la llamada a Ollama (un servidor colgado
+        # no debe bloquear la calibracion) y lado mayor de la imagen enviada
+        # (acota los tokens de imagen para que quepan prompt y respuesta en
+        # num_ctx). Las cajas vuelven normalizadas 0..1000, asi que reducir la
+        # imagen no cambia su conversion a pixeles de la captura original.
+        self.vision_timeout = float(vision_timeout)
+        self.vision_max_side = int(vision_max_side)
+        # Elementos pedidos a Qwen3-VL (complementa a la accesibilidad, que
+        # aporta la mayoria de controles) y salida maxima acorde (~60 tokens
+        # por elemento): acota el tiempo de generacion, sobre todo sin GPU.
+        self.vision_max_elements = int(vision_max_elements)
         self._lock = threading.Lock()
         self._wait_event = threading.Event()
 
@@ -1237,16 +1255,49 @@ class UICalibrationPipeline:
         from src.core.ui_element_model import UIElementData, normalize_element_type
         from src.eyes.detection.visual_ui_detector_fusion import SOURCE_QWEN3VL, DetectedCandidate
 
+        started = time.monotonic()
+        qwen_metrics: Dict[str, Any] = {}
+        report.metrics["qwen3vl"] = qwen_metrics
         try:
             calibrator = self._vision_calibrator()
-            raw = calibrator.vision.analyze_image(str(image_path), calibrator._build_prompt(app_name))
+            try:
+                prompt = calibrator._build_prompt(app_name, max_elements=self.vision_max_elements)
+            except TypeError:
+                prompt = calibrator._build_prompt(app_name)
+            qwen_path = self._downscaled_copy(image_path, self.vision_max_side, qwen_metrics)
+            try:
+                raw = calibrator.vision.analyze_image(
+                    str(qwen_path), prompt,
+                    timeout=self.vision_timeout,
+                    num_predict=max(1024, 60 * self.vision_max_elements + 400),
+                )
+            except TypeError:
+                # Implementaciones de vision sin parametro de espera.
+                raw = calibrator.vision.analyze_image(str(qwen_path), prompt)
             parsed = calibrator._parse_response(str(raw or "")) if raw else None
         except Exception as exc:
+            qwen_metrics["seconds"] = round(time.monotonic() - started, 3)
             report.warnings.append("Qwen3-VL no disponible: %s" % exc)
+            return []
+        finally:
+            if "qwen_path" in locals() and qwen_path != image_path:
+                try:
+                    os.unlink(str(qwen_path))
+                except OSError as exc:
+                    logger.debug("[CALIBRATION-PIPELINE] copia para Qwen3-VL no borrada: %s", exc)
+        qwen_metrics["seconds"] = round(time.monotonic() - started, 3)
+        if isinstance(raw, str) and raw.startswith("ERROR:"):
+            report.warnings.append("Qwen3-VL no disponible: %s" % raw[len("ERROR:"):].strip()[:300])
             return []
         if not isinstance(parsed, dict) or not isinstance(parsed.get("elements"), list):
             report.warnings.append("Qwen3-VL devolvio una respuesta no interpretable")
             return []
+        qwen_metrics["elements"] = len(parsed["elements"])
+        if parsed.get("truncated"):
+            qwen_metrics["truncated"] = True
+            report.warnings.append(
+                "Qwen3-VL corto la respuesta; se usan los %d elementos completos" % len(parsed["elements"])
+            )
         width, height = int(capture.pixel_width), int(capture.pixel_height)
         result = []
         for raw_element in parsed["elements"]:
@@ -1288,6 +1339,35 @@ class UICalibrationPipeline:
                 raw={"name": name, "type": raw_element.get("type"), "model": getattr(calibrator, "MODEL", "")},
             ))
         return result
+
+    @staticmethod
+    def _downscaled_copy(image_path: str, max_side: int, metrics: Dict[str, Any]) -> str:
+        """Copia temporal de la captura con el lado mayor <= ``max_side``.
+
+        Devuelve la ruta original si ya cabe o si no se puede reducir. La
+        copia la borra quien la pide.
+        """
+        try:
+            from PIL import Image
+
+            with Image.open(image_path) as image:
+                width, height = image.size
+                metrics["source_size"] = [int(width), int(height)]
+                longest = max(width, height)
+                if max_side <= 0 or longest <= max_side:
+                    metrics["sent_size"] = [int(width), int(height)]
+                    return image_path
+                scale = float(max_side) / float(longest)
+                size = (max(1, int(round(width * scale))), max(1, int(round(height * scale))))
+                reduced = image.convert("RGB").resize(size, Image.LANCZOS)
+            fd, path = tempfile.mkstemp(prefix="jarvis_calib_qwen_", suffix=".png")
+            os.close(fd)
+            reduced.save(path)
+            metrics["sent_size"] = [size[0], size[1]]
+            return path
+        except Exception as exc:
+            logger.warning("[CALIBRATION-PIPELINE] no se pudo reducir la captura para Qwen3-VL: %s", exc)
+            return image_path
 
     def _omniparser_candidates(self, manifest: Any, image_path: str, window: WindowInfo, report: CalibrationReport) -> List[Any]:
         from src.eyes.detection.visual_ui_detector_fusion import SOURCE_OMNIPARSER, DetectedCandidate
@@ -1570,21 +1650,43 @@ class UICalibrationPipeline:
             else:
                 safe_point_check = True
             if safe_point is not None and safe_point_check and checks_done < self.max_pointer_checks:
-                # Entre la toma del snapshot (etapa de deteccion) y aqui pueden
-                # haber pasado etapas lentas (Qwen3-VL) que hacen que otra
-                # ventana (consola, IDE) recupere el primer plano. Se asegura
-                # que la ventana de destino tenga el foco antes de comparar.
-                res_act = adapter.activate_window(int(window.window_id))
-                if not res_act.ok:
-                    raise _StageFailure(
-                        STAGE_POINTER,
-                        "no se pudo activar la ventana antes de verificar el puntero: %s" % res_act.error,
-                    )
+                # Entre la deteccion y aqui pasan etapas lentas (Qwen3-VL) en
+                # las que otra ventana (consola, IDE) puede tomar el primer
+                # plano. Antes de mover el puntero la ventana de prueba debe
+                # tener el foco (regla de entrada sobre la ventana verificada):
+                # si lo perdio se reactiva UNA vez y se deja constancia de que
+                # ventana lo tenia; despues `verify_before_action` sigue
+                # comprobando foco, geometria, monitor e identidad, de modo que
+                # un cambio real (ventana movida, escala, PID) sigue bloqueando.
                 if not adapter.is_foreground(int(window.window_id)):
-                    raise _StageFailure(
-                        STAGE_POINTER,
-                        "la ventana de destino no quedo en primer plano antes de verificar el puntero",
+                    fg_res = adapter.get_foreground_window()
+                    fg_info = fg_res.value if (fg_res.ok and fg_res.value is not None) else None
+                    quien = (
+                        "%s (pid %s)" % (fg_info.app_identity or fg_info.title or "?", fg_info.pid)
+                        if fg_info is not None else "desconocida"
                     )
+                    report.warnings.append(
+                        "la ventana de prueba perdio el foco antes de verificar el puntero; "
+                        "lo tenia: %s; se reactiva" % quien
+                    )
+                    focus_log = report.metrics.setdefault("focus_restored", [])
+                    focus_log.append({
+                        "stage": STAGE_POINTER,
+                        "foreground_app": fg_info.app_identity if fg_info is not None else None,
+                        "foreground_pid": fg_info.pid if fg_info is not None else None,
+                    })
+                    res_act = adapter.activate_window(int(window.window_id))
+                    if not res_act.ok:
+                        raise _StageFailure(
+                            STAGE_POINTER,
+                            "no se pudo reactivar la ventana antes de verificar el puntero "
+                            "(foco en %s): %s" % (quien, res_act.error),
+                        )
+                    if not adapter.is_foreground(int(window.window_id)):
+                        raise _StageFailure(
+                            STAGE_POINTER,
+                            "la ventana de prueba no recupero el primer plano (foco en %s)" % quien,
+                        )
                 drift = verify_before_action(snapshot, adapter)
                 if _get(drift, "action", "proceed") != "proceed":
                     raise _StageFailure(

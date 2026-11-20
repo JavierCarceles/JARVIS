@@ -36,6 +36,10 @@ from typing import Any, Callable, Dict, List, Optional, Sequence
 from src.core.log import get_logger
 from src.core.operation_errors import ErrorCode, OperationError, OperationStage, redact_text
 from src.desktop.platform_contract import Capability, CapabilityReport, CapabilityStatus
+from src.hands.apps.aplicaciones_integradas_windows import (
+    es_ruta_del_sistema_windows,
+    ruta_windows_normalizada,
+)
 from src.hands.apps.platform_launch import (
     AMBIGUOUS,
     DEFAULT_ALLOWED_URI_SCHEMES,
@@ -67,6 +71,83 @@ _LAUNCH_TYPE_TO_TARGET = {
 }
 
 _APPS_FOLDER_PREFIX = "shell:appsfolder\\"
+
+
+_ruta_windows_normalizada = ruta_windows_normalizada
+
+
+def _es_copia_del_sistema_o_del_paquete(target: Any, system_root: Optional[str] = None) -> bool:
+    """True si el destino es un ejecutable del propio Windows o de un paquete.
+
+    Cubre los ``.exe`` que Windows instala como alias o copias de una
+    aplicacion empaquetada: los de ``%SystemRoot%`` (``System32\\calc.exe``,
+    ``System32\\notepad.exe``) y los de ``\\WindowsApps\\`` (alias de
+    ejecucion y copias del paquete). Un ``.exe`` instalado por el usuario en
+    otra carpeta no lo es.
+    """
+    if getattr(target, "target_type", None) not in (TARGET_EXE, TARGET_COMMAND):
+        return False
+    ruta = _ruta_windows_normalizada(getattr(target, "target", ""))
+    if not ruta:
+        return False
+    if "\\windowsapps\\" in ruta:
+        return True
+    return es_ruta_del_sistema_windows(ruta, system_root)
+
+
+def _es_de_windowsapps(target: Any) -> bool:
+    return "\\windowsapps\\" in _ruta_windows_normalizada(getattr(target, "target", ""))
+
+
+def _nombre_ejecutable(target: Any) -> str:
+    import ntpath
+
+    nombre = ntpath.basename(_ruta_windows_normalizada(getattr(target, "target", "")))
+    # Un destino `command` ("notepad") y un `exe` ("...\\notepad.exe") son el
+    # mismo programa.
+    return nombre[:-4] if nombre.endswith(".exe") else nombre
+
+
+def preferir_destino_de_la_misma_aplicacion(
+    targets: Sequence[Any], system_root: Optional[str] = None
+) -> Optional[Any]:
+    """Elige destino solo cuando todos son la MISMA aplicacion del sistema.
+
+    No es un desempate general: si hay dos aplicaciones distintas que
+    coinciden con el nombre pedido, devuelve None y el llamador declara
+    ambiguedad (el usuario decide). Solo dos casos, ambos con una aplicacion
+    del propio Windows que el SO expone por varias vias:
+
+    1. Exactamente un paquete (AUMID) y el resto son ``.exe`` de
+       ``%SystemRoot%`` o de ``WindowsApps`` (``System32\\calc.exe`` es un
+       stub que abre la misma Calculadora empaquetada): se usa el AUMID.
+    2. Sin paquetes, exactamente un ``.exe`` fuera de ``WindowsApps`` y el
+       resto son copias en ``WindowsApps`` con el MISMO nombre de fichero
+       (``System32\\notepad.exe`` frente a ``WindowsApps\\...\\notepad.exe``):
+       se usa el de fuera de ``WindowsApps``, que es la ruta de produccion.
+    """
+    if len(targets) < 2:
+        return None
+    paquetes = [t for t in targets if getattr(t, "target_type", None) == TARGET_AUMID]
+    resto = [t for t in targets if getattr(t, "target_type", None) != TARGET_AUMID]
+    if len(paquetes) == 1:
+        if all(_es_copia_del_sistema_o_del_paquete(t, system_root) for t in resto):
+            return paquetes[0]
+        return None
+    if paquetes:
+        return None
+    if any(getattr(t, "target_type", None) not in (TARGET_EXE, TARGET_COMMAND) for t in targets):
+        return None
+    fuera = [t for t in targets if not _es_de_windowsapps(t)]
+    if len(fuera) != 1:
+        return None
+    nombre = _nombre_ejecutable(fuera[0])
+    if not nombre:
+        return None
+    copias = [t for t in targets if t is not fuera[0]]
+    if all(_nombre_ejecutable(t) == nombre for t in copias):
+        return fuera[0]
+    return None
 
 
 def _aumid_from_candidate(candidate: Any) -> str:
@@ -101,6 +182,99 @@ def _infer_target_type(destination: str, launch_type: str) -> Optional[str]:
     return None
 
 
+# ---------------------------------------------------------------------------
+# Identidad de paquete (AUMID) de las ventanas, sin depender del idioma
+# ---------------------------------------------------------------------------
+
+_PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+_ERROR_SUCCESS = 0
+_ERROR_INSUFFICIENT_BUFFER = 122
+
+
+def aumid_de_proceso(pid: int) -> Optional[str]:
+    """AUMID del proceso ``pid`` (``GetApplicationUserModelId``, Windows 8+).
+
+    None si no es Windows, el proceso no tiene identidad de aplicacion
+    empaquetada (APPMODEL_ERROR_NO_APPLICATION: aplicacion de escritorio
+    clasica) o no se puede abrir con PROCESS_QUERY_LIMITED_INFORMATION.
+    """
+    if sys.platform != "win32" or not pid:
+        return None
+    import ctypes
+    from ctypes import wintypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    funcion = getattr(kernel32, "GetApplicationUserModelId", None)
+    if funcion is None:
+        return None
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel32.CloseHandle.restype = wintypes.BOOL
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    funcion.restype = ctypes.c_long
+    funcion.argtypes = [wintypes.HANDLE, ctypes.POINTER(ctypes.c_uint32), wintypes.LPWSTR]
+    handle = kernel32.OpenProcess(_PROCESS_QUERY_LIMITED_INFORMATION, False, int(pid))
+    if not handle:
+        return None
+    try:
+        longitud = ctypes.c_uint32(0)
+        codigo = funcion(handle, ctypes.byref(longitud), None)
+        if codigo != _ERROR_INSUFFICIENT_BUFFER or longitud.value == 0:
+            return None
+        bufer = ctypes.create_unicode_buffer(int(longitud.value))
+        codigo = funcion(handle, ctypes.byref(longitud), bufer)
+        if codigo != _ERROR_SUCCESS:
+            return None
+        return bufer.value or None
+    finally:
+        kernel32.CloseHandle(handle)
+
+
+def pids_de_ventanas_hijas(hwnd: int) -> List[int]:
+    """PIDs de las ventanas hijas de ``hwnd`` distintos del propio.
+
+    Las aplicaciones UWP se muestran dentro de una ventana de
+    ApplicationFrameHost.exe; la aplicacion real es el proceso de una ventana
+    hija (``Windows.UI.Core.CoreWindow``).
+    """
+    if sys.platform != "win32" or not hwnd:
+        return []
+    import ctypes
+    from ctypes import wintypes
+
+    user32 = ctypes.WinDLL("user32", use_last_error=True)
+    user32.GetWindowThreadProcessId.restype = wintypes.DWORD
+    user32.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+    propio = wintypes.DWORD(0)
+    user32.GetWindowThreadProcessId(wintypes.HWND(int(hwnd)), ctypes.byref(propio))
+    encontrados: List[int] = []
+    tipo_callback = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+
+    def _visitar(hijo: Any, _param: Any) -> bool:
+        pid = wintypes.DWORD(0)
+        user32.GetWindowThreadProcessId(hijo, ctypes.byref(pid))
+        if pid.value and pid.value != propio.value and pid.value not in encontrados:
+            encontrados.append(int(pid.value))
+        return True
+
+    callback = tipo_callback(_visitar)
+    user32.EnumChildWindows.restype = wintypes.BOOL
+    user32.EnumChildWindows.argtypes = [wintypes.HWND, tipo_callback, wintypes.LPARAM]
+    user32.EnumChildWindows(wintypes.HWND(int(hwnd)), callback, 0)
+    return encontrados
+
+
+def aumids_de_ventana_windows(window: Any) -> List[str]:
+    """AUMID del proceso de la ventana y de los procesos de sus hijas."""
+    resultado: List[str] = []
+    pids = [int(getattr(window, "pid", 0) or 0)] + pids_de_ventanas_hijas(int(window.window_id))
+    for pid in pids:
+        aumid = aumid_de_proceso(pid)
+        if aumid and aumid not in resultado:
+            resultado.append(aumid)
+    return resultado
+
+
 class WindowsLaunchAdapter(ApplicationLaunchAdapter):
     """Adaptador Windows del contrato de lanzamiento."""
 
@@ -115,9 +289,13 @@ class WindowsLaunchAdapter(ApplicationLaunchAdapter):
         startfile: Optional[Callable[[str], Any]] = None,
         allowed_uri_schemes: Optional[Sequence[str]] = None,
         machine_id: Optional[str] = None,
+        aumids_de_ventana: Optional[Callable[[Any], Sequence[str]]] = None,
     ) -> None:
         super().__init__(desktop=desktop)
         self._app_manager = app_manager
+        # Lectura de los AUMID de los procesos de una ventana; inyectable para
+        # probar la verificacion sin APIs de Windows.
+        self._aumids_de_ventana = aumids_de_ventana or aumids_de_ventana_windows
         self._discovery = discovery
         self._preflight = preflight
         self._startfile = startfile
@@ -259,6 +437,34 @@ class WindowsLaunchAdapter(ApplicationLaunchAdapter):
             },
         )
 
+    def _new_window_by_app_id(
+        self, desktop: Any, before: Sequence[int], app_id: str
+    ) -> Optional[Any]:
+        """Ventana nueva cuyo proceso (o el proceso de la app alojada en
+        ApplicationFrameHost) tiene exactamente el AUMID ``app_id``."""
+        buscado = str(app_id or "").strip().casefold()
+        if desktop is None or not buscado or "!" not in buscado:
+            return None
+        known = set(int(w) for w in before)
+        try:
+            result = desktop.list_windows(visible_only=True)
+        except Exception as exc:
+            logger.debug("list_windows() fallo: %s", exc)
+            return None
+        if not getattr(result, "ok", False):
+            return None
+        for window in result.value or []:
+            if int(window.window_id) in known:
+                continue
+            try:
+                aumids = self._aumids_de_ventana(window) or ()
+            except Exception as exc:
+                logger.debug("No se pudo leer el AUMID de la ventana %s: %s", window.window_id, exc)
+                continue
+            if any(str(a).strip().casefold() == buscado for a in aumids):
+                return window
+        return None
+
     def discover(self, name: str) -> List[LaunchTarget]:
         """Busqueda puntual por nombre en las fuentes permitidas (sin lanzar)."""
         if not is_safe_launch_text(name):
@@ -295,28 +501,10 @@ class WindowsLaunchAdapter(ApplicationLaunchAdapter):
             if clave not in unicos:
                 unicos[clave] = target
         targets = list(unicos.values())
-        # Resolucion preferida: si hay exactamente un paquete UWP (AUMID) y los
-        # demas son entradas .exe del catalogo conocido (nombre comercial
-        # "Sistema operativo Microsoft Windows"), se prefiere el paquete nativo
-        # del SO en vez de declarar ambiguedad (el usuario pide "calculadora" y
-        # no el .exe genérico del sistema).
-        paquetes = [t for t in targets if t.target_type == TARGET_AUMID]
-        if len(targets) > 1 and len(paquetes) == 1:
-            return ResolutionOutcome(RESOLVED, paquetes[0], targets, None, source)
-        # Desempate entre varios destinos del mismo tipo: se prefiere el de
-        # mayor confianza de descubrimiento (ej. "notepad.exe" en system32 del
-        # SO por encima de la copia de WindowsApps del paquete).
         if len(targets) > 1:
-            orden_confianza = {"alta": 3, "media": 2, "baja": 1, "ninguna": 0}
-
-            def _confianza(target: Any) -> int:
-                ev = getattr(target, "evidence", None) or {}
-                return orden_confianza.get(str(ev.get("confianza", "ninguna")).casefold(), 0)
-
-            mejor = max(targets, key=_confianza)
-            empatados = [t for t in targets if _confianza(t) == _confianza(mejor)]
-            if len(empatados) == 1:
-                return ResolutionOutcome(RESOLVED, mejor, targets, None, source)
+            preferido = preferir_destino_de_la_misma_aplicacion(targets)
+            if preferido is not None:
+                return ResolutionOutcome(RESOLVED, preferido, targets, None, source)
         if len(targets) == 1:
             return ResolutionOutcome(RESOLVED, targets[0], targets, None, source)
         if len(targets) > 1:

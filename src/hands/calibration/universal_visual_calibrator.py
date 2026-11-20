@@ -598,7 +598,8 @@ class UniversalVisualCalibrator:
                 return None
         return None
 
-    def _build_prompt(self, application_name: str) -> str:
+    def _build_prompt(self, application_name: str, max_elements: Optional[int] = None) -> str:
+        limite = int(max_elements) if max_elements else self.MAX_ELEMENTS
         return f"""
 Analiza exclusivamente la interfaz visible de esta aplicaci\u00f3n:
 
@@ -629,7 +630,7 @@ Devuelve \u00daNICAMENTE JSON v\u00e1lido con esta estructura:
 }}
 
 REGLAS:
-- M\u00e1ximo {self.MAX_ELEMENTS} elementos.
+- M\u00e1ximo {limite} elementos.
 - bbox relativo a TODA la imagen.
 - Coordenadas NORMALIZADAS de 0 a {self.NORMALIZED_MAX}.
 - x1 < x2 y y1 < y2.
@@ -682,7 +683,43 @@ REGLAS:
                         return parsed if isinstance(parsed, dict) else None
                     except json.JSONDecodeError:
                         return None
+        # JSON cortado (el modelo agoto num_predict a mitad de la lista): se
+        # conservan los elementos que llegaron completos en vez de perderlos
+        # todos. Nunca se completa ni se inventa un elemento a medias.
+        salvaged = UniversalVisualCalibrator._salvage_elements(text)
+        if salvaged:
+            logger.warning(
+                "[VISUAL-CALIBRATOR] respuesta JSON incompleta: se recuperan %d elementos completos",
+                len(salvaged),
+            )
+            return {"elements": salvaged, "truncated": True}
         return None
+
+    @staticmethod
+    def _salvage_elements(text: str) -> List[Dict[str, Any]]:
+        """Objetos completos de la lista ``elements`` de un JSON cortado."""
+        decoder = json.JSONDecoder()
+        key = text.find('"elements"')
+        if key < 0:
+            return []
+        start = text.find("[", key)
+        if start < 0:
+            return []
+        items: List[Dict[str, Any]] = []
+        index = start + 1
+        length = len(text)
+        while index < length:
+            while index < length and text[index] in " \t\r\n,":
+                index += 1
+            if index >= length or text[index] != "{":
+                break
+            try:
+                value, index = decoder.raw_decode(text, index)
+            except json.JSONDecodeError:
+                break
+            if isinstance(value, dict):
+                items.append(value)
+        return items
 
     @staticmethod
     def _get_image_size(screenshot_path: Path) -> Tuple[int, int]:

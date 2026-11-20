@@ -179,8 +179,26 @@ class TestCalibracionAplicacionesEntornoReal(unittest.TestCase):
         return False
 
     def _verificar(self, nombre: str, report: Any, vscode_antes: List[Any]) -> None:
-        detalle = "%s: etapa=%s error=%s avisos=%s" % (
-            nombre, report.stage_failed, report.error, report.warnings,
+        metricas = report.metrics or {}
+        diagnostico = {
+            "tiempos_s": metricas.get("timings"),
+            "total_s": metricas.get("total_seconds"),
+            "candidatos_por_fuente": metricas.get("candidates_by_source"),
+            "qwen3vl": metricas.get("qwen3vl"),
+            "puerta": {
+                "aceptados": metricas.get("gate_accepted"),
+                "rechazados": metricas.get("gate_rejected"),
+            },
+            "puntero": {
+                "comprobados": metricas.get("pointer_checks"),
+                "verificados": metricas.get("pointer_verified"),
+            },
+            "foco_restaurado": metricas.get("focus_restored"),
+        }
+        # Visible con -s: tiempos por etapa, detectores y foco aunque pase.
+        print("\n[CALIBRACION %s] %s" % (nombre, diagnostico))
+        detalle = "%s: etapa=%s error=%s avisos=%s diagnostico=%s" % (
+            nombre, report.stage_failed, report.error, report.warnings, diagnostico,
         )
         if report.stage_failed == STAGE_LAUNCH and "ya estaba abierta" in str(report.error or ""):
             self.fail(

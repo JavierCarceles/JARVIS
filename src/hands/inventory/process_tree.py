@@ -35,6 +35,11 @@ import time
 from typing import Optional, Set
 
 
+# Procesos auxiliares (powershell, tasklist...) sin consola visible: una
+# consola nueva puede quitar el primer plano a la ventana de la aplicacion.
+_SIN_VENTANA = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+
 def obtener_pids_por_nombre(nombre_ejecutable: str) -> Set[int]:
     """Devuelve el conjunto de PIDs activos de una imagen de tasklist."""
     resultado = subprocess.run(
@@ -42,6 +47,7 @@ def obtener_pids_por_nombre(nombre_ejecutable: str) -> Set[int]:
         capture_output=True,
         text=True,
         check=False,
+        creationflags=_SIN_VENTANA,
     )
     pids: Set[int] = set()
     token = nombre_ejecutable.lower()
@@ -97,6 +103,7 @@ def cerrar_proceso_por_pid(pid: int, timeout_segundos: float = 10.0) -> bool:
         capture_output=True,
         text=True,
         check=False,
+        creationflags=_SIN_VENTANA,
     )
     fin = time.time() + timeout_segundos
     while time.time() < fin:
@@ -134,5 +141,6 @@ def _pid_esta_vivo(pid: int) -> bool:
         capture_output=True,
         text=True,
         check=False,
+        creationflags=_SIN_VENTANA,
     )
     return str(pid) in resultado.stdout

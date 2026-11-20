@@ -152,6 +152,7 @@ Estos datos solo valen para el ordenador donde se crearon. No deben copiarse a o
 - **Codigo:** `src/hands/inventory/system_inventory_storage.py` (almacenamiento) y `src/hands/inventory/system_inventory.py` (identidad del equipo y contrato).
 - **Identidad del equipo:** `generate_machine_id()` = `uuid5(NAMESPACE_DNS, "jarvis-local-<hostname>-<SO>")`. No usa MAC, numero de serie ni usuario. Si la base pertenece a otro `machine_id`, se rechaza (`InventoryIncompatibleMachineError`).
 - **Proteccion:** modo WAL, claves foraneas activas, permisos solo para el usuario, copia de seguridad con sufijo `.bak` y comprobacion de integridad antes de restaurar (`InventoryCorruptError`, `InventoryBackupError`).
+- **Integridad al abrir** (`initialize` -> `verify_integrity_al_abrir`): bases de hasta 256 MB, `PRAGMA quick_check` + `integrity_check` completos; mayores, `PRAGMA quick_check(tabla)` de cada tabla con sus indices salvo `file_entries` (con la base real, 5,6 M filas y 14 GB, la completa tardaba unos 6 minutos en cada apertura: 136 s + 231 s medidos). `JARVIS_INVENTARIO_VERIFICACION_COMPLETA=1` fuerza la completa; `verify_integrity()` la ejecuta bajo demanda.
 - **Version de esquema:** 6.
 
 | Tabla | Para que | Columnas principales |

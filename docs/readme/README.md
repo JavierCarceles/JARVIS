@@ -290,6 +290,7 @@ Envio de imagenes a Qwen3-VL (`Vision._chat_json`, comun a todos los metodos de 
 
 - Qwen3-VL usa un token visual por bloque de 32x32 pixeles. Una imagen de mas de `MODEL_IMAGE_MAX_PIXELS` (1920x1080) se reduce conservando la proporcion y se envia como PNG en memoria; las mas pequenas se envian por ruta. Una captura 4K completa (unos 8000 tokens) desbordaria el contexto de 8192.
 - Si los tokens visuales estimados, el prompt y `num_predict` no caben en `num_ctx`, se usa el multiplo de 1024 suficiente.
+- Con `timeout` (segundos; `analyze_image(..., timeout=, num_predict=)` lo pasa a `_chat_json`), la respuesta se lee en streaming y, al agotarse, se corta la conexion (Ollama deja de generar) y se devuelve lo recibido con `done_reason="timeout"`; sin `timeout`, una sola llamada como antes.
 - `last_chat_info` guarda el tamano original y el enviado, `num_ctx`, `done_reason` y la longitud del contenido y del razonamiento. Una salida cortada (`done_reason=length`) o un contenido vacio con razonamiento se registran como aviso.
 
 `detect_ui_elements(imagen, application=None, refine_with_opencv=False)`:
@@ -362,21 +363,25 @@ Decide si una aplicacion se puede abrir o calibrar. No la ejecuta.
 `ApplicationLaunchService.open(nombre)` resuelve (catalogo global o, si no esta, resolucion local del adaptador del SO), pasa el preflight, lanza y verifica proceso y ventana. Lo usa `UICalibrationPipeline` para abrir la aplicacion que calibra.
 
 - **Catalogo con comando sin ruta** (por ejemplo `executable: "chrome"`): si el comando no esta en PATH pero el preflight resolvio y valido una ruta (`executable_path`), se lanza esa ruta como `.exe`.
+- **Catalogo sin destino verificable en este equipo:** si el preflight no resuelve el ejecutable y la entrada del catalogo no tiene ejecutable ni URL, o solo un comando sin ruta (`notepad.exe`, `calc.exe`), se resuelve el nombre pedido en el equipo (`_resolve_locally`: PATH, menu Inicio/AUMID, App Paths) y se pasa el preflight del destino encontrado.
+- **Varios destinos locales (`WindowsLaunchAdapter._from_resolution`):** por defecto es ambiguo y se pregunta. `preferir_destino_de_la_misma_aplicacion` solo elige cuando todos son la misma aplicacion del propio Windows: un unico paquete (AUMID) y el resto `.exe` de `%SystemRoot%` o de `WindowsApps` (se usa el AUMID; `System32\calc.exe` es un stub de la Calculadora empaquetada), o, sin paquetes, un unico `.exe` fuera de `WindowsApps` y el resto copias en `WindowsApps` con el mismo nombre de fichero (se usa el de fuera). La confianza del descubrimiento no rompe ambiguedades.
+- **Paquetes del menu Inicio:** el `app_id` (AUMID `Familia!App`) de Get-StartApps se conserva en la clasificacion y el candidato descubierto; un candidato sin ruta pero con AUMID se trata como paquete lanzable y lo valida el preflight del destino (`check_launch_target`, shell:AppsFolder).
 - **Reutilizacion:** solo se reutiliza una instancia con ventana visible. Si hay procesos con el nombre esperado pero ninguno tiene ventana (navegador residente en segundo plano), se lanza para obtener una ventana nueva.
-- **Verificacion** (`ApplicationLaunchAdapter.verify`, espera acotada sin sleep fijo): ventana visible del PID lanzado o de procesos nuevos con el nombre esperado; para aplicaciones de instancia unica, una ventana NUEVA (no presente en la instantanea previa al lanzamiento) de un proceso que ya existia con ese nombre; para AUMID/URI sin nombre de proceso, una ventana nueva cuyo titulo contiene el nombre visible.
+- **Verificacion** (`ApplicationLaunchAdapter.verify`, espera acotada sin sleep fijo): ventana visible del PID lanzado o de procesos nuevos con el nombre esperado; para aplicaciones de instancia unica, una ventana NUEVA (no presente en la instantanea previa al lanzamiento) de un proceso que ya existia con ese nombre; para AUMID/URI sin nombre de proceso, una ventana nueva cuyo proceso tiene ese AUMID (`WindowsLaunchAdapter`: `GetApplicationUserModelId` sobre el proceso de la ventana y, en las apps alojadas en ApplicationFrameHost, sobre los procesos de sus ventanas hijas) y, si no se puede leer, una ventana nueva cuyo titulo contiene el nombre visible.
 - **Procesos propios:** un proceso que ya existia antes de lanzar nunca se registra como abierto por JARVIS. La apertura recordada (idempotencia) deja de valer cuando su proceso termina o su ventana ya no existe.
 
 ### 7.3 Descubrimiento (`apps/`) e inventario (`inventory/`)
 
 #### `application_discovery.py` - encontrar aplicaciones instaladas
 
-Busca aplicaciones en fuentes del sistema, las clasifica y las valida sin lanzarlas. **No esta conectado al flujo normal:** ningun modulo de `src/` ni `main.py` lo usa; solo los tests.
+Busca aplicaciones en fuentes del sistema, las clasifica y las valida sin lanzarlas. Lo usan `launch_windows.py` (resolucion local de `WindowsLaunchAdapter`) y `platform_launch.py`; `main.py` no lo llama directamente.
 
 - `ApplicationDiscovery(...)`: `descubrir_todos()`, `buscar_por_nombre(nombre)`, `buscar_por_nombre_con_desambiguacion(nombre)`, `resolver_aplicacion_por_nombre(nombre)`, `auto_registrar_descubiertos()`, `registrar_candidatos(...)`, `verificar_aislamiento_inventario()`.
 - **Fuentes, por orden de prioridad:** aplicacion ya abierta, catalogo conocido, menu Inicio, AppX, desinstaladores del registro, PATH (solo el primer nivel de cada carpeta), App Paths del registro y, por ultimo, el inventario SQLite. Si una fuente falla, las demas siguen.
 - **Busqueda por nombre:** cada fuente se filtra por el nombre ANTES de aplicar su limite de resultados (`_fuentes_primarias(limite, nombre_filtro)`), y el inventario se consulta con el filtro en SQL (`search(name_contains=...)`), de modo que la aplicacion no depende de estar entre las primeras entradas. En PATH un ejecutable solo cuenta en la primera carpeta que lo contiene, como al ejecutarlo por nombre. Las rutas del almacen de componentes (`\Windows\WinSxS\`) no se proponen como candidatos.
+- **Aplicaciones de Windows en cualquier idioma** (`aplicaciones_integradas_windows.py`): el menu Inicio, los titulos y los recursos de version estan traducidos. Para las aplicaciones que trae Windows (Bloc de notas, Calculadora, Paint, Explorador de archivos, Configuracion, Fotos, Camara, Reloj, Recortes, Grabadora, Microsoft Store, Terminal, Notas rapidas, Reproductor multimedia, Peliculas y TV, El Tiempo, Mapas, Panel de control, Mapa de caracteres, WordPad, Reproductor de Windows Media, Edge) la tabla da sus nombres en espanol e ingles y sus identificadores fijos (familia de paquete del AUMID, AUMID completo o `.exe`). Si el nombre pedido coincide exactamente (sin tildes ni mayusculas) con uno de ellos, la busqueda acepta tambien la entrada del menu Inicio con esa familia de paquete o con el nombre en el otro idioma, y el `.exe` en PATH/App Paths: "calculadora" encuentra "Calculator" en un Windows en ingles. Sin coincidencias parciales ("explorer" no trae "Internet Explorer"). No incluye herramientas que `CalibrationManager` trata como riesgo (Administrador de tareas, Lupa, Escritorio remoto). Las aplicaciones de terceros se llaman igual en todos los idiomas y no necesitan entrada.
 - **Ambiguedad:** si hay varios candidatos y no exactamente una fuente de autoridad (abierta o catalogo), el resultado se marca como ambiguo y requiere preguntar al usuario.
-- **Identidad estable** (nunca la ruta): `paquete:<AUMID>`, `fabprod:<fabricante>:<producto>`, `nombre:<nombre>` o `candidato:<id>`. El auto-registro hace upsert en `data/memory/entities.json` sin inventar capacidades.
+- **Identidad estable** (nunca la ruta ni el idioma): `paquete:<AUMID>` (evidencia `paquete_id:` o `app_id` de Get-StartApps), `fabexe:<fabricante>:<ejecutable.exe>`, `fabprod:<fabricante>:<producto>` (solo sin `.exe` conocido), `nombre:<nombre>` o `candidato:<id>`. El producto no identifica: lo comparten aplicaciones distintas (todos los `.exe` de Windows, Word y Excel) y en Windows esta traducido. El clasificador nombra los `.exe` de `%SystemRoot%` por su `FileDescription` ("Bloc de notas" / "Notepad") y no por el producto comun. El auto-registro hace upsert en `data/memory/entities.json` sin inventar capacidades.
 - **Limitaciones:** la confianza se guarda como texto en una columna numerica; cada candidato lanza un PowerShell (lento).
 
 #### `application_launch_classifier.py` - tipo de lanzamiento
@@ -401,7 +406,7 @@ Busca aplicaciones en fuentes del sistema, las clasifica y las valida sin lanzar
 
 #### `system_inventory_storage.py` - base de datos del inventario
 
-`SystemInventoryStorage(db_path="data/system_inventory.sqlite3")`: esquema, migraciones y proteccion descritos en `docs/readme/README_DATA.md`. Metodos principales: `initialize`, `verificar_identidad_equipo`, `begin_scan_run`/`end_scan_run`, `insert_file_entries`, `insert_application_candidates`, `search` (filtros por nombre exacto, subcadena del nombre `name_contains` con comodines LIKE escapados, extension, tipo, volumen, solo volumenes montados), `buscar_candidatos_para_orden`, `revalidar_destino_aplicacion`, refrescos, deteccion de cambios, copias de seguridad, `write_manifest`.
+`SystemInventoryStorage(db_path="data/system_inventory.sqlite3")`: esquema, migraciones y proteccion descritos en `docs/readme/README_DATA.md`. Metodos principales: `initialize`, `verificar_identidad_equipo`, `begin_scan_run`/`end_scan_run`, `insert_file_entries`, `insert_application_candidates`, `search` (filtros por nombre exacto, subcadena del nombre `name_contains` con comodines LIKE escapados, extension, tipo, volumen, solo volumenes montados; con filtro por nombre fija el indice anteponiendo `+` a los demas terminos y al ORDER BY: nombre exacto por `idx_file_entries_name`, subcadena con extension por `idx_file_entries_extension`, porque sin `ANALYZE` SQLite recorria toda la tabla por el indice de rutas; `search_by_name` y `count` aplican lo mismo), `buscar_candidatos_para_orden`, `revalidar_destino_aplicacion`, refrescos, deteccion de cambios, copias de seguridad, `write_manifest`.
 
 Ojo: la ruta por defecto es relativa al directorio de trabajo, mientras que el preflight usa la ruta absoluta del proyecto. Si JARVIS no se arranca desde su carpeta, pueden usarse dos bases distintas.
 
@@ -429,6 +434,25 @@ calibrate_application(app, monitor)
   -> cerrar lo que abrio JARVIS o restaurar la ventana del usuario
 ```
 
+#### `calibration_pipeline.py` - pipeline unico de calibracion
+
+`UICalibrationPipeline(...).calibrate(app, monitor_reference=None, policy="product"|"test", depth="surface"|"deep"|"branch", reuse_window=True)` -> `CalibrationReport`. Lo usan la prueba real de calibracion y `delegate_legacy_calibration`. Etapas en orden (la primera que falla queda en `stage_failed`):
+
+```
+preflight (politica de calibracion) -> capabilities -> launch (ApplicationLaunchService.open)
+  -> monitor (politica o referencia del usuario) -> window (mover, maximizar, primer plano)
+  -> stability (capturas o arbol estables) -> environment -> accessibility (arbol UIA/AX)
+  -> capture (mss del area visible de la ventana) -> detection (UIA + Qwen3-VL + OmniParser/PaddleOCR si estan)
+  -> fusion -> quality_gate -> pointer_verification (mueve el puntero, nunca hace clic) -> persistence (SQLite)
+  -> limpieza: borra temporales, devuelve el puntero, cierra lo que abrio o restaura la ventana del usuario
+```
+
+- **Qwen3-VL:** se envia una copia de la captura con el lado mayor <= `vision_max_side` (1600 px), se piden `vision_max_elements` (40) elementos con `num_predict = 60 x elementos + 400`, y la llamada tiene un presupuesto total de `vision_timeout` (300 s) con respuesta parcial (ver `vision.py`). Las cajas vuelven normalizadas 0..1000 y se convierten con el tamano de la captura original. Una respuesta cortada conserva los elementos completos (`UniversalVisualCalibrator._parse_response`, aviso y `metrics["qwen3vl"]["truncated"]`). Si Ollama no responde, la calibracion sigue con la accesibilidad.
+- **Foco antes del puntero:** si la ventana de prueba no esta en primer plano se reactiva una vez, se anota en `warnings` y `metrics["focus_restored"]` que aplicacion y PID tenian el foco, y `verify_before_action` comprueba despues foco, geometria, monitor e identidad.
+- **Metricas** (`report.metrics`): `timings` por etapa, `total_seconds`, `candidates_by_source`, `qwen3vl` (tamano enviado, segundos, elementos), puerta de calidad, `pointer_checks`/`pointer_verified`.
+- **Diagnostico previo en Windows:** `python scripts/diagnostico_calibracion_windows.py` (solo lectura, no abre aplicaciones): Python/SQLite, capacidades y monitores, Ollama y una llamada corta a Qwen3-VL con su latencia, verificacion del inventario al abrir, tiempo de `shell:AppsFolder` y resolucion de "calculadora"/"calculator"/"notepad".
+- **Procesos auxiliares sin consola:** las llamadas a `powershell`, `tasklist` y `taskkill` usan `CREATE_NO_WINDOW`, para que una consola nueva no quite el primer plano a la ventana calibrada cuando JARVIS no tiene consola propia.
+
 #### `calibration_manager.py`
 
 `get_calibration_manager()` -> `CalibrationManager`:
@@ -439,7 +463,7 @@ calibrate_application(app, monitor)
 - `launch_application(app)`, `move_window_to_monitor(...)`, `verify_visible_window_for_application(...)`, `wait_for_application_window(...)`, `is_application_calibrated(app)`, `get_calibration_statistics()`.
 - **Reutilizar ventana:** puntua las ventanas abiertas (proceso esperado, titulo, tamano, foco) y reutiliza la mejor si supera el umbral; si no, lanza la aplicacion y espera una ventana nueva (10 s por defecto).
 - **Seguridad:**
-  - VS Code, juegos y herramientas administrativas se ignoran siempre.
+  - VS Code, juegos y herramientas administrativas se ignoran siempre. Las herramientas administrativas y de accesibilidad se reconocen por su nombre en espanol y en ingles (Administrador de tareas / Task Manager, Narrador / Narrator, Teclado en pantalla / On-Screen Keyboard, Editor del Registro / Registry Editor, Servicios / Services, etc.), porque el menu Inicio esta traducido.
   - Las ventanas creadas por JARVIS se cierran al terminar; las del usuario se restauran a su estado original.
   - En navegadores ya abiertos por el usuario se abre una pestana temporal con Ctrl+T y se cierra con Ctrl+W. Si el foco falla, esas teclas podrian ir a otra ventana.
 - **Persistencia:** `data/macros_coords.json` (atomico) y `data/launch_evidence.json`.

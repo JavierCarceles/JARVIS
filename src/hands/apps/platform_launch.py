@@ -300,10 +300,10 @@ class LaunchOutcome:
         return {
             "success": self.success,
             "pid": self.pid,
-            "window": self.window.to_dict() if self.window is not None and hasattr(self.window, "to_dict") else None,
+            "window": _objeto_a_dict(self.window),
             "reused_existing": self.reused_existing,
-            "target": self.target.to_dict() if self.target is not None and hasattr(self.target, "to_dict") else None,
-            "error": self.error.to_dict() if self.error is not None and hasattr(self.error, "to_dict") else None,
+            "target": _objeto_a_dict(self.target),
+            "error": _objeto_a_dict(self.error),
             "evidence": redact_evidence(dict(self.evidence)),
             "launched": self.launched,
             "process_verified": self.process_verified,
@@ -326,6 +326,27 @@ class LaunchOutcome:
 # ============================================================================
 # CONTRATO DEL ADAPTADOR
 # ============================================================================
+
+
+def _objeto_a_dict(valor: Any) -> Optional[Dict[str, Any]]:
+    """Serializa ventana/destino/error del resultado sin perder datos.
+
+    Los tipos del contrato (`WindowInfo`, `LaunchTarget`, `OperationError`)
+    tienen `to_dict()`. Un adaptador que devuelva otro objeto (p. ej. un
+    `SimpleNamespace`) se serializa con sus atributos, redactados, en lugar de
+    descartarse en silencio como None.
+    """
+    if valor is None:
+        return None
+    to_dict = getattr(valor, "to_dict", None)
+    if callable(to_dict):
+        return to_dict()
+    if isinstance(valor, dict):
+        return redact_evidence(dict(valor))
+    atributos = getattr(valor, "__dict__", None)
+    if isinstance(atributos, dict):
+        return redact_evidence({k: v for k, v in atributos.items() if not k.startswith("_")})
+    return {"valor": redact_text(str(valor))}
 
 
 def _default_spawner(argv: Sequence[str]) -> Any:
@@ -532,6 +553,16 @@ class ApplicationLaunchAdapter:
                                   "window_match": "nueva_ventana_de_proceso_existente"},
                     )
             if not pids and not names and preexisting_window_ids is not None and target is not None:
+                # Primero por identidad del paquete (AUMID del proceso de la
+                # ventana): no depende del idioma ni del titulo. Si el
+                # adaptador no puede leerla, por titulo.
+                window = self._new_window_by_app_id(desktop, preexisting_window_ids, target.app_id)
+                if window is not None:
+                    return LaunchOutcome(
+                        True, pid=window.pid, window=window, target=target, process_verified=True,
+                        window_verified=True,
+                        evidence={"verified_pids": [window.pid], "window_match": "nueva_ventana_por_aumid"},
+                    )
                 window = self._new_window_by_title(desktop, preexisting_window_ids, target.display_name)
                 if window is not None:
                     return LaunchOutcome(
@@ -641,6 +672,17 @@ class ApplicationLaunchAdapter:
                     continue
                 if getattr(window, "is_visible", False) and not getattr(window, "is_minimized", False):
                     return window
+        return None
+
+    def _new_window_by_app_id(
+        self, desktop: Any, before: Sequence[int], app_id: str
+    ) -> Optional[WindowInfo]:
+        """Ventana nueva cuyo proceso tiene el AUMID ``app_id``.
+
+        El contrato base no sabe leer la identidad de paquete de un proceso:
+        devuelve None y la verificacion sigue por titulo. Lo implementa el
+        adaptador de Windows.
+        """
         return None
 
     @staticmethod

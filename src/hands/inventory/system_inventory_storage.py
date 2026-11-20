@@ -44,6 +44,7 @@ from typing import Callable, Optional
 
 import psutil
 
+from src.core.log import get_logger
 from src.hands.apps.application_preflight import (
     ApplicationPreflight,
     get_application_preflight,
@@ -66,6 +67,8 @@ from src.hands.inventory.system_inventory import (
     esta_caducado,
     validar_destino,
 )
+
+logger = get_logger(__name__)
 
 
 SCHEMA_VERSION = 6
@@ -902,7 +905,7 @@ class SystemInventoryStorage:
         # una valida, se falla en alto sin destruir datos recuperables. Nunca
         # se sobrescribe una base valida con una vacia o incompleta tras un error.
         if self.db_path.exists():
-            integridad = self.verify_integrity()
+            integridad = self.verify_integrity_al_abrir()
             if not integridad["ok"]:
                 try:
                     self.restaurar_desde_backup()
@@ -1093,6 +1096,81 @@ class SystemInventoryStorage:
                 except Exception:
                     pass
         return dest
+
+    # Hasta este tamano, abrir la base ejecuta la verificacion completa
+    # (`verify_integrity`). Por encima, `quick_check` es O(N) e
+    # `integrity_check` O(N log N) en filas (documentacion de SQLite): con el
+    # inventario real (5,6 M filas, 14 GB) tardan decenas de minutos y
+    # bloqueaban cualquier operacion que abriera la base (p. ej. guardar un
+    # perfil de calibracion).
+    INTEGRIDAD_COMPLETA_MAX_BYTES = 256 * 1024 * 1024
+    # Tablas que la verificacion al abrir omite en bases grandes: el resto se
+    # comprueba con sus indices (`PRAGMA quick_check(tabla)`, SQLite >= 3.33).
+    TABLAS_OMITIDAS_AL_ABRIR = ("file_entries",)
+    # Fuerza la verificacion completa al abrir sea cual sea el tamano.
+    ENV_VERIFICACION_COMPLETA = "JARVIS_INVENTARIO_VERIFICACION_COMPLETA"
+
+    def verify_integrity_al_abrir(self) -> dict:
+        """Verificacion de integridad acotada que se hace al abrir la base.
+
+        Bases de hasta ``INTEGRIDAD_COMPLETA_MAX_BYTES`` (o con la variable de
+        entorno ``JARVIS_INVENTARIO_VERIFICACION_COMPLETA=1``): la completa,
+        ``verify_integrity()``. Mayores: ``PRAGMA quick_check(tabla)`` de cada
+        tabla salvo ``TABLAS_OMITIDAS_AL_ABRIR`` (estructura de la tabla y de
+        sus indices), sin leer los millones de entradas de ``file_entries``.
+        Una corrupcion en esas paginas la sigue detectando SQLite al leerlas
+        (``sqlite3.DatabaseError``) y ``verify_integrity()`` sigue disponible
+        para una comprobacion completa explicita.
+        """
+        try:
+            tamano = self.db_path.stat().st_size
+        except OSError as exc:
+            return {"quick_check": None, "integrity_check": None, "ok": False, "error": str(exc), "modo": "ligera"}
+        forzar = os.environ.get(self.ENV_VERIFICACION_COMPLETA, "").strip() == "1"
+        if forzar or tamano <= self.INTEGRIDAD_COMPLETA_MAX_BYTES:
+            resultado = self.verify_integrity()
+            resultado["modo"] = "completa"
+            return resultado
+        resultado: dict[str, object] = {
+            "quick_check": None,
+            "integrity_check": None,
+            "ok": False,
+            "error": None,
+            "modo": "ligera",
+            "tablas_comprobadas": [],
+            "tablas_omitidas": list(self.TABLAS_OMITIDAS_AL_ABRIR),
+        }
+        try:
+            conn = self.connect()
+            conn.execute("PRAGMA schema_version").fetchone()
+            tablas = [
+                str(fila[0])
+                for fila in conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"
+                ).fetchall()
+            ]
+            errores: list[str] = []
+            for tabla in tablas:
+                if tabla in self.TABLAS_OMITIDAS_AL_ABRIR:
+                    continue
+                nombre = tabla.replace('"', '""')
+                filas = conn.execute(f'PRAGMA quick_check("{nombre}")').fetchall()
+                textos = [str(f[0]) for f in filas]
+                resultado["tablas_comprobadas"].append(tabla)  # type: ignore[union-attr]
+                if textos != ["ok"]:
+                    errores.append("%s: %s" % (tabla, "; ".join(textos[:5])))
+            resultado["quick_check"] = "ok" if not errores else "; ".join(errores)
+            resultado["ok"] = not errores
+            if errores:
+                resultado["error"] = resultado["quick_check"]
+        except sqlite3.DatabaseError as exc:
+            resultado["error"] = str(exc)
+            resultado["ok"] = False
+        logger.info(
+            "Inventario de %.1f MB: verificacion de integridad ligera al abrir (%s; omitidas %s)",
+            tamano / (1024 * 1024), "ok" if resultado["ok"] else "fallo", list(self.TABLAS_OMITIDAS_AL_ABRIR),
+        )
+        return resultado
 
     def verify_integrity(self) -> dict:
         """Diagnostica la integridad de la base de datos actual sin repararla.
@@ -3439,8 +3517,10 @@ class SystemInventoryStorage:
         """Busca entradas de archivo por nombre normalizado (paginado)."""
         conn = self.connect()
         cur = conn.execute(
+            # `+absolute_path`: fuerza el indice de nombre en vez de recorrer
+            # toda la tabla por el indice de rutas para evitar ordenar.
             "SELECT * FROM file_entries WHERE machine_id = ? AND lower(name) = lower(?) "
-            "ORDER BY absolute_path LIMIT ? OFFSET ?",
+            "ORDER BY +absolute_path LIMIT ? OFFSET ?",
             (machine_id, name, limit, offset),
         )
         return [dict(r) for r in cur.fetchall()]
@@ -3599,33 +3679,55 @@ class SystemInventoryStorage:
         conn = self.connect()
 
         # Construir consulta dinamica con filtros proporcionados.
+        #
+        # Seleccion de indice: sin estadisticas (ANALYZE) el planificador de
+        # SQLite elige mal en una base de millones de entradas y recorre el
+        # indice de `absolute_path` (para evitar ordenar) o el de `excluded`,
+        # leyendo toda la tabla: una busqueda por nombre tardaba ~30 s en la
+        # base real. Cuando hay un filtro selectivo por nombre se fija el
+        # indice a usar anteponiendo `+` (que desactiva el uso de indice) a
+        # los demas terminos y al ORDER BY:
+        # - nombre exacto -> idx_file_entries_name (machine_id, lower(name));
+        # - subcadena de nombre con extension -> idx_file_entries_extension
+        #   (LIKE '%x%' no puede usar el indice de nombre).
+        # Sin filtro por nombre se mantiene el plan original: con LIMIT, el
+        # recorrido ordenado por `absolute_path` termina pronto.
+        filtro_nombre_exacto = name is not None
+        filtro_subcadena = bool(name_contains)
+        selectivo = filtro_nombre_exacto or filtro_subcadena
+        sin_indice = "+" if selectivo else ""
+
         where_clauses: list[str] = ["machine_id = ?"]
         params: list[object] = [machine_id]
 
-        if name is not None:
+        if filtro_nombre_exacto:
             where_clauses.append("lower(name) = lower(?)")
             params.append(name)
-        if name_contains:
+        if filtro_subcadena:
             escapado = (
                 str(name_contains).lower()
                 .replace("!", "!!").replace("%", "!%").replace("_", "!_")
             )
-            where_clauses.append("lower(name) LIKE ? ESCAPE '!'")
+            # Con nombre exacto o extension disponibles, la subcadena se
+            # evalua sobre las filas ya acotadas por ese indice.
+            prefijo_like = "+" if (filtro_nombre_exacto or extension is not None) else ""
+            where_clauses.append(prefijo_like + "lower(name) LIKE ? ESCAPE '!'")
             params.append("%" + escapado + "%")
         if ruta is not None:
-            where_clauses.append("absolute_path LIKE ?")
+            where_clauses.append(sin_indice + "absolute_path LIKE ?")
             params.append(ruta + "%")
         if extension is not None:
-            where_clauses.append("lower(extension) = lower(?)")
+            prefijo_ext = "+" if filtro_nombre_exacto else ""
+            where_clauses.append(prefijo_ext + "lower(extension) = lower(?)")
             params.append(extension)
         if tipo is not None:
-            where_clauses.append("entry_type = ?")
+            where_clauses.append(sin_indice + "entry_type = ?")
             params.append(tipo)
         if volume is not None:
-            where_clauses.append("volume = ?")
+            where_clauses.append(sin_indice + "volume = ?")
             params.append(volume)
         if disponible is not None:
-            where_clauses.append("excluded = ?")
+            where_clauses.append(sin_indice + "excluded = ?")
             params.append(0 if disponible else 1)
 
         where_sql = " AND ".join(where_clauses)
@@ -3641,7 +3743,7 @@ class SystemInventoryStorage:
         sql = f"""
             SELECT * FROM file_entries
             WHERE {where_sql}
-            ORDER BY {order_by}
+            ORDER BY {sin_indice}{order_by}
             LIMIT ? OFFSET ?
         """
         params.extend([limit, offset])
@@ -3712,23 +3814,25 @@ class SystemInventoryStorage:
         where_clauses: list[str] = ["machine_id = ?"]
         params: list[object] = [machine_id]
 
+        # Con nombre exacto se fuerza su indice (ver `search`).
+        sin_indice = "+" if name is not None else ""
         if name is not None:
             where_clauses.append("lower(name) = lower(?)")
             params.append(name)
         if ruta is not None:
-            where_clauses.append("absolute_path LIKE ?")
+            where_clauses.append(sin_indice + "absolute_path LIKE ?")
             params.append(ruta + "%")
         if extension is not None:
-            where_clauses.append("lower(extension) = lower(?)")
+            where_clauses.append(sin_indice + "lower(extension) = lower(?)")
             params.append(extension)
         if tipo is not None:
-            where_clauses.append("entry_type = ?")
+            where_clauses.append(sin_indice + "entry_type = ?")
             params.append(tipo)
         if volume is not None:
-            where_clauses.append("volume = ?")
+            where_clauses.append(sin_indice + "volume = ?")
             params.append(volume)
         if disponible is not None:
-            where_clauses.append("excluded = ?")
+            where_clauses.append(sin_indice + "excluded = ?")
             params.append(0 if disponible else 1)
 
         where_sql = " AND ".join(where_clauses)

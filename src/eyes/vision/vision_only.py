@@ -12,7 +12,7 @@ import json
 import time
 from enum import Enum
 
-from typing import List, Dict, Any
+from typing import Any, Dict, List, Optional
 
 import ollama
 from pydantic import BaseModel, Field
@@ -94,7 +94,14 @@ class Vision:
         ]
         return nodes
 
-    def analyze_image(self, image_path: str, prompt: str) -> str:
+    def analyze_image(
+        self,
+        image_path: str,
+        prompt: str,
+        num_predict: int = 4096,
+        num_ctx: int = 8192,
+        timeout: Optional[float] = None,
+    ) -> str:
         """
         Analiza una imagen usando el modelo de vision.
         
@@ -106,28 +113,73 @@ class Vision:
             Respuesta del modelo como string
         """
         
+        # num_predict: el calibrador pide una lista de elementos con varios
+        # campos (~50 tokens cada uno); con 500 tokens la respuesta se cortaba
+        # tras unos 10 elementos y el JSON quedaba incompleto. num_ctx debe
+        # caber la imagen (~1 token por 32x32 px en Qwen3-VL), el prompt y la
+        # salida.
+        # timeout: presupuesto total de la llamada. Sin el, un Ollama colgado
+        # no vuelve nunca. Con el, la respuesta se lee en streaming y, si se
+        # agota, se corta la conexion (Ollama deja de generar) y se devuelve
+        # lo recibido: el llamador recupera los elementos completos. Asi, sin
+        # GPU (pocos tokens/s), se obtiene parte de la lista en vez de nada.
         try:
-            response = ollama.chat(
-                model=self.model,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": prompt,
-                        "images": [image_path],
-                    }
-                ],
-                stream=False,
-                think=False,
-                format="json",
-                options={
-                    "temperature": 0.1,
-                    "num_ctx": 8192,
-                    "num_predict": 500,
-                },
-                keep_alive="5m",
-            )
-
-            result = response["message"]["content"]
+            mensajes = [
+                {
+                    "role": "user",
+                    "content": prompt,
+                    "images": [image_path],
+                }
+            ]
+            opciones = {
+                "temperature": 0.1,
+                "num_ctx": int(num_ctx),
+                "num_predict": int(num_predict),
+            }
+            if timeout:
+                limite = time.monotonic() + float(timeout)
+                cliente = ollama.Client(timeout=float(timeout))
+                partes: List[str] = []
+                cortada = False
+                flujo = cliente.chat(
+                    model=self.model,
+                    messages=mensajes,
+                    stream=True,
+                    think=False,
+                    format="json",
+                    options=opciones,
+                    keep_alive="5m",
+                )
+                try:
+                    for trozo in flujo:
+                        contenido = (trozo.get("message") or {}).get("content") if hasattr(trozo, "get") else None
+                        if contenido is None:
+                            contenido = getattr(getattr(trozo, "message", None), "content", "") or ""
+                        partes.append(str(contenido))
+                        if time.monotonic() >= limite:
+                            cortada = True
+                            break
+                finally:
+                    cerrar = getattr(flujo, "close", None)
+                    if callable(cerrar):
+                        cerrar()
+                result = "".join(partes)
+                if cortada:
+                    logger.warning(
+                        "[VISION] Tiempo agotado (%.0f s): se usa la respuesta parcial (%d caracteres)",
+                        float(timeout), len(result),
+                    )
+            else:
+                response = ollama.chat(
+                    model=self.model,
+                    messages=mensajes,
+                    stream=False,
+                    think=False,
+                    format="json",
+                    options=opciones,
+                    keep_alive="5m",
+                )
+                result = response["message"]["content"]
 
             if not isinstance(result, str):
                 result = str(result)

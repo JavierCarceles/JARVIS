@@ -39,6 +39,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Union
 
 from src.core.log import get_logger
+from src.hands.apps.aplicaciones_integradas_windows import VariantesBusqueda, variantes_para
 from src.hands.apps.application_launch_classifier import (
     CONFIANZA_ALTA,
     CONFIANZA_BAJA,
@@ -402,11 +403,13 @@ class CandidatoConCatalogo:
 
 _TIPO_EVIDENCIA_PAQUETE = "paquete"
 _TIPO_EVIDENCIA_FABRICANTE_PRODUCTO = "fabricante_producto"
+_TIPO_EVIDENCIA_FABRICANTE_EJECUTABLE = "fabricante_ejecutable"
 _TIPO_EVIDENCIA_NOMBRE_COMERCIAL = "nombre_comercial"
 _TIPO_EVIDENCIA_INSUFICIENTE = "insuficiente"
 
 _PREFIJO_ENTIDAD_PAQUETE = "paquete"
 _PREFIJO_ENTIDAD_FABRICANTE_PRODUCTO = "fabprod"
+_PREFIJO_ENTIDAD_FABRICANTE_EJECUTABLE = "fabexe"
 _PREFIJO_ENTIDAD_NOMBRE = "nombre"
 _PREFIJO_ENTIDAD_CANDIDATO = "candidato"
 
@@ -504,6 +507,21 @@ def _extraer_evidencia_identidad(candidato: DiscoveredCandidate) -> dict:
         if isinstance(item, str) and item.startswith("paquete_id:"):
             evidencia["paquete_id"] = item[len("paquete_id:"):].strip()
             break
+    # AUMID de Get-StartApps ("Familia!App"): no depende del idioma ni de la ruta.
+    app_id = str(getattr(candidato, "app_id", None) or "").strip()
+    if "paquete_id" not in evidencia and "!" in app_id:
+        evidencia["paquete_id"] = app_id
+
+    # Nombre del fichero ejecutable: distingue aplicaciones del mismo
+    # fabricante y producto (todos los .exe de Windows comparten el producto
+    # "Microsoft Windows Operating System"; Word y Excel, "Microsoft Office") y,
+    # a diferencia del producto, no esta traducido.
+    if ruta:
+        import ntpath
+
+        fichero = ntpath.basename(ruta.replace("/", "\\")).strip().casefold()
+        if fichero.endswith(".exe"):
+            evidencia["ejecutable"] = fichero
 
     evidencia["fuentes"] = list(
         dict.fromkeys([str(candidato.fuente or "")] + list(candidato.fuentes_consultadas or []))
@@ -517,10 +535,12 @@ def calcular_identidad_estable(candidato: DiscoveredCandidate) -> IdentidadGloba
 
     Precedencia de evidencia estable:
       1. paquete_id / AUMID (maxima estabilidad, independiente de la ruta);
-      2. fabricante + producto (estable, independiente de la ruta de instalacion);
-      3. nombre comercial normalizado (evidencia mas debil: no fusiona entidades
+      2. fabricante + nombre del ejecutable (independiente de la ruta y del
+         idioma del sistema);
+      3. fabricante + producto, solo si no hay ejecutable;
+      4. nombre comercial normalizado (evidencia mas debil: no fusiona entidades
          por nombre solo; se mantienen separadas con alternativas);
-      4. insuficiente: sin evidencia estable, el candidato se conserva separado.
+      5. insuficiente: sin evidencia estable, el candidato se conserva separado.
 
     Nunca se usa la ruta absoluta como base de la identidad global.
     """
@@ -544,9 +564,29 @@ def calcular_identidad_estable(candidato: DiscoveredCandidate) -> IdentidadGloba
             alternativas=[],
         )
 
-    # 2. Fabricante + producto: estable e independiente de la ruta de instalacion.
+    # 2. Fabricante + ejecutable: estable, independiente de la ruta de
+    #    instalacion y del idioma del sistema. El producto no sirve como
+    #    identidad: lo comparten aplicaciones distintas y en los programas de
+    #    Windows esta traducido ("Sistema operativo Microsoft Windows").
     fabricante = str(evidencia.get("fabricante", "")).strip()
     producto = str(evidencia.get("producto", "")).strip()
+    ejecutable = str(evidencia.get("ejecutable", "")).strip()
+    if fabricante and ejecutable:
+        return IdentidadGlobalEstable(
+            entity_id=(
+                f"{_PREFIJO_ENTIDAD_FABRICANTE_EJECUTABLE}:"
+                f"{_normalizar_texto_identidad(fabricante)}:"
+                f"{ejecutable}"
+            ),
+            nombre_canonico=nombre_canonico or nombre_normalizado,
+            tipo_evidencia=_TIPO_EVIDENCIA_FABRICANTE_EJECUTABLE,
+            evidencia_base=evidencia,
+            confianza=confianza,
+            fusionar_por_nombre_desaconsejado=False,
+            alternativas=[],
+        )
+
+    # 3. Fabricante + producto (sin ejecutable conocido).
     if fabricante and producto:
         return IdentidadGlobalEstable(
             entity_id=(
@@ -562,7 +602,7 @@ def calcular_identidad_estable(candidato: DiscoveredCandidate) -> IdentidadGloba
             alternativas=[],
         )
 
-    # 3. Nombre comercial normalizado: evidencia mas debil, no fusiona por nombre solo.
+    # 4. Nombre comercial normalizado: evidencia mas debil, no fusiona por nombre solo.
     if nombre_canonico:
         return IdentidadGlobalEstable(
             entity_id=f"{_PREFIJO_ENTIDAD_NOMBRE}:{nombre_canonico}",
@@ -574,7 +614,7 @@ def calcular_identidad_estable(candidato: DiscoveredCandidate) -> IdentidadGloba
             alternativas=[candidato.to_dict()],
         )
 
-    # 4. Evidencia insuficiente: se conserva el candidato separado con alternativas.
+    # 5. Evidencia insuficiente: se conserva el candidato separado con alternativas.
     clave_sufijo = candidato.candidate_id or nombre_normalizado or "desconocido"
     return IdentidadGlobalEstable(
         entity_id=f"{_PREFIJO_ENTIDAD_CANDIDATO}:{clave_sufijo}",
@@ -1025,16 +1065,27 @@ class ApplicationDiscovery:
         # ------------------------------------------------------------------
         # Paso 2: fuentes nativas instaladas (FUENTES_PRIMARIAS).
         # ------------------------------------------------------------------
-        primarios = self._fuentes_primarias(limite_por_fuente, nombre_filtro=nombre_lower)
+        variantes = variantes_para(nombre)
+        primarios = self._fuentes_primarias(
+            limite_por_fuente, nombre_filtro=nombre_lower, variantes=variantes
+        )
         for fuente in FUENTES_PRIMARIAS:
             if any(str(p.get("source", "")).casefold() == fuente for p in primarios):
                 fuentes_consultadas.append(fuente)
 
-        coincidencias = [
-            p
-            for p in primarios
-            if nombre_lower in str(p.get("name", "")).casefold()
-        ]
+        def _coincide_busqueda(p: dict[str, Any]) -> bool:
+            nombre_p = str(p.get("name", ""))
+            if nombre_lower in nombre_p.casefold():
+                return True
+            if variantes is None:
+                return False
+            return (
+                variantes.coincide_nombre(nombre_p)
+                or variantes.coincide_app_id(p.get("app_id"))
+                or variantes.coincide_ejecutable(nombre_p)
+            )
+
+        coincidencias = [p for p in primarios if _coincide_busqueda(p)]
         for c in coincidencias:
             crudos.append(
                 {
@@ -1071,7 +1122,10 @@ class ApplicationDiscovery:
                 for directory in [d for d in raw_path.split(os.pathsep) if d]:
                     if not os.path.isdir(directory):
                         continue
-                    for candidato_nombre in (nombre + ".exe", nombre):
+                    nombres_exe = [nombre + ".exe", nombre] + sorted(
+                        variantes.ejecutables if variantes is not None else []
+                    )
+                    for candidato_nombre in nombres_exe:
                         ruta = os.path.join(directory, candidato_nombre)
                         if os.path.isfile(ruta):
                             ruta_norm = os.path.normcase(os.path.abspath(ruta))
@@ -2804,7 +2858,10 @@ class ApplicationDiscovery:
     # ------------------------------------------------------------------ #
 
     def _fuentes_primarias(
-        self, limite_por_fuente: int, nombre_filtro: Optional[str] = None
+        self,
+        limite_por_fuente: int,
+        nombre_filtro: Optional[str] = None,
+        variantes: Optional[VariantesBusqueda] = None,
     ) -> list[dict[str, Any]]:
         """
         Recolecta candidatos de las fuentes de descubrimiento existentes del SO,
@@ -2823,14 +2880,25 @@ class ApplicationDiscovery:
         recolectados: list[dict[str, Any]] = []
         filtro = (nombre_filtro or "").strip().casefold() or None
 
-        def _coincide(nombre_entrada: Any) -> bool:
-            return filtro is None or filtro in str(nombre_entrada or "").casefold()
+        # `variantes` (aplicaciones integradas de Windows) amplia el filtro sin
+        # depender del idioma del sistema: el nombre en el otro idioma (igual
+        # exacto), la familia de paquete del AUMID y el nombre del .exe.
+        def _coincide(nombre_entrada: Any, app_id: Any = None) -> bool:
+            if filtro is None or filtro in str(nombre_entrada or "").casefold():
+                return True
+            if variantes is None:
+                return False
+            return (
+                variantes.coincide_nombre(str(nombre_entrada or ""))
+                or variantes.coincide_app_id(app_id)
+                or variantes.coincide_ejecutable(str(nombre_entrada or ""))
+            )
 
         # 1) CalibrationManager: menu de aplicaciones, .lnk menu Inicio,
         #    paquetes AppX y registro de desinstaladores (fuente existente).
         try:
             apps = self.calibration.discover_applications() or []
-            apps = [a for a in apps if _coincide(a.get("name", ""))]
+            apps = [a for a in apps if _coincide(a.get("name", ""), a.get("app_id"))]
             for app in apps[:limite_por_fuente]:
                 nombre = str(app.get("name", "")).strip()
                 path = str(app.get("path", "")).strip()

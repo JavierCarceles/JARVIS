@@ -3140,17 +3140,59 @@ class TestIdentidadGlobalEstable:
         assert id1.nombre_canonico == "miapp"
 
     def test_3_8_5_1_4_11_2_identidad_desde_fabricante_producto_independiente_de_ruta(self):
-        """Fabricante + producto dan entidad estable aunque la ruta cambie."""
+        """Fabricante + ejecutable dan entidad estable aunque la ruta cambie."""
         c1 = self._candidato("f1", "Notepad", ruta=r"C:\Windows\System32\notepad.exe",
                              nombre_comercial="Notepad", producto="Microsoft Corporation", version="10.0")
         c2 = self._candidato("f2", "Notepad", ruta=r"D:\Copia\notepad.exe",
                              nombre_comercial="Notepad", producto="Microsoft Corporation", version="10.0")
         id1 = calcular_identidad_estable(c1)
         id2 = calcular_identidad_estable(c2)
-        assert id1.entity_id == id2.entity_id == "fabprod:microsoft corporation:microsoft corporation"
-        assert id1.tipo_evidencia == "fabricante_producto"
+        assert id1.entity_id == id2.entity_id == "fabexe:microsoft corporation:notepad.exe"
+        assert id1.tipo_evidencia == "fabricante_ejecutable"
         assert id1.fusionar_por_nombre_desaconsejado is False
         assert id1.alternativas == []
+
+    def test_identidad_distingue_ejecutables_del_mismo_producto(self):
+        """Todos los .exe de Windows comparten fabricante y producto (y Word y
+        Excel comparten "Microsoft Office"): no pueden ser la misma entidad."""
+        producto = "Sistema operativo Microsoft Windows"
+        bloc = self._candidato("b", "Bloc de notas", ruta=r"C:\Windows\System32\notepad.exe",
+                               nombre_comercial="Bloc de notas", producto=producto)
+        calc = self._candidato("c", "Calculadora", ruta=r"C:\Windows\System32\calc.exe",
+                               nombre_comercial="Calculadora", producto=producto)
+        assert calcular_identidad_estable(bloc).entity_id != calcular_identidad_estable(calc).entity_id
+
+    def test_identidad_no_depende_del_idioma_del_producto(self):
+        """El mismo notepad.exe en un Windows en espanol y en ingles."""
+        es = self._candidato("es", "Bloc de notas", ruta=r"C:\Windows\System32\notepad.exe",
+                             nombre_comercial="Bloc de notas",
+                             producto="Sistema operativo Microsoft Windows")
+        en = self._candidato("en", "Notepad", ruta=r"C:\Windows\System32\notepad.exe",
+                             nombre_comercial="Notepad",
+                             producto="Microsoft Windows Operating System")
+        es.evidencia.append("ignorado")
+        id_es = calcular_identidad_estable(es)
+        id_en = calcular_identidad_estable(en)
+        # El fabricante sale del producto observado cuando no hay recursos de
+        # version leidos (Mac/tests): se fija para comparar solo el ejecutable.
+        assert id_es.entity_id.rsplit(":", 1)[-1] == id_en.entity_id.rsplit(":", 1)[-1] == "notepad.exe"
+
+    def test_identidad_paquete_desde_app_id_del_menu_inicio(self):
+        """El AUMID de Get-StartApps identifica la app sin depender del idioma."""
+        es = self._candidato("es", "Calculadora", ruta="")
+        en = self._candidato("en", "Calculator", ruta="")
+        es.app_id = en.app_id = "Microsoft.WindowsCalculator_8wekyb3d8bbwe!App"
+        id_es = calcular_identidad_estable(es)
+        id_en = calcular_identidad_estable(en)
+        assert id_es.entity_id == id_en.entity_id == "paquete:Microsoft.WindowsCalculator_8wekyb3d8bbwe!App"
+
+    def test_identidad_fabricante_producto_sin_ejecutable(self):
+        """Sin ruta a un .exe se mantiene fabricante + producto."""
+        c = self._candidato("l", "App", ruta=r"C:\Menu\App.lnk", nombre_comercial="App",
+                            producto="Fabricante SA")
+        identidad = calcular_identidad_estable(c)
+        assert identidad.entity_id == "fabprod:fabricante sa:fabricante sa"
+        assert identidad.tipo_evidencia == "fabricante_producto"
 
     def test_3_8_5_1_4_11_2_nombre_comercial_solo_no_fusiona_por_nombre(self):
         """Solo nombre comercial: entidad estable pero no se fusiona por nombre;
@@ -3532,14 +3574,17 @@ class TestRegistroMinimoAplicacion:
         registro = construir_registro_minimo_aplicacion(
             candidato, identidad, ahora_iso=self.AHORA
         )
-        assert identidad.entity_id == "nombre:notepad"
-        assert identidad.tipo_evidencia == "nombre_comercial"
-        assert identidad.fusionar_por_nombre_desaconsejado is True
+        # Fabricante del recurso de version + nombre del ejecutable: no
+        # depende del idioma del sistema ni se confunde con otros .exe de
+        # Windows (que comparten producto).
+        assert identidad.entity_id == "fabexe:microsoft corporation:notepad.exe"
+        assert identidad.tipo_evidencia == "fabricante_ejecutable"
+        assert identidad.fusionar_por_nombre_desaconsejado is False
         assert "C:" not in identidad.entity_id
         assert "System32" not in identidad.entity_id
         assert "Windows" not in identidad.entity_id
         assert registro.entity_id == identidad.entity_id
-        assert registro.metadata["tipo_evidencia_identidad"] == "nombre_comercial"
+        assert registro.metadata["tipo_evidencia_identidad"] == "fabricante_ejecutable"
         assert identidad.evidencia_base["fabricante"] == "Microsoft Corporation"
         assert validar_registro_minimo_aplicacion(registro) == []
 

@@ -40,6 +40,11 @@ from src.hands.apps.application_preflight import get_application_preflight
 
 logger = get_logger(__name__)
 
+# Procesos auxiliares (powershell, tasklist...) sin consola visible: una
+# consola nueva puede quitar el primer plano a la ventana de la aplicacion.
+_SIN_VENTANA = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+
 
 # ============================================================================
 # WIN32
@@ -243,6 +248,16 @@ class CalibrationManager:
         "seguridad_de_windows", "asistencia_rapida", "acceso_por_voz", "narrador", "lupa",
         "subtitulos_en_directo", "teclado_en_pantalla", "grabacion_de_acciones_de_usuario",
         "conexion_a_escritorio_remoto", "informacion_del_sistema", "configuracion_del_sistema",
+        # Los mismos en un Windows en ingles (el menu Inicio esta traducido).
+        "computer_management", "print_management", "hyper_v_manager", "task_manager",
+        "local_security_policy", "registry_editor", "iscsi_initiator", "resource_monitor",
+        "performance_monitor", "task_scheduler", "services", "component_services", "event_viewer",
+        "windows_defender_firewall_with_advanced_security", "windows_memory_diagnostic",
+        "defragment_and_optimize_drives", "disk_cleanup", "recovery_drive", "windows_security",
+        "quick_assist", "voice_access", "narrator", "magnifier", "live_captions",
+        "on_screen_keyboard", "steps_recorder", "remote_desktop_connection",
+        "system_information", "system_configuration", "odbc_data_sources_32_bit",
+        "odbc_data_sources_64_bit",
     }
 
     ELEVATION_RISK_NAME_PARTS = (
@@ -253,6 +268,8 @@ class CalibrationManager:
         "visor de eventos", "windows defender firewall", "diagnostico de memoria", "unidad de recuperacion",
         "security center", "security policy", "event viewer", "task scheduler", "computer management",
         "disk management", "device manager", "registry editor", "hyper v",
+        "resource monitor", "performance monitor", "component services", "print management",
+        "memory diagnostic", "recovery drive",
     )
 
     GAME_LAUNCHER_EXACT_NAMES = {
@@ -555,7 +572,7 @@ $result | ConvertTo-Json -Compress -Depth 4
 """
         try:
             process = subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", powershell_script],
-                                     capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60)
+                                     capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60, creationflags=_SIN_VENTANA)
             if process.returncode != 0 or not process.stdout.strip():
                 self._application_metadata_loaded = True
                 return
@@ -640,6 +657,7 @@ $result | ConvertTo-Json -Compress -Depth 4
                 encoding="utf-8",
                 errors="replace",
                 timeout=30,
+                creationflags=_SIN_VENTANA,
             )
             if process.returncode == 0 and process.stdout.strip():
                 data = json.loads(process.stdout.strip())
@@ -856,6 +874,7 @@ $result | ConvertTo-Json -Compress -Depth 4
                 result = subprocess.run(
                     ["tasklist", "/FO", "CSV", "/NH"],
                     capture_output=True, text=True, check=False, timeout=15,
+                    creationflags=_SIN_VENTANA,
                 )
                 if result.returncode == 0 and result.stdout.strip():
                     for line in result.stdout.strip().splitlines():

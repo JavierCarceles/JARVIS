@@ -30,10 +30,16 @@ from pathlib import Path
 from typing import Any, Iterable, Optional
 
 from src.core.log import get_logger
+from src.hands.apps.aplicaciones_integradas_windows import es_ruta_del_sistema_windows
 from src.hands.apps.application_preflight import ApplicationPreflight
 from src.hands.inventory.system_inventory import EntryType, InventoryEntry
 
 logger = get_logger(__name__)
+
+# Procesos auxiliares (powershell, tasklist...) sin consola visible: una
+# consola nueva puede quitar el primer plano a la ventana de la aplicacion.
+_SIN_VENTANA = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
 
 
 # ---------------------------------------------------------------------------
@@ -239,7 +245,7 @@ def _leer_subsistema_pe(ruta: str) -> Optional[int]:
 def leer_version_archivo_windows(ruta: str) -> Optional[dict[str, str]]:
     """
     Lee metadatos de version de un archivo PE de Windows (ProductName,
-    ProductVersion, FileVersion, CompanyName) mediante la API del SO
+    ProductVersion, FileVersion, CompanyName, FileDescription) mediante la API del SO
     (version.dll a traves de ctypes, sin dependencias externas).
 
     Retorna None en SO no Windows, archivo inexistente, sin recursos de
@@ -280,7 +286,7 @@ def leer_version_archivo_windows(ruta: str) -> Optional[dict[str, str]]:
             return None
         block = f"\\StringFileInfo\\{lang_id:04X}{charset_id:04X}\\"
         resultado: dict[str, str] = {}
-        for clave in ("ProductName", "ProductVersion", "FileVersion", "CompanyName"):
+        for clave in ("ProductName", "ProductVersion", "FileVersion", "CompanyName", "FileDescription"):
             valor_ptr = ctypes.c_void_p()
             largo_val = ctypes.c_uint(0)
             if ctypes.windll.version.VerQueryValueW(
@@ -330,6 +336,7 @@ def resolver_target_acceso_directo(ruta_lnk: str) -> Optional[str]:
              "-Command", script],
             capture_output=True, text=True, encoding="utf-8", errors="replace",
             timeout=10, env=env,
+            creationflags=_SIN_VENTANA,
         )
         if proc.returncode != 0:
             return None
@@ -650,6 +657,12 @@ class LaunchClassifier:
         version: Optional[str] = None
         if version_info:
             nombre_comercial = version_info.get("ProductName")
+            # Los .exe de Windows (%SystemRoot%) comparten el producto
+            # "Microsoft Windows Operating System", traducido segun el idioma
+            # ("Sistema operativo Microsoft Windows"): no nombra la aplicacion.
+            # Su descripcion de fichero si ("Bloc de notas" / "Notepad").
+            if version_info.get("FileDescription") and es_ruta_del_sistema_windows(destino):
+                nombre_comercial = version_info.get("FileDescription")
             producto = version_info.get("ProductName") or version_info.get("CompanyName")
             version = version_info.get("ProductVersion") or version_info.get("FileVersion")
             clasificacion.evidencia.append("version_recurso_leida")

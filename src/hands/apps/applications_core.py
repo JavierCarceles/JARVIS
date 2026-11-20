@@ -38,6 +38,11 @@ from src.desktop.screen_manager import get_screen_manager
 
 logger = get_logger(__name__)
 
+# Procesos auxiliares (powershell, tasklist...) sin consola visible: una
+# consola nueva puede quitar el primer plano a la ventana de la aplicacion.
+_SIN_VENTANA = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+
 RESOLUTION_FUZZY_THRESHOLD = 0.7
 _MAX_RESOLUTION_ALTERNATIVES = 3
 RESOLUTION_AMBIGUITY_GAP = 0.05
@@ -1519,6 +1524,7 @@ def _is_process_running(process_name: str) -> bool:
                 capture_output=True,
                 text=True,
                 check=False,
+                creationflags=_SIN_VENTANA,
             )
             output = result.stdout or ""
             return name.lower() in output.lower()
@@ -1583,6 +1589,7 @@ def close_application(app_name: str) -> str:
                 check=False,
                 capture_output=True,
                 text=True,
+                creationflags=_SIN_VENTANA,
             )
         elif platform.system() == "Darwin":
             unix_process_name = process_name

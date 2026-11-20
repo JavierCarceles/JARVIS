@@ -39,6 +39,11 @@ from src.core.log import get_logger
 
 logger = get_logger(__name__)
 
+# Procesos auxiliares (powershell, tasklist...) sin consola visible: una
+# consola nueva puede quitar el primer plano a la ventana de la aplicacion.
+_SIN_VENTANA = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+
 
 @dataclass(frozen=True)
 class PreflightResult:
@@ -133,7 +138,10 @@ class ApplicationPreflight:
         "resources",
     )
 
-    POWERSHELL_TIMEOUT = 10
+    # Enumerar shell:AppsFolder con ExtendedProperty recorre todas las apps del
+    # menu Inicio; en un equipo cargado puede pasar de 10 s y entonces una app
+    # instalada (Calculadora por AUMID) se rechazaba como no verificable.
+    POWERSHELL_TIMEOUT = 30
 
     def __init__(self) -> None:
         self._executable_cache: Dict[str, Optional[str]] = {}
@@ -1166,6 +1174,7 @@ foreach ($item in $items) {
                 errors="replace",
                 timeout=self.POWERSHELL_TIMEOUT,
                 env=env,
+                creationflags=_SIN_VENTANA,
             )
 
             if process.returncode != 0:
@@ -1258,6 +1267,7 @@ if ($found) { exit 0 } else { exit 1 }
                 errors="replace",
                 timeout=self.POWERSHELL_TIMEOUT,
                 env=env,
+                creationflags=_SIN_VENTANA,
             )
             return process.returncode == 0
         except (subprocess.TimeoutExpired, OSError):

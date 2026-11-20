@@ -768,9 +768,14 @@ REGLAS:
         image_path: str,
         prompt: str,
         calibration_target: Optional[str] = None,
+        timeout: Optional[float] = None,
+        num_predict: int = 4096,
     ) -> str:
         """
         Analiza una captura para calibracion universal.
+
+        ``timeout``: presupuesto total de la llamada a Ollama (ver
+        ``_chat_json``); ``num_predict``: tokens maximos de la respuesta.
 
         IMPORTANTE: este metodo devuelve el JSON del modelo como string porque
         UniversalVisualCalibrator y los calibradores legacy ya utilizan ese
@@ -807,8 +812,9 @@ REGLAS:
                 prompt=prompt,
                 response_format=schema,
                 num_ctx=8192,
-                num_predict=4096,
+                num_predict=int(num_predict),
                 temperature=0.0,
+                timeout=timeout,
             )
             if not result:
                 logger.warning(r"[VISION] Qwen devolvio una respuesta vacia")
@@ -1076,8 +1082,17 @@ Responde \u00daNICAMENTE JSON:
         num_ctx: int = 8192,
         num_predict: int = 4096,
         temperature: float = 0.0,
+        timeout: Optional[float] = None,
     ) -> str:
         """Envia la imagen y el prompt a Ollama y devuelve ``message.content``.
+
+        ``timeout`` (segundos) es el presupuesto total de la llamada. Sin el,
+        la llamada espera a que Ollama termine (comportamiento anterior). Con
+        el, la respuesta se lee en streaming y, si se agota, se corta la
+        conexion (Ollama deja de generar) y se devuelve lo recibido con
+        ``done_reason="timeout"``: el llamador recupera los elementos
+        completos. Sin GPU (pocos tokens por segundo) se obtiene parte de la
+        lista en vez de bloquear la calibracion.
 
         Si la imagen supera ``max_image_pixels`` se envia una copia reducida
         (ver ``_prepare_model_image``) y ``num_ctx`` se amplia cuando los
@@ -1099,26 +1114,34 @@ Responde \u00daNICAMENTE JSON:
             "thinking_chars": 0,
         }
         self.last_chat_info = info
-        response = ollama.chat(
-            model=self.model,
-            messages=[
-                {
-                    "role": "user",
-                    "content": prompt,
-                    "images": [payload],
-                }
-            ],
-            stream=False,
-            think=False,
-            format=response_format,
-            options={
-                "temperature": temperature,
-                "num_ctx": effective_ctx,
-                "num_predict": num_predict,
-            },
-            keep_alive="5m",
-        )
-        content, thinking, done_reason = self._read_chat_response(response)
+        messages = [
+            {
+                "role": "user",
+                "content": prompt,
+                "images": [payload],
+            }
+        ]
+        options = {
+            "temperature": temperature,
+            "num_ctx": effective_ctx,
+            "num_predict": num_predict,
+        }
+        if timeout:
+            content, thinking, done_reason = self._chat_stream_with_deadline(
+                messages, response_format, options, float(timeout)
+            )
+            info["timeout_s"] = float(timeout)
+        else:
+            response = ollama.chat(
+                model=self.model,
+                messages=messages,
+                stream=False,
+                think=False,
+                format=response_format,
+                options=options,
+                keep_alive="5m",
+            )
+            content, thinking, done_reason = self._read_chat_response(response)
         info["done_reason"] = done_reason
         info["content_chars"] = len(content)
         info["thinking_chars"] = len(thinking)
@@ -1139,6 +1162,53 @@ Responde \u00daNICAMENTE JSON:
                 self._thinking_hint(),
             )
         return content
+
+    def _chat_stream_with_deadline(
+        self, messages: List[Dict[str, Any]], response_format: Any, options: Dict[str, Any], timeout: float
+    ) -> Tuple[str, str, Optional[str]]:
+        """Chat en streaming con presupuesto total; corta la conexion al agotarlo."""
+        deadline = time.monotonic() + float(timeout)
+        client = ollama.Client(timeout=float(timeout))
+        stream = client.chat(
+            model=self.model,
+            messages=messages,
+            stream=True,
+            think=False,
+            format=response_format,
+            options=options,
+            keep_alive="5m",
+        )
+        content_parts: List[str] = []
+        thinking_parts: List[str] = []
+        done_reason: Optional[str] = None
+        try:
+            for chunk in stream:
+                content, thinking, reason = self._read_chat_response(chunk)
+                # _read_chat_response recorta espacios: se conserva el texto
+                # tal cual llega para no unir mal los trozos del JSON.
+                raw_message = chunk.get("message", {}) if isinstance(chunk, dict) else getattr(chunk, "message", None)
+                raw_content = (
+                    raw_message.get("content", "") if isinstance(raw_message, dict)
+                    else getattr(raw_message, "content", "")
+                ) or ""
+                content_parts.append(str(raw_content))
+                if thinking:
+                    thinking_parts.append(thinking)
+                if reason:
+                    done_reason = reason
+                if time.monotonic() >= deadline:
+                    done_reason = "timeout"
+                    break
+        finally:
+            close = getattr(stream, "close", None)
+            if callable(close):
+                close()
+        if done_reason == "timeout":
+            logger.warning(
+                "[VISION] %s: tiempo agotado (%.0f s); se usa la respuesta parcial (%s caracteres)",
+                self.model, float(timeout), len("".join(content_parts)),
+            )
+        return "".join(content_parts).strip(), "".join(thinking_parts).strip(), done_reason
 
     def _thinking_hint(self) -> str:
         """Sugerencia de modelo cuando el actual responde solo con razonamiento."""
