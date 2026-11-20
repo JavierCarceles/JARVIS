@@ -31,11 +31,10 @@ Que hace `subir`:
 Que hace `descargar`:
   1. Descarga el manifiesto y las partes, comprueba su SHA-256.
   2. Descomprime, comprueba la base con `PRAGMA quick_check` y el tamano.
-  3. Si la tabla `machines` de la copia incluye ESTE equipo, la deja en `data/system_inventory.sqlite3`
-     (si ya habia una, la renombra a `.antes_descarga` tras confirmarlo).
-     Si es de otro equipo, la deja en `data/system_inventory_descargada.sqlite3`:
-     JARVIS rechaza bases de otro `machine_id`, asi que solo sirve para
-     consultarla.
+  3. La deja en `data/system_inventory.sqlite3`, igual que en el equipo de
+     origen (si ya habia una, la renombra a `.antes_descarga` tras
+     confirmarlo). Si la copia es de otro equipo, JARVIS en este equipo no la
+     usa (rechaza bases de otro `machine_id`), pero sirve para consultarla.
 
 Solo usa la biblioteca estandar de Python.
 """
@@ -60,7 +59,6 @@ from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
 BASE_POR_DEFECTO = RAIZ / "data" / "system_inventory.sqlite3"
-BASE_OTRO_EQUIPO = RAIZ / "data" / "system_inventory_descargada.sqlite3"
 DIR_TEMPORAL = RAIZ / "data" / "_bbdd_tmp"
 
 REPO = "JavierCarceles/JARVIS-datos"
@@ -397,15 +395,11 @@ def descargar(destino_forzado: Path | None, auto_si: bool) -> None:
         partes.append(ruta)
     print(f"  {len(partes)} parte(s) correctas. Copia creada el {manifiesto['creado']}.")
 
-    if destino_forzado:
-        destino = destino_forzado
-    elif machine_id_local() in (manifiesto.get("machine_ids") or []):
-        # La base contiene datos de este equipo (tabla machines).
-        destino = BASE_POR_DEFECTO
-    else:
-        destino = BASE_OTRO_EQUIPO
-        print("\n  Esta copia es de OTRO equipo. JARVIS en este equipo no la usara (rechaza")
-        print(f"  bases de otro machine_id); se guarda aparte para consultarla: {destino.name}")
+    destino = destino_forzado or BASE_POR_DEFECTO
+    if machine_id_local() not in (manifiesto.get("machine_ids") or []):
+        print(f"\n  Esta copia es de OTRO equipo ({manifiesto.get('equipo_origen', '?')}). Se guarda igual que")
+        print("  en el original para consultarla; JARVIS en este equipo no la usara (rechaza")
+        print("  bases de otro machine_id con InventoryIncompatibleMachineError, sin borrarla).")
 
     temporal = DIR_TEMPORAL / "descomprimida.sqlite3"
     total = manifiesto["tamano_original"]
