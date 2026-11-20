@@ -2138,54 +2138,6 @@ $result | ConvertTo-Json -Compress -Depth 4
             self._temporary_browser_tab_open = False
             self._temporary_browser_hwnd = None
 
-    def _prepare_window_for_calibration(self, window: Any, application_name: str = "") -> Optional[Any]:
-        """Restaura/maximiza una ventana y devuelve su monitor real.
-
-        Es completamente independiente de la aplicacion: sirve para
-        navegadores, aplicaciones Win32, UWP/StartApps y herramientas GUI.
-        No desplaza la ventana a otro monitor.
-        """
-        hwnd = self._get_window_handle(window)
-        if not hwnd or not self._win32_is_window(hwnd):
-            return None
-
-        try:
-            if self._is_process_elevated(self._get_window_process_id(window)):
-                return None
-
-            was_minimized = bool(USER32.IsIconic(wintypes.HWND(hwnd)))
-            if was_minimized:
-                USER32.ShowWindow(wintypes.HWND(hwnd), SW_RESTORE)
-                time.sleep(0.5)
-
-            USER32.ShowWindow(wintypes.HWND(hwnd), SW_MAXIMIZE)
-            time.sleep(0.8)
-
-            try:
-                USER32.SetForegroundWindow(wintypes.HWND(hwnd))
-            except Exception:
-                pass
-            time.sleep(0.2)
-
-            monitor = self.screen_manager.get_monitor_for_window(window)
-            if monitor is None:
-                # Volver a consultar el objeto de ventana por HWND si
-                # pygetwindow tiene una instancia desactualizada.
-                refreshed = self._get_window_by_handle(hwnd)
-                if refreshed is not None:
-                    window = refreshed
-                    monitor = self.screen_manager.get_monitor_for_window(window)
-
-            if monitor is None:
-                logger.warning(r"[CALIBRATION-MANAGER] No se pudo determinar el monitor de HWND=%s tras preparar la ventana", hwnd)
-                return None
-
-            geometry = self._get_window_geometry(window)
-            return monitor
-        except Exception as exc:
-            logger.error(r"[CALIBRATION-MANAGER] Error preparando HWND=%s para calibracion: %s", hwnd, exc)
-            return None
-
     def move_window_to_monitor(
         self,
         window: Any,
@@ -3112,123 +3064,6 @@ $result | ConvertTo-Json -Compress -Depth 4
             return []
         return self.get_calibration_pipeline().resources_for_planner(app_info["app_key"], int(window_id))
 
-    # ------------------------------------------------------------------
-    # Flujo heredado (sin uso en el pipeline unico). Se conserva por
-    # compatibilidad con macros_coords.json hasta su migracion.
-    # ------------------------------------------------------------------
-
-    def _get_monitors_to_calibrate(self, screen_number: Optional[int]) -> List[Any]:
-        self.screen_manager.refresh_monitors()
-        monitors = list(getattr(self.screen_manager, "monitors", []) or [])
-        if screen_number is None:
-            return monitors
-        try:
-            requested = int(screen_number)
-        except (TypeError, ValueError):
-            return []
-        monitor = self.screen_manager.get_monitor(requested)
-        return [monitor] if monitor is not None else []
-
-    def _calibrate_open_window(self, application_name: str, window: Any, screen_number: int) -> CalibrationResult:
-        app_type = self._get_application_type(application_name)
-        screenshot_path: Optional[str] = None
-        try:
-            target_monitor = self.screen_manager.get_monitor(screen_number)
-            if target_monitor is None:
-                return CalibrationResult(
-                    application_name, app_type, screen_number, False, 0,
-                    error=f"Monitor {screen_number} no encontrado"
-                )
-
-            current_monitor = self.screen_manager.get_monitor_for_window(window)
-            if current_monitor is None:
-                current_monitor = self._prepare_window_for_calibration(
-                    window, application_name
-                )
-
-            if current_monitor is None:
-                return CalibrationResult(
-                    application_name, app_type, screen_number, False, 0,
-                    error="No se pudo determinar el monitor actual de la ventana"
-                )
-
-            if current_monitor.monitor_id != target_monitor.monitor_id:
-                if not self.move_window_to_monitor(
-                    window, screen_number, application_name
-                ):
-                    return CalibrationResult(
-                        application_name, app_type, screen_number, False, 0,
-                        error=f"No se pudo preparar la ventana en el monitor {screen_number}"
-                    )
-            else:
-                # Aunque ya este en el monitor correcto, nos aseguramos de que
-                # siga restaurada/maximizada antes de capturar.
-                prepared = self._prepare_window_for_calibration(
-                    window, application_name
-                )
-                if prepared is None or prepared.monitor_id != target_monitor.monitor_id:
-                    return CalibrationResult(
-                        application_name, app_type, screen_number, False, 0,
-                        error=f"La ventana no qued\u00f3 preparada en el monitor {screen_number}"
-                    )
-
-            time.sleep(1.0)
-            screenshot_path = self.screen_manager.capture_monitor(screen_number)
-            if not screenshot_path:
-                return CalibrationResult(
-                    application_name, app_type, screen_number, False, 0,
-                    error=f"No se pudo capturar el monitor {screen_number}"
-                )
-            screenshot = Path(str(screenshot_path))
-            if not screenshot.exists() or screenshot.stat().st_size <= 0:
-                return CalibrationResult(
-                    application_name, app_type, screen_number, False, 0,
-                    error="La captura no existe o est\u00e1 vac\u00eda"
-                )
-
-            analysis = self.visual_calibrator.calibrate(
-                application_name=application_name,
-                monitor_number=screen_number,
-                screenshot_path=str(screenshot),
-            )
-            if not isinstance(analysis, dict):
-                return CalibrationResult(
-                    application_name, app_type, screen_number, False, 0,
-                    error="UniversalVisualCalibrator devolvi\u00f3 un formato inv\u00e1lido"
-                )
-            if analysis.get("success") is False or analysis.get("error"):
-                return CalibrationResult(
-                    application_name, app_type, screen_number, False, 0,
-                    error=str(analysis.get("error", "Error en UniversalVisualCalibrator")),
-                    calibration_data=analysis,
-                )
-
-            elements = self._extract_elements(analysis)
-            if not elements:
-                return CalibrationResult(
-                    application_name, app_type, screen_number, False, 0,
-                    error="No se detectaron elementos interactivos",
-                    calibration_data=analysis,
-                )
-
-            return CalibrationResult(
-                application_name, app_type, screen_number, True, len(elements),
-                calibration_data={"elements": elements, "raw_analysis": analysis},
-            )
-        except Exception as exc:
-            logger.error(r"[CALIBRATION-MANAGER] Error calibrando %s monitor %s: %s", application_name, screen_number, exc)
-            return CalibrationResult(
-                application_name, app_type, screen_number, False, 0, error=str(exc)
-            )
-        finally:
-            if screenshot_path:
-                try:
-                    path = Path(str(screenshot_path))
-                    if path.exists():
-                        path.unlink()
-                except Exception as exc:
-                    logger.debug(r"[CALIBRATION-MANAGER] No se pudo eliminar captura temporal: %s", exc)
-
     def calibrate_all_applications(self, applications: Optional[List[Any]] = None, force: bool = False) -> Dict[str, Any]:
         self.screen_manager.refresh_monitors()
         discovered = self.discover_applications() if applications is None else self._resolve_application_list(applications)
@@ -3276,15 +3111,6 @@ $result | ConvertTo-Json -Compress -Depth 4
     # ========================================================================
     # RESULTADOS / PERSISTENCIA
     # ========================================================================
-
-    def _extract_elements(self, analysis: Dict[str, Any]) -> List[Dict[str, Any]]:
-        elements = analysis.get("elements")
-        if isinstance(elements, list):
-            return [item for item in elements if isinstance(item, dict)]
-        calibration_data = analysis.get("calibration_data")
-        if isinstance(calibration_data, dict) and isinstance(calibration_data.get("elements"), list):
-            return [item for item in calibration_data["elements"] if isinstance(item, dict)]
-        return []
 
     def _extract_element_center(self, element: Dict[str, Any]) -> Optional[Tuple[int, int]]:
         for key in ("center", "absolute"):

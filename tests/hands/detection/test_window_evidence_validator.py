@@ -40,7 +40,7 @@ from src.desktop.screen_manager import get_screen_manager
 
 # Reusa la infraestructura de ventana compartida (una Notepad por sesion de
 # pytest, monitor secundario derecho, lock de exclusion, cierre por atexit).
-from tests.eyes.detection.test_visual_ui_detector_fusion import TestGuiBase  # noqa: E402
+from tests.eyes.detection.visual_ui_detector_fusion.test_visual_ui_detector_fusion import TestGuiBase  # noqa: E402
 
 
 def _sintetico_elemento(

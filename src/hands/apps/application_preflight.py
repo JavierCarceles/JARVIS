@@ -452,6 +452,7 @@ class ApplicationPreflight:
         destination: str,
         target_type: Optional[str] = None,
         ambiguous: bool = False,
+        mac_boundary: Any = None,
     ) -> Dict[str, Any]:
         """Preflight de un destino YA resuelto en este equipo (no lo lanza).
 
@@ -495,7 +496,7 @@ class ApplicationPreflight:
             )
 
         if ttype == "bundle" or (sys.platform == "darwin" and target.casefold().endswith(".app")):
-            return self._check_bundle_target(application, target, **common)
+            return self._check_bundle_target(application, target, mac_boundary=mac_boundary, **common)
 
         if ttype == "aumid":
             if self.verify_app_id_in_apps_folder(target):
@@ -626,8 +627,13 @@ class ApplicationPreflight:
         login_required: Optional[bool] = None,
         logged_in: Optional[bool] = None,
         resources_available: Optional[bool] = None,
+        mac_boundary: Any = None,
     ) -> Dict[str, Any]:
         """Valida un bundle macOS y su estado de Gatekeeper/cuarentena.
+
+        ``mac_boundary`` es la frontera nativa del adaptador de lanzamiento
+        macOS que resolvio el destino (``MacLaunchBoundary``); si no se da se usa
+        la frontera por defecto. Todo acceso al SO pasa por esa frontera.
 
         No elude Gatekeeper: una app en cuarentena o rechazada por ``spctl``
         queda bloqueada con instrucciones para que el usuario la abra el mismo
@@ -642,7 +648,9 @@ class ApplicationPreflight:
             from src.hands.apps.launch_macos import inspect_bundle_for_preflight
 
             info = inspect_bundle_for_preflight(
-                bundle, expected_bundle_id=str(application.get("bundle_id", "") or "") or None
+                bundle,
+                expected_bundle_id=str(application.get("bundle_id", "") or "") or None,
+                boundary=mac_boundary,
             )
         except Exception as exc:
             logger.warning("No se pudo inspeccionar el bundle macOS: %s", exc)

@@ -26,21 +26,29 @@ Toda validacion de destino se delega en `ApplicationPreflight.validate_launch_de
 
 from __future__ import annotations
 
+import hashlib
 import os
 import re
 import shutil
 import sqlite3
+import threading
+import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
+from src.core.log import get_logger
 from src.hands.apps.application_launch_classifier import (
+    CONFIANZA_ALTA,
+    CONFIANZA_BAJA,
+    CONFIANZA_MEDIA,
     CONFIANZA_NINGUNA,
     LaunchClassification,
     LaunchClassifier,
     LaunchType,
     leer_version_archivo_windows,
+    resolver_targets_accesos_directos,
 )
 from src.hands.apps.application_preflight import ApplicationPreflight
 from src.hands.calibration.calibration_manager import CalibrationManager
@@ -54,8 +62,11 @@ from src.hands.inventory.system_inventory_storage import (
     SCAN_RESULT_INTERRUPTED,
     SCAN_RESULT_OK,
     SystemInventoryStorage,
+    texto_sin_acentos,
 )
 from src.memory.storage import Entity
+
+logger = get_logger(__name__)
 
 
 def _ahora_iso() -> str:
@@ -116,6 +127,89 @@ _PRIORIDAD_FUENTE[FUENTE_INVENTARIO] = len(FUENTES_PRIMARIAS)
 
 # Extensiones tratadas como candidatos de lanzamiento al consultar el inventario.
 _EXTENSIONS_CANDIDATOS = (".exe", ".lnk")
+
+# Registro de candidatos desde file_entries (inventario SQLite ya escaneado).
+FUENTE_INVENTARIO_SQLITE = "inventario_sqlite"
+EVIDENCIA_ORIGEN_FILE_ENTRIES = "origen=file_entries_sqlite"
+EVIDENCIA_NO_LANZABLE = "lanzable=false"
+# Confianza numerica guardada en application_candidates.confidence.
+_CONFIANZA_NUMERICA = {
+    CONFIANZA_ALTA: 0.9,
+    CONFIANZA_MEDIA: 0.7,
+    CONFIANZA_BAJA: 0.4,
+    CONFIANZA_NINGUNA: 0.1,
+}
+# Carpetas cuyos accesos directos son lanzadores de aplicaciones. "Recent" y
+# similares se excluyen: apuntan a documentos personales.
+_CARPETAS_LNK_ADMITIDAS = ("/start menu/programs/", "/desktop/")
+_TAMANO_LOTE_UPSERT = 1000
+
+
+def _ruta_comparable(ruta: Optional[str]) -> str:
+    """Ruta con barras '/' y sin mayusculas, para comparar carpetas en
+    cualquier SO (independiente de `normalize_path`, que depende del SO)."""
+    return str(ruta or "").replace("\\", "/").casefold()
+
+
+def _lnk_en_carpeta_admitida(ruta: Optional[str]) -> bool:
+    """True si el acceso directo esta bajo el menu Inicio o un escritorio."""
+    r = _ruta_comparable(ruta)
+    return any(carpeta in r for carpeta in _CARPETAS_LNK_ADMITIDAS)
+
+
+def _nombre_comparable(nombre: Optional[str]) -> str:
+    """Nombre sin extension .exe/.lnk, sin mayusculas ni acentos."""
+    texto = str(nombre or "").strip()
+    base = texto.replace("\\", "/").rsplit("/", 1)[-1]
+    raiz, extension = os.path.splitext(base)
+    if extension.casefold() in _EXTENSIONS_CANDIDATOS:
+        base = raiz
+    # Misma normalizacion que la funcion SQL de busqueda por nombre.
+    return texto_sin_acentos(base).strip()
+
+
+def _candidate_id_inventario(machine_id: str, normalized_path: str) -> str:
+    """Identificador estable de un candidato registrado desde file_entries."""
+    base = f"{machine_id}|{normalized_path}".encode("utf-8")
+    return "inv-" + hashlib.sha1(base).hexdigest()[:16]
+
+
+def _carpetas_path_comparables() -> list[str]:
+    """Carpetas de PATH en orden, comparables con `_ruta_comparable`."""
+    carpetas: list[str] = []
+    for d in os.environ.get("PATH", "").split(os.pathsep):
+        d = d.strip().strip('"')
+        if d:
+            carpetas.append(_ruta_comparable(d).rstrip("/"))
+    return carpetas
+
+
+def _aplicar_semantica_path(filas: list[dict]) -> list[dict]:
+    """Entre filas con el mismo nombre de fichero, conserva solo la de la
+    primera carpeta de PATH que lo contiene (como resuelve el SO un comando).
+    Si ninguna de esas filas esta en PATH, las conserva todas (ambiguedad real).
+    Mantiene el orden original."""
+    grupos: dict[str, list[int]] = {}
+    for i, fila in enumerate(filas):
+        nombre = _ruta_comparable(fila.get("absolute_path")).rsplit("/", 1)[-1]
+        grupos.setdefault(nombre or str(i), []).append(i)
+    carpetas = _carpetas_path_comparables()
+    descartados: set[int] = set()
+    for indices in grupos.values():
+        if len(indices) < 2:
+            continue
+        mejor_indice: Optional[int] = None
+        mejor_posicion: Optional[int] = None
+        for i in indices:
+            carpeta = _ruta_comparable(filas[i].get("absolute_path")).rsplit("/", 1)[0]
+            if carpeta in carpetas:
+                posicion = carpetas.index(carpeta)
+                if mejor_posicion is None or posicion < mejor_posicion:
+                    mejor_posicion = posicion
+                    mejor_indice = i
+        if mejor_indice is not None:
+            descartados.update(i for i in indices if i != mejor_indice)
+    return [fila for i, fila in enumerate(filas) if i not in descartados]
 
 
 @dataclass
@@ -1917,6 +2011,348 @@ class ApplicationDiscovery:
         }
 
     # ------------------------------------------------------------------ #
+    # Registro de candidatos desde el inventario ya escaneado (file_entries)
+    # ------------------------------------------------------------------ #
+
+    def registrar_candidatos_desde_inventario(
+        self,
+        volumenes: Optional[list[str]] = None,
+        incluir_winsxs: bool = False,
+        resolver_lnk: Optional[Callable[[list[str]], dict[str, Optional[str]]]] = None,
+        progreso: Optional[Callable[[dict[str, Any]], None]] = None,
+    ) -> dict[str, Any]:
+        """
+        Convierte las entradas `.exe` y `.lnk` de `file_entries` del ultimo
+        escaneo completo (resultado `ok`) de cada volumen en filas de
+        `application_candidates` del `machine_id` actual, sin reescanear.
+
+        - `volumenes`: volumenes a procesar; por defecto los montados
+          (`storage.obtener_volumes_montados`).
+        - `.exe` fuera del almacen de componentes WinSxS (salvo
+          `incluir_winsxs=True`); `.lnk` solo bajo "Start Menu/Programs" o
+          "Desktop" (nunca "Recent": son documentos personales).
+        - Los `.lnk` se resuelven por lotes (`resolver_lnk`, por defecto
+          `resolver_targets_accesos_directos`) y se clasifican con
+          `LaunchClassifier(lnk_targets=...)`. No se filtra por GUI: CLI,
+          servicios e instaladores se registran con su clasificacion.
+        - Se descartan las filas cuyo fichero ya no existe (sin tipo de
+          lanzamiento).
+        - Upsert idempotente por `candidate_id` estable
+          ("inv-" + sha1(machine_id|normalized_path)[:16]) en lotes de 1000.
+        - No escribe en `entities.json`: el auto-registro en el catalogo
+          global sigue siendo bajo demanda al resolver por nombre.
+
+        Devuelve un informe con el detalle por volumen (`scan_id`, `leidos`,
+        `omitidos_winsxs`, `registrados`, `lanzables`, `por_tipo`,
+        `por_subtipo`, `segundos`, ...) y los totales.
+        """
+        return self._registrar_desde_inventario(
+            self.storage,
+            volumenes=volumenes,
+            incluir_winsxs=incluir_winsxs,
+            resolver_lnk=resolver_lnk,
+            progreso=progreso,
+        )
+
+    def _registrar_desde_inventario(
+        self,
+        storage: SystemInventoryStorage,
+        volumenes: Optional[list[str]] = None,
+        incluir_winsxs: bool = False,
+        resolver_lnk: Optional[Callable[[list[str]], dict[str, Optional[str]]]] = None,
+        progreso: Optional[Callable[[dict[str, Any]], None]] = None,
+    ) -> dict[str, Any]:
+        """Implementacion de `registrar_candidatos_desde_inventario` sobre un
+        almacenamiento concreto (el hilo de fondo usa su propia conexion)."""
+        inicio_total = time.monotonic()
+        if volumenes is None:
+            volumenes = sorted(storage.obtener_volumes_montados())
+        resolver = resolver_lnk or resolver_targets_accesos_directos
+        informe: dict[str, Any] = {
+            "machine_id": self.machine_id,
+            "volumenes": {},
+            "registrados": 0,
+            "lanzables": 0,
+            "segundos": 0.0,
+        }
+        for volumen in volumenes:
+            detalle = self._registrar_volumen_desde_inventario(
+                storage, volumen, incluir_winsxs, resolver, progreso
+            )
+            informe["volumenes"][volumen] = detalle
+            informe["registrados"] += int(detalle.get("registrados", 0))
+            informe["lanzables"] += int(detalle.get("lanzables", 0))
+        informe["segundos"] = round(time.monotonic() - inicio_total, 3)
+        return informe
+
+    def _registrar_volumen_desde_inventario(
+        self,
+        storage: SystemInventoryStorage,
+        volumen: str,
+        incluir_winsxs: bool,
+        resolver: Callable[[list[str]], dict[str, Optional[str]]],
+        progreso: Optional[Callable[[dict[str, Any]], None]],
+    ) -> dict[str, Any]:
+        """Registra los candidatos de un volumen desde su ultimo escaneo ok."""
+        from src.hands.inventory.system_inventory_storage import normalize_path
+
+        inicio = time.monotonic()
+        detalle: dict[str, Any] = {
+            "scan_id": None,
+            "leidos": 0,
+            "omitidos_winsxs": 0,
+            "omitidos_lnk_fuera_de_menu": 0,
+            "descartados_inexistentes": 0,
+            "lnk_resueltos": 0,
+            "registrados": 0,
+            "lanzables": 0,
+            "por_tipo": {},
+            "por_subtipo": {},
+            "segundos": 0.0,
+            "motivo": None,
+        }
+        escaneo = storage._obtener_ultimo_scan_completo_por_volumen(self.machine_id, volumen)
+        if not escaneo:
+            detalle["motivo"] = "sin_escaneo_completo_ok"
+            detalle["segundos"] = round(time.monotonic() - inicio, 3)
+            logger.info(
+                "Registro de candidatos desde inventario: el volumen %s no tiene "
+                "escaneo completo ok para este equipo",
+                volumen,
+            )
+            return detalle
+        scan_id = str(escaneo["scan_id"])
+        detalle["scan_id"] = scan_id
+
+        # 1) Lectura y filtrado de file_entries (solo lectura).
+        ejecutables: list[dict[str, Any]] = []
+        accesos_directos: list[dict[str, Any]] = []
+        for lote in storage.iterar_entradas_lanzables_escaneo(scan_id, self.machine_id):
+            for fila in lote:
+                detalle["leidos"] += 1
+                ruta = str(fila.get("absolute_path") or "")
+                if not ruta:
+                    continue
+                if not incluir_winsxs and es_ruta_almacen_componentes(ruta):
+                    detalle["omitidos_winsxs"] += 1
+                    continue
+                extension = str(fila.get("extension") or os.path.splitext(ruta)[1]).lower()
+                if extension == ".lnk":
+                    if not _lnk_en_carpeta_admitida(ruta):
+                        detalle["omitidos_lnk_fuera_de_menu"] += 1
+                        continue
+                    accesos_directos.append(fila)
+                else:
+                    ejecutables.append(fila)
+
+        # 2) Resolucion por lotes de los accesos directos.
+        destinos_lnk: dict[str, Optional[str]] = {}
+        if accesos_directos:
+            rutas_lnk = [str(f["absolute_path"]) for f in accesos_directos]
+            try:
+                destinos_lnk = dict(resolver(rutas_lnk) or {})
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "No se pudieron resolver por lotes los accesos directos del "
+                    "volumen %s; se resolveran uno a uno: %s",
+                    volumen, exc,
+                )
+                destinos_lnk = {}
+            detalle["lnk_resueltos"] = sum(1 for v in destinos_lnk.values() if v)
+        clasificador = LaunchClassifier(preflight=self.preflight, lnk_targets=destinos_lnk)
+
+        # 3) Clasificacion y upsert por lotes.
+        pendientes: list[dict[str, Any]] = []
+
+        def _volcar() -> None:
+            if not pendientes:
+                return
+            escritas = storage.upsert_application_candidates(
+                scan_id=scan_id,
+                machine_id=self.machine_id,
+                volume=volumen,
+                candidates=list(pendientes),
+            )
+            detalle["registrados"] += int(escritas)
+            pendientes.clear()
+            if progreso is not None:
+                try:
+                    progreso({"volumen": volumen, "scan_id": scan_id, **{
+                        k: detalle[k] for k in ("leidos", "registrados", "lanzables")
+                    }})
+                except Exception as exc:  # noqa: BLE001
+                    logger.debug("Callback de progreso del registro fallido: %s", exc)
+
+        for fila in ejecutables + accesos_directos:
+            ruta = str(fila["absolute_path"])
+            normalizada = str(fila.get("normalized_path") or "") or normalize_path(ruta)
+            candidate_id = _candidate_id_inventario(self.machine_id, normalizada)
+            ahora = _ahora_iso()
+            try:
+                clasificacion = clasificador.classify_candidate(
+                    {
+                        "candidate_id": candidate_id,
+                        "name": str(fila.get("name") or os.path.basename(ruta)),
+                        "absolute_path": ruta,
+                        "source": FUENTE_INVENTARIO_SQLITE,
+                        "volume": volumen,
+                        "last_checked_at": ahora,
+                    }
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("No se pudo clasificar un candidato del inventario: %s", exc)
+                detalle["descartados_inexistentes"] += 1
+                continue
+            if clasificacion.launch_type is None:
+                # El fichero ya no existe (o no es un destino reconocible).
+                detalle["descartados_inexistentes"] += 1
+                continue
+            subtipo = clasificacion.launch_subtype.value
+            evidencia = list(clasificacion.evidencia) + [
+                f"subtipo={subtipo}",
+                "lanzable=true" if clasificacion.es_lanzable else EVIDENCIA_NO_LANZABLE,
+                EVIDENCIA_ORIGEN_FILE_ENTRIES,
+            ]
+            pendientes.append(
+                {
+                    "candidate_id": candidate_id,
+                    "name": str(fila.get("name") or os.path.basename(ruta)),
+                    "absolute_path": ruta,
+                    "launch_type": clasificacion.launch_type,
+                    "confidence": _CONFIANZA_NUMERICA.get(clasificacion.confianza, 0.1),
+                    "version": clasificacion.version,
+                    "producto": clasificacion.producto,
+                    "evidencia": evidencia,
+                    "source": FUENTE_INVENTARIO_SQLITE,
+                    "last_checked_at": ahora,
+                }
+            )
+            if clasificacion.es_lanzable:
+                detalle["lanzables"] += 1
+            detalle["por_tipo"][clasificacion.launch_type] = (
+                detalle["por_tipo"].get(clasificacion.launch_type, 0) + 1
+            )
+            detalle["por_subtipo"][subtipo] = detalle["por_subtipo"].get(subtipo, 0) + 1
+            if len(pendientes) >= _TAMANO_LOTE_UPSERT:
+                _volcar()
+        _volcar()
+
+        detalle["segundos"] = round(time.monotonic() - inicio, 3)
+        logger.info(
+            "Registro de candidatos desde inventario: volumen %s, %d leidos, "
+            "%d omitidos WinSxS, %d registrados (%d lanzables) en %.1f s",
+            volumen, detalle["leidos"], detalle["omitidos_winsxs"],
+            detalle["registrados"], detalle["lanzables"], detalle["segundos"],
+        )
+        return detalle
+
+    def _volumenes_pendientes_de_candidatos(
+        self, storage: SystemInventoryStorage
+    ) -> list[str]:
+        """Volumenes montados cuyo ultimo escaneo completo ok del equipo actual
+        aun no tiene candidatos en `application_candidates`."""
+        pendientes: list[str] = []
+        for volumen in sorted(storage.obtener_volumes_montados()):
+            escaneo = storage._obtener_ultimo_scan_completo_por_volumen(
+                self.machine_id, volumen
+            )
+            if not escaneo:
+                continue
+            if not storage.existen_candidatos_de_escaneo(
+                self.machine_id, str(escaneo["scan_id"])
+            ):
+                pendientes.append(volumen)
+        return pendientes
+
+    def programar_registro_candidatos_inventario(
+        self, esperar_a: Optional[Any] = None
+    ) -> threading.Thread:
+        """
+        Lanza en un hilo daemon el registro de candidatos desde el inventario.
+
+        Si se pasa `esperar_a` (la `EjecucionPrimerInventario` del primer
+        inventario), espera a que termine (`esperar()`). Despues registra solo
+        los volumenes montados cuyo ultimo escaneo completo ok aun no tiene
+        candidatos. El hilo usa su propia conexion SQLite y nunca propaga
+        excepciones: los fallos se registran en el log. Devuelve el hilo.
+        """
+
+        def _trabajo() -> None:
+            storage_hilo: Optional[SystemInventoryStorage] = None
+            try:
+                if esperar_a is not None:
+                    esperar_a.esperar()
+                ruta_db = getattr(self.storage, "db_path", None)
+                storage_hilo = (
+                    SystemInventoryStorage(ruta_db) if ruta_db is not None else self.storage
+                )
+                pendientes = self._volumenes_pendientes_de_candidatos(storage_hilo)
+                if not pendientes:
+                    logger.info(
+                        "Registro de candidatos desde inventario: no hay volumenes pendientes"
+                    )
+                    return
+                informe = self._registrar_desde_inventario(storage_hilo, volumenes=pendientes)
+                logger.info(
+                    "Registro de candidatos desde inventario terminado: %d registrados "
+                    "(%d lanzables) en %d volumen(es), %.1f s",
+                    informe["registrados"], informe["lanzables"],
+                    len(informe["volumenes"]), informe["segundos"],
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.exception(
+                    "Fallo el registro de candidatos desde el inventario: %s", exc
+                )
+            finally:
+                if storage_hilo is not None and storage_hilo is not self.storage:
+                    try:
+                        storage_hilo.close()
+                    except Exception as exc:  # noqa: BLE001
+                        logger.debug("No se pudo cerrar la conexion del registro: %s", exc)
+
+        hilo = threading.Thread(
+            target=_trabajo,
+            name="jarvis-registro-candidatos-inventario",
+            daemon=True,
+        )
+        hilo.start()
+        return hilo
+
+    def _candidatos_locales_por_nombre(
+        self, nombre: str, limite: int = 10
+    ) -> list[dict[str, Any]]:
+        """
+        Candidatos de `application_candidates` del equipo actual para un nombre,
+        sin falsas ambiguedades:
+
+        - pide hasta 100 filas por subcadena de nombre;
+        - descarta las marcadas `lanzable=false` en la evidencia (las filas
+          antiguas sin esa marca se conservan);
+        - si hay filas cuyo nombre sin extension coincide exactamente con el
+          pedido (sin mayusculas ni acentos), se queda solo con esas;
+        - entre filas con el mismo nombre de fichero aplica la semantica de
+          PATH (gana la primera carpeta de PATH que lo contiene); si ninguna
+          esta en PATH las conserva todas (ambiguedad real).
+
+        Devuelve como mucho `limite` filas en el orden del almacenamiento.
+        """
+        filas = self.storage.buscar_candidatos_registrados(
+            machine_id=self.machine_id,
+            name=nombre,
+            limite=100,
+        )
+        filas = [
+            f for f in filas
+            if EVIDENCIA_NO_LANZABLE not in [str(e) for e in (f.get("evidencia") or [])]
+        ]
+        pedido = _nombre_comparable(nombre)
+        exactas = [f for f in filas if _nombre_comparable(f.get("name")) == pedido]
+        if exactas:
+            filas = exactas
+        filas = _aplicar_semantica_path(filas)
+        return filas[: max(0, int(limite))]
+
+    # ------------------------------------------------------------------ #
     # Resolucion de aplicacion por nombre: catalogo global + SQLite local
     # (unidad 3.8.5.1.4.11.6)
     # ------------------------------------------------------------------ #
@@ -1963,10 +2399,8 @@ class ApplicationDiscovery:
             if ejecutable:
                 # Obtener la ruta vigente desde SQLite (filtrado por
                 # machine_id y volumenes montados), no asumir la del catalogo.
-                candidatos_sqlite = self.storage.buscar_candidatos_registrados(
-                    machine_id=self.machine_id,
-                    name=nombre,
-                    limite=10,
+                candidatos_sqlite = self._candidatos_locales_por_nombre(
+                    nombre, limite=10
                 )
                 for c in candidatos_sqlite:
                     ruta = str(c.get("absolute_path") or "").strip()
@@ -2018,11 +2452,7 @@ class ApplicationDiscovery:
         # ------------------------------------------------------------------
         # Paso 2: No esta en el catalogo global, consultar SQLite local.
         # ------------------------------------------------------------------
-        candidatos_sqlite = self.storage.buscar_candidatos_registrados(
-            machine_id=self.machine_id,
-            name=nombre,
-            limite=10,
-        )
+        candidatos_sqlite = self._candidatos_locales_por_nombre(nombre, limite=10)
 
         for c in candidatos_sqlite:
             ruta = str(c.get("absolute_path") or "").strip()
@@ -2172,11 +2602,7 @@ class ApplicationDiscovery:
         # Paso 2: candidatos locales de SQLite (instalacion local real).
         # ------------------------------------------------------------------
         try:
-            filas = self.storage.buscar_candidatos_registrados(
-                machine_id=self.machine_id,
-                name=nombre,
-                limite=10,
-            )
+            filas = self._candidatos_locales_por_nombre(nombre, limite=10)
         except (OSError, PermissionError, sqlite3.Error):
             filas = []
         except Exception:  # noqa: BLE001

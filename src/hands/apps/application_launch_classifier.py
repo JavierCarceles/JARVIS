@@ -19,16 +19,21 @@ Dependencias reales reutilizadas:
 from __future__ import annotations
 
 import ctypes
+import json
 import os
 import re
 import subprocess
+import tempfile
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Iterable, Optional
 
+from src.core.log import get_logger
 from src.hands.apps.application_preflight import ApplicationPreflight
 from src.hands.inventory.system_inventory import EntryType, InventoryEntry
+
+logger = get_logger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -339,6 +344,130 @@ def resolver_target_acceso_directo(ruta_lnk: str) -> Optional[str]:
         return None
 
 
+# Script de PowerShell para resolver un lote de accesos directos con un solo
+# proceso. Lee las rutas de un fichero JSON UTF-8 (no por stdin: la codificacion
+# de consola de Windows estropea rutas con caracteres no ASCII) y escribe en
+# stdout un JSON {ruta: destino} en UTF-8.
+_SCRIPT_RESOLVER_LOTE_LNK = (
+    "$ErrorActionPreference = 'SilentlyContinue'; "
+    "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
+    "$rutas = Get-Content -LiteralPath '__FICHERO__' -Raw -Encoding UTF8 | ConvertFrom-Json; "
+    "$shell = New-Object -ComObject WScript.Shell; "
+    "$res = @{}; "
+    "foreach ($r in $rutas) { "
+    "$t = ''; "
+    "try { $t = $shell.CreateShortcut($r).TargetPath } catch { $t = '' }; "
+    "if ($t -eq $null) { $t = '' }; "
+    "$res[$r] = [string]$t "
+    "}; "
+    "$res | ConvertTo-Json -Compress"
+)
+
+
+def _destino_exe_existente(target: Optional[str]) -> Optional[str]:
+    """Devuelve el destino si es un .exe existente; None en otro caso."""
+    if not target or not isinstance(target, str):
+        return None
+    t = target.strip().strip('"')
+    if not t:
+        return None
+    try:
+        t = os.path.abspath(t)
+    except (OSError, ValueError):
+        return None
+    if t.casefold().endswith(".exe") and os.path.isfile(t):
+        return t
+    return None
+
+
+def _resolver_lote_lnk_powershell(rutas: list[str], timeout: float) -> dict[str, Optional[str]]:
+    """Resuelve un lote de .lnk con un unico proceso PowerShell (solo Windows).
+
+    Las rutas se pasan en un fichero temporal JSON UTF-8. Ante cualquier fallo
+    del proceso devuelve None para todas las rutas del lote.
+    """
+    resultado: dict[str, Optional[str]] = {r: None for r in rutas}
+    if not rutas:
+        return resultado
+    fichero: Optional[str] = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", suffix=".json", delete=False
+        ) as tmp:
+            json.dump(list(rutas), tmp, ensure_ascii=False)
+            fichero = tmp.name
+        script = _SCRIPT_RESOLVER_LOTE_LNK.replace("__FICHERO__", fichero.replace("'", "''"))
+        creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        proc = subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+             "-Command", script],
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=timeout, creationflags=creationflags,
+        )
+        if proc.returncode != 0:
+            logger.warning(
+                "Resolucion de accesos directos por lotes: PowerShell termino con codigo %s",
+                proc.returncode,
+            )
+            return resultado
+        salida = (proc.stdout or "").strip().lstrip("\ufeff")
+        if not salida:
+            return resultado
+        datos = json.loads(salida)
+        if not isinstance(datos, dict):
+            return resultado
+        # ConvertTo-Json conserva la ruta tal como se envio; se compara sin
+        # distinguir mayusculas por si PowerShell la normaliza.
+        por_clave = {str(k).casefold(): v for k, v in datos.items()}
+        for ruta in rutas:
+            target = datos.get(ruta, por_clave.get(ruta.casefold()))
+            resultado[ruta] = _destino_exe_existente(target if isinstance(target, str) else None)
+    except subprocess.TimeoutExpired:
+        logger.warning(
+            "Resolucion de accesos directos por lotes: tiempo agotado (%s s) con %d rutas",
+            timeout, len(rutas),
+        )
+    except (OSError, ValueError) as exc:
+        logger.warning("Resolucion de accesos directos por lotes fallida: %s", exc)
+    finally:
+        if fichero:
+            try:
+                os.remove(fichero)
+            except OSError as exc:
+                logger.debug("No se pudo borrar el fichero temporal de rutas .lnk: %s", exc)
+    return resultado
+
+
+def resolver_targets_accesos_directos(
+    rutas: Iterable[str],
+    lote: int = 200,
+    timeout: float = 120,
+) -> dict[str, Optional[str]]:
+    """
+    Resuelve por lotes el destino de varios accesos directos .lnk de Windows.
+
+    Usa un solo proceso PowerShell por lote (`WScript.Shell.CreateShortcut(ruta)
+    .TargetPath`) en lugar de un proceso por acceso directo como
+    `resolver_target_acceso_directo`. Devuelve un diccionario ruta -> destino
+    `.exe` existente, o None si el acceso directo no existe, no apunta a un
+    ejecutable existente o el lote fallo. En un SO distinto de Windows
+    devuelve None para todas las rutas. Nunca lanza excepcion.
+    """
+    lista = [str(r) for r in rutas if r]
+    resultado: dict[str, Optional[str]] = {r: None for r in lista}
+    if os.name != "nt" or not lista:
+        return resultado
+    validas = [
+        r for r in lista
+        if r.casefold().endswith(".lnk") and os.path.isfile(r)
+    ]
+    tam = max(1, int(lote))
+    for inicio in range(0, len(validas), tam):
+        parte = validas[inicio:inicio + tam]
+        resultado.update(_resolver_lote_lnk_powershell(parte, timeout))
+    return resultado
+
+
 # ---------------------------------------------------------------------------
 # Resultado de clasificacion
 # ---------------------------------------------------------------------------
@@ -415,8 +544,26 @@ class LaunchClassifier:
     resolucion de aplicaciones o el planificador.
     """
 
-    def __init__(self, preflight: Optional[ApplicationPreflight] = None) -> None:
+    def __init__(
+        self,
+        preflight: Optional[ApplicationPreflight] = None,
+        lnk_targets: Optional[dict[str, Optional[str]]] = None,
+    ) -> None:
         self.preflight = preflight or ApplicationPreflight()
+        # Cache opcional de destinos de accesos directos ya resueltos (por
+        # ejemplo con `resolver_targets_accesos_directos`). Clave: ruta del
+        # .lnk normalizada con os.path.normcase; valor: destino .exe o None.
+        # Sin cache, cada .lnk se resuelve con `resolver_target_acceso_directo`.
+        self._lnk_targets: dict[str, Optional[str]] = {
+            os.path.normcase(str(k)): v for k, v in (lnk_targets or {}).items() if k
+        }
+
+    def _target_acceso_directo(self, destino: str) -> Optional[str]:
+        """Destino de un .lnk: primero la cache, si no, resolucion individual."""
+        clave = os.path.normcase(destino)
+        if clave in self._lnk_targets:
+            return self._lnk_targets[clave]
+        return resolver_target_acceso_directo(destino)
 
     # ------------------------------------------------------------------ #
     # Entrada
@@ -674,7 +821,7 @@ class LaunchClassifier:
 
         # Acceso directo: lanzable si el target resuelve a un ejecutable real.
         if launch_type == LaunchType.ACCESO_DIRECTO.value:
-            target = resolver_target_acceso_directo(destino)
+            target = self._target_acceso_directo(destino)
             if target:
                 evidencia.append("acceso_directo_target_resuelto")
                 if version_info:

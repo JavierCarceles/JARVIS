@@ -804,6 +804,8 @@ class ApplicationLaunchService:
         self.discovery_fallback = bool(discovery_fallback)
         self._owned_lock = threading.Lock()
         self._owned: Dict[str, List[int]] = {}
+        # Ventanas concretas verificadas al abrir (las unicas que close() cierra).
+        self._owned_windows: Dict[str, List[int]] = {}
 
     # ------------------------------------------------------------------
     # Dependencias perezosas
@@ -868,11 +870,19 @@ class ApplicationLaunchService:
         return outcome
 
     def close(self, app_name: str, only_owned: bool = True) -> LaunchOutcome:
-        """Cierra de forma ordenada SOLO las ventanas de procesos abiertos por
-        este servicio (``only_owned=True``). Nunca fuerza el cierre."""
+        """Cierra de forma ordenada SOLO las ventanas que este servicio abrio y
+        verifico (``only_owned=True``). Nunca fuerza el cierre.
+
+        Se cierran las ventanas concretas registradas al abrir, y solo si siguen
+        perteneciendo al proceso propio registrado. No se cierran el resto de
+        ventanas de ese proceso: un proceso anfitrion compartido (por ejemplo
+        ``ApplicationFrameHost`` de las apps UWP) puede tener ventanas del
+        usuario.
+        """
         key = normalize_app_key(app_name)
         with self._owned_lock:
             pids = list(self._owned.get(key, []))
+            window_ids = list(self._owned_windows.get(key, []))
         if only_owned and not pids:
             return LaunchOutcome.failed(
                 OperationError(OperationStage.PROCESS, ErrorCode.NOT_FOUND,
@@ -882,17 +892,20 @@ class ApplicationLaunchService:
         desktop = self.adapter._get_desktop()
         closed: List[int] = []
         if desktop is not None:
-            for pid in pids:
+            for window_id in window_ids:
                 try:
-                    result = desktop.list_windows(pid=pid, visible_only=False)
-                    for window in (result.value or []) if getattr(result, "ok", False) else []:
-                        if getattr(desktop.close_window(window.window_id), "ok", False):
-                            closed.append(window.window_id)
+                    current = desktop.get_window(int(window_id))
+                    window = current.value if getattr(current, "ok", False) else None
+                    if window is None or int(getattr(window, "pid", 0) or 0) not in pids:
+                        continue  # ya cerrada o el identificador ya no es de un proceso propio
+                    if getattr(desktop.close_window(int(window_id)), "ok", False):
+                        closed.append(int(window_id))
                 except Exception as exc:
-                    logger.warning("No se pudo cerrar ventana de PID %s: %s", pid, exc)
+                    logger.warning("No se pudo cerrar la ventana %s: %s", window_id, exc)
         self.registry.forget(self.OPEN_KEY_PREFIX + key)
         with self._owned_lock:
             self._owned.pop(key, None)
+            self._owned_windows.pop(key, None)
         if closed:
             return LaunchOutcome(True, app_name=app_name, evidence={"closed_windows": closed})
         return LaunchOutcome.failed(
@@ -1335,7 +1348,7 @@ class ApplicationLaunchService:
             preexisting = {int(p) for p in (launched.evidence.get("preexisting_pids") or [])}
             if launched.pid is not None and int(launched.pid) not in preexisting:
                 # Un proceso que ya existia (del usuario) nunca pasa a ser propio.
-                self._remember_owned(name, launched.pid)
+                self._remember_owned(name, launched.pid, launched.window)
         self._log_outcome(launched)
         return launched
 
@@ -1364,11 +1377,15 @@ class ApplicationLaunchService:
         if pid:
             self.registry.mark_success(key, outcome, ttl_seconds=None, still_valid=still_valid)
 
-    def _remember_owned(self, name: str, pid: Optional[int]) -> None:
+    def _remember_owned(self, name: str, pid: Optional[int], window: Any = None) -> None:
         if not pid:
             return
+        key = normalize_app_key(name)
         with self._owned_lock:
-            self._owned.setdefault(normalize_app_key(name), []).append(int(pid))
+            self._owned.setdefault(key, []).append(int(pid))
+            window_id = getattr(window, "window_id", None)
+            if window_id is not None:
+                self._owned_windows.setdefault(key, []).append(int(window_id))
 
     @staticmethod
     def _log_outcome(outcome: LaunchOutcome) -> None:

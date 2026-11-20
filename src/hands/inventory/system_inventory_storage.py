@@ -35,6 +35,7 @@ import shutil
 import sqlite3
 import threading
 import time
+import unicodedata
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -86,6 +87,32 @@ def normalize_path(path: str) -> str:
     if not _FILESYSTEM_CASE_SENSITIVE:
         p = p.lower()
     return p
+
+
+def texto_sin_acentos(texto: Optional[str]) -> str:
+    """Texto sin mayusculas ni diacriticos, para comparar nombres.
+
+    Descompone con NFKD, elimina las marcas combinantes (tildes, dieresis,
+    virgulilla de la enye...) y aplica `casefold`. Ejemplo: "M\u00daSICA" y
+    "m\u00fasica" -> "musica". Devuelve "" para None o valores no texto.
+    """
+    if texto is None:
+        return ""
+    descompuesto = unicodedata.normalize("NFKD", str(texto))
+    return "".join(ch for ch in descompuesto if not unicodedata.combining(ch)).casefold()
+
+
+# Nombre de la funcion SQL registrada en cada conexion (ver `connect`). Permite
+# comparaciones de nombres en SQL que ignoran mayusculas y acentos; el `LIKE`
+# de SQLite solo ignora mayusculas ASCII.
+FUNCION_SQL_SIN_ACENTOS = "jarvis_sin_acentos"
+
+
+def _sql_sin_acentos(valor: object) -> Optional[str]:
+    """Adaptador de `texto_sin_acentos` para SQLite (NULL -> NULL)."""
+    if valor is None:
+        return None
+    return texto_sin_acentos(str(valor))
 
 
 DEFAULT_DB_PATH = Path("data") / "system_inventory.sqlite3"
@@ -602,6 +629,13 @@ class SystemInventoryStorage:
         if self._conn is None:
             self._conn = sqlite3.connect(str(self.db_path))
             self._conn.row_factory = sqlite3.Row
+            # Comparaciones de nombres sin mayusculas ni acentos en SQL.
+            try:
+                self._conn.create_function(
+                    FUNCION_SQL_SIN_ACENTOS, 1, _sql_sin_acentos, deterministic=True
+                )
+            except sqlite3.NotSupportedError:
+                self._conn.create_function(FUNCION_SQL_SIN_ACENTOS, 1, _sql_sin_acentos)
             # WAL permite lecturas concurrentes y escrituras secuenciales
             # seguras; evita bloqueos prolongados en escaneos largos.
             self._conn.execute("PRAGMA journal_mode=WAL")
@@ -3178,6 +3212,151 @@ class SystemInventoryStorage:
             raise
         return len(candidates)
 
+    def upsert_application_candidates(
+        self,
+        scan_id: str,
+        machine_id: str,
+        volume: str,
+        candidates: list[dict],
+    ) -> int:
+        """Inserta o actualiza candidatos de aplicacion en una transaccion atomica.
+
+        A diferencia de `insert_application_candidates` (INSERT simple, que
+        falla si el `candidate_id` ya existe), este metodo es idempotente:
+        si el `candidate_id` ya existe se actualizan `scan_id`, `volume`,
+        `name`, `absolute_path`, `launch_type`, `confidence`, `version`,
+        `producto`, `evidencia`, `source` y `last_checked_at`. La
+        actualizacion solo se aplica si la fila existente pertenece al mismo
+        `machine_id`: nunca se reescribe un candidato de otro equipo.
+
+        Todo el lote se confirma o se revierte entero. Devuelve el numero de
+        filas insertadas o actualizadas.
+        """
+        if not candidates:
+            return 0
+        filas = [
+            (
+                c.get("candidate_id"),
+                scan_id,
+                machine_id,
+                volume,
+                c.get("name"),
+                c.get("absolute_path"),
+                c.get("launch_type"),
+                c.get("confidence"),
+                c.get("version"),
+                c.get("producto"),
+                c.get("evidencia", "[]") if isinstance(c.get("evidencia"), str)
+                else json.dumps(c.get("evidencia", []), ensure_ascii=False),
+                c.get("source", "inventory"),
+                c.get("last_checked_at") or _now_iso(),
+            )
+            for c in candidates
+        ]
+        conn = self.connect()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            cur = conn.executemany(
+                """
+                INSERT INTO application_candidates(
+                    candidate_id, scan_id, machine_id, volume, name,
+                    absolute_path, launch_type, confidence, version, producto,
+                    evidencia, source, last_checked_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(candidate_id) DO UPDATE SET
+                    scan_id = excluded.scan_id,
+                    volume = excluded.volume,
+                    name = excluded.name,
+                    absolute_path = excluded.absolute_path,
+                    launch_type = excluded.launch_type,
+                    confidence = excluded.confidence,
+                    version = excluded.version,
+                    producto = excluded.producto,
+                    evidencia = excluded.evidencia,
+                    source = excluded.source,
+                    last_checked_at = excluded.last_checked_at
+                WHERE application_candidates.machine_id = excluded.machine_id
+                """,
+                filas,
+            )
+            afectadas = cur.rowcount
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        return int(afectadas) if afectadas is not None and afectadas >= 0 else len(filas)
+
+    def iterar_entradas_lanzables_escaneo(
+        self,
+        scan_id: str,
+        machine_id: str,
+        lote: int = 1000,
+        extensiones: tuple[str, ...] = (".exe", ".lnk"),
+    ):
+        """Generador por lotes de las entradas `.exe` y `.lnk` de un escaneo.
+
+        Lee de `file_entries` las filas del `scan_id` y `machine_id` dados con
+        `lower(extension)` en `extensiones` (la columna guarda mayusculas
+        mezcladas: `.exe`, `.EXE`, `.Exe`), `entry_type = 'file'` y
+        `excluded = 0`. Cada iteracion devuelve una lista de hasta `lote`
+        diccionarios con `entry_id`, `absolute_path`, `normalized_path`,
+        `name`, `extension`, `volume` y `last_checked_at`.
+
+        La lectura se pagina por `rowid` (una consulta por extension, que usa
+        el indice `idx_file_entries_extension`) y cada consulta termina antes
+        de devolver el lote: el llamante puede escribir en la misma conexion
+        entre lote y lote sin dejar sentencias de lectura abiertas.
+        Solo lectura: no modifica la base de datos.
+        """
+        lote = max(1, int(lote))
+        conn = self.connect()
+        for extension in extensiones:
+            ultimo_rowid = -1
+            while True:
+                cur = conn.execute(
+                    """
+                    SELECT rowid AS fila, entry_id, absolute_path, normalized_path,
+                           name, extension, volume, last_checked_at
+                    FROM file_entries
+                    WHERE machine_id = ? AND lower(extension) = ?
+                      AND rowid > ? AND scan_id = ?
+                      AND entry_type = ? AND excluded = 0
+                    ORDER BY rowid
+                    LIMIT ?
+                    """,
+                    (
+                        machine_id,
+                        extension.lower(),
+                        ultimo_rowid,
+                        scan_id,
+                        EntryType.FILE.value,
+                        lote,
+                    ),
+                )
+                filas = cur.fetchall()
+                if not filas:
+                    break
+                ultimo_rowid = int(filas[-1]["fila"])
+                resultado = []
+                for r in filas:
+                    d = dict(r)
+                    d.pop("fila", None)
+                    resultado.append(d)
+                yield resultado
+                if len(filas) < lote:
+                    break
+
+    def existen_candidatos_de_escaneo(self, machine_id: str, scan_id: str) -> bool:
+        """True si `application_candidates` ya tiene alguna fila del `scan_id`
+        para el `machine_id` dado."""
+        conn = self.connect()
+        cur = conn.execute(
+            "SELECT 1 FROM application_candidates "
+            "WHERE machine_id = ? AND scan_id = ? LIMIT 1",
+            (machine_id, scan_id),
+        )
+        return cur.fetchone() is not None
+
     def buscar_candidatos_registrados(
         self,
         machine_id: str,
@@ -3198,8 +3377,10 @@ class SystemInventoryStorage:
         - machine_id: identificador del equipo (aislamiento por equipo).
         - launch_type: filtro opcional por tipo de lanzamiento.
         - fuente: filtro opcional por fuente de descubrimiento.
-        - name: filtro opcional por nombre (comparacion case-insensitive,
-          coincidencia de subcadena).
+        - name: filtro opcional por nombre (coincidencia de subcadena que
+          ignora mayusculas y acentos: "musica" encuentra "M\u00fasica.lnk" y
+          "m\u00fasica" encuentra "MUSICA.exe"; usa la funcion SQL
+          `jarvis_sin_acentos` registrada en `connect`).
         - limite: numero maximo de resultados (paginado).
         - offset: desplazamiento para paginacion.
 
@@ -3217,8 +3398,11 @@ class SystemInventoryStorage:
             condiciones.append("source = ?")
             parametros.append(fuente)
         if name is not None:
-            condiciones.append("lower(name) LIKE lower(?)")
-            parametros.append("%" + name + "%")
+            # Ambos lados sin mayusculas ni acentos. El LIKE de SQLite solo
+            # ignora mayusculas ASCII; con la funcion registrada en `connect`
+            # "musica" encuentra "M\u00fasica.lnk" y "Espana" encuentra "Espa\u00f1a".
+            condiciones.append(f"{FUNCION_SQL_SIN_ACENTOS}(name) LIKE ?")
+            parametros.append("%" + texto_sin_acentos(name) + "%")
         where = " AND ".join(condiciones)
         cur = conn.execute(
             f"""

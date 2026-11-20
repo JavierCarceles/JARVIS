@@ -263,6 +263,25 @@ class PlanningCapabilityService:
         return str(metadata.get("entity_id") or _norm(getattr(app, "name", app_name)) or _norm(app_name))
 
     @staticmethod
+    def _calibration_key(app: Any, app_name: str) -> str:
+        """Clave con la que la calibracion guarda los perfiles de la aplicacion.
+
+        Es la de ``CalibrationManager`` (``_get_storage_application_key`` sobre
+        el nombre, que resuelve aliases como chrome/edge/firefox) normalizada
+        como en ``UICalibrationPipeline``. No es el ``entity_id`` del catalogo:
+        consultar los recursos con el ``entity_id`` nunca encontraria el perfil.
+        """
+        name = str(getattr(app, "name", "") or app_name or "")
+        try:
+            from src.hands.calibration.calibration_manager import CalibrationManager
+            from src.hands.calibration.calibration_pipeline import _app_key
+
+            return _app_key(CalibrationManager._get_storage_application_key(name) or name)
+        except Exception as exc:
+            logger.debug("Clave de calibracion no disponible para %s: %s", name, exc)
+            return _norm(name)
+
+    @staticmethod
     def _declared(app: Any) -> Dict[str, Any]:
         result: Dict[str, Any] = {}
         for cap_def in list(getattr(app, "capabilities", None) or []):
@@ -315,7 +334,7 @@ class PlanningCapabilityService:
             required = [str(e).strip() for e in (getattr(cap_def, "required_ui_elements", None) or []) if str(e).strip()]
             needs_calibration = bool(required) or cap in UI_CAPABILITIES
             if needs_calibration and resources is None:
-                resources = self._resources(app_id, window_id)
+                resources = self._resources(self._calibration_key(app, app_name), window_id)
             result.append(self._evaluate(app, app_id, cap, cap_def, required, needs_calibration, resources, window_id))
         return result
 

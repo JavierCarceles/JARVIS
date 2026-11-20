@@ -156,6 +156,7 @@ def main():
         # Se decide si es necesario, se informa su alcance y se ejecuta en
         # segundo plano sin bloquear el arranque ni la conversacion de JARVIS.
         # ------------------------------------------------------------------
+        _jarvis_ejecucion_inventario = None
         try:
             from src.hands.inventory.system_inventory import (
                 GestorPrimerInventario,
@@ -210,6 +211,37 @@ def main():
         except Exception as e:
             logger.warning(
                 "No se pudo programar el primer inventario del sistema de archivos: %s",
+                e,
+            )
+
+        # ------------------------------------------------------------------
+        # Registro de candidatos de aplicacion desde el inventario ya escaneado
+        # (file_entries -> application_candidates). Hilo en segundo plano que,
+        # si se lanzo el primer inventario, espera a que termine; solo procesa
+        # los volumenes cuyo ultimo escaneo completo aun no tiene candidatos.
+        # ------------------------------------------------------------------
+        try:
+            from src.core.config import get_project_root
+            from src.hands.apps.application_discovery import ApplicationDiscovery
+            from src.hands.apps.applications_core import get_application_manager
+            from src.hands.calibration.calibration_manager import get_calibration_manager
+            from src.hands.inventory.system_inventory import generate_machine_id
+            from src.hands.inventory.system_inventory_storage import SystemInventoryStorage
+
+            _jarvis_registro_discovery = ApplicationDiscovery(
+                storage=SystemInventoryStorage(
+                    get_project_root() / "data" / "system_inventory.sqlite3"
+                ),
+                calibration=get_calibration_manager(),
+                machine_id=generate_machine_id(),
+                app_manager=get_application_manager(),
+            )
+            _jarvis_registro_discovery.programar_registro_candidatos_inventario(
+                esperar_a=_jarvis_ejecucion_inventario
+            )
+        except Exception as e:
+            logger.warning(
+                "No se pudo programar el registro de candidatos desde el inventario: %s",
                 e,
             )
 

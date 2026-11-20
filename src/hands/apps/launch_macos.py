@@ -36,6 +36,7 @@ from __future__ import annotations
 import os
 import plistlib
 import re
+import sqlite3
 import subprocess
 import sys
 import time
@@ -117,6 +118,10 @@ class MacLaunchBoundary:
             logger.warning("mdfind no disponible: %s", exc)
             return []
         return [line.strip() for line in (result.stdout or "").splitlines() if line.strip().endswith(".app")]
+
+    def bundle_exists(self, bundle_path: str) -> bool:
+        """True si ``bundle_path`` es una carpeta ``.app`` existente (``os.path.isdir``)."""
+        return bool(bundle_path) and os.path.isdir(bundle_path)
 
     def read_info_plist(self, bundle_path: str) -> Dict[str, Any]:
         plist_path = os.path.join(bundle_path, "Contents", "Info.plist")
@@ -223,7 +228,7 @@ def inspect_bundle_for_preflight(
     if not path.endswith(".app"):
         matches = b.spotlight_by_bundle_id(path)
         path = matches[0] if matches else ""
-    if not path or not os.path.isdir(path):
+    if not path or not b.bundle_exists(path):
         return {"exists": False}
     ident = bundle_identity(path, b)
     mismatch = bool(expected_bundle_id) and ident.get("bundle_id", "").casefold() != str(expected_bundle_id).casefold()
@@ -246,7 +251,13 @@ def register_bundles_in_inventory(
 
     Usa una ejecucion de escaneo con resultado parcial sobre el volumen raiz:
     deja claro que no es un inventario completo. Aislado por ``machine_id``.
+
+    Idempotente: el ``candidate_id`` es estable por equipo y bundle id; si el
+    candidato ya estaba registrado se conserva tal cual (no se duplica ni se
+    aborta el registro del resto). Devuelve cuantos candidatos se insertaron
+    ahora (los ya existentes no cuentan).
     """
+
     bundles = [t for t in targets if t.target_type == TARGET_BUNDLE and t.evidence.get("bundle_path")]
     if not bundles:
         return 0
@@ -283,7 +294,12 @@ def register_bundles_in_inventory(
                 "source": target.source or "macos_bundles",
                 "last_checked_at": now,
             })
-        inserted = storage.insert_application_candidates(scan_id, mid, "/", rows)
+        for row in rows:
+            try:
+                inserted += storage.insert_application_candidates(scan_id, mid, "/", [row])
+            except sqlite3.IntegrityError:
+                # Ya registrado en este equipo: se conserva el registro existente.
+                logger.debug("Candidato macOS ya registrado: %s", row["candidate_id"])
         storage.end_scan_run(scan_id, result=SCAN_RESULT_PARTIAL, entries_count=inserted,
                              coverage_estimate="descubrimiento_puntual_bundles")
     except Exception:
@@ -431,7 +447,7 @@ class MacOSLaunchAdapter(ApplicationLaunchAdapter):
         application = {"name": target.display_name, "app_id": target.app_id, "bundle_id": target.app_id}
         destination = target.evidence.get("bundle_path") or target.target
         result = self.preflight_engine.check_launch_target(
-            application, destination, target_type=target.target_type
+            application, destination, target_type=target.target_type, mac_boundary=self.boundary
         )
         return LaunchPreflight.from_preflight_dict(result)
 

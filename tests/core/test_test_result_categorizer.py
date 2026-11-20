@@ -129,8 +129,8 @@ class TestCategorizerHeuristicaArchivo(unittest.TestCase):
     def test_archivo_entorno_real_apertura_se_categoriza_como_apertura_gui(self):
         # Usar un archivo existente de la suite si esta disponible
         ruta = os.path.join(
-            os.path.dirname(__file__), "..", "..", "..", "tests",
-            "hands", "test_apertura_aplicacion_cerrada_entorno_real.py",
+            os.path.dirname(__file__), "..", "hands", "calibration",
+            "calibration_manager", "test_apertura_aplicacion_cerrada_entorno_real.py",
         )
         ruta = os.path.abspath(ruta)
         if os.path.exists(ruta):

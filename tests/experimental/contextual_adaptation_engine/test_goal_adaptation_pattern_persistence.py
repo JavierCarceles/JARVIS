@@ -323,7 +323,7 @@ def test_el_patron_persistido_sobrevive_al_reinicio(engine, tmp_path):
 def test_el_test_no_escribe_en_los_ficheros_de_persistencia_de_produccion(engine, tmp_path):
     """El test no debe tocar los ficheros de persistencia de Goal de `data/`.
 
-    `tests/test_goal_adaptation_feedback.py` creo el motor sin `data_dir` y
+    `tests/experimental/contextual_adaptation_engine/test_goal_adaptation_feedback.py` creo el motor sin `data_dir` y
     contamino `data/goal_adaptation_feedback.json` con 42 registros de test
     (ver 2.8.8.9.4.1). Este test debe permanecer aislado.
     """
