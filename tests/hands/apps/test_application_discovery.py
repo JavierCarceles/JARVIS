@@ -4706,3 +4706,74 @@ class TestResolucionAplicacionPorNombreConDesambiguacion:
             assert "Windows" not in entidad.get("id", "")
         finally:
             self._teardown_resolver(storage)
+
+
+# ---------------------------------------------------------------------------
+# Busqueda por nombre: filtro antes de los limites y almacen de componentes
+# ---------------------------------------------------------------------------
+
+class TestBusquedaPorNombreSinTruncar:
+    """El nombre se filtra antes de aplicar los limites de cada fuente."""
+
+    def _menu_grande(self) -> list:
+        apps = [_app("Aplicacion %03d" % i, "", FUENTE_START_MENU) for i in range(120)]
+        apps.append(_app("Calculadora", "", FUENTE_START_MENU))
+        return apps
+
+    def test_sin_filtro_el_limite_deja_fuera_la_aplicacion(self):
+        descub, _, _ = _discovery_con_mocks(calib_apps=self._menu_grande())
+        primarios = descub._fuentes_primarias(limite_por_fuente=10)
+        assert not any(p["name"] == "Calculadora" for p in primarios)
+
+    def test_con_filtro_la_aplicacion_entra_aunque_este_al_final(self):
+        descub, _, _ = _discovery_con_mocks(calib_apps=self._menu_grande())
+        primarios = descub._fuentes_primarias(limite_por_fuente=10, nombre_filtro="calculadora")
+        menu = [p for p in primarios if p["source"] == FUENTE_START_MENU]
+        assert [p["name"] for p in menu] == ["Calculadora"]
+
+    def test_buscar_por_nombre_filtra_el_inventario_en_la_consulta(self):
+        descub, _, storage = _discovery_con_mocks(calib_apps=[])
+        descub.buscar_por_nombre("aplicacion_inexistente_xyz")
+        llamadas_inventario = [
+            c for c in storage.search.call_args_list if c.kwargs.get("extension") == ".exe"
+        ]
+        assert llamadas_inventario, "el inventario debe consultarse cuando no hay otras fuentes"
+        assert all(
+            c.kwargs.get("name_contains") == "aplicacion_inexistente_xyz"
+            for c in llamadas_inventario
+        )
+
+    def test_inventario_descarta_el_almacen_de_componentes(self, tmp_path):
+        winsxs = tmp_path / "Windows" / "WinSxS" / "amd64_herramienta_1.0"
+        winsxs.mkdir(parents=True)
+        (winsxs / "herramientaxyz.exe").write_bytes(b"MZ")
+        real = tmp_path / "Programas" / "Herramienta"
+        real.mkdir(parents=True)
+        (real / "herramientaxyz.exe").write_bytes(b"MZ")
+        entradas = [
+            {"name": "herramientaxyz.exe", "absolute_path": str(winsxs / "herramientaxyz.exe"),
+             "volume": "C:", "last_checked_at": "2026-01-01T00:00:00"},
+            {"name": "herramientaxyz.exe", "absolute_path": str(real / "herramientaxyz.exe"),
+             "volume": "C:", "last_checked_at": "2026-01-01T00:00:00"},
+        ]
+        descub, _, _ = _discovery_con_mocks(calib_apps=[], storage_entries=entradas)
+        candidatos = descub.buscar_por_nombre("herramientaxyz")
+        rutas = [str(c.absolute_path or c.destination or "") for c in candidatos]
+        assert not any("winsxs" in r.casefold() for r in rutas)
+        assert any(r.endswith(str(real / "herramientaxyz.exe")) for r in rutas), rutas
+
+
+class TestSemanticaPath:
+    """Un comando repetido en PATH solo cuenta en la primera carpeta (como el SO)."""
+
+    def test_copia_posterior_en_path_no_es_alternativa(self, tmp_path, monkeypatch):
+        primera = tmp_path / "System32"
+        segunda = tmp_path / "Windows"
+        for carpeta in (primera, segunda):
+            carpeta.mkdir()
+            (carpeta / "editorxyz.exe").write_bytes(b"MZ")
+        monkeypatch.setenv("PATH", os.pathsep.join([str(primera), str(segunda)]))
+        descub, _, _ = _discovery_con_mocks(calib_apps=[])
+        primarios = descub._fuentes_primarias(limite_por_fuente=10, nombre_filtro="editorxyz")
+        rutas = [p["absolute_path"] for p in primarios if p["source"] == FUENTE_PATH]
+        assert rutas == [str(primera / "editorxyz.exe")]

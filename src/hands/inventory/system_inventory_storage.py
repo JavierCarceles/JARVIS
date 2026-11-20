@@ -3380,6 +3380,7 @@ class SystemInventoryStorage:
         offset: int = 0,
         order_by: str = "absolute_path",
         solo_volumes_montados: bool = True,
+        name_contains: Optional[str] = None,
     ) -> list[dict]:
         """
         Busqueda unificada de entradas de inventario por multiples criterios.
@@ -3394,6 +3395,9 @@ class SystemInventoryStorage:
         Parametros:
         - machine_id: identificador del equipo (obligatorio, aislamiento por equipo).
         - name: nombre exacto o normalizado (comparacion case-insensitive).
+        - name_contains: subcadena del nombre (case-insensitive). Se filtra en
+          SQL antes del LIMIT, de modo que la busqueda por nombre no depende
+          de que la aplicacion este entre las primeras filas del inventario.
         - ruta: prefijo de ruta absoluta (LIKE).
         - extension: extension de archivo (case-insensitive).
         - tipo: tipo de entrada (file, directory, symlink, junction, mount_point, other).
@@ -3417,6 +3421,13 @@ class SystemInventoryStorage:
         if name is not None:
             where_clauses.append("lower(name) = lower(?)")
             params.append(name)
+        if name_contains:
+            escapado = (
+                str(name_contains).lower()
+                .replace("!", "!!").replace("%", "!%").replace("_", "!_")
+            )
+            where_clauses.append("lower(name) LIKE ? ESCAPE '!'")
+            params.append("%" + escapado + "%")
         if ruta is not None:
             where_clauses.append("absolute_path LIKE ?")
             params.append(ruta + "%")

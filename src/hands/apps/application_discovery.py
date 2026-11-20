@@ -44,7 +44,11 @@ from src.hands.apps.application_launch_classifier import (
 )
 from src.hands.apps.application_preflight import ApplicationPreflight
 from src.hands.calibration.calibration_manager import CalibrationManager
-from src.hands.inventory.system_inventory import EntryType, generate_machine_id
+from src.hands.inventory.system_inventory import (
+    EntryType,
+    es_ruta_almacen_componentes,
+    generate_machine_id,
+)
 from src.hands.inventory.system_inventory_storage import (
     SCAN_MODE_FULL,
     SCAN_RESULT_INTERRUPTED,
@@ -925,7 +929,7 @@ class ApplicationDiscovery:
         # ------------------------------------------------------------------
         # Paso 2: fuentes nativas instaladas (FUENTES_PRIMARIAS).
         # ------------------------------------------------------------------
-        primarios = self._fuentes_primarias(limite_por_fuente)
+        primarios = self._fuentes_primarias(limite_por_fuente, nombre_filtro=nombre_lower)
         for fuente in FUENTES_PRIMARIAS:
             if any(str(p.get("source", "")).casefold() == fuente for p in primarios):
                 fuentes_consultadas.append(fuente)
@@ -1019,6 +1023,10 @@ class ApplicationDiscovery:
             else:
                 try:
                     self.storage.connect()
+                    # El filtro por nombre va en la consulta SQL: si se
+                    # filtrara despues, el LIMIT devolveria las primeras .exe
+                    # de todo el inventario (millones de entradas) y casi
+                    # nunca la aplicacion buscada.
                     entradas = self.storage.search(
                         machine_id=self.machine_id,
                         extension=".exe",
@@ -1026,6 +1034,7 @@ class ApplicationDiscovery:
                         disponible=True,
                         limit=limite_por_fuente,
                         solo_volumes_montados=True,
+                        name_contains=nombre,
                     )
                 except (OSError, PermissionError, sqlite3.Error):
                     entradas = []
@@ -1046,6 +1055,7 @@ class ApplicationDiscovery:
                     e
                     for e in entradas
                     if nombre_lower in str(e.get("name", "")).casefold()
+                    and not es_ruta_almacen_componentes(str(e.get("absolute_path", "")))
                     and str(e.get("name", "")).casefold() not in nombres_resueltos
                     and str(e.get("absolute_path", "")).casefold()
                     not in destinos_resueltos
@@ -2365,7 +2375,9 @@ class ApplicationDiscovery:
     # Fuentes primarias existentes (reutilizadas)
     # ------------------------------------------------------------------ #
 
-    def _fuentes_primarias(self, limite_por_fuente: int) -> list[dict[str, Any]]:
+    def _fuentes_primarias(
+        self, limite_por_fuente: int, nombre_filtro: Optional[str] = None
+    ) -> list[dict[str, Any]]:
         """
         Recolecta candidatos de las fuentes de descubrimiento existentes del SO,
         en orden: menu de aplicaciones (Get-StartApps, .lnk, AppX, registro de
@@ -2373,13 +2385,24 @@ class ApplicationDiscovery:
 
         Cada fuente se lee de forma independiente y resiliente: el fallo de una
         no interrumpe las demas.
+
+        `nombre_filtro` limita la recoleccion a entradas cuyo nombre lo
+        contiene (sin distinguir mayusculas). El filtro se aplica ANTES de los
+        limites por fuente: sin el, una busqueda por nombre solo veria las
+        primeras entradas del menu Inicio y de PATH, y aplicaciones como
+        "Microsoft Edge" o "Calculadora" quedarian fuera del limite.
         """
         recolectados: list[dict[str, Any]] = []
+        filtro = (nombre_filtro or "").strip().casefold() or None
+
+        def _coincide(nombre_entrada: Any) -> bool:
+            return filtro is None or filtro in str(nombre_entrada or "").casefold()
 
         # 1) CalibrationManager: menu de aplicaciones, .lnk menu Inicio,
         #    paquetes AppX y registro de desinstaladores (fuente existente).
         try:
             apps = self.calibration.discover_applications() or []
+            apps = [a for a in apps if _coincide(a.get("name", ""))]
             for app in apps[:limite_por_fuente]:
                 nombre = str(app.get("name", "")).strip()
                 path = str(app.get("path", "")).strip()
@@ -2416,6 +2439,11 @@ class ApplicationDiscovery:
             raw_path = os.environ.get("PATH", "")
             dirs = [d for d in raw_path.split(os.pathsep) if d]
             vistos_exe: set[str] = set()
+            # Semantica de PATH: un comando se resuelve con la PRIMERA carpeta
+            # que lo contiene; las copias con el mismo nombre en carpetas
+            # posteriores (C:\Windows\notepad.exe tras System32) quedan
+            # ocultas y no son destinos alternativos.
+            vistos_nombres: set[str] = set()
             for directory in dirs:
                 if not os.path.isdir(directory):
                     continue
@@ -2423,11 +2451,16 @@ class ApplicationDiscovery:
                     for entry in os.listdir(directory):
                         if not entry.lower().endswith(".exe"):
                             continue
+                        if not _coincide(entry):
+                            continue
+                        if entry.casefold() in vistos_nombres:
+                            continue
                         ruta = os.path.join(directory, entry)
                         clave = os.path.normcase(os.path.abspath(ruta))
                         if clave in vistos_exe:
                             continue
                         vistos_exe.add(clave)
+                        vistos_nombres.add(entry.casefold())
                         if len(recolectados) >= limite_por_fuente * 2:
                             break
                         recolectados.append(
@@ -2466,6 +2499,8 @@ class ApplicationDiscovery:
                                 except OSError:
                                     break
                                 index += 1
+                                if not _coincide(exe_name):
+                                    continue
                                 try:
                                     with winreg.OpenKey(key, exe_name) as subkey:
                                         path, _ = winreg.QueryValueEx(subkey, "")

@@ -25,6 +25,7 @@ import ctypes
 import os
 import platform
 import psutil
+import sqlite3
 import subprocess
 import threading
 import time
@@ -228,6 +229,19 @@ def is_excluded_path(path: str, exclusions: Optional[list[str]] = None) -> bool:
         if pattern.lower() in path_lower:
             return True
     return False
+
+
+def es_ruta_almacen_componentes(ruta: str) -> bool:
+    """Devuelve True si `ruta` esta dentro del almacen de componentes de
+    Windows (`\\Windows\\WinSxS\\`).
+
+    El inventario registra esas entradas (son ficheros reales), pero son copias
+    de servicio de los binarios del sistema (decenas de `notepad.exe` o
+    `calc.exe` por version): nunca son el destino de lanzamiento de una
+    aplicacion y no deben competir con la ruta de produccion al resolverla.
+    """
+    texto = str(ruta or "").replace("/", "\\").casefold()
+    return "\\winsxs\\" in texto
 
 
 def is_excluded_mount(mount_point: str, exclusions: Optional[list[str]] = None) -> bool:
@@ -2014,6 +2028,51 @@ FILE_ATTRIBUTE_REPARSE_POINT = 0x00000400
 IO_REPARSE_TAG_SYMLINK = 0xA000000C
 IO_REPARSE_TAG_MOUNT_POINT = 0xA0000003  # junction / punto de montaje de volumen
 
+# Bit "name surrogate" de una etiqueta de reparse point: indica que la entrada
+# redirige a otra ruta del espacio de nombres (junction, enlace simbolico,
+# punto de montaje de volumen). Los reparse points sin este bit (marcadores de
+# OneDrive/archivos en la nube, AppExecLink, deduplicacion) son directorios o
+# archivos reales y se recorren como tales.
+IO_REPARSE_TAG_NAME_SURROGATE_BIT = 0x20000000
+
+
+def tipo_enlace_entrada_windows(
+    entrada: Any, stat_result: Any, es_windows: Optional[bool] = None
+) -> Optional[EntryType]:
+    """Devuelve `EntryType.JUNCTION` o `EntryType.SYMLINK` si la entrada de
+    directorio es un reparse point de redireccion en Windows, o None si no lo es.
+
+    Usa solo los metadatos que ya trae `os.DirEntry.stat(follow_symlinks=False)`
+    (`st_file_attributes` y `st_reparse_tag`), sin abrir el destino. En Windows
+    `DirEntry.is_dir(follow_symlinks=False)` devuelve True para una junction
+    (no es un symlink para Python), por lo que sin esta comprobacion una
+    junction como `C:\\Documents and Settings` se recorreria como un directorio
+    real. En otros SO devuelve siempre None. `es_windows` permite fijar la
+    plataforma (por defecto `os.name == "nt"`).
+    """
+    if es_windows is None:
+        es_windows = os.name == "nt"
+    if not es_windows:
+        return None
+    attrs = getattr(stat_result, "st_file_attributes", 0) or 0
+    if not attrs & FILE_ATTRIBUTE_REPARSE_POINT:
+        return None
+    tag = getattr(stat_result, "st_reparse_tag", 0) or 0
+    if tag == IO_REPARSE_TAG_SYMLINK:
+        return EntryType.SYMLINK
+    if tag == IO_REPARSE_TAG_MOUNT_POINT:
+        return EntryType.JUNCTION
+    if tag & IO_REPARSE_TAG_NAME_SURROGATE_BIT:
+        return EntryType.SYMLINK
+    es_junction = getattr(entrada, "is_junction", None)
+    if callable(es_junction):
+        try:
+            if es_junction():
+                return EntryType.JUNCTION
+        except OSError:
+            return None
+    return None
+
 
 class TipoEnlace(Enum):
     """Tipo de mecanismo de redireccion del sistema de archivos observado."""
@@ -2494,6 +2553,13 @@ class RecorridoVolumen:
     - `seguir_enlaces`: si True, los enlaces simbolicos y junctions no ciclicos se atraviesan segun
       `debe_seguir_enlace` (politica conservadora). Por defecto False: los enlaces se reportan como
       entrada pero no se recorren, preservando el comportamiento seguro de recorrido controlado.
+      En Windows las junctions y enlaces simbolicos se identifican por su reparse point
+      (`tipo_enlace_entrada_windows`) y se emiten como `JUNCTION`/`SYMLINK`, nunca como
+      directorio real.
+    - `conservar_entradas`: si True (por defecto) las entradas emitidas se conservan en
+      memoria y se exponen en `entradas_validas`. Los escaneos de volumen completo, que
+      persisten cada entrada en SQLite por lotes, lo desactivan para no retener millones de
+      objetos en memoria.
     """
 
     def __init__(
@@ -2507,8 +2573,10 @@ class RecorridoVolumen:
         callback_control: Optional[Callable[[], ControlRecorrido]] = None,
         limite_recursos: Optional[LimiteRecursos] = None,
         medidor_recursos: Optional[MedidorRecursosSistema] = None,
+        conservar_entradas: bool = True,
     ) -> None:
         self.volumen = volumen
+        self._conservar_entradas = conservar_entradas
         self.raiz = _aplicar_prefijo_ruta_larga(os.path.abspath(raiz))
         self.contrato = contrato
         self.maquina_id = maquina_id
@@ -2564,7 +2632,7 @@ class RecorridoVolumen:
         """
         return self._progreso.interrumpido
 
-    def _clave_directorio(self, path: str) -> str:
+    def _clave_directorio(self, path: str, es_enlace: bool = False) -> str:
         """Identificador canonico de visita para un directorio.
 
         Combina la ruta real resuelta (symlinks y junctions) con la identidad
@@ -2572,7 +2640,19 @@ class RecorridoVolumen:
         mismo objeto del sistema de archivos (enlace simbolico, junction,
         reparse point o bind mount) generen la misma clave y no se recorran
         dos veces (3.8.5.1.4.4.2).
+
+        En Windows un directorio real (no enlace) se identifica por su propia
+        ruta normalizada, sin `os.path.realpath`: resolver la ruta real solo
+        tiene sentido para el enlace que se va a atravesar (`es_enlace=True`).
+        Si se resolviera tambien al apilar, una junction hermana (por ejemplo
+        `C:\\Documents and Settings` -> `C:\\Users`, o `Archivos de programa`
+        -> `Program Files`) registraria como visitado el directorio real antes
+        de llegar a el, el directorio real se descartaria y la junction, que
+        Windows protege con una ACL que deniega listar, fallaria con permiso
+        denegado: el arbol completo quedaria fuera del inventario.
         """
+        if os.name == "nt" and not es_enlace:
+            return self._normalizar_visitado(path)
         try:
             real = os.path.realpath(path)
         except OSError:
@@ -2586,15 +2666,19 @@ class RecorridoVolumen:
                 pass
         return clave
 
-    def _considerar_directorio_para_pila(self, ruta: str, pila: list[str]) -> None:
+    def _considerar_directorio_para_pila(
+        self, ruta: str, pila: list[str], es_enlace: bool = False
+    ) -> None:
         """Agrega `ruta` a la pila de recorrido solo si aun no fue visitada.
 
         Usa el identificador canonico de visita, por lo que descarta
         silenciosamente ciclos, duplicados por punto de montaje y recorridos
         repetidos de enlaces (3.8.5.1.4.4.2). Se registra la clave al apilar
         para que la pila nunca contenga el mismo directorio dos veces.
+        `es_enlace` indica que `ruta` es un enlace/junction que se va a
+        atravesar, por lo que su clave usa la ruta real del destino.
         """
-        clave = self._clave_directorio(ruta)
+        clave = self._clave_directorio(ruta, es_enlace=es_enlace)
         if clave in self._visitados:
             return
         self._visitados.add(clave)
@@ -2683,7 +2767,12 @@ class RecorridoVolumen:
             extension = os.path.splitext(nombre)[1]
 
             # Tipo de entrada observado directamente del SO, sin inferencias.
-            if entrada.is_dir(follow_symlinks=False):
+            # En Windows las junctions y enlaces se detectan por su reparse
+            # point antes que is_dir, que devuelve True para una junction.
+            tipo_enlace_windows = tipo_enlace_entrada_windows(entrada, stat)
+            if tipo_enlace_windows is not None:
+                tipo_entrada = tipo_enlace_windows
+            elif entrada.is_dir(follow_symlinks=False):
                 tipo_entrada = EntryType.DIRECTORY
             elif entrada.is_symlink():
                 tipo_entrada = EntryType.SYMLINK
@@ -2895,7 +2984,8 @@ class RecorridoVolumen:
                             # visita aun no fue registrado.
                             self._considerar_directorio_para_pila(ruta_absoluta, self._pila)
                         elif (
-                            entry.entry_type == EntryType.SYMLINK
+                            entry.entry_type
+                            in (EntryType.SYMLINK, EntryType.JUNCTION)
                             and self._seguir_enlaces
                         ):
                             # Enlace simbolico/junction: atravesar solo si la
@@ -2906,10 +2996,11 @@ class RecorridoVolumen:
                                 info_enlace, self._visitados, "conservadora"
                             ):
                                 self._considerar_directorio_para_pila(
-                                    ruta_absoluta, self._pila
+                                    ruta_absoluta, self._pila, es_enlace=True
                                 )
 
-                        self._entradas_emitidas.append(entry)
+                        if self._conservar_entradas:
+                            self._entradas_emitidas.append(entry)
                         yield entry
 
             except PermissionError as exc:
@@ -4348,6 +4439,7 @@ class EscanerRutaVolumen:
         de concurrencia incluso ante fallos.
         """
         from src.hands.inventory.system_inventory_storage import (
+            SCAN_RESULT_ERROR,
             SCAN_RESULT_INTERRUPTED,
             SCAN_RESULT_OK,
         )
@@ -4380,6 +4472,7 @@ class EscanerRutaVolumen:
             callback_control=self.callback_control,
             limite_recursos=self.limite_recursos,
             medidor_recursos=self.medidor_recursos,
+            conservar_entradas=False,
         )
 
         entradas_procesadas = 0
@@ -4387,6 +4480,49 @@ class EscanerRutaVolumen:
         directorios_procesados = 0
         lote: list[dict] = []
         interrumpido = False
+        duplicadas = 0
+
+        def _insertar_lote(entradas_lote: list[dict]) -> None:
+            """Inserta un lote; si la clave unica rechaza alguna ruta repetida
+            dentro del mismo scan (por ejemplo dos nombres que solo difieren
+            en mayusculas en un directorio sensible a mayusculas), inserta el
+            resto una a una y cuenta la repetida como error, sin abortar un
+            escaneo de volumen completo."""
+            nonlocal duplicadas
+            try:
+                self.storage.insert_file_entries(
+                    scan_id, self.maquina_id, self.volumen, entradas_lote
+                )
+                return
+            except sqlite3.IntegrityError:
+                pass
+            for item in entradas_lote:
+                try:
+                    self.storage.insert_file_entries(
+                        scan_id, self.maquina_id, self.volumen, [item]
+                    )
+                except sqlite3.IntegrityError as exc:
+                    duplicadas += 1
+                    logger.warning(
+                        "Entrada repetida descartada en scan_id=%s volumen=%s (total=%d, ruta=%s): %s",
+                        scan_id,
+                        self.volumen,
+                        duplicadas,
+                        safe_log_path(str(item.get("absolute_path", ""))),
+                        exc,
+                    )
+
+        def _finalizar(resultado_scan: str) -> None:
+            progreso_fin = recorrido.progreso
+            self.storage.end_scan_run(
+                scan_id=scan_id,
+                finished_at=datetime.now().isoformat(),
+                result=resultado_scan,
+                entries_count=entradas_procesadas - duplicadas,
+                errors_count=progreso_fin.errores + duplicadas,
+                exclusions_count=progreso_fin.exclusiones,
+                coverage_estimate=str(round(progreso_fin.cobertura, 2)),
+            )
 
         try:
             for entrada in recorrido.recorrer():
@@ -4416,18 +4552,51 @@ class EscanerRutaVolumen:
                     }
                 )
                 if len(lote) >= self.tamano_lote_entradas:
-                    self.storage.insert_file_entries(
-                        scan_id, self.maquina_id, self.volumen, lote
-                    )
+                    _insertar_lote(lote)
                     lote = []
+
+            if lote:
+                _insertar_lote(lote)
+                lote = []
 
             if recorrido.ejecucion_parcial:
                 interrumpido = True
-        finally:
-            if lote:
-                self.storage.insert_file_entries(
-                    scan_id, self.maquina_id, self.volumen, lote
+        except BaseException as exc:
+            # Un fallo inesperado o una interrupcion manual (Ctrl+C) no deben
+            # dejar el scan_run abierto ni el bloqueo de concurrencia tomado:
+            # se guardan las entradas ya leidas y se cierra el scan_run como
+            # error o interrumpido antes de propagar la excepcion.
+            resultado_fallo = (
+                SCAN_RESULT_ERROR
+                if isinstance(exc, Exception)
+                else SCAN_RESULT_INTERRUPTED
+            )
+            logger.error(
+                "Escaneo scan_id=%s volumen=%s terminado con %s tras %d entradas: %s",
+                scan_id,
+                self.volumen,
+                resultado_fallo,
+                entradas_procesadas,
+                exc,
+            )
+            try:
+                if lote:
+                    _insertar_lote(lote)
+            except Exception as exc_lote:
+                logger.warning(
+                    "No se pudo guardar el ultimo lote del scan_id=%s: %s",
+                    scan_id,
+                    exc_lote,
                 )
+            try:
+                _finalizar(resultado_fallo)
+            except Exception as exc_fin:
+                logger.warning(
+                    "No se pudo cerrar el scan_run %s tras el fallo: %s",
+                    scan_id,
+                    exc_fin,
+                )
+            raise
 
         finalizado_en = datetime.now().isoformat()
         resultado = SCAN_RESULT_INTERRUPTED if interrumpido else SCAN_RESULT_OK
@@ -4436,11 +4605,15 @@ class EscanerRutaVolumen:
             scan_id=scan_id,
             finished_at=finalizado_en,
             result=resultado,
-            entries_count=entradas_procesadas,
-            errors_count=progreso.errores,
+            entries_count=entradas_procesadas - duplicadas,
+            errors_count=progreso.errores + duplicadas,
             exclusions_count=progreso.exclusiones,
             coverage_estimate=str(round(progreso.cobertura, 2)),
         )
+        if duplicadas:
+            progreso.errores_por_categoria["entrada_duplicada"] = duplicadas
+        entradas_procesadas -= duplicadas
+        progreso.errores += duplicadas
 
         logger.info(
             "Fin de escaneo scan_id=%s volumen=%s modo=%s resultado=%s entradas=%d archivos=%d directorios=%d errores=%d exclusiones=%d cobertura=%.2f%%",

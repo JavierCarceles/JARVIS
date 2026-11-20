@@ -352,10 +352,19 @@ Decide si una aplicacion se puede abrir o calibrar. No la ejecuta.
   2. Resolucion no ambigua.
   3. Nombre o `app_id` no bloqueados (herramientas administrativas: registro, servicios, firewall, programador de tareas, Hyper-V...; se compara por subcadena, asi que puede haber falsos positivos).
   4. Login requerido y confirmado; recursos disponibles.
-  5. Se encuentra el ejecutable real: primero en `shell:AppsFolder` via PowerShell (hasta 10 s) y despues en el inventario SQLite (solo `.exe` existentes). Si no hay ejecutable, se acepta una URL valida o un paquete verificado.
+  5. Se encuentra el ejecutable real: primero en `shell:AppsFolder` via PowerShell (hasta 10 s), despues en el inventario SQLite (solo `.exe` existentes; nombre exacto con y sin `.exe`; nunca rutas del almacen de componentes `\Windows\WinSxS\`), despues en PATH y por ultimo en la clave App Paths del registro (HKCU y HKLM), que localiza programas instalados fuera de PATH como `chrome.exe`. Si no hay ejecutable, se acepta una URL valida o un paquete verificado.
   6. El destino es valido (`validate_launch_destination`): `.exe`, `.lnk` o URI admitida (`ms-settings`, `microsoft-edge`, `ms-store`, `ms-windows-store`, `mailto`, `http`, `https`).
   7. El manifiesto del ejecutable no pide elevacion ni `uiAccess` (lee el `.manifest` o el recurso interno con `pefile`; sin manifiesto se permite con confianza media).
 - **Plataforma:** solo Windows en la practica. En macOS no hay PowerShell ni `.exe`: todo termina en `executable_not_resolved` salvo las URL.
+
+#### `platform_launch.py` y `launch_windows.py` - flujo unico de apertura
+
+`ApplicationLaunchService.open(nombre)` resuelve (catalogo global o, si no esta, resolucion local del adaptador del SO), pasa el preflight, lanza y verifica proceso y ventana. Lo usa `UICalibrationPipeline` para abrir la aplicacion que calibra.
+
+- **Catalogo con comando sin ruta** (por ejemplo `executable: "chrome"`): si el comando no esta en PATH pero el preflight resolvio y valido una ruta (`executable_path`), se lanza esa ruta como `.exe`.
+- **Reutilizacion:** solo se reutiliza una instancia con ventana visible. Si hay procesos con el nombre esperado pero ninguno tiene ventana (navegador residente en segundo plano), se lanza para obtener una ventana nueva.
+- **Verificacion** (`ApplicationLaunchAdapter.verify`, espera acotada sin sleep fijo): ventana visible del PID lanzado o de procesos nuevos con el nombre esperado; para aplicaciones de instancia unica, una ventana NUEVA (no presente en la instantanea previa al lanzamiento) de un proceso que ya existia con ese nombre; para AUMID/URI sin nombre de proceso, una ventana nueva cuyo titulo contiene el nombre visible.
+- **Procesos propios:** un proceso que ya existia antes de lanzar nunca se registra como abierto por JARVIS. La apertura recordada (idempotencia) deja de valer cuando su proceso termina o su ventana ya no existe.
 
 ### 7.3 Descubrimiento (`apps/`) e inventario (`inventory/`)
 
@@ -365,9 +374,10 @@ Busca aplicaciones en fuentes del sistema, las clasifica y las valida sin lanzar
 
 - `ApplicationDiscovery(...)`: `descubrir_todos()`, `buscar_por_nombre(nombre)`, `buscar_por_nombre_con_desambiguacion(nombre)`, `resolver_aplicacion_por_nombre(nombre)`, `auto_registrar_descubiertos()`, `registrar_candidatos(...)`, `verificar_aislamiento_inventario()`.
 - **Fuentes, por orden de prioridad:** aplicacion ya abierta, catalogo conocido, menu Inicio, AppX, desinstaladores del registro, PATH (solo el primer nivel de cada carpeta), App Paths del registro y, por ultimo, el inventario SQLite. Si una fuente falla, las demas siguen.
+- **Busqueda por nombre:** cada fuente se filtra por el nombre ANTES de aplicar su limite de resultados (`_fuentes_primarias(limite, nombre_filtro)`), y el inventario se consulta con el filtro en SQL (`search(name_contains=...)`), de modo que la aplicacion no depende de estar entre las primeras entradas. En PATH un ejecutable solo cuenta en la primera carpeta que lo contiene, como al ejecutarlo por nombre. Las rutas del almacen de componentes (`\Windows\WinSxS\`) no se proponen como candidatos.
 - **Ambiguedad:** si hay varios candidatos y no exactamente una fuente de autoridad (abierta o catalogo), el resultado se marca como ambiguo y requiere preguntar al usuario.
 - **Identidad estable** (nunca la ruta): `paquete:<AUMID>`, `fabprod:<fabricante>:<producto>`, `nombre:<nombre>` o `candidato:<id>`. El auto-registro hace upsert en `data/memory/entities.json` sin inventar capacidades.
-- **Limitaciones:** la busqueda en el inventario aplica el limite de resultados antes de filtrar por nombre (puede no encontrar la aplicacion si hay muchos `.exe`); la confianza se guarda como texto en una columna numerica; cada candidato lanza un PowerShell (lento).
+- **Limitaciones:** la confianza se guarda como texto en una columna numerica; cada candidato lanza un PowerShell (lento).
 
 #### `application_launch_classifier.py` - tipo de lanzamiento
 
@@ -383,13 +393,15 @@ Busca aplicaciones en fuentes del sistema, las clasifica y las valida sin lanzar
 - `generate_machine_id()`: identificador del equipo a partir del nombre del equipo y el SO.
 - `InventoryEntry`, `InventoryContract` (alcance, exclusiones, privacidad: nunca lee contenido de ficheros), exclusiones tecnicas (`$Recycle.Bin`, `pagefile.sys`, `/proc`, `/private/var/folders`...).
 - Enumeracion de volumenes para Windows, Linux y macOS.
-- `RecorridoVolumen`: recorrido iterativo con pausa, cancelacion y limites de CPU, memoria y disco.
+- `RecorridoVolumen`: recorrido iterativo con pausa, cancelacion y limites de CPU, memoria y disco. En Windows las junctions y enlaces simbolicos se reconocen por su reparse point (`tipo_enlace_entrada_windows`: etiqueta `MOUNT_POINT`/`SYMLINK` o bit "name surrogate") y se registran como `junction`/`symlink` sin recorrerse; los reparse points sin redireccion (carpetas de OneDrive, AppExecLink) se tratan como directorios o ficheros normales. Un directorio real se identifica por su propia ruta normalizada (sin `realpath`), asi que una junction hermana (`Documents and Settings`, `Archivos de programa`) no oculta `C:\Users` ni `C:\Program Files`. `conservar_entradas=False` evita guardar en memoria las entradas ya emitidas.
+- `EscanerRutaVolumen` / `escanear_volumen` / `escanear_ruta`: escaneo con `scan_run` en SQLite e insercion por lotes sin retener entradas en memoria. Si la clave unica rechaza una ruta repetida dentro del mismo escaneo, el lote se reinserta entrada a entrada y la repetida cuenta como error `entrada_duplicada`. Ante una excepcion o una interrupcion manual, guarda el ultimo lote, cierra el `scan_run` como `error` o `interrumpido` (liberando el bloqueo) y propaga la excepcion.
+- `es_ruta_almacen_componentes(ruta)`: True para rutas dentro de `\Windows\WinSxS\`.
 - `GestorPrimerInventario`: `main.py` lo usa al arrancar. Si este equipo no tiene ningun escaneo correcto, lanza en segundo plano un **inventario completo de todos los volumenes**.
 - Politicas de refresco, caducidad y retencion; validacion de rutas para lanzar.
 
 #### `system_inventory_storage.py` - base de datos del inventario
 
-`SystemInventoryStorage(db_path="data/system_inventory.sqlite3")`: esquema, migraciones y proteccion descritos en `docs/readme/README_DATA.md`. Metodos principales: `initialize`, `verificar_identidad_equipo`, `begin_scan_run`/`end_scan_run`, `insert_file_entries`, `insert_application_candidates`, `search` (filtros por nombre, extension, tipo, volumen, solo volumenes montados), `buscar_candidatos_para_orden`, `revalidar_destino_aplicacion`, refrescos, deteccion de cambios, copias de seguridad, `write_manifest`.
+`SystemInventoryStorage(db_path="data/system_inventory.sqlite3")`: esquema, migraciones y proteccion descritos en `docs/readme/README_DATA.md`. Metodos principales: `initialize`, `verificar_identidad_equipo`, `begin_scan_run`/`end_scan_run`, `insert_file_entries`, `insert_application_candidates`, `search` (filtros por nombre exacto, subcadena del nombre `name_contains` con comodines LIKE escapados, extension, tipo, volumen, solo volumenes montados), `buscar_candidatos_para_orden`, `revalidar_destino_aplicacion`, refrescos, deteccion de cambios, copias de seguridad, `write_manifest`.
 
 Ojo: la ruta por defecto es relativa al directorio de trabajo, mientras que el preflight usa la ruta absoluta del proyecto. Si JARVIS no se arranca desde su carpeta, pueden usarse dos bases distintas.
 

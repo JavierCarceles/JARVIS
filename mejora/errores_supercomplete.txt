@@ -135,3 +135,47 @@ ESTADO: BLOQUEADO
 REPETICIONES_TIPO: 2 (vea ERR-0022 y esta entrada ERR-0024)
 MEMORIA_PERSISTENTE: La unidad 3.8.6.12.3 esta cerrada como IMPLEMENTADA; el puntero avanza a 3.8.6.12.4 PENDIENTE. La macro de cierre no se ejecuto porque macro_mejoraActual.json no existe.
 ---
+ERR-0028
+FECHA_HORA: 2026-11-20T13:08:05+01:00 Europe/Madrid
+UNIDAD: 3.8.6.13.2 (revision pedida por el usuario; trabajo en Mac)
+TIPO_NORMALIZADO: INVENTARIO_ARBOLES_PERDIDOS
+HERRAMIENTA_OPERACION: revision de src/hands/inventory/system_inventory.py (RecorridoVolumen, EscanerRutaVolumen) y tests/hands/inventory/test_escaneo_volumenes_locales_completo_entorno_real.py
+OBJETIVO: escaneo completo de volumenes (data/system_inventory.sqlite3)
+SINTOMA_SALIDA: El usuario observa ~3M de entradas frente a ~5M de un escaneo anterior. La base de muestra tiene el scan_run del escaneo completo con result=interrumpido y entries_count=0, y en el primer nivel de C: solo aparecen las entradas de las carpetas Users, Program Files y Program Files (x86), sin nada debajo; la base real no contenia notepad/calc/chrome.
+CAUSA: (1) En Windows DirEntry.is_dir(follow_symlinks=False) es True para una junction y _clave_directorio usaba os.path.realpath al apilar: la junction "Documents and Settings" registraba C:\Users como visitado y "Archivos de programa" registraba C:\Program Files; el directorio real se descartaba y la junction, con ACL que deniega listar, fallaba con permiso denegado: arboles enteros fuera del inventario (igual en perfiles de usuario: "Datos de programa", "Configuracion local", etc.). (2) El recorrido guardaba en memoria todas las entradas emitidas (millones de objetos). (3) Una IntegrityError de la clave unica en un lote o cualquier excepcion abortaba el escaneo sin end_scan_run: scan_run abierto como interrumpido y bloqueo sin liberar. (4) El script del test chocaba con unittest.main al pasar --db-path/--raiz y solo escaneaba C:.
+CORRECCION: Aplicada en Mac: tipo_enlace_entrada_windows (reparse point MOUNT_POINT/SYMLINK o bit name surrogate) -> entradas JUNCTION/SYMLINK no recorridas; clave de visita sin realpath para directorios reales en Windows; conservar_entradas=False en EscanerRutaVolumen; lote reinsertado entrada a entrada ante IntegrityError (error entrada_duplicada); scan_run cerrado como error/interrumpido ante excepcion o Ctrl+C. Script reescrito: todos los volumenes locales fijos, --volumen/--raiz/--db-path compatibles con unittest, contraste por carpeta de primer nivel con el SO y recuento persistido.
+VERIFICACION: En Mac (Python 3.14.10 aislado): tests nuevos de test_system_inventory.py y test_system_inventory_storage.py PASSED; no regresion igual a la linea base. PENDIENTE en Windows: test con junction real (TestJunctionsWindowsEntornoReal) y escaneo completo ejecutado manualmente por el usuario.
+ESTADO: ABIERTO
+REPETICIONES_TIPO: 1 (primera aparicion de TIPO_NORMALIZADO INVENTARIO_ARBOLES_PERDIDOS en este archivo)
+MEMORIA_PERSISTENTE: No aplica (primera aparicion). Prevencion: en Windows comprobar el reparse point antes de tratar una entrada como directorio y no usar realpath para identificar directorios reales.
+---
+
+ERR-0029
+FECHA_HORA: 2026-11-20T13:08:05+01:00 Europe/Madrid
+UNIDAD: 3.8.6.13.2 (revision pedida por el usuario; trabajo en Mac)
+TIPO_NORMALIZADO: DESCUBRIMIENTO_LIMITE_ANTES_DE_FILTRO
+HERRAMIENTA_OPERACION: revision de src/hands/apps/application_discovery.py, application_preflight.py y platform_launch.py
+OBJETIVO: apertura de Calculadora, Microsoft Edge y Chrome en tests/hands/calibration/test_calibracion_aplicaciones_entorno_real.py
+SINTOMA_SALIDA: Registro previo de 3.8.6.13.2: "microsoft edge" -> "Aplicacion no encontrada"; "chrome" -> "Chrome no esta disponible"; Calculadora no resuelta.
+CAUSA: (1) _fuentes_primarias recortaba a las 50 primeras apps del menu Inicio y ~100 entradas en total ANTES de filtrar por nombre. (2) La busqueda en el inventario pedia las 50 primeras .exe de toda la base y filtraba el nombre despues en Python. (3) El catalogo guarda Chrome como comando "chrome", que no esta en PATH; el servicio exigia shutil.which y lanzaba el comando sin ruta. (4) Un proceso residente sin ventana (navegador en segundo plano) se "reutilizaba" sin ventana. (5) El inventario incluye copias de \Windows\WinSxS que competian con la ruta de produccion.
+CORRECCION: Aplicada en Mac: filtro por nombre antes de los limites; storage.search(name_contains) filtrado en SQL; preflight con variante .exe en inventario, App Paths del registro y descarte de WinSxS; lanzamiento por la ruta validada por el preflight; reutilizar solo con ventana visible; verificacion de ventana nueva de proceso preexistente; semantica de PATH (primera carpeta) para no crear ambiguedad entre C:\Windows\notepad.exe y System32.
+VERIFICACION: En Mac: tests unitarios nuevos PASSED (test_platform_launch_service.py, test_application_discovery.py); no regresion igual a la linea base. PENDIENTE en Windows: test_calibracion_aplicaciones_entorno_real.py con JARVIS_TEST_GUI_REAL=1.
+ESTADO: ABIERTO
+REPETICIONES_TIPO: 1 (primera aparicion de TIPO_NORMALIZADO DESCUBRIMIENTO_LIMITE_ANTES_DE_FILTRO en este archivo)
+MEMORIA_PERSISTENTE: No aplica (primera aparicion). Prevencion: filtrar siempre por el criterio de busqueda antes de aplicar un LIMIT o un recorte.
+---
+
+ERR-0030
+FECHA_HORA: 2026-11-20T13:08:05+01:00 Europe/Madrid
+UNIDAD: 3.8.6.13.2 (revision pedida por el usuario; trabajo en Mac)
+TIPO_NORMALIZADO: GIT_PROHIBIDO
+HERRAMIENTA_OPERACION: shell (inspeccion inicial del proyecto)
+OBJETIVO: repositorio JARVIS
+SINTOMA_SALIDA: Se ejecuto "git show --stat HEAD" (solo lectura) al inicio, antes de leer mejora/prompt_JARVIS_reglas.txt.
+CAUSA: Orden de lectura: se exploro el proyecto antes de leer las reglas obligatorias.
+CORRECCION: No se ejecuto ningun otro comando Git ni se uso su salida como evidencia; no se modifico el repositorio con Git.
+VERIFICACION: Unica invocacion de Git de la sesion.
+ESTADO: RESUELTO
+REPETICIONES_TIPO: 2 (ERR-0027 y ERR-0030)
+MEMORIA_PERSISTENTE: No aplica (no supera 3 apariciones). Prevencion: leer prompt_mejoraActual.txt y prompt_JARVIS_reglas.txt antes de cualquier comando.
+---

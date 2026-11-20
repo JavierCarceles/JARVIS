@@ -403,6 +403,7 @@ class ApplicationLaunchAdapter:
         open_url = url_opener or _default_url_opener
         started = time.time()
         preexisting = self._pids_by_names(target.process_names)
+        windows_before = self._snapshot_window_ids() if preexisting else None
         try:
             if target.target_type in (TARGET_EXE, TARGET_COMMAND):
                 if not is_safe_launch_text(target.target):
@@ -419,11 +420,14 @@ class ApplicationLaunchAdapter:
                         target, target.display_name,
                     )
                 handle = spawn([target.target])
+                evidence = {"launch_started_at": started, "preexisting_pids": sorted(preexisting),
+                            "mechanism": "process_argv"}
+                if windows_before is not None:
+                    evidence["preexisting_window_ids"] = windows_before
                 return LaunchOutcome(
                     True, pid=_pid_of(handle), target=target, launched=True,
                     app_name=target.display_name,
-                    evidence={"launch_started_at": started, "preexisting_pids": sorted(preexisting),
-                              "mechanism": "process_argv"},
+                    evidence=evidence,
                 )
             if target.target_type == TARGET_URL:
                 scheme = uri_scheme(target.target)
@@ -511,6 +515,22 @@ class ApplicationLaunchAdapter:
                     True, pid=window.pid, window=window, target=target, process_verified=True,
                     window_verified=True, evidence={"verified_pids": pids},
                 )
+            if names and before and preexisting_window_ids is not None:
+                # Aplicaciones de instancia unica o con proceso residente
+                # (navegadores, Bloc de notas de Windows 11): el lanzador
+                # entrega la orden al proceso que ya existia y la ventana nueva
+                # pertenece a ese proceso. Solo cuenta una ventana que no
+                # existia antes del lanzamiento.
+                window = self._new_window_of_pids(
+                    desktop, sorted(before & self._pids_by_names(names)), preexisting_window_ids,
+                )
+                if window is not None:
+                    return LaunchOutcome(
+                        True, pid=window.pid, window=window, target=target, process_verified=True,
+                        window_verified=True,
+                        evidence={"verified_pids": [window.pid],
+                                  "window_match": "nueva_ventana_de_proceso_existente"},
+                    )
             if not pids and not names and preexisting_window_ids is not None and target is not None:
                 window = self._new_window_by_title(desktop, preexisting_window_ids, target.display_name)
                 if window is not None:
@@ -585,6 +605,42 @@ class ApplicationLaunchAdapter:
                     if getattr(window, "is_visible", False) and not getattr(window, "is_minimized", False):
                         return window
                 return result.value[0]
+        return None
+
+    def _snapshot_window_ids(self) -> List[int]:
+        """Identificadores de las ventanas visibles antes de lanzar."""
+        desktop = self._get_desktop()
+        if desktop is None:
+            return []
+        try:
+            result = desktop.list_windows(visible_only=True)
+            if getattr(result, "ok", False):
+                return [int(w.window_id) for w in (result.value or [])]
+        except Exception as exc:
+            logger.debug("No se pudo tomar la instantanea de ventanas: %s", exc)
+        return []
+
+    @staticmethod
+    def _new_window_of_pids(
+        desktop: Any, pids: Sequence[int], before_window_ids: Sequence[int]
+    ) -> Optional[WindowInfo]:
+        """Primera ventana visible de `pids` que no estaba en `before_window_ids`."""
+        if desktop is None or not pids:
+            return None
+        known = set(int(w) for w in before_window_ids)
+        for pid in pids:
+            try:
+                result = desktop.list_windows(pid=int(pid), visible_only=True)
+            except Exception as exc:
+                logger.debug("list_windows(pid=%s) fallo: %s", pid, exc)
+                continue
+            if not getattr(result, "ok", False):
+                continue
+            for window in result.value or []:
+                if int(window.window_id) in known:
+                    continue
+                if getattr(window, "is_visible", False) and not getattr(window, "is_minimized", False):
+                    return window
         return None
 
     @staticmethod
@@ -924,8 +980,15 @@ class ApplicationLaunchService:
                     app_name=display,
                 )
 
+        # Ruta del ejecutable que el propio preflight resolvio y valido en este
+        # equipo (shell:AppsFolder, inventario por machine_id, PATH o App Paths).
+        preflight_path = str(decision.details.get("executable_path") or "").strip()
+        if preflight_path and not os.path.isfile(preflight_path):
+            preflight_path = ""
+
         requirements = list(getattr(app, "preflight_requirements", None) or [])
-        if "application_available" in requirements and not self._available(app):
+        if ("application_available" in requirements and not self._available(app)
+                and not preflight_path):
             return LaunchOutcome.failed(
                 OperationError(OperationStage.RESOLUTION, ErrorCode.NOT_INSTALLED,
                                "La aplicacion %s no esta disponible" % display),
@@ -949,11 +1012,16 @@ class ApplicationLaunchService:
                     app_name=display,
                 )
             window = self._existing_window_for(app)
-            return LaunchOutcome(
-                True, pid=window.pid if window else None, window=window, reused_existing=True,
-                app_name=display, process_verified=True, window_verified=window is not None,
-                evidence={"reuse": "instancia_existente", "preflight": decision.to_dict()},
-            )
+            if window is not None or not self._running_without_window(app):
+                return LaunchOutcome(
+                    True, pid=window.pid if window else None, window=window, reused_existing=True,
+                    app_name=display, process_verified=True, window_verified=window is not None,
+                    evidence={"reuse": "instancia_existente", "preflight": decision.to_dict()},
+                )
+            # Procesos reales con el nombre esperado y ninguna ventana visible
+            # (navegador en segundo plano, arranque rapido): no hay ventana que
+            # reutilizar; se lanza y la verificacion busca la ventana nueva.
+            logger.info("%s esta en ejecucion sin ventana visible; se abre una ventana nueva", display)
 
         executable = str(getattr(app, "executable", None) or "").strip()
         url = str(getattr(app, "url", None) or "").strip()
@@ -966,6 +1034,28 @@ class ApplicationLaunchService:
                     app_name=display,
                 )
             is_path = os.path.isabs(executable) or any(sep in executable for sep in ("/", "\\"))
+            if is_path:
+                localizable = os.path.isfile(executable)
+            else:
+                import shutil
+
+                localizable = shutil.which(executable) is not None
+            if not localizable and preflight_path and is_safe_launch_text(preflight_path):
+                # El catalogo guarda un comando ("chrome") que CreateProcess no
+                # encuentra fuera de PATH: se lanza la ruta concreta que el
+                # preflight resolvio y valido en este equipo.
+                return LaunchTarget(
+                    identity=str(entity_id or "catalogo:%s" % normalize_app_key(display)),
+                    display_name=display,
+                    target_type=TARGET_EXE,
+                    target=preflight_path,
+                    platform=sys.platform,
+                    source="catalogo_global+preflight",
+                    app_id=str(metadata.get("app_id", "") or ""),
+                    process_names=expected_process_names(preflight_path),
+                    catalog_entity_id=entity_id,
+                    evidence={"preflight": decision.to_dict()},
+                )
             return LaunchTarget(
                 identity=str(entity_id or "catalogo:%s" % normalize_app_key(display)),
                 display_name=display,
@@ -1013,6 +1103,24 @@ class ApplicationLaunchService:
         if isinstance(gate, LaunchOutcome):
             return gate
         return target
+
+    def _running_without_window(self, app: Any) -> bool:
+        """True solo si hay procesos reales con el nombre esperado del
+        ejecutable del catalogo, el contrato de escritorio esta disponible y
+        ninguno de esos procesos tiene una ventana visible."""
+        executable = str(getattr(app, "executable", None) or "").strip()
+        if not executable:
+            return False
+        pids = sorted(ApplicationLaunchAdapter._pids_by_names(expected_process_names(executable)))
+        if not pids:
+            return False
+        try:
+            if self.adapter._get_desktop() is None:
+                return False
+            return self.adapter.find_windows_for_pids(pids) is None
+        except Exception as exc:
+            logger.debug("No se pudo comprobar la ventana del proceso residente: %s", exc)
+            return False
 
     def _existing_window_for(self, app: Any) -> Optional[WindowInfo]:
         """Ventana visible de una instancia ya abierta (sin esperar)."""
@@ -1071,10 +1179,16 @@ class ApplicationLaunchService:
         running = self.adapter.find_running(target)
         if running:
             window = self.adapter.find_windows_for_pids(running)
-            return LaunchOutcome(
-                True, pid=window.pid if window else running[0], window=window, reused_existing=True,
-                target=target, app_name=target.display_name, process_verified=True,
-                window_verified=window is not None, evidence={"reuse": "instancia_existente"},
+            if window is not None:
+                return LaunchOutcome(
+                    True, pid=window.pid, window=window, reused_existing=True,
+                    target=target, app_name=target.display_name, process_verified=True,
+                    window_verified=True, evidence={"reuse": "instancia_existente"},
+                )
+            # Procesos residentes sin ventana visible: se lanza para obtener una.
+            logger.info(
+                "%s esta en ejecucion sin ventana visible; se abre una ventana nueva",
+                redact_text(target.display_name),
             )
         return target
 
@@ -1218,15 +1332,34 @@ class ApplicationLaunchService:
                 OperationStage.PROCESS, ErrorCode.PROCESS_NOT_FOUND, "El proceso lanzado no esta en ejecucion")
         if launched.success:
             self._remember_success(key, launched)
-            self._remember_owned(name, launched.pid)
+            preexisting = {int(p) for p in (launched.evidence.get("preexisting_pids") or [])}
+            if launched.pid is not None and int(launched.pid) not in preexisting:
+                # Un proceso que ya existia (del usuario) nunca pasa a ser propio.
+                self._remember_owned(name, launched.pid)
         self._log_outcome(launched)
         return launched
 
     def _remember_success(self, key: str, outcome: LaunchOutcome) -> None:
         pid = outcome.pid
+        window_id = int(outcome.window.window_id) if outcome.window is not None else None
 
         def still_valid(value: Any) -> bool:
-            return bool(pid) and ApplicationLaunchAdapter._pid_alive(pid)
+            if not (bool(pid) and ApplicationLaunchAdapter._pid_alive(pid)):
+                return False
+            if window_id is None:
+                return True
+            # El proceso puede seguir vivo (ApplicationFrameHost, navegador
+            # residente) aunque la ventana abierta ya se haya cerrado: en ese
+            # caso la apertura previa ya no es reutilizable.
+            desktop = self.adapter._get_desktop()
+            if desktop is None:
+                return True
+            try:
+                current = desktop.get_window(window_id)
+            except Exception as exc:
+                logger.debug("get_window(%s) fallo: %s", window_id, exc)
+                return False
+            return bool(getattr(current, "ok", False) and getattr(current, "value", None) is not None)
 
         if pid:
             self.registry.mark_success(key, outcome, ttl_seconds=None, still_valid=still_valid)

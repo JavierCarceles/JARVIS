@@ -34,7 +34,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, Optional, Set
 
-from src.hands.inventory.system_inventory import generate_machine_id
+from src.hands.inventory.system_inventory import es_ruta_almacen_componentes, generate_machine_id
 from src.core.log import get_logger
 
 logger = get_logger(__name__)
@@ -964,6 +964,8 @@ class ApplicationPreflight:
                     executable = os.path.abspath(candidato)
             except Exception:
                 executable = None
+            if not executable:
+                executable = self._resolve_from_app_paths(name)
 
         if executable:
             executable = os.path.abspath(executable)
@@ -972,6 +974,36 @@ class ApplicationPreflight:
 
         self._executable_cache[cache_key] = executable
         return executable
+
+    @staticmethod
+    def _resolve_from_app_paths(name: str) -> Optional[str]:
+        """Resuelve `name` por la clave App Paths del registro (HKCU y HKLM).
+
+        Es el mismo registro que usa Windows para abrir un programa por nombre
+        (Win+R ``chrome``): un navegador o aplicacion instalada fuera de PATH
+        (``C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe``) queda
+        localizable sin recorrer el disco. Solo lectura del registro.
+        """
+        if sys.platform != "win32" or not name:
+            return None
+        clave = name if name.casefold().endswith(".exe") else name + ".exe"
+        if any(sep in clave for sep in ("\\", "/")):
+            return None
+        try:
+            import winreg  # type: ignore
+        except ImportError:
+            return None
+        raiz = "Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\" + clave
+        for hive in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
+            try:
+                with winreg.OpenKey(hive, raiz) as key:
+                    valor, _tipo = winreg.QueryValueEx(key, "")
+            except OSError:
+                continue
+            ruta = os.path.expandvars(str(valor or "").strip().strip('"'))
+            if ruta and os.path.isfile(ruta) and ruta.casefold().endswith(".exe"):
+                return os.path.abspath(ruta)
+        return None
 
     def _resolve_from_inventory_local(
         self,
@@ -1006,6 +1038,10 @@ class ApplicationPreflight:
             nombres_a_probar = {name}
             if name.casefold().endswith(".exe"):
                 nombres_a_probar.add(name[:-4])
+            else:
+                # El inventario guarda el nombre real del fichero
+                # ("notepad.exe") y la busqueda por nombre es exacta.
+                nombres_a_probar.add(name + ".exe")
 
             for nombre in nombres_a_probar:
                 resultados = storage.search(
@@ -1021,6 +1057,7 @@ class ApplicationPreflight:
                     ruta = entrada.get("absolute_path")
                     if (
                         ruta
+                        and not es_ruta_almacen_componentes(ruta)
                         and os.path.isfile(ruta)
                         and ruta.casefold().endswith(".exe")
                     ):

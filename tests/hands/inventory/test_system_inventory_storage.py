@@ -5968,3 +5968,57 @@ class TestCandidatosParaOrden:
             assert "candidato_a_aplicacion" in r
             assert "excluida" in r
 
+
+
+# ---------------------------------------------------------------------------
+# Busqueda por subcadena del nombre filtrada en SQL antes del LIMIT
+# ---------------------------------------------------------------------------
+
+class TestSearchNameContains:
+    """`search(name_contains=...)` filtra en SQL y escapa los comodines LIKE."""
+
+    def _poblar(self, storage: SystemInventoryStorage, nombres: list[str]) -> str:
+        machine_id = "maquina-name-contains"
+        storage.initialize()
+        storage.begin_scan_run("scan-nc", machine_id, "C:", SCAN_MODE_FULL)
+        entradas = []
+        for indice, nombre in enumerate(nombres):
+            entradas.append({
+                "entry_id": f"e-{indice}",
+                "absolute_path": f"C:\\Apps\\{indice:04d}\\{nombre}",
+                "relative_path": f"Apps\\{indice:04d}\\{nombre}",
+                "name": nombre,
+                "extension": ".exe",
+                "entry_type": "file",
+                "last_checked_at": "2026-01-01T00:00:00",
+            })
+        storage.insert_file_entries("scan-nc", machine_id, "C:", entradas)
+        storage.end_scan_run("scan-nc", result=SCAN_RESULT_OK, entries_count=len(entradas))
+        return machine_id
+
+    def test_encuentra_la_aplicacion_aunque_no_este_entre_las_primeras_filas(
+        self, storage: SystemInventoryStorage
+    ):
+        nombres = [f"herramienta_{i:03d}.exe" for i in range(200)] + ["Notepad.exe"]
+        machine_id = self._poblar(storage, nombres)
+        sin_filtro = storage.search(
+            machine_id=machine_id, extension=".exe", tipo="file", limit=50,
+            solo_volumes_montados=False,
+        )
+        assert all(e["name"] != "Notepad.exe" for e in sin_filtro)
+        con_filtro = storage.search(
+            machine_id=machine_id, extension=".exe", tipo="file", limit=50,
+            solo_volumes_montados=False, name_contains="NOTEPAD",
+        )
+        assert [e["name"] for e in con_filtro] == ["Notepad.exe"]
+
+    def test_comodines_like_se_tratan_como_texto(self, storage: SystemInventoryStorage):
+        machine_id = self._poblar(storage, ["a_b.exe", "axb.exe", "100%.exe", "1000.exe"])
+        guion = storage.search(
+            machine_id=machine_id, limit=10, solo_volumes_montados=False, name_contains="a_b",
+        )
+        assert [e["name"] for e in guion] == ["a_b.exe"]
+        porcentaje = storage.search(
+            machine_id=machine_id, limit=10, solo_volumes_montados=False, name_contains="100%",
+        )
+        assert [e["name"] for e in porcentaje] == ["100%.exe"]

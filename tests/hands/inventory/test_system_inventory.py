@@ -2222,3 +2222,221 @@ class TestRecuperacionCierreInesperado:
 
         with pytest.raises(ValueError, match="ya esta finalizado"):
             storage.reanudar_scan(scan_id, MACHINE_ID, "T:")
+
+
+# ---------------------------------------------------------------------------
+# Junctions de Windows, memoria del recorrido y robustez del escaner de volumen
+# ---------------------------------------------------------------------------
+
+class _StatSintetico:
+    """Resultado de stat con los campos de Windows que usa la deteccion de enlaces."""
+
+    def __init__(self, atributos: int, etiqueta: int) -> None:
+        self.st_file_attributes = atributos
+        self.st_reparse_tag = etiqueta
+
+
+class _EntradaSinJunction:
+    """Entrada de directorio sin `is_junction` (Python anterior a 3.12)."""
+
+
+class TestTipoEnlaceEntradaWindows:
+    """`tipo_enlace_entrada_windows` distingue junctions/enlaces de directorios reales."""
+
+    def test_junction_por_etiqueta_mount_point(self):
+        from src.hands.inventory.system_inventory import (
+            FILE_ATTRIBUTE_REPARSE_POINT,
+            IO_REPARSE_TAG_MOUNT_POINT,
+            tipo_enlace_entrada_windows,
+        )
+
+        stat = _StatSintetico(FILE_ATTRIBUTE_REPARSE_POINT | 0x10, IO_REPARSE_TAG_MOUNT_POINT)
+        assert tipo_enlace_entrada_windows(_EntradaSinJunction(), stat, es_windows=True) == EntryType.JUNCTION
+
+    def test_symlink_por_etiqueta_symlink(self):
+        from src.hands.inventory.system_inventory import (
+            FILE_ATTRIBUTE_REPARSE_POINT,
+            IO_REPARSE_TAG_SYMLINK,
+            tipo_enlace_entrada_windows,
+        )
+
+        stat = _StatSintetico(FILE_ATTRIBUTE_REPARSE_POINT, IO_REPARSE_TAG_SYMLINK)
+        assert tipo_enlace_entrada_windows(_EntradaSinJunction(), stat, es_windows=True) == EntryType.SYMLINK
+
+    def test_reparse_de_nube_no_es_enlace(self):
+        """Carpetas de OneDrive (etiqueta cloud sin bit name surrogate) son directorios reales."""
+        from src.hands.inventory.system_inventory import (
+            FILE_ATTRIBUTE_REPARSE_POINT,
+            tipo_enlace_entrada_windows,
+        )
+
+        stat = _StatSintetico(FILE_ATTRIBUTE_REPARSE_POINT | 0x10, 0x9000001A)
+        assert tipo_enlace_entrada_windows(_EntradaSinJunction(), stat, es_windows=True) is None
+
+    def test_appexeclink_no_es_enlace(self):
+        from src.hands.inventory.system_inventory import (
+            FILE_ATTRIBUTE_REPARSE_POINT,
+            tipo_enlace_entrada_windows,
+        )
+
+        stat = _StatSintetico(FILE_ATTRIBUTE_REPARSE_POINT, 0x8000001B)
+        assert tipo_enlace_entrada_windows(_EntradaSinJunction(), stat, es_windows=True) is None
+
+    def test_directorio_sin_reparse_no_es_enlace(self):
+        from src.hands.inventory.system_inventory import tipo_enlace_entrada_windows
+
+        stat = _StatSintetico(0x10, 0)
+        assert tipo_enlace_entrada_windows(_EntradaSinJunction(), stat, es_windows=True) is None
+
+    def test_fuera_de_windows_devuelve_none(self):
+        from src.hands.inventory.system_inventory import (
+            FILE_ATTRIBUTE_REPARSE_POINT,
+            IO_REPARSE_TAG_MOUNT_POINT,
+            tipo_enlace_entrada_windows,
+        )
+
+        stat = _StatSintetico(FILE_ATTRIBUTE_REPARSE_POINT, IO_REPARSE_TAG_MOUNT_POINT)
+        assert tipo_enlace_entrada_windows(_EntradaSinJunction(), stat, es_windows=False) is None
+
+
+def _arbol_simple(tmp_path: Path) -> Path:
+    base = tmp_path / "arbol_memoria"
+    (base / "sub").mkdir(parents=True)
+    (base / "a.txt").write_text("a", encoding="utf-8")
+    (base / "sub" / "b.txt").write_text("b", encoding="utf-8")
+    return base
+
+
+class TestRecorridoConservarEntradas:
+    """`conservar_entradas=False` no retiene en memoria lo ya emitido."""
+
+    def test_conservar_entradas_por_defecto(self, tmp_path: Path):
+        base = _arbol_simple(tmp_path)
+        recorrido = RecorridoVolumen(
+            volumen="T:", raiz=str(base),
+            contrato=InventoryContract(machine_id=MACHINE_ID), maquina_id=MACHINE_ID,
+        )
+        emitidas = list(recorrido.recorrer())
+        assert len(emitidas) == 3
+        assert len(recorrido.entradas_validas) == 3
+
+    def test_sin_conservar_entradas_emite_todo_y_no_retiene(self, tmp_path: Path):
+        base = _arbol_simple(tmp_path)
+        recorrido = RecorridoVolumen(
+            volumen="T:", raiz=str(base),
+            contrato=InventoryContract(machine_id=MACHINE_ID), maquina_id=MACHINE_ID,
+            conservar_entradas=False,
+        )
+        emitidas = list(recorrido.recorrer())
+        assert {e.name for e in emitidas} == {"a.txt", "sub", "b.txt"}
+        assert recorrido.entradas_validas == []
+        assert recorrido.progreso.completado is True
+
+
+class TestEscanerRobustezFallos:
+    """El escaner de volumen no deja scan_runs abiertos ni aborta por una ruta repetida."""
+
+    def test_ruta_repetida_en_el_scan_no_aborta(
+        self, storage: SystemInventoryStorage, tmp_path: Path, monkeypatch
+    ):
+        base = _arbol_simple(tmp_path)
+        original = RecorridoVolumen.recorrer
+
+        def recorrer_con_repetida(self):
+            primera = None
+            for entrada in original(self):
+                if primera is None:
+                    primera = entrada
+                yield entrada
+            # La misma ruta emitida dos veces en un scan viola la clave unica.
+            yield primera
+
+        monkeypatch.setattr(RecorridoVolumen, "recorrer", recorrer_con_repetida)
+        resultado = EscanerRutaVolumen(
+            volumen="T:", raiz=str(base),
+            contrato=InventoryContract(machine_id=MACHINE_ID), maquina_id=MACHINE_ID,
+            storage=storage, tamano_lote_entradas=2,
+        ).ejecutar()
+
+        assert resultado.resultado == SCAN_RESULT_OK
+        assert resultado.entradas_procesadas == 3
+        assert resultado.errores_por_categoria.get("entrada_duplicada") == 1
+        assert len(storage.obtener_entradas_escaneo(resultado.scan_id)) == 3
+        run = storage.get_scan_run(resultado.scan_id)
+        assert run["result"] == SCAN_RESULT_OK
+        assert run["entries_count"] == 3
+        assert not storage.has_active_scan(MACHINE_ID, "T:")
+
+    def test_excepcion_cierra_scan_run_como_error_y_libera_bloqueo(
+        self, storage: SystemInventoryStorage, tmp_path: Path, monkeypatch
+    ):
+        base = _arbol_simple(tmp_path)
+        original = RecorridoVolumen.recorrer
+
+        def recorrer_que_falla(self):
+            for indice, entrada in enumerate(original(self)):
+                if indice == 2:
+                    raise RuntimeError("fallo simulado de E/S")
+                yield entrada
+
+        monkeypatch.setattr(RecorridoVolumen, "recorrer", recorrer_que_falla)
+        escaner = EscanerRutaVolumen(
+            volumen="T:", raiz=str(base),
+            contrato=InventoryContract(machine_id=MACHINE_ID), maquina_id=MACHINE_ID,
+            storage=storage, tamano_lote_entradas=500,
+        )
+        with pytest.raises(RuntimeError, match="fallo simulado"):
+            escaner.ejecutar()
+
+        run = storage.get_latest_scan(MACHINE_ID, "T:")
+        assert run["result"] == "error"
+        assert run["finished_at"] is not None
+        assert run["entries_count"] == 2
+        # Las entradas leidas antes del fallo quedan guardadas.
+        assert len(storage.obtener_entradas_escaneo(run["scan_id"])) == 2
+        assert not storage.has_active_scan(MACHINE_ID, "T:")
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Junctions NTFS reales: solo Windows (excepcion (a))")
+class TestJunctionsWindowsEntornoReal:
+    """Con una junction real que apunta a un directorio hermano, el directorio
+    real se recorre por su propia ruta y la junction se registra sin recorrerse."""
+
+    def test_junction_hermana_no_oculta_el_directorio_real(
+        self, storage: SystemInventoryStorage, tmp_path: Path
+    ):
+        import subprocess
+
+        base = tmp_path / "raiz_junction"
+        real = base / "Zreal"
+        (real / "sub").mkdir(parents=True)
+        (real / "sub" / "dentro.txt").write_text("x", encoding="utf-8")
+        junction = base / "Ajunction"  # orden alfabetico anterior al directorio real
+        salida = subprocess.run(
+            ["cmd", "/c", "mklink", "/J", str(junction), str(real)],
+            capture_output=True, text=True,
+        )
+        assert salida.returncode == 0, salida.stdout + salida.stderr
+        try:
+            resultado = escanear_ruta(
+                ruta_absoluta=str(base),
+                contrato=InventoryContract(machine_id=MACHINE_ID),
+                maquina_id=MACHINE_ID,
+                storage=storage,
+            )
+            entradas = storage.obtener_entradas_escaneo(resultado.scan_id)
+            por_nombre = {e["name"]: e for e in entradas}
+            assert por_nombre["Ajunction"]["entry_type"] == EntryType.JUNCTION.value
+            assert por_nombre["Zreal"]["entry_type"] == EntryType.DIRECTORY.value
+            assert "dentro.txt" in por_nombre
+            ruta_dentro = os.path.normcase(por_nombre["dentro.txt"]["absolute_path"])
+            assert ruta_dentro.startswith(os.path.normcase(str(real)))
+            # La junction no se recorre: ninguna entrada cuelga de ella.
+            prefijo_junction = os.path.normcase(str(junction)) + os.sep
+            assert not any(
+                os.path.normcase(e["absolute_path"]).startswith(prefijo_junction)
+                for e in entradas
+            )
+            assert resultado.resultado == SCAN_RESULT_OK
+        finally:
+            os.rmdir(junction)  # elimina solo la junction, no el destino

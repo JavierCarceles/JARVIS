@@ -1,31 +1,39 @@
 # -*- coding: utf-8 -*-
 """
-Verificacion en el entorno real del escaneo completo de volumenes locales
-(3.8.5.1.4.10.3).
+Verificacion en el entorno real del escaneo completo de volumenes locales.
 
-Ejecuta el escaner de produccion (escanear_volumen) sobre el volumen C: del
-equipo real y verifica que produce un scan_run finalizado con end_scan_run,
-registro de entradas en SQLite real y contraste con el SO.
+Ejecuta el escaner de produccion (escanear_volumen) sobre TODOS los volumenes
+locales fijos y disponibles del equipo real (o solo los indicados con
+--volumen) y verifica para cada uno:
+
+- que produce un scan_run finalizado con end_scan_run y resultado "ok";
+- que las entradas persistidas en SQLite coinciden con las procesadas;
+- contraste con el SO: cada carpeta de primer nivel del volumen que el SO deja
+  listar y que tiene contenido debe tener entradas en el inventario (detecta
+  arboles enteros perdidos, por ejemplo C:\\Users o C:\\Program Files);
+- informe por carpeta de primer nivel y errores agrupados por categoria.
 
 Es una prueba opt-in de entorno real: NO se ejecuta en la suite normal ni
-al arrancar JARVIS. Requiere confirmacion explicita de alcance antes de la
-primera ejecucion global (3.8.5.1.4.10.3, politica de verificacion real).
-
-Usa el codigo de produccion real de JARVIS (src/hands/inventory/system_inventory.py
-y src/hands/inventory/system_inventory_storage.py). No usa mocks que decidan el
-resultado.
+al arrancar JARVIS. Usa el codigo de produccion real de JARVIS
+(src/hands/inventory/system_inventory.py y
+src/hands/inventory/system_inventory_storage.py). No usa mocks.
 
 Por defecto guarda el escaneo en la base de datos real de JARVIS:
   data/system_inventory.sqlite3
+Cada ejecucion anade un scan_run nuevo (no borra escaneos previos). Para
+partir de cero, renombrar antes la base existente.
 
-Uso:
-    # Escaneo completo de C: en la BD real de JARVIS (recomendado).
-    # Requiere JARVIS_AUTORIZAR_ESCANEO_VOLUMEN_GLOBAL=1 (escaneo global de raiz de volumen).
+Uso (PowerShell, desde la raiz del proyecto):
+    # Escaneo completo de todos los volumenes locales fijos en la BD real.
+    $env:JARVIS_AUTORIZAR_ESCANEO_VOLUMEN_GLOBAL = "1"
     python tests/hands/inventory/test_escaneo_volumenes_locales_completo_entorno_real.py
 
-    # Prueba rapida en un subarbol pequeno con BD temporal (no afecta a JARVIS).
-    python tests/hands/inventory/test_escaneo_volumenes_locales_completo_entorno_real.py \
-        --db-path /tmp/prueba.sqlite3 --raiz C:\\Windows\\System32\\drivers\\etc
+    # Solo algunos volumenes.
+    python tests/hands/inventory/test_escaneo_volumenes_locales_completo_entorno_real.py --volumen C:
+
+    # Prueba rapida en un subarbol pequeno con BD temporal (no afecta a JARVIS
+    # y no necesita la variable de autorizacion).
+    python tests/hands/inventory/test_escaneo_volumenes_locales_completo_entorno_real.py --db-path $env:TEMP\\prueba.sqlite3 --raiz C:\\Windows\\System32\\drivers\\etc
 """
 
 from __future__ import annotations
@@ -36,29 +44,44 @@ import sys
 import time
 import unittest
 from pathlib import Path
+from typing import Optional
 
-# tests/hands/ -> tests -> JARVIS (raiz del proyecto, donde esta src/)
+# tests/hands/inventory/ -> tests/hands -> tests -> JARVIS (raiz del proyecto)
 ROOT = Path(__file__).resolve().parent.parent.parent.parent
 sys.path.insert(0, str(ROOT))
 
-from src.hands.inventory.system_inventory import (
+from src.hands.inventory.system_inventory import (  # noqa: E402
+    EstadoVolumen,
+    InventoryContract,
     ProgresoRecorrido,
+    VolumeType,
     default_contract,
     detectar_sistema,
     enumerar_volumenes_comun,
-    generate_machine_id,
-    escanear_volumen,
     escanear_ruta,
+    escanear_volumen,
+    generate_machine_id,
+    tipo_enlace_entrada_windows,
 )
-from src.hands.inventory.system_inventory_storage import SystemInventoryStorage
+from src.hands.inventory.system_inventory_storage import (  # noqa: E402
+    SystemInventoryStorage,
+    normalize_path,
+)
 
 
-# Prueba opt-in de entorno real (3.8.5.1.4.10.14.1): se lanza unicamente de
-# forma manual con `python ...` (para escaneo global de raiz de volumen, ademas
-# con JARVIS_AUTORIZAR_ESCANEO_VOLUMEN_GLOBAL=1). Nunca forma parte de la suite
+# Prueba opt-in de entorno real: se lanza unicamente de forma manual con
+# `python ...` (para escaneo global de raiz de volumen, ademas con
+# JARVIS_AUTORIZAR_ESCANEO_VOLUMEN_GLOBAL=1). Nunca forma parte de la suite
 # automatizada de pytest ni del arranque de JARVIS.
 if "pytest" in sys.modules:
     __test__ = False
+
+
+VAR_AUTORIZACION_GLOBAL = "JARVIS_AUTORIZAR_ESCANEO_VOLUMEN_GLOBAL"
+"""Variable de entorno que autoriza el escaneo global (raiz de volumen completo)."""
+
+ARGS: Optional[argparse.Namespace] = None
+"""Argumentos propios del script; se rellenan en __main__ antes de unittest."""
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -71,20 +94,23 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Ruta de la base de datos SQLite (por defecto: data/system_inventory.sqlite3).",
     )
     parser.add_argument(
-        "--raiz",
-        default="C:\\",
-        help="Ruta raiz a escanear (por defecto: C:\\, volumen completo).",
+        "--volumen",
+        nargs="*",
+        default=[],
+        help="Volumenes a escanear (ej. C: D:). Por defecto: todos los locales fijos disponibles.",
     )
     parser.add_argument(
-        "--volumen",
-        default="C:",
-        help="Identificador de volumen para el scan_run (por defecto: C:).",
+        "--raiz",
+        default="",
+        help="Subarbol concreto a escanear en lugar de volumenes completos.",
     )
     return parser
 
 
-VAR_AUTORIZACION_GLOBAL = "JARVIS_AUTORIZAR_ESCANEO_VOLUMEN_GLOBAL"
-"""Variable de entorno que autoriza el escaneo global (raiz de volumen completo)."""
+def _args() -> argparse.Namespace:
+    if ARGS is not None:
+        return ARGS
+    return _build_parser().parse_args([])
 
 
 def _es_raiz_de_volumen(ruta: str) -> bool:
@@ -111,155 +137,209 @@ def _exigir_autorizacion_global(raiz: str) -> None:
         )
 
 
+def _volumenes_a_escanear(pedidos: list[str]) -> list[tuple[str, str]]:
+    """Devuelve (identificador, raiz) de los volumenes locales fijos disponibles.
+
+    Si `pedidos` no esta vacio, se limita a esos identificadores (sin
+    distinguir mayusculas) y falla si alguno no esta disponible.
+    """
+    volumenes = enumerar_volumenes_comun()
+    print(f"\nVOLUMENES DETECTADOS (adaptador de produccion): {len(volumenes)}", flush=True)
+    for v in volumenes:
+        print(
+            f"  identificador={v.identificador} raiz={v.raiz} tipo={v.tipo.value} "
+            f"disponible={v.disponible} estado={v.estado.value} fs={v.sistema_archivos}",
+            flush=True,
+        )
+    elegibles = [
+        (v.identificador, v.raiz)
+        for v in volumenes
+        if v.tipo == VolumeType.FIXED
+        and v.disponible
+        and v.estado == EstadoVolumen.DISPONIBLE
+    ]
+    if not pedidos:
+        return elegibles
+    pedidos_norm = {p.upper().rstrip("\\/") for p in pedidos}
+    elegidos = [(i, r) for i, r in elegibles if i.upper().rstrip("\\/") in pedidos_norm]
+    faltan = pedidos_norm - {i.upper().rstrip("\\/") for i, _ in elegidos}
+    if faltan:
+        raise AssertionError(f"Volumenes pedidos no disponibles como locales fijos: {sorted(faltan)}")
+    return elegidos
+
+
+def _carpetas_primer_nivel(raiz: str, contrato: InventoryContract) -> list[str]:
+    """Carpetas reales (no junction/enlace) de primer nivel que el SO deja
+    listar y que tienen al menos una entrada no excluida."""
+    carpetas: list[str] = []
+    with os.scandir(raiz) as it:
+        for entrada in it:
+            try:
+                if contrato.should_exclude_path(entrada.path):
+                    continue
+                stat = entrada.stat(follow_symlinks=False)
+                if tipo_enlace_entrada_windows(entrada, stat) is not None:
+                    continue
+                if entrada.is_symlink() or not entrada.is_dir(follow_symlinks=False):
+                    continue
+                with os.scandir(entrada.path) as hijos:
+                    if any(not contrato.should_exclude_path(h.path) for h in hijos):
+                        carpetas.append(entrada.path)
+            except OSError:
+                # El SO tampoco deja listarla con este usuario: no es una perdida
+                # del escaner, ya consta como error de permiso en el scan_run.
+                continue
+    return sorted(carpetas, key=str.lower)
+
+
+def _contar_bajo(storage: SystemInventoryStorage, machine_id: str, scan_id: str, carpeta: str) -> int:
+    """Cuenta las entradas del scan que cuelgan de `carpeta` (rango por ruta normalizada)."""
+    prefijo = normalize_path(carpeta).rstrip("/") + "/"
+    fin = prefijo[:-1] + "0"  # '0' es el caracter siguiente a '/'
+    fila = storage.connect().execute(
+        "SELECT COUNT(*) FROM file_entries WHERE machine_id = ? AND normalized_path >= ? "
+        "AND normalized_path < ? AND scan_id = ?",
+        (machine_id, prefijo, fin, scan_id),
+    ).fetchone()
+    return int(fila[0])
+
+
 class TestEscaneoVolumenesLocalesCompletoEntornoReal(unittest.TestCase):
     """Escaneo completo de volumenes locales en el equipo real."""
 
-    def test_escaneo_volumen_c_completo_entorno_real(self):
-        """Escanear C: completo produce un scan_run finalizado con entradas reales."""
-        args = _build_parser().parse_args()
-        import psutil
+    def _informe_progreso(self, etiqueta: str):
+        estado = {"inicio": time.time(), "ultimo": 0.0}
+
+        def informe(progreso: ProgresoRecorrido) -> None:
+            ahora = time.time()
+            if ahora - estado["ultimo"] < 5.0 and not progreso.completado:
+                return
+            estado["ultimo"] = ahora
+            print(
+                f"[ESCANEO {etiqueta}] entradas={progreso.entradas_procesadas} "
+                f"archivos={progreso.archivos_procesados} "
+                f"directorios={progreso.directorios_procesados} "
+                f"errores={progreso.errores} exclusiones={progreso.exclusiones} "
+                f"cobertura={progreso.cobertura:.2f}% "
+                f"tiempo={ahora - estado['inicio']:.1f}s",
+                flush=True,
+            )
+
+        return informe
+
+    def _verificar_resultado(self, storage, machine_id, resultado, etiqueta, duracion):
+        print(
+            f"\nESCANEO {etiqueta}: resultado={resultado.resultado} "
+            f"entradas={resultado.entradas_procesadas} archivos={resultado.archivos_procesados} "
+            f"directorios={resultado.directorios_procesados} errores={resultado.errores} "
+            f"exclusiones={resultado.exclusiones} cobertura={resultado.cobertura}% "
+            f"duracion={duracion:.1f}s",
+            flush=True,
+        )
+        print(f"  errores por categoria: {resultado.errores_por_categoria}", flush=True)
+
+        self.assertTrue(
+            resultado.completado,
+            f"Escaneo {etiqueta} interrumpido: resultado={resultado.resultado}",
+        )
+        self.assertEqual(resultado.resultado, "ok")
+        self.assertGreater(resultado.entradas_procesadas, 0)
+        self.assertEqual(resultado.cobertura, 100.0)
+        self.assertTrue(resultado.iniciado_en)
+        self.assertTrue(resultado.finalizado_en)
+
+        run = storage.get_scan_run(resultado.scan_id)
+        self.assertIsNotNone(run)
+        self.assertEqual(run["result"], "ok")
+        self.assertIsNotNone(run["finished_at"])
+        self.assertEqual(run["entries_count"], resultado.entradas_procesadas)
+
+        persistidas = storage.connect().execute(
+            "SELECT COUNT(*) FROM file_entries WHERE scan_id = ?", (resultado.scan_id,)
+        ).fetchone()[0]
+        print(f"  entradas persistidas en SQLite: {persistidas}", flush=True)
+        self.assertEqual(
+            persistidas,
+            resultado.entradas_procesadas,
+            "Las entradas guardadas en SQLite no coinciden con las procesadas",
+        )
+
+    def test_escaneo_volumenes_locales_completo_entorno_real(self):
+        """Escanear los volumenes locales produce scan_runs completos sin arboles perdidos."""
+        args = _args()
+        sistema = detectar_sistema()
+        self.assertEqual(sistema.sistema_operativo, "Windows")
 
         machine_id = generate_machine_id()
         contrato = default_contract()
         contrato.machine_id = machine_id
 
-        # Autorizacion expresa obligatoria antes de cualquier escaneo global
-        # (raiz de volumen completo). Los subarboles controlados no la requieren.
-        _exigir_autorizacion_global(args.raiz)
+        if args.raiz:
+            objetivos = [("", args.raiz)]
+        else:
+            objetivos = _volumenes_a_escanear(args.volumen)
+            self.assertTrue(objetivos, "No hay volumenes locales fijos disponibles")
+        for _ident, raiz in objetivos:
+            _exigir_autorizacion_global(raiz)
 
-        # Enumerar con el adaptador de produccion todos los volumenes locales
-        # montados admitidos (solo lectura de metadatos).
-        volumenes_detectados = enumerar_volumenes_comun()
-        print(
-            f"\nVOLUMENES LOCALES MONTADOS (adaptador de produccion): "
-            f"{len(volumenes_detectados)}",
-            flush=True,
-        )
-        for _v in volumenes_detectados:
-            print(
-                f"  identificador={_v.identificador} raiz={_v.raiz} "
-                f"tipo={_v.tipo.value} disponible={_v.disponible} "
-                f"estado={_v.estado.value} sistema_origen={_v.sistema_origen}",
-                flush=True,
-            )
-
-        # Contrastar volumen detectado por el adaptador con el SO.
-        sistema = detectar_sistema()
-        self.assertEqual(sistema.sistema_operativo, "Windows")
-        montados_so = set()
-        for particion in psutil.disk_partitions(all=False):
-            punto = particion.mountpoint or ""
-            if not punto:
-                continue
-            if os.name == "nt":
-                drive = os.path.splitdrive(punto)[0]
-                if drive:
-                    montados_so.add(drive.upper())
-        self.assertIn("C:", montados_so, "C: debe estar montado segun el SO")
-
-        # Base de datos real de JARVIS (o ruta alternativa para pruebas rapidas).
         db_path = Path(args.db_path)
         db_path.parent.mkdir(parents=True, exist_ok=True)
         storage = SystemInventoryStorage(db_path)
         try:
             storage.initialize(machine_id_actual=machine_id)
             storage.connect()
+            previos = storage.connect().execute(
+                "SELECT COUNT(*) FROM scan_runs WHERE machine_id = ?", (machine_id,)
+            ).fetchone()[0]
+            print(f"\nBD: {db_path} | machine_id={machine_id} | scan_runs previos={previos}", flush=True)
 
-            # Progreso acumulado para informes relevantes (no por fichero).
-            estado = {
-                "volumen": args.volumen,
-                "entradas": 0,
-                "archivos": 0,
-                "directorios": 0,
-                "errores": 0,
-                "exclusiones": 0,
-                "cobertura": 0.0,
-                "inicio": time.time(),
-                "ultimo_informe": 0.0,
-            }
+            total = 0
+            for ident, raiz in objetivos:
+                etiqueta = ident or raiz
+                t0 = time.time()
+                if ident:
+                    resultado = escanear_volumen(
+                        volumen=ident,
+                        ruta_raiz=raiz,
+                        contrato=contrato,
+                        maquina_id=machine_id,
+                        storage=storage,
+                        modo="completo",
+                        callback_progreso=self._informe_progreso(etiqueta),
+                    )
+                else:
+                    resultado = escanear_ruta(
+                        ruta_absoluta=raiz,
+                        contrato=contrato,
+                        maquina_id=machine_id,
+                        storage=storage,
+                        modo="completo",
+                        callback_progreso=self._informe_progreso(etiqueta),
+                    )
+                self._verificar_resultado(storage, machine_id, resultado, etiqueta, time.time() - t0)
+                total += resultado.entradas_procesadas
 
-            def informe_progreso(progreso: ProgresoRecorrido) -> None:
-                """Imprime informacion relevante cada ~5 segundos."""
-                ahora = time.time()
-                if ahora - estado["ultimo_informe"] < 5.0:
-                    return
-                estado["ultimo_informe"] = ahora
-                estado["entradas"] = progreso.entradas_procesadas
-                estado["archivos"] = progreso.archivos_procesados
-                estado["directorios"] = progreso.directorios_procesados
-                estado["errores"] = progreso.errores
-                estado["exclusiones"] = progreso.exclusiones
-                estado["cobertura"] = progreso.cobertura
-                transcurrido = ahora - estado["inicio"]
-                print(
-                    f"[ESCANEO {args.volumen}:] volumen={estado['volumen']} "
-                    f"entradas={estado['entradas']} "
-                    f"archivos={estado['archivos']} "
-                    f"directorios={estado['directorios']} "
-                    f"errores={estado['errores']} "
-                    f"exclusiones={estado['exclusiones']} "
-                    f"cobertura={estado['cobertura']:.2f}% "
-                    f"tiempo={transcurrido:.1f}s",
-                    flush=True,
+                # Contraste con el SO: ninguna carpeta de primer nivel con
+                # contenido listable puede quedar sin entradas en el inventario.
+                print(f"  entradas por carpeta de primer nivel de {etiqueta}:", flush=True)
+                perdidas = []
+                for carpeta in _carpetas_primer_nivel(raiz, contrato):
+                    n = _contar_bajo(storage, machine_id, resultado.scan_id, carpeta)
+                    print(f"    {carpeta}: {n}", flush=True)
+                    if n == 0:
+                        perdidas.append(carpeta)
+                self.assertEqual(
+                    perdidas,
+                    [],
+                    f"Carpetas listables por el SO sin ninguna entrada en el inventario: {perdidas}",
                 )
 
-            # Ejecutar escaneo de produccion real sobre la raiz indicada.
-            t0 = time.time()
-            if args.raiz == "C:\\" and len(args.raiz) <= 3:
-                resultado = escanear_volumen(
-                    volumen=args.volumen,
-                    ruta_raiz=args.raiz,
-                    contrato=contrato,
-                    maquina_id=machine_id,
-                    storage=storage,
-                    modo="completo",
-                    callback_progreso=informe_progreso,
-                )
-            else:
-                resultado = escanear_ruta(
-                    ruta_absoluta=args.raiz,
-                    contrato=contrato,
-                    maquina_id=machine_id,
-                    storage=storage,
-                    modo="completo",
-                    callback_progreso=informe_progreso,
-                )
-            duracion = time.time() - t0
-
-            print(
-                f"\nESCANEO COMPLETO {args.volumen}: OK: "
-                f"{resultado.entradas_procesadas} entradas, "
-                f"{round(duracion, 3)}s, "
-                f"resultado={resultado.resultado}, "
-                f"cobertura={resultado.cobertura}%"
-            )
-
-            # Verificar que el scan_run se completo (no interrumpido).
-            self.assertTrue(
-                resultado.completado,
-                f"Escaneo interrumpido: resultado={resultado.resultado}, "
-                f"entradas={resultado.entradas_procesadas}",
-            )
-            self.assertEqual(resultado.resultado, "ok")
-            self.assertGreater(resultado.entradas_procesadas, 0)
-            self.assertEqual(resultado.cobertura, 100.0)
-            self.assertIsNotNone(resultado.finalizado_en)
-            self.assertIsNotNone(resultado.iniciado_en)
-            self.assertEqual(resultado.volumen, args.volumen)
-
-            # Verificar persistencia en la base de datos SQLite real de JARVIS.
-            scan_runs = storage.listar_scan_runs_por_volumen(machine_id, args.volumen)
-            self.assertGreaterEqual(len(scan_runs), 1)
-            ultimo = scan_runs[-1]
-            self.assertEqual(ultimo["result"], "ok")
-            self.assertGreater(ultimo["entries_count"], 0)
-            self.assertIsNotNone(ultimo["finished_at"])
+            print(f"\nTOTAL ENTRADAS ESCANEADAS: {total}", flush=True)
         finally:
             storage.close()
-            # La base de datos se conserva para poder reutilizar el escaneo
-            # real como inventario local del equipo en futuras pruebas o como
-            # punto de partida para el inventario de produccion.
+            # La base de datos se conserva como inventario local del equipo.
 
 
 if __name__ == "__main__":
-    unittest.main()
+    ARGS, _resto = _build_parser().parse_known_args()
+    unittest.main(argv=[sys.argv[0]] + _resto, verbosity=2)
