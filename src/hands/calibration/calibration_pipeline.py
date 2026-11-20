@@ -1570,6 +1570,21 @@ class UICalibrationPipeline:
             else:
                 safe_point_check = True
             if safe_point is not None and safe_point_check and checks_done < self.max_pointer_checks:
+                # Entre la toma del snapshot (etapa de deteccion) y aqui pueden
+                # haber pasado etapas lentas (Qwen3-VL) que hacen que otra
+                # ventana (consola, IDE) recupere el primer plano. Se asegura
+                # que la ventana de destino tenga el foco antes de comparar.
+                res_act = adapter.activate_window(int(window.window_id))
+                if not res_act.ok:
+                    raise _StageFailure(
+                        STAGE_POINTER,
+                        "no se pudo activar la ventana antes de verificar el puntero: %s" % res_act.error,
+                    )
+                if not adapter.is_foreground(int(window.window_id)):
+                    raise _StageFailure(
+                        STAGE_POINTER,
+                        "la ventana de destino no quedo en primer plano antes de verificar el puntero",
+                    )
                 drift = verify_before_action(snapshot, adapter)
                 if _get(drift, "action", "proceed") != "proceed":
                     raise _StageFailure(

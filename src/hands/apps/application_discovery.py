@@ -241,6 +241,7 @@ class DiscoveredCandidate:
     razon: str = ""
     requiere_preflight: bool = True
     advertencias: list[str] = field(default_factory=list)
+    app_id: Optional[str] = None
 
     # Metadatos de descubrimiento (3.8.5.1.4.7.2).
     destino_original: Optional[str] = None
@@ -276,6 +277,7 @@ class DiscoveredCandidate:
             confianza=clasificacion.confianza,
             version=clasificacion.version,
             producto=clasificacion.producto,
+            app_id=clasificacion.app_id,
             fuente=fuente,
             ultima_comprobacion=clasificacion.ultima_comprobacion,
             razon=clasificacion.razon,
@@ -3091,20 +3093,35 @@ class ApplicationDiscovery:
 
             clasificacion = self.clasificador.classify_candidate(c)
 
-            # Validacion de destino con preflight (solo lectura, no lanza).
-            preflight_decision: Optional[dict] = None
-            if clasificacion.destination:
-                try:
-                    preflight_decision = self.clasificador.validar_destino_antes_de_lanzar(
-                        clasificacion.destination
-                    )
-                except Exception:
-                    preflight_decision = {
-                        "valid": False,
-                        "launch_type": None,
-                        "destination": clasificacion.destination,
-                        "reason": "Error al validar destino con preflight",
-                    }
+            # Paquete UWP descubierto por app_id (AUMID) sin ruta de archivo:
+            # el preflight del target (check_launch_target con TARGET_AUMID)
+            # validara el app_id en shell:AppsFolder. No se descarta aqui.
+            app_id = str(c.get("app_id") or "").strip()
+            if app_id and "!" in app_id and not clasificacion.destination:
+                clasificacion.app_id = app_id
+                clasificacion.launch_type = LaunchType.PAQUETE.value
+                clasificacion.es_lanzable = True
+                preflight_decision = {
+                    "valid": True,
+                    "launch_type": LaunchType.PAQUETE.value,
+                    "destination": app_id,
+                    "reason": "Paquete UWP por app_id (AUMID); preflight del target lo valida",
+                }
+            else:
+                # Validacion de destino con preflight (solo lectura, no lanza).
+                preflight_decision: Optional[dict] = None
+                if clasificacion.destination:
+                    try:
+                        preflight_decision = self.clasificador.validar_destino_antes_de_lanzar(
+                            clasificacion.destination
+                        )
+                    except Exception:
+                        preflight_decision = {
+                            "valid": False,
+                            "launch_type": None,
+                            "destination": clasificacion.destination,
+                            "reason": "Error al validar destino con preflight",
+                        }
 
             # 3.8.5.1.4.9.6: preflight completo de politica sobre el candidato.
             preflight_policy: Optional[dict] = None

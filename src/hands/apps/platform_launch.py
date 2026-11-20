@@ -300,10 +300,10 @@ class LaunchOutcome:
         return {
             "success": self.success,
             "pid": self.pid,
-            "window": self.window.to_dict() if self.window else None,
+            "window": self.window.to_dict() if self.window is not None and hasattr(self.window, "to_dict") else None,
             "reused_existing": self.reused_existing,
-            "target": self.target.to_dict() if self.target else None,
-            "error": self.error.to_dict() if self.error else None,
+            "target": self.target.to_dict() if self.target is not None and hasattr(self.target, "to_dict") else None,
+            "error": self.error.to_dict() if self.error is not None and hasattr(self.error, "to_dict") else None,
             "evidence": redact_evidence(dict(self.evidence)),
             "launched": self.launched,
             "process_verified": self.process_verified,
@@ -965,20 +965,22 @@ class ApplicationLaunchService:
         terminal (error, o reutilizacion de la instancia abierta)."""
         display = str(getattr(app, "name", name) or name)
         metadata = getattr(app, "metadata", None) or {}
+        entity_id = metadata.get("entity_id")
         preflight_raw = self.preflight.check(self.catalog_preflight_dict(app))
         decision = LaunchPreflight.from_preflight_dict(preflight_raw)
+        # Cuando el preflight no resuelve un ejecutable para el nombre del
+        # catalogo (a menudo localizado) y la entidad no trae un destino propio
+        # verificable en este equipo, se intenta la resolucion local por nombre
+        # (PATH, shell:AppsFolder, registro, App Paths) antes de rechazarla.
+        resolver_localmente = False
         if not decision.allowed:
-            # Si el preflight bloquea porque no resuelve un ejecutable y la
-            # entidad de catalogo no tiene ejecutable ni URL propia, no fallar:
-            # caerse al descubrimiento local para localizar la ruta de
-            # produccion (p. ej. notepad.exe via PATH) en vez de rechazar la
-            # aplicacion por una entidad del catalogo con alias ambiguo.
             executable = str(getattr(app, "executable", None) or "").strip()
             url = str(getattr(app, "url", None) or "").strip()
-            if (not executable and not url
-                    and decision.blocked_by == "executable_not_resolved"):
+            comando_sin_ruta = bool(executable) and not os.path.isabs(executable) and "/" not in executable and "\\" not in executable
+            if ((not executable and not url) or comando_sin_ruta) and decision.blocked_by == "executable_not_resolved":
+                resolver_localmente = True
                 logger.debug(
-                    "Catalogo %s sin destino propio; se cae al descubrimiento local para %s",
+                    "Catalogo %s sin destino propio verificable en este equipo; se intenta resolucion local para %s",
                     display, name,
                 )
             else:
@@ -1036,9 +1038,30 @@ class ApplicationLaunchService:
             # reutilizar; se lanza y la verificacion busca la ventana nueva.
             logger.info("%s esta en ejecucion sin ventana visible; se abre una ventana nueva", display)
 
+        if resolver_localmente:
+            resolution = self._resolve_locally(name)
+            if not resolution.resolved:
+                if resolution.status == AMBIGUOUS:
+                    return self._ambiguity_outcome(display, resolution)
+                return LaunchOutcome.failed(
+                    resolution.error or OperationError(
+                        OperationStage.RESOLUTION, ErrorCode.TARGET_NOT_LOCALIZABLE,
+                        "La aplicacion %s no tiene ejecutable ni URL configurados y no se localizo "
+                        "un destino en este equipo" % display,
+                    ),
+                    app_name=display,
+                )
+            target = resolution.target
+            assert target is not None
+            if entity_id and not target.catalog_entity_id:
+                target.catalog_entity_id = entity_id
+            gate = self._target_preflight(target)
+            if isinstance(gate, LaunchOutcome):
+                return gate
+            return target
+
         executable = str(getattr(app, "executable", None) or "").strip()
         url = str(getattr(app, "url", None) or "").strip()
-        entity_id = metadata.get("entity_id")
         if executable:
             if not is_safe_launch_text(executable):
                 return LaunchOutcome.failed(

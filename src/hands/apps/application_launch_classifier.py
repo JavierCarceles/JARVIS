@@ -500,6 +500,7 @@ class LaunchClassification:
     razon: str = ""
     requiere_preflight: bool = True
     advertencias: list[str] = field(default_factory=list)
+    app_id: Optional[str] = None
 
     def __post_init__(self) -> None:
         if self.confianza not in CONFIDENCIAS_VALIDAS:
@@ -599,6 +600,7 @@ class LaunchClassifier:
             "source": candidate.get("source", "inventario"),
             "volume": candidate.get("volume"),
             "launch_type": candidate.get("launch_type"),
+            "app_id": candidate.get("app_id"),
             "last_checked_at": str(candidate.get("last_checked_at", "")),
         }
 
@@ -625,6 +627,7 @@ class LaunchClassifier:
             fuente=source,
             ultima_comprobacion=last_checked or _ahora_iso(),
             razon="Sin destino de lanzamiento identificable.",
+            app_id=campos["app_id"],
         )
 
         if not destination or not isinstance(destination, str) or not destination.strip():

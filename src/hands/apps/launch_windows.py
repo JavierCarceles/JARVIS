@@ -213,7 +213,7 @@ class WindowsLaunchAdapter(ApplicationLaunchAdapter):
             return None
         destination = str(getattr(candidate, "destination", None) or getattr(candidate, "absolute_path", None) or "").strip()
         launch_type = str(getattr(candidate, "launch_type", "") or "")
-        aumid = _aumid_from_candidate(candidate)
+        aumid = _aumid_from_candidate(candidate) or str(getattr(candidate, "app_id", None) or "").strip()
         target_type = TARGET_AUMID if (aumid and launch_type == "paquete") else _infer_target_type(destination, launch_type)
         if target_type is None:
             return None
@@ -288,10 +288,35 @@ class WindowsLaunchAdapter(ApplicationLaunchAdapter):
                 candidates=[t.display_name for t in targets],
             ), source)
         targets = [t for t in (self._candidate_to_target(c) for c in candidates) if t is not None]
-        unique = {}
+        # Deduplicar por destino real conservando el destino de mayor precedencia.
+        unicos = {}
         for target in targets:
-            unique.setdefault((target.target_type, target.target.casefold()), target)
-        targets = list(unique.values())
+            clave = (target.target_type, target.target.casefold())
+            if clave not in unicos:
+                unicos[clave] = target
+        targets = list(unicos.values())
+        # Resolucion preferida: si hay exactamente un paquete UWP (AUMID) y los
+        # demas son entradas .exe del catalogo conocido (nombre comercial
+        # "Sistema operativo Microsoft Windows"), se prefiere el paquete nativo
+        # del SO en vez de declarar ambiguedad (el usuario pide "calculadora" y
+        # no el .exe genérico del sistema).
+        paquetes = [t for t in targets if t.target_type == TARGET_AUMID]
+        if len(targets) > 1 and len(paquetes) == 1:
+            return ResolutionOutcome(RESOLVED, paquetes[0], targets, None, source)
+        # Desempate entre varios destinos del mismo tipo: se prefiere el de
+        # mayor confianza de descubrimiento (ej. "notepad.exe" en system32 del
+        # SO por encima de la copia de WindowsApps del paquete).
+        if len(targets) > 1:
+            orden_confianza = {"alta": 3, "media": 2, "baja": 1, "ninguna": 0}
+
+            def _confianza(target: Any) -> int:
+                ev = getattr(target, "evidence", None) or {}
+                return orden_confianza.get(str(ev.get("confianza", "ninguna")).casefold(), 0)
+
+            mejor = max(targets, key=_confianza)
+            empatados = [t for t in targets if _confianza(t) == _confianza(mejor)]
+            if len(empatados) == 1:
+                return ResolutionOutcome(RESOLVED, mejor, targets, None, source)
         if len(targets) == 1:
             return ResolutionOutcome(RESOLVED, targets[0], targets, None, source)
         if len(targets) > 1:
