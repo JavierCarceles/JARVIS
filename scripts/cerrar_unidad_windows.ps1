@@ -1,5 +1,5 @@
 # Pruebas pendientes en Windows antes de cerrar la unidad actual.
-# Lo lanza cerrar_unidad.bat (raiz del proyecto). Cada paso se ejecuta oculto
+# Lo lanza cerrar_unidad.bat (raiz del proyecto). No pide nada: cada paso se ejecuta oculto
 # (no roba el foco a las ventanas de prueba) y en serie; la salida queda en
 # salidas_windows\ y al final se sube a GitHub (sin push forzado).
 
@@ -40,11 +40,6 @@ function Paso([string]$nombre, [string]$argumentos) {
     Add-Content -Path $resumenFichero -Value $linea -Encoding ascii
 }
 
-function Esperar([string]$texto) {
-    Write-Host ''
-    Read-Host ($texto + '. Pulsa Enter cuando este hecho')
-}
-
 Write-Host '=== git pull ==='
 git pull
 if ($LASTEXITCODE -ne 0) {
@@ -55,15 +50,13 @@ if ($LASTEXITCODE -ne 0) {
 
 & $py -c "import PySide6" 2>$null
 if ($LASTEXITCODE -ne 0) {
-    Write-Host ('Falta PySide6 en ' + $py + '. Instala las dependencias en ese Python y vuelve a lanzar cerrar_unidad.bat:')
-    Write-Host '  venv\Scripts\activate'
-    Write-Host '  docs\requirements\jarvis_requirements.bat'
-    Write-Host ('o directamente: ' + $py + ' -m pip install -r docs\requirements\requirements.txt')
-    Read-Host 'Pulsa Enter para salir'
-    exit 1
+    Write-Host ('=== Falta PySide6: instalando docs\requirements\requirements.txt en ' + $py + ' ===')
+    & $py -m pip install -r docs\requirements\requirements.txt
+    & $py -c "import PySide6" 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        Add-Content -Path $resumenFichero -Value 'AVISO: PySide6 sigue sin poder importarse tras pip install' -Encoding ascii
+    }
 }
-
-Esperar 'Cierra Bloc de notas, Calculadora, Chrome, Edge, Configuracion y Discord si los tienes abiertos (VS Code puede quedarse)'
 
 Paso '00_diagnostico' 'scripts/diagnostico_calibracion_windows.py'
 Paso '01_py_compile' '-m py_compile src/hands/inventory/system_inventory_storage.py src/hands/apps/launch_windows.py src/hands/apps/platform_launch.py src/hands/calibration/calibration_pipeline.py src/hands/apps/application_discovery.py scripts/diagnostico_calibracion_windows.py'
@@ -72,11 +65,8 @@ Paso '03_application_discovery' '-m pytest tests/hands/apps/application_discover
 Paso '04_gui_platform_launch' '-m pytest tests/hands/apps/test_platform_launch_entorno_real.py -v -s -rfEs'
 Paso '04b_identidad_integradas' '-m pytest tests/hands/apps/test_aplicaciones_integradas_windows.py tests/hands/apps/application_discovery/test_application_discovery.py -k "identidad or Integradas or Variantes or Busqueda" -v -rfEs'
 Paso '04c_navegacion_chat' '-m pytest tests/hands/calibration/ui_exploration/test_navegacion_chat_entorno_real.py -v -s -rfEs'
-Esperar 'Comprueba que Configuracion de Windows esta cerrada'
 Paso '04c_navegacion_ajustes' '-m pytest tests/hands/calibration/ui_exploration/test_navegacion_ajustes_entorno_real.py -v -s -rfEs'
-Esperar 'Comprueba que Bloc de notas, Calculadora y Chrome estan cerrados'
 Paso '05_calibracion_aplicaciones' '-m pytest tests/hands/calibration/calibration_pipeline/test_calibracion_aplicaciones_entorno_real.py -v -s -rfEs'
-Esperar 'No regresion: abrira y cerrara aplicaciones reales y puede tardar mucho. Cierra Bloc de notas, Calculadora, Chrome, Edge, Mapa de caracteres y Discord'
 Paso '06a_no_regresion_hands' ("-m pytest tests/hands --ignore=" + $escaneo + " -q -rfEs")
 Paso '06b_no_regresion_resto' '-m pytest tests/brain tests/core tests/desktop tests/ear tests/experimental tests/eyes tests/fixtures tests/helpers tests/memory -q -rfEs'
 
@@ -92,4 +82,3 @@ git push
 if ($LASTEXITCODE -ne 0) {
     Write-Host 'git push ha fallado: haz git pull y vuelve a hacer git push. Nunca push forzado.'
 }
-Read-Host 'Pulsa Enter para cerrar'
