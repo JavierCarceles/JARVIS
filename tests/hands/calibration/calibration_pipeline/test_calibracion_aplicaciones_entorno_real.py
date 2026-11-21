@@ -9,8 +9,8 @@ UNA aplicacion por vez y solo con una instancia propia abierta por la prueba:
 - Bloc de notas (`notepad`).
 - Calculadora (`calculadora`, o `calculator` si el menu Inicio esta en ingles):
   aplicacion empaquetada (UWP) lanzada por su AUMID.
-- Una aplicacion de otra familia: navegador Chromium (`chrome` o, si Chrome no
-  esta disponible o tiene ventanas abiertas, `microsoft edge`).
+- Una aplicacion de otra familia: navegador Chromium (`chrome`). Edge no se
+  usa en esta prueba.
 
 Para cada aplicacion verifica: exito sin etapa fallida, perfil persistido en
 SQLite, al menos un control validado, monitor de pruebas, instancia abierta por
@@ -21,8 +21,8 @@ No escribe texto ni pulsa controles: el pipeline solo mueve el puntero para
 verificar puntos seguros. Nunca cierra procesos ni ventanas preexistentes.
 
 Precondicion: la aplicacion bajo prueba no debe tener ventanas abiertas por el
-usuario (para el navegador basta con que uno de los dos candidatos no las
-tenga). Si las tiene, la prueba falla indicando que ventana cerrar; no se salta.
+usuario. Si las tiene, la prueba falla indicando que ventana cerrar; no se
+salta.
 
 Requiere Windows y JARVIS_TEST_GUI_REAL=1. Ejecutar de uno en uno (lock de
 fichero; nunca en paralelo con otros tests GUI):
@@ -48,7 +48,7 @@ from src.hands.calibration.calibration_pipeline import (
 NOMBRES_BLOC_DE_NOTAS = ("notepad",)
 NOMBRES_CALCULADORA = ("calculadora", "calculator")
 # (nombre para JARVIS, nombre del proceso del navegador)
-NAVEGADORES_CHROMIUM = (("chrome", "chrome.exe"), ("microsoft edge", "msedge.exe"))
+NAVEGADORES_CHROMIUM = (("chrome", "chrome.exe"),)
 
 CODIGOS_NO_ENCONTRADA = ("not_found", "not_installed")
 ESPERA_CIERRE_SEGUNDOS = 15.0
@@ -246,8 +246,7 @@ class TestCalibracionAplicacionesEntornoReal(unittest.TestCase):
         ]
         if not candidatos:
             self.fail(
-                "Chrome y Edge tienen ventanas abiertas por el usuario; cerrar las de uno de "
-                "los dos (por ejemplo Chrome) y repetir la prueba"
+                "Chrome tiene ventanas abiertas por el usuario; cerrarlas y repetir la prueba"
             )
         vscode_antes = _estado_ventanas_vscode(self.adapter)
         nombre, report = self._calibrar(candidatos)
