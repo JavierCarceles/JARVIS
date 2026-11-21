@@ -331,6 +331,10 @@ class UICalibrationPipeline:
         vision_timeout: float = 300.0,
         vision_max_side: int = 1600,
         vision_max_elements: int = 40,
+        visual_detectors: str = "auto",
+        min_accessible_controls: int = 5,
+        explore_navigation: bool = False,
+        navigation_containers: Optional[Sequence[str]] = None,
     ) -> None:
         self._adapter = adapter
         self._launcher = launcher
@@ -361,6 +365,20 @@ class UICalibrationPipeline:
         # aporta la mayoria de controles) y salida maxima acorde (~60 tokens
         # por elemento): acota el tiempo de generacion, sobre todo sin GPU.
         self.vision_max_elements = int(vision_max_elements)
+        # Deteccion visual (Qwen3-VL, OmniParser, PaddleOCR): "auto" solo
+        # cuando la accesibilidad no basta (menos de min_accessible_controls
+        # controles accionables o sin arbol); "always" siempre; "never" nunca.
+        if visual_detectors not in ("auto", "always", "never"):
+            raise ValueError("visual_detectors debe ser 'auto', 'always' o 'never'")
+        self.visual_detectors = visual_detectors
+        self.min_accessible_controls = int(min_accessible_controls)
+        # Exploracion profunda: seleccionar elementos de listas de navegacion
+        # (panel de Ajustes, lista de conversaciones) solo si se pide; ante la
+        # duda no se pulsa (regla de exploracion segura).
+        self.explore_navigation = bool(explore_navigation)
+        # Solo se navega dentro de estos contenedores (por defecto el panel de
+        # navegacion de WinUI): fuera, una lista puede ser de valores.
+        self.navigation_containers = navigation_containers
         self._lock = threading.Lock()
         self._wait_event = threading.Event()
 
@@ -434,9 +452,11 @@ class UICalibrationPipeline:
 
     def _detector_manifest(self) -> Any:
         if self._manifest is None:
-            from src.hands.detection.detector_manifest import build_detector_manifest
+            # Compartido en el proceso: comprobar la disponibilidad carga los
+            # modelos y no debe repetirse en cada calibracion.
+            from src.hands.detection.detector_manifest import obtener_manifiesto
 
-            self._manifest = build_detector_manifest()
+            self._manifest = obtener_manifiesto()
         return self._manifest
 
     def _select_policy(self, policy: str) -> Any:
@@ -687,7 +707,10 @@ class UICalibrationPipeline:
 
         if depth in (DEPTH_DEEP, DEPTH_BRANCH):
             t = time.monotonic()
-            self._stage_exploration(app_info, window, depth, branch_ref, access_ok, report)
+            self._stage_exploration(
+                app_info, window, depth, branch_ref, access_ok, report,
+                ctx=ctx, display=display, topology=topology,
+            )
             self._timed(report, STAGE_EXPLORATION, t)
 
     # ------------------------------------------------------------------
@@ -1141,7 +1164,30 @@ class UICalibrationPipeline:
             counts[SOURCE_UIA] = len(access)
             detectors[SOURCE_UIA] = {"source": tree.source, "status": "used"}
 
-        if capture is not None and image_path:
+        accessible_actionable = sum(
+            1 for c in candidates
+            if (_get(c, "raw", {}) or {}).get("is_enabled")
+            and ((_get(c, "raw", {}) or {}).get("actions") or (_get(c, "raw", {}) or {}).get("patterns"))
+        )
+        if self.visual_detectors == "never":
+            run_visual, visual_reason = False, "desactivada (visual_detectors=never)"
+        elif self.visual_detectors == "always":
+            run_visual, visual_reason = True, "siempre (visual_detectors=always)"
+        elif tree is None:
+            run_visual, visual_reason = True, "sin arbol de accesibilidad"
+        elif accessible_actionable < self.min_accessible_controls:
+            run_visual, visual_reason = True, "accesibilidad insuficiente (%d controles accionables < %d)" % (
+                accessible_actionable, self.min_accessible_controls)
+        else:
+            run_visual, visual_reason = False, "accesibilidad suficiente (%d controles accionables)" % accessible_actionable
+        report.metrics["visual_detection"] = {
+            "mode": self.visual_detectors,
+            "used": bool(run_visual and capture is not None and image_path),
+            "reason": visual_reason,
+            "accessible_actionable": accessible_actionable,
+        }
+
+        if run_visual and capture is not None and image_path:
             manifest = None
             if self.use_optional_detectors:
                 try:
@@ -1374,9 +1420,11 @@ class UICalibrationPipeline:
 
         entry = self._manifest_entry(manifest, "omniparser")
         try:
-            from src.hands.detection.omniparser_adapter import OmniParserAdapter
+            from src.hands.detection.detector_manifest import obtener_adaptador_omniparser
 
-            adapter = OmniParserAdapter(model_path=_get(entry, "weight_path"))
+            adapter = obtener_adaptador_omniparser(
+                model_path=_get(entry, "weight_path"), device=_get(entry, "device", None)
+            )
             regions = adapter.detect(image_path, screen=0)
         except Exception as exc:
             report.warnings.append("OmniParser no disponible: %s" % exc)
@@ -1404,11 +1452,14 @@ class UICalibrationPipeline:
         entry = self._manifest_entry(manifest, "paddleocr")
         params = _get(entry, "parameters", {}) or {}
         try:
-            from src.hands.detection.paddleocr_adapter import PaddleOCRAdapter
+            from src.hands.detection.detector_manifest import obtener_adaptador_paddleocr
 
-            adapter = PaddleOCRAdapter(
+            device = _get(entry, "device", None)
+            adapter = obtener_adaptador_paddleocr(
                 model_dir=_get(entry, "weight_path"),
                 rec_model_dir=params.get("rec_model_dir") if isinstance(params, dict) else None,
+                device=device,
+                use_gpu=(device == "cuda"),
             )
             regions = adapter.detect(image_path, screen=0)
         except Exception as exc:
@@ -1536,6 +1587,42 @@ class UICalibrationPipeline:
         role = identity.get("native_role") or ""
         return "%s@%s" % (base, role) if role else base
 
+    @classmethod
+    def _unique_control_ids(cls, transformed: List[Tuple[Any, Any, Any, Any]]) -> List[str]:
+        """``control_id`` unico por control del perfil.
+
+        Dos controles distintos pueden dar el mismo id base: textos de OCR
+        repetidos ("0" en la pantalla y en el boton de la Calculadora),
+        controles sin nombre o sin identificador de accesibilidad. El perfil
+        exige ids unicos (son la clave de puntos y cajas). Los repetidos
+        reciben ``#1``, ``#2``... en orden de lectura (arriba-abajo,
+        izquierda-derecha), estable mientras la disposicion de la ventana no
+        cambie. Un id que no se repite se conserva tal cual.
+        """
+        bases = [cls._control_id(item[0]) for item in transformed]
+        groups: Dict[str, List[int]] = {}
+        for index, base in enumerate(bases):
+            groups.setdefault(base, []).append(index)
+        result = list(bases)
+        taken = set(bases)
+        for base, indexes in groups.items():
+            if len(indexes) < 2:
+                continue
+            ordered = sorted(
+                indexes,
+                key=lambda i: (round(float(transformed[i][1].top)), round(float(transformed[i][1].left)), i),
+            )
+            ordinal = 0
+            for i in ordered:
+                ordinal += 1
+                candidate_id = "%s#%d" % (base, ordinal)
+                while candidate_id in taken:
+                    ordinal += 1
+                    candidate_id = "%s#%d" % (base, ordinal)
+                taken.add(candidate_id)
+                result[i] = candidate_id
+        return result
+
     @staticmethod
     def _gate_key(candidate: Any) -> str:
         return str(
@@ -1613,8 +1700,9 @@ class UICalibrationPipeline:
             str(k): str(_get(v, "version", "") or "")
             for k, v in (report.metrics.get("detectors") or {}).items()
         }
-        for cand, work_box, desktop_box, (client_box, norm_box) in transformed:
-            control_id = self._control_id(cand)
+        unique_ids = self._unique_control_ids(transformed)
+        for index, (cand, work_box, desktop_box, (client_box, norm_box)) in enumerate(transformed):
+            control_id = unique_ids[index]
             sources = [ev.source for ev in (_get(cand, "sources", []) or [])]
             assessment = self._assessment_for(gate_result, cand)
             decision = self._decision_for(gate_result, cand)
@@ -1884,6 +1972,32 @@ class UICalibrationPipeline:
             raise _StageFailure(STAGE_PERSISTENCE, "no se pudo guardar el perfil de calibracion: %s" % exc)
         report.metrics["profile_status"] = _to_plain(profile.status)
 
+    def _reset_owned_app(self, app_info: Dict[str, Any], ctx: Any, display: Any, topology: Any) -> Any:
+        """Callable de reinicio para la exploracion: SOLO para la app abierta
+        por JARVIS. Cierra su ventana, la vuelve a abrir por el lanzador y la
+        prepara igual (monitor, maximizada, primer plano)."""
+
+        def _reset() -> Optional[Tuple[int, int]]:
+            adapter = self.adapter
+            current = ctx.window
+            if current is not None:
+                adapter.close_window(int(current.window_id))
+                deadline = time.monotonic() + 10.0
+                while time.monotonic() < deadline:
+                    res = adapter.get_window(int(current.window_id))
+                    if not res.ok or res.value is None or not res.value.is_visible:
+                        break
+                    self._wait_event.wait(0.2)
+            outcome = self.launcher.open(app_info["name"], timeout=self.launch_timeout)
+            window = _get(outcome, "window")
+            if not _get(outcome, "success", False) or window is None:
+                return None
+            prepared = self._stage_prepare_window(adapter, window, display, topology)
+            ctx.window = prepared
+            return int(prepared.window_id), int(prepared.pid)
+
+        return _reset
+
     def _stage_exploration(
         self,
         app_info: Dict[str, Any],
@@ -1892,8 +2006,27 @@ class UICalibrationPipeline:
         branch_ref: Any,
         access_ok: bool,
         report: CalibrationReport,
+        ctx: Any = None,
+        display: Any = None,
+        topology: Any = None,
     ) -> None:
-        from src.hands.calibration.ui_exploration import DeepUIExplorer, persist_state_map_logically
+        """Exploracion en profundidad con clics verificados y mapa JSON.
+
+        Pestanas, menus y elementos de navegacion se pulsan con el raton en el
+        punto de su caja verificado antes del clic; cada transicion guarda la
+        evidencia. Si la app la abrio JARVIS, las transiciones sin vuelta se
+        resuelven reiniciandola. El mapa (estados con profundidad, elementos
+        con coordenadas y transiciones) se guarda en
+        ``data/ui_maps/<machine_id>/<app>.json`` y, en profundidad completa,
+        se reproduce cada camino desde la raiz con las coordenadas guardadas.
+        """
+        from src.hands.calibration.ui_exploration import (
+            DEFAULT_NAVIGATION_CONTAINERS,
+            INTERACTION_CLICK,
+            DeepUIExplorer,
+            ExplorationSafetyPolicy,
+            persist_state_map_logically,
+        )
 
         if not access_ok:
             report.exploration = {"aborted": True, "abort_reason": "la exploracion requiere accesibilidad"}
@@ -1902,12 +2035,22 @@ class UICalibrationPipeline:
         target_ref = None
         if depth == DEPTH_BRANCH:
             target_ref = dict(branch_ref) if isinstance(branch_ref, dict) else {"name": str(branch_ref)}
+        owned = bool(getattr(ctx, "owned", False))
+        reset = self._reset_owned_app(app_info, ctx, display, topology) if (owned and ctx is not None) else None
         explorer = DeepUIExplorer(
             adapter=self.adapter,
-            policy=self.explorer_policy,
+            policy=self.explorer_policy or ExplorationSafetyPolicy(
+                allow_navigation=self.explore_navigation,
+                navigation_containers=(
+                    self.navigation_containers if self.navigation_containers is not None
+                    else DEFAULT_NAVIGATION_CONTAINERS
+                ),
+            ),
             budget=self.explorer_budget,
             store=self._store,
             app_id=app_info["app_key"],
+            interaction=INTERACTION_CLICK,
+            reset_root=reset,
         )
         try:
             result = explorer.explore(
@@ -1923,11 +2066,54 @@ class UICalibrationPipeline:
         report.exploration = result.to_dict()
         if result.aborted:
             report.warnings.append("exploracion detenida: %s" % result.abort_reason)
+        try:
+            self._save_ui_map(app_info, result, explorer, ctx, display, depth, report)
+        except Exception as exc:
+            report.warnings.append("mapa de navegacion no guardado: %s" % exc)
         if result.state_map.states:
             saved, reason = persist_state_map_logically(app_info["app_key"], result.state_map)
             report.exploration["catalog_saved"] = saved
             if not saved:
                 report.warnings.append("mapa de estados no guardado en el catalogo: %s" % reason)
+
+    def _save_ui_map(
+        self, app_info: Dict[str, Any], result: Any, explorer: Any, ctx: Any, display: Any, depth: str,
+        report: CalibrationReport,
+    ) -> None:
+        from src.hands.calibration.ui_navigation_map import (
+            UINavigator,
+            build_navigation_map,
+            save_navigation_map,
+            verify_all_paths,
+        )
+
+        machine_id = str(getattr(self.store, "machine_id", "") or "")
+        if not machine_id:
+            from src.hands.inventory.system_inventory import generate_machine_id
+
+            machine_id = generate_machine_id()
+        current = getattr(ctx, "window", None) if ctx is not None else None
+        data = build_navigation_map(result, app_info["app_key"], machine_id, window=current, display=display)
+        if (
+            depth == DEPTH_DEEP
+            and explorer.reset_root is not None
+            and current is not None
+            and len(data["states"]) > 1
+        ):
+            # Prueba del mapa: cada camino desde la raiz con coordenadas guardadas.
+            navigator = UINavigator(explorer, data, int(current.window_id), int(current.pid))
+            verification = verify_all_paths(navigator)
+            report.exploration["path_verification"] = {
+                "ok": verification["ok"], "failed": verification["failed"],
+            }
+            if verification["failed"]:
+                report.warnings.append(
+                    "%d caminos del mapa no se pudieron reproducir con las coordenadas guardadas"
+                    % verification["failed"]
+                )
+        path = save_navigation_map(data)
+        report.exploration["ui_map_path"] = str(path)
+        report.exploration["ui_map_states"] = len(data["states"])
 
     # ------------------------------------------------------------------
     # Navegadores y limpieza

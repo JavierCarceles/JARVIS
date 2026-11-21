@@ -69,14 +69,42 @@ ACTION_EXPAND = "expand"
 ACTION_SELECT_TAB = "select_tab"
 ACTION_OPEN_MENU = "open_menu"
 ACTION_OPEN_DIALOG = "open_dialog"
+# Seleccionar un elemento de una lista o arbol de navegacion (panel lateral de
+# Ajustes, lista de conversaciones). Solo con allow_navigation=True.
+ACTION_NAVIGATE = "navigate"
 
-EXPLORATION_ACTIONS = frozenset({ACTION_EXPAND, ACTION_SELECT_TAB, ACTION_OPEN_MENU, ACTION_OPEN_DIALOG})
+EXPLORATION_ACTIONS = frozenset({ACTION_EXPAND, ACTION_SELECT_TAB, ACTION_OPEN_MENU, ACTION_OPEN_DIALOG, ACTION_NAVIGATE})
 
 # Formas de volver al estado anterior.
 RETURN_COLLAPSE = "collapse"
 RETURN_ESCAPE = "escape"
 RETURN_SELECT_PREVIOUS_TAB = "select_previous_tab"
 RETURN_CLOSE_OPENED_WINDOW = "close_opened_window"
+# Vuelta reiniciando la aplicacion abierta por JARVIS (callable reset_root) y
+# reproduciendo la ruta desde la raiz: para transiciones sin vuelta propia
+# (tras abrir una conversacion no hay "deseleccionar").
+RETURN_RESET = "reset"
+
+# Roles de elementos de navegacion seleccionables (seleccionar navega; nunca
+# ejecutan un comando: abrir un fichero de una lista requiere doble clic o
+# Invoke, que no se usan).
+NAVIGATION_ROLES = frozenset({"ListItem", "TreeItem", "DataItem", "AXRow", "AXOutlineRow"})
+
+# Contenedores cuyos elementos son VALORES, no navegacion: seleccionar una
+# opcion de un desplegable cambia un ajuste (p. ej. el tema de Windows).
+VALUE_CONTAINER_ROLES = frozenset({"ComboBox", "AXComboBox", "AXPopUpButton"})
+
+# Contenedores de navegacion conocidos (nombre o identificador de un antepasado,
+# sin mayusculas): panel NavigationView de WinUI (Configuracion de Windows y
+# apps modernas). Fuera de ellos una lista puede contener VALORES (temas,
+# fondos de pantalla) y seleccionar uno cambiaria la configuracion.
+DEFAULT_NAVIGATION_CONTAINERS = ("menuitemshost", "navigationview", "navigation", "navegacion", "paneroot")
+
+# Formas de ejecutar una accion de exploracion.
+INTERACTION_ACCESSIBILITY = "accessibility"
+INTERACTION_CLICK = "click"
+# Acciones que en modo clic se hacen con el raton sobre el punto verificado.
+CLICK_ACTIONS = frozenset({ACTION_SELECT_TAB, ACTION_NAVIGATE, ACTION_OPEN_MENU})
 
 # Acciones que nunca se ejecutan durante la exploracion (escritura o efecto).
 NEVER_ACTIONS = frozenset({"set_value", "toggle", "type_text", "scroll", "invoke_leaf"})
@@ -193,8 +221,19 @@ class ExplorationSafetyPolicy:
         self,
         allow_dialogs: bool = False,
         extra_forbidden_terms: Optional[Sequence[str]] = None,
+        allow_navigation: bool = False,
+        navigation_containers: Optional[Sequence[str]] = None,
     ) -> None:
+        """``navigation_containers``: si se da, navegar solo se permite en
+        elementos con un antepasado cuyo nombre o identificador (sin
+        mayusculas) esta en la lista. None = sin restriccion (apps propias de
+        prueba)."""
         self.allow_dialogs = bool(allow_dialogs)
+        self.allow_navigation = bool(allow_navigation)
+        self.navigation_containers = (
+            frozenset(str(c).strip().casefold() for c in navigation_containers)
+            if navigation_containers is not None else None
+        )
         self.forbidden_terms: Tuple[str, ...] = (
             FORBIDDEN_TERMS_ES + FORBIDDEN_TERMS_EN + tuple(extra_forbidden_terms or ())
         )
@@ -203,6 +242,8 @@ class ExplorationSafetyPolicy:
         actions = {ACTION_EXPAND, ACTION_SELECT_TAB, ACTION_OPEN_MENU}
         if self.allow_dialogs:
             actions.add(ACTION_OPEN_DIALOG)
+        if self.allow_navigation:
+            actions.add(ACTION_NAVIGATE)
         return frozenset(actions)
 
     def label_of(self, node: AccessibilityNode) -> str:
@@ -258,6 +299,10 @@ class ExplorationSafetyPolicy:
             if not native_actions & {"expand", "show_menu", "invoke"}:
                 return False, "el control no expone una accion para abrir el menu"
             return True, "abrir menu"
+        if action == ACTION_NAVIGATE:
+            if node.native_role not in NAVIGATION_ROLES or "select" not in native_actions:
+                return False, "el control no es un elemento de navegacion seleccionable"
+            return True, "navegar (seleccionar elemento de navegacion)"
         if action == ACTION_OPEN_DIALOG:
             if node.native_role not in MENU_ITEM_ROLES or "invoke" not in native_actions:
                 return False, "solo elementos de menu pueden abrir dialogos"
@@ -274,6 +319,13 @@ class ExplorationSafetyPolicy:
         native_actions = set(node.actions)
         if node.native_role in TAB_ROLES and "select" in native_actions:
             return ACTION_SELECT_TAB
+        if (
+            self.allow_navigation
+            and node.native_role in NAVIGATION_ROLES
+            and "select" in native_actions
+            and not (node.native_role == "TreeItem" and "expand" in native_actions)
+        ):
+            return ACTION_NAVIGATE
         if "expand" in native_actions:
             return ACTION_EXPAND
         if node.native_role in MENU_OPENER_ROLES and native_actions & {"show_menu", "invoke"}:
@@ -331,6 +383,10 @@ class UITransition:
     to_state: str
     return_action: str
     verified_return: bool
+    # Evidencia de la ejecucion real: metodo (clic/accesibilidad), punto y
+    # comprobacion del elemento bajo el puntero (fisica: no va al catalogo),
+    # estado antes/despues y si la interfaz cambio.
+    evidence: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -340,6 +396,7 @@ class UITransition:
             "to_state": self.to_state,
             "return_action": self.return_action,
             "verified_return": self.verified_return,
+            "evidence": dict(self.evidence),
         }
 
     @classmethod
@@ -351,6 +408,7 @@ class UITransition:
             to_state=str(data.get("to_state", "")),
             return_action=str(data.get("return_action", "")),
             verified_return=bool(data.get("verified_return", False)),
+            evidence=dict(data.get("evidence") or {}),
         )
 
 
@@ -359,6 +417,7 @@ _PHYSICAL_KEYS = frozenset({
     "bbox", "box", "center", "coordinates", "x", "y", "left", "top", "right",
     "bottom", "width", "height", "rect", "bounds", "point", "monitor",
     "display_id", "dpi", "scale_factor", "pid", "hwnd", "window_id",
+    "click_point", "element_box", "window_client",
 })
 
 
@@ -404,6 +463,7 @@ class UIStateMap:
                 existing.to_state = transition.to_state
                 existing.return_action = transition.return_action
                 existing.verified_return = transition.verified_return
+                existing.evidence = dict(transition.evidence)
                 return
         self.transitions.append(transition)
 
@@ -582,6 +642,11 @@ class ExplorationResult:
     target_path: List[Dict[str, Any]] = field(default_factory=list)
     closed_windows: List[int] = field(default_factory=list)
     errors: List[str] = field(default_factory=list)
+    # Capa fisica (no va al catalogo): por estado, elementos interactivos con
+    # su caja en el escritorio y normalizada al area cliente de la ventana.
+    physical_states: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    resets: int = 0
+    no_effect: List[Dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -620,6 +685,8 @@ class _ObservedState:
     tree_hash: str
     foreground_pid: Optional[int] = None
     foreground_window: Optional[int] = None
+    main_present: bool = True
+    main_client: Optional[Tuple[float, float, float, float]] = None
 
     def nodes(self) -> List[AccessibilityNode]:
         result: List[AccessibilityNode] = []
@@ -678,7 +745,25 @@ class DeepUIExplorer:
         budget: Optional[ExplorationBudget] = None,
         store: Any = None,
         app_id: str = "",
+        interaction: str = INTERACTION_ACCESSIBILITY,
+        reset_root: Optional[Any] = None,
+        pointer_verifier: Any = None,
     ) -> None:
+        """Ademas de lo anterior:
+
+        interaction: ``"accessibility"`` (patrones/acciones AX) o ``"click"``
+            (pestanas, navegacion y menus con el raton sobre el punto seguro de
+            la caja del elemento, verificando antes del clic que el elemento
+            bajo el puntero es el esperado). El modo clic demuestra que las
+            coordenadas sirven.
+        reset_root: callable sin argumentos que reinicia la aplicacion ABIERTA
+            POR JARVIS y devuelve ``(window_id, pid)`` de la ventana nueva en
+            su estado inicial, o None si no pudo. Solo se usa cuando una
+            transicion no tiene vuelta propia. Sin el, esas transiciones abortan
+            la exploracion como hasta ahora.
+        """
+        if interaction not in (INTERACTION_ACCESSIBILITY, INTERACTION_CLICK):
+            raise ValueError("interaction debe ser 'accessibility' o 'click'")
         if adapter is None:
             from src.desktop.platform_contract import get_desktop_platform
 
@@ -697,6 +782,11 @@ class DeepUIExplorer:
         self._elapsed_before = 0.0
         self._actions = 0
         self._performed_log: List[Dict[str, Any]] = []
+        self.interaction = interaction
+        self.reset_root = reset_root
+        self._pointer_verifier = pointer_verifier
+        self._last_evidence: Dict[str, Any] = {}
+        self._resets = 0
 
     # ------------------------------------------------------------------
     # Control externo
@@ -770,6 +860,16 @@ class DeepUIExplorer:
                 foreground_window = int(fg.value.window_id)
         except Exception as exc:
             logger.debug("[EXPLORACION] primer plano no disponible: %s", exc)
+        main_client: Optional[Tuple[float, float, float, float]] = None
+        if self._main_window_id in window_ids:
+            try:
+                main = self.adapter.get_window(self._main_window_id)
+                if main.ok and main.value is not None:
+                    rect = main.value.client_bounds or main.value.frame_bounds or main.value.bounds
+                    if rect is not None:
+                        main_client = (float(rect.left), float(rect.top), float(rect.right), float(rect.bottom))
+            except Exception as exc:
+                logger.debug("[EXPLORACION] geometria de la ventana principal no disponible: %s", exc)
         return _ObservedState(
             window_ids=frozenset(window_ids),
             trees=trees,
@@ -779,6 +879,8 @@ class DeepUIExplorer:
             tree_hash=tree_hash,
             foreground_pid=foreground_pid,
             foreground_window=foreground_window,
+            main_present=self._main_window_id in window_ids,
+            main_client=main_client,
         )
 
     def _observe(self) -> _ObservedState:
@@ -858,7 +960,7 @@ class DeepUIExplorer:
         native = set(node.actions)
         if action == ACTION_EXPAND:
             return "expand"
-        if action == ACTION_SELECT_TAB:
+        if action in (ACTION_SELECT_TAB, ACTION_NAVIGATE):
             return "select"
         if action == ACTION_OPEN_MENU:
             if "show_menu" in native:
@@ -877,7 +979,11 @@ class DeepUIExplorer:
             raise _ExplorationAbort("accion rechazada por la politica en ejecucion: %s" % reason)
         native_action = self._native_action_for(node, action)
         window_id = int(node.window_id or self._main_window_id)
+        if self.interaction == INTERACTION_CLICK and action in CLICK_ACTIONS:
+            self._click_node(node, action, window_id)
+            return
         self._actions += 1
+        self._last_evidence = {"method": "accessibility:%s" % native_action}
         self._performed_log.append({
             "action": action,
             "native_action": native_action,
@@ -889,6 +995,58 @@ class DeepUIExplorer:
                 "la accion %s sobre %r fallo: %s"
                 % (action, node.name or node.identifier, result.error)
             )
+
+    def _verifier(self) -> Any:
+        if self._pointer_verifier is None:
+            from src.hands.calibration.coordinate_spaces import PointerVerifier
+
+            self._pointer_verifier = PointerVerifier(adapter=self.adapter)
+        return self._pointer_verifier
+
+    def _click_node(self, node: AccessibilityNode, action: str, window_id: int) -> None:
+        """Clic real en el centro de la caja del elemento, verificado antes de pulsar.
+
+        Antes del clic: primer plano propio, puntero movido al punto y el
+        elemento bajo el puntero coincide con la caja esperada
+        (``PointerVerifier``). Si algo no se verifica no se hace clic.
+        """
+        from src.hands.calibration.coordinate_spaces import CoordinateSpace, SpaceBox, SpacePoint
+
+        box = node.bbox
+        if box is None or not box.is_valid():
+            raise _ExplorationAbort("el elemento %r no tiene caja para hacer clic" % (node.name or node.identifier))
+        if not self._foreground_is_own():
+            raise _ExplorationAbort("la ventana explorada no esta en primer plano: no se hace clic")
+        space = CoordinateSpace.from_value(getattr(self.adapter, "desktop_space", "DESKTOP_PIXELS"))
+        x = (float(box.left) + float(box.right)) / 2.0
+        y = (float(box.top) + float(box.bottom)) / 2.0
+        expected_box = SpaceBox(float(box.left), float(box.top), float(box.right), float(box.bottom), space)
+        verification = self._verifier().move_and_verify(
+            SpacePoint(x, y, space), int(window_id), expected_pid=self._pid, expected_box=expected_box,
+        )
+        evidence = {
+            "method": "click",
+            "click_point": [round(x, 1), round(y, 1)],
+            "element_box": [float(box.left), float(box.top), float(box.right), float(box.bottom)],
+            "pointer_ok": bool(getattr(verification, "ok", False)),
+            "element_under_pointer_ok": getattr(verification, "element_ok", None),
+            "pointer_reason": str(getattr(verification, "reason", "") or ""),
+        }
+        self._last_evidence = evidence
+        if not evidence["pointer_ok"]:
+            raise _ExplorationAbort(
+                "coordenadas no verificadas para %r: %s" % (node.name or node.identifier, evidence["pointer_reason"])
+            )
+        self._actions += 1
+        self._performed_log.append({
+            "action": action,
+            "native_action": "click",
+            "element_ref": element_reference(node),
+            "click_point": list(evidence["click_point"]),
+        })
+        result = self.adapter.click()
+        if not result.ok:
+            raise _ExplorationAbort("el clic sobre %r fallo: %s" % (node.name or node.identifier, result.error))
 
     def _foreground_is_own(self, observed: Optional[_ObservedState] = None) -> bool:
         if observed is not None and observed.foreground_pid is not None:
@@ -912,7 +1070,9 @@ class DeepUIExplorer:
         return bool(result.ok)
 
     def _returned(self, expected: _ObservedState, current: _ObservedState) -> bool:
-        if current.window_ids != expected.window_ids:
+        # Mismo numero de ventanas y misma presencia de la principal (los ids
+        # cambian si la aplicacion se reinicio para volver a la raiz).
+        if len(current.window_ids) != len(expected.window_ids) or current.main_present != expected.main_present:
             return False
         if current.state_id == expected.state_id:
             return True
@@ -935,7 +1095,7 @@ class DeepUIExplorer:
             attempts = [RETURN_COLLAPSE, RETURN_ESCAPE]
         elif action == ACTION_OPEN_MENU:
             attempts = [RETURN_ESCAPE, RETURN_COLLAPSE, RETURN_ESCAPE]
-        elif action == ACTION_SELECT_TAB:
+        elif action in (ACTION_SELECT_TAB, ACTION_NAVIGATE):
             attempts = [RETURN_SELECT_PREVIOUS_TAB]
         elif action == ACTION_OPEN_DIALOG:
             attempts = [RETURN_ESCAPE, RETURN_CLOSE_OPENED_WINDOW]
@@ -957,7 +1117,7 @@ class DeepUIExplorer:
             elif method == RETURN_ESCAPE:
                 ok = self._press_escape()
             elif method == RETURN_SELECT_PREVIOUS_TAB:
-                ok = self._restore_previous_tab(expected, current, node_ref)
+                ok = self._restore_previous_tab(expected, current, node_ref, action)
             elif method == RETURN_CLOSE_OPENED_WINDOW:
                 ok = bool(self._close_new_windows(current, expected.window_ids))
             if not ok:
@@ -968,27 +1128,33 @@ class DeepUIExplorer:
         return False, "+".join(attempts) or "none", current
 
     def _restore_previous_tab(
-        self, expected: _ObservedState, current: _ObservedState, node_ref: Dict[str, Any]
+        self,
+        expected: _ObservedState,
+        current: _ObservedState,
+        node_ref: Dict[str, Any],
+        action: str = ACTION_SELECT_TAB,
     ) -> bool:
-        """Selecciona pestanas hermanas seguras hasta recuperar el estado esperado."""
+        """Selecciona hermanos seguros (pestanas o elementos de navegacion)
+        hasta recuperar el estado esperado."""
         selected = self._locate(current, node_ref)
         if selected is None:
             return False
         tree = current.tree_for(selected)
         if tree is None:
             return False
+        roles = NAVIGATION_ROLES if action == ACTION_NAVIGATE else TAB_ROLES
         siblings = [
             n for n in tree.nodes
             if n.parent_id == selected.parent_id
             and n.node_id != selected.node_id
-            and n.native_role in TAB_ROLES
+            and n.native_role in roles
         ]
         for sibling in siblings:
-            allowed, _ = self.policy.is_allowed(sibling, ACTION_SELECT_TAB)
+            allowed, _ = self.policy.is_allowed(sibling, action)
             if not allowed:
                 continue
             ref = element_reference(sibling, tree)
-            self._perform(sibling, ACTION_SELECT_TAB)
+            self._perform(sibling, action)
             observed = self._observe()
             if self._returned(expected, observed):
                 return True
@@ -1108,6 +1274,110 @@ class DeepUIExplorer:
         node = self._locate(observed, target_ref)
         return node is not None and node.visible and not node.offscreen
 
+    # ------------------------------------------------------------------
+    # Capa fisica y reinicio
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def element_key(node: AccessibilityNode, tree: Optional[AccessibilityTree] = None) -> str:
+        """Clave estable de un elemento dentro de un estado (sin coordenadas)."""
+        ref = element_reference(node, tree)
+        return "%s|%s|%s" % (ref.get("identifier") or ref.get("name") or "", ref.get("native_role") or "",
+                             ref.get("parent_name") or "")
+
+    def _physical_snapshot(self, observed: _ObservedState, depth: int) -> Dict[str, Any]:
+        """Elementos interactivos visibles del estado con su caja real.
+
+        ``box_client_norm`` es la caja relativa al area cliente de la ventana
+        principal (0..1), reutilizable aunque la ventana se mueva o cambie de
+        tamano; ``bbox`` es la caja en el espacio del escritorio en el momento
+        de la observacion.
+        """
+        client = observed.main_client
+        elements: List[Dict[str, Any]] = []
+        for wid in sorted(observed.trees):
+            tree = observed.trees[wid]
+            slot = 0 if wid == self._main_window_id else 1
+            for node in tree.nodes:
+                if not node.actions or not node.enabled or not node.visible or node.offscreen:
+                    continue
+                if node.bbox is None or not node.bbox.is_valid():
+                    continue
+                ref = element_reference(node, tree)
+                box = node.bbox
+                record: Dict[str, Any] = {
+                    "key": self.element_key(node, tree),
+                    "name": node.name,
+                    "identifier": node.identifier,
+                    "control_type": node.control_type,
+                    "native_role": node.native_role,
+                    "tree_depth": int(node.depth),
+                    "parent_name": ref.get("parent_name", ""),
+                    "actions": list(node.actions),
+                    "window_slot": slot,
+                    "bbox": [float(box.left), float(box.top), float(box.right), float(box.bottom)],
+                }
+                if client is not None and slot == 0:
+                    cl, ct, cr, cb = client
+                    width, height = max(1e-9, cr - cl), max(1e-9, cb - ct)
+                    record["box_client_norm"] = [
+                        round((float(box.left) - cl) / width, 6), round((float(box.top) - ct) / height, 6),
+                        round((float(box.right) - cl) / width, 6), round((float(box.bottom) - ct) / height, 6),
+                    ]
+                action = self.policy.candidate_action(node)
+                record["exploration_action"] = action
+                if action is not None:
+                    allowed, why = self.policy.is_allowed(node, action)
+                    record["exploration_allowed"] = bool(allowed)
+                    if not allowed:
+                        record["exploration_blocked_reason"] = why
+                elements.append(record)
+        return {
+            "state_id": observed.state_id,
+            "depth": int(depth),
+            # Etiquetas "identificador|nombre" de todo lo visible: distinguen
+            # estados con la misma estructura y distinto contenido ("Chat con
+            # Manolito" frente a "Chat con Lucia").
+            "labels": sorted(self.state_labels(observed)),
+            "window_client": list(client) if client is not None else None,
+            "windows": len(observed.window_ids),
+            "elements": elements,
+        }
+
+    @staticmethod
+    def state_labels(observed: _ObservedState) -> Set[str]:
+        labels: Set[str] = set()
+        for node in observed.nodes():
+            if node.visible and not node.offscreen and (node.name or node.identifier):
+                labels.add("%s|%s" % (node.identifier or "", node.name or ""))
+        return labels
+
+    def _record_physical(self, result: ExplorationResult, observed: _ObservedState, depth: int) -> None:
+        if observed.state_id not in result.physical_states:
+            result.physical_states[observed.state_id] = self._physical_snapshot(observed, depth)
+
+    def _reset_to_root(self, root: _ObservedState) -> _ObservedState:
+        """Reinicia la aplicacion propia y comprueba que queda en el estado raiz."""
+        if self.reset_root is None:
+            raise _ExplorationAbort("transicion sin vuelta y sin reinicio disponible")
+        self._actions += 1
+        self._resets += 1
+        self._performed_log.append({"action": RETURN_RESET, "native_action": "reset", "element_ref": {}})
+        try:
+            outcome = self.reset_root()
+        except Exception as exc:
+            raise _ExplorationAbort("el reinicio de la aplicacion fallo: %s" % exc)
+        if not outcome:
+            raise _ExplorationAbort("no se pudo reiniciar la aplicacion para volver a la raiz")
+        window_id, pid = outcome
+        self._main_window_id = int(window_id)
+        self._pid = int(pid) if pid else None
+        observed = self._observe()
+        if observed.state_id != root.state_id and not self._returned(root, observed):
+            raise _ExplorationAbort("tras reiniciar, la aplicacion no esta en el estado raiz")
+        self._baseline_windows = observed.window_ids
+        return observed
+
     def explore(
         self,
         window_id: int,
@@ -1182,6 +1452,8 @@ class DeepUIExplorer:
             state_map.add_state(self._state_node(root, 0))
             state_map.root_state_id = root.state_id
             frontier.append([])
+        self._record_physical(result, root, 0)
+        self._resets = 0
 
         result.visited = list(state_map.states)
         skipped_keys: Set[str] = set(
@@ -1229,6 +1501,19 @@ class DeepUIExplorer:
                     if self._already_explored(state_map, current.state_id, action, ref):
                         continue
                     allowed, why = self.policy.is_allowed(node, action)
+                    if allowed and action == ACTION_NAVIGATE and tree is not None:
+                        contenedor = next(
+                            (a for a in tree.ancestors_of(node.node_id) if a.native_role in VALUE_CONTAINER_ROLES),
+                            None,
+                        )
+                        if contenedor is not None:
+                            allowed, why = False, "opcion de un desplegable: seleccionarla cambiaria un valor"
+                        elif self.policy.navigation_containers is not None and not any(
+                            (a.name or "").strip().casefold() in self.policy.navigation_containers
+                            or (a.identifier or "").strip().casefold() in self.policy.navigation_containers
+                            for a in tree.ancestors_of(node.node_id)
+                        ):
+                            allowed, why = False, "fuera de un contenedor de navegacion permitido"
                     if not allowed:
                         key = json.dumps(ref, sort_keys=True)
                         if key not in skipped_keys:
@@ -1258,14 +1543,41 @@ class DeepUIExplorer:
                     if after.foreground_pid is not None and self._pid is not None and after.foreground_pid != self._pid:
                         raise _ExplorationAbort("una ventana de otro proceso paso a primer plano tras %s" % action)
 
+                    evidence = dict(self._last_evidence)
+                    evidence.update({
+                        "before_state": current.state_id,
+                        "after_state": after.state_id,
+                        "changed": after.state_id != current.state_id,
+                        "new_windows": len(after.window_ids) - len(current.window_ids),
+                        "element_key": self.element_key(live, current.tree_for(live)),
+                    })
+                    if after.state_id == current.state_id:
+                        # Accion ejecutada sin cambio observable: se registra
+                        # como bucle sobre el mismo estado (contrato del mapa)
+                        # con changed=False y ademas en no_effect.
+                        result.no_effect.append({"element_ref": ref, "action": action, "evidence": evidence})
+
                     is_new = state_map.add_state(self._state_node(after, depth + 1))
+                    if after.state_id != current.state_id:
+                        self._record_physical(result, after, depth + 1)
                     ok, method, back = self._return_to(current, ref, action, after)
                     if not ok and action == ACTION_OPEN_DIALOG and self._returned(root, back) and path:
                         # Invocar un elemento de menu cierra el menu: al cerrar el
                         # dialogo se vuelve a la raiz y se reproduce la ruta.
-                        back, _ = self._replay(root, path)
+                        # La pila de vuelta pasa a ser la de esta reproduccion.
+                        back, stack = self._replay(root, path)
                         ok = self._returned(current, back)
                         method = "%s+replay" % method
+                    if not ok and self.reset_root is not None:
+                        # Sin vuelta propia (p. ej. tras abrir una conversacion):
+                        # se reinicia la aplicacion propia y se repite la ruta.
+                        root = self._reset_to_root(root)
+                        # Tras el reinicio las ventanas son otras: la pila de
+                        # vuelta (estados esperados y sus ventanas) debe ser la
+                        # de esta reproduccion, no la de antes del reinicio.
+                        back, stack = self._replay(root, path)
+                        ok = self._returned(current, back)
+                        method = "%s+%s" % (method, RETURN_RESET)
                     state_map.add_transition(UITransition(
                         from_state=current.state_id,
                         action=action,
@@ -1273,6 +1585,7 @@ class DeepUIExplorer:
                         to_state=after.state_id,
                         return_action=method,
                         verified_return=ok,
+                        evidence=evidence,
                     ))
                     if not ok:
                         raise _ExplorationAbort(
@@ -1299,7 +1612,12 @@ class DeepUIExplorer:
                     # El estado se reprocesa al reanudar; las transiciones ya
                     # registradas se omiten.
                     frontier.appendleft(path)
-                self._unwind(stack, current, root)
+                try:
+                    self._unwind(stack, current, root)
+                except _ExplorationAbort:
+                    if self.reset_root is None:
+                        raise
+                    root = self._reset_to_root(root)
         except _ExplorationAbort as exc:
             self._recover(result, str(exc))
         except Exception as exc:  # error inesperado: parada segura igualmente
@@ -1307,6 +1625,7 @@ class DeepUIExplorer:
             self._recover(result, "error inesperado: %s" % exc)
 
         result.actions_performed = self._actions
+        result.resets = self._resets
         result.elapsed_seconds = self._elapsed_before + (time.monotonic() - self._started_at)
         if frontier or result.budget_exhausted or result.aborted:
             result.checkpoint = ExplorationCheckpoint(
@@ -1336,6 +1655,11 @@ __all__ = [
     "EXPLORATION_ACTIONS",
     "FORBIDDEN_TERMS_ES",
     "FORBIDDEN_TERMS_EN",
+    "ACTION_NAVIGATE",
+    "INTERACTION_ACCESSIBILITY",
+    "INTERACTION_CLICK",
+    "NAVIGATION_ROLES",
+    "DEFAULT_NAVIGATION_CONTAINERS",
     "ExplorationSafetyPolicy",
     "UIStateNode",
     "UITransition",

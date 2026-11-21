@@ -195,6 +195,14 @@ def comprobar_resolucion() -> None:
                 nombre, getattr(resultado, "status", "?"),
                 "%s:%s" % (destino.target_type, destino.target) if destino is not None else "", segundos)
             (_ok if destino is not None else _aviso)(texto)
+            if destino is None:
+                for alternativa in getattr(resultado, "candidates", None) or []:
+                    print("        alternativa %s:%s (fuente %s, confianza %s)" % (
+                        alternativa.target_type, alternativa.target, alternativa.source,
+                        (alternativa.evidence or {}).get("confianza", "")), flush=True)
+                error = getattr(resultado, "error", None)
+                if error is not None:
+                    print("        motivo: %s" % getattr(error, "message", error), flush=True)
     except Exception as exc:
         _aviso("resolucion no comprobada: %s" % exc)
 

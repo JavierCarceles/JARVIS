@@ -254,3 +254,48 @@ ESTADO: ABIERTO
 REPETICIONES_TIPO: 1 (primera aparicion de TIPO_NORMALIZADO LLAMADA_A_MODELO_SIN_LIMITE en este archivo)
 MEMORIA_PERSISTENTE: No aplica (primera aparicion). Prevencion: toda llamada a un modelo local lleva presupuesto de tiempo y usa la salida parcial.
 ---
+
+ERR-0036
+FECHA_HORA: 2026-11-20T19:30:00+01:00 Europe/Madrid
+UNIDAD: 3.8.6.13.2 (peticion del usuario: calibracion rapida y en profundidad verificable)
+TIPO_NORMALIZADO: CARGA_REPETIDA_DE_MODELOS
+HERRAMIENTA_OPERACION: revision de detector_manifest.py y calibration_pipeline.py tras la ejecucion real en Windows (pruebascalibracionentornoreal.txt)
+OBJETIVO: calibrar una aplicacion en pocos segundos
+SINTOMA_SALIDA: Calculadora: deteccion 12,1 s y fusion 2,8 s de 20,8 s; el registro muestra los modelos de PaddleOCR creados dos veces por calibracion; la accesibilidad (0,12 s) ya daba 48 controles.
+CAUSA: build_detector_manifest instanciaba OmniParserAdapter/PaddleOCRAdapter (carga de modelos) para comprobar disponibilidad y el pipeline los volvia a instanciar; cada UICalibrationPipeline rehacia el manifiesto; los detectores visuales se ejecutaban siempre.
+CORRECCION: cache por proceso (obtener_manifiesto, obtener_adaptador_omniparser, obtener_adaptador_paddleocr; la clase en la clave para no mezclar dobles de test) y visual_detectors="auto" (solo sin arbol o con menos de 5 controles accionables).
+VERIFICACION: En Mac sin fallos nuevos frente a la linea base (tests/hands/detection, calibration, apps, eyes). PENDIENTE en Windows: tiempos de test_calibracion_aplicaciones_entorno_real.py (metrics visual_detection y timings).
+ESTADO: ABIERTO
+REPETICIONES_TIPO: 1 (primera aparicion de TIPO_NORMALIZADO CARGA_REPETIDA_DE_MODELOS en este archivo)
+MEMORIA_PERSISTENTE: No aplica (primera aparicion). Prevencion: comprobar disponibilidad de un detector sin cargar el modelo dos veces; usar detectores costosos solo cuando aportan.
+---
+
+ERR-0037
+FECHA_HORA: 2026-11-20T19:06:00+01:00 Europe/Madrid
+UNIDAD: 3.8.6.13.2 (revision en Mac 3 del codigo de calibracion en profundidad)
+TIPO_NORMALIZADO: CLIC_SIN_VERIFICAR_IDENTIDAD
+HERRAMIENTA_OPERACION: revision critica de src/hands/calibration/ui_navigation_map.py (UINavigator.click_stored/go_to) y ui_exploration.py (DeepUIExplorer.explore)
+OBJETIVO: navegar con el mapa guardado sin pulsar un elemento equivocado
+SINTOMA_SALIDA: (1) UINavigator pulsaba la coordenada guardada comprobando solo que el elemento bajo el puntero ocupa esa caja (PointerVerifier compara cajas, no identidad): si el contenido se desplaza (contacto nuevo arriba) el clic abre otro chat y el fallo solo se ve despues. (2) Tras reiniciar la app para volver (reset_root) o reproducir la ruta tras un dialogo, el explorador seguia deshaciendo con la pila de vuelta anterior al reinicio (ids de ventana viejos). (3) go_to volvia a comprobar el estado de partida de cada paso con todas las etiquetas aunque el paso anterior acababa de verificarlo, con riesgo de falso fallo si cambia contenido.
+CAUSA: la navegacion no consultaba el arbol de accesibilidad actual antes del clic; la pila devuelta por _replay se descartaba (back, _ = ...).
+CORRECCION: UINavigator(coordinates="live"|"stored"): antes de cada clic localiza el elemento por su referencia logica en el arbol actual; "live" pulsa su caja actual; "stored" no pulsa si el punto guardado no cae en la caja actual (identity_ok False); StepEvidence anota coordinate_source, identity_ok y stored_offset_px; verify_all_paths usa siempre las guardadas. La pila de vuelta pasa a ser la de la nueva reproduccion. El estado de partida solo se comprueba en el primer paso sin reinicio. find_elements compara sin acentos.
+VERIFICACION: Mac (Python 3.14.10): test_navegacion_verificada.py y test_ui_exploration_state_map.py 95 PASSED (7 tests nuevos: contacto nuevo arriba, coordenada corrompida detectada antes del clic sin abrir chats, fallback a caja guardada, raiz distinta sin clics, busqueda sin acentos). PENDIENTE en Windows: test_navegacion_chat_entorno_real.py test_07 y test_08.
+ESTADO: ABIERTO
+REPETICIONES_TIPO: 1 (primera aparicion de TIPO_NORMALIZADO CLIC_SIN_VERIFICAR_IDENTIDAD en este archivo)
+MEMORIA_PERSISTENTE: No aplica (primera aparicion). Prevencion: antes de pulsar una coordenada guardada, comprobar en el arbol actual que el elemento buscado sigue en ese punto.
+---
+
+ERR-0038
+FECHA_HORA: 2026-11-20T18:58:00+01:00 Europe/Madrid
+UNIDAD: 3.8.6.13.2 (entorno de pruebas en Mac)
+TIPO_NORMALIZADO: ENTORNO_PYTHON_VERSION
+HERRAMIENTA_OPERACION: pytest con un venv de Python 3.12 (Homebrew) en el scratchpad
+OBJETIVO: tests de ui_exploration y fixtures en Mac
+SINTOMA_SALIDA: INTERNALERROR al importar src.memory.conversation: NameError: name 'Entity' is not defined (anotacion de tipo evaluada en la definicion de DomainMemory)
+CAUSA: el proyecto usa Python 3.14 (anotaciones diferidas); en 3.12 la anotacion se evalua al definir la clase.
+CORRECCION: venv nuevo con Python 3.14.10 instalado con uv en el scratchpad; mismas dependencias.
+VERIFICACION: con 3.14.10 la coleccion y los tests funcionan (149 PASSED en el conjunto de la unidad).
+ESTADO: RESUELTO
+REPETICIONES_TIPO: 1 (primera aparicion de TIPO_NORMALIZADO ENTORNO_PYTHON_VERSION en este archivo)
+MEMORIA_PERSISTENTE: No aplica (primera aparicion). Prevencion: en Mac crear el venv con Python 3.14 desde el principio.
+---

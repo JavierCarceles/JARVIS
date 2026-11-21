@@ -487,6 +487,19 @@ class WindowsLaunchAdapter(ApplicationLaunchAdapter):
         if getattr(resolution, "requiere_desambiguacion", False) or getattr(resolution, "ambiguo", False):
             pool = alternatives or candidates
             targets = [t for t in (self._candidate_to_target(c) for c in pool) if t is not None]
+            # El descubrimiento decide la ambiguedad por nombres y fuentes; si
+            # todos los destinos son la misma aplicacion del propio Windows
+            # (paquete + stub de System32 + copia de WindowsApps), no hay nada
+            # que preguntar al usuario.
+            unicos_amb: Dict[Any, Any] = {}
+            for target in targets:
+                unicos_amb.setdefault((target.target_type, target.target.casefold()), target)
+            targets = list(unicos_amb.values())
+            if len(targets) == 1:
+                return ResolutionOutcome(RESOLVED, targets[0], targets, None, source)
+            preferido = preferir_destino_de_la_misma_aplicacion(targets)
+            if preferido is not None:
+                return ResolutionOutcome(RESOLVED, preferido, targets, None, source)
             return ResolutionOutcome(AMBIGUOUS, None, targets, OperationError(
                 OperationStage.RESOLUTION, ErrorCode.AMBIGUOUS,
                 str(getattr(resolution, "motivo_ambiguedad", "") or "varios destinos plausibles"),

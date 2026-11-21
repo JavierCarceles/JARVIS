@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 import time
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
@@ -28,6 +29,54 @@ from typing import Any, Dict, List, Optional
 from src.core.log import get_logger
 
 logger = get_logger(__name__)
+
+# Cache por proceso de los adaptadores de deteccion. Crear OmniParserAdapter o
+# PaddleOCRAdapter carga sus modelos (segundos); antes se cargaban dos veces por
+# calibracion (comprobacion del manifiesto + uso en el pipeline) y otra vez en
+# cada calibracion. Clave: los mismos argumentos de construccion.
+_ADAPTADORES: Dict[Any, Any] = {}
+_ADAPTADORES_LOCK = threading.Lock()
+_MANIFIESTO_CACHE: Dict[Any, Any] = {}
+
+
+def obtener_adaptador_omniparser(model_path: Optional[str] = None, device: Optional[str] = None) -> Any:
+    """``OmniParserAdapter`` compartido en el proceso (carga el modelo una vez)."""
+    from src.hands.detection.omniparser_adapter import OmniParserAdapter
+
+    clave = ("omniparser", OmniParserAdapter, model_path, device)
+    with _ADAPTADORES_LOCK:
+        adaptador = _ADAPTADORES.get(clave)
+        if adaptador is None:
+            adaptador = OmniParserAdapter(model_path=model_path, device=device)
+            _ADAPTADORES[clave] = adaptador
+        return adaptador
+
+
+def obtener_adaptador_paddleocr(
+    model_dir: Optional[str] = None,
+    rec_model_dir: Optional[str] = None,
+    device: Optional[str] = None,
+    use_gpu: bool = False,
+) -> Any:
+    """``PaddleOCRAdapter`` compartido en el proceso (carga los modelos una vez)."""
+    from src.hands.detection.paddleocr_adapter import PaddleOCRAdapter
+
+    clave = ("paddleocr", PaddleOCRAdapter, model_dir, rec_model_dir, device, bool(use_gpu))
+    with _ADAPTADORES_LOCK:
+        adaptador = _ADAPTADORES.get(clave)
+        if adaptador is None:
+            adaptador = PaddleOCRAdapter(
+                model_dir=model_dir, rec_model_dir=rec_model_dir, device=device, use_gpu=bool(use_gpu),
+            )
+            _ADAPTADORES[clave] = adaptador
+        return adaptador
+
+
+def invalidar_cache_detectores() -> None:
+    """Olvida adaptadores y manifiestos cacheados (p. ej. tras instalar pesos)."""
+    with _ADAPTADORES_LOCK:
+        _ADAPTADORES.clear()
+        _MANIFIESTO_CACHE.clear()
 
 # ---------------------------------------------------------------------------
 # Estados de disponibilidad
@@ -354,7 +403,7 @@ def _check_omniparser(model_path: Optional[str] = None) -> DetectorManifestEntry
             fallback=None,
             checked_at=_ahora_iso(),
         )
-    adapter = OmniParserAdapter(model_path=model_path, device=device)
+    adapter = obtener_adaptador_omniparser(model_path=model_path, device=device)
     disponible = bool(adapter.available)
     if not disponible:
         error = adapter.error
@@ -428,7 +477,7 @@ def _check_paddleocr(
             fallback=None,
             checked_at=_ahora_iso(),
         )
-    adapter = PaddleOCRAdapter(
+    adapter = obtener_adaptador_paddleocr(
         model_dir=model_dir,
         rec_model_dir=rec_model_dir,
         device=device,
@@ -686,4 +735,24 @@ __all__ = [
     "DetectorManifestEntry",
     "DetectorManifest",
     "build_detector_manifest",
+    "obtener_manifiesto",
+    "obtener_adaptador_omniparser",
+    "obtener_adaptador_paddleocr",
+    "invalidar_cache_detectores",
 ]
+
+
+def obtener_manifiesto(**kwargs: Any) -> DetectorManifest:
+    """``build_detector_manifest`` cacheado por proceso y argumentos.
+
+    La disponibilidad de los detectores no cambia entre dos calibraciones del
+    mismo proceso; reconstruirla cargaba de nuevo los modelos.
+    """
+    clave = tuple(sorted((k, repr(v)) for k, v in kwargs.items()))
+    with _ADAPTADORES_LOCK:
+        manifiesto = _MANIFIESTO_CACHE.get(clave)
+    if manifiesto is None:
+        manifiesto = build_detector_manifest(**kwargs)
+        with _ADAPTADORES_LOCK:
+            _MANIFIESTO_CACHE[clave] = manifiesto
+    return manifiesto

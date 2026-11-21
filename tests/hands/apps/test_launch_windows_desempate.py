@@ -141,3 +141,44 @@ class TestFromResolutionUsaLaRegla(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestAmbiguedadDelDescubrimiento(unittest.TestCase):
+    """El descubrimiento marca ambiguo por nombres; caso real en Windows:
+    resolve("calculadora") devolvia AMBIGUOUS con el paquete, System32\\calc.exe
+    y la copia de WindowsApps (la misma Calculadora)."""
+
+    def _adaptador(self, targets_por_candidato):
+        adapter = WindowsLaunchAdapter.__new__(WindowsLaunchAdapter)
+        adapter._candidate_to_target = lambda c: targets_por_candidato[c]
+        return adapter
+
+    def _resolucion(self, alternativas):
+        return SimpleNamespace(candidatos=[], alternativas=alternativas,
+                               requiere_desambiguacion=True, ambiguo=True,
+                               motivo_ambiguedad="varios candidatos")
+
+    def test_misma_aplicacion_del_sistema_se_resuelve(self):
+        paquete = _t(TARGET_AUMID, AUMID_CALC)
+        stub = _t(TARGET_EXE, r"C:\Windows\System32\calc.exe")
+        copia = _t(TARGET_EXE, WINDOWSAPPS + r"\Microsoft.WindowsCalculator_11_x64__8wekyb3d8bbwe\CalculatorApp.exe")
+        adapter = self._adaptador({"p": paquete, "s": stub, "c": copia})
+        with unittest.mock.patch.dict("os.environ", {"SystemRoot": r"C:\Windows"}):
+            outcome = adapter._from_resolution(self._resolucion(["s", "p", "c"]), "nativo")
+        self.assertEqual(outcome.status, RESOLVED)
+        self.assertIs(outcome.target, paquete)
+
+    def test_duplicados_del_mismo_destino_cuentan_como_uno(self):
+        a = _t(TARGET_EXE, r"C:\Programas\App\app.exe")
+        b = _t(TARGET_EXE, r"c:\programas\app\APP.EXE")
+        adapter = self._adaptador({"a": a, "b": b})
+        outcome = adapter._from_resolution(self._resolucion(["a", "b"]), "nativo")
+        self.assertEqual(outcome.status, RESOLVED)
+
+    def test_aplicaciones_distintas_siguen_ambiguas(self):
+        a = _t(TARGET_EXE, r"C:\Program Files\A\calc.exe")
+        b = _t(TARGET_EXE, r"D:\Juegos\B\calculator.exe")
+        adapter = self._adaptador({"a": a, "b": b})
+        outcome = adapter._from_resolution(self._resolucion(["a", "b"]), "nativo")
+        self.assertEqual(outcome.status, AMBIGUOUS)
+        self.assertEqual(len(outcome.candidates), 2)

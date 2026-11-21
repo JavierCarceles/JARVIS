@@ -67,3 +67,10 @@ macro_scheduler.py
 data/system_inventory*.sqlite3*
 !data/system_inventory_sample.sqlite3
 data/_bbdd_tmp/
+
+# --- Mapas de navegacion calibrados (coordenadas de cada equipo) -----------
+data/ui_maps/
+
+# --- Notas locales de trabajo (no se suben) ----------------------------------
+HANDOFF_CALIBRACION.txt
+pruebascalibracionentornoreal.txt
