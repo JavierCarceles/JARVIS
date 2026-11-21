@@ -1,0 +1,299 @@
+============================= test session starts =============================
+platform win32 -- Python 3.14.7, pytest-9.1.1, pluggy-1.6.0 -- C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS
+plugins: anyio-4.15.1, cov-7.1.0
+collecting ... collected 8 items
+
+tests/hands/calibration/ui_exploration/test_navegacion_chat_entorno_real.py::TestNavegacionChatEntornoReal::test_01_mapa_con_profundidad ERROR
+tests/hands/calibration/ui_exploration/test_navegacion_chat_entorno_real.py::TestNavegacionChatEntornoReal::test_02_evidencia_de_clics_reales ERROR
+tests/hands/calibration/ui_exploration/test_navegacion_chat_entorno_real.py::TestNavegacionChatEntornoReal::test_03_borrar_nunca_se_pulsa ERROR
+tests/hands/calibration/ui_exploration/test_navegacion_chat_entorno_real.py::TestNavegacionChatEntornoReal::test_04_json_con_coordenadas ERROR
+tests/hands/calibration/ui_exploration/test_navegacion_chat_entorno_real.py::TestNavegacionChatEntornoReal::test_05_todos_los_caminos_se_reproducen_con_coordenadas_guardadas ERROR
+tests/hands/calibration/ui_exploration/test_navegacion_chat_entorno_real.py::TestNavegacionChatEntornoReal::test_06_mandar_hola_a_manolito ERROR
+tests/hands/calibration/ui_exploration/test_navegacion_chat_entorno_real.py::TestNavegacionChatEntornoReal::test_07_coordenada_corrompida_se_detecta_antes_del_clic ERROR
+tests/hands/calibration/ui_exploration/test_navegacion_chat_entorno_real.py::TestNavegacionChatEntornoReal::test_08_en_vivo_llega_al_chat_aunque_la_coordenada_guardada_este_mal ERROR
+
+=================================== ERRORS ====================================
+_ ERROR at setup of TestNavegacionChatEntornoReal.test_01_mapa_con_profundidad _
+
+cls = <class 'test_navegacion_chat_entorno_real.TestNavegacionChatEntornoReal'>
+
+    @classmethod
+    def setUpClass(cls):
+        if not is_windows():
+            raise unittest.SkipTest("Solo Windows (excepcion (a))")
+        if os.environ.get("JARVIS_TEST_GUI_REAL") != "1":
+            raise unittest.SkipTest("Establecer JARVIS_TEST_GUI_REAL=1 para ejecutar este test GUI real")
+        try:
+>           import PySide6  # noqa: F401
+            ^^^^^^^^^^^^^^
+E           ModuleNotFoundError: No module named 'PySide6'
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_chat_entorno_real.py:72: ModuleNotFoundError
+
+During handling of the above exception, another exception occurred:
+
+cls = <class 'test_navegacion_chat_entorno_real.TestNavegacionChatEntornoReal'>
+
+    @classmethod
+    def setUpClass(cls):
+        if not is_windows():
+            raise unittest.SkipTest("Solo Windows (excepcion (a))")
+        if os.environ.get("JARVIS_TEST_GUI_REAL") != "1":
+            raise unittest.SkipTest("Establecer JARVIS_TEST_GUI_REAL=1 para ejecutar este test GUI real")
+        try:
+            import PySide6  # noqa: F401
+        except ImportError as exc:
+>           raise AssertionError("PySide6 es necesario para la app de prueba: %s" % exc)
+E           AssertionError: PySide6 es necesario para la app de prueba: No module named 'PySide6'
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_chat_entorno_real.py:74: AssertionError
+_ ERROR at setup of TestNavegacionChatEntornoReal.test_02_evidencia_de_clics_reales _
+
+cls = <class 'test_navegacion_chat_entorno_real.TestNavegacionChatEntornoReal'>
+
+    @classmethod
+    def setUpClass(cls):
+        if not is_windows():
+            raise unittest.SkipTest("Solo Windows (excepcion (a))")
+        if os.environ.get("JARVIS_TEST_GUI_REAL") != "1":
+            raise unittest.SkipTest("Establecer JARVIS_TEST_GUI_REAL=1 para ejecutar este test GUI real")
+        try:
+>           import PySide6  # noqa: F401
+            ^^^^^^^^^^^^^^
+E           ModuleNotFoundError: No module named 'PySide6'
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_chat_entorno_real.py:72: ModuleNotFoundError
+
+During handling of the above exception, another exception occurred:
+
+cls = <class 'test_navegacion_chat_entorno_real.TestNavegacionChatEntornoReal'>
+
+    @classmethod
+    def setUpClass(cls):
+        if not is_windows():
+            raise unittest.SkipTest("Solo Windows (excepcion (a))")
+        if os.environ.get("JARVIS_TEST_GUI_REAL") != "1":
+            raise unittest.SkipTest("Establecer JARVIS_TEST_GUI_REAL=1 para ejecutar este test GUI real")
+        try:
+            import PySide6  # noqa: F401
+        except ImportError as exc:
+>           raise AssertionError("PySide6 es necesario para la app de prueba: %s" % exc)
+E           AssertionError: PySide6 es necesario para la app de prueba: No module named 'PySide6'
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_chat_entorno_real.py:74: AssertionError
+_ ERROR at setup of TestNavegacionChatEntornoReal.test_03_borrar_nunca_se_pulsa _
+
+cls = <class 'test_navegacion_chat_entorno_real.TestNavegacionChatEntornoReal'>
+
+    @classmethod
+    def setUpClass(cls):
+        if not is_windows():
+            raise unittest.SkipTest("Solo Windows (excepcion (a))")
+        if os.environ.get("JARVIS_TEST_GUI_REAL") != "1":
+            raise unittest.SkipTest("Establecer JARVIS_TEST_GUI_REAL=1 para ejecutar este test GUI real")
+        try:
+>           import PySide6  # noqa: F401
+            ^^^^^^^^^^^^^^
+E           ModuleNotFoundError: No module named 'PySide6'
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_chat_entorno_real.py:72: ModuleNotFoundError
+
+During handling of the above exception, another exception occurred:
+
+cls = <class 'test_navegacion_chat_entorno_real.TestNavegacionChatEntornoReal'>
+
+    @classmethod
+    def setUpClass(cls):
+        if not is_windows():
+            raise unittest.SkipTest("Solo Windows (excepcion (a))")
+        if os.environ.get("JARVIS_TEST_GUI_REAL") != "1":
+            raise unittest.SkipTest("Establecer JARVIS_TEST_GUI_REAL=1 para ejecutar este test GUI real")
+        try:
+            import PySide6  # noqa: F401
+        except ImportError as exc:
+>           raise AssertionError("PySide6 es necesario para la app de prueba: %s" % exc)
+E           AssertionError: PySide6 es necesario para la app de prueba: No module named 'PySide6'
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_chat_entorno_real.py:74: AssertionError
+_ ERROR at setup of TestNavegacionChatEntornoReal.test_04_json_con_coordenadas _
+
+cls = <class 'test_navegacion_chat_entorno_real.TestNavegacionChatEntornoReal'>
+
+    @classmethod
+    def setUpClass(cls):
+        if not is_windows():
+            raise unittest.SkipTest("Solo Windows (excepcion (a))")
+        if os.environ.get("JARVIS_TEST_GUI_REAL") != "1":
+            raise unittest.SkipTest("Establecer JARVIS_TEST_GUI_REAL=1 para ejecutar este test GUI real")
+        try:
+>           import PySide6  # noqa: F401
+            ^^^^^^^^^^^^^^
+E           ModuleNotFoundError: No module named 'PySide6'
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_chat_entorno_real.py:72: ModuleNotFoundError
+
+During handling of the above exception, another exception occurred:
+
+cls = <class 'test_navegacion_chat_entorno_real.TestNavegacionChatEntornoReal'>
+
+    @classmethod
+    def setUpClass(cls):
+        if not is_windows():
+            raise unittest.SkipTest("Solo Windows (excepcion (a))")
+        if os.environ.get("JARVIS_TEST_GUI_REAL") != "1":
+            raise unittest.SkipTest("Establecer JARVIS_TEST_GUI_REAL=1 para ejecutar este test GUI real")
+        try:
+            import PySide6  # noqa: F401
+        except ImportError as exc:
+>           raise AssertionError("PySide6 es necesario para la app de prueba: %s" % exc)
+E           AssertionError: PySide6 es necesario para la app de prueba: No module named 'PySide6'
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_chat_entorno_real.py:74: AssertionError
+_ ERROR at setup of TestNavegacionChatEntornoReal.test_05_todos_los_caminos_se_reproducen_con_coordenadas_guardadas _
+
+cls = <class 'test_navegacion_chat_entorno_real.TestNavegacionChatEntornoReal'>
+
+    @classmethod
+    def setUpClass(cls):
+        if not is_windows():
+            raise unittest.SkipTest("Solo Windows (excepcion (a))")
+        if os.environ.get("JARVIS_TEST_GUI_REAL") != "1":
+            raise unittest.SkipTest("Establecer JARVIS_TEST_GUI_REAL=1 para ejecutar este test GUI real")
+        try:
+>           import PySide6  # noqa: F401
+            ^^^^^^^^^^^^^^
+E           ModuleNotFoundError: No module named 'PySide6'
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_chat_entorno_real.py:72: ModuleNotFoundError
+
+During handling of the above exception, another exception occurred:
+
+cls = <class 'test_navegacion_chat_entorno_real.TestNavegacionChatEntornoReal'>
+
+    @classmethod
+    def setUpClass(cls):
+        if not is_windows():
+            raise unittest.SkipTest("Solo Windows (excepcion (a))")
+        if os.environ.get("JARVIS_TEST_GUI_REAL") != "1":
+            raise unittest.SkipTest("Establecer JARVIS_TEST_GUI_REAL=1 para ejecutar este test GUI real")
+        try:
+            import PySide6  # noqa: F401
+        except ImportError as exc:
+>           raise AssertionError("PySide6 es necesario para la app de prueba: %s" % exc)
+E           AssertionError: PySide6 es necesario para la app de prueba: No module named 'PySide6'
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_chat_entorno_real.py:74: AssertionError
+_ ERROR at setup of TestNavegacionChatEntornoReal.test_06_mandar_hola_a_manolito _
+
+cls = <class 'test_navegacion_chat_entorno_real.TestNavegacionChatEntornoReal'>
+
+    @classmethod
+    def setUpClass(cls):
+        if not is_windows():
+            raise unittest.SkipTest("Solo Windows (excepcion (a))")
+        if os.environ.get("JARVIS_TEST_GUI_REAL") != "1":
+            raise unittest.SkipTest("Establecer JARVIS_TEST_GUI_REAL=1 para ejecutar este test GUI real")
+        try:
+>           import PySide6  # noqa: F401
+            ^^^^^^^^^^^^^^
+E           ModuleNotFoundError: No module named 'PySide6'
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_chat_entorno_real.py:72: ModuleNotFoundError
+
+During handling of the above exception, another exception occurred:
+
+cls = <class 'test_navegacion_chat_entorno_real.TestNavegacionChatEntornoReal'>
+
+    @classmethod
+    def setUpClass(cls):
+        if not is_windows():
+            raise unittest.SkipTest("Solo Windows (excepcion (a))")
+        if os.environ.get("JARVIS_TEST_GUI_REAL") != "1":
+            raise unittest.SkipTest("Establecer JARVIS_TEST_GUI_REAL=1 para ejecutar este test GUI real")
+        try:
+            import PySide6  # noqa: F401
+        except ImportError as exc:
+>           raise AssertionError("PySide6 es necesario para la app de prueba: %s" % exc)
+E           AssertionError: PySide6 es necesario para la app de prueba: No module named 'PySide6'
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_chat_entorno_real.py:74: AssertionError
+_ ERROR at setup of TestNavegacionChatEntornoReal.test_07_coordenada_corrompida_se_detecta_antes_del_clic _
+
+cls = <class 'test_navegacion_chat_entorno_real.TestNavegacionChatEntornoReal'>
+
+    @classmethod
+    def setUpClass(cls):
+        if not is_windows():
+            raise unittest.SkipTest("Solo Windows (excepcion (a))")
+        if os.environ.get("JARVIS_TEST_GUI_REAL") != "1":
+            raise unittest.SkipTest("Establecer JARVIS_TEST_GUI_REAL=1 para ejecutar este test GUI real")
+        try:
+>           import PySide6  # noqa: F401
+            ^^^^^^^^^^^^^^
+E           ModuleNotFoundError: No module named 'PySide6'
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_chat_entorno_real.py:72: ModuleNotFoundError
+
+During handling of the above exception, another exception occurred:
+
+cls = <class 'test_navegacion_chat_entorno_real.TestNavegacionChatEntornoReal'>
+
+    @classmethod
+    def setUpClass(cls):
+        if not is_windows():
+            raise unittest.SkipTest("Solo Windows (excepcion (a))")
+        if os.environ.get("JARVIS_TEST_GUI_REAL") != "1":
+            raise unittest.SkipTest("Establecer JARVIS_TEST_GUI_REAL=1 para ejecutar este test GUI real")
+        try:
+            import PySide6  # noqa: F401
+        except ImportError as exc:
+>           raise AssertionError("PySide6 es necesario para la app de prueba: %s" % exc)
+E           AssertionError: PySide6 es necesario para la app de prueba: No module named 'PySide6'
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_chat_entorno_real.py:74: AssertionError
+_ ERROR at setup of TestNavegacionChatEntornoReal.test_08_en_vivo_llega_al_chat_aunque_la_coordenada_guardada_este_mal _
+
+cls = <class 'test_navegacion_chat_entorno_real.TestNavegacionChatEntornoReal'>
+
+    @classmethod
+    def setUpClass(cls):
+        if not is_windows():
+            raise unittest.SkipTest("Solo Windows (excepcion (a))")
+        if os.environ.get("JARVIS_TEST_GUI_REAL") != "1":
+            raise unittest.SkipTest("Establecer JARVIS_TEST_GUI_REAL=1 para ejecutar este test GUI real")
+        try:
+>           import PySide6  # noqa: F401
+            ^^^^^^^^^^^^^^
+E           ModuleNotFoundError: No module named 'PySide6'
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_chat_entorno_real.py:72: ModuleNotFoundError
+
+During handling of the above exception, another exception occurred:
+
+cls = <class 'test_navegacion_chat_entorno_real.TestNavegacionChatEntornoReal'>
+
+    @classmethod
+    def setUpClass(cls):
+        if not is_windows():
+            raise unittest.SkipTest("Solo Windows (excepcion (a))")
+        if os.environ.get("JARVIS_TEST_GUI_REAL") != "1":
+            raise unittest.SkipTest("Establecer JARVIS_TEST_GUI_REAL=1 para ejecutar este test GUI real")
+        try:
+            import PySide6  # noqa: F401
+        except ImportError as exc:
+>           raise AssertionError("PySide6 es necesario para la app de prueba: %s" % exc)
+E           AssertionError: PySide6 es necesario para la app de prueba: No module named 'PySide6'
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_chat_entorno_real.py:74: AssertionError
+=========================== short test summary info ===========================
+ERROR tests/hands/calibration/ui_exploration/test_navegacion_chat_entorno_real.py::TestNavegacionChatEntornoReal::test_01_mapa_con_profundidad
+ERROR tests/hands/calibration/ui_exploration/test_navegacion_chat_entorno_real.py::TestNavegacionChatEntornoReal::test_02_evidencia_de_clics_reales
+ERROR tests/hands/calibration/ui_exploration/test_navegacion_chat_entorno_real.py::TestNavegacionChatEntornoReal::test_03_borrar_nunca_se_pulsa
+ERROR tests/hands/calibration/ui_exploration/test_navegacion_chat_entorno_real.py::TestNavegacionChatEntornoReal::test_04_json_con_coordenadas
+ERROR tests/hands/calibration/ui_exploration/test_navegacion_chat_entorno_real.py::TestNavegacionChatEntornoReal::test_05_todos_los_caminos_se_reproducen_con_coordenadas_guardadas
+ERROR tests/hands/calibration/ui_exploration/test_navegacion_chat_entorno_real.py::TestNavegacionChatEntornoReal::test_06_mandar_hola_a_manolito
+ERROR tests/hands/calibration/ui_exploration/test_navegacion_chat_entorno_real.py::TestNavegacionChatEntornoReal::test_07_coordenada_corrompida_se_detecta_antes_del_clic
+ERROR tests/hands/calibration/ui_exploration/test_navegacion_chat_entorno_real.py::TestNavegacionChatEntornoReal::test_08_en_vivo_llega_al_chat_aunque_la_coordenada_guardada_este_mal
+============================== 8 errors in 0.16s ==============================
