@@ -3,16 +3,16 @@
   "machine_id": "4de10a54-5054-515b-aa57-1b30a1feb801",
   "volumes": [],
   "last_scan": {
-    "scan_id": "scan-6e5c17c1-5d4c-40c3-aa9d-eafea18b13ee",
+    "scan_id": "registro-4af17bc2-1212-4ccc-8dcd-dd9732082677",
     "volume": "C:",
     "mode": "completo",
-    "started_at": "2026-11-20T13:25:14.353722",
-    "finished_at": "2026-11-20T13:50:49.206073",
+    "started_at": "2026-11-21T12:15:51.936795+00:00",
+    "finished_at": "2026-11-21T12:15:51.936795+00:00",
     "result": "ok",
-    "entries_count": 5594686,
-    "errors_count": 1866,
-    "exclusions_count": 19,
-    "coverage_estimate": "100.0"
+    "entries_count": 1,
+    "errors_count": 0,
+    "exclusions_count": 0,
+    "coverage_estimate": null
   },
-  "updated_at": "2026-11-20T12:50:49.210308+00:00"
+  "updated_at": "2026-11-21T12:15:51.947104+00:00"
 }
