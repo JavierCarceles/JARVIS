@@ -3565,6 +3565,67 @@ class TestRegistroMinimoAplicacion:
         assert registro.ruta_absoluta_observada == r"C:\No\Existe\app.exe"
         assert validar_registro_minimo_aplicacion(registro) == []
 
+    def _candidato_paquete_menu_inicio(self, app_id, evidencia):
+        """Candidato como el que da el menu Inicio en Windows 11 para una app
+        empaquetada: sin ruta ni destino, con el AUMID de Get-StartApps."""
+        return DiscoveredCandidate(
+            candidate_id="cand-paquete",
+            name="calculadora",
+            absolute_path=None,
+            destination=None,
+            nombre_comercial="calculadora",
+            aliases=[],
+            launch_type=LaunchType.PAQUETE,
+            launch_subtype=LaunchSubtype.DESCONOCIDO,
+            es_lanzable=True,
+            evidencia=list(evidencia),
+            confianza=CONFIANZA_ALTA,
+            fuente=FUENTE_START_MENU,
+            ultima_comprobacion=self.AHORA,
+            app_id=app_id,
+        )
+
+    def test_paquete_con_aumid_sin_ruta_es_disponible(self):
+        """Paquete con AUMID de Get-StartApps y sin ruta: disponible (caso
+        real de Calculadora y Bloc de notas en Windows 11)."""
+        candidato = self._candidato_paquete_menu_inicio(
+            "Microsoft.WindowsCalculator_8wekyb3d8bbwe!App", ["destino_vacio"]
+        )
+        assert destino_observable(candidato) is True
+        identidad = calcular_identidad_estable(candidato)
+        assert identidad.entity_id == "paquete:Microsoft.WindowsCalculator_8wekyb3d8bbwe!App"
+        registro = construir_registro_minimo_aplicacion(
+            candidato, identidad, ahora_iso=self.AHORA
+        )
+        assert registro.estado_disponible == "available"
+        assert registro.ruta_absoluta_observada is None
+
+    def test_paquete_con_aumid_en_evidencia_es_disponible(self):
+        candidato = self._candidato_paquete_menu_inicio(
+            None, ["paquete_id:Microsoft.WindowsNotepad_8wekyb3d8bbwe!App"]
+        )
+        assert destino_observable(candidato) is True
+
+    def test_paquete_sin_aumid_no_es_disponible(self):
+        """Sin AUMID con forma Familia!App no hay destino nativo: no_disponible."""
+        for app_id, evidencia in ((None, []), ("calculadora", ["destino_vacio"]),
+                                  (None, ["paquete_id:sin_separador"])):
+            candidato = self._candidato_paquete_menu_inicio(app_id, evidencia)
+            assert destino_observable(candidato) is False, (app_id, evidencia)
+            registro = construir_registro_minimo_aplicacion(
+                candidato, calcular_identidad_estable(candidato), ahora_iso=self.AHORA
+            )
+            assert registro.estado_disponible == "no_disponible"
+
+    def test_ejecutable_con_app_id_no_cuenta_como_paquete(self):
+        """Un AUMID no hace disponible un .exe inexistente: solo vale para paquetes."""
+        candidato = self._candidato_paquete_menu_inicio(
+            "Microsoft.WindowsCalculator_8wekyb3d8bbwe!App", []
+        )
+        candidato.launch_type = LaunchType.EJECUTABLE
+        candidato.absolute_path = r"C:\No\Existe\calc.exe"
+        assert destino_observable(candidato) is False
+
     def test_3_8_5_1_4_11_3_identidad_real_de_notepad_sin_ruta_en_id(self):
         """Integracion con calculo de identidad real (11.2) sobre notepad.exe
         del equipo: entity_id estable derivado de metadatos del SO, sin

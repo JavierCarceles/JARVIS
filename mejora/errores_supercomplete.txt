@@ -299,3 +299,48 @@ ESTADO: RESUELTO
 REPETICIONES_TIPO: 1 (primera aparicion de TIPO_NORMALIZADO ENTORNO_PYTHON_VERSION en este archivo)
 MEMORIA_PERSISTENTE: No aplica (primera aparicion). Prevencion: en Mac crear el venv con Python 3.14 desde el principio.
 ---
+
+ERR-0039
+FECHA_HORA: 2026-11-21T11:10:00+01:00 Europe/Madrid
+UNIDAD: 3.8.6.13.2
+TIPO_NORMALIZADO: CATALOGO_ESTADO_INCORRECTO
+HERRAMIENTA_OPERACION: python scripts/diagnostico_calibracion_windows.py en Windows 11 (resolucion de calculadora, calculator y notepad con el lanzador de produccion)
+OBJETIVO: resolver sin lanzar y comprobar el destino
+SINTOMA_SALIDA: las tres resoluciones dieron resolved aumid:Microsoft.WindowsCalculator_8wekyb3d8bbwe!App / Microsoft.WindowsNotepad_8wekyb3d8bbwe!App, pero el auto-registro (WindowsLaunchAdapter._auto_register) anadio a data/memory/entities.json las entidades paquete:... con "estado_disponible": "no_disponible" y evidencia "destino_vacio".
+CAUSA: destino_observable (src/hands/apps/application_discovery.py) solo aceptaba un fichero existente en absolute_path o un destination no vacio; el candidato del menu Inicio de una app empaquetada no tiene ninguno de los dos y su destino nativo es el AUMID de Get-StartApps (app_id), que el lanzador si usa.
+CORRECCION: destino_observable acepta un candidato con launch_type paquete y AUMID con forma Familia!App aportado por la fuente (app_id o evidencia paquete_id:); nuevo helper _aumid_observado. Un .exe inexistente con app_id sigue sin ser observable. Se restauro data/memory/entities.json a su version anterior al diagnostico.
+VERIFICACION: Mac (Python 3.14.10): 4 tests nuevos en TestRegistroMinimoAplicacion (paquete con AUMID en app_id y en evidencia disponible; sin AUMID no_disponible; .exe con app_id no cuenta). test_application_discovery.py + test_application_entities_auto_registration.py: mismo conjunto de 22 FAILED con y sin el cambio (APIs y rutas de Windows, cv2, ollama) y los dos tests de paquete con AUMID fallan sin la correccion. PENDIENTE en Windows: repetir el diagnostico y comprobar que las entidades paquete:... quedan "available".
+ESTADO: ABIERTO
+REPETICIONES_TIPO: 1 (primera aparicion de TIPO_NORMALIZADO CATALOGO_ESTADO_INCORRECTO en este archivo)
+MEMORIA_PERSISTENTE: No aplica (primera aparicion). Prevencion: para apps empaquetadas el destino nativo es el AUMID, no una ruta.
+---
+
+ERR-0040
+FECHA_HORA: 2026-11-21T11:10:00+01:00 Europe/Madrid
+UNIDAD: 3.8.6.13.2
+TIPO_NORMALIZADO: CATALOGO_FECHA_CREACION_REESCRITA
+HERRAMIENTA_OPERACION: python scripts/diagnostico_calibracion_windows.py en Windows 11
+OBJETIVO: diagnostico previo a la calibracion
+SINTOMA_SALIDA: en data/memory/entities.json, app_chrome y app_spotify cambiaron created_at y updated_at a 2026-11-21T10:48:57 (inicio de la resolucion del diagnostico); el valor anterior, 2026-11-20T17:49:45, tambien era de una ejecucion anterior. La fecha de creacion se pierde en cada ejecucion.
+CAUSA: ApplicationManager.register_application (src/hands/apps/applications_core.py) registra Chrome y Spotify de serie al crearse el gestor y guarda la entidad con Entity.from_dict de un diccionario sin created_at: from_dict pone la hora actual y save_entity sobrescribe la entidad existente. Ocurre cada vez que se crea el gestor (lanzador, descubrimiento, diagnostico).
+CORRECCION: ninguna todavia (fuera del alcance de la unidad). Propuesta: conservar created_at de la entidad existente al guardar.
+VERIFICACION: NE
+ESTADO: ABIERTO
+REPETICIONES_TIPO: 1 (primera aparicion de TIPO_NORMALIZADO CATALOGO_FECHA_CREACION_REESCRITA en este archivo)
+MEMORIA_PERSISTENTE: No aplica (primera aparicion). Prevencion: al fusionar una entidad existente conservar su created_at.
+---
+
+ERR-0041
+FECHA_HORA: 2026-11-21T11:05:00+01:00 Europe/Madrid
+UNIDAD: 3.8.6.13.2 (entorno de pruebas en Mac)
+TIPO_NORMALIZADO: ENTORNO_PYTHON_VERSION
+HERRAMIENTA_OPERACION: pytest con un venv de Python 3.12 (Homebrew) en el scratchpad
+OBJETIVO: tests de application_discovery en Mac
+SINTOMA_SALIDA: INTERNALERROR al importar src.memory.conversation: NameError: name 'Entity' is not defined
+CAUSA: la misma de ERR-0038: el proyecto necesita Python 3.14 y se creo el venv con 3.12.
+CORRECCION: venv con Python 3.14.10 instalado con uv en el scratchpad.
+VERIFICACION: con 3.14.10 los tests se recogen y ejecutan.
+ESTADO: RESUELTO
+REPETICIONES_TIPO: 2 (ERR-0038, ERR-0041)
+MEMORIA_PERSISTENTE: Si. En Mac crear el venv de pruebas con Python 3.14 (uv) desde el principio.
+---

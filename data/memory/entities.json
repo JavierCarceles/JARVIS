@@ -40,8 +40,8 @@
         "loading"
       ]
     },
-    "created_at": "2026-11-21T10:48:57.714577",
-    "updated_at": "2026-11-21T10:48:57.714822",
+    "created_at": "2026-11-20T17:49:45.042065",
+    "updated_at": "2026-11-20T17:49:45.042131",
     "metadata": null,
     "aliases": [],
     "confidence": 1.0,
@@ -80,8 +80,8 @@
         "active"
       ]
     },
-    "created_at": "2026-11-21T10:48:57.718717",
-    "updated_at": "2026-11-21T10:48:57.723384",
+    "created_at": "2026-11-20T17:49:45.043295",
+    "updated_at": "2026-11-20T17:49:45.043360",
     "metadata": null,
     "aliases": [],
     "confidence": 1.0,
@@ -268,59 +268,5 @@
     "aliases": [],
     "confidence": 1.0,
     "tags": []
-  },
-  {
-    "id": "paquete:Microsoft.WindowsCalculator_8wekyb3d8bbwe!App",
-    "type": "application",
-    "name": "calculadora",
-    "properties": {
-      "ruta_absoluta_observada": null,
-      "tipo_lanzamiento_nativo": "paquete",
-      "estado_disponible": "no_disponible",
-      "fecha_observacion": "2026-11-21T09:49:03.741758+00:00",
-      "fuente_observacion": "start_menu",
-      "evidencia_observacion": [
-        "destino_vacio"
-      ],
-      "capacidades_verificadas": [],
-      "capacidades_no_verificadas": [],
-      "tipo_evidencia_identidad": "paquete",
-      "fusionar_por_nombre_desaconsejada": false
-    },
-    "created_at": "2026-11-21T09:49:02.436567+00:00",
-    "updated_at": "2026-11-21T10:49:03.750716",
-    "metadata": null,
-    "aliases": [],
-    "confidence": 1.0,
-    "tags": [
-      "desconocido"
-    ]
-  },
-  {
-    "id": "paquete:Microsoft.WindowsNotepad_8wekyb3d8bbwe!App",
-    "type": "application",
-    "name": "bloc de notas",
-    "properties": {
-      "ruta_absoluta_observada": null,
-      "tipo_lanzamiento_nativo": "paquete",
-      "estado_disponible": "no_disponible",
-      "fecha_observacion": "2026-11-21T09:49:07.986968+00:00",
-      "fuente_observacion": "start_menu",
-      "evidencia_observacion": [
-        "destino_vacio"
-      ],
-      "capacidades_verificadas": [],
-      "capacidades_no_verificadas": [],
-      "tipo_evidencia_identidad": "paquete",
-      "fusionar_por_nombre_desaconsejada": false
-    },
-    "created_at": "2026-11-21T09:49:07.986968+00:00",
-    "updated_at": "2026-11-21T10:49:07.992500",
-    "metadata": null,
-    "aliases": [],
-    "confidence": 1.0,
-    "tags": [
-      "desconocido"
-    ]
   }
 ]

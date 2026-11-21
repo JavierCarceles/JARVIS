@@ -668,8 +668,10 @@ def destino_observable(candidato: DiscoveredCandidate) -> bool:
     Se considera observable cuando existe un archivo de disco en la ruta
     absoluta observada (ejecutable, acceso directo, etc.) o, para destinos
     que no son archivos de disco (paquetes, URI, lanzadores), cuando se
-    conserva un destino nativo verificado. Nunca se asume disponibilidad solo
-    por la extension de archivo.
+    conserva un destino nativo verificado. Un paquete sin ruta ni destino es
+    observable si una fuente aporto su AUMID (``app_id`` o evidencia
+    ``paquete_id:``) con forma ``Familia!App``. Nunca se asume disponibilidad
+    solo por la extension de archivo.
     """
     if str(candidato.absolute_path or "").strip() and os.path.isfile(
         str(candidato.absolute_path)
@@ -679,7 +681,23 @@ def destino_observable(candidato: DiscoveredCandidate) -> bool:
         candidato.destination or ""
     ).strip():
         return True
+    # Aplicacion empaquetada sin ruta ni destino (Get-StartApps / menu Inicio):
+    # su destino nativo es el AUMID ("Familia!App") que reporto el propio SO.
+    tipo = getattr(candidato.launch_type, "value", candidato.launch_type)
+    if str(tipo or "") == "paquete" and _aumid_observado(candidato):
+        return True
     return False
+
+
+def _aumid_observado(candidato: DiscoveredCandidate) -> str:
+    """AUMID aportado por una fuente de descubrimiento (nunca inferido del nombre)."""
+    for item in list(candidato.evidencia or []):
+        if isinstance(item, str) and item.startswith("paquete_id:"):
+            valor = item[len("paquete_id:"):].strip()
+            if "!" in valor:
+                return valor
+    app_id = str(getattr(candidato, "app_id", None) or "").strip()
+    return app_id if "!" in app_id else ""
 
 
 @dataclass

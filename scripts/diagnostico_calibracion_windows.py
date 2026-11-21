@@ -1,8 +1,11 @@
 # -*- coding: ascii -*-
 """
-Diagnostico previo a la calibracion real en Windows (solo lectura).
+Diagnostico previo a la calibracion real en Windows.
 
-No abre, mueve ni cierra aplicaciones y no envia teclado ni raton. Comprueba en
+No abre, mueve ni cierra aplicaciones y no envia teclado ni raton. Unica
+escritura: la resolucion del punto 6 usa el lanzador de produccion, que
+registra en `data/memory/entities.json` las aplicaciones que resuelve (igual
+que al abrirlas desde JARVIS). Comprueba en
 segundos lo que suele hacer fallar o alargar `test_calibracion_aplicaciones_
 entorno_real.py`, para no descubrirlo tras minutos de prueba GUI:
 
@@ -208,7 +211,8 @@ def comprobar_resolucion() -> None:
 
 
 def main() -> int:
-    print("Diagnostico de calibracion (solo lectura; no abre aplicaciones)\n", flush=True)
+    print("Diagnostico de calibracion (no abre aplicaciones; registra en el catalogo las que resuelve)\n",
+          flush=True)
     comprobar_entorno()
     comprobar_escritorio()
     comprobar_ollama()
