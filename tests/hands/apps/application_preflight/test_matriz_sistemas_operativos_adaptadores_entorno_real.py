@@ -47,9 +47,11 @@ class TestMatrizSistemasOperativosAdaptadoresEntornoReal(unittest.TestCase):
         _tests_hands_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         _tests_dir = os.path.dirname(_tests_hands_dir)
         _root_dir = os.path.dirname(_tests_dir)
-        cls.adaptador_windows = os.path.join(_root_dir, "src", "hands", "windows")
-        cls.adaptador_linux = os.path.join(_root_dir, "src", "hands", "linux")
-        cls.adaptador_macos = os.path.join(_root_dir, "src", "hands", "macos")
+        # Los adaptadores nativos viven en src/hands/apps/<so>/ desde la
+        # reorganizacion de src/hands.
+        cls.adaptador_windows = os.path.join(_root_dir, "src", "hands", "apps", "windows")
+        cls.adaptador_linux = os.path.join(_root_dir, "src", "hands", "apps", "linux")
+        cls.adaptador_macos = os.path.join(_root_dir, "src", "hands", "apps", "macos")
 
     def test_01_so_equipo_detectado_nativamente(self):
         """El SO real del equipo se detecta con platform.system()."""

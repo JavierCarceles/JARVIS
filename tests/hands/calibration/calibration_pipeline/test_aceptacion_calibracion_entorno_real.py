@@ -176,6 +176,18 @@ def _monitor_de_pruebas(adapter: Any) -> Any:
     return max(no_principales, key=lambda p: (p.bounds.right, p.bounds.center[0], p.bounds.top))
 
 
+
+def _pids_del_arbol(pid: int) -> set:
+    """PID lanzado y todos sus descendientes (psutil)."""
+    propios = {int(pid)}
+    try:
+        import psutil
+
+        propios.update(int(hijo.pid) for hijo in psutil.Process(int(pid)).children(recursive=True))
+    except Exception:
+        pass
+    return propios
+
 class _LanzadorFixture:
     """Entrega al pipeline la ventana de la fixture que abrio la prueba.
 
@@ -264,10 +276,15 @@ class TestAceptacionCalibracionEntornoReal(unittest.TestCase):
         _ESTADO["proc"] = proc
         limite = time.monotonic() + 30.0
         while time.monotonic() < limite:
-            resultado = self.adapter.list_windows(pid=proc.pid, visible_only=True)
+            # En un venv de Windows, venv\Scripts\python.exe es un lanzador que
+            # arranca el interprete base como proceso hijo: la ventana es de
+            # ese hijo. Se aceptan el proceso lanzado y sus descendientes.
+            propios = _pids_del_arbol(proc.pid)
+            resultado = self.adapter.list_windows(visible_only=True)
             nuevas = [
                 w for w in (resultado.value or [])
                 if int(w.window_id) not in antes and TITULO_FIXTURE in str(w.title or "")
+                and int(w.pid or 0) in propios
             ] if resultado.ok else []
             if nuevas:
                 _ESTADO["window_id"] = int(nuevas[0].window_id)

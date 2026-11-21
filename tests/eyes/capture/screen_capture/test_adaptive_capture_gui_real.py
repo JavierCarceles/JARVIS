@@ -162,8 +162,22 @@ class TestAdaptiveCaptureGuiReal(unittest.TestCase):
                 break
         if secundario is None:
             secundario = sm.get_primary_monitor()
+        # Notepad se abre donde Windows decida (normalmente el monitor
+        # principal): se restaura y se mueve al rectangulo del secundario
+        # antes de maximizar, para que ocultar/restaurar cambie de verdad la
+        # pantalla que captura el test (misma secuencia que
+        # test_visual_ui_detector_fusion.py).
         try:
-            user32.ShowWindow(cls.hwnd, 3)  # SW_MAXIMIZE
+            user32.ShowWindow(ctypes.c_void_p(cls.hwnd), 9)  # SW_RESTORE
+            time.sleep(0.3)
+            user32.SetWindowPos(
+                ctypes.c_void_p(cls.hwnd), 0,
+                int(secundario.left), int(secundario.top),
+                int(secundario.width), int(secundario.height),
+                0x0004 | 0x0040,  # SWP_NOZORDER | SWP_SHOWWINDOW
+            )
+            time.sleep(0.3)
+            user32.ShowWindow(ctypes.c_void_p(cls.hwnd), 3)  # SW_MAXIMIZE
         except Exception:
             pass
         time.sleep(0.5)

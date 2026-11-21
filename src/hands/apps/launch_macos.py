@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import os
 import plistlib
+import posixpath
 import re
 import sqlite3
 import subprocess
@@ -124,7 +125,7 @@ class MacLaunchBoundary:
         return bool(bundle_path) and os.path.isdir(bundle_path)
 
     def read_info_plist(self, bundle_path: str) -> Dict[str, Any]:
-        plist_path = os.path.join(bundle_path, "Contents", "Info.plist")
+        plist_path = posixpath.join(bundle_path, "Contents", "Info.plist")
         try:
             with open(plist_path, "rb") as fh:
                 data = plistlib.load(fh)
@@ -197,13 +198,15 @@ def _boundary(boundary: Optional[MacLaunchBoundary]) -> MacLaunchBoundary:
 def bundle_identity(bundle_path: str, boundary: Optional[MacLaunchBoundary] = None) -> Dict[str, str]:
     """Identidad de un bundle desde su Info.plist (sin rutas en el resultado salvo
     ``executable_path``, que es dato local privado)."""
+    # Rutas de bundle macOS: siempre POSIX (``posixpath``), con independencia
+    # del SO anfitrion, para que el contrato se comporte igual en Windows.
     info = _boundary(boundary).read_info_plist(bundle_path)
     bundle_id = str(info.get("CFBundleIdentifier", "") or "")
     name = str(info.get("CFBundleDisplayName", "") or info.get("CFBundleName", "") or "")
     if not name:
-        name = os.path.splitext(os.path.basename(bundle_path.rstrip("/")))[0]
+        name = posixpath.splitext(posixpath.basename(bundle_path.rstrip("/")))[0]
     executable = str(info.get("CFBundleExecutable", "") or "")
-    executable_path = os.path.join(bundle_path, "Contents", "MacOS", executable) if executable else ""
+    executable_path = posixpath.join(bundle_path, "Contents", "MacOS", executable) if executable else ""
     return {
         "bundle_id": bundle_id,
         "bundle_name": name,
@@ -381,7 +384,7 @@ class MacOSLaunchAdapter(ApplicationLaunchAdapter):
         wanted = name.strip().casefold()
         paths: List[str] = []
         for path in self.boundary.list_application_bundles():
-            if wanted in os.path.basename(path).casefold():
+            if wanted in posixpath.basename(path).casefold():
                 paths.append(path)
         for path in self.boundary.spotlight_by_name(name.strip()):
             if path not in paths:

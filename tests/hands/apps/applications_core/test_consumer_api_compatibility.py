@@ -22,6 +22,7 @@ No se modifica codigo de produccion.
 """
 
 import logging
+import os
 from unittest.mock import MagicMock, patch
 
 # ---------------------------------------------------------------------------
@@ -98,6 +99,37 @@ def _make_minimal_manager(name="MinApp", app_type="utility"):
 # ---------------------------------------------------------------------------
 # 1. Brain consumer API compatibility
 # ---------------------------------------------------------------------------
+
+
+def _assert_lanzo_ejecutable_del_modelo(mock_spawn, executable):
+    """El lanzamiento usa el ejecutable del modelo: el comando tal cual, o la
+    ruta concreta que el preflight resolvio y valido para ese mismo ejecutable
+    (un comando como "chrome" que no esta en PATH en Windows se lanza por la
+    ruta del .exe instalado)."""
+    mock_spawn.assert_called_once()
+    argv = list(mock_spawn.call_args.args[0])
+    assert len(argv) == 1, argv
+    if argv == [executable]:
+        return
+    lanzado = argv[0]
+    assert os.path.isabs(lanzado) and os.path.isfile(lanzado), argv
+
+    def _stem(ruta):
+        return os.path.splitext(os.path.basename(str(ruta)))[0].casefold()
+
+    assert _stem(lanzado) == _stem(executable), argv
+
+
+def _preflight_permitido():
+    """Preflight que admite el destino: las pruebas de compatibilidad del modelo
+    no prueban el preflight (cubierto en TestOpenApplication y en las suites de
+    preflight), y "fake_exe" no existe en ningun equipo."""
+    preflight = MagicMock()
+    preflight.check.return_value = {"allowed": True, "reason": "ok", "blocked_by": None}
+    return patch(
+        "src.hands.apps.applications_core.get_application_preflight",
+        return_value=preflight,
+    )
 
 class TestBrainApplicationKnowledgeConsumer:
     """Brain._get_application_knowledge() consume el API del integrador."""
@@ -307,16 +339,19 @@ class TestInternalFunctionsConsumerCompatibility:
     def test_open_application_resolves_from_model(self):
         """open_application resuelve la app desde el modelo y accede app.name, app.executable,
         app.preflight_requirements - API consumida por el executor/accion registrada."""
-        with patch("src.hands.apps.applications_core.subprocess.Popen") as mock_popen, \
+        with patch("src.hands.apps.applications_core._spawn_application_process") as mock_spawn, \
              patch(
                  "src.hands.apps.applications_core._check_application_available",
                  return_value=True,
+             ), patch(
+                 "src.hands.apps.applications_core._is_process_running",
+                 return_value=False,
              ):
-            mock_popen.return_value = MagicMock()
+            mock_spawn.return_value = MagicMock()
             result = open_application("chrome")
             assert isinstance(result, str)
             assert "Chrome" in result
-            mock_popen.assert_called_once_with(["chrome"])
+            _assert_lanzo_ejecutable_del_modelo(mock_spawn, "chrome")
 
     def test_open_application_not_found_raises(self):
         """open_application levanta ValueError cuando la app no esta en el modelo."""
@@ -326,20 +361,24 @@ class TestInternalFunctionsConsumerCompatibility:
     def test_open_application_minimal_app_with_executable(self):
         """open_application accede app.executable, app.name y app.preflight_requirements;
         una app minimal (contrato 3.1.2) con ejecutable funciona correctamente.
-        Se parchea subprocess.Popen para evitar ejecucion real."""
+        Se intercepta solo la creacion del proceso para evitar ejecucion real
+        (no subprocess.Popen entero: tambien lo usan las consultas del sistema)
+        y se admite el preflight obligatorio (ver _preflight_permitido)."""
         manager = _make_minimal_manager(name="MinApp", app_type="utility")
         manager.applications["minapp"].executable = "fake_exe"
         with patch(
             "src.hands.apps.applications_core.get_application_manager",
             return_value=manager,
+        ), _preflight_permitido(), patch(
+            "src.hands.apps.applications_core._is_process_running", return_value=False,
         ), patch(
-            "src.hands.apps.applications_core.subprocess.Popen"
-        ) as mock_popen:
-            mock_popen.return_value = MagicMock()
+            "src.hands.apps.applications_core._spawn_application_process"
+        ) as mock_spawn:
+            mock_spawn.return_value = MagicMock()
             result = open_application("minapp")
             assert isinstance(result, str)
             assert "MinApp" in result
-            mock_popen.assert_called_once_with(["fake_exe"])
+            mock_spawn.assert_called_once_with(["fake_exe"])
 
     def test_open_application_minimal_app_no_executable_no_url(self):
         """open_application accede app.executable y app.url; con ambos None levanta RuntimeError.

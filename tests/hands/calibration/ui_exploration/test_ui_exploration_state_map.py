@@ -331,6 +331,29 @@ class TestExplorationSafetyPolicy:
         assert permitido is True
         assert motivo == "expandir"
 
+    def test_abridor_de_menu_con_expandir_se_abre_como_menu(self):
+        """Un MenuItem de la barra de menus que expone expandir (Qt en UIA) se
+        abre como menu (en modo clic se pulsa con el raton); un ComboBox o un
+        TreeItem con expandir siguen siendo expandir."""
+        p = ExplorationSafetyPolicy()
+
+        def nodo(rol):
+            class Nodo:
+                enabled = True
+                visible = True
+                offscreen = False
+                native_role = rol
+                actions = ["expand", "collapse"]
+                name = "Sistema"
+                identifier = ""
+            return Nodo()
+
+        assert p.candidate_action(nodo("MenuItem")) == ACTION_OPEN_MENU
+        assert p.candidate_action(nodo("MenuBarItem")) == ACTION_OPEN_MENU
+        assert p.is_allowed(nodo("MenuItem"), ACTION_OPEN_MENU)[0] is True
+        assert p.candidate_action(nodo("ComboBox")) == ACTION_EXPAND
+        assert p.candidate_action(nodo("TreeItem")) == ACTION_EXPAND
+
     def test_is_allowed_rechaza_accion_never(self):
         p = ExplorationSafetyPolicy()
         class Nodo:

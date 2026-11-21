@@ -326,6 +326,13 @@ class ExplorationSafetyPolicy:
             and not (node.native_role == "TreeItem" and "expand" in native_actions)
         ):
             return ACTION_NAVIGATE
+        # Un abridor de menu (barra de menus, boton de menu) se abre como menu
+        # aunque tambien exponga expandir: asi en modo clic se pulsa con el
+        # raton y la vuelta es Escape.
+        if node.native_role in MENU_OPENER_ROLES and "expand" in native_actions and node.native_role not in (
+            "ComboBox",
+        ):
+            return ACTION_OPEN_MENU
         if "expand" in native_actions:
             return ACTION_EXPAND
         if node.native_role in MENU_OPENER_ROLES and native_actions & {"show_menu", "invoke"}:

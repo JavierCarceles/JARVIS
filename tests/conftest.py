@@ -217,3 +217,25 @@ def _reset_global_singletons_between_tests(_catalogo_memoria_de_prueba):
     _applications_core_mod._app_manager = None
     _storage_mod._memory_manager = None
     _app_integration_mod._app_integrator = None
+
+
+# ---------------------------------------------------------------------------
+# LOGGING ACTIVO PARA LOS TESTS QUE COMPRUEBAN LOS REGISTROS
+# ---------------------------------------------------------------------------
+# Varios modulos de test silencian el ruido con `logging.disable(CRITICAL)`
+# a nivel de modulo (se ejecuta durante la RECOLECCION, antes de cualquier
+# test) o en fixtures de modulo/sesion que no lo restauran. Es estado global
+# del proceso: en la suite completa deja `logging` desactivado para todos los
+# tests posteriores y los que comprueban lo que se loguea reciben ''.
+#
+# Esta fixture (no autouse) reactiva `logging` solo durante el test que la
+# pide y restaura despues el nivel de desactivacion previo, de modo que el
+# resultado no depende de que otros modulos se recolecten o ejecuten antes.
+@pytest.fixture
+def logging_habilitado():
+    previo = logging.root.manager.disable
+    logging.disable(logging.NOTSET)
+    try:
+        yield
+    finally:
+        logging.disable(previo)

@@ -59,6 +59,8 @@ class TestNavegacionAjustesEntornoReal(unittest.TestCase):
         # Por que la deteccion no da controles: ventana elegida y que aporto cada fuente.
         print("[NAVEGACION AJUSTES] deteccion: %s" % {
             "ventana": cls.report.window,
+            "contenido_alojado": metricas.get("hosted_content"),
+            "nodos_arbol": metricas.get("tree_nodes"),
             "candidatos_por_fuente": metricas.get("candidates_by_source"),
             "deteccion_visual": metricas.get("visual_detection"),
             "qwen3vl": metricas.get("qwen3vl"),

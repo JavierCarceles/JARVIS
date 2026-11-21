@@ -345,7 +345,7 @@ class TestApplicationsMemoryFileFormat:
     def test_no_code_reads_applications_via_memory_type(self):
         """Ningun codigo de applications_core.py referencia MemoryType.APPLICATIONS."""
         src = (
-            (PROJECT_ROOT / "src" / "hands" / "applications_core.py")
+            (PROJECT_ROOT / "src" / "hands" / "apps" / "applications_core.py")
             .read_text(encoding="utf-8")
         )
         assert MemoryType.APPLICATIONS.name not in src

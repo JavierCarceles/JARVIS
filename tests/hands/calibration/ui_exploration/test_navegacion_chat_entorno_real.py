@@ -177,6 +177,17 @@ class TestNavegacionChatEntornoReal(unittest.TestCase):
                cls.resultado.abort_reason)
         )
         cls.resumen.append("mapa JSON: %s" % cls.mapa_path)
+        # Diagnostico: que se hizo, que no tuvo efecto y que se salto (y por que).
+        for accion in cls.explorador.performed_actions():
+            cls.resumen.append("  accion %s" % {k: accion.get(k) for k in sorted(accion) if k != "tree"})
+        for sin_efecto in cls.resultado.no_effect:
+            cls.resumen.append("  sin efecto %s" % sin_efecto)
+        for saltado in cls.resultado.skipped_forbidden:
+            ref = saltado.get("element_ref") or {}
+            cls.resumen.append("  saltado %s/%s (%s): %s" % (
+                ref.get("name"), ref.get("native_role"), saltado.get("action"), saltado.get("reason")))
+        for error in cls.resultado.errors:
+            cls.resumen.append("  error %s" % error)
         for state_id, estado in cls.datos["states"].items():
             camino = " -> ".join(p["element_ref"].get("name", "?") for p in (estado["path_from_root"] or []))
             cls.resumen.append("  estado %s prof=%d camino=[%s] elementos=%d"

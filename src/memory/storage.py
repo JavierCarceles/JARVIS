@@ -759,16 +759,19 @@ class MemoryManager:
 
             result = self._escribir_entidades_atomico(entities_path, existing_entities)
 
-            self._update_cache(
-                "entities",
-                existing_entities,
-                MemoryType.ENTITIES,
-            )
+            # La cache solo refleja lo que de verdad quedo en disco: si la
+            # escritura falla, la entidad no aparece como guardada.
+            if result:
+                self._update_cache(
+                    "entities",
+                    existing_entities,
+                    MemoryType.ENTITIES,
+                )
 
             return result
 
         except Exception as e:
-            logger.error(f"Error guardando entidad id={entity.id} en disco: {e}")
+            logger.error(f"Error en save_entity guardando id={entity.id} en disco: {e}")
             return False
 
     @staticmethod
@@ -826,7 +829,7 @@ class MemoryManager:
                     pass
                 raise
         except (OSError, PermissionError, ValueError, TypeError) as e:
-            logger.error(f"Error escribiendo entidades de forma atomica en {file_path}: {e}")
+            logger.error(f"Error en save_entity escribiendo entidades de forma atomica en {file_path}: {e}")
             return False
 
     def get_entity(self, entity_id: str) -> Optional[Entity]:
@@ -854,7 +857,7 @@ class MemoryManager:
                 try:
                     return Entity.from_dict(entity_data)
                 except Exception as exc:
-                    logger.warning(f"Entidad invalida no puede reconstruirse (id={entity_id}): {exc}")
+                    logger.warning(f"Entidad invalida no puede reconstruirse en get_entity (id={entity_id}): {exc}")
                     return None
 
         return None
@@ -892,7 +895,7 @@ class MemoryManager:
                     try:
                         entities.append(Entity.from_dict(entity_data))
                     except Exception as exc:
-                        logger.warning(f"Entidad invalida omitida (id={entity_data.get('id', '?')}) "
+                        logger.warning(f"Entidad invalida omitida en get_entities_by_type (id={entity_data.get('id', '?')}) "
                             f"al cargar tipo '{entity_type}': {exc}")
 
             return entities

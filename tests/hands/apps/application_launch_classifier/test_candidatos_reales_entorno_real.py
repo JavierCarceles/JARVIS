@@ -16,7 +16,7 @@ Tipos de candidatos probados:
 - Herramientas CLI (cmd, powershell, ping, etc.).
 - Instaladores (nombres con setup/install si se encuentran en el sistema).
 - Accesos directos rotos (.lnk sin target valido).
-- Paquetes (.appx, .msix si existen en el sistema).
+- Paquetes AppX/MSIX instalados (AUMID real del menu de aplicaciones).
 - Falsos positivos (.dll, archivos con extension enganosa, directorios).
 
 No lanza ninguna aplicacion, no instala ni modifica datos del usuario.
@@ -277,40 +277,62 @@ class TestAccesosDirectosRotos:
 # ---------------------------------------------------------------------------
 
 class TestPaquetes:
-    """Paquetes de aplicacion (.appx, .msix) si existen en el sistema."""
+    """Paquetes de aplicacion (AppX/MSIX) realmente instalados en el sistema.
 
-    def test_paquete_appx_si_existe(self, clasificador, preflight):
-        """Busca un archivo .appx en el sistema y verifica que se clasifica
-        como PAQUETE. Si no hay ninguno, se salta."""
-        rutas_paquete = [
-            r"C:\Windows\SystemApps\Microsoft.Windows.Cortana_cw5n1h2txyewy\AppxManifest.xml",
+    Un Windows instalado no guarda ficheros .appx/.msix sueltos: los paquetes
+    instalados son carpetas protegidas y se identifican por su AUMID
+    ("Familia_editor!App") en el menu de aplicaciones (shell:AppsFolder /
+    Get-StartApps). Es la forma de destino que el descubrimiento clasifica como
+    ``paquete``.
+    """
+
+    # Paquetes integrados de Windows 11, en orden de preferencia.
+    _FAMILIAS_PREFERIDAS = (
+        "microsoft.windowscalculator_",
+        "microsoft.windowsnotepad_",
+        "microsoft.windows.photos_",
+        "microsoft.windowsstore_",
+    )
+
+    def _paquete_instalado_real(self, discovery):
+        """(nombre, aumid) de un paquete instalado leido de la fuente real del
+        menu de aplicaciones; None si no hay ninguno."""
+        apps = discovery.calibration.discover_applications() or []
+        paquetes = [
+            (str(a.get("name", "")).strip(), str(a.get("app_id", "")).strip())
+            for a in apps
+            if "!" in str(a.get("app_id", "")) and not str(a.get("path", "")).strip()
         ]
-        # Buscar .appx en Program Files y Windows (no recursivo masivo, solo rutas conocidas)
-        found_appx = None
-        for base in [r"C:\Windows", r"C:\Program Files", r"C:\Program Files (x86)"]:
-            if not _existe(base):
-                continue
-            try:
-                for entry in os.listdir(base):
-                    if entry.lower().endswith((".appx", ".msix", ".appxbundle", ".msixbundle")):
-                        found_appx = os.path.join(base, entry)
-                        break
-            except (OSError, PermissionError):
-                continue
-            if found_appx:
-                break
+        paquetes = [(n, i) for n, i in paquetes if n and i]
+        for familia in self._FAMILIAS_PREFERIDAS:
+            for nombre, aumid in paquetes:
+                if aumid.casefold().startswith(familia):
+                    return nombre, aumid
+        return paquetes[0] if paquetes else None
 
-        if not found_appx:
-            pytest.skip("No se encontro paquete .appx/.msix en el sistema")
-
-        clasificacion = clasificador.classify_candidate(
-            {"name": Path(found_appx).stem, "absolute_path": found_appx, "source": "sistema_real"}
+    @pytest.mark.skipif(sys.platform != "win32", reason="Los paquetes AppX/MSIX solo existen en Windows")
+    def test_paquete_instalado_se_clasifica_como_paquete(self, discovery, preflight):
+        """Toma un paquete instalado real (AUMID del menu de aplicaciones),
+        lo pasa por el pipeline real de descubrimiento y comprueba que se
+        clasifica como ``paquete`` lanzable y que el preflight lo verifica en
+        shell:AppsFolder. En Windows siempre hay paquetes instalados: si no se
+        encuentra ninguno la prueba falla (no se salta)."""
+        encontrado = self._paquete_instalado_real(discovery)
+        assert encontrado is not None, (
+            "No se encontro ningun paquete AppX/MSIX instalado en el menu de aplicaciones"
         )
-        assert clasificacion.launch_type == "paquete"
-        assert isinstance(clasificacion.es_lanzable, bool)
-        decision = preflight.validate_launch_destination(found_appx)
-        assert isinstance(decision, dict)
-        assert "valid" in decision
+        nombre, aumid = encontrado
+
+        candidatos = discovery.buscar_por_nombre(nombre, incluir_inventario=False)
+        del_paquete = [c for c in candidatos if (c.app_id or "").casefold() == aumid.casefold()]
+        assert del_paquete, f"el descubrimiento no devolvio el paquete {aumid} buscando {nombre!r}"
+        candidato = del_paquete[0]
+        assert candidato.launch_type == "paquete"
+        assert candidato.es_lanzable is True
+
+        assert preflight.verify_app_id_in_apps_folder(aumid) is True
+        decision = preflight.check_launch_target({"name": nombre}, aumid, "aumid")
+        assert decision["allowed"] is True, decision
 
 
 # ---------------------------------------------------------------------------

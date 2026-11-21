@@ -19,7 +19,9 @@ from src.core.log import get_logger, setup_logging
 
 
 @pytest.fixture(autouse=True)
-def _restaurar_logging():
+def _restaurar_logging(logging_habilitado):
+    # logging_habilitado (tests/conftest.py): otros modulos de la suite dejan
+    # logging.disable(CRITICAL) activo; aqui se comprueba el logging real.
     raiz = logging.getLogger()
     handlers, nivel = list(raiz.handlers), raiz.level
     yield

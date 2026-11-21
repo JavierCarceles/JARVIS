@@ -114,8 +114,16 @@ class TestEjecutableDisponible:
     def test_hay_candidato_registrado_ejecutable(self):
         filas = _leer_candidatos_por_tipo(LaunchType.EJECUTABLE.value)
         assert len(filas) >= 1, "debe haber al menos un candidato ejecutable registrado"
-        ids = {f["candidate_id"] for f in filas}
-        assert any("charmap" in (i or "").lower() for i in ids), f"ids={ids}"
+        # El candidate_id es un identificador opaco (sin ruta): el candidato
+        # de charmap se reconoce por su ruta y su nombre registrados.
+        charmap = [
+            f for f in filas
+            if os.path.basename(str(f["absolute_path"] or "")).casefold() == "charmap.exe"
+            or str(f["name"] or "").casefold() in ("charmap", "charmap.exe")
+        ]
+        assert charmap, "charmap.exe no esta registrado como candidato ejecutable: %s" % sorted(
+            str(f["absolute_path"]) for f in filas
+        )[:20]
 
     def test_preflight_valida_ejecutable_real_sin_lanzar(self):
         res = _preflight.validate_launch_destination(DEST_EJECUTABLE)

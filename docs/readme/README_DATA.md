@@ -162,7 +162,7 @@ Estos datos solo valen para el ordenador donde se crearon. No deben copiarse a o
 | `schema_version` | Version del esquema | `version` |
 | `machines` | Equipos conocidos | `machine_id`, `created_at` |
 | `volumes` | Discos/volumenes de cada equipo | `volume_id`, `machine_id`, `volume`, `volume_type`, `state`, `first_seen_at`, `last_seen_at` |
-| `scan_runs` | Cada escaneo realizado | `scan_id`, `machine_id`, `volume`, `mode` (`completo`/`incremental`), `started_at`, `finished_at`, `result` (`ok`/`parcial`/`interrumpido`/`error`), contadores, `coverage_estimate` |
+| `scan_runs` | Cada escaneo realizado | `scan_id`, `machine_id`, `volume`, `mode` (`completo`/`incremental`), `started_at`, `finished_at`, `result` (`ok`/`parcial`/`interrumpido`/`error`), contadores, `coverage_estimate`. Las ejecuciones `registro-...` solo registran candidatos de aplicacion (`ApplicationDiscovery.registrar_candidatos`): no recorren el volumen y `get_latest_scan` y el ultimo escaneo completo ok las ignoran. |
 | `file_entries` | Ficheros y carpetas encontrados | `entry_id`, `scan_id`, `machine_id`, `volume`, `absolute_path`, `normalized_path`, `relative_path`, `name`, `extension`, `entry_type`, `size_bytes`, fechas, `attributes` (JSON), `excluded`, `source`, `last_checked_at` |
 | `application_candidates` | Posibles aplicaciones | `candidate_id`, `scan_id`, `machine_id`, `volume`, `name`, `absolute_path`, `launch_type`, `confidence`, `version`, `producto`, `evidencia` (JSON), `source`, `last_checked_at` |
 | `lineas_base` | Linea base por volumen (una por equipo y volumen) | `linea_id`, `machine_id`, `volume`, `fecha_base`, `estado_volumen`, `cobertura`, contadores, `scan_id`, `created_at` |

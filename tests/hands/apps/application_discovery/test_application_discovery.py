@@ -658,9 +658,10 @@ class TestAmbiguedadDesambiguacion:
         notepad = r"C:\Windows\System32\notepad.exe"
         if not os.path.exists(notepad):
             pytest.skip("notepad.exe no disponible en este equipo")
-        # Solo la fuente mockeada: el PATH y los App Paths reales del equipo
-        # aportan en Windows 11 otra copia del mismo programa (WindowsApps).
-        monkeypatch.setenv("PATH", "")
+        # Los App Paths reales de Windows 11 aportan otra copia del mismo
+        # programa (WindowsApps\...\Notepad.exe); se aislan. El PATH se deja:
+        # el catalogo conocido resuelve "notepad.exe" con shutil.which y, sin
+        # PATH, apareceria como un segundo candidato sin destino.
         if os.name == "nt":
             import winreg
 

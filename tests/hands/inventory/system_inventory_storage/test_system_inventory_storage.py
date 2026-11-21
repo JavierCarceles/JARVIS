@@ -407,6 +407,29 @@ class TestScanRuns:
         assert latest["scan_id"] == "scan-new"
         assert latest["entries_count"] == 50
 
+    def test_registro_de_candidatos_no_cuenta_como_ultimo_escaneo(self, storage: SystemInventoryStorage):
+        """Caso real (Windows): tests que registran candidatos con
+        ApplicationDiscovery.registrar_candidatos dejaban una ejecucion
+        "registro-..." completa y ok mas reciente que el escaneo real de 5,6
+        millones de entradas, y el registro de candidatos desde el inventario
+        no encontraba el escaneo bueno."""
+        from src.hands.inventory.system_inventory_storage import PREFIJO_SCAN_REGISTRO
+
+        storage.initialize()
+        storage.record_machine("machine-alfa")
+        storage.begin_scan_run("scan-real", "machine-alfa", "C:", SCAN_MODE_FULL,
+                               started_at="2026-11-20T10:00:00+00:00")
+        storage.end_scan_run("scan-real", entries_count=5000)
+        registro = PREFIJO_SCAN_REGISTRO + "abc"
+        storage.begin_scan_run(registro, "machine-alfa", "C:", SCAN_MODE_FULL,
+                               started_at="2026-11-21T12:00:00+00:00")
+        storage.end_scan_run(registro, entries_count=1)
+
+        assert storage._obtener_ultimo_scan_completo_por_volumen("machine-alfa", "C:")["scan_id"] == "scan-real"
+        assert storage.get_latest_scan("machine-alfa", "C:")["scan_id"] == "scan-real"
+        assert storage.get_latest_scan("machine-alfa")["scan_id"] == "scan-real"
+        assert storage.get_latest_scan("machine-alfa", "C:", incluir_registros=True)["scan_id"] == registro
+
     def test_get_latest_scan_por_volumen(self, storage: SystemInventoryStorage):
         storage.initialize()
         storage.record_machine("machine-alfa")

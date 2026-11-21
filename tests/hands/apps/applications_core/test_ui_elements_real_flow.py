@@ -383,10 +383,10 @@ class TestApplicationManagerReal:
         assert manager.get_application("notepad") is app
 
     def test_register_application_evita_duplicados(self):
-        """Re-registrar una app ya registrada no la duplica: conserva la
-        instancia original, actualiza sus aliases en memoria, persiste la
-        entidad actualizada y devuelve True (contrato vigente de
-        ApplicationManager.register_application)."""
+        """Re-registrar una app ya registrada no la duplica: devuelve False,
+        conserva la instancia original, le anade los aliases nuevos del
+        duplicado y persiste la entidad de la app original con esos aliases
+        (contrato de ApplicationManager.register_application)."""
         manager = _make_manager()
         app = _real_app_knowledge("Notepad", executable="notepad.exe")
         assert manager.register_application(app) is True
@@ -396,7 +396,7 @@ class TestApplicationManagerReal:
         duplicada.metadata = {"aliases": ["bloc de notas"]}
         resultado2 = manager.register_application(duplicada)
 
-        assert resultado2 is True
+        assert resultado2 is False
         assert list(manager.applications.keys()).count("notepad") == 1
         assert len(manager.applications) == 1
         # La instancia registrada sigue siendo la original, no la duplicada.

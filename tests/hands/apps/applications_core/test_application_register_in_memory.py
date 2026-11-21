@@ -352,3 +352,80 @@ class TestRegisterPersistenceGap:
 
         assert manager.get_application("alpha") is not None
         assert mm.get_entity("app_alpha") is not None
+
+
+# ---------------------------------------------------------------------------
+# 5. Duplicado con aliases nuevos y reinicio del gestor (created_at estable)
+# ---------------------------------------------------------------------------
+class TestRegisterAliasesYCreatedAt:
+    """El duplicado aporta sus aliases a la app ya registrada sin sobrescribirla,
+    y volver a registrar la misma app al reiniciar no reescribe entities.json
+    ni cambia su ``created_at``."""
+
+    def test_duplicado_con_alias_nuevo_anade_alias_sin_sobrescribir(self, tmp_path):
+        mm = MemoryManager(tmp_path)
+        manager = _make_min_manager(mm)
+        original = _make_app(name="DupApp", app_type="browser", executable="dupapp_v1")
+        duplicada = _make_app(name="DupApp", app_type="player", executable="dupapp_v2")
+        duplicada.metadata = {"aliases": ["mi dup"]}
+        assert manager.register_application(original) is True
+
+        assert manager.register_application(duplicada) is False
+
+        assert manager.get_application("dupapp") is original
+        assert manager.get_application("mi dup") is original
+        guardada = MemoryManager(tmp_path).get_entity("app_dupapp")
+        assert guardada is not None
+        assert guardada.aliases == ["mi dup"]
+        assert guardada.properties["type"] == "browser"
+        assert guardada.properties["executable"] == "dupapp_v1"
+
+    def test_reinicio_no_reescribe_entities_json(self, tmp_path):
+        """Un gestor nuevo que registra la misma app (como hace __init__ con
+        Chrome y Spotify en cada arranque) no modifica el fichero."""
+        manager = _make_min_manager(MemoryManager(tmp_path))
+        assert manager.register_application(_make_app(name="Alpha")) is True
+        fichero = tmp_path / "entities.json"
+        antes = fichero.read_bytes()
+
+        otro = _make_min_manager(MemoryManager(tmp_path))
+        assert otro.register_application(_make_app(name="Alpha")) is True
+
+        assert fichero.read_bytes() == antes
+
+    def test_reinicio_con_cambios_conserva_created_at(self, tmp_path):
+        """Si la app cambia entre arranques se reescribe, pero su created_at es
+        el de la primera vez."""
+        manager = _make_min_manager(MemoryManager(tmp_path))
+        manager.register_application(_make_app(name="Alpha", executable="alpha_v1.exe"))
+        primera = MemoryManager(tmp_path).get_entity("app_alpha")
+
+        otro = _make_min_manager(MemoryManager(tmp_path))
+        assert otro.register_application(_make_app(name="Alpha", executable="alpha_v2.exe")) is True
+
+        segunda = MemoryManager(tmp_path).get_entity("app_alpha")
+        assert segunda.properties["executable"] == "alpha_v2.exe"
+        assert segunda.created_at == primera.created_at
+
+    def test_arranque_repetido_del_gestor_no_modifica_entities_json(self, tmp_path):
+        """Dos arranques reales de ApplicationManager sobre el mismo directorio:
+        el segundo no reescribe entities.json (Chrome y Spotify ya estan
+        guardados igual) y conserva sus created_at."""
+        from unittest.mock import patch
+
+        with patch(
+            "src.hands.apps.applications_core.get_memory_manager",
+            return_value=MemoryManager(tmp_path),
+        ):
+            ApplicationManager()
+        fichero = tmp_path / "entities.json"
+        antes = fichero.read_bytes()
+        assert {e["id"] for e in json.loads(antes)} == {"app_chrome", "app_spotify"}
+
+        with patch(
+            "src.hands.apps.applications_core.get_memory_manager",
+            return_value=MemoryManager(tmp_path),
+        ):
+            ApplicationManager()
+
+        assert fichero.read_bytes() == antes

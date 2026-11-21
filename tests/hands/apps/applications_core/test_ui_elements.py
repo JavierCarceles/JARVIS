@@ -214,7 +214,7 @@ class TestUIElementInteraction:
         with patch.object(self.coordinate_manager, 'get_calibration') as mock_get:
             mock_get.return_value = expected_coords
             
-            with patch('tests.hands.calibration.test_ui_elements.click_element') as mock_click:
+            with patch(__name__ + '.click_element') as mock_click:
                 mock_click(button="left")
                 
                 mock_click.assert_called_once_with(button="left")
@@ -227,7 +227,7 @@ class TestUIElementInteraction:
         with patch.object(self.coordinate_manager, 'get_calibration') as mock_get:
             mock_get.return_value = expected_coords
             
-            with patch('tests.hands.calibration.test_ui_elements.click_element') as mock_click:
+            with patch(__name__ + '.click_element') as mock_click:
                 # Simular doble clic mediante dos clics rapidos
                 mock_click(button="left", wait_after=0.01)
                 mock_click(button="left", wait_after=0.01)
@@ -242,7 +242,7 @@ class TestUIElementInteraction:
         with patch.object(self.coordinate_manager, 'get_calibration') as mock_get:
             mock_get.return_value = expected_coords
             
-            with patch('tests.hands.calibration.test_ui_elements.click_element') as mock_click:
+            with patch(__name__ + '.click_element') as mock_click:
                 mock_click(button="right")
                 
                 mock_click.assert_called_once_with(button="right")
@@ -256,7 +256,7 @@ class TestUIElementInteraction:
         with patch.object(self.coordinate_manager, 'get_calibration') as mock_get:
             mock_get.return_value = expected_coords
             
-            with patch('tests.hands.calibration.test_ui_elements.type_text') as mock_type:
+            with patch(__name__ + '.type_text') as mock_type:
                 mock_type(text=test_text)
                 
                 mock_type.assert_called_once_with(text=test_text)

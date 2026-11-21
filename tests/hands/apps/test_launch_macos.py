@@ -190,7 +190,7 @@ class TestResolucionTextEditYCalculadora:
     def test_aplicacion_no_instalada_devuelve_not_installed(self):
         resolucion = _adaptador(SyntheticMacLaunchBoundary()).resolve("Pages")
         assert resolucion.status == NOT_FOUND
-        assert _codigo(resolucion.error) == ErrorCode.NOT_INSTALLED.value
+        assert _codigo(resolucion.error) == ErrorCode.NOT_INSTALLED
 
     def test_nombre_con_caracteres_no_admitidos_no_consulta_spotlight(self):
         boundary = SyntheticMacLaunchBoundary()
@@ -274,7 +274,7 @@ class TestAperturaPorServicioUnico:
         boundary = SyntheticMacLaunchBoundary(quarantined=[TEXTEDIT])
         outcome = _servicio(_adaptador(boundary)).open("TextEdit")
         assert not outcome.success
-        assert _codigo(outcome.error) == ErrorCode.GATEKEEPER_BLOCKED.value
+        assert _codigo(outcome.error) == ErrorCode.GATEKEEPER_BLOCKED
         assert outcome.error.stage == OperationStage.PERMISSION
         assert boundary.opened == []
 
@@ -282,7 +282,7 @@ class TestAperturaPorServicioUnico:
         boundary = SyntheticMacLaunchBoundary(open_code=1)
         outcome = _servicio(_adaptador(boundary)).open("TextEdit")
         assert not outcome.success
-        assert _codigo(outcome.error) == ErrorCode.LAUNCH_FAILED.value
+        assert _codigo(outcome.error) == ErrorCode.LAUNCH_FAILED
         # Nunca se reintenta una apertura que ya llego a ejecutarse con exito;
         # un fallo de LaunchServices no lanzo nada y no duplica instancias.
         assert "com.apple.TextEdit" not in boundary.running
@@ -295,14 +295,14 @@ class TestAperturaPorServicioUnico:
         )
         outcome = _adaptador(boundary).launch(destino, timeout=1.0)
         assert not outcome.success
-        assert _codigo(outcome.error) == ErrorCode.UNSAFE_ARGUMENT.value
+        assert _codigo(outcome.error) == ErrorCode.UNSAFE_ARGUMENT
         assert boundary.opened == []
 
     def test_aplicacion_no_instalada_no_abre_nada(self):
         boundary = SyntheticMacLaunchBoundary()
         outcome = _servicio(_adaptador(boundary)).open("Pages")
         assert not outcome.success
-        assert _codigo(outcome.error) in (ErrorCode.NOT_INSTALLED.value, ErrorCode.NOT_FOUND.value)
+        assert _codigo(outcome.error) in (ErrorCode.NOT_INSTALLED, ErrorCode.NOT_FOUND)
         assert boundary.opened == []
 
 

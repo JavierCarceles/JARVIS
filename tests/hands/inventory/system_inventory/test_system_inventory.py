@@ -1075,9 +1075,14 @@ class TestExclusionesUsuarioContrato:
 # agregados (unidad 3.8.5.1.4.8.5).
 # ---------------------------------------------------------------------------
 
+@pytest.mark.usefixtures("logging_habilitado")
 class TestLogsSinRutasCompletas:
     """Verifica que los logs nunca contienen rutas completas ni listados
-    de nombres, sino resumenes agregados y evidencia minima para diagnostico."""
+    de nombres, sino resumenes agregados y evidencia minima para diagnostico.
+
+    ``logging_habilitado`` (tests/conftest.py) reactiva ``logging`` durante
+    cada test: otros modulos de la suite dejan ``logging.disable(CRITICAL)``
+    activo y, sin ella, el capturador no recibiria ningun registro."""
 
     def _capturar_logs(self, accion):
         """Ejecuta `accion` capturando los registros emitidos por el logger

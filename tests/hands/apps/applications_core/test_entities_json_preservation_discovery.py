@@ -146,7 +146,14 @@ class TestPreservacionEntitiesJsonDescubrimiento:
 
     def test_memory_entities_json_inalterable(self):
         """data/memory/entities.json (usado por MemoryManager) no se modifica
-        por registro/consumo de conocimiento dinamico."""
+        por registro/consumo de conocimiento dinamico.
+
+        El gestor se arranca ANTES de la captura: su arranque registra las apps
+        hardcodeadas (Chrome, Spotify) con ``register_application``, que si
+        persiste en este fichero cuando aun no las tiene (el catalogo de prueba
+        no las incluye). Eso no es conocimiento dinamico; lo que se mide es el
+        registro de apps descubiertas y su consumo."""
+        get_application_manager()
         resultado = verify_entities_json_unchanged(
             _ruta_entities_memoria(), _operacion_registro_y_consumo
         )

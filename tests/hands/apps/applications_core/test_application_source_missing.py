@@ -248,16 +248,19 @@ class TestApplicationManagerWhenSourceMissing:
         )
 
     def test_source_file_content_after_init(self, isolated_manager):
-        """Caracterizacion del contenido real del fichero tras init sin fuente.
+        """Contenido real del fichero tras init sin fuente: las dos apps
+        hardcodeadas que registra __init__ (Chrome y Spotify).
 
-        entities.json se crea con `[]` (vacia) debido a un hallazgo preexistente
-        (D-ENTITIES-PERSIST-BUG): save_entity pasa dicts a _process_data_for_save
-        que solo procesa instancias de Entity. Este test documenta el
-        comportamiento actual, no asume que el bug debe corregirse aqui."""
+        Antes se creaba `[]` por el defecto D-ENTITIES-PERSIST-BUG (save_entity
+        no persistia las entidades); corregido el defecto, cada entidad
+        registrada queda en disco."""
         manager, mm, tmp_path = isolated_manager
         entities_path = tmp_path / "entities.json"
         content = json.loads(entities_path.read_text(encoding="utf-8"))
-        assert content == []
+        assert isinstance(content, list)
+        assert {e["id"] for e in content} == {"app_chrome", "app_spotify"}
+        assert {e["name"] for e in content} == {"Chrome", "Spotify"}
+        assert all(e["type"] == "application" for e in content)
 
 
 # ---------------------------------------------------------------------------

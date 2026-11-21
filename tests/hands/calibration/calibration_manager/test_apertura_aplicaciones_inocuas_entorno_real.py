@@ -275,11 +275,13 @@ class TestAperturaAplicacionesInocuasEntornoReal(unittest.TestCase):
         else:
             # Notepad ya estaba abierto y la API reutilizo la instancia existente.
             # No cerrar nada ajeno: escenario de reutilizacion registrado.
-            self.skipTest(
-                "Notepad ya estaba abierto; la API reutilizo la instancia existente "
-                "(was_owned=False). No se cierra nada ajeno. "
-                "Escenario de reutilizacion registrado; BLOQUEADO para prueba de "
-                "propiedad exclusiva si se requiere was_owned=True."
+            # Sin instancia propia no se puede probar el ciclo. No se cierra
+            # nada ajeno; la prueba falla (no se salta) para que se vea que
+            # otra prueba o el usuario dejaron Notepad abierto.
+            self.fail(
+                "Notepad ya tenia una ventana abierta antes de la prueba y la API la "
+                "reutilizo (was_owned=False); cerrarla (o la prueba anterior que la "
+                "dejo abierta) y repetir. No se cierra nada ajeno."
             )
 
     # 3.8.5.6.7.4: enumeracion de monitores reales (entorno de dos pantallas)
@@ -440,11 +442,13 @@ class TestAperturaAplicacionesInocuasEntornoReal(unittest.TestCase):
         else:
             # Calc ya estaba abierto y la API reutilizo la instancia existente.
             # No cerrar nada ajeno: escenario de reutilizacion registrado.
-            self.skipTest(
-                "Calc ya estaba abierto; la API reutilizo la instancia existente "
-                "(was_owned=False). No se cierra nada ajeno. "
-                "Escenario de reutilizacion registrado; BLOQUEADO para prueba de "
-                "propiedad exclusiva si se requiere was_owned=True."
+            # Sin instancia propia no se puede probar el ciclo. No se cierra
+            # nada ajeno; la prueba falla (no se salta) para que se vea que
+            # otra prueba o el usuario dejaron Calc abierto.
+            self.fail(
+                "Calc ya tenia una ventana abierta antes de la prueba y la API la "
+                "reutilizo (was_owned=False); cerrarla (o la prueba anterior que la "
+                "dejo abierta) y repetir. No se cierra nada ajeno."
             )
 
     # 3.8.5.6.12.1: msedge.exe existe en el equipo (fuente real del SO)
@@ -470,145 +474,12 @@ class TestAperturaAplicacionesInocuasEntornoReal(unittest.TestCase):
 
     # 3.8.5.6.12.3: ciclo completo lanzar -> verificar activacion/proceso/ventana
     #               por identificador real de proceso -> cerrar -> preservar
-    def test_3_8_5_6_12_3_ciclo_completo_edge(self):
-        """Ciclo completo real: preflight, lanzamiento, verificacion, cierre, preservacion."""
-        pf = self.preflight.check({
-            "name": _EDGE_NAME, "app_id": "", "path": _EDGE_PATH,
-        })
-        self.assertTrue(pf.get("allowed", False), f"preflight: {pf.get('reason')}")
-
-        # Lanzamiento REAL (sin mockear lanzador, procesos ni ventanas).
-        resultado = self.cal.launch_application({
-            "name": _EDGE_NAME,
-            "app_id": "",
-            "path": _EDGE_PATH,
-            "arguments": "",
-        })
-        ok = bool(resultado[1]) if isinstance(resultado, tuple) else bool(resultado)
-        self.assertTrue(ok, "launch_application no informo exito al abrir Edge")
-
-        root_pid = getattr(self.cal, "_last_launch_root_pid", None)
-        owned_pids = getattr(self.cal, "_last_launch_owned_pids", set())
-        owned_hwnds = getattr(self.cal, "_last_launch_owned_hwnds", set())
-        was_owned = bool(getattr(self.cal, "_last_launch_was_owned", False))
-        launch_state = str(getattr(self.cal, "_last_launch_state", "DESCONOCIDO"))
-
-        despues_edge = _contar_edge()
-        # Edge puede lanzar varios procesos; solo verificamos que no disminuya
-        self.assertGreaterEqual(
-            despues_edge, self.edge_antes,
-            f"conteo Edge inesperado: antes={self.edge_antes}, despues={despues_edge}",
-        )
-
-        if was_owned and root_pid is not None:
-            # Caso exito: proceso propio lanzado por la prueba.
-            self.proc_pid = int(root_pid)
-            self.cerrado_por_la_prueba = True
-
-            self.assertTrue(
-                self.cal._is_process_alive(int(root_pid)),
-                "el proceso lanzado no esta vivo justo despues del lanzamiento",
-            )
-            self.assertIn(int(root_pid), owned_pids,
-                          f"el root_pid {root_pid} no esta en los PIDs propios del lanzamiento")
-            self.assertGreaterEqual(len(owned_hwnds), 1,
-                                    "no se obtuvo ninguna ventana propia lanzada")
-
-            # Detectar ventana perteneciente al proceso (3.8.5.5.3).
-            espera = self.cal.wait_for_application_window(
-                root_pid=root_pid,
-                application_name=_EDGE_NAME,
-                app_id="",
-                timeout=8.0,
-                poll_interval=0.4,
-            )
-            self.assertEqual(
-                espera["status"], "VENTANA_DETECTADA",
-                f"se esperaba ventana detectada, obtuvo: {espera}",
-            )
-            ventana = espera["window"]
-            self.assertIsNotNone(ventana, "no se devolvio objeto de ventana")
-
-            hwnd_creado = self.cal._get_window_handle(ventana)
-            self.assertIsNotNone(hwnd_creado, "la ventana detectada no tiene HWND")
-
-            ventana_pid = self.cal._get_window_process_id(ventana)
-            self.assertIsNotNone(ventana_pid, "la ventana detectada no tiene PID")
-            self.assertEqual(ventana_pid, root_pid,
-                             "PID de ventana distinto al root_pid")
-
-            # La ventana debe ser visible (3.8.5.5.4).
-            self.assertTrue(
-                self.cal._win32_is_visible(hwnd_creado),
-                "la ventana detectada no es visible",
-            )
-
-            # No confundir con Visual Studio Code.
-            es_vscode = getattr(self.cal, "_es_visual_studio_code", lambda hwnd: False)(hwnd_creado)
-            self.assertFalse(es_vscode, "la ventana detectada se confunde con Visual Studio Code")
-
-            # Estabilidad minima del proceso y la ventana durante un intervalo (3.8.5.5.5).
-            estabilidad = self.cal.verify_estabilidad_minima_proceso_ventana(
-                root_pid=root_pid,
-                window=ventana,
-                application_name=_EDGE_NAME,
-                app_id="",
-                estabilidad_interval=1.5,
-                estabilidad_checks=3,
-            )
-            self.assertEqual(estabilidad["status"], "ESTABLE", f"no estable: {estabilidad}")
-            self.assertTrue(estabilidad["process_alive"], "el proceso no estuvo vivo")
-            self.assertTrue(estabilidad["window_valida"], "la ventana no estuvo valida")
-            self.assertTrue(estabilidad["window_visible"], "la ventana no estuvo visible")
-
-            # ========== PASO: cerrar solo lo creado por la prueba ==========
-            subprocess.run(
-                ["taskkill", "/PID", str(int(root_pid)), "/F"],
-                capture_output=True, text=True, check=False,
-            )
-            tiempo = time.time() + 10
-            while time.time() < tiempo:
-                if not self.cal._is_process_alive(int(root_pid)):
-                    break
-                time.sleep(0.25)
-            self.assertFalse(
-                self.cal._is_process_alive(int(root_pid)),
-                "el proceso propio no se termino tras cerrar por PID",
-            )
-            self.proc_pid = None
-            self.cerrado_por_la_prueba = False
-
-            # La cuenta de Edge no debe disminuir tras el cierre de nuestro proceso propio
-            # (otros procesos de Edge pueden seguir vivos).
-            despues_edge_cierre = _contar_edge()
-            self.assertGreaterEqual(
-                despues_edge_cierre, self.edge_antes,
-                f"conteo Edge tras cierre inferior al baseline: antes={self.edge_antes}, despues={despues_edge_cierre}",
-            )
-
-            # Las ventanas preexistentes (incluido Visual Studio Code) deben seguir presentes.
-            despues_ventanas = _ventanas()
-            faltantes = []
-            for hwnd in self.ventanas_antes:
-                if hwnd not in despues_ventanas:
-                    faltantes.append(hwnd)
-            self.assertEqual(
-                faltantes, [],
-                f"desaparecieron ventanas previas tras el cierre: {faltantes}",
-            )
-
-            vscode_despues = _contar_vscode()
-            self.assertGreaterEqual(vscode_despues, self.vscode_antes,
-                                    f"Visual Studio Code no se preservo: antes={self.vscode_antes}, despues={vscode_despues}")
-        else:
-            # Edge ya estaba abierto y la API reutilizo la instancia existente.
-            # No cerrar nada ajeno: escenario de reutilizacion registrado.
-            self.skipTest(
-                "Edge ya estaba abierto; la API reutilizo la instancia existente "
-                "(was_owned=False). No se cierra nada ajeno. "
-                "Escenario de reutilizacion registrado."
-            )
-
+    # El ciclo completo de Edge (3.8.5.6.12.3) se retiro el 2026-11-21 por
+    # decision del usuario ("olvidate de Edge"): Edge reutiliza procesos
+    # propios ya residentes (arranque en segundo plano), la ventana nueva no
+    # pertenece a un proceso creado por la prueba y el cierre por PID habria
+    # terminado un proceso preexistente. La familia Chromium se cubre con
+    # Chrome en test_calibracion_aplicaciones_entorno_real.py.
 
 if __name__ == "__main__":
     unittest.main()

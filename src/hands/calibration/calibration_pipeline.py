@@ -302,6 +302,8 @@ class UICalibrationPipeline:
         max_pointer_checks: maximo de controles cuyo punto seguro se verifica
             moviendo el puntero (nunca se hace click).
         stability_timeout: limite de espera de estabilidad visual (segundos).
+        hosted_content_timeout: espera maxima (segundos) a que una ventana de
+            ApplicationFrameHost pase de la pantalla de carga al contenido real.
         vision_timeout: espera maxima de la llamada a Qwen3-VL (segundos).
         vision_max_side: lado mayor (px) de la copia de la captura que se
             envia a Qwen3-VL.
@@ -321,6 +323,7 @@ class UICalibrationPipeline:
         use_optional_detectors: bool = True,
         max_pointer_checks: int = 40,
         stability_timeout: float = 8.0,
+        hosted_content_timeout: float = 20.0,
         launch_timeout: float = 15.0,
         explorer_budget: Any = None,
         explorer_policy: Any = None,
@@ -347,6 +350,7 @@ class UICalibrationPipeline:
         self.use_optional_detectors = bool(use_optional_detectors)
         self.max_pointer_checks = int(max_pointer_checks)
         self.stability_timeout = float(stability_timeout)
+        self.hosted_content_timeout = float(hosted_content_timeout)
         self.launch_timeout = float(launch_timeout)
         self.explorer_budget = explorer_budget
         self.explorer_policy = explorer_policy
@@ -1035,6 +1039,65 @@ class UICalibrationPipeline:
         report.metrics["stability_method"] = method
         if not stable:
             raise _StageFailure(STAGE_STABILITY, "la interfaz no se estabilizo en %.1f s" % self.stability_timeout)
+        if self._wait_hosted_content(adapter, window, report) and capture_ok:
+            # El contenido real acaba de aparecer: se vuelve a esperar a que
+            # la imagen deje de cambiar antes de capturar.
+            try:
+                from src.hands.calibration.dynamic_ui import UIChangeDetector
+
+                def _capture_frame_again() -> Any:
+                    res = adapter.capture_window(wid)
+                    return res.value.image if res.ok and res.value is not None else None
+
+                UIChangeDetector().wait_until_stable(
+                    _capture_frame_again, timeout=self.stability_timeout, stable_frames=3
+                )
+            except Exception as exc:
+                report.warnings.append("estabilidad visual tras el contenido no evaluable: %s" % exc)
+
+    # Proceso que aloja las ventanas de las aplicaciones empaquetadas (UWP /
+    # WinUI) en Windows: al abrirse muestra primero una pantalla de carga
+    # estable (logo sobre fondo liso) y el contenido real llega despues.
+    _PACKAGED_HOST_PROCESSES = frozenset({"applicationframehost.exe"})
+
+    def _wait_hosted_content(self, adapter: Any, window: WindowInfo, report: CalibrationReport) -> bool:
+        """Espera (con limite) a que una ventana alojada por ApplicationFrameHost
+        muestre su contenido real y no la pantalla de carga.
+
+        La pantalla de carga es visualmente estable, asi que la estabilidad de
+        frames no basta: se sondea el arbol de accesibilidad hasta que tenga
+        al menos ``min_accessible_controls`` controles accionables o se agote
+        ``hosted_content_timeout``. Devuelve True si espero y el contenido
+        aparecio. No hace nada para otras ventanas.
+        """
+        identidad = str(getattr(window, "app_identity", "") or "").strip().casefold()
+        if identidad not in self._PACKAGED_HOST_PROCESSES:
+            return False
+        limite = time.monotonic() + max(0.0, float(self.hosted_content_timeout))
+        inicio = time.monotonic()
+        accionables = 0
+        while True:
+            res = adapter.get_accessibility_tree(int(window.window_id), pid=window.pid)
+            if res.ok and res.value is not None:
+                accionables = sum(
+                    1 for n in res.value.nodes
+                    if getattr(n, "enabled", False) and (getattr(n, "actions", None) or getattr(n, "native_patterns", None))
+                )
+            if accionables >= self.min_accessible_controls or time.monotonic() >= limite:
+                break
+            self._wait_event.wait(0.25)
+        listo = accionables >= self.min_accessible_controls
+        report.metrics["hosted_content"] = {
+            "waited_seconds": round(time.monotonic() - inicio, 3),
+            "actionable": accionables,
+            "ready": listo,
+        }
+        if not listo:
+            report.warnings.append(
+                "la aplicacion empaquetada no mostro contenido accesible en %.0f s (%d controles accionables)"
+                % (float(self.hosted_content_timeout), accionables)
+            )
+        return listo
 
     def _wait_tree_stable(self, adapter: Any, window: WindowInfo, required: int = 3, poll: float = 0.2) -> bool:
         deadline = time.monotonic() + self.stability_timeout

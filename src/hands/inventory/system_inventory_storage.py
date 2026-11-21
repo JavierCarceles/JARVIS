@@ -154,6 +154,11 @@ class InventoryIncompatibleMachineError(Exception):
 SCAN_MODE_FULL = "completo"
 SCAN_MODE_INCREMENTAL = "incremental"
 
+# Prefijo de las ejecuciones que solo registran candidatos de aplicacion
+# (ApplicationDiscovery.registrar_candidatos): no recorren ningun volumen ni
+# tienen entradas de fichero, asi que no cuentan como "ultimo escaneo".
+PREFIJO_SCAN_REGISTRO = "registro-"
+
 # Valores admitidos para el resultado de una ejecucion de escaneo.
 SCAN_RESULT_OK = "ok"
 SCAN_RESULT_PARTIAL = "parcial"
@@ -1290,17 +1295,20 @@ class SystemInventoryStorage:
         self, machine_id: str, volume: str
     ) -> Optional[dict]:
         """Devuelve el ultimo scan_run con resultado SCAN_RESULT_OK de
-        (machine_id, volumen), o None si no existe ninguno completo."""
+        (machine_id, volumen), o None si no existe ninguno completo. Las
+        ejecuciones de registro de candidatos (PREFIJO_SCAN_REGISTRO) no
+        recorren el volumen y no cuentan."""
         conn = self.connect()
         cur = conn.execute(
             """
             SELECT scan_id, started_at, result, entries_count
             FROM scan_runs
             WHERE machine_id = ? AND volume = ? AND result = ?
+              AND scan_id NOT LIKE ?
             ORDER BY started_at DESC
             LIMIT 1
             """,
-            (machine_id, volume, SCAN_RESULT_OK),
+            (machine_id, volume, SCAN_RESULT_OK, PREFIJO_SCAN_REGISTRO + "%"),
         )
         row = cur.fetchone()
         return dict(row) if row is not None else None
@@ -1951,19 +1959,27 @@ class SystemInventoryStorage:
         row = cur.fetchone()
         return dict(row) if row is not None else None
 
-    def get_latest_scan(self, machine_id: str, volume: Optional[str] = None) -> Optional[dict]:
-        """Devuelve la ultima ejecucion de escaneo de un equipo (y opcionalmente volumen)."""
+    def get_latest_scan(
+        self, machine_id: str, volume: Optional[str] = None, incluir_registros: bool = False
+    ) -> Optional[dict]:
+        """Devuelve la ultima ejecucion de escaneo de un equipo (y opcionalmente volumen).
+
+        Por defecto no cuenta las ejecuciones de registro de candidatos
+        (PREFIJO_SCAN_REGISTRO): no recorren el volumen ni tienen entradas.
+        """
         conn = self.connect()
+        filtro = "" if incluir_registros else " AND scan_id NOT LIKE ?"
+        extra = () if incluir_registros else (PREFIJO_SCAN_REGISTRO + "%",)
         if volume is None:
             cur = conn.execute(
-                "SELECT * FROM scan_runs WHERE machine_id = ? ORDER BY started_at DESC LIMIT 1",
-                (machine_id,),
+                "SELECT * FROM scan_runs WHERE machine_id = ?" + filtro + " ORDER BY started_at DESC LIMIT 1",
+                (machine_id,) + extra,
             )
         else:
             cur = conn.execute(
-                "SELECT * FROM scan_runs WHERE machine_id = ? AND volume = ? "
-                "ORDER BY started_at DESC LIMIT 1",
-                (machine_id, volume),
+                "SELECT * FROM scan_runs WHERE machine_id = ? AND volume = ?" + filtro
+                + " ORDER BY started_at DESC LIMIT 1",
+                (machine_id, volume) + extra,
             )
         row = cur.fetchone()
         return dict(row) if row is not None else None

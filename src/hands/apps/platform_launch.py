@@ -1085,14 +1085,7 @@ class ApplicationLaunchService:
             if not resolution.resolved:
                 if resolution.status == AMBIGUOUS:
                     return self._ambiguity_outcome(display, resolution)
-                return LaunchOutcome.failed(
-                    resolution.error or OperationError(
-                        OperationStage.RESOLUTION, ErrorCode.TARGET_NOT_LOCALIZABLE,
-                        "La aplicacion %s no tiene ejecutable ni URL configurados y no se localizo "
-                        "un destino en este equipo" % display,
-                    ),
-                    app_name=display,
-                )
+                return self._catalog_unresolved_outcome(display, app, resolution, decision)
             target = resolution.target
             assert target is not None
             if entity_id and not target.catalog_entity_id:
@@ -1165,14 +1158,7 @@ class ApplicationLaunchService:
         if not resolution.resolved:
             if resolution.status == AMBIGUOUS:
                 return self._ambiguity_outcome(display, resolution)
-            return LaunchOutcome.failed(
-                resolution.error or OperationError(
-                    OperationStage.RESOLUTION, ErrorCode.TARGET_NOT_LOCALIZABLE,
-                    "La aplicacion %s no tiene ejecutable ni URL configurados y no se localizo "
-                    "un destino en este equipo" % display,
-                ),
-                app_name=display,
-            )
+            return self._catalog_unresolved_outcome(display, app, resolution, decision)
         target = resolution.target
         assert target is not None
         if entity_id and not target.catalog_entity_id:
@@ -1181,6 +1167,52 @@ class ApplicationLaunchService:
         if isinstance(gate, LaunchOutcome):
             return gate
         return target
+
+    @staticmethod
+    def _catalog_unresolved_outcome(
+        display: str, app: Any, resolution: ResolutionOutcome, decision: LaunchPreflight,
+    ) -> LaunchOutcome:
+        """Error de una aplicacion del catalogo cuya resolucion local no encontro
+        destino en este equipo.
+
+        La aplicacion SI existe en el catalogo, asi que no se informa "no
+        encontrada": si tiene un comando configurado que el preflight no
+        resolvio, se devuelve ese rechazo del preflight; si no tiene ejecutable
+        ni URL, se dice asi. La resolucion local queda en la evidencia. Un fallo
+        interno de la resolucion (fuentes de descubrimiento caidas, adaptador
+        ausente, nombre no admitido) se devuelve tal cual, porque no prueba que
+        la aplicacion falte en este equipo.
+        """
+        error = resolution.error
+        ausente = resolution.status == NOT_FOUND and (
+            error is None or error.code in (ErrorCode.NOT_INSTALLED, ErrorCode.NOT_FOUND)
+        )
+        if not ausente and error is not None:
+            return LaunchOutcome.failed(error, app_name=display)
+        evidence = {"preflight": decision.to_dict(), "resolution": resolution.to_dict()}
+        executable = str(getattr(app, "executable", None) or "").strip()
+        url = str(getattr(app, "url", None) or "").strip()
+        if executable and not decision.allowed:
+            code = ErrorCode.ELEVATION_REQUIRED if decision.requires_elevation else ErrorCode.PREFLIGHT_BLOCKED
+            return LaunchOutcome.failed(
+                OperationError(
+                    OperationStage.PREFLIGHT, code,
+                    "La aplicacion %s no paso el preflight: %s (bloqueado por: %s)"
+                    % (display, decision.reason or "sin motivo", decision.blocked_by or "desconocido"),
+                    evidence=evidence,
+                ),
+                app_name=display,
+            )
+        if not executable and not url:
+            message = ("La aplicacion %s no tiene ejecutable ni URL configurados y no se localizo "
+                       "un destino en este equipo" % display)
+        else:
+            message = "No se localizo un destino de la aplicacion %s en este equipo" % display
+        return LaunchOutcome.failed(
+            OperationError(OperationStage.RESOLUTION, ErrorCode.TARGET_NOT_LOCALIZABLE, message,
+                           evidence=evidence),
+            app_name=display,
+        )
 
     def _running_without_window(self, app: Any) -> bool:
         """True solo si hay procesos reales con el nombre esperado del

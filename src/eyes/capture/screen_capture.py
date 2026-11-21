@@ -562,6 +562,7 @@ class DXcamCapture:
         self._dxcam = None
         self._camera = None
         self._monitor_info = None
+        self._monitor_match_attempted = False
         self._effective_backend = None
         self._available = False
         self._error = None
@@ -793,6 +794,18 @@ class DXcamCapture:
             self._effective_backend = None
             return None
         monitor_num = None
+        if self._monitor_info is None and not getattr(self, "_monitor_match_attempted", False):
+            # Sin mapeo previo (p. ej. AdaptiveCapture crea la camara sin
+            # llamar a match_monitor): se mapea la salida dxcam a su monitor
+            # una vez, para que el fallback capture la pantalla asignada a
+            # output_idx y no siempre la principal.
+            self._monitor_match_attempted = True
+            error_previo = self._error
+            try:
+                self.match_monitor()
+            except Exception:
+                self._monitor_info = None
+            self._error = error_previo
         if self._monitor_info is not None:
             monitor_num = getattr(self._monitor_info, "monitor_id", None)
         if monitor_num is None:

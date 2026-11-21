@@ -588,6 +588,7 @@ class LaunchClassifier:
                 "source": d.get("source", "filesystem_scan"),
                 "volume": d.get("volume"),
                 "launch_type": d.get("launch_type"),
+                "app_id": d.get("app_id"),
                 "last_checked_at": d.get("last_checked_at", ""),
             }
         if not isinstance(candidate, dict):
@@ -598,6 +599,7 @@ class LaunchClassifier:
                 "source": "desconocida",
                 "volume": None,
                 "launch_type": None,
+                "app_id": None,
                 "last_checked_at": "",
             }
         return {

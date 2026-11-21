@@ -323,8 +323,8 @@ HERRAMIENTA_OPERACION: python scripts/diagnostico_calibracion_windows.py en Wind
 OBJETIVO: diagnostico previo a la calibracion
 SINTOMA_SALIDA: en data/memory/entities.json, app_chrome y app_spotify cambiaron created_at y updated_at a 2026-11-21T10:48:57 (inicio de la resolucion del diagnostico); el valor anterior, 2026-11-20T17:49:45, tambien era de una ejecucion anterior. La fecha de creacion se pierde en cada ejecucion.
 CAUSA: ApplicationManager.register_application (src/hands/apps/applications_core.py) registra Chrome y Spotify de serie al crearse el gestor y guarda la entidad con Entity.from_dict de un diccionario sin created_at: from_dict pone la hora actual y save_entity sobrescribe la entidad existente. Ocurre cada vez que se crea el gestor (lanzador, descubrimiento, diagnostico).
-CORRECCION: ninguna todavia (fuera del alcance de la unidad). Propuesta: conservar created_at de la entidad existente al guardar.
-VERIFICACION: NE
+CORRECCION: ApplicationManager._persist_application conserva el created_at de la entidad guardada y no reescribe entities.json si el contenido no cambia (arrancar el gestor ya no modifica el catalogo).
+VERIFICACION: Mac: 4 tests nuevos (TestRegisterAliasesYCreatedAt en test_application_register_in_memory.py) PASSED; fallan con el codigo anterior. PENDIENTE en Windows.
 ESTADO: ABIERTO
 REPETICIONES_TIPO: 1 (primera aparicion de TIPO_NORMALIZADO CATALOGO_FECHA_CREACION_REESCRITA en este archivo)
 MEMORIA_PERSISTENTE: No aplica (primera aparicion). Prevencion: al fusionar una entidad existente conservar su created_at.
@@ -373,4 +373,214 @@ VERIFICACION: NE (requiere instalar en Windows y repetir cerrar_unidad.bat).
 ESTADO: ABIERTO
 REPETICIONES_TIPO: 1 (primera aparicion de TIPO_NORMALIZADO DEPENDENCIA_NO_DECLARADA en este archivo)
 MEMORIA_PERSISTENTE: No aplica (primera aparicion). Prevencion: al anadir un import de terceros, anadirlo a requirements.txt.
+---
+
+ERR-0044
+FECHA_HORA: 2026-11-21T14:30:00+01:00 Europe/Madrid
+UNIDAD: 3.8.6.13.2
+TIPO_NORMALIZADO: EXPLORACION_SIN_CLIC_EN_MENU
+HERRAMIENTA_OPERACION: test_navegacion_chat_entorno_real.py en Windows (cerrar_unidad.bat 04c y 06a)
+OBJETIVO: calibracion en profundidad con clics reales sobre la app de chat propia
+SINTOMA_SALIDA: 6 FAILED: 2 estados y 1 transicion en 16 acciones; ninguna llega al chat de Manolito; la unica transicion es el menu Sistema con method accessibility:expand (test_02 exige click).
+CAUSA: (1) candidate_action devolvia expand para un MenuItem de Qt que expone expandir, y expand no es una accion de clic; (2) por que no se exploraron los contactos: sin datos (el test no imprimia acciones, saltos ni errores).
+CORRECCION: (1) un abridor de menu (MenuItem, MenuBarItem...) con expandir se abre como menu (open_menu: clic y vuelta con Escape); ComboBox y TreeItem siguen con expandir; test nuevo test_abridor_de_menu_con_expandir_se_abre_como_menu. (2) El test imprime cada accion ejecutada, las que no tuvieron efecto, las saltadas con su motivo y los errores.
+VERIFICACION: Mac: tests/hands/calibration con el mismo conjunto de FAILED/ERROR con y sin el cambio; test nuevo PASSED. PENDIENTE en Windows (y causa de (2)).
+ESTADO: ABIERTO
+REPETICIONES_TIPO: 1 (primera aparicion de TIPO_NORMALIZADO EXPLORACION_SIN_CLIC_EN_MENU en este archivo)
+MEMORIA_PERSISTENTE: No aplica (primera aparicion).
+---
+
+ERR-0045
+FECHA_HORA: 2026-11-21T14:30:00+01:00 Europe/Madrid
+UNIDAD: 3.8.6.13.2
+TIPO_NORMALIZADO: CALIBRACION_PANTALLA_DE_CARGA
+HERRAMIENTA_OPERACION: test_navegacion_ajustes_entorno_real.py en Windows
+OBJETIVO: calibrar y explorar Configuracion de Windows
+SINTOMA_SALIDA: quality_gate: ningun control accionable supero la puerta de calidad; ventana de applicationframehost.exe, uia 4, qwen3vl 0, omniparser 1, paddleocr 0; estabilidad en 0,33 s.
+CAUSA: la ventana de una app empaquetada muestra primero una pantalla de carga estable (logo sobre fondo liso): la estabilidad de frames pasaba antes de que llegara el contenido; el arbol solo tenia el marco y la captura no tenia texto.
+CORRECCION: UICalibrationPipeline._wait_hosted_content: para ventanas de applicationframehost.exe, tras la estabilidad sondea el arbol hasta min_accessible_controls controles accionables o hosted_content_timeout (20 s) y vuelve a esperar estabilidad visual; metrics["hosted_content"]. Test unitario test_contenido_alojado.py (3). El test de Ajustes imprime contenido_alojado y nodos del arbol. README actualizado.
+VERIFICACION: Mac: 3 PASSED; tests/hands/calibration sin fallos nuevos. PENDIENTE en Windows.
+ESTADO: ABIERTO
+REPETICIONES_TIPO: 1 (primera aparicion de TIPO_NORMALIZADO CALIBRACION_PANTALLA_DE_CARGA en este archivo)
+MEMORIA_PERSISTENTE: No aplica (primera aparicion).
+---
+
+ERR-0046
+FECHA_HORA: 2026-11-21T14:30:00+01:00 Europe/Madrid
+UNIDAD: 3.8.6.13.2
+TIPO_NORMALIZADO: PID_LANZADOR_VENV
+HERRAMIENTA_OPERACION: test_aceptacion_calibracion_entorno_real.py en Windows con venv\Scripts\python.exe
+OBJETIVO: abrir la fixture Qt propia
+SINTOMA_SALIDA: "No aparecio la ventana propia de la fixture en 30 s" (test_01) y por arrastre test_03 (falta la familia qt_fixture).
+CAUSA: en Windows, venv\Scripts\python.exe es un lanzador que arranca el interprete base como proceso hijo; la ventana es del hijo y el test filtraba list_windows por el PID del lanzador.
+CORRECCION: el test acepta el PID lanzado y sus descendientes (psutil, _pids_del_arbol).
+VERIFICACION: py_compile OK. PENDIENTE en Windows.
+ESTADO: ABIERTO
+REPETICIONES_TIPO: 1 (primera aparicion de TIPO_NORMALIZADO PID_LANZADOR_VENV en este archivo)
+MEMORIA_PERSISTENTE: No aplica (primera aparicion). Prevencion: no identificar ventanas por el PID de sys.executable en un venv de Windows.
+---
+
+ERR-0047
+FECHA_HORA: 2026-11-21T14:30:00+01:00 Europe/Madrid
+UNIDAD: 3.8.6.13.2
+TIPO_NORMALIZADO: CIERRE_PROCESO_AJENO
+HERRAMIENTA_OPERACION: test_apertura_aplicaciones_inocuas_entorno_real.py::test_3_8_5_6_12_3_ciclo_completo_edge en Windows
+OBJETIVO: ciclo completo de Edge
+SINTOMA_SALIDA: "el root_pid 15532 no esta en los PIDs propios del lanzamiento" (owned_pids vacio). El test ya habia marcado cerrado_por_la_prueba=True con ese PID, asi que tearDown ejecuto taskkill /PID 15532 /F sobre un proceso de Edge preexistente.
+CAUSA: Edge reutiliza procesos residentes (arranque en segundo plano): la ventana es nueva pero su proceso no lo creo la prueba; el test asumia proceso propio.
+CORRECCION: por decision del usuario ("olvidate de Edge") se retira el ciclo completo de Edge; quedan las comprobaciones de existencia y preflight. La familia Chromium la cubre Chrome en test_calibracion_aplicaciones_entorno_real.py. Ademas, los casos de Bloc de notas y Calculadora que se saltaban (SKIPPED) cuando ya habia una ventana abierta ahora fallan con un mensaje claro.
+VERIFICACION: py_compile OK. PENDIENTE en Windows.
+ESTADO: ABIERTO
+REPETICIONES_TIPO: 1 (primera aparicion de TIPO_NORMALIZADO CIERRE_PROCESO_AJENO en este archivo)
+MEMORIA_PERSISTENTE: No aplica (primera aparicion). Prevencion: nunca marcar un PID para cierre forzado antes de comprobar que lo creo la prueba.
+---
+
+ERR-0048
+FECHA_HORA: 2026-11-21T14:30:00+01:00 Europe/Madrid
+UNIDAD: 3.8.6.13.2
+TIPO_NORMALIZADO: TEST_DEPENDE_DEL_ENTORNO
+HERRAMIENTA_OPERACION: test_application_discovery.py::test_un_solo_candidato_no_es_ambiguo en Windows
+OBJETIVO: un solo candidato no es ambiguo
+SINTOMA_SALIDA: assert 2 == 1, primero con la copia de WindowsApps de los App Paths reales y, tras vaciar PATH en el test, con un candidato catalogo_conocido "notepad.exe" sin destino.
+CAUSA: el test no aislaba los App Paths reales de Windows 11; vaciar PATH impedia al catalogo conocido resolver notepad.exe con shutil.which.
+CORRECCION: el test aisla solo los App Paths (winreg.OpenKey) y deja el PATH.
+VERIFICACION: en Mac se salta (no hay notepad, excepcion (a)). PENDIENTE en Windows.
+ESTADO: ABIERTO
+REPETICIONES_TIPO: 1 (primera aparicion de TIPO_NORMALIZADO TEST_DEPENDE_DEL_ENTORNO en este archivo)
+MEMORIA_PERSISTENTE: No aplica (primera aparicion).
+---
+
+ERR-0049
+FECHA_HORA: 2026-11-21T15:20:00+01:00 Europe/Madrid
+UNIDAD: 3.8.6.13.2
+TIPO_NORMALIZADO: CONTRATO_CONTRADICTORIO_TESTS
+HERRAMIENTA_OPERACION: no regresion tests/hands en Windows (cerrar_unidad.bat 06a)
+OBJETIVO: no regresion del catalogo de aplicaciones
+SINTOMA_SALIDA: 13 FAILED en test_application_register_duplicates.py, test_application_register_in_memory.py, test_application_identification.py y test_duplicados_y_preservacion_entities_json.py: register_application devolvia True y guardaba el duplicado; en un caso sobrescribia en disco la entidad original ('player' en vez de 'browser').
+CAUSA: la unidad 3.2.2.3 definio "evitar duplicados" (False, sin save_entity, sin sobrescribir) y creo esos tests; el commit 85ab4e4 (3.8.5.1.4.9.10, registro con PRODUCCION: NA) cambio a actualizar aliases y devolver True sin documentarlo, con perdida de datos.
+CORRECCION: un duplicado devuelve False y nunca sobrescribe; si trae aliases nuevos se anaden a la aplicacion registrada y se guarda la entidad de esa aplicacion. test_ui_elements_real_flow::test_register_application_evita_duplicados vuelve a esperar False (sus comprobaciones de aliases no cambian). README.md actualizado.
+VERIFICACION: Mac: los 13 PASSED. PENDIENTE en Windows.
+ESTADO: ABIERTO
+REPETICIONES_TIPO: 2 (ERR-0042, ERR-0049)
+MEMORIA_PERSISTENTE: Si. Al cambiar el comportamiento de una funcion, buscar y actualizar los tests que fijan el anterior y documentarlo en el registro de la unidad.
+---
+
+ERR-0050
+FECHA_HORA: 2026-11-21T15:20:00+01:00 Europe/Madrid
+UNIDAD: 3.8.6.13.2
+TIPO_NORMALIZADO: MENSAJE_DE_ERROR_ENMASCARADO
+HERRAMIENTA_OPERACION: no regresion tests/hands en Windows
+OBJETIVO: abrir aplicaciones del catalogo
+SINTOMA_SALIDA: test_open_rechazado_por_preflight_ejecutable_no_resuelto y test_open_application_minimal_app_no_executable_no_url: "Regex pattern did not match" (salia "Aplicacion no encontrada en este equipo").
+CAUSA: desde 2cd7a9f una app del catalogo sin comando resuelto recurre a la resolucion local; si tampoco encuentra nada, el error ocultaba el rechazo del preflight o la falta de ejecutable y URL.
+CORRECCION: platform_launch._catalog_unresolved_outcome devuelve el rechazo del preflight o "no tiene ejecutable ni URL configurados" cuando la resolucion local no encuentra nada; errores internos, adaptador ausente o nombre no valido se devuelven tal cual. README.md actualizado.
+VERIFICACION: Mac: PASSED. PENDIENTE en Windows.
+ESTADO: ABIERTO
+REPETICIONES_TIPO: 1 (primera aparicion de TIPO_NORMALIZADO MENSAJE_DE_ERROR_ENMASCARADO en este archivo)
+MEMORIA_PERSISTENTE: No aplica (primera aparicion).
+---
+
+ERR-0051
+FECHA_HORA: 2026-11-21T15:20:00+01:00 Europe/Madrid
+UNIDAD: 3.8.6.13.2
+TIPO_NORMALIZADO: MOCK_GLOBAL_DE_SUBPROCESS
+HERRAMIENTA_OPERACION: no regresion tests/hands en Windows
+OBJETIVO: tests de consumidores de open_application
+SINTOMA_SALIDA: "Expected 'Popen' to be called once. Called 2 times." y "not enough values to unpack (expected 2, got 0)" en test_consumer_api_compatibility.py y test_application_consumers_real_model.py.
+CAUSA: parchear applications_core.subprocess.Popen sustituye subprocess.Popen global y las sondas de solo lectura (tasklist, PowerShell shell:AppsFolder) usaban el mock; varios tests "fake_exe" eran anteriores al preflight obligatorio (3.8.5.1.4.7.10).
+CORRECCION: los tests parchean solo _spawn_application_process (unico punto de lanzamiento), fijan _is_process_running a False donde faltaba y usan un preflight que permite el destino de prueba, como hizo 3.8.5.1.4.7.10 en sus propios tests. La comprobacion de ["chrome"] admite tambien la ruta absoluta que el preflight resuelve (comportamiento documentado).
+VERIFICACION: Mac: PASSED. PENDIENTE en Windows (variante con ruta de Chrome).
+ESTADO: ABIERTO
+REPETICIONES_TIPO: 1 (primera aparicion de TIPO_NORMALIZADO MOCK_GLOBAL_DE_SUBPROCESS en este archivo)
+MEMORIA_PERSISTENTE: No aplica (primera aparicion). Prevencion: parchear el punto de lanzamiento propio, nunca subprocess.Popen del modulo.
+---
+
+ERR-0052
+FECHA_HORA: 2026-11-21T15:20:00+01:00 Europe/Madrid
+UNIDAD: 3.8.6.13.2
+TIPO_NORMALIZADO: LOGGING_DESACTIVADO_POR_TESTS
+HERRAMIENTA_OPERACION: no regresion completa en Windows (06a y 06b)
+OBJETIVO: tests que comprueban mensajes de log
+SINTOMA_SALIDA: texto capturado vacio en TestLogsSinRutasCompletas (4), tests/core/test_log.py::test_setup_escribe_en_fichero_con_nombre_corto y TestErrorLoggingDuringLoad (3).
+CAUSA: unos 16 modulos de test llaman logging.disable(logging.CRITICAL) al importarse o en fixtures y no lo deshacen; al recoger la suite entera el logging queda apagado. Ademas la refactorizacion 97dc335 quito el nombre del metodo de los mensajes de storage.
+CORRECCION: fixture logging_habilitado en tests/conftest.py (reactiva el logging en el test y restaura el estado), usada por esos tests; storage.py vuelve a nombrar el metodo en sus mensajes y solo actualiza la cache si la escritura en disco tuvo exito.
+VERIFICACION: Mac: reproducido junto a un modulo que desactiva el logging y PASSED tras la correccion. PENDIENTE en Windows.
+ESTADO: ABIERTO
+REPETICIONES_TIPO: 1 (primera aparicion de TIPO_NORMALIZADO LOGGING_DESACTIVADO_POR_TESTS en este archivo)
+MEMORIA_PERSISTENTE: No aplica (primera aparicion).
+---
+
+ERR-0053
+FECHA_HORA: 2026-11-21T15:20:00+01:00 Europe/Madrid
+UNIDAD: 3.8.6.13.2
+TIPO_NORMALIZADO: CONTRATO_MACOS_EN_WINDOWS
+HERRAMIENTA_OPERACION: tests/hands/apps/test_launch_macos.py en Windows
+OBJETIVO: tests de contrato macOS con frontera sintetica (deben pasar en Windows)
+SINTOMA_SALIDA: 6 x "'str' object has no attribute 'value'" y ruta '/System/Applications/TextEdit.app/Contents\\MacOS\\TextEdit'.
+CAUSA: ErrorCode es una clase de constantes de texto, no un Enum (el test usaba .value desde su creacion); launch_macos.py componia rutas de macOS con os.path, que en Windows usa barras invertidas.
+CORRECCION: el test compara con ErrorCode.X; launch_macos.py usa posixpath para las rutas de macOS.
+VERIFICACION: Mac: 19/19 PASSED. PENDIENTE en Windows.
+ESTADO: ABIERTO
+REPETICIONES_TIPO: 1 (primera aparicion de TIPO_NORMALIZADO CONTRATO_MACOS_EN_WINDOWS en este archivo)
+MEMORIA_PERSISTENTE: No aplica (primera aparicion).
+---
+
+ERR-0054
+FECHA_HORA: 2026-11-21T15:20:00+01:00 Europe/Madrid
+UNIDAD: 3.8.6.13.2
+TIPO_NORMALIZADO: TEST_DEPENDE_DEL_ENTORNO
+HERRAMIENTA_OPERACION: tests/hands/inventory/test_filesystem_observer.py en Windows
+OBJETIVO: comportamiento del observador sin watchdog
+SINTOMA_SALIDA: 3 FAILED (assert True is False, _queue.Empty) con watchdog instalado.
+CAUSA: los tests daban por hecho que watchdog no estaba instalado; esta en requirements.txt.
+CORRECCION: fixture fobs_sin_watchdog que oculta watchdog en sys.modules y carga una copia real del modulo de produccion, de modo que se ejecuta su rama except ImportError. Hallazgo sin corregir: con watchdog real, start() sobre una ruta inexistente deja escapar queue.Empty de watchdog.
+VERIFICACION: Mac con y sin watchdog: PASSED. PENDIENTE en Windows.
+ESTADO: ABIERTO
+REPETICIONES_TIPO: 2 (ERR-0048, ERR-0054)
+MEMORIA_PERSISTENTE: Si. Un test no debe depender de que un paquete este o no instalado: simular su ausencia.
+---
+
+ERR-0055
+FECHA_HORA: 2026-11-21T15:20:00+01:00 Europe/Madrid
+UNIDAD: 3.8.6.13.2
+TIPO_NORMALIZADO: TESTS_ESCRIBEN_EN_DATOS_REALES
+HERRAMIENTA_OPERACION: test_application_entities_sqlite_registro_real.py en Windows; data/system_inventory_manifest.json
+OBJETIVO: candidatos de aplicacion en la SQLite real
+SINTOMA_SALIDA: "No se encontraron candidatos .exe en la SQLite real para el equipo actual" (3 FAILED). El manifiesto muestra como ultimo escaneo un "registro-4af17bc2..." completo, ok, con 1 entrada, de las 12:15Z (durante 06a).
+CAUSA: (1) application_candidates esta vacia para este equipo: nunca se ejecuto scripts\registrar_candidatos_inventario.py (pendiente desde el registro de la unidad). (2) ApplicationDiscovery.registrar_candidatos crea una ejecucion "registro-..." con modo completo y resultado ok; test_lanzamiento_discord_entorno_real.py y test_registrar_aplicaciones_desde_inventario_entorno_real.py la usan sobre la base real, y la busqueda del "ultimo escaneo completo ok" elegia esa ejecucion vacia en vez del escaneo real de 5,6 millones de entradas.
+CORRECCION: _obtener_ultimo_scan_completo_por_volumen y get_latest_scan (salvo incluir_registros=True) excluyen las ejecuciones con PREFIJO_SCAN_REGISTRO; registrar_candidatos usa esa constante. Test nuevo test_registro_de_candidatos_no_cuenta_como_ultimo_escaneo. No se borra nada de la base real. Pendiente del usuario en Windows: venv\Scripts\python scripts\registrar_candidatos_inventario.py --volumen C:
+VERIFICACION: Mac: test nuevo PASSED; tests/hands/inventory + application_discovery con el mismo conjunto de FAILED/ERROR con y sin el cambio. PENDIENTE en Windows.
+ESTADO: ABIERTO
+REPETICIONES_TIPO: 1 (primera aparicion de TIPO_NORMALIZADO TESTS_ESCRIBEN_EN_DATOS_REALES en este archivo)
+MEMORIA_PERSISTENTE: No aplica (primera aparicion). Prevencion: las ejecuciones que no recorren un volumen no deben poder pasar por escaneos.
+---
+
+ERR-0056
+FECHA_HORA: 2026-11-21T15:20:00+01:00 Europe/Madrid
+UNIDAD: 3.8.6.13.2
+TIPO_NORMALIZADO: CAPTURA_MONITOR_EQUIVOCADO
+HERRAMIENTA_OPERACION: tests/eyes/capture/screen_capture/test_adaptive_capture_gui_real.py en Windows
+OBJETIVO: detectar la transicion al restaurar Notepad
+SINTOMA_SALIDA: "Se esperaba una transicion al restaurar Notepad".
+CAUSA (inferida del codigo): AdaptiveCapture crea DXcamCapture sin match_monitor(); cuando dxcam no tiene frame nuevo, el respaldo mss capturaba el monitor PRINCIPAL y no el vigilado. El test decia colocar Notepad en el secundario pero no lo movia.
+CORRECCION: screen_capture.py: el respaldo asocia la salida de dxcam a su monitor una vez y captura ese monitor (sin dxcam sigue el principal). El test mueve Notepad al monitor secundario y lo maximiza. Sin corregir (solo informado): dxcam da RGB de 3 canales y mss BGRA de 4; _frame_diff da 1.0 si cambia la forma.
+VERIFICACION: script con dxcam/mss falsos: el respaldo pide el monitor correcto. PENDIENTE en Windows.
+ESTADO: ABIERTO
+REPETICIONES_TIPO: 1 (primera aparicion de TIPO_NORMALIZADO CAPTURA_MONITOR_EQUIVOCADO en este archivo)
+MEMORIA_PERSISTENTE: No aplica (primera aparicion).
+---
+
+ERR-0057
+FECHA_HORA: 2026-11-21T15:20:00+01:00 Europe/Madrid
+UNIDAD: 3.8.6.13.2
+TIPO_NORMALIZADO: VENTANA_DE_PRUEBA_SIN_CERRAR
+HERRAMIENTA_OPERACION: no regresion tests/hands en Windows
+OBJETIVO: tests de Bloc de notas y Calculadora con instancia propia
+SINTOMA_SALIDA: test_apertura_aplicaciones_inocuas_entorno_real.py encontro Bloc de notas y Calculadora ya abiertos (SKIPPED, reutilizo la instancia); test_3_8_5_3_2 "RuntimeError not raised".
+CAUSA: en Windows 11 System32\notepad.exe es un stub que arranca el Notepad empaquetado (otro PID) y termina; test_aplicacion_ya_abierta_entorno_real.py cerraba solo el PID del stub y dejaba la ventana real abierta. test_3_8_5_3_2 daba por hecho que Notepad no pasaba el preflight, y cambios posteriores deliberados lo hacen resoluble.
+CORRECCION: limpieza con addCleanup (tambien si el test falla) que cierra solo lo creado por la prueba: ventanas nuevas frente a una instantanea de setUp, PIDs nuevos de Notepad y el stub. test_3_8_5_3_2 pasa a comprobar el objetivo de 3.8.5.3 (reutilizar la app abierta sin lanzar un proceso nuevo).
+VERIFICACION: py_compile OK. PENDIENTE en Windows.
+ESTADO: ABIERTO
+REPETICIONES_TIPO: 1 (primera aparicion de TIPO_NORMALIZADO VENTANA_DE_PRUEBA_SIN_CERRAR en este archivo)
+MEMORIA_PERSISTENTE: No aplica (primera aparicion).
 ---

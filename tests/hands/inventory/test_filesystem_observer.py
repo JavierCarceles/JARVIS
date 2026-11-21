@@ -5,15 +5,19 @@ Tests de contrato del observador opcional de cambios del sistema de archivos
 Verifican que el observador es una optimizacion opcional: reporta no disponible
 cuando `watchdog` no esta instalado, degrada de forma segura sin fallar el
 sistema, nunca toca la base de datos del inventario y su contrato de eventos
-es el esperado. Cuando `watchdog` no esta instalado (entorno actual), el
-camino real que se ejecuta es el de no disponibilidad; el camino con
-observador activo se simula mediante sustitucion de los componentes de
-watchdog para verificar el contrato de traduccion de eventos sin depender del
-paquete externo.
+es el esperado. `watchdog` figura en los requisitos y puede estar instalado
+o no: los tests no dependen del entorno. El camino de no disponibilidad se
+ejecuta cargando una copia real del modulo con el import de `watchdog`
+bloqueado (rama `except ImportError` de produccion); el camino con observador
+activo se simula mediante sustitucion de los componentes de watchdog para
+verificar el contrato de traduccion de eventos sin depender del paquete
+externo.
 """
 
 from __future__ import annotations
 
+import importlib.util
+import sys
 from dataclasses import FrozenInstanceError
 from pathlib import Path
 
@@ -72,30 +76,51 @@ def _simular_watchdog_disponible(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 # ---------------------------------------------------------------------------
-# No disponibilidad (camino real del entorno actual: watchdog no instalado).
+# No disponibilidad: watchdog ausente (import bloqueado, rama real de
+# produccion), con independencia de que este instalado en el equipo.
 # ---------------------------------------------------------------------------
 
-def test_observador_reporta_no_disponible_sin_watchdog():
-    """En el entorno actual watchdog no esta instalado, por lo que
-    is_available() debe ser False y el observador degrada de forma segura."""
-    assert FileSystemObserver.is_available() is False
+@pytest.fixture
+def fobs_sin_watchdog(monkeypatch: pytest.MonkeyPatch):
+    """Copia real del modulo cargada como si `watchdog` no estuviera
+    instalado: `sys.modules[...] = None` hace que `from watchdog... import`
+    levante ImportError y se ejecuta el `except ImportError` del modulo. El
+    modulo importado normalmente (`fobs`) no se modifica."""
+    for nombre in list(sys.modules):
+        if nombre == "watchdog" or nombre.startswith("watchdog."):
+            monkeypatch.delitem(sys.modules, nombre)
+    for nombre in ("watchdog", "watchdog.observers", "watchdog.events"):
+        monkeypatch.setitem(sys.modules, nombre, None)
+    nombre_copia = "_filesystem_observer_sin_watchdog"
+    spec = importlib.util.spec_from_file_location(nombre_copia, fobs.__file__)
+    modulo = importlib.util.module_from_spec(spec)
+    monkeypatch.setitem(sys.modules, nombre_copia, modulo)
+    spec.loader.exec_module(modulo)
+    return modulo
 
 
-def test_observador_sin_watchdog_no_puede_iniciarse_levanta_error():
+def test_observador_reporta_no_disponible_sin_watchdog(fobs_sin_watchdog):
+    """Sin watchdog instalado, is_available() es False y el observador
+    degrada de forma segura."""
+    assert fobs_sin_watchdog._WATCHDOG_AVAILABLE is False
+    assert fobs_sin_watchdog.FileSystemObserver.is_available() is False
+
+
+def test_observador_sin_watchdog_no_puede_iniciarse_levanta_error(fobs_sin_watchdog):
     """start() levanta ObserverUnavailableError cuando watchdog no esta
     disponible, sin dejar el observador en ejecucion."""
-    observador = FileSystemObserver(lambda evento: None)
+    observador = fobs_sin_watchdog.FileSystemObserver(lambda evento: None)
     assert observador.is_running is False
-    with pytest.raises(ObserverUnavailableError):
+    with pytest.raises(fobs_sin_watchdog.ObserverUnavailableError):
         observador.start("C:/Carpeta/Observada")
     assert observador.is_running is False
 
 
-def test_error_menciona_refresco_bajo_demanda_como_alternativa():
+def test_error_menciona_refresco_bajo_demanda_como_alternativa(fobs_sin_watchdog):
     """El error de no disponibilidad orienta al refresco bajo demanda, que no
     depende de observadores (3.8.5.1.4.5.6)."""
-    observador = FileSystemObserver(lambda evento: None)
-    with pytest.raises(ObserverUnavailableError) as exc:
+    observador = fobs_sin_watchdog.FileSystemObserver(lambda evento: None)
+    with pytest.raises(fobs_sin_watchdog.ObserverUnavailableError) as exc:
         observador.start("C:/Carpeta/Observada")
     mensaje = str(exc.value).lower()
     assert "refrescar_entrada_por_ruta" in mensaje or "refresco bajo demanda" in mensaje

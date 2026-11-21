@@ -59,6 +59,7 @@ from src.hands.inventory.system_inventory import (
     generate_machine_id,
 )
 from src.hands.inventory.system_inventory_storage import (
+    PREFIJO_SCAN_REGISTRO,
     SCAN_MODE_FULL,
     SCAN_RESULT_INTERRUPTED,
     SCAN_RESULT_OK,
@@ -1781,7 +1782,7 @@ class ApplicationDiscovery:
             return 0
         self.storage.connect()
         self.storage.record_machine(self.machine_id)
-        scan = scan_id or f"registro-{uuid.uuid4()}"
+        scan = scan_id or f"{PREFIJO_SCAN_REGISTRO}{uuid.uuid4()}"
         ahora = _ahora_iso()
         try:
             self.storage.begin_scan_run(

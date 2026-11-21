@@ -392,6 +392,26 @@ def _serialize_ui_element(element: "UIElement") -> Dict[str, Any]:
     return result
 
 
+def _app_aliases(app: ApplicationKnowledge) -> List[str]:
+    """Aliases dinamicos de ``metadata['aliases']`` como lista de cadenas."""
+    if app.metadata and isinstance(app.metadata, dict):
+        return [str(a) for a in (app.metadata.get("aliases") or [])]
+    return []
+
+
+def _same_persisted_content(entity: Entity, entity_data: Dict[str, Any]) -> bool:
+    """True si la entidad guardada tiene el mismo contenido que ``entity_data``
+    (se ignoran ``created_at``, ``updated_at`` y ``metadata``)."""
+    return (
+        entity.type == entity_data.get("type")
+        and entity.name == entity_data.get("name")
+        and (entity.properties or {}) == entity_data.get("properties")
+        and list(entity.aliases or []) == list(entity_data.get("aliases") or [])
+        and list(entity.tags or []) == list(entity_data.get("tags") or [])
+        and float(entity.confidence) == float(entity_data.get("confidence", 1.0))
+    )
+
+
 class ApplicationManager:
     """Gestor del conocimiento estructurado de aplicaciones."""
 
@@ -550,62 +570,95 @@ class ApplicationManager:
         """Registra una aplicacion en memoria y en el gestor.
 
         Evita duplicados: si la aplicacion ya esta registrada en el gestor
-        (por nombre normalizado), se actualizan sus aliases en memoria y se
-        persiste la entidad en ``entities.json`` para que las resoluciones
-        posteriores por alias dinamico sigan funcionando, en lugar de omitir
-        silenciosamente la actualizacion. Se devuelve ``True`` cuando la
-        aplicacion se registra o se actualiza correctamente.
+        (por nombre normalizado), no se sobrescribe y se devuelve ``False``,
+        igual que ``_load_custom_applications``, que tambien omite las
+        aplicaciones ya registradas. Si el duplicado trae aliases nuevos
+        (``metadata['aliases']``), se anaden a la aplicacion ya registrada y se
+        persiste la entidad de ESA aplicacion (no la del duplicado), para que
+        ``_resolve_alias`` los vea en ejecuciones posteriores. Devuelve
+        ``True`` cuando la aplicacion nueva queda registrada.
+
+        Al persistir ``app_<clave>`` en ``entities.json`` se conserva el
+        ``created_at`` de la entidad que ya estuviera guardada, y si su
+        contenido no cambia no se reescribe el fichero: arrancar el gestor
+        (que registra Chrome y Spotify) no modifica ``entities.json`` en cada
+        inicio.
         """
         try:
             key = self._normalize_name(app.name)
-            aliases = []
-            if app.metadata and isinstance(app.metadata, dict):
-                aliases = [str(a) for a in (app.metadata.get("aliases") or [])]
-
-            entity_data = {
-                "id": f"app_{key}",
-                "type": "application",
-                "name": app.name,
-                "properties": {
-                    "type": app.type,
-                    "executable": app.executable,
-                    "url": app.url,
-                    "login_required": app.login_required,
-                    "capabilities": [cap.capability.value for cap in app.capabilities],
-                    "ui_elements": [_serialize_ui_element(e) for e in app.ui_elements],
-                    "states": [s.value for s in app.states],
-                },
-                "aliases": aliases,
-                "confidence": 1.0,
-                "tags": [],
-            }
-
             if key in self.applications:
-                # Aplicacion ya registrada: refrescar los aliases en memoria y
-                # persistirlos para que _resolve_alias los vea en ejecuciones
-                # posteriores sin depender de entidades previas con aliases
-                # vacios en disco.
                 existing = self.applications[key]
-                if existing.metadata is None:
+                nuevos = self._aliases_nuevos(existing, _app_aliases(app))
+                if not nuevos:
+                    logger.info("Aplicacion '%s' ya registrada; se omite el duplicado", key)
+                    return False
+                if not isinstance(existing.metadata, dict):
                     existing.metadata = {}
-                existing.metadata["aliases"] = aliases
-                try:
-                    self.memory_manager.save_entity(Entity.from_dict(entity_data))
-                except Exception:
-                    # La entidad ya existe en disco; guardar la versione
-                    # actualizada es el camino preferido pero no bloquea el
-                    # registro en memoria si el almacenamiento falla.
-                    pass
-                logger.info(f"Aplicacion '{key}' ya registrada, aliases actualizados "
-                    "")
-                return True
+                existing.metadata["aliases"] = _app_aliases(existing) + nuevos
+                logger.info(
+                    "Aplicacion '%s' ya registrada; se omite el duplicado y se anaden sus aliases %s",
+                    key, nuevos,
+                )
+                self._persist_application(key, existing)
+                return False
 
-            self.memory_manager.save_entity(Entity.from_dict(entity_data))
+            self._persist_application(key, app)
             self.applications[key] = app
             return True
         except Exception as exc:
             logger.info(f"Error procesando solicitud: {str(exc)}")
             return False
+
+    @staticmethod
+    def _aliases_nuevos(existing: ApplicationKnowledge, aliases: List[str]) -> List[str]:
+        """Aliases de ``aliases`` que la aplicacion registrada aun no tiene."""
+        vistos = {a.casefold() for a in _app_aliases(existing)}
+        nuevos: List[str] = []
+        for alias in aliases:
+            if alias.casefold() not in vistos:
+                vistos.add(alias.casefold())
+                nuevos.append(alias)
+        return nuevos
+
+    def _persist_application(self, key: str, app: ApplicationKnowledge) -> None:
+        """Guarda ``app_<clave>`` en memoria conservando ``created_at`` y sin
+        reescribir ``entities.json`` si el contenido guardado ya es el mismo."""
+        entity_data = {
+            "id": f"app_{key}",
+            "type": "application",
+            "name": app.name,
+            "properties": {
+                "type": app.type,
+                "executable": app.executable,
+                "url": app.url,
+                "login_required": app.login_required,
+                "capabilities": [cap.capability.value for cap in app.capabilities],
+                "ui_elements": [_serialize_ui_element(e) for e in app.ui_elements],
+                "states": [s.value for s in app.states],
+            },
+            "aliases": _app_aliases(app),
+            "confidence": 1.0,
+            "tags": [],
+        }
+        previa = self._persisted_app_entity(entity_data["id"])
+        if previa is not None and _same_persisted_content(previa, entity_data):
+            return
+        if previa is not None and previa.created_at:
+            entity_data["created_at"] = previa.created_at
+        self.memory_manager.save_entity(Entity.from_dict(entity_data))
+
+    def _persisted_app_entity(self, entity_id: str) -> Optional[Entity]:
+        """Entidad ya guardada con ese id, o None (tambien si el gestor de
+        memoria no permite consultarla)."""
+        get_entity = getattr(self.memory_manager, "get_entity", None)
+        if not callable(get_entity):
+            return None
+        try:
+            previa = get_entity(entity_id)
+        except Exception as exc:
+            logger.debug("No se pudo leer la entidad previa %s: %s", entity_id, exc)
+            return None
+        return previa if isinstance(previa, Entity) else None
 
     def register_discovered_application(
         self,

@@ -795,6 +795,9 @@ class TestDomainMemoryWithIncompleteData:
 # ---------------------------------------------------------------------------
 # 8. Error logging verification (3.2.3.3)
 # ---------------------------------------------------------------------------
+# logging_habilitado (tests/conftest.py): otros modulos de la suite llaman a
+# logging.disable(CRITICAL) al importarse; sin el, caplog no recibe nada.
+@pytest.mark.usefixtures("logging_habilitado")
 class TestErrorLoggingDuringLoad:
     """Verifica que los errores de carga se registran con detalle y sin
     ocultar la excepcion (unidad 3.2.3.3).
@@ -985,13 +988,16 @@ class TestErrorLoggingDuringLoad:
     # --- save_entity: exception -> ERROR with exception text ---
     def test_save_entity_exception_logs_error_with_exception(self, tmp_path, caplog):
         """save_entity con file permission error -> ERROR que incluye el
-        tipo de excepcion."""
-        from src.memory.storage import MemoryType
+        tipo de excepcion.
+
+        save_entity escribe entities.json de forma atomica (fichero temporal +
+        os.replace), no con JSONStorage.save: el fallo del disco se simula en
+        ese reemplazo final."""
         mm = MemoryManager(tmp_path)
         caplog.set_level(logging.ERROR)
 
-        with patch.object(
-            mm.storage, "save",
+        with patch(
+            "src.memory.storage.os.replace",
             side_effect=OSError("disk full"),
         ):
             result = mm.save_entity(Entity(
@@ -999,6 +1005,13 @@ class TestErrorLoggingDuringLoad:
                 created_at="2024-01-01T00:00:00", updated_at="2024-01-01T00:00:00",
             ))
             assert result is False
+
+        # La entidad no guardada no aparece ni en disco ni en la cache.
+        assert mm.get_entity("test_ent") is None
+        entities_path = tmp_path / "entities.json"
+        if entities_path.exists():
+            assert "test_ent" not in entities_path.read_text(encoding="utf-8")
+        assert not list(tmp_path.glob("entities.json.*.tmp"))
 
         errors = [r for r in caplog.records if r.levelno == logging.ERROR]
         assert len(errors) >= 1
