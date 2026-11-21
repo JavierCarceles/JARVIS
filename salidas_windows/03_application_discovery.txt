@@ -1,0 +1,180 @@
+============================= test session starts =============================
+platform win32 -- Python 3.14.7, pytest-9.1.1, pluggy-1.6.0 -- C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS
+plugins: anyio-4.15.1, cov-7.1.0
+collecting ... collected 134 items
+
+tests/hands/apps/application_discovery/test_application_discovery.py::TestDiscoveredCandidate::test_from_classification_mapea_campos PASSED [  0%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestDiscoveredCandidate::test_to_dict_contiene_metadatos_descubrimiento PASSED [  1%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestDiscoveredCandidateCampos76::test_from_classification_mapea_todos_los_campos_76 PASSED [  2%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestDiscoveredCandidateCampos76::test_to_dict_serializa_todos_los_campos_76 PASSED [  2%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestRegistrarCandidatos::test_registra_y_recupera_candidatos PASSED [  3%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestApplicationDiscoveryInit::test_crea_instancias_reales_por_defecto PASSED [  4%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestApplicationDiscoveryInit::test_acepta_dependencias_inyectadas PASSED [  5%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestFuentesPrimarias::test_menu_aplicaciones_start_menu PASSED [  5%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestFuentesPrimarias::test_paquetes_appx PASSED [  6%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestFuentesPrimarias::test_registro_desinstaladores PASSED [  7%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestFuentesPrimarias::test_fuentes_primarias_tiene_orden_esperado PASSED [  8%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestFuentesPrimarias::test_fallo_fuente_calibration_no_interrumpe PASSED [  8%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestPrioridadFallback::test_descubrir_todos_incluir_inventario_false_no_consulta_inventario PASSED [  9%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestPrioridadFallback::test_buscar_por_nombre_encontrado_en_primarias_no_consulta_inventario PASSED [ 10%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestPrioridadFallback::test_buscar_por_nombre_faltante_consulta_inventario PASSED [ 11%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestPrioridadFallback::test_buscar_por_nombre_faltante_sin_inventario_retorna_vacio PASSED [ 11%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestPrioridadFallback::test_buscar_por_nombre_vacio_retorna_vacio PASSED [ 12%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestClasificacionValidacion::test_clasifica_ejecutivo_real_lanzable PASSED [ 13%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestClasificacionValidacion::test_clasifica_herramienta_cli_real PASSED [ 14%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestClasificacionValidacion::test_uri_aplicacion_admitida_sin_lanzar PASSED [ 14%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestClasificacionValidacion::test_solo_extension_exe_no_asume_lanzable PASSED [ 15%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestClasificacionValidacion::test_todo_candidato_con_destino_tiene_preflight_decision PASSED [ 16%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestDeduplicacion::test_mismo_destino_dos_fuentes_queda_uno_con_mayor_prioridad PASSED [ 17%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestDeduplicacion::test_rutas_distintas_se_conservan_todas PASSED [ 17%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestCandidatosLanzables::test_solo_retorna_lanzables PASSED [ 18%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestAmbiguedadDesambiguacion::test_varios_candidatos_plausibles_no_se_elige_silenciosamente PASSED [ 19%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestAmbiguedadDesambiguacion::test_un_solo_candidato_no_es_ambiguo FAILED [ 20%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestAmbiguedadDesambiguacion::test_sin_candidatos_no_es_ambiguo PASSED [ 20%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestAmbiguedadDesambiguacion::test_evaluar_ambiguedad_varios_inventario_es_ambiguo PASSED [ 21%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestAmbiguedadDesambiguacion::test_evaluar_ambiguedad_fuente_autoritaria_unica_no_es_ambigua PASSED [ 22%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestAmbiguedadDesambiguacion::test_evaluar_ambiguedad_varias_fuentes_autoritativas_es_ambigua PASSED [ 23%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestAmbiguedadDesambiguacion::test_resultado_resolucion_to_dict PASSED [ 23%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestAmbiguedadAlmacenamientoReal::test_dos_entradas_inventario_mismo_nombre_son_alternativas_ambiguas PASSED [ 24%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestDeduplicarPorDestinoReal::test_mismo_destino_ruta_queda_uno PASSED [ 25%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestDeduplicarPorDestinoReal::test_rutas_distintas_se_conservan_todas PASSED [ 26%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestDeduplicarPorDestinoReal::test_mismo_uri_se_deduplica PASSED [ 26%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestDeduplicarPorDestinoReal::test_mismo_uri_lanzador_se_deduplica PASSED [ 27%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestDeduplicarPorDestinoReal::test_uris_lanzador_distintas_se_conservan PASSED [ 28%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestDeduplicarPorDestinoReal::test_sin_destino_va_a_sueltos PASSED [ 29%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestDeduplicarPorDestinoReal::test_ordena_por_confianza_descendente PASSED [ 29%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestSeparacionCatalogoDinamicoEntitiesJson::test_registrar_candidatos_no_modifica_entities_json PASSED [ 30%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestSeparacionCatalogoDinamicoEntitiesJson::test_flujo_descubrir_y_registrar_respeta_entidades_originales PASSED [ 31%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestSeparacionCatalogoDinamicoEntitiesJson::test_esquema_entities_json_invariante_siete_entidades PASSED [ 32%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestInventarioComplementoAlmacenamientoReal::test_buscar_por_nombre_con_inventario_real_encuentra_candidatos PASSED [ 32%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestEstadoVigenteRutasInaccesibles::test_excluye_candidato_inventario_ruta_eliminada_y_actualiza_estado PASSED [ 33%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestEstadoVigenteRutasInaccesibles::test_ruta_vigente_se_devuelve_con_disponible_true PASSED [ 34%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestEstadoVigenteRutasInaccesibles::test_ruta_uri_no_se_descarta_por_no_existir_como_archivo PASSED [ 35%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestEstadoVigenteRutasInaccesibles::test_re_resolucion_con_fuentes_vigentes_descarta_la_obsoleta PASSED [ 35%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestEstadoVigenteRutasInaccesibles::test_inventario_real_ruta_eliminada_excluida_estado_persistido PASSED [ 36%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestAislamientoInventarioPorEquipo::test_inventario_de_otro_equipo_no_se_consulta PASSED [ 37%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestAislamientoInventarioPorEquipo::test_misma_maquina_inventario_utilizable PASSED [ 38%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestAislamientoInventarioPorEquipo::test_inventario_copiado_a_otro_equipo_no_se_usa_entorno_real PASSED [ 38%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestVinculacionCatalogo::test_vinculacion_encuentra_conocimiento_por_nombre_tal_cual PASSED [ 39%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestVinculacionCatalogo::test_vinculacion_no_encuentra_conocimiento_desconocido PASSED [ 40%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestVinculacionCatalogo::test_vinculacion_preserva_fuente_autoritaria PASSED [ 41%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestVinculacionCatalogo::test_vinculacion_coincide_por_stem_ejecutivo_sin_extension PASSED [ 41%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestVinculacionCatalogo::test_vinculacion_no_modifica_entities_json_memoria PASSED [ 42%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestVinculacionCatalogo::test_buscar_por_nombre_con_catalogo_devuelve_tupla_ordenada PASSED [ 43%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestVinculacionCatalogoEntornoReal::test_catalogo_real_reconoce_notepad_desde_inventario PASSED [ 44%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestVinculacionCatalogoEntornoReal::test_catalogo_real_no_encuentra_desconocido PASSED [ 44%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestVinculacionCatalogoEntornoReal::test_buscar_por_nombre_con_catalogo_flujo_real PASSED [ 45%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestPreflightPoliticaCompleta::test_ejecutar_preflight_uri_admitida_esta_autorizado PASSED [ 46%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestPreflightPoliticaCompleta::test_ejecutar_preflight_bloquea_nombre_administrativo PASSED [ 47%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestPreflightPoliticaCompleta::test_ejecutar_preflight_bloquea_app_id_administrativo PASSED [ 47%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestPreflightPoliticaCompleta::test_filtrar_por_preflight_policy_retorna_solo_autorizados PASSED [ 48%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestPreflightPoliticaCompleta::test_to_dict_incluye_preflight_policy PASSED [ 49%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestPreflightPoliticaCompleta::test_candidato_sin_destino_tiene_preflight_policy_no_autorizado PASSED [ 50%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestPreflightPoliticaEntornoReal::test_buscar_por_nombre_con_preflight_policy_real_notepad PASSED [ 50%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestPreflightPoliticaEntornoReal::test_buscar_por_nombre_con_preflight_policy_real_cmd PASSED [ 51%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestIntegracionCatalogoDescubierto::test_app_registrada_vinculada_al_catalogo_global_con_preflight PASSED [ 52%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestIntegracionCatalogoDescubierto::test_app_descubierta_no_registrada_sin_vinculo_al_catalogo PASSED [ 52%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestIntegracionCatalogoDescubierto::test_nombre_registrado_no_es_ambiguo_tiene_fuente_autoritativa PASSED [ 53%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestSinRutasParalelasPlannerExecutor::test_modulo_application_discovery_sin_imports_brain_planner_executor PASSED [ 54%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestSinRutasParalelasPlannerExecutor::test_flujo_resolucion_solo_usa_contratos_verificados PASSED [ 55%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestResolucionPreflightEntornoReal::test_aplicacion_conocida_resolucion_preflight_entorno_real PASSED [ 55%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestResolucionPreflightEntornoReal::test_aplicacion_inventario_no_registrada_resolucion_preflight_entorno_real PASSED [ 56%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestEscenariosBloqueoEntornoReal::test_ruta_obsoleta_bloqueada_sin_lanzar PASSED [ 57%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestEscenariosBloqueoEntornoReal::test_volumen_desmontado_bloqueado_y_revalidado PASSED [ 58%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestEscenariosBloqueoEntornoReal::test_coincidencia_ambigua_devuelta_para_aclaracion PASSED [ 58%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestIdentidadGlobalEstable::test_3_8_5_1_4_11_2_identidad_desde_paquete_id PASSED [ 59%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestIdentidadGlobalEstable::test_3_8_5_1_4_11_2_identidad_desde_fabricante_producto_independiente_de_ruta PASSED [ 60%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestIdentidadGlobalEstable::test_identidad_distingue_ejecutables_del_mismo_producto PASSED [ 61%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestIdentidadGlobalEstable::test_identidad_no_depende_del_idioma_del_producto PASSED [ 61%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestIdentidadGlobalEstable::test_identidad_paquete_desde_app_id_del_menu_inicio PASSED [ 62%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestIdentidadGlobalEstable::test_identidad_fabricante_producto_sin_ejecutable PASSED [ 63%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestIdentidadGlobalEstable::test_3_8_5_1_4_11_2_nombre_comercial_solo_no_fusiona_por_nombre PASSED [ 64%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestIdentidadGlobalEstable::test_3_8_5_1_4_11_2_evidencia_insuficiente_mantiene_candidato_separado PASSED [ 64%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestIdentidadGlobalEstable::test_3_8_5_1_4_11_2_ruta_absoluta_no_es_base_de_identidad PASSED [ 65%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestIdentidadGlobalEstable::test_3_8_5_1_4_11_2_precedencia_paquete_sobre_fabricante_producto PASSED [ 66%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestIdentidadGlobalEstable::test_3_8_5_1_4_11_2_evidencia_base_contiene_metadatos_verificables PASSED [ 67%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestIdentidadGlobalEstable::test_3_8_5_1_4_11_2_mismo_candidato_devuelve_misma_identidad PASSED [ 67%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestIdentidadGlobalEstable::test_3_8_5_1_4_11_2_entity_id_aptos_para_modelo_entity PASSED [ 68%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestRegistroMinimoAplicacion::test_3_8_5_1_4_11_3_registro_minimo_todos_los_campos_requeridos PASSED [ 69%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestRegistroMinimoAplicacion::test_3_8_5_1_4_11_3_entity_id_estable_sin_ruta_absoluta PASSED [ 70%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestRegistroMinimoAplicacion::test_3_8_5_1_4_11_3_paquete_uri_sin_exe_conserva_destino_nativo PASSED [ 70%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestRegistroMinimoAplicacion::test_3_8_5_1_4_11_3_no_inventa_capacidades PASSED [ 71%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestRegistroMinimoAplicacion::test_3_8_5_1_4_11_3_categoria_rol_desde_subtipo_real PASSED [ 72%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestRegistroMinimoAplicacion::test_3_8_5_1_4_11_3_estado_available_con_fecha_fuente_evidencia PASSED [ 73%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestRegistroMinimoAplicacion::test_3_8_5_1_4_11_3_registro_a_dict_entidad_compatible PASSED [ 73%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestRegistroMinimoAplicacion::test_3_8_5_1_4_11_3_validacion_rechaza_campos_faltantes PASSED [ 74%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestRegistroMinimoAplicacion::test_3_8_5_1_4_11_3_destino_no_observable_estado_no_disponible PASSED [ 75%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestRegistroMinimoAplicacion::test_paquete_con_aumid_sin_ruta_es_disponible PASSED [ 76%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestRegistroMinimoAplicacion::test_paquete_con_aumid_en_evidencia_es_disponible PASSED [ 76%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestRegistroMinimoAplicacion::test_paquete_sin_aumid_no_es_disponible PASSED [ 77%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestRegistroMinimoAplicacion::test_ejecutable_con_app_id_no_cuenta_como_paquete PASSED [ 78%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestRegistroMinimoAplicacion::test_3_8_5_1_4_11_3_identidad_real_de_notepad_sin_ruta_en_id PASSED [ 79%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestAutoRegistroDescubiertos::test_3_8_5_1_4_11_4_registra_accesibles_sin_filtro_gui PASSED [ 79%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestAutoRegistroDescubiertos::test_3_8_5_1_4_11_4_upsert_no_duplica_al_repetir PASSED [ 80%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestAutoRegistroDescubiertos::test_3_8_5_1_4_11_4_preserva_entidades_preexistentes PASSED [ 81%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestAutoRegistroDescubiertos::test_3_8_5_1_4_11_4_json_corrupto_no_vacia_catalogo PASSED [ 82%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestAutoRegistroDescubiertos::test_3_8_5_1_4_11_4_integracion_notepad_real PASSED [ 82%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestAutoRegistroCandidatosInventario::test_registra_candidatos_inventario_preserva_entidades_preexistentes PASSED [ 83%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestAutoRegistroCandidatosInventario::test_inventario_bloqueado_otro_equipo_no_registra PASSED [ 84%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestAutoRegistroCandidatosInventario::test_inventario_no_poblado_maquina_nueva_no_verificado PASSED [ 85%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestAutoRegistroCandidatosInventario::test_importacion_parcial_no_marca_desaparecidas PASSED [ 85%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestAutoRegistroCandidatosInventario::test_upsert_idempotente_no_duplica PASSED [ 86%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestAutoRegistroCandidatosInventario::test_integracion_notepad_real_sin_lanzar PASSED [ 87%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestResolucionAplicacionPorNombre::test_116_resolver_en_catalogo_con_ruta_sqlite_valida PASSED [ 88%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestResolucionAplicacionPorNombre::test_116_resolver_no_en_catalogo_sino_en_sqlite_auto_registra PASSED [ 88%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestResolucionAplicacionPorNombre::test_116_resolver_no_en_catalogo_no_en_sqlite_retorna_none PASSED [ 89%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestResolucionAplicacionPorNombre::test_116_resolver_en_catalogo_sin_ruta_valida_sqlite_retorna_none PASSED [ 90%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestResolucionAplicacionPorNombre::test_116_resolver_ruta_inexistente_en_sqlite_se_salta PASSED [ 91%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestResolucionAplicacionPorNombre::test_116_buscar_candidatos_registrados_filtro_nombre PASSED [ 91%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestResolucionAplicacionPorNombreConDesambiguacion::test_117_varios_destinos_locales_ambiguos_mantiene_alternativas PASSED [ 92%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestResolucionAplicacionPorNombreConDesambiguacion::test_117_un_destino_valido_retorna_unico_sin_ambiguedad PASSED [ 93%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestResolucionAplicacionPorNombreConDesambiguacion::test_117_app_en_catalogo_fuente_autoritaria_es_catalogo PASSED [ 94%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestResolucionAplicacionPorNombreConDesambiguacion::test_117_candidato_sin_preflight_valido_se_excluye PASSED [ 94%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestResolucionAplicacionPorNombreConDesambiguacion::test_117_no_encontrado_retorna_vacio PASSED [ 95%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestResolucionAplicacionPorNombreConDesambiguacion::test_117_auto_registra_en_entities_json_cuando_no_esta_en_catalogo PASSED [ 96%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestBusquedaPorNombreSinTruncar::test_sin_filtro_el_limite_deja_fuera_la_aplicacion PASSED [ 97%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestBusquedaPorNombreSinTruncar::test_con_filtro_la_aplicacion_entra_aunque_este_al_final PASSED [ 97%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestBusquedaPorNombreSinTruncar::test_buscar_por_nombre_filtra_el_inventario_en_la_consulta PASSED [ 98%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestBusquedaPorNombreSinTruncar::test_inventario_descarta_el_almacen_de_componentes PASSED [ 99%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestSemanticaPath::test_copia_posterior_en_path_no_es_alternativa PASSED [100%]
+
+================================== FAILURES ===================================
+______ TestAmbiguedadDesambiguacion.test_un_solo_candidato_no_es_ambiguo ______
+
+self = <test_application_discovery.TestAmbiguedadDesambiguacion object at 0x0000023147D3A210>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000002314617DCD0>
+
+    def test_un_solo_candidato_no_es_ambiguo(self, monkeypatch):
+        notepad = r"C:\Windows\System32\notepad.exe"
+        if not os.path.exists(notepad):
+            pytest.skip("notepad.exe no disponible en este equipo")
+        # Solo la fuente mockeada: el PATH y los App Paths reales del equipo
+        # aportan en Windows 11 otra copia del mismo programa (WindowsApps).
+        monkeypatch.setenv("PATH", "")
+        if os.name == "nt":
+            import winreg
+    
+            def _sin_app_paths(*_args, **_kwargs):
+                raise OSError("App Paths aislado en este test")
+    
+            monkeypatch.setattr(winreg, "OpenKey", _sin_app_paths)
+        descub, _, _ = _discovery_con_mocks(
+            calib_apps=[_app("Notepad", notepad, FUENTE_START_MENU)]
+        )
+        resultado = descub.buscar_por_nombre_con_desambiguacion("notepad")
+    
+        assert resultado.ambiguo is False
+        assert resultado.requiere_desambiguacion is False
+        assert resultado.motivo_ambiguedad is None
+        assert resultado.alternativas == []
+>       assert len(resultado.candidatos) == 1
+E       AssertionError: assert 2 == 1
+E        +  where 2 = len([DiscoveredCandidate(candidate_id='C:\\Windows\\System32\\notepad.exe', name='Notepad', nombre_comercial='Bloc de notas', aliases=['Notepad', 'Bloc de notas', 'Microsoft Corporation'], absolute_path='C:\\Windows\\System32\\notepad.exe', destination='C:\\Windows\\System32\\notepad.exe', volume='C:', launch_type='ejecutable', launch_subtype='gui_aplicacion', es_lanzable=True, evidencia=['version_recurso_leida', 'archivo_ejecutable_existente', 'version_recurso_leida', 'ubicacion_de_instalacion_real'], confianza='alta', version='10.0.26100.9949', producto='Sistema operativo Microsoft® Windows®', fuente='start_menu', ultima_comprobacion='2026-11-21T11:37:09.870048+00:00', razon='tipo=ejecutable; subtipo=gui_aplicacion; lanzable=si; confianza=alta; evidencia=version_recurso_leida,archivo_ejecutable_existente,version_recurso_leida,ubicacion_de_instalacion_real', requiere_preflight=True, advertencias=[], app_id=None, destino_original='C:\\Windows\\System32\\notepad.exe', fuentes_consultadas=['catalogo_conocido', 'start_menu'], esta_en_inventario=False, preflight_decision={'valid': True, 'launch_type': 'ejecutable', 'destination': 'C:\\Windows\\System32\\notepad.exe', 'reason': 'Ejecutabl...we\\notepad.exe', 'requires_elevation': False, 'confidence': 'medium', 'availability': 'available', 'login_required': None, 'logged_in': None, 'resources_available': None, 'blocked_by': None}, disponible=True), DiscoveredCandidate(candidate_id='notepad.exe', name='Bloc de notas', nombre_comercial=None, aliases=[], absolute_path=None, destination=None, volume=None, launch_type=None, launch_subtype='desconocido', es_lanzable=False, evidencia=['destino_vacio'], confianza='ninguna', version=None, producto=None, fuente='catalogo_conocido', ultima_comprobacion='2026-11-21T11:37:09.919783+00:00', razon='El candidato no tiene destino de lanzamiento.', requiere_preflight=True, advertencias=[], app_id=None, destino_original=None, fuentes_consultadas=['catalogo_conocido', 'start_menu'], esta_en_inventario=False, preflight_decision=None, preflight_policy={'allowed': False, 'reason': 'No se pudo resolver el ejecutable y no hay destino de lanzamiento verificable', 'executable_path': None, 'requires_elevation': False, 'confidence': 'high', 'availability': 'unknown', 'login_required': None, 'logged_in': None, 'resources_available': None, 'blocked_by': 'executable_not_resolved'}, disponible=True)])
+E        +    where [DiscoveredCandidate(candidate_id='C:\\Windows\\System32\\notepad.exe', name='Notepad', nombre_comercial='Bloc de notas', aliases=['Notepad', 'Bloc de notas', 'Microsoft Corporation'], absolute_path='C:\\Windows\\System32\\notepad.exe', destination='C:\\Windows\\System32\\notepad.exe', volume='C:', launch_type='ejecutable', launch_subtype='gui_aplicacion', es_lanzable=True, evidencia=['version_recurso_leida', 'archivo_ejecutable_existente', 'version_recurso_leida', 'ubicacion_de_instalacion_real'], confianza='alta', version='10.0.26100.9949', producto='Sistema operativo Microsoft® Windows®', fuente='start_menu', ultima_comprobacion='2026-11-21T11:37:09.870048+00:00', razon='tipo=ejecutable; subtipo=gui_aplicacion; lanzable=si; confianza=alta; evidencia=version_recurso_leida,archivo_ejecutable_existente,version_recurso_leida,ubicacion_de_instalacion_real', requiere_preflight=True, advertencias=[], app_id=None, destino_original='C:\\Windows\\System32\\notepad.exe', fuentes_consultadas=['catalogo_conocido', 'start_menu'], esta_en_inventario=False, preflight_decision={'valid': True, 'launch_type': 'ejecutable', 'destination': 'C:\\Windows\\System32\\notepad.exe', 'reason': 'Ejecutabl...we\\notepad.exe', 'requires_elevation': False, 'confidence': 'medium', 'availability': 'available', 'login_required': None, 'logged_in': None, 'resources_available': None, 'blocked_by': None}, disponible=True), DiscoveredCandidate(candidate_id='notepad.exe', name='Bloc de notas', nombre_comercial=None, aliases=[], absolute_path=None, destination=None, volume=None, launch_type=None, launch_subtype='desconocido', es_lanzable=False, evidencia=['destino_vacio'], confianza='ninguna', version=None, producto=None, fuente='catalogo_conocido', ultima_comprobacion='2026-11-21T11:37:09.919783+00:00', razon='El candidato no tiene destino de lanzamiento.', requiere_preflight=True, advertencias=[], app_id=None, destino_original=None, fuentes_consultadas=['catalogo_conocido', 'start_menu'], esta_en_inventario=False, preflight_decision=None, preflight_policy={'allowed': False, 'reason': 'No se pudo resolver el ejecutable y no hay destino de lanzamiento verificable', 'executable_path': None, 'requires_elevation': False, 'confidence': 'high', 'availability': 'unknown', 'login_required': None, 'logged_in': None, 'resources_available': None, 'blocked_by': 'executable_not_resolved'}, disponible=True)] = ResultadoResolucionCandidatos(candidatos=[DiscoveredCandidate(candidate_id='C:\\Windows\\System32\\notepad.exe', name='Notepad', nombre_comercial='Bloc de notas', aliases=['Notepad', 'Bloc de notas', 'Microsoft Corporation'], absolute_path='C:\\Windows\\System32\\notepad.exe', destination='C:\\Windows\\System32\\notepad.exe', volume='C:', launch_type='ejecutable', launch_subtype='gui_aplicacion', es_lanzable=True, evidencia=['version_recurso_leida', 'archivo_ejecutable_existente', 'version_recurso_leida', 'ubicacion_de_instalacion_real'], confianza='alta', version='10.0.26100.9949', producto='Sistema operativo Microsoft® Windows®', fuente='start_menu', ultima_comprobacion='2026-11-21T11:37:09.870048+00:00', razon='tipo=ejecutable; subtipo=gui_aplicacion; lanzable=si; confianza=alta; evidencia=version_recurso_leida,archivo_ejecutable_existente,version_recurso_leida,ubicacion_de_instalacion_real', requiere_preflight=True, advertencias=[], app_id=None, destino_original='C:\\Windows\\System32\\notepad.exe', fuentes_consultadas=['catalogo_conocido', 'start_menu'], esta_en_inventario=False, preflight_decision={'valid': True, 'launch_type': 'ejecutable', 'destination': 'C:\\Windows\\Sys...ged_in': None, 'resources_available': None, 'blocked_by': None}, disponible=True), DiscoveredCandidate(candidate_id='notepad.exe', name='Bloc de notas', nombre_comercial=None, aliases=[], absolute_path=None, destination=None, volume=None, launch_type=None, launch_subtype='desconocido', es_lanzable=False, evidencia=['destino_vacio'], confianza='ninguna', version=None, producto=None, fuente='catalogo_conocido', ultima_comprobacion='2026-11-21T11:37:09.919783+00:00', razon='El candidato no tiene destino de lanzamiento.', requiere_preflight=True, advertencias=[], app_id=None, destino_original=None, fuentes_consultadas=['catalogo_conocido', 'start_menu'], esta_en_inventario=False, preflight_decision=None, preflight_policy={'allowed': False, 'reason': 'No se pudo resolver el ejecutable y no hay destino de lanzamiento verificable', 'executable_path': None, 'requires_elevation': False, 'confidence': 'high', 'availability': 'unknown', 'login_required': None, 'logged_in': None, 'resources_available': None, 'blocked_by': 'executable_not_resolved'}, disponible=True)], ambiguo=False, motivo_ambiguedad=None, alternativas=[], requiere_desambiguacion=False, fuente_autoritaria='catalogo_conocido').candidatos
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\application_discovery\test_application_discovery.py:680: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/hands/apps/application_discovery/test_application_discovery.py::TestAmbiguedadDesambiguacion::test_un_solo_candidato_no_es_ambiguo
+================== 1 failed, 133 passed in 352.82s (0:05:52) ==================

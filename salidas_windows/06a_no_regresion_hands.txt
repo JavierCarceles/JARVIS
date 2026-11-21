@@ -1,0 +1,2191 @@
+........................................................................ [  1%]
+........................................................................ [  3%]
+........................................................................ [  4%]
+........................................................................ [  6%]
+........................................................................ [  7%]
+........................................................................ [  9%]
+...........F............................................................ [ 10%]
+........................................................................ [ 12%]
+........FF..F........................................................... [ 13%]
+...........F.................s............s............................. [ 15%]
+.......F................................................................ [ 16%]
+..............................................................F.......F.......F........................................................... [ 19%]
+....................................................FF.F................ [ 21%]
+........................................F............................... [ 22%]
+...................................FF....F.............................. [ 24%]
+..................................F..................................... [ 25%]
+........................................................................ [ 27%]
+........................................................................ [ 29%]
+........................................................FFFFF.F.FF...F.. [ 30%]
+....F.FF........................................................F....... [ 32%]
+........................................................................ [ 33%]
+.................F...................................................... [ 35%]
+........................................................................ [ 36%]
+..................................................................F.FF.. [ 38%]
+.................F.....F...................................FFFF......... [ 39%]
+........................................................................ [ 41%]
+............................................F.F......FFFF...... [ 42%]
+...................................................................... [ 44%]
+........F..s...s........................................................ [ 45%]
+........................................................................ [ 47%]
+..........................F.F......................................... [ 48%]
+........................................................................ [ 50%]
+........................................................................ [ 51%]
+........................................................................ [ 53%]
+........................................................................ [ 54%]
+........................................................................ [ 56%]
+................................................................ [ 57%]
+........................FFFFFF.F.FFF.................................... [ 59%]
+........................................................................ [ 60%]
+........................................................................ [ 62%]
+........................................................................ [ 63%]
+........................................................................ [ 65%]
+........................................................................ [ 66%]
+....................................FFFF................................ [ 68%]
+........................................................................ [ 70%]
+........................................................................ [ 71%]
+........................................................................ [ 73%]
+........................................................................ [ 74%]
+........................FFF............................................. [ 76%]
+........................................................................ [ 77%]
+........................................................................ [ 79%]
+........................................................................ [ 80%]
+........................................................................ [ 82%]
+........................................................................ [ 83%]
+........................................................................ [ 85%]
+........................................................................ [ 86%]
+........................................................................ [ 88%]
+........................................................................ [ 90%]
+........................................................................ [ 91%]
+........................................................................ [ 93%]
+........................................................................ [ 94%]
+........................................................................ [ 96%]
+........................................................................ [ 97%]
+........................................................................ [ 99%]
+.....................................                                    [100%]
+================================== FAILURES ===================================
+______ TestAmbiguedadDesambiguacion.test_un_solo_candidato_no_es_ambiguo ______
+
+self = <test_application_discovery.TestAmbiguedadDesambiguacion object at 0x0000020ACCD9B390>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000020ADF488B00>
+
+    def test_un_solo_candidato_no_es_ambiguo(self, monkeypatch):
+        notepad = r"C:\Windows\System32\notepad.exe"
+        if not os.path.exists(notepad):
+            pytest.skip("notepad.exe no disponible en este equipo")
+        # Solo la fuente mockeada: el PATH y los App Paths reales del equipo
+        # aportan en Windows 11 otra copia del mismo programa (WindowsApps).
+        monkeypatch.setenv("PATH", "")
+        if os.name == "nt":
+            import winreg
+    
+            def _sin_app_paths(*_args, **_kwargs):
+                raise OSError("App Paths aislado en este test")
+    
+            monkeypatch.setattr(winreg, "OpenKey", _sin_app_paths)
+        descub, _, _ = _discovery_con_mocks(
+            calib_apps=[_app("Notepad", notepad, FUENTE_START_MENU)]
+        )
+        resultado = descub.buscar_por_nombre_con_desambiguacion("notepad")
+    
+        assert resultado.ambiguo is False
+        assert resultado.requiere_desambiguacion is False
+        assert resultado.motivo_ambiguedad is None
+        assert resultado.alternativas == []
+>       assert len(resultado.candidatos) == 1
+E       AssertionError: assert 2 == 1
+E        +  where 2 = len([DiscoveredCandidate(candidate_id='C:\\Windows\\System32\\notepad.exe', name='Notepad', nombre_comercial='Bloc de nota...red': None, 'logged_in': None, 'resources_available': None, 'blocked_by': 'executable_not_resolved'}, disponible=True)])
+E        +    where [DiscoveredCandidate(candidate_id='C:\\Windows\\System32\\notepad.exe', name='Notepad', nombre_comercial='Bloc de nota...red': None, 'logged_in': None, 'resources_available': None, 'blocked_by': 'executable_not_resolved'}, disponible=True)] = ResultadoResolucionCandidatos(candidatos=[DiscoveredCandidate(candidate_id='C:\\Windows\\System32\\notepad.exe', name=...=False, motivo_ambiguedad=None, alternativas=[], requiere_desambiguacion=False, fuente_autoritaria='catalogo_conocido').candidatos
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\application_discovery\test_application_discovery.py:680: AssertionError
+_ TestSqliteRealSoloLecturaYAislamiento.test_existen_candidatos_exe_en_sqlite_real _
+
+self = <test_application_entities_sqlite_registro_real.TestSqliteRealSoloLecturaYAislamiento object at 0x0000020ACC8C08A0>
+
+    def test_existen_candidatos_exe_en_sqlite_real(self):
+        """Hay al menos un candidato .exe persistido en la SQLite real para
+        el machine_id actual (verificacion real de inventario existente)."""
+        if not SQLITE_REAL.exists():
+            pytest.skip("data/system_inventory.sqlite3 no disponible")
+        machine_id = generate_machine_id()
+        filas = _leer_candidatos_exe_sqlite_real(SQLITE_REAL, machine_id)
+>       assert len(filas) >= 1, (
+            "No se encontraron candidatos .exe en la SQLite real para el equipo actual"
+        )
+E       AssertionError: No se encontraron candidatos .exe en la SQLite real para el equipo actual
+E       assert 0 >= 1
+E        +  where 0 = len([])
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\application_discovery\test_application_entities_sqlite_registro_real.py:250: AssertionError
+_ TestAutoRegistroDesdeSqliteReal.test_auto_registro_candidatos_reales_sqlite _
+
+self = <test_application_entities_sqlite_registro_real.TestAutoRegistroDesdeSqliteReal object at 0x0000020ACC6DCCD0>
+tmp_path = WindowsPath('C:/Users/User/AppData/Local/Temp/pytest-of-User/pytest-1346/test_auto_registro_candidatos_0')
+
+    def test_auto_registro_candidatos_reales_sqlite(self, tmp_path):
+        """Lee candidatos .exe de la SQLite real, ejecuta
+        auto_registrar_candidatos_inventario y verifica que se generan
+        entidades en el catalogo aislado sin tocar produccion."""
+        if not SQLITE_REAL.exists():
+            pytest.skip("data/system_inventory.sqlite3 no disponible")
+    
+        machine_id = generate_machine_id()
+        informe = _informe_aislamiento_coincide(machine_id)
+    
+        # Lectura real de la SQLite (read-only).
+        filas = _leer_candidatos_exe_sqlite_real(SQLITE_REAL, machine_id)
+        candidatos = _construir_candidatos_desde_filas(filas)
+>       assert len(candidatos) >= 1
+E       assert 0 >= 1
+E        +  where 0 = len([])
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\application_discovery\test_application_entities_sqlite_registro_real.py:280: AssertionError
+_ TestRegistroMinimoAplicacionDesdeSqlite.test_entidades_tienen_campos_obligatorios_registro_minimo _
+
+self = <test_application_entities_sqlite_registro_real.TestRegistroMinimoAplicacionDesdeSqlite object at 0x0000020ACC6DCF50>
+tmp_path = WindowsPath('C:/Users/User/AppData/Local/Temp/pytest-of-User/pytest-1346/test_entidades_tienen_campos_o0')
+
+    def test_entidades_tienen_campos_obligatorios_registro_minimo(self, tmp_path):
+        """Cada entidad generada desde un candidato real de la SQLite tiene
+        los campos obligatorios del registro minimo de aplicacion."""
+        if not SQLITE_REAL.exists():
+            pytest.skip("data/system_inventory.sqlite3 no disponible")
+    
+        machine_id = generate_machine_id()
+        filas = _leer_candidatos_exe_sqlite_real(SQLITE_REAL, machine_id)
+        candidatos = _construir_candidatos_desde_filas(filas)
+        candidatos_lanzables = [c for c in candidatos if c.es_lanzable]
+>       assert len(candidatos_lanzables) >= 1
+E       assert 0 >= 1
+E        +  where 0 = len([])
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\application_discovery\test_application_entities_sqlite_registro_real.py:392: AssertionError
+____________ TestEntradaInventoryEntry.test_acepta_inventory_entry ____________
+
+self = <test_application_launch_classifier.TestEntradaInventoryEntry object at 0x0000020ACD8287D0>
+
+    def test_acepta_inventory_entry(self):
+        clasificador = LaunchClassifier()
+        entry = InventoryEntry(
+            machine_id="maquina",
+            volume="C:",
+            absolute_path=sys.executable,
+            relative_path="python.exe",
+            name="python.exe",
+            extension=".exe",
+            entry_type=EntryType.FILE,
+            size_bytes=0,
+            modified_at="",
+            created_at="",
+            source="filesystem_scan",
+        )
+>       c = clasificador.classify_candidate(entry)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\application_launch_classifier\test_application_launch_classifier.py:631: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <src.hands.apps.application_launch_classifier.LaunchClassifier object at 0x0000020AE2139C70>
+candidate = InventoryEntry(machine_id='maquina', volume='C:', absolute_path='C:\\Informatica\\PROYECTOS\\BACKEND\\IA_PYTHON\\IA\\J..., accessed_at=None, attributes=[], excluded=False, exclusion_reason=None, source='filesystem_scan', last_checked_at='')
+
+    def classify_candidate(self, candidate: Any) -> LaunchClassification:
+        """Clasifica un candidato individual y devuelve su LaunchClassification."""
+        campos = self._candidate_a_campos(candidate)
+        candidate_id = campos["candidate_id"] or _nombre_sin_extension(campos["destination"]) or "desconocido"
+        name = campos["name"] or _nombre_sin_extension(campos["destination"]) or "desconocido"
+        destination = campos["destination"]
+        source = campos["source"]
+        volume = campos["volume"]
+        preclassified = campos["launch_type"]
+        last_checked = campos["last_checked_at"]
+    
+        clasificacion = LaunchClassification(
+            candidate_id=candidate_id,
+            name=name,
+            absolute_path=destination,
+            destination=destination,
+            volume=volume,
+            fuente=source,
+            ultima_comprobacion=last_checked or _ahora_iso(),
+            razon="Sin destino de lanzamiento identificable.",
+>           app_id=campos["app_id"],
+                   ^^^^^^^^^^^^^^^^
+        )
+E       KeyError: 'app_id'
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\src\hands\apps\application_launch_classifier.py:637: KeyError
+______ TestEjecutableDisponible.test_hay_candidato_registrado_ejecutable ______
+
+self = <test_clasificacion_tipos_lanzamiento_entorno_real.TestEjecutableDisponible object at 0x0000020ACD7F8550>
+
+    def test_hay_candidato_registrado_ejecutable(self):
+        filas = _leer_candidatos_por_tipo(LaunchType.EJECUTABLE.value)
+        assert len(filas) >= 1, "debe haber al menos un candidato ejecutable registrado"
+        ids = {f["candidate_id"] for f in filas}
+>       assert any("charmap" in (i or "").lower() for i in ids), f"ids={ids}"
+E       AssertionError: ids={'cand-4de10a54-5054-515b-aa57-1b30a1feb801-306fc8b1', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-e76db41b', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-ac8ebea4', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-599a08b4', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-54bda2c7', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-d08c96c6', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-754b5020', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-b16840db', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-88257fcc', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-bb8a7aea', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-ad4ff616', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-cb983924', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-6676d191', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-0fa2b14c', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-a2c2b97a', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-d92e1fa2', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-8aeb4e17', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-53111115', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-a9703654', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-3eeba6d0', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-cb257e46', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-99c6bb9d', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-75cb520b', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-06108077', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-92458276', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-9e66058b', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-6be9d849', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-97faae67', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-f126ad80', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-643e5ea3', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-670e11b5', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-e1361d9c', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-d703179d', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-6da3ee30', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-b2e799e5', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-be2409d4', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-d0fdf101', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-6ef7f2e6', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-63a695b0', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-121a9bc1', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-d7aaab66', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-92385b47', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-7ad81175', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-0de3a39a', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-724e1e3d', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-57088fe9', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-6bbe901b', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-c18a676f', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-873f48c6', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-41a5a414', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-dd907864', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-2a8d1766', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-ec9d8221', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-666fea25', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-18854706', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-b408bc92', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-9bbba972', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-42e6f1c5', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-7fbb72da', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-261eea15', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-7d4c384c', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-6672f8cc', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-dcb4fef0', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-fbbb5f82', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-fea0062b', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-94e0e578', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-e62ae69d', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-28341b7e', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-4ccc4362', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-5c94444a', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-ca765b82', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-6e21dbe2', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-4f16f7c1', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-f73e36f7', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-73917285', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-fa2414f1', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-9f162539', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-1642fc43', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-2f08f7c8', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-68b29f50', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-6e702f64', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-65740851', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-32aa09b9', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-a0a700da', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-50024db5', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-6b1c91ec', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-42200efd', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-2a83b197', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-ed97e010', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-1c1ad31c', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-1d5e83eb', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-f299a2f3', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-8e5de5eb', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-c96cc45b', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-080a25e8', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-789a6848', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-93ace658', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-a0d9eb9d', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-62b89449', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-9d3cc145', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-0c4cabbc', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-c7511dfd', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-71483be9', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-14a166a0', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-18e1e089', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-157476cb', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-a40c083d', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-f9170acf', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-7e3509e7', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-ab994bea', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-81115881', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-98ca464a', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-e509a7ea', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-33decab7', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-6cd6d66b', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-631b0b66', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-48c4a226', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-06214c74', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-1ac25a22', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-4a283a55', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-5f40024c', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-784105a0', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-711268be', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-4f9f6c82', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-eabb109d', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-e08e8193', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-aa14c351', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-1414a356', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-265f12b3', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-9cd2a0e3', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-b62c1936', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-89d96d2c', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-5417d3f3', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-667aff1b', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-adf1ec52', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-76f0e181', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-57082370', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-72e5f294', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-e66872e1', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-e51208a7', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-ddd9a61c', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-89e366a9', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-59ec01c4', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-fc9d4454', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-8ebe6b0a', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-91e3b69b', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-fa248f8c', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-7ffbb2a0', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-7a4b1bb8', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-4cbbf0a3', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-f0cfaef3', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-6b2adbaf', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-360bb2b2', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-a0f59121', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-20e13dfe', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-592985cb', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-627c7b4a', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-5b78884f', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-c5a40785', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-57c55b7c', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-70d88be4', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-c4364b6b', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-da2003e3', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-6e392297', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-a279dbf6', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-43b003b1', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-3a905f53', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-e9674988', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-e57261b2', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-b287a3bb', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-337b5fbc', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-227c2e8a', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-658c1dba', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-e10b98fd', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-fe0535a8', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-79a0d481', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-081c7314', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-20ec1039', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-cc29ddbf', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-ca765a3e', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-5a6a7aeb', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-5d1433af', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-f3bb31dc', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-e9f26086', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-c593e747', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-ba117ecb', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-7f36912a', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-13f1cdd3', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-2d1eaae4', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-c8d24b54', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-588c75ce', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-fc7b8ebb', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-c2d84ff9', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-5acda902', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-012c96c0', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-3efcac1a', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-600db442', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-68a93e28', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-2560d098', 'cand-4de10a54-5054-515b-aa57-1b30a1feb801-9c8db10b'}
+E       assert False
+E        +  where False = any(<generator object TestEjecutableDisponible.test_hay_candidato_registrado_ejecutable.<locals>.<genexpr> at 0x0000020ADF4C9540>)
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\application_launch_classifier\test_clasificacion_tipos_lanzamiento_entorno_real.py:118: AssertionError
+_ TestMatrizSistemasOperativosAdaptadoresEntornoReal.test_02_adaptador_windows_nativo_existe _
+
+self = <test_matriz_sistemas_operativos_adaptadores_entorno_real.TestMatrizSistemasOperativosAdaptadoresEntornoReal testMethod=test_02_adaptador_windows_nativo_existe>
+
+    def test_02_adaptador_windows_nativo_existe(self):
+        """Existe adaptador nativo para Windows en el equipo actual."""
+>       self.assertTrue(os.path.isdir(self.adaptador_windows), self.adaptador_windows)
+E       AssertionError: False is not true : C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\src\hands\windows
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\application_preflight\test_matriz_sistemas_operativos_adaptadores_entorno_real.py:62: AssertionError
+_ TestMatrizSistemasOperativosAdaptadoresEntornoReal.test_10_matriz_declaracion_estado_adaptadores _
+
+self = <test_matriz_sistemas_operativos_adaptadores_entorno_real.TestMatrizSistemasOperativosAdaptadoresEntornoReal testMethod=test_10_matriz_declaracion_estado_adaptadores>
+
+    def test_10_matriz_declaracion_estado_adaptadores(self):
+        """Declara el estado de cada adaptador segun evidencia nativa del equipo."""
+        adaptadores = {
+            "windows": os.path.isdir(self.adaptador_windows),
+            "linux": os.path.isdir(self.adaptador_linux),
+            "macos": os.path.isdir(self.adaptador_macos),
+        }
+        # Solo Windows tiene adaptador nativo y pruebas reales en este equipo.
+>       self.assertTrue(adaptadores["windows"])
+E       AssertionError: False is not true
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\application_preflight\test_matriz_sistemas_operativos_adaptadores_entorno_real.py:141: AssertionError
+_ TestAplicacionYaAbiertaEntornoReal.test_3_8_5_3_2_app_abierta_no_lanza_proceso_nuevo_si_preflight_rechaza _
+
+self = <test_aplicacion_ya_abierta_entorno_real.TestAplicacionYaAbiertaEntornoReal testMethod=test_3_8_5_3_2_app_abierta_no_lanza_proceso_nuevo_si_preflight_rechaza>
+
+    def test_3_8_5_3_2_app_abierta_no_lanza_proceso_nuevo_si_preflight_rechaza(self):
+        # Notepad puede estar ya abierto (proceso del usuario, ajeno; no se toca).
+        # Su ejecutable no pasa preflight (no localizable via shutil.which en
+        # Windows 11), por lo que open_application debe rechazarlo SIN lanzar
+        # un proceso nuevo: el conteo de notepad debe mantenerse estable.
+        self.proc = subprocess.Popen([_NOTEPAD])
+        self.assertIsNotNone(self.proc.pid)
+        esperado = self.conteo_notepad_inicial + 1
+        self.assertTrue(
+            self._esperar_conteo_notepad(esperado),
+            "nuestro proceso notepad no aparecio en tasklist",
+        )
+        conteo_antes_de_abrir = _contar_procesos(_NOTEPAD)
+    
+        # Identificar el PID real del notepad lanzado por esta prueba para
+        # poder cerrarlo en tearDown sin tocar el del usuario.
+        pid_real = esperar_pid_nuevo(
+            _NOTEPAD, self.pids_notepad_inicial, timeout_segundos=10.0
+        )
+        self.assertIsNotNone(
+            pid_real, "no se pudo identificar el PID real del notepad lanzado"
+        )
+        self.pid_notepad_propio = pid_real
+    
+>       with self.assertRaises(RuntimeError):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: RuntimeError not raised
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\applications_core\test_aplicacion_ya_abierta_entorno_real.py:141: AssertionError
+_ TestInternalFunctionsConsumeRealModel.test_open_application_chrome_uses_model _
+
+self = <test_application_consumers_real_model.TestInternalFunctionsConsumeRealModel object at 0x0000020ACD8BB9B0>
+
+    def test_open_application_chrome_uses_model(self):
+        """open_application('chrome') resuelve desde el modelo real y lanza el ejecutable."""
+        with patch("src.hands.apps.applications_core.subprocess.Popen") as mock_popen, \
+             patch(
+                 "src.hands.apps.applications_core._check_application_available",
+                 return_value=True,
+             ), patch(
+                 "src.hands.apps.applications_core._is_process_running",
+                 return_value=False,
+             ):
+            mock_popen.return_value = MagicMock()
+            result = open_application("chrome")
+            assert "Chrome" in result
+>           mock_popen.assert_called_once_with(["chrome"])
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\applications_core\test_application_consumers_real_model.py:431: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <MagicMock name='Popen' id='2245726033568'>, args = (['chrome'],)
+kwargs = {}
+
+    def assert_called_once_with(self, /, *args, **kwargs):
+        """assert that the mock was called exactly once and that that call was
+        with the specified arguments."""
+        if not self.call_count == 1:
+            msg = ("Expected '%s' to be called once. Called %s times.%s"
+                   % (self._mock_name or 'mock',
+                      self.call_count,
+                      self._calls_repr()))
+>           raise AssertionError(msg)
+E           AssertionError: Expected 'Popen' to be called once. Called 2 times.
+E           Calls: [call(['powershell', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', '\n$ErrorActionPreference = "SilentlyContinue"\n\n$shell = New-Object -ComObject Shell.Application\n$folder = $shell.Namespace("shell:AppsFolder")\n\nif ($null -eq $folder) {\n    exit 0\n}\n\n$items = $folder.Items()\n\nforeach ($item in $items) {\n    $itemName = [string]$item.Name\n    $aumid = [string]$item.ExtendedProperty("System.AppUserModel.ID")\n    $target = [string]$item.ExtendedProperty("System.Link.TargetParsingPath")\n    $itemPath = [string]$item.Path\n\n    $matched = $false\n\n    if ($env:JARVIS_APP_ID) {\n        if ($aumid -and ($aumid -ieq $env:JARVIS_APP_ID)) {\n            $matched = $true\n        }\n\n        if ($itemPath -and ($itemPath -ieq $env:JARVIS_APP_ID)) {\n            $matched = $true\n        }\n    }\n\n    if (-not $matched -and $env:JARVIS_APP_NAME) {\n        if ($itemName -ieq $env:JARVIS_APP_NAME) {\n            $matched = $true\n        }\n    }\n\n    if ($matched) {\n        [pscustomobject]@{\n            Name = $itemName\n            AppUserModelId = $aumid\n            Target = $target\n            Path = $itemPath\n        } | ConvertTo-Json -Compress\n\n        exit 0\n    }\n}\n'], text=True, encoding='utf-8', errors='replace', env={'ACSETUPSVCPORT': '23210', 'ACSVCPORT': '17532', 'ALLUSERSPROFILE': 'C:\\ProgramData', 'APPDATA': 'C:\\Users\\User\\AppData\\Roaming', 'CHROME_CRASHPAD_PIPE_NAME': '\\\\.\\pipe\\crashpad_2420_VYOSLCZOAJSSOWLB', 'COMPUTERNAME': 'DESKTOP-OUA1CIO', 'CUDA_PATH': 'C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.1', 'CUDA_PATH_V12_1': 'C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.1', 'CHOCOLATEYINSTALL': 'C:\\ProgramData\\chocolatey', 'CHOCOLATEYLASTPATHUPDATE': '134027353110878716', 'COMSPEC': 'C:\\WINDOWS\\system32\\cmd.exe', 'COMMONPROGRAMFILES': 'C:\\Program Files\\Common Files', 'COMMONPROGRAMFILES(X86)': 'C:\\Program Files (x86)\\Common Files', 'COMMONPROGRAMW6432': 'C:\\Program Files\\Common Files', 'DRIVERDATA': 'C:\\Windows\\System32\\Drivers\\DriverData', 'EFC_7540_1262719628': '1', 'EFC_7540_1592913036': '1', 'EFC_7540_2283032206': '1', 'EFC_7540_3789132940': '1', 'EFC_7540_4126798990': '1', 'HOMEDRIVE': 'C:', 'HOMEPATH': '\\Users\\User', 'INTELLIJ IDEA COMMUNITY EDITION': 'C:\\Informática\\IntelliJ\\IntelliJ IDEA Community Edition 2024.3.2.1\\bin;', 'JARVIS_TEST_GUI_REAL': '1', 'JAVA_HOME': 'C:\\Informática\\JDKS\\jdk17.0.14_7', 'LOCALAPPDATA': 'C:\\Users\\User\\AppData\\Local', 'LOGONSERVER': '\\\\DESKTOP-OUA1CIO', 'NUMBER_OF_PROCESSORS': '28', 'OS': 'Windows_NT', 'ONEDRIVE': 'C:\\Users\\User\\OneDrive', 'PATHEXT': '.COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC;.PY;.PYW;.CPL', 'PROCESSOR_ARCHITECTURE': 'AMD64', 'PROCESSOR_IDENTIFIER': 'Intel64 Family 6 Model 183 Stepping 1, GenuineIntel', 'PROCESSOR_LEVEL': '6', 'PROCESSOR_REVISION': 'b701', 'PROMPT': '$P$G', 'PSEXECUTIONPOLICYPREFERENCE': 'Bypass', 'PSMODULEPATH': 'C:\\Users\\User\\Documents\\WindowsPowerShell\\Modules;C:\\Program Files\\WindowsPowerShell\\Modules;C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\Modules;C:\\Program Files (x86)\\Microsoft SQL Server\\160\\Tools\\PowerShell\\Modules\\', 'PUBLIC': 'C:\\Users\\Public', 'PATH': 'C:\\Informatica\\PROYECTOS\\BACKEND\\IA_PYTHON\\IA\\JARVIS\\venv\\Lib\\site-packages\\PySide6;C:\\Informatica\\PROYECTOS\\BACKEND\\IA_PYTHON\\IA\\JARVIS\\venv\\Lib\\site-packages\\cv2\\../../x64/vc14/bin;C:\\Informatica\\PROYECTOS\\BACKEND\\IA_PYTHON\\IA\\JARVIS\\venv\\Scripts;C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.1\\bin;C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.1\\libnvvp;C:\\Python314\\Scripts\\;C:\\Python314\\;C:\\Users\\User\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\;C:\\Users\\User\\AppData\\Local\\Programs\\Python\\Python313\\;C:\\Informática\\JDKS\\jdk17.0.14_7\\bin;C:\\Program Files (x86)\\Razer Chroma SDK\\bin;C:\\Program Files\\Razer Chroma SDK\\bin;C:\\Program Files (x86)\\Razer\\ChromaBroadcast\\bin;C:\\Program Files\\Razer\\ChromaBroadcast\\bin;C:\\Windows\\system32;C:\\Windows;C:\\Windows\\System32\\Wbem;C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\;C:\\Windows\\System32\\OpenSSH\\;C:\\Program Files (x86)\\NVIDIA Corporation\\PhysX\\Common;C:\\Program Files\\dotnet\\;C:\\Windows\\system32\\config\\systemprofile\\AppData\\Local\\Microsoft\\WindowsApps;C:\\Program Files (x86)\\Microsoft SQL Server\\160\\Tools\\Binn\\;C:\\Program Files\\Microsoft SQL Server\\160\\Tools\\Binn\\;C:\\Program Files\\Microsoft SQL Server\\Client SDK\\ODBC\\170\\Tools\\Binn\\;C:\\Program Files\\Microsoft SQL Server\\160\\DTS\\Binn\\;C:\\Informática\\MAVEN\\apache-maven-3.9.9\\bin;C:\\Informática\\JDKS\\jdk17.0.14_7\\bin;C:\\WINDOWS\\system32;C:\\WINDOWS;C:\\WINDOWS\\System32\\Wbem;C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\;C:\\WINDOWS\\System32\\OpenSSH\\;C:\\ProgramData\\chocolatey\\bin;C:\\Program Files\\NVIDIA Corporation\\NVIDIA App\\NvDLISR;C:\\Program Files\\Git\\cmd;C:\\Program Files\\Docker\\Docker\\resources\\bin;C:\\Program Files\\nodejs\\;C:\\ffmpeg\\bin;C:\\Program Files\\NVIDIA Corporation\\Nsight Compute 2023.1.0\\;C:\\Program Files\\WSL\\;C:\\Program Files\\GitHub CLI\\;C:\\Users\\User\\AppData\\Local\\Programs\\Python\\Python311\\Scripts\\;C:\\Users\\User\\AppData\\Local\\Programs\\Python\\Python311\\;C:\\Users\\User\\AppData\\Local\\Programs\\Python\\Python39\\Scripts\\;C:\\Users\\User\\AppData\\Local\\Programs\\Python\\Python39\\;C:\\Users\\User\\AppData\\Local\\Microsoft\\WindowsApps;;C:\\Informática\\IntelliJ\\IntelliJ IDEA Community Edition 2024.3.2.1\\bin;;C:\\Users\\User\\AppData\\Local\\Programs\\Microsoft VS Code\\bin;C:\\Program Files\\JetBrains\\PyCharm 2025.3.1\\bin;C:\\Users\\User\\AppData\\Local\\Microsoft\\WinGet\\Packages\\PHP.PHP.8.3_Microsoft.Winget.Source_8wekyb3d8bbwe;;C:\\Users\\User\\AppData\\Local\\Programs\\Ollama;C:\\Users\\User\\AppData\\Roaming\\npm;C:\\Users\\User\\AppData\\Local\\Microsoft\\WinGet\\Packages\\ggml.llamacpp_Microsoft.Winget.Source_8wekyb3d8bbwe;C:\\Users\\User\\AppData\\Local\\Programs\\Microsoft VS Code\\bin\\copilot-shim;;c:\\Users\\User\\.vscode\\extensions\\ms-python.debugpy-2026.6.0-win32-x64\\bundled\\scripts\\noConfigScripts;c:\\Users\\User\\AppData\\Roaming\\Code\\User\\globalStorage\\github.copilot-chat\\debugCommand;C:\\Users\\User\\AppData\\Local\\Programs\\Microsoft VS Code\\bin\\copilot-shim', 'PROGRAMDATA': 'C:\\ProgramData', 'PROGRAMFILES': 'C:\\Program Files', 'PROGRAMFILES(X86)': 'C:\\Program Files (x86)', 'PROGRAMW6432': 'C:\\Program Files', 'PYCHARM': 'C:\\Program Files\\JetBrains\\PyCharm 2025.3.1\\bin', 'PYTHONIOENCODING': 'utf-8', 'RLSSVCPORT': '22112', 'SESSIONNAME': 'Console', 'SYSTEMDRIVE': 'C:', 'SYSTEMROOT': 'C:\\WINDOWS', 'TEMP': 'C:\\Users\\User\\AppData\\Local\\Temp', 'TMP': 'C:\\Users\\User\\AppData\\Local\\Temp', 'USERDOMAIN': 'DESKTOP-OUA1CIO', 'USERDOMAIN_ROAMINGPROFILE': 'DESKTOP-OUA1CIO', 'USERNAME': 'User', 'USERPROFILE': 'C:\\Users\\User', 'VIRTUAL_ENV': 'C:\\Informatica\\PROYECTOS\\BACKEND\\IA_PYTHON\\IA\\JARVIS\\venv', 'VIRTUAL_ENV_PROMPT': 'venv', 'VSCODE_PYTHON_AUTOACTIVATE_GUARD': '1', 'WINDIR': 'C:\\WINDOWS', 'TERM_PROGRAM': 'vscode', 'TERM_PROGRAM_VERSION': '1.147.0', 'LANG': 'en_US.UTF-8', 'COLORTERM': 'truecolor', 'COPILOT_DEBUG_NONCE': 'a8969d33999cf938cf0d869ab3065240', 'GIT_ASKPASS': 'c:\\Users\\User\\AppData\\Roaming\\Code\\User\\globalStorage\\vscode.git\\askpass\\70789581cae28aa7\\askpass.sh', 'VSCODE_GIT_ASKPASS_NODE': 'C:\\Users\\User\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe', 'VSCODE_GIT_ASKPASS_EXTRA_ARGS': '', 'VSCODE_GIT_ASKPASS_MAIN': 'c:\\Users\\User\\AppData\\Roaming\\Code\\User\\globalStorage\\vscode.git\\askpass\\70789581cae28aa7\\askpass-main.js', 'VSCODE_GIT_IPC_HANDLE': '\\\\.\\pipe\\vscode-git-ea5146c8b6-sock', 'PYTHONSTARTUP': 'c:\\Users\\User\\AppData\\Roaming\\Code\\User\\workspaceStorage\\efefa9def89bc249bc481dea39386155\\ms-python.python\\pythonrc.py', 'PYDEVD_DISABLE_FILE_VALIDATION': '1', 'VSCODE_DEBUGPY_ADAPTER_ENDPOINTS': 'c:\\Users\\User\\.vscode\\extensions\\ms-python.debugpy-2026.6.0-win32-x64\\.noConfigDebugAdapterEndpoints\\endpoint-4417563f54e24ba6.txt', 'BUNDLED_DEBUGPY_PATH': 'c:\\Users\\User\\.vscode\\extensions\\ms-python.debugpy-2026.6.0-win32-x64\\bundled\\libs\\debugpy', 'VSCODE_INJECTION': '1', '_OLD_VIRTUAL_PATH': 'C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.1\\bin;C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.1\\libnvvp;C:\\Python314\\Scripts\\;C:\\Python314\\;C:\\Users\\User\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\;C:\\Users\\User\\AppData\\Local\\Programs\\Python\\Python313\\;C:\\Informática\\JDKS\\jdk17.0.14_7\\bin;C:\\Program Files (x86)\\Razer Chroma SDK\\bin;C:\\Program Files\\Razer Chroma SDK\\bin;C:\\Program Files (x86)\\Razer\\ChromaBroadcast\\bin;C:\\Program Files\\Razer\\ChromaBroadcast\\bin;C:\\Windows\\system32;C:\\Windows;C:\\Windows\\System32\\Wbem;C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\;C:\\Windows\\System32\\OpenSSH\\;C:\\Program Files (x86)\\NVIDIA Corporation\\PhysX\\Common;C:\\Program Files\\dotnet\\;C:\\Windows\\system32\\config\\systemprofile\\AppData\\Local\\Microsoft\\WindowsApps;C:\\Program Files (x86)\\Microsoft SQL Server\\160\\Tools\\Binn\\;C:\\Program Files\\Microsoft SQL Server\\160\\Tools\\Binn\\;C:\\Program Files\\Microsoft SQL Server\\Client SDK\\ODBC\\170\\Tools\\Binn\\;C:\\Program Files\\Microsoft SQL Server\\160\\DTS\\Binn\\;C:\\Informática\\MAVEN\\apache-maven-3.9.9\\bin;C:\\Informática\\JDKS\\jdk17.0.14_7\\bin;C:\\WINDOWS\\system32;C:\\WINDOWS;C:\\WINDOWS\\System32\\Wbem;C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\;C:\\WINDOWS\\System32\\OpenSSH\\;C:\\ProgramData\\chocolatey\\bin;C:\\Program Files\\NVIDIA Corporation\\NVIDIA App\\NvDLISR;C:\\Program Files\\Git\\cmd;C:\\Program Files\\Docker\\Docker\\resources\\bin;C:\\Program Files\\nodejs\\;C:\\ffmpeg\\bin;C:\\Program Files\\NVIDIA Corporation\\Nsight Compute 2023.1.0\\;C:\\Program Files\\WSL\\;C:\\Program Files\\GitHub CLI\\;C:\\Users\\User\\AppData\\Local\\Programs\\Python\\Python311\\Scripts\\;C:\\Users\\User\\AppData\\Local\\Programs\\Python\\Python311\\;C:\\Users\\User\\AppData\\Local\\Programs\\Python\\Python39\\Scripts\\;C:\\Users\\User\\AppData\\Local\\Programs\\Python\\Python39\\;C:\\Users\\User\\AppData\\Local\\Microsoft\\WindowsApps;;C:\\Informática\\IntelliJ\\IntelliJ IDEA Community Edition 2024.3.2.1\\bin;;C:\\Users\\User\\AppData\\Local\\Programs\\Microsoft VS Code\\bin;C:\\Program Files\\JetBrains\\PyCharm 2025.3.1\\bin;C:\\Users\\User\\AppData\\Local\\Microsoft\\WinGet\\Packages\\PHP.PHP.8.3_Microsoft.Winget.Source_8wekyb3d8bbwe;;C:\\Users\\User\\AppData\\Local\\Programs\\Ollama;C:\\Users\\User\\AppData\\Roaming\\npm;C:\\Users\\User\\AppData\\Local\\Microsoft\\WinGet\\Packages\\ggml.llamacpp_Microsoft.Winget.Source_8wekyb3d8bbwe;C:\\Users\\User\\AppData\\Local\\Programs\\Microsoft VS Code\\bin\\copilot-shim;;c:\\Users\\User\\.vscode\\extensions\\ms-python.debugpy-2026.6.0-win32-x64\\bundled\\scripts\\noConfigScripts;c:\\Users\\User\\AppData\\Roaming\\Code\\User\\globalStorage\\github.copilot-chat\\debugCommand;C:\\Users\\User\\AppData\\Local\\Programs\\Microsoft VS Code\\bin\\copilot-shim', 'PYTEST_VERSION': '9.1.1', 'PYSIDE6_OPTION_PYTHON_ENUM': 'True', 'PYTEST_CURRENT_TEST': 'tests/hands/apps/applications_core/test_application_consumers_real_model.py::TestInternalFunctionsConsumeRealModel::test_open_application_chrome_uses_model (call)', 'JARVIS_APP_NAME': 'Chrome', 'JARVIS_APP_ID': ''}, creationflags=134217728, stdout=-1, stderr=-1),
+E            call().__enter__(),
+E            call().__enter__().communicate(None, timeout=30),
+E            call().__enter__().communicate().__iter__(),
+E            call().__enter__().kill(),
+E            call().__exit__(<class 'ValueError'>, ValueError('not enough values to unpack (expected 2, got 0)'), <traceback object at 0x0000020AF2DB4FC0>),
+E            call(['C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'])].
+
+C:\Python314\Lib\unittest\mock.py:997: AssertionError
+_ TestInternalFunctionsConsumeRealModel.test_open_application_alias_resolves_to_real_app _
+
+self = <test_application_consumers_real_model.TestInternalFunctionsConsumeRealModel object at 0x0000020ACD8BB8A0>
+
+    def test_open_application_alias_resolves_to_real_app(self):
+        """open_application('gh') resuelve el alias a GitHub y lanza su ejecutable."""
+        app = _real_manager().get_application("gh")
+        executable = app.executable
+        with patch("src.hands.apps.applications_core.subprocess.Popen") as mock_popen, \
+             patch(
+                 "src.hands.apps.applications_core._check_application_available",
+                 return_value=True,
+             ), patch(
+                 "src.hands.apps.applications_core._is_process_running",
+                 return_value=False,
+             ):
+            mock_popen.return_value = MagicMock()
+            result = open_application("gh")
+            assert "GitHub" in result
+>           mock_popen.assert_called_once_with([executable])
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\applications_core\test_application_consumers_real_model.py:448: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <MagicMock name='Popen' id='2245719378640'>, args = (['chrome.exe'],)
+kwargs = {}
+
+    def assert_called_once_with(self, /, *args, **kwargs):
+        """assert that the mock was called exactly once and that that call was
+        with the specified arguments."""
+        if not self.call_count == 1:
+            msg = ("Expected '%s' to be called once. Called %s times.%s"
+                   % (self._mock_name or 'mock',
+                      self.call_count,
+                      self._calls_repr()))
+>           raise AssertionError(msg)
+E           AssertionError: Expected 'Popen' to be called once. Called 2 times.
+E           Calls: [call(['powershell', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', '\n$ErrorActionPreference = "SilentlyContinue"\n\n$shell = New-Object -ComObject Shell.Application\n$folder = $shell.Namespace("shell:AppsFolder")\n\nif ($null -eq $folder) {\n    exit 0\n}\n\n$items = $folder.Items()\n\nforeach ($item in $items) {\n    $itemName = [string]$item.Name\n    $aumid = [string]$item.ExtendedProperty("System.AppUserModel.ID")\n    $target = [string]$item.ExtendedProperty("System.Link.TargetParsingPath")\n    $itemPath = [string]$item.Path\n\n    $matched = $false\n\n    if ($env:JARVIS_APP_ID) {\n        if ($aumid -and ($aumid -ieq $env:JARVIS_APP_ID)) {\n            $matched = $true\n        }\n\n        if ($itemPath -and ($itemPath -ieq $env:JARVIS_APP_ID)) {\n            $matched = $true\n        }\n    }\n\n    if (-not $matched -and $env:JARVIS_APP_NAME) {\n        if ($itemName -ieq $env:JARVIS_APP_NAME) {\n            $matched = $true\n        }\n    }\n\n    if ($matched) {\n        [pscustomobject]@{\n            Name = $itemName\n            AppUserModelId = $aumid\n            Target = $target\n            Path = $itemPath\n        } | ConvertTo-Json -Compress\n\n        exit 0\n    }\n}\n'], text=True, encoding='utf-8', errors='replace', env={'ACSETUPSVCPORT': '23210', 'ACSVCPORT': '17532', 'ALLUSERSPROFILE': 'C:\\ProgramData', 'APPDATA': 'C:\\Users\\User\\AppData\\Roaming', 'CHROME_CRASHPAD_PIPE_NAME': '\\\\.\\pipe\\crashpad_2420_VYOSLCZOAJSSOWLB', 'COMPUTERNAME': 'DESKTOP-OUA1CIO', 'CUDA_PATH': 'C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.1', 'CUDA_PATH_V12_1': 'C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.1', 'CHOCOLATEYINSTALL': 'C:\\ProgramData\\chocolatey', 'CHOCOLATEYLASTPATHUPDATE': '134027353110878716', 'COMSPEC': 'C:\\WINDOWS\\system32\\cmd.exe', 'COMMONPROGRAMFILES': 'C:\\Program Files\\Common Files', 'COMMONPROGRAMFILES(X86)': 'C:\\Program Files (x86)\\Common Files', 'COMMONPROGRAMW6432': 'C:\\Program Files\\Common Files', 'DRIVERDATA': 'C:\\Windows\\System32\\Drivers\\DriverData', 'EFC_7540_1262719628': '1', 'EFC_7540_1592913036': '1', 'EFC_7540_2283032206': '1', 'EFC_7540_3789132940': '1', 'EFC_7540_4126798990': '1', 'HOMEDRIVE': 'C:', 'HOMEPATH': '\\Users\\User', 'INTELLIJ IDEA COMMUNITY EDITION': 'C:\\Informática\\IntelliJ\\IntelliJ IDEA Community Edition 2024.3.2.1\\bin;', 'JARVIS_TEST_GUI_REAL': '1', 'JAVA_HOME': 'C:\\Informática\\JDKS\\jdk17.0.14_7', 'LOCALAPPDATA': 'C:\\Users\\User\\AppData\\Local', 'LOGONSERVER': '\\\\DESKTOP-OUA1CIO', 'NUMBER_OF_PROCESSORS': '28', 'OS': 'Windows_NT', 'ONEDRIVE': 'C:\\Users\\User\\OneDrive', 'PATHEXT': '.COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC;.PY;.PYW;.CPL', 'PROCESSOR_ARCHITECTURE': 'AMD64', 'PROCESSOR_IDENTIFIER': 'Intel64 Family 6 Model 183 Stepping 1, GenuineIntel', 'PROCESSOR_LEVEL': '6', 'PROCESSOR_REVISION': 'b701', 'PROMPT': '$P$G', 'PSEXECUTIONPOLICYPREFERENCE': 'Bypass', 'PSMODULEPATH': 'C:\\Users\\User\\Documents\\WindowsPowerShell\\Modules;C:\\Program Files\\WindowsPowerShell\\Modules;C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\Modules;C:\\Program Files (x86)\\Microsoft SQL Server\\160\\Tools\\PowerShell\\Modules\\', 'PUBLIC': 'C:\\Users\\Public', 'PATH': 'C:\\Informatica\\PROYECTOS\\BACKEND\\IA_PYTHON\\IA\\JARVIS\\venv\\Lib\\site-packages\\PySide6;C:\\Informatica\\PROYECTOS\\BACKEND\\IA_PYTHON\\IA\\JARVIS\\venv\\Lib\\site-packages\\cv2\\../../x64/vc14/bin;C:\\Informatica\\PROYECTOS\\BACKEND\\IA_PYTHON\\IA\\JARVIS\\venv\\Scripts;C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.1\\bin;C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.1\\libnvvp;C:\\Python314\\Scripts\\;C:\\Python314\\;C:\\Users\\User\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\;C:\\Users\\User\\AppData\\Local\\Programs\\Python\\Python313\\;C:\\Informática\\JDKS\\jdk17.0.14_7\\bin;C:\\Program Files (x86)\\Razer Chroma SDK\\bin;C:\\Program Files\\Razer Chroma SDK\\bin;C:\\Program Files (x86)\\Razer\\ChromaBroadcast\\bin;C:\\Program Files\\Razer\\ChromaBroadcast\\bin;C:\\Windows\\system32;C:\\Windows;C:\\Windows\\System32\\Wbem;C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\;C:\\Windows\\System32\\OpenSSH\\;C:\\Program Files (x86)\\NVIDIA Corporation\\PhysX\\Common;C:\\Program Files\\dotnet\\;C:\\Windows\\system32\\config\\systemprofile\\AppData\\Local\\Microsoft\\WindowsApps;C:\\Program Files (x86)\\Microsoft SQL Server\\160\\Tools\\Binn\\;C:\\Program Files\\Microsoft SQL Server\\160\\Tools\\Binn\\;C:\\Program Files\\Microsoft SQL Server\\Client SDK\\ODBC\\170\\Tools\\Binn\\;C:\\Program Files\\Microsoft SQL Server\\160\\DTS\\Binn\\;C:\\Informática\\MAVEN\\apache-maven-3.9.9\\bin;C:\\Informática\\JDKS\\jdk17.0.14_7\\bin;C:\\WINDOWS\\system32;C:\\WINDOWS;C:\\WINDOWS\\System32\\Wbem;C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\;C:\\WINDOWS\\System32\\OpenSSH\\;C:\\ProgramData\\chocolatey\\bin;C:\\Program Files\\NVIDIA Corporation\\NVIDIA App\\NvDLISR;C:\\Program Files\\Git\\cmd;C:\\Program Files\\Docker\\Docker\\resources\\bin;C:\\Program Files\\nodejs\\;C:\\ffmpeg\\bin;C:\\Program Files\\NVIDIA Corporation\\Nsight Compute 2023.1.0\\;C:\\Program Files\\WSL\\;C:\\Program Files\\GitHub CLI\\;C:\\Users\\User\\AppData\\Local\\Programs\\Python\\Python311\\Scripts\\;C:\\Users\\User\\AppData\\Local\\Programs\\Python\\Python311\\;C:\\Users\\User\\AppData\\Local\\Programs\\Python\\Python39\\Scripts\\;C:\\Users\\User\\AppData\\Local\\Programs\\Python\\Python39\\;C:\\Users\\User\\AppData\\Local\\Microsoft\\WindowsApps;;C:\\Informática\\IntelliJ\\IntelliJ IDEA Community Edition 2024.3.2.1\\bin;;C:\\Users\\User\\AppData\\Local\\Programs\\Microsoft VS Code\\bin;C:\\Program Files\\JetBrains\\PyCharm 2025.3.1\\bin;C:\\Users\\User\\AppData\\Local\\Microsoft\\WinGet\\Packages\\PHP.PHP.8.3_Microsoft.Winget.Source_8wekyb3d8bbwe;;C:\\Users\\User\\AppData\\Local\\Programs\\Ollama;C:\\Users\\User\\AppData\\Roaming\\npm;C:\\Users\\User\\AppData\\Local\\Microsoft\\WinGet\\Packages\\ggml.llamacpp_Microsoft.Winget.Source_8wekyb3d8bbwe;C:\\Users\\User\\AppData\\Local\\Programs\\Microsoft VS Code\\bin\\copilot-shim;;c:\\Users\\User\\.vscode\\extensions\\ms-python.debugpy-2026.6.0-win32-x64\\bundled\\scripts\\noConfigScripts;c:\\Users\\User\\AppData\\Roaming\\Code\\User\\globalStorage\\github.copilot-chat\\debugCommand;C:\\Users\\User\\AppData\\Local\\Programs\\Microsoft VS Code\\bin\\copilot-shim', 'PROGRAMDATA': 'C:\\ProgramData', 'PROGRAMFILES': 'C:\\Program Files', 'PROGRAMFILES(X86)': 'C:\\Program Files (x86)', 'PROGRAMW6432': 'C:\\Program Files', 'PYCHARM': 'C:\\Program Files\\JetBrains\\PyCharm 2025.3.1\\bin', 'PYTHONIOENCODING': 'utf-8', 'RLSSVCPORT': '22112', 'SESSIONNAME': 'Console', 'SYSTEMDRIVE': 'C:', 'SYSTEMROOT': 'C:\\WINDOWS', 'TEMP': 'C:\\Users\\User\\AppData\\Local\\Temp', 'TMP': 'C:\\Users\\User\\AppData\\Local\\Temp', 'USERDOMAIN': 'DESKTOP-OUA1CIO', 'USERDOMAIN_ROAMINGPROFILE': 'DESKTOP-OUA1CIO', 'USERNAME': 'User', 'USERPROFILE': 'C:\\Users\\User', 'VIRTUAL_ENV': 'C:\\Informatica\\PROYECTOS\\BACKEND\\IA_PYTHON\\IA\\JARVIS\\venv', 'VIRTUAL_ENV_PROMPT': 'venv', 'VSCODE_PYTHON_AUTOACTIVATE_GUARD': '1', 'WINDIR': 'C:\\WINDOWS', 'TERM_PROGRAM': 'vscode', 'TERM_PROGRAM_VERSION': '1.147.0', 'LANG': 'en_US.UTF-8', 'COLORTERM': 'truecolor', 'COPILOT_DEBUG_NONCE': 'a8969d33999cf938cf0d869ab3065240', 'GIT_ASKPASS': 'c:\\Users\\User\\AppData\\Roaming\\Code\\User\\globalStorage\\vscode.git\\askpass\\70789581cae28aa7\\askpass.sh', 'VSCODE_GIT_ASKPASS_NODE': 'C:\\Users\\User\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe', 'VSCODE_GIT_ASKPASS_EXTRA_ARGS': '', 'VSCODE_GIT_ASKPASS_MAIN': 'c:\\Users\\User\\AppData\\Roaming\\Code\\User\\globalStorage\\vscode.git\\askpass\\70789581cae28aa7\\askpass-main.js', 'VSCODE_GIT_IPC_HANDLE': '\\\\.\\pipe\\vscode-git-ea5146c8b6-sock', 'PYTHONSTARTUP': 'c:\\Users\\User\\AppData\\Roaming\\Code\\User\\workspaceStorage\\efefa9def89bc249bc481dea39386155\\ms-python.python\\pythonrc.py', 'PYDEVD_DISABLE_FILE_VALIDATION': '1', 'VSCODE_DEBUGPY_ADAPTER_ENDPOINTS': 'c:\\Users\\User\\.vscode\\extensions\\ms-python.debugpy-2026.6.0-win32-x64\\.noConfigDebugAdapterEndpoints\\endpoint-4417563f54e24ba6.txt', 'BUNDLED_DEBUGPY_PATH': 'c:\\Users\\User\\.vscode\\extensions\\ms-python.debugpy-2026.6.0-win32-x64\\bundled\\libs\\debugpy', 'VSCODE_INJECTION': '1', '_OLD_VIRTUAL_PATH': 'C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.1\\bin;C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.1\\libnvvp;C:\\Python314\\Scripts\\;C:\\Python314\\;C:\\Users\\User\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\;C:\\Users\\User\\AppData\\Local\\Programs\\Python\\Python313\\;C:\\Informática\\JDKS\\jdk17.0.14_7\\bin;C:\\Program Files (x86)\\Razer Chroma SDK\\bin;C:\\Program Files\\Razer Chroma SDK\\bin;C:\\Program Files (x86)\\Razer\\ChromaBroadcast\\bin;C:\\Program Files\\Razer\\ChromaBroadcast\\bin;C:\\Windows\\system32;C:\\Windows;C:\\Windows\\System32\\Wbem;C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\;C:\\Windows\\System32\\OpenSSH\\;C:\\Program Files (x86)\\NVIDIA Corporation\\PhysX\\Common;C:\\Program Files\\dotnet\\;C:\\Windows\\system32\\config\\systemprofile\\AppData\\Local\\Microsoft\\WindowsApps;C:\\Program Files (x86)\\Microsoft SQL Server\\160\\Tools\\Binn\\;C:\\Program Files\\Microsoft SQL Server\\160\\Tools\\Binn\\;C:\\Program Files\\Microsoft SQL Server\\Client SDK\\ODBC\\170\\Tools\\Binn\\;C:\\Program Files\\Microsoft SQL Server\\160\\DTS\\Binn\\;C:\\Informática\\MAVEN\\apache-maven-3.9.9\\bin;C:\\Informática\\JDKS\\jdk17.0.14_7\\bin;C:\\WINDOWS\\system32;C:\\WINDOWS;C:\\WINDOWS\\System32\\Wbem;C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\;C:\\WINDOWS\\System32\\OpenSSH\\;C:\\ProgramData\\chocolatey\\bin;C:\\Program Files\\NVIDIA Corporation\\NVIDIA App\\NvDLISR;C:\\Program Files\\Git\\cmd;C:\\Program Files\\Docker\\Docker\\resources\\bin;C:\\Program Files\\nodejs\\;C:\\ffmpeg\\bin;C:\\Program Files\\NVIDIA Corporation\\Nsight Compute 2023.1.0\\;C:\\Program Files\\WSL\\;C:\\Program Files\\GitHub CLI\\;C:\\Users\\User\\AppData\\Local\\Programs\\Python\\Python311\\Scripts\\;C:\\Users\\User\\AppData\\Local\\Programs\\Python\\Python311\\;C:\\Users\\User\\AppData\\Local\\Programs\\Python\\Python39\\Scripts\\;C:\\Users\\User\\AppData\\Local\\Programs\\Python\\Python39\\;C:\\Users\\User\\AppData\\Local\\Microsoft\\WindowsApps;;C:\\Informática\\IntelliJ\\IntelliJ IDEA Community Edition 2024.3.2.1\\bin;;C:\\Users\\User\\AppData\\Local\\Programs\\Microsoft VS Code\\bin;C:\\Program Files\\JetBrains\\PyCharm 2025.3.1\\bin;C:\\Users\\User\\AppData\\Local\\Microsoft\\WinGet\\Packages\\PHP.PHP.8.3_Microsoft.Winget.Source_8wekyb3d8bbwe;;C:\\Users\\User\\AppData\\Local\\Programs\\Ollama;C:\\Users\\User\\AppData\\Roaming\\npm;C:\\Users\\User\\AppData\\Local\\Microsoft\\WinGet\\Packages\\ggml.llamacpp_Microsoft.Winget.Source_8wekyb3d8bbwe;C:\\Users\\User\\AppData\\Local\\Programs\\Microsoft VS Code\\bin\\copilot-shim;;c:\\Users\\User\\.vscode\\extensions\\ms-python.debugpy-2026.6.0-win32-x64\\bundled\\scripts\\noConfigScripts;c:\\Users\\User\\AppData\\Roaming\\Code\\User\\globalStorage\\github.copilot-chat\\debugCommand;C:\\Users\\User\\AppData\\Local\\Programs\\Microsoft VS Code\\bin\\copilot-shim', 'PYTEST_VERSION': '9.1.1', 'PYSIDE6_OPTION_PYTHON_ENUM': 'True', 'PYTEST_CURRENT_TEST': 'tests/hands/apps/applications_core/test_application_consumers_real_model.py::TestInternalFunctionsConsumeRealModel::test_open_application_alias_resolves_to_real_app (call)', 'JARVIS_APP_NAME': 'GitHub', 'JARVIS_APP_ID': ''}, creationflags=134217728, stdout=-1, stderr=-1),
+E            call().__enter__(),
+E            call().__enter__().communicate(None, timeout=30),
+E            call().__enter__().communicate().__iter__(),
+E            call().__enter__().kill(),
+E            call().__exit__(<class 'ValueError'>, ValueError('not enough values to unpack (expected 2, got 0)'), <traceback object at 0x0000020A83796680>),
+E            call(['chrome.exe'])].
+
+C:\Python314\Lib\unittest\mock.py:997: AssertionError
+_ TestInternalFunctionsConsumeRealModel.test_open_application_minimal_app_with_executable _
+
+self = <test_application_consumers_real_model.TestInternalFunctionsConsumeRealModel object at 0x0000020ACD6C0C50>
+
+    def test_open_application_minimal_app_with_executable(self):
+        """open_application con app minimal (contrato 3.1.2) y ejecutable funciona."""
+        manager = ApplicationManager()
+        manager.applications.clear()
+        app = ApplicationKnowledge(name="MinApp", type="utility")
+        app.executable = "fake_exe"
+        manager.applications["minapp"] = app
+        # _check_application_available: executable 'fake_exe' no existe en PATH -> False,
+        # pero MinApp no tiene 'application_available' en preflight_requirements,
+        # asi que se omite el chequeo y se lanza directamente.
+        with patch(
+            "src.hands.apps.applications_core.get_application_manager",
+            return_value=manager,
+        ), patch("src.hands.apps.applications_core.subprocess.Popen") as mock_popen, \
+             patch("src.hands.apps.applications_core._is_process_running", return_value=False):
+            mock_popen.return_value = MagicMock()
+>           result = open_application("minapp")
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\applications_core\test_application_consumers_real_model.py:471: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+app_name = 'minapp'
+
+    @register_action(
+        name="open_application",
+        description="Abre una aplicaci\u00f3n gen\u00e9rica",
+        action_type=ActionType.APPLICATION,
+        category="aplicacion",
+        tags=["aplicacion", "open", "reusable"],
+        parameters={
+            "app_name": {
+                "type": "str",
+                "required": True,
+                "description": "Nombre de la aplicaci\u00f3n a abrir",
+            }
+        },
+        preconditions=["application_exists"],
+        effects=["application_open"],
+        cost=10.0,
+        capability="open_application",
+        planner_enabled=True,
+    )
+    def open_application(app_name: str) -> str:
+        """Abre una aplicacion por el flujo unico de lanzamiento y valida el resultado.
+    
+        Delega en ``ApplicationLaunchService.open`` (``platform_launch``):
+        catalogo global -> (si no esta o no tiene destino) resolucion local por
+        ``machine_id`` y fuentes de descubrimiento con auto-registro ->
+        ``ApplicationPreflight`` obligatorio -> reutilizacion si ya esta abierta
+        (salvo que el contrato de la capacidad OPEN exija cerrarla) -> lanzamiento
+        con argv estructurado -> verificacion de proceso/ventana. Una apertura con
+        exito no se repite mientras el proceso siga vivo.
+    
+        Errores: ``ValueError`` si la aplicacion no existe en el catalogo ni en
+        este equipo (codigo ``not_found``); ``RuntimeError`` con el mensaje estructurado (preflight,
+        disponibilidad, ambiguedad, lanzamiento o verificacion) en otro caso. El
+        error estructurado completo queda en el atributo ``operation_error`` de la
+        excepcion.
+        """
+        from src.core.operation_errors import ErrorCode
+    
+        service = _launch_service_for_open()
+        outcome = service.open(app_name)
+        display = outcome.app_name or str(app_name)
+        if outcome.success:
+            if outcome.reused_existing:
+                return f"Aplicacion {display} ya esta abierta; se reutilizo la instancia existente"
+            if outcome.window_verified:
+                return f"Aplicaci\u00f3n {display} abierta exitosamente (ventana verificada)"
+            return f"Aplicaci\u00f3n {display} abierta exitosamente"
+    
+        error = outcome.error
+        if error is not None and error.code == ErrorCode.NOT_FOUND:
+            exc: Exception = ValueError(f"Aplicacion no encontrada: {app_name}")
+        else:
+            message = error.user_message() if error is not None else f"No se pudo abrir {display}"
+            exc = RuntimeError(message)
+        setattr(exc, "operation_error", error)
+        setattr(exc, "launch_outcome", outcome)
+        logger.info("open_application(%s) fallo: %s", display, error)
+>       raise exc
+E       RuntimeError: Aplicacion no encontrada en este equipo: minapp
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\src\hands\apps\applications_core.py:1506: RuntimeError
+_ TestApplicationsMemoryFileFormat.test_no_code_reads_applications_via_memory_type _
+
+self = <test_application_data_format.TestApplicationsMemoryFileFormat object at 0x0000020ACD4E4270>
+
+    def test_no_code_reads_applications_via_memory_type(self):
+        """Ningun codigo de applications_core.py referencia MemoryType.APPLICATIONS."""
+        src = (
+            (PROJECT_ROOT / "src" / "hands" / "applications_core.py")
+>           .read_text(encoding="utf-8")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        )
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\applications_core\test_application_data_format.py:349: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Python314\Lib\pathlib\__init__.py:787: in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = WindowsPath('C:/Informatica/PROYECTOS/BACKEND/IA_PYTHON/IA/JARVIS/src/hands/applications_core.py')
+mode = 'r', buffering = -1, encoding = 'utf-8', errors = None, newline = None
+
+    def open(self, mode='r', buffering=-1, encoding=None,
+             errors=None, newline=None):
+        """
+        Open the file pointed to by this path and return a file object, as
+        the built-in open() function does.
+        """
+        if "b" not in mode:
+            encoding = io.text_encoding(encoding)
+>       return io.open(self, mode, buffering, encoding, errors, newline)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Informatica\\PROYECTOS\\BACKEND\\IA_PYTHON\\IA\\JARVIS\\src\\hands\\applications_core.py'
+
+C:\Python314\Lib\pathlib\__init__.py:771: FileNotFoundError
+_ TestErrorLoggingDuringLoad.test_get_entity_invalid_logs_warning_with_id_and_exception _
+
+self = <test_application_data_incomplete.TestErrorLoggingDuringLoad object at 0x0000020ACD6CEFD0>
+tmp_path = WindowsPath('C:/Users/User/AppData/Local/Temp/pytest-of-User/pytest-1346/test_get_entity_invalid_logs_w0')
+caplog = <_pytest.logging.LogCaptureFixture object at 0x0000020ADFC8EFD0>
+
+    def test_get_entity_invalid_logs_warning_with_id_and_exception(self, tmp_path, caplog):
+        """get_entity con entity que falta 'name' -> WARNING que incluye el
+        id de la entity y el texto de la excepcion (TypeError)."""
+        incomplete = {
+            "id": "bad_app",
+            "type": "application",
+            "properties": {},
+            "aliases": [], "tags": [], "confidence": 1.0,
+            "created_at": "2024-01-01", "updated_at": "2024-01-01", "metadata": None,
+        }
+        _write_entities_json(tmp_path, [incomplete])
+        mm = MemoryManager(tmp_path)
+        caplog.set_level(logging.WARNING)
+    
+        result = mm.get_entity("bad_app")
+        assert result is None
+    
+        warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+        assert len(warnings) >= 1
+        msg = warnings[0].getMessage()
+        assert "bad_app" in msg
+        assert "name" in msg.lower() or "required" in msg.lower()
+>       assert "get_entity" in msg
+E       assert 'get_entity' in "Entidad invalida no puede reconstruirse (id=bad_app): Entity.__init__() missing 1 required positional argument: 'name'"
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\applications_core\test_application_data_incomplete.py:858: AssertionError
+------------------------------ Captured log call ------------------------------
+WARNING  src.memory.storage:storage.py:857 Entidad invalida no puede reconstruirse (id=bad_app): Entity.__init__() missing 1 required positional argument: 'name'
+__ TestErrorLoggingDuringLoad.test_get_entities_by_type_invalid_logs_warning __
+
+self = <test_application_data_incomplete.TestErrorLoggingDuringLoad object at 0x0000020ACD9729E0>
+tmp_path = WindowsPath('C:/Users/User/AppData/Local/Temp/pytest-of-User/pytest-1346/test_get_entities_by_type_inva0')
+caplog = <_pytest.logging.LogCaptureFixture object at 0x0000020ADFC8CB90>
+
+    def test_get_entities_by_type_invalid_logs_warning(self, tmp_path, caplog):
+        """get_entities_by_type con entity incompleta -> WARNING per-item
+        con el id y la excepcion; la entity valida se carga igual."""
+        incomplete = {
+            "id": "bad_app",
+            "type": "application",
+            "properties": {},
+            "aliases": [], "tags": [], "confidence": 1.0,
+            "created_at": "2024-01-01", "updated_at": "2024-01-01", "metadata": None,
+        }
+        _write_entities_json(tmp_path, [_make_valid_entity("ok", "Good"), incomplete])
+        mm = MemoryManager(tmp_path)
+        caplog.set_level(logging.WARNING)
+    
+        result = mm.get_entities_by_type("application")
+        assert len(result) == 1
+        assert result[0].id == "ok"
+    
+        warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+        assert len(warnings) >= 1
+        msg = warnings[0].getMessage()
+        assert "bad_app" in msg
+>       assert "get_entities_by_type" in msg
+E       assert 'get_entities_by_type' in "Entidad invalida omitida (id=bad_app) al cargar tipo 'application': Entity.__init__() missing 1 required positional argument: 'name'"
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\applications_core\test_application_data_incomplete.py:883: AssertionError
+------------------------------ Captured log call ------------------------------
+WARNING  src.memory.storage:storage.py:895 Entidad invalida omitida (id=bad_app) al cargar tipo 'application': Entity.__init__() missing 1 required positional argument: 'name'
+_ TestErrorLoggingDuringLoad.test_save_entity_exception_logs_error_with_exception _
+
+self = <test_application_data_incomplete.TestErrorLoggingDuringLoad object at 0x0000020ACD55A750>
+tmp_path = WindowsPath('C:/Users/User/AppData/Local/Temp/pytest-of-User/pytest-1346/test_save_entity_exception_log0')
+caplog = <_pytest.logging.LogCaptureFixture object at 0x0000020AE04CB790>
+
+    def test_save_entity_exception_logs_error_with_exception(self, tmp_path, caplog):
+        """save_entity con file permission error -> ERROR que incluye el
+        tipo de excepcion."""
+        from src.memory.storage import MemoryType
+        mm = MemoryManager(tmp_path)
+        caplog.set_level(logging.ERROR)
+    
+        with patch.object(
+            mm.storage, "save",
+            side_effect=OSError("disk full"),
+        ):
+            result = mm.save_entity(Entity(
+                id="test_ent", type="application", name="Test", properties={},
+                created_at="2024-01-01T00:00:00", updated_at="2024-01-01T00:00:00",
+            ))
+>           assert result is False
+E           assert True is False
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\applications_core\test_application_data_incomplete.py:1001: AssertionError
+______________ TestNameUniquenessBehavior.test_same_name_skipped ______________
+
+self = <test_application_identification.TestNameUniquenessBehavior object at 0x0000020ACD576350>
+
+    def test_same_name_skipped(self):
+        """Registro duplicado (misma clave name.lower()) se omite, no sobreescribe."""
+        manager = ApplicationManager.__new__(ApplicationManager)
+        manager.applications = {}
+    
+        class FakeMM:
+            def __init__(self):
+                self.save_calls = 0
+    
+            def save_entity(self, entity):
+                self.save_calls += 1
+        mm = FakeMM()
+        manager.memory_manager = mm
+    
+        app1 = ApplicationKnowledge(name="DupApp", type="utility", executable="dup1")
+        app2 = ApplicationKnowledge(name="dupapp", type="browser", executable="dup2")
+        assert manager.register_application(app1) is True
+>       assert manager.register_application(app2) is False
+E       AssertionError: assert True is False
+E        +  where True = register_application(ApplicationKnowledge(name='dupapp', type='browser', executable='dup2', url=None, icon=None, capabilities=[], ui_elemen...alse, calibration_policy=[], preflight_requirements=[], default_state=<ApplicationState.CLOSED: 'closed'>, metadata={}))
+E        +    where register_application = <src.hands.apps.applications_core.ApplicationManager object at 0x0000020A81C1DE50>.register_application
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\applications_core\test_application_identification.py:163: AssertionError
+_ TestRegisterApplicationDuplicateAvoidance.test_second_registration_returns_false _
+
+self = <test_application_register_duplicates.TestRegisterApplicationDuplicateAvoidance object at 0x0000020ACDB3CB90>
+
+    def test_second_registration_returns_false(self):
+        """Registrar la misma app dos veces: segunda vez devuelve False."""
+        manager = _make_min_manager()
+        app = _make_app(name="DupApp")
+        assert manager.register_application(app) is True
+>       assert manager.register_application(app) is False
+E       AssertionError: assert True is False
+E        +  where True = register_application(ApplicationKnowledge(name='DupApp', type='browser', executable='dupapp', url=None, icon=None, capabilities=[], ui_elem...tion_policy=[], preflight_requirements=[], default_state=<ApplicationState.CLOSED: 'closed'>, metadata={'aliases': []}))
+E        +    where register_application = <src.hands.apps.applications_core.ApplicationManager object at 0x0000020AE050CCB0>.register_application
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\applications_core\test_application_register_duplicates.py:79: AssertionError
+_ TestRegisterApplicationDuplicateAvoidance.test_duplicate_does_not_call_save_entity _
+
+self = <test_application_register_duplicates.TestRegisterApplicationDuplicateAvoidance object at 0x0000020ACDB3D1D0>
+
+    def test_duplicate_does_not_call_save_entity(self):
+        """La segunda llamada no invoca save_entity (evita escritura duplicada)."""
+        manager = _make_min_manager()
+        app = _make_app(name="DupApp")
+        manager.register_application(app)
+        first_calls = manager.memory_manager.save_calls
+        manager.register_application(app)
+>       assert manager.memory_manager.save_calls == first_calls
+E       assert 2 == 1
+E        +  where 2 = <test_application_register_duplicates._make_min_manager.<locals>._CountingMemoryManager object at 0x0000020ADFB3F0E0>.save_calls
+E        +    where <test_application_register_duplicates._make_min_manager.<locals>._CountingMemoryManager object at 0x0000020ADFB3F0E0> = <src.hands.apps.applications_core.ApplicationManager object at 0x0000020AE050FE90>.memory_manager
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\applications_core\test_application_register_duplicates.py:88: AssertionError
+_ TestRegisterApplicationDuplicateAvoidance.test_duplicate_does_not_overwrite_existing_app _
+
+self = <test_application_register_duplicates.TestRegisterApplicationDuplicateAvoidance object at 0x0000020ACC90B950>
+
+    def test_duplicate_does_not_overwrite_existing_app(self):
+        """La app registrada original no se sobreescribe con una instancia distinta."""
+        manager = _make_min_manager()
+        app_v1 = _make_app(name="DupApp", executable="dupapp_v1")
+        app_v2 = _make_app(name="DupApp", executable="dupapp_v2")
+        manager.register_application(app_v1)
+        result = manager.register_application(app_v2)
+>       assert result is False
+E       assert True is False
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\applications_core\test_application_register_duplicates.py:97: AssertionError
+_ TestRegisterApplicationDuplicateAvoidance.test_duplicate_save_entity_called_exactly_once _
+
+self = <test_application_register_duplicates.TestRegisterApplicationDuplicateAvoidance object at 0x0000020ACC90BA80>
+
+    def test_duplicate_save_entity_called_exactly_once(self):
+        """save_entity se llama exactamente una vez tras dos registros del mismo app."""
+        manager = _make_min_manager()
+        app = _make_app(name="DupApp")
+        manager.register_application(app)
+        manager.register_application(app)
+>       assert manager.memory_manager.save_calls == 1
+E       assert 2 == 1
+E        +  where 2 = <test_application_register_duplicates._make_min_manager.<locals>._CountingMemoryManager object at 0x0000020ADFB3DA90>.save_calls
+E        +    where <test_application_register_duplicates._make_min_manager.<locals>._CountingMemoryManager object at 0x0000020ADFB3DA90> = <src.hands.apps.applications_core.ApplicationManager object at 0x0000020ADFB8E750>.memory_manager
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\applications_core\test_application_register_duplicates.py:108: AssertionError
+_ TestRegisterApplicationDuplicateAvoidance.test_duplicate_entity_stored_once _
+
+self = <test_application_register_duplicates.TestRegisterApplicationDuplicateAvoidance object at 0x0000020ACC9957F0>
+
+    def test_duplicate_entity_stored_once(self):
+        """Solo se almacena una entidad para la app duplicada."""
+        manager = _make_min_manager()
+        app = _make_app(name="DupApp")
+        manager.register_application(app)
+        manager.register_application(app)
+>       assert len(manager.memory_manager.saved) == 1
+E       AssertionError: assert 2 == 1
+E        +  where 2 = len([Entity(id='app_dupapp', type='application', name='DupApp', properties={'type': 'browser', 'executable': 'dupapp', 'ur...6-11-21T13:12:59.151158', updated_at='2026-11-21T13:12:59.151159', metadata=None, aliases=[], confidence=1.0, tags=[])])
+E        +    where [Entity(id='app_dupapp', type='application', name='DupApp', properties={'type': 'browser', 'executable': 'dupapp', 'ur...6-11-21T13:12:59.151158', updated_at='2026-11-21T13:12:59.151159', metadata=None, aliases=[], confidence=1.0, tags=[])] = <test_application_register_duplicates._make_min_manager.<locals>._CountingMemoryManager object at 0x0000020ADFB3F230>.saved
+E        +      where <test_application_register_duplicates._make_min_manager.<locals>._CountingMemoryManager object at 0x0000020ADFB3F230> = <src.hands.apps.applications_core.ApplicationManager object at 0x0000020ADFB8DA90>.memory_manager
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\applications_core\test_application_register_duplicates.py:116: AssertionError
+__ TestRegisterApplicationDuplicateDetection.test_case_insensitive_duplicate __
+
+self = <test_application_register_duplicates.TestRegisterApplicationDuplicateDetection object at 0x0000020ACDB3D450>
+
+    def test_case_insensitive_duplicate(self):
+        """Mismo nombre con diferente capitalizacion se detecta como duplicado."""
+        manager = _make_min_manager()
+        app = _make_app(name="MyApp")
+        manager.register_application(app)
+        # "MyApp" y "myapp" comparten la clave "myapp"
+        dup = _make_app(name="MYAPP", executable="other")
+>       assert manager.register_application(dup) is False
+E       AssertionError: assert True is False
+E        +  where True = register_application(ApplicationKnowledge(name='MYAPP', type='browser', executable='other', url=None, icon=None, capabilities=[], ui_elemen...alse, calibration_policy=[], preflight_requirements=[], default_state=<ApplicationState.CLOSED: 'closed'>, metadata={}))
+E        +    where register_application = <src.hands.apps.applications_core.ApplicationManager object at 0x0000020ADFB8E2D0>.register_application
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\applications_core\test_application_register_duplicates.py:141: AssertionError
+___ TestRegisterApplicationDuplicateDetection.test_spaces_and_case_variants ___
+
+self = <test_application_register_duplicates.TestRegisterApplicationDuplicateDetection object at 0x0000020ACC90BBB0>
+
+    def test_spaces_and_case_variants(self):
+        """Nombre con espacios/extra se normaliza: solo el nombre lower importa."""
+        manager = _make_min_manager()
+        app = _make_app(name="TestApp")
+        manager.register_application(app)
+        # "testapp" like key (exact name lower)
+>       assert manager.register_application(_make_app(name="TESTAPP")) is False
+E       AssertionError: assert True is False
+E        +  where True = register_application(ApplicationKnowledge(name='TESTAPP', type='browser', executable='dupapp', url=None, icon=None, capabilities=[], ui_ele...alse, calibration_policy=[], preflight_requirements=[], default_state=<ApplicationState.CLOSED: 'closed'>, metadata={}))
+E        +    where register_application = <src.hands.apps.applications_core.ApplicationManager object at 0x0000020ADFB8D5B0>.register_application
+E        +    and   ApplicationKnowledge(name='TESTAPP', type='browser', executable='dupapp', url=None, icon=None, capabilities=[], ui_ele...alse, calibration_policy=[], preflight_requirements=[], default_state=<ApplicationState.CLOSED: 'closed'>, metadata={}) = _make_app(name='TESTAPP')
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\applications_core\test_application_register_duplicates.py:161: AssertionError
+_ TestRegisterApplicationDuplicateDetection.test_app_with_ui_elements_not_duplicated _
+
+self = <test_application_register_duplicates.TestRegisterApplicationDuplicateDetection object at 0x0000020ACC90BCE0>
+
+    def test_app_with_ui_elements_not_duplicated(self):
+        """App con ui_elements/states: el duplicado se detecta igualmente."""
+        manager = _make_min_manager()
+        app = ApplicationKnowledge(
+            name="UiApp", type="browser", executable="uiapp",
+            ui_elements=[UIElement(name="btn", type="button",
+                                   required_capability=ApplicationCapability.OPEN)],
+            states=[ApplicationState.OPEN, ApplicationState.ACTIVE],
+        )
+        assert manager.register_application(app) is True
+>       assert manager.register_application(app) is False
+E       AssertionError: assert True is False
+E        +  where True = register_application(ApplicationKnowledge(name='UiApp', type='browser', executable='uiapp', url=None, icon=None, capabilities=[], ui_elemen...tion_policy=[], preflight_requirements=[], default_state=<ApplicationState.CLOSED: 'closed'>, metadata={'aliases': []}))
+E        +    where register_application = <src.hands.apps.applications_core.ApplicationManager object at 0x0000020AE050CCB0>.register_application
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\applications_core\test_application_register_duplicates.py:173: AssertionError
+_ TestRegisterApplicationNotBlocked.test_register_after_duplicate_re_registers_different_app _
+
+self = <test_application_register_duplicates.TestRegisterApplicationNotBlocked object at 0x0000020ACDB3DD10>
+
+    def test_register_after_duplicate_re_registers_different_app(self):
+        """Despues de un duplicado rechazado, una app nueva se registra OK."""
+        manager = _make_min_manager()
+        app = _make_app(name="FirstApp")
+        manager.register_application(app)
+        # Intento de duplicado -> rechazado
+>       assert manager.register_application(_make_app(name="FIRSTAPP")) is False
+E       AssertionError: assert True is False
+E        +  where True = register_application(ApplicationKnowledge(name='FIRSTAPP', type='browser', executable='dupapp', url=None, icon=None, capabilities=[], ui_el...alse, calibration_policy=[], preflight_requirements=[], default_state=<ApplicationState.CLOSED: 'closed'>, metadata={}))
+E        +    where register_application = <src.hands.apps.applications_core.ApplicationManager object at 0x0000020AE050C830>.register_application
+E        +    and   ApplicationKnowledge(name='FIRSTAPP', type='browser', executable='dupapp', url=None, icon=None, capabilities=[], ui_el...alse, calibration_policy=[], preflight_requirements=[], default_state=<ApplicationState.CLOSED: 'closed'>, metadata={}) = _make_app(name='FIRSTAPP')
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\applications_core\test_application_register_duplicates.py:301: AssertionError
+_ TestRegisterDuplicateWithRealMemoryManager.test_second_registration_returns_false _
+
+self = <test_application_register_in_memory.TestRegisterDuplicateWithRealMemoryManager object at 0x0000020ACDB3E210>
+tmp_path = WindowsPath('C:/Users/User/AppData/Local/Temp/pytest-of-User/pytest-1346/test_second_registration_retur0')
+
+    def test_second_registration_returns_false(self, tmp_path):
+        """Registrar la misma app dos veces: segunda vez devuelve False."""
+        mm = MemoryManager(tmp_path)
+        manager = _make_min_manager(mm)
+        app = _make_app(name="DupApp")
+    
+        assert manager.register_application(app) is True
+>       assert manager.register_application(app) is False
+E       AssertionError: assert True is False
+E        +  where True = register_application(ApplicationKnowledge(name='DupApp', type='utility', executable='myapp.exe', url=None, icon=None, capabilities=[], ui_e...tion_policy=[], preflight_requirements=[], default_state=<ApplicationState.CLOSED: 'closed'>, metadata={'aliases': []}))
+E        +    where register_application = <src.hands.apps.applications_core.ApplicationManager object at 0x0000020AE050E6F0>.register_application
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\applications_core\test_application_register_in_memory.py:227: AssertionError
+_ TestRegisterDuplicateWithRealMemoryManager.test_duplicate_preserves_original_app _
+
+self = <test_application_register_in_memory.TestRegisterDuplicateWithRealMemoryManager object at 0x0000020ACD5D43E0>
+tmp_path = WindowsPath('C:/Users/User/AppData/Local/Temp/pytest-of-User/pytest-1346/test_duplicate_preserves_origi0')
+
+    def test_duplicate_preserves_original_app(self, tmp_path):
+        """La app registrada original no se sobreescribe con otra instancia del
+        mismo nombre."""
+        mm = MemoryManager(tmp_path)
+        manager = _make_min_manager(mm)
+        app_v1 = _make_app(name="DupApp", executable="dupapp_v1")
+        app_v2 = _make_app(name="DupApp", executable="dupapp_v2")
+        manager.register_application(app_v1)
+    
+>       assert manager.register_application(app_v2) is False
+E       AssertionError: assert True is False
+E        +  where True = register_application(ApplicationKnowledge(name='DupApp', type='utility', executable='dupapp_v2', url=None, icon=None, capabilities=[], ui_e...alse, calibration_policy=[], preflight_requirements=[], default_state=<ApplicationState.CLOSED: 'closed'>, metadata={}))
+E        +    where register_application = <src.hands.apps.applications_core.ApplicationManager object at 0x0000020A81463D10>.register_application
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\applications_core\test_application_register_in_memory.py:251: AssertionError
+_ TestRegisterDuplicateWithRealMemoryManager.test_duplicate_does_not_overwrite_entity_in_cache _
+
+self = <test_application_register_in_memory.TestRegisterDuplicateWithRealMemoryManager object at 0x0000020ACD5D4510>
+tmp_path = WindowsPath('C:/Users/User/AppData/Local/Temp/pytest-of-User/pytest-1346/test_duplicate_does_not_overwr0')
+
+    def test_duplicate_does_not_overwrite_entity_in_cache(self, tmp_path):
+        """La entidad en cache conserva los datos del registro original."""
+        mm = MemoryManager(tmp_path)
+        manager = _make_min_manager(mm)
+        app_v1 = _make_app(name="DupApp", app_type="browser", executable="dupapp_v1")
+        app_v2 = _make_app(name="DupApp", app_type="player", executable="dupapp_v2")
+        manager.register_application(app_v1)
+        manager.register_application(app_v2)  # omitido (duplicado)
+    
+        entity = mm.get_entity("app_dupapp")
+        assert entity is not None
+        assert entity.name == "DupApp"
+>       assert entity.properties["type"] == "browser"
+E       AssertionError: assert 'player' == 'browser'
+E         
+E         - browser
+E         + player
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\applications_core\test_application_register_in_memory.py:268: AssertionError
+_ TestApplicationManagerWhenSourceMissing.test_source_file_content_after_init _
+
+self = <test_application_source_missing.TestApplicationManagerWhenSourceMissing object at 0x0000020ACDAB47D0>
+isolated_manager = (<src.hands.apps.applications_core.ApplicationManager object at 0x0000020AE04FCE90>, <src.memory.storage.MemoryManager...ADFCBF1C0>, WindowsPath('C:/Users/User/AppData/Local/Temp/pytest-of-User/pytest-1346/test_source_file_content_after0'))
+
+    def test_source_file_content_after_init(self, isolated_manager):
+        """Caracterizacion del contenido real del fichero tras init sin fuente.
+    
+        entities.json se crea con `[]` (vacia) debido a un hallazgo preexistente
+        (D-ENTITIES-PERSIST-BUG): save_entity pasa dicts a _process_data_for_save
+        que solo procesa instancias de Entity. Este test documenta el
+        comportamiento actual, no asume que el bug debe corregirse aqui."""
+        manager, mm, tmp_path = isolated_manager
+        entities_path = tmp_path / "entities.json"
+        content = json.loads(entities_path.read_text(encoding="utf-8"))
+>       assert content == []
+E       AssertionError: assert [{'id': 'app_...e, ...}, ...}] == []
+E         
+E         Left contains 2 more items, first extra item: {'id': 'app_chrome', 'type': 'application', 'name': 'Chrome', 'properties': {'type': 'browser', 'executable': 'chrome', 'url': 'https://chrome.google.com', 'login_required': False, ...}, ...}
+E         Use -v to get more diff
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\applications_core\test_application_source_missing.py:260: AssertionError
+_ TestOpenApplication.test_open_rechazado_por_preflight_ejecutable_no_resuelto _
+
+self = <test_applications_core.TestOpenApplication object at 0x0000020ACF380490>
+
+    def test_open_rechazado_por_preflight_ejecutable_no_resuelto(self):
+        """3.8.5.1.4.7.10: open_application rechaza apps cuyo ejecutable no se resuelve."""
+        fake_manager = ApplicationManager()
+        app = ApplicationKnowledge(
+            name="UnknownApp", type="utility", executable="nonexistent_xyz.exe",
+        )
+        fake_manager.applications["unknownapp"] = app
+        with patch("src.hands.apps.applications_core.get_application_manager", return_value=fake_manager):
+>           with pytest.raises(RuntimeError, match="no paso el preflight"):
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           AssertionError: Regex pattern did not match.
+E             Expected regex: 'no paso el preflight'
+E             Actual message: 'Aplicacion no encontrada en este equipo: unknownapp'
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\applications_core\test_applications_core.py:789: AssertionError
+_ TestInternalFunctionsConsumerCompatibility.test_open_application_resolves_from_model _
+
+self = <test_consumer_api_compatibility.TestInternalFunctionsConsumerCompatibility object at 0x0000020ACF2EB230>
+
+    def test_open_application_resolves_from_model(self):
+        """open_application resuelve la app desde el modelo y accede app.name, app.executable,
+        app.preflight_requirements - API consumida por el executor/accion registrada."""
+        with patch("src.hands.apps.applications_core.subprocess.Popen") as mock_popen, \
+             patch(
+                 "src.hands.apps.applications_core._check_application_available",
+                 return_value=True,
+             ):
+            mock_popen.return_value = MagicMock()
+            result = open_application("chrome")
+            assert isinstance(result, str)
+            assert "Chrome" in result
+>           mock_popen.assert_called_once_with(["chrome"])
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\applications_core\test_consumer_api_compatibility.py:319: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <MagicMock name='Popen' id='2245697636400'>, args = (['chrome'],)
+kwargs = {}
+
+    def assert_called_once_with(self, /, *args, **kwargs):
+        """assert that the mock was called exactly once and that that call was
+        with the specified arguments."""
+        if not self.call_count == 1:
+            msg = ("Expected '%s' to be called once. Called %s times.%s"
+                   % (self._mock_name or 'mock',
+                      self.call_count,
+                      self._calls_repr()))
+>           raise AssertionError(msg)
+E           AssertionError: Expected 'Popen' to be called once. Called 2 times.
+E           Calls: [call(['tasklist', '/FI', 'IMAGENAME eq chrome'], text=True, creationflags=134217728, stdout=-1, stderr=-1),
+E            call().__enter__(),
+E            call().__enter__().communicate(None, timeout=None),
+E            call().__enter__().communicate().__iter__(),
+E            call().__enter__().kill(),
+E            call().__exit__(<class 'ValueError'>, ValueError('not enough values to unpack (expected 2, got 0)'), <traceback object at 0x0000020AF2952800>),
+E            call(['C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'])].
+
+C:\Python314\Lib\unittest\mock.py:997: AssertionError
+_ TestInternalFunctionsConsumerCompatibility.test_open_application_minimal_app_with_executable _
+
+self = <test_consumer_api_compatibility.TestInternalFunctionsConsumerCompatibility object at 0x0000020ACF382AD0>
+
+    def test_open_application_minimal_app_with_executable(self):
+        """open_application accede app.executable, app.name y app.preflight_requirements;
+        una app minimal (contrato 3.1.2) con ejecutable funciona correctamente.
+        Se parchea subprocess.Popen para evitar ejecucion real."""
+        manager = _make_minimal_manager(name="MinApp", app_type="utility")
+        manager.applications["minapp"].executable = "fake_exe"
+        with patch(
+            "src.hands.apps.applications_core.get_application_manager",
+            return_value=manager,
+        ), patch(
+            "src.hands.apps.applications_core.subprocess.Popen"
+        ) as mock_popen:
+            mock_popen.return_value = MagicMock()
+>           result = open_application("minapp")
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\applications_core\test_consumer_api_compatibility.py:339: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+app_name = 'minapp'
+
+    @register_action(
+        name="open_application",
+        description="Abre una aplicaci\u00f3n gen\u00e9rica",
+        action_type=ActionType.APPLICATION,
+        category="aplicacion",
+        tags=["aplicacion", "open", "reusable"],
+        parameters={
+            "app_name": {
+                "type": "str",
+                "required": True,
+                "description": "Nombre de la aplicaci\u00f3n a abrir",
+            }
+        },
+        preconditions=["application_exists"],
+        effects=["application_open"],
+        cost=10.0,
+        capability="open_application",
+        planner_enabled=True,
+    )
+    def open_application(app_name: str) -> str:
+        """Abre una aplicacion por el flujo unico de lanzamiento y valida el resultado.
+    
+        Delega en ``ApplicationLaunchService.open`` (``platform_launch``):
+        catalogo global -> (si no esta o no tiene destino) resolucion local por
+        ``machine_id`` y fuentes de descubrimiento con auto-registro ->
+        ``ApplicationPreflight`` obligatorio -> reutilizacion si ya esta abierta
+        (salvo que el contrato de la capacidad OPEN exija cerrarla) -> lanzamiento
+        con argv estructurado -> verificacion de proceso/ventana. Una apertura con
+        exito no se repite mientras el proceso siga vivo.
+    
+        Errores: ``ValueError`` si la aplicacion no existe en el catalogo ni en
+        este equipo (codigo ``not_found``); ``RuntimeError`` con el mensaje estructurado (preflight,
+        disponibilidad, ambiguedad, lanzamiento o verificacion) en otro caso. El
+        error estructurado completo queda en el atributo ``operation_error`` de la
+        excepcion.
+        """
+        from src.core.operation_errors import ErrorCode
+    
+        service = _launch_service_for_open()
+        outcome = service.open(app_name)
+        display = outcome.app_name or str(app_name)
+        if outcome.success:
+            if outcome.reused_existing:
+                return f"Aplicacion {display} ya esta abierta; se reutilizo la instancia existente"
+            if outcome.window_verified:
+                return f"Aplicaci\u00f3n {display} abierta exitosamente (ventana verificada)"
+            return f"Aplicaci\u00f3n {display} abierta exitosamente"
+    
+        error = outcome.error
+        if error is not None and error.code == ErrorCode.NOT_FOUND:
+            exc: Exception = ValueError(f"Aplicacion no encontrada: {app_name}")
+        else:
+            message = error.user_message() if error is not None else f"No se pudo abrir {display}"
+            exc = RuntimeError(message)
+        setattr(exc, "operation_error", error)
+        setattr(exc, "launch_outcome", outcome)
+        logger.info("open_application(%s) fallo: %s", display, error)
+>       raise exc
+E       RuntimeError: Fallo consultando las fuentes de descubrimiento: not enough values to unpack (expected 2, got 0)
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\src\hands\apps\applications_core.py:1506: RuntimeError
+_ TestInternalFunctionsConsumerCompatibility.test_open_application_minimal_app_no_executable_no_url _
+
+self = <test_consumer_api_compatibility.TestInternalFunctionsConsumerCompatibility object at 0x0000020ACF382F10>
+
+    def test_open_application_minimal_app_no_executable_no_url(self):
+        """open_application accede app.executable y app.url; con ambos None levanta RuntimeError.
+    
+        NOTA: tras la correccion del manejador de errores en applications_core.py,
+        open_application propaga correctamente el RuntimeError original cuando la app
+        no tiene ejecutable ni URL configurados. La compatibilidad del API modelo no
+        se ve afectada: open_application accede correctamente a app.executable y app.url."""
+        manager = _make_minimal_manager(name="MinApp", app_type="utility")
+        with patch(
+            "src.hands.apps.applications_core.get_application_manager",
+            return_value=manager,
+        ):
+>           with pytest.raises(RuntimeError, match="no tiene ejecutable ni URL"):
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           AssertionError: Regex pattern did not match.
+E             Expected regex: 'no tiene ejecutable ni URL'
+E             Actual message: 'Aplicacion no encontrada en este equipo: minapp'
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\applications_core\test_consumer_api_compatibility.py:356: AssertionError
+_ TestNoDuplicadosMemoria.test_registro_catalogo_duplicado_no_guarda_dos_veces _
+
+self = <test_duplicados_y_preservacion_entities_json.TestNoDuplicadosMemoria object at 0x0000020ACD9B9F90>
+
+    def test_registro_catalogo_duplicado_no_guarda_dos_veces(self) -> None:
+        """register_application omite duplicados por nombre normalizado y no
+        llama a save_entity dos veces."""
+        manager = _make_manager()
+        mm: _FakeMemoryManager = manager.memory_manager  # type: ignore[assignment]
+        saved_antes = len(mm.saved_entities)
+    
+        app = ApplicationKnowledge(name="Chrome", type="browser", executable="chrome.exe")
+        assert manager.register_application(app) is True
+        assert len(mm.saved_entities) == saved_antes + 1
+    
+        app2 = ApplicationKnowledge(name="chrome", type="browser", executable="chrome.exe")
+>       assert manager.register_application(app2) is False, "nombre normalizado duplicado -> se omite"
+E       AssertionError: nombre normalizado duplicado -> se omite
+E       assert True is False
+E        +  where True = register_application(ApplicationKnowledge(name='chrome', type='browser', executable='chrome.exe', url=None, icon=None, capabilities=[], ui_...alse, calibration_policy=[], preflight_requirements=[], default_state=<ApplicationState.CLOSED: 'closed'>, metadata={}))
+E        +    where register_application = <src.hands.apps.applications_core.ApplicationManager object at 0x0000020AE3B938F0>.register_application
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\applications_core\test_duplicados_y_preservacion_entities_json.py:167: AssertionError
+_ TestPreservacionEntitiesJsonDescubrimiento.test_memory_entities_json_inalterable _
+
+self = <test_entities_json_preservation_discovery.TestPreservacionEntitiesJsonDescubrimiento object at 0x0000020ACD9BA5D0>
+
+    def test_memory_entities_json_inalterable(self):
+        """data/memory/entities.json (usado por MemoryManager) no se modifica
+        por registro/consumo de conocimiento dinamico."""
+        resultado = verify_entities_json_unchanged(
+            _ruta_entities_memoria(), _operacion_registro_y_consumo
+        )
+>       assert resultado["source_untouched"] is True
+E       assert False is True
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\applications_core\test_entities_json_preservation_discovery.py:153: AssertionError
+_______________ TestUIElementInteraction.test_ui_element_click ________________
+
+self = <test_ui_elements.TestUIElementInteraction object at 0x0000020ACF2EC190>
+
+    def test_ui_element_click(self):
+        """Test de clic en elemento UI"""
+        element_name = "submit_button"
+        expected_coords = {"x": 300, "y": 400, "width": 100, "height": 40}
+    
+        with patch.object(self.coordinate_manager, 'get_calibration') as mock_get:
+            mock_get.return_value = expected_coords
+    
+>           with patch('tests.hands.calibration.test_ui_elements.click_element') as mock_click:
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\applications_core\test_ui_elements.py:217: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Python314\Lib\unittest\mock.py:1494: in __enter__
+    self.target = self.getter()
+                  ^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+name = 'tests.hands.calibration.test_ui_elements'
+
+    def resolve_name(name):
+        """
+        Resolve a name to an object.
+    
+        It is expected that `name` will be a string in one of the following
+        formats, where W is shorthand for a valid Python identifier and dot stands
+        for a literal period in these pseudo-regexes:
+    
+        W(.W)*
+        W(.W)*:(W(.W)*)?
+    
+        The first form is intended for backward compatibility only. It assumes that
+        some part of the dotted name is a package, and the rest is an object
+        somewhere within that package, possibly nested inside other objects.
+        Because the place where the package stops and the object hierarchy starts
+        can't be inferred by inspection, repeated attempts to import must be done
+        with this form.
+    
+        In the second form, the caller makes the division point clear through the
+        provision of a single colon: the dotted name to the left of the colon is a
+        package to be imported, and the dotted name to the right is the object
+        hierarchy within that package. Only one import is needed in this form. If
+        it ends with the colon, then a module object is returned.
+    
+        The function will return an object (which might be a module), or raise one
+        of the following exceptions:
+    
+        ValueError - if `name` isn't in a recognised format
+        ImportError - if an import failed when it shouldn't have
+        AttributeError - if a failure occurred when traversing the object hierarchy
+                         within the imported package to get to the desired object.
+        """
+        global _NAME_PATTERN
+        if _NAME_PATTERN is None:
+            # Lazy import to speedup Python startup time
+            import re
+            dotted_words = r'(?!\d)(\w+)(\.(?!\d)(\w+))*'
+            _NAME_PATTERN = re.compile(f'^(?P<pkg>{dotted_words})'
+                                       f'(?P<cln>:(?P<obj>{dotted_words})?)?$',
+                                       re.UNICODE)
+    
+        m = _NAME_PATTERN.match(name)
+        if not m:
+            raise ValueError(f'invalid format: {name!r}')
+        gd = m.groupdict()
+        if gd.get('cln'):
+            # there is a colon - a one-step import is all that's needed
+            mod = importlib.import_module(gd['pkg'])
+            parts = gd.get('obj')
+            parts = parts.split('.') if parts else []
+        else:
+            # no colon - have to iterate to find the package boundary
+            parts = name.split('.')
+            modname = parts.pop(0)
+            # first part *must* be a module/package.
+            mod = importlib.import_module(modname)
+            while parts:
+                p = parts[0]
+                s = f'{modname}.{p}'
+                try:
+                    mod = importlib.import_module(s)
+                    parts.pop(0)
+                    modname = s
+                except ImportError:
+                    break
+        # if we reach this point, mod is the module, already imported, and
+        # parts is the list of parts in the object hierarchy to be traversed, or
+        # an empty list if just the module is wanted.
+        result = mod
+        for p in parts:
+>           result = getattr(result, p)
+                     ^^^^^^^^^^^^^^^^^^
+E           AttributeError: module 'tests.hands.calibration' has no attribute 'test_ui_elements'
+
+C:\Python314\Lib\pkgutil.py:473: AttributeError
+____________ TestUIElementInteraction.test_ui_element_double_click ____________
+
+self = <test_ui_elements.TestUIElementInteraction object at 0x0000020ACF2EC2D0>
+
+    def test_ui_element_double_click(self):
+        """Test de doble clic en elemento UI"""
+        element_name = "file_item"
+        expected_coords = {"x": 150, "y": 250, "width": 200, "height": 30}
+    
+        with patch.object(self.coordinate_manager, 'get_calibration') as mock_get:
+            mock_get.return_value = expected_coords
+    
+>           with patch('tests.hands.calibration.test_ui_elements.click_element') as mock_click:
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\applications_core\test_ui_elements.py:230: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Python314\Lib\unittest\mock.py:1494: in __enter__
+    self.target = self.getter()
+                  ^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+name = 'tests.hands.calibration.test_ui_elements'
+
+    def resolve_name(name):
+        """
+        Resolve a name to an object.
+    
+        It is expected that `name` will be a string in one of the following
+        formats, where W is shorthand for a valid Python identifier and dot stands
+        for a literal period in these pseudo-regexes:
+    
+        W(.W)*
+        W(.W)*:(W(.W)*)?
+    
+        The first form is intended for backward compatibility only. It assumes that
+        some part of the dotted name is a package, and the rest is an object
+        somewhere within that package, possibly nested inside other objects.
+        Because the place where the package stops and the object hierarchy starts
+        can't be inferred by inspection, repeated attempts to import must be done
+        with this form.
+    
+        In the second form, the caller makes the division point clear through the
+        provision of a single colon: the dotted name to the left of the colon is a
+        package to be imported, and the dotted name to the right is the object
+        hierarchy within that package. Only one import is needed in this form. If
+        it ends with the colon, then a module object is returned.
+    
+        The function will return an object (which might be a module), or raise one
+        of the following exceptions:
+    
+        ValueError - if `name` isn't in a recognised format
+        ImportError - if an import failed when it shouldn't have
+        AttributeError - if a failure occurred when traversing the object hierarchy
+                         within the imported package to get to the desired object.
+        """
+        global _NAME_PATTERN
+        if _NAME_PATTERN is None:
+            # Lazy import to speedup Python startup time
+            import re
+            dotted_words = r'(?!\d)(\w+)(\.(?!\d)(\w+))*'
+            _NAME_PATTERN = re.compile(f'^(?P<pkg>{dotted_words})'
+                                       f'(?P<cln>:(?P<obj>{dotted_words})?)?$',
+                                       re.UNICODE)
+    
+        m = _NAME_PATTERN.match(name)
+        if not m:
+            raise ValueError(f'invalid format: {name!r}')
+        gd = m.groupdict()
+        if gd.get('cln'):
+            # there is a colon - a one-step import is all that's needed
+            mod = importlib.import_module(gd['pkg'])
+            parts = gd.get('obj')
+            parts = parts.split('.') if parts else []
+        else:
+            # no colon - have to iterate to find the package boundary
+            parts = name.split('.')
+            modname = parts.pop(0)
+            # first part *must* be a module/package.
+            mod = importlib.import_module(modname)
+            while parts:
+                p = parts[0]
+                s = f'{modname}.{p}'
+                try:
+                    mod = importlib.import_module(s)
+                    parts.pop(0)
+                    modname = s
+                except ImportError:
+                    break
+        # if we reach this point, mod is the module, already imported, and
+        # parts is the list of parts in the object hierarchy to be traversed, or
+        # an empty list if just the module is wanted.
+        result = mod
+        for p in parts:
+>           result = getattr(result, p)
+                     ^^^^^^^^^^^^^^^^^^
+E           AttributeError: module 'tests.hands.calibration' has no attribute 'test_ui_elements'
+
+C:\Python314\Lib\pkgutil.py:473: AttributeError
+____________ TestUIElementInteraction.test_ui_element_right_click _____________
+
+self = <test_ui_elements.TestUIElementInteraction object at 0x0000020ACD95E060>
+
+    def test_ui_element_right_click(self):
+        """Test de clic derecho en elemento UI"""
+        element_name = "context_menu_item"
+        expected_coords = {"x": 400, "y": 300, "width": 150, "height": 25}
+    
+        with patch.object(self.coordinate_manager, 'get_calibration') as mock_get:
+            mock_get.return_value = expected_coords
+    
+>           with patch('tests.hands.calibration.test_ui_elements.click_element') as mock_click:
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\applications_core\test_ui_elements.py:245: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Python314\Lib\unittest\mock.py:1494: in __enter__
+    self.target = self.getter()
+                  ^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+name = 'tests.hands.calibration.test_ui_elements'
+
+    def resolve_name(name):
+        """
+        Resolve a name to an object.
+    
+        It is expected that `name` will be a string in one of the following
+        formats, where W is shorthand for a valid Python identifier and dot stands
+        for a literal period in these pseudo-regexes:
+    
+        W(.W)*
+        W(.W)*:(W(.W)*)?
+    
+        The first form is intended for backward compatibility only. It assumes that
+        some part of the dotted name is a package, and the rest is an object
+        somewhere within that package, possibly nested inside other objects.
+        Because the place where the package stops and the object hierarchy starts
+        can't be inferred by inspection, repeated attempts to import must be done
+        with this form.
+    
+        In the second form, the caller makes the division point clear through the
+        provision of a single colon: the dotted name to the left of the colon is a
+        package to be imported, and the dotted name to the right is the object
+        hierarchy within that package. Only one import is needed in this form. If
+        it ends with the colon, then a module object is returned.
+    
+        The function will return an object (which might be a module), or raise one
+        of the following exceptions:
+    
+        ValueError - if `name` isn't in a recognised format
+        ImportError - if an import failed when it shouldn't have
+        AttributeError - if a failure occurred when traversing the object hierarchy
+                         within the imported package to get to the desired object.
+        """
+        global _NAME_PATTERN
+        if _NAME_PATTERN is None:
+            # Lazy import to speedup Python startup time
+            import re
+            dotted_words = r'(?!\d)(\w+)(\.(?!\d)(\w+))*'
+            _NAME_PATTERN = re.compile(f'^(?P<pkg>{dotted_words})'
+                                       f'(?P<cln>:(?P<obj>{dotted_words})?)?$',
+                                       re.UNICODE)
+    
+        m = _NAME_PATTERN.match(name)
+        if not m:
+            raise ValueError(f'invalid format: {name!r}')
+        gd = m.groupdict()
+        if gd.get('cln'):
+            # there is a colon - a one-step import is all that's needed
+            mod = importlib.import_module(gd['pkg'])
+            parts = gd.get('obj')
+            parts = parts.split('.') if parts else []
+        else:
+            # no colon - have to iterate to find the package boundary
+            parts = name.split('.')
+            modname = parts.pop(0)
+            # first part *must* be a module/package.
+            mod = importlib.import_module(modname)
+            while parts:
+                p = parts[0]
+                s = f'{modname}.{p}'
+                try:
+                    mod = importlib.import_module(s)
+                    parts.pop(0)
+                    modname = s
+                except ImportError:
+                    break
+        # if we reach this point, mod is the module, already imported, and
+        # parts is the list of parts in the object hierarchy to be traversed, or
+        # an empty list if just the module is wanted.
+        result = mod
+        for p in parts:
+>           result = getattr(result, p)
+                     ^^^^^^^^^^^^^^^^^^
+E           AttributeError: module 'tests.hands.calibration' has no attribute 'test_ui_elements'
+
+C:\Python314\Lib\pkgutil.py:473: AttributeError
+_____________ TestUIElementInteraction.test_ui_element_text_input _____________
+
+self = <test_ui_elements.TestUIElementInteraction object at 0x0000020ACD95E190>
+
+    def test_ui_element_text_input(self):
+        """Test de entrada de texto en elemento UI"""
+        element_name = "search_field"
+        expected_coords = {"x": 200, "y": 100, "width": 300, "height": 30}
+        test_text = "Buscar prueba"
+    
+        with patch.object(self.coordinate_manager, 'get_calibration') as mock_get:
+            mock_get.return_value = expected_coords
+    
+>           with patch('tests.hands.calibration.test_ui_elements.type_text') as mock_type:
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\applications_core\test_ui_elements.py:259: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Python314\Lib\unittest\mock.py:1494: in __enter__
+    self.target = self.getter()
+                  ^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+name = 'tests.hands.calibration.test_ui_elements'
+
+    def resolve_name(name):
+        """
+        Resolve a name to an object.
+    
+        It is expected that `name` will be a string in one of the following
+        formats, where W is shorthand for a valid Python identifier and dot stands
+        for a literal period in these pseudo-regexes:
+    
+        W(.W)*
+        W(.W)*:(W(.W)*)?
+    
+        The first form is intended for backward compatibility only. It assumes that
+        some part of the dotted name is a package, and the rest is an object
+        somewhere within that package, possibly nested inside other objects.
+        Because the place where the package stops and the object hierarchy starts
+        can't be inferred by inspection, repeated attempts to import must be done
+        with this form.
+    
+        In the second form, the caller makes the division point clear through the
+        provision of a single colon: the dotted name to the left of the colon is a
+        package to be imported, and the dotted name to the right is the object
+        hierarchy within that package. Only one import is needed in this form. If
+        it ends with the colon, then a module object is returned.
+    
+        The function will return an object (which might be a module), or raise one
+        of the following exceptions:
+    
+        ValueError - if `name` isn't in a recognised format
+        ImportError - if an import failed when it shouldn't have
+        AttributeError - if a failure occurred when traversing the object hierarchy
+                         within the imported package to get to the desired object.
+        """
+        global _NAME_PATTERN
+        if _NAME_PATTERN is None:
+            # Lazy import to speedup Python startup time
+            import re
+            dotted_words = r'(?!\d)(\w+)(\.(?!\d)(\w+))*'
+            _NAME_PATTERN = re.compile(f'^(?P<pkg>{dotted_words})'
+                                       f'(?P<cln>:(?P<obj>{dotted_words})?)?$',
+                                       re.UNICODE)
+    
+        m = _NAME_PATTERN.match(name)
+        if not m:
+            raise ValueError(f'invalid format: {name!r}')
+        gd = m.groupdict()
+        if gd.get('cln'):
+            # there is a colon - a one-step import is all that's needed
+            mod = importlib.import_module(gd['pkg'])
+            parts = gd.get('obj')
+            parts = parts.split('.') if parts else []
+        else:
+            # no colon - have to iterate to find the package boundary
+            parts = name.split('.')
+            modname = parts.pop(0)
+            # first part *must* be a module/package.
+            mod = importlib.import_module(modname)
+            while parts:
+                p = parts[0]
+                s = f'{modname}.{p}'
+                try:
+                    mod = importlib.import_module(s)
+                    parts.pop(0)
+                    modname = s
+                except ImportError:
+                    break
+        # if we reach this point, mod is the module, already imported, and
+        # parts is the list of parts in the object hierarchy to be traversed, or
+        # an empty list if just the module is wanted.
+        result = mod
+        for p in parts:
+>           result = getattr(result, p)
+                     ^^^^^^^^^^^^^^^^^^
+E           AttributeError: module 'tests.hands.calibration' has no attribute 'test_ui_elements'
+
+C:\Python314\Lib\pkgutil.py:473: AttributeError
+_ TestResolucionTextEditYCalculadora.test_aplicacion_no_instalada_devuelve_not_installed _
+
+self = <test_launch_macos.TestResolucionTextEditYCalculadora object at 0x0000020ACDB17530>
+
+    def test_aplicacion_no_instalada_devuelve_not_installed(self):
+        resolucion = _adaptador(SyntheticMacLaunchBoundary()).resolve("Pages")
+        assert resolucion.status == NOT_FOUND
+>       assert _codigo(resolucion.error) == ErrorCode.NOT_INSTALLED.value
+                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: 'str' object has no attribute 'value'
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\test_launch_macos.py:193: AttributeError
+_ TestPreflightBundle.test_bundle_sin_cuarentena_se_permite_con_ejecutable_dentro_del_bundle _
+
+self = <test_launch_macos.TestPreflightBundle object at 0x0000020ACF23B9D0>
+
+    def test_bundle_sin_cuarentena_se_permite_con_ejecutable_dentro_del_bundle(self):
+        adapter = _adaptador(SyntheticMacLaunchBoundary())
+        decision = adapter.preflight(self._destino(adapter))
+        assert decision.allowed, decision.reason
+>       assert decision.details.get("executable_path") == TEXTEDIT + "/Contents/MacOS/TextEdit"
+E       AssertionError: assert '/System/Appl...cOS\\TextEdit' == '/System/Appl...acOS/TextEdit'
+E         
+E         - /System/Applications/TextEdit.app/Contents/MacOS/TextEdit
+E         ?                                  ^        ^     ^
+E         + /System/Applications/TextEdit.app\Contents\MacOS\TextEdit
+E         ?                                  ^        ^     ^
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\test_launch_macos.py:217: AssertionError
+___ TestAperturaPorServicioUnico.test_cuarentena_bloquea_sin_llamar_a_open ____
+
+self = <test_launch_macos.TestAperturaPorServicioUnico object at 0x0000020ACF313360>
+
+    def test_cuarentena_bloquea_sin_llamar_a_open(self):
+        boundary = SyntheticMacLaunchBoundary(quarantined=[TEXTEDIT])
+        outcome = _servicio(_adaptador(boundary)).open("TextEdit")
+        assert not outcome.success
+>       assert _codigo(outcome.error) == ErrorCode.GATEKEEPER_BLOCKED.value
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: 'str' object has no attribute 'value'
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\test_launch_macos.py:277: AttributeError
+_ TestAperturaPorServicioUnico.test_fallo_de_launchservices_devuelve_launch_failed _
+
+self = <test_launch_macos.TestAperturaPorServicioUnico object at 0x0000020ACDB17BF0>
+
+    def test_fallo_de_launchservices_devuelve_launch_failed(self):
+        boundary = SyntheticMacLaunchBoundary(open_code=1)
+        outcome = _servicio(_adaptador(boundary)).open("TextEdit")
+        assert not outcome.success
+>       assert _codigo(outcome.error) == ErrorCode.LAUNCH_FAILED.value
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: 'str' object has no attribute 'value'
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\test_launch_macos.py:285: AttributeError
+____ TestAperturaPorServicioUnico.test_bundle_id_inseguro_no_llega_a_open _____
+
+self = <test_launch_macos.TestAperturaPorServicioUnico object at 0x0000020ACF244D10>
+
+    def test_bundle_id_inseguro_no_llega_a_open(self):
+        boundary = SyntheticMacLaunchBoundary()
+        destino = LaunchTarget(
+            identity="bundle:x", display_name="x", target_type=TARGET_BUNDLE,
+            target="com.apple.TextEdit; open /tmp", platform="macos", source="test",
+        )
+        outcome = _adaptador(boundary).launch(destino, timeout=1.0)
+        assert not outcome.success
+>       assert _codigo(outcome.error) == ErrorCode.UNSAFE_ARGUMENT.value
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: 'str' object has no attribute 'value'
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\test_launch_macos.py:298: AttributeError
+___ TestAperturaPorServicioUnico.test_aplicacion_no_instalada_no_abre_nada ____
+
+self = <test_launch_macos.TestAperturaPorServicioUnico object at 0x0000020ACF245150>
+
+    def test_aplicacion_no_instalada_no_abre_nada(self):
+        boundary = SyntheticMacLaunchBoundary()
+        outcome = _servicio(_adaptador(boundary)).open("Pages")
+        assert not outcome.success
+>       assert _codigo(outcome.error) in (ErrorCode.NOT_INSTALLED.value, ErrorCode.NOT_FOUND.value)
+                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: 'str' object has no attribute 'value'
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\apps\test_launch_macos.py:305: AttributeError
+_ TestAperturaAplicacionesInocuasEntornoReal.test_3_8_5_6_12_3_ciclo_completo_edge _
+
+self = <test_apertura_aplicaciones_inocuas_entorno_real.TestAperturaAplicacionesInocuasEntornoReal testMethod=test_3_8_5_6_12_3_ciclo_completo_edge>
+
+    def test_3_8_5_6_12_3_ciclo_completo_edge(self):
+        """Ciclo completo real: preflight, lanzamiento, verificacion, cierre, preservacion."""
+        pf = self.preflight.check({
+            "name": _EDGE_NAME, "app_id": "", "path": _EDGE_PATH,
+        })
+        self.assertTrue(pf.get("allowed", False), f"preflight: {pf.get('reason')}")
+    
+        # Lanzamiento REAL (sin mockear lanzador, procesos ni ventanas).
+        resultado = self.cal.launch_application({
+            "name": _EDGE_NAME,
+            "app_id": "",
+            "path": _EDGE_PATH,
+            "arguments": "",
+        })
+        ok = bool(resultado[1]) if isinstance(resultado, tuple) else bool(resultado)
+        self.assertTrue(ok, "launch_application no informo exito al abrir Edge")
+    
+        root_pid = getattr(self.cal, "_last_launch_root_pid", None)
+        owned_pids = getattr(self.cal, "_last_launch_owned_pids", set())
+        owned_hwnds = getattr(self.cal, "_last_launch_owned_hwnds", set())
+        was_owned = bool(getattr(self.cal, "_last_launch_was_owned", False))
+        launch_state = str(getattr(self.cal, "_last_launch_state", "DESCONOCIDO"))
+    
+        despues_edge = _contar_edge()
+        # Edge puede lanzar varios procesos; solo verificamos que no disminuya
+        self.assertGreaterEqual(
+            despues_edge, self.edge_antes,
+            f"conteo Edge inesperado: antes={self.edge_antes}, despues={despues_edge}",
+        )
+    
+        if was_owned and root_pid is not None:
+            # Caso exito: proceso propio lanzado por la prueba.
+            self.proc_pid = int(root_pid)
+            self.cerrado_por_la_prueba = True
+    
+            self.assertTrue(
+                self.cal._is_process_alive(int(root_pid)),
+                "el proceso lanzado no esta vivo justo despues del lanzamiento",
+            )
+>           self.assertIn(int(root_pid), owned_pids,
+                          f"el root_pid {root_pid} no esta en los PIDs propios del lanzamiento")
+E           AssertionError: 15532 not found in set() : el root_pid 15532 no esta en los PIDs propios del lanzamiento
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\calibration_manager\test_apertura_aplicaciones_inocuas_entorno_real.py:512: AssertionError
+_ TestAceptacionCalibracionEntornoReal.test_01_ciclo_completo_en_la_fixture_entorno_real _
+
+self = <test_aceptacion_calibracion_entorno_real.TestAceptacionCalibracionEntornoReal testMethod=test_01_ciclo_completo_en_la_fixture_entorno_real>
+
+    def test_01_ciclo_completo_en_la_fixture_entorno_real(self):
+>       ventana = self._abrir_fixture()
+                  ^^^^^^^^^^^^^^^^^^^^^
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\calibration_pipeline\test_aceptacion_calibracion_entorno_real.py:291: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\calibration_pipeline\test_aceptacion_calibracion_entorno_real.py:277: in _abrir_fixture
+    self.fail("No aparecio la ventana propia de la fixture en 30 s")
+E   AssertionError: No aparecio la ventana propia de la fixture en 30 s
+_ TestAceptacionCalibracionEntornoReal.test_03_familias_control_sin_accesibilidad_y_metricas _
+
+self = <test_aceptacion_calibracion_entorno_real.TestAceptacionCalibracionEntornoReal testMethod=test_03_familias_control_sin_accesibilidad_y_metricas>
+
+    def test_03_familias_control_sin_accesibilidad_y_metricas(self):
+        reports = _ESTADO["reports"]
+>       self.assertEqual(set(reports), {"qt_fixture", "win32_notepad"}, "Deben calibrarse dos familias de GUI")
+E       AssertionError: Items in the second set but not the first:
+E       'qt_fixture' : Deben calibrarse dos familias de GUI
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\calibration_pipeline\test_aceptacion_calibracion_entorno_real.py:364: AssertionError
+_____ TestNavegacionAjustesEntornoReal.test_01_calibracion_y_exploracion ______
+
+self = <test_navegacion_ajustes_entorno_real.TestNavegacionAjustesEntornoReal testMethod=test_01_calibracion_y_exploracion>
+
+    def test_01_calibracion_y_exploracion(self):
+>       self.assertTrue(self.report.success, "%s: %s" % (self.report.stage_failed, self.report.error))
+E       AssertionError: False is not true : quality_gate: ningun control accionable supero la puerta de calidad (0 detectados sin accion demostrada)
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_ajustes_entorno_real.py:78: AssertionError
+---------------------------- Captured stdout setup ----------------------------
+
+[NAVEGACION AJUSTES] etapa_fallida=quality_gate error=ningun control accionable supero la puerta de calidad (0 detectados sin accion demostrada) tiempos={'preflight': 0.0, 'capabilities': 0.0, 'launch': 5.064, 'monitor': 0.001, 'window': 0.003, 'stability': 0.276, 'environment': 0.001, 'accessibility': 0.017, 'capture': 0.129, 'detection': 79.714, 'fusion': 0.156}
+[NAVEGACION AJUSTES] deteccion: {'ventana': {'window_id': 1967336, 'pid': 18076, 'app_identity': 'applicationframehost.exe', 'bounds': {'left': 3826, 'top': -14, 'right': 7694, 'bottom': 2066, 'width': 3868, 'height': 2080}, 'client_bounds': {'left': 3840, 'top': -14, 'right': 7680, 'bottom': 2052, 'width': 3840, 'height': 2066}, 'is_maximized': True, 'is_foreground': True, 'display_id': '\\\\?\\DISPLAY#SAM1018#5&7920914&0&UID4354#{e6f07b5f-ee97-4a90-b076-33f57bf4eaa7}', 'scale_factor': 2.25, 'dpi': 216}, 'candidatos_por_fuente': {'uia': 4, 'qwen3vl': 0, 'omniparser_v2_icon_detect_v3': 1, 'paddleocr': 0}, 'deteccion_visual': {'mode': 'auto', 'used': True, 'reason': 'accesibilidad insuficiente (4 controles accionables < 5)', 'accessible_actionable': 4}, 'qwen3vl': {'source_size': [3840, 2052], 'sent_size': [1600, 855], 'seconds': 2.027, 'elements': 0}, 'puerta': {'aceptados': 0, 'rechazados': 4}, 'avisos': []}
+[NAVEGACION AJUSTES] exploracion: {'states': None, 'transitions': None, 'actions_performed': None, 'elapsed_seconds': None, 'aborted': None, 'abort_reason': None, 'path_verification': None, 'ui_map_path': None}
+---------------------------- Captured stderr setup ----------------------------
+ [ 0 ; 9 3 m 2 0 2 6 - 1 1 - 2 1   1 3 : 2 0 : 2 0 . 0 9 4 8 9 2 8   [ W : o n n x r u n t i m e : ,   g r a p h . c c : 5 6 0 7   o n n x r u n t i m e : : G r a p h : : C l e a n U n u s e d I n i t i a l i z e r s A n d N o d e A r g s ]   R e m o v i n g   i n i t i a l i z e r   ' p 2 o . p d _ o p . f u l l . 0 . 0 ' .   I t   i s   n o t   u s e d   b y   a n y   n o d e   a n d   s h o u l d   b e   r e m o v e d   f r o m   t h e   m o d e l .  [ m 
+  [ 0 ; 9 3 m 2 0 2 6 - 1 1 - 2 1   1 3 : 2 0 : 2 0 . 0 9 7 7 2 9 8   [ W : o n n x r u n t i m e : ,   g r a p h . c c : 5 6 0 7   o n n x r u n t i m e : : G r a p h : : C l e a n U n u s e d I n i t i a l i z e r s A n d N o d e A r g s ]   R e m o v i n g   i n i t i a l i z e r   ' p 2 o . p d _ o p . f u l l _ i n t _ a r r a y . 6 . 0 ' .   I t   i s   n o t   u s e d   b y   a n y   n o d e   a n d   s h o u l d   b e   r e m o v e d   f r o m   t h e   m o d e l .  [ m 
+  [ 0 ; 9 3 m 2 0 2 6 - 1 1 - 2 1   1 3 : 2 0 : 2 0 . 0 9 8 8 2 7 4   [ W : o n n x r u n t i m e : ,   g r a p h . c c : 5 6 0 7   o n n x r u n t i m e : : G r a p h : : C l e a n U n u s e d I n i t i a l i z e r s A n d N o d e A r g s ]   R e m o v i n g   i n i t i a l i z e r   ' p 2 o . p d _ o p . f u l l _ i n t _ a r r a y . 0 . 0 ' .   I t   i s   n o t   u s e d   b y   a n y   n o d e   a n d   s h o u l d   b e   r e m o v e d   f r o m   t h e   m o d e l .  [ m 
+  [ 0 ; 9 3 m 2 0 2 6 - 1 1 - 2 1   1 3 : 2 0 : 2 0 . 0 9 9 4 0 7 2   [ W : o n n x r u n t i m e : ,   g r a p h . c c : 5 6 0 7   o n n x r u n t i m e : : G r a p h : : C l e a n U n u s e d I n i t i a l i z e r s A n d N o d e A r g s ]   R e m o v i n g   i n i t i a l i z e r   ' p 2 o . p d _ o p . f u l l _ i n t _ a r r a y . 3 . 0 ' .   I t   i s   n o t   u s e d   b y   a n y   n o d e   a n d   s h o u l d   b e   r e m o v e d   f r o m   t h e   m o d e l .  [ m 
+  [ 0 ; 9 3 m 2 0 2 6 - 1 1 - 2 1   1 3 : 2 0 : 2 0 . 4 8 7 8 9 9 6   [ W : o n n x r u n t i m e : ,   g r a p h . c c : 5 6 0 7   o n n x r u n t i m e : : G r a p h : : C l e a n U n u s e d I n i t i a l i z e r s A n d N o d e A r g s ]   R e m o v i n g   i n i t i a l i z e r   ' p 2 o . p d _ o p . f u l l . 0 . 0 ' .   I t   i s   n o t   u s e d   b y   a n y   n o d e   a n d   s h o u l d   b e   r e m o v e d   f r o m   t h e   m o d e l .  [ m 
+  [ 0 ; 9 3 m 2 0 2 6 - 1 1 - 2 1   1 3 : 2 0 : 2 0 . 4 9 0 7 9 5 2   [ W : o n n x r u n t i m e : ,   g r a p h . c c : 5 6 0 7   o n n x r u n t i m e : : G r a p h : : C l e a n U n u s e d I n i t i a l i z e r s A n d N o d e A r g s ]   R e m o v i n g   i n i t i a l i z e r   ' p 2 o . p d _ o p . f u l l _ i n t _ a r r a y . 6 . 0 ' .   I t   i s   n o t   u s e d   b y   a n y   n o d e   a n d   s h o u l d   b e   r e m o v e d   f r o m   t h e   m o d e l .  [ m 
+  [ 0 ; 9 3 m 2 0 2 6 - 1 1 - 2 1   1 3 : 2 0 : 2 0 . 4 9 1 3 9 0 9   [ W : o n n x r u n t i m e : ,   g r a p h . c c : 5 6 0 7   o n n x r u n t i m e : : G r a p h : : C l e a n U n u s e d I n i t i a l i z e r s A n d N o d e A r g s ]   R e m o v i n g   i n i t i a l i z e r   ' p 2 o . p d _ o p . f u l l _ i n t _ a r r a y . 0 . 0 ' .   I t   i s   n o t   u s e d   b y   a n y   n o d e   a n d   s h o u l d   b e   r e m o v e d   f r o m   t h e   m o d e l .  [ m 
+  [ 0 ; 9 3 m 2 0 2 6 - 1 1 - 2 1   1 3 : 2 0 : 2 0 . 4 9 1 9 9 9 3   [ W : o n n x r u n t i m e : ,   g r a p h . c c : 5 6 0 7   o n n x r u n t i m e : : G r a p h : : C l e a n U n u s e d I n i t i a l i z e r s A n d N o d e A r g s ]   R e m o v i n g   i n i t i a l i z e r   ' p 2 o . p d _ o p . f u l l _ i n t _ a r r a y . 3 . 0 ' .   I t   i s   n o t   u s e d   b y   a n y   n o d e   a n d   s h o u l d   b e   r e m o v e d   f r o m   t h e   m o d e l .  [ m 
+ 
+_ TestNavegacionAjustesEntornoReal.test_02_solo_clics_verificados_de_navegacion _
+
+self = <test_navegacion_ajustes_entorno_real.TestNavegacionAjustesEntornoReal testMethod=test_02_solo_clics_verificados_de_navegacion>
+
+    def test_02_solo_clics_verificados_de_navegacion(self):
+>       self.assertIsNotNone(self.mapa)
+E       AssertionError: unexpectedly None
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_ajustes_entorno_real.py:84: AssertionError
+_ TestNavegacionAjustesEntornoReal.test_03_caminos_reproducidos_con_coordenadas_guardadas _
+
+self = <test_navegacion_ajustes_entorno_real.TestNavegacionAjustesEntornoReal testMethod=test_03_caminos_reproducidos_con_coordenadas_guardadas>
+
+    def test_03_caminos_reproducidos_con_coordenadas_guardadas(self):
+        verificacion = self.exploracion.get("path_verification")
+>       self.assertIsNotNone(verificacion, "la profundidad completa debe reproducir los caminos")
+E       AssertionError: unexpectedly None : la profundidad completa debe reproducir los caminos
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_ajustes_entorno_real.py:95: AssertionError
+_____ TestNavegacionAjustesEntornoReal.test_04_elementos_con_coordenadas ______
+
+self = <test_navegacion_ajustes_entorno_real.TestNavegacionAjustesEntornoReal testMethod=test_04_elementos_con_coordenadas>
+
+    def test_04_elementos_con_coordenadas(self):
+>       self.assertIsNotNone(self.mapa)
+E       AssertionError: unexpectedly None
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_ajustes_entorno_real.py:100: AssertionError
+_________ TestNavegacionChatEntornoReal.test_01_mapa_con_profundidad __________
+
+self = <test_navegacion_chat_entorno_real.TestNavegacionChatEntornoReal testMethod=test_01_mapa_con_profundidad>
+
+    def test_01_mapa_con_profundidad(self):
+        self.assertFalse(self.resultado.aborted, self.resultado.abort_reason)
+>       chat = self._estado_tras("Manolito")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_chat_entorno_real.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_chat_entorno_real.py:190: in _estado_tras
+    self.fail("no hay estado alcanzado por '%s'; estados: %s" % (nombre, self.resumen))
+E   AssertionError: no hay estado alcanzado por 'Manolito'; estados: ['exploracion: 4.7 s, estados=2, transiciones=1, acciones=16, reinicios=0, abortada=False ', 'mapa JSON: C:\\Informatica\\PROYECTOS\\BACKEND\\IA_PYTHON\\IA\\JARVIS\\tests\\fixtures\\_tmp_ui_maps\\prueba_windows\\fixture_chat.json', '  estado 0cf8c25c prof=0 camino=[] elementos=17', '  estado 41c7bb35 prof=1 camino=[Sistema] elementos=25']
+_______ TestNavegacionChatEntornoReal.test_02_evidencia_de_clics_reales _______
+
+self = <test_navegacion_chat_entorno_real.TestNavegacionChatEntornoReal testMethod=test_02_evidencia_de_clics_reales>
+
+    def test_02_evidencia_de_clics_reales(self):
+        cambios = [t for t in self.datos["transitions"] if t["evidence"].get("changed")]
+        self.assertTrue(cambios)
+        for transicion in self.datos["transitions"]:
+>           self.assertEqual(transicion["evidence"]["method"], "click", transicion)
+E           AssertionError: 'accessibility:expand' != 'click'
+E           - accessibility:expand
+E           + click
+E            : {'from_state': '0cf8c25c63023c95eede3fef', 'action': 'expand', 'element_ref': {'identifier': '', 'name': 'Sistema', 'control_type': 'menu', 'native_role': 'MenuItem', 'parent_name': 'Sistema', 'depth': 3}, 'to_state': '41c7bb355063e67720833f9d', 'return_action': 'collapse', 'verified_return': True, 'evidence': {'method': 'accessibility:expand', 'before_state': '0cf8c25c63023c95eede3fef', 'after_state': '41c7bb355063e67720833f9d', 'changed': True, 'new_windows': 1, 'element_key': 'Sistema|MenuItem|Sistema'}}
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_chat_entorno_real.py:211: AssertionError
+_________ TestNavegacionChatEntornoReal.test_04_json_con_coordenadas __________
+
+self = <test_navegacion_chat_entorno_real.TestNavegacionChatEntornoReal testMethod=test_04_json_con_coordenadas>
+
+    def test_04_json_con_coordenadas(self):
+        guardado = json.loads(Path(self.mapa_path).read_text(encoding="utf-8"))
+>       chat = self._estado_tras("Manolito")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_chat_entorno_real.py:222: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_chat_entorno_real.py:190: in _estado_tras
+    self.fail("no hay estado alcanzado por '%s'; estados: %s" % (nombre, self.resumen))
+E   AssertionError: no hay estado alcanzado por 'Manolito'; estados: ['exploracion: 4.7 s, estados=2, transiciones=1, acciones=16, reinicios=0, abortada=False ', 'mapa JSON: C:\\Informatica\\PROYECTOS\\BACKEND\\IA_PYTHON\\IA\\JARVIS\\tests\\fixtures\\_tmp_ui_maps\\prueba_windows\\fixture_chat.json', '  estado 0cf8c25c prof=0 camino=[] elementos=17', '  estado 41c7bb35 prof=1 camino=[Sistema] elementos=25']
+________ TestNavegacionChatEntornoReal.test_06_mandar_hola_a_manolito _________
+
+self = <test_navegacion_chat_entorno_real.TestNavegacionChatEntornoReal testMethod=test_06_mandar_hola_a_manolito>
+
+    def test_06_mandar_hola_a_manolito(self):
+        navegador = self._navegador()
+>       chat = self._estado_tras("Manolito")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_chat_entorno_real.py:239: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_chat_entorno_real.py:190: in _estado_tras
+    self.fail("no hay estado alcanzado por '%s'; estados: %s" % (nombre, self.resumen))
+E   AssertionError: no hay estado alcanzado por 'Manolito'; estados: ['exploracion: 4.7 s, estados=2, transiciones=1, acciones=16, reinicios=0, abortada=False ', 'mapa JSON: C:\\Informatica\\PROYECTOS\\BACKEND\\IA_PYTHON\\IA\\JARVIS\\tests\\fixtures\\_tmp_ui_maps\\prueba_windows\\fixture_chat.json', '  estado 0cf8c25c prof=0 camino=[] elementos=17', '  estado 41c7bb35 prof=1 camino=[Sistema] elementos=25', 'reproduccion de caminos: ok=1 fallidos=0']
+_ TestNavegacionChatEntornoReal.test_07_coordenada_corrompida_se_detecta_antes_del_clic _
+
+self = <test_navegacion_chat_entorno_real.TestNavegacionChatEntornoReal testMethod=test_07_coordenada_corrompida_se_detecta_antes_del_clic>
+
+    def test_07_coordenada_corrompida_se_detecta_antes_del_clic(self):
+        from src.hands.calibration.ui_navigation_map import COORDS_STORED, UINavigator
+    
+        datos = self._datos_con_manolito_en_la_caja_de_lucia()
+        inicio = len(self._eventos())
+        resultado = UINavigator(
+            self.explorador, datos, self.window_id, self.pid, coordinates=COORDS_STORED
+>       ).go_to(self._estado_tras("Manolito"))
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_chat_entorno_real.py:270: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_chat_entorno_real.py:190: in _estado_tras
+    self.fail("no hay estado alcanzado por '%s'; estados: %s" % (nombre, self.resumen))
+E   AssertionError: no hay estado alcanzado por 'Manolito'; estados: ['exploracion: 4.7 s, estados=2, transiciones=1, acciones=16, reinicios=0, abortada=False ', 'mapa JSON: C:\\Informatica\\PROYECTOS\\BACKEND\\IA_PYTHON\\IA\\JARVIS\\tests\\fixtures\\_tmp_ui_maps\\prueba_windows\\fixture_chat.json', '  estado 0cf8c25c prof=0 camino=[] elementos=17', '  estado 41c7bb35 prof=1 camino=[Sistema] elementos=25', 'reproduccion de caminos: ok=1 fallidos=0']
+_ TestNavegacionChatEntornoReal.test_08_en_vivo_llega_al_chat_aunque_la_coordenada_guardada_este_mal _
+
+self = <test_navegacion_chat_entorno_real.TestNavegacionChatEntornoReal testMethod=test_08_en_vivo_llega_al_chat_aunque_la_coordenada_guardada_este_mal>
+
+    def test_08_en_vivo_llega_al_chat_aunque_la_coordenada_guardada_este_mal(self):
+        from src.hands.calibration.ui_navigation_map import COORDS_LIVE, UINavigator
+    
+        datos = self._datos_con_manolito_en_la_caja_de_lucia()
+        inicio = len(self._eventos())
+>       resultado = UINavigator(self.explorador, datos, self.window_id, self.pid).go_to(self._estado_tras("Manolito"))
+                                                                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_chat_entorno_real.py:282: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_chat_entorno_real.py:190: in _estado_tras
+    self.fail("no hay estado alcanzado por '%s'; estados: %s" % (nombre, self.resumen))
+E   AssertionError: no hay estado alcanzado por 'Manolito'; estados: ['exploracion: 4.7 s, estados=2, transiciones=1, acciones=16, reinicios=0, abortada=False ', 'mapa JSON: C:\\Informatica\\PROYECTOS\\BACKEND\\IA_PYTHON\\IA\\JARVIS\\tests\\fixtures\\_tmp_ui_maps\\prueba_windows\\fixture_chat.json', '  estado 0cf8c25c prof=0 camino=[] elementos=17', '  estado 41c7bb35 prof=1 camino=[Sistema] elementos=25', 'reproduccion de caminos: ok=1 fallidos=0']
+-------------------------- Captured stdout teardown ---------------------------
+
+[NAVEGACION CHAT] resumen:
+  exploracion: 4.7 s, estados=2, transiciones=1, acciones=16, reinicios=0, abortada=False 
+  mapa JSON: C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\fixtures\_tmp_ui_maps\prueba_windows\fixture_chat.json
+    estado 0cf8c25c prof=0 camino=[] elementos=17
+    estado 41c7bb35 prof=1 camino=[Sistema] elementos=25
+  reproduccion de caminos: ok=1 fallidos=0
+___ TestLogsSinRutasCompletas.test_recorrido_log_resumen_no_rutas_completas ___
+
+self = <test_system_inventory.TestLogsSinRutasCompletas object at 0x0000020ADDAD4550>
+storage = <src.hands.inventory.system_inventory_storage.SystemInventoryStorage object at 0x0000020A8AFB28D0>
+tmp_path = WindowsPath('C:/Users/User/AppData/Local/Temp/pytest-of-User/pytest-1346/test_recorrido_log_resumen_no_0')
+
+    def test_recorrido_log_resumen_no_rutas_completas(self, storage, tmp_path):
+        """El recorrido de volumen loguea resumenes (conteos) y nunca la ruta
+        completa de la raiz ni listados de entradas."""
+        storage.initialize()
+        _, base = _volumen_para_scan(tmp_path, letra="L:")
+    
+        def accion():
+            contrato = InventoryContract(machine_id=MACHINE_ID)
+            recorrido = RecorridoVolumen(
+                volumen="L:",
+                raiz=str(base),
+                contrato=contrato,
+                maquina_id=MACHINE_ID,
+            )
+            list(recorrido.recorrer())
+    
+        registros = self._capturar_logs(accion)
+        texto_logs = "\n".join(registros)
+    
+        # Debe haber registros de inicio y fin de recorrido.
+>       assert "Inicio de recorrido" in texto_logs or "Fin de recorrido" in texto_logs
+E       AssertionError: assert ('Inicio de recorrido' in '' or 'Fin de recorrido' in '')
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\inventory\system_inventory\test_system_inventory.py:1123: AssertionError
+_ TestLogsSinRutasCompletas.test_errores_log_agregados_por_categoria_no_ruta_completa _
+
+self = <test_system_inventory.TestLogsSinRutasCompletas object at 0x0000020ADDAD4690>
+storage = <src.hands.inventory.system_inventory_storage.SystemInventoryStorage object at 0x0000020A86F2D970>
+tmp_path = WindowsPath('C:/Users/User/AppData/Local/Temp/pytest-of-User/pytest-1346/test_errores_log_agregados_por0')
+
+    def test_errores_log_agregados_por_categoria_no_ruta_completa(
+        self, storage, tmp_path
+    ):
+        """Los errores se loguean agregados por categoria, nunca con la ruta
+        completa del archivo/directorio que fallo."""
+        storage.initialize()
+        # Ruta inexistente: genera un error de tipo "ruta_eliminada".
+        inexistente = str(tmp_path / "no_existe" / "nada")
+    
+        def accion():
+            contrato = InventoryContract(machine_id=MACHINE_ID)
+            escanear_ruta(
+                ruta_absoluta=inexistente,
+                contrato=contrato,
+                maquina_id=MACHINE_ID,
+                storage=storage,
+            )
+    
+        registros = self._capturar_logs(accion)
+        texto_logs = "\n".join(registros)
+    
+        # Debe haber registro de error agregado por categoria.
+>       assert "categoria=" in texto_logs or "Error de recorrido" in texto_logs
+E       AssertionError: assert ('categoria=' in '' or 'Error de recorrido' in '')
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\inventory\system_inventory\test_system_inventory.py:1156: AssertionError
+_ TestLogsSinRutasCompletas.test_escanear_ruta_log_inicio_y_fin_con_evidencia_minima _
+
+self = <test_system_inventory.TestLogsSinRutasCompletas object at 0x0000020ADB98F950>
+storage = <src.hands.inventory.system_inventory_storage.SystemInventoryStorage object at 0x0000020A86F2C770>
+tmp_path = WindowsPath('C:/Users/User/AppData/Local/Temp/pytest-of-User/pytest-1346/test_escanear_ruta_log_inicio_0')
+
+    def test_escanear_ruta_log_inicio_y_fin_con_evidencia_minima(
+        self, storage, tmp_path
+    ):
+        """escanear_ruta loguea inicio y fin con evidencia minima (scan_id,
+        volumen, modo, resultado, conteos) y nunca rutas completas."""
+        storage.initialize()
+        _, base = _volumen_para_scan(tmp_path, letra="M:")
+    
+        def accion():
+            contrato = InventoryContract(machine_id=MACHINE_ID)
+            escanear_ruta(
+                ruta_absoluta=str(base),
+                contrato=contrato,
+                maquina_id=MACHINE_ID,
+                storage=storage,
+            )
+    
+        registros = self._capturar_logs(accion)
+        texto_logs = "\n".join(registros)
+    
+        # Evidencia minima de diagnostico.
+>       assert "scan_id=" in texto_logs
+E       AssertionError: assert 'scan_id=' in ''
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\inventory\system_inventory\test_system_inventory.py:1182: AssertionError
+____ TestLogsSinRutasCompletas.test_politica_refresco_log_resumen_no_rutas ____
+
+self = <test_system_inventory.TestLogsSinRutasCompletas object at 0x0000020ADB98FA80>
+storage = <src.hands.inventory.system_inventory_storage.SystemInventoryStorage object at 0x0000020A8AFA2BD0>
+tmp_path = WindowsPath('C:/Users/User/AppData/Local/Temp/pytest-of-User/pytest-1346/test_politica_refresco_log_res0')
+
+    def test_politica_refresco_log_resumen_no_rutas(
+        self, storage, tmp_path
+    ):
+        """La politica de refresco loguea resumenes agregados (volumen, modo,
+        entradas_refrescadas, cambios) y nunca rutas completas."""
+        storage.initialize()
+        _, base = _volumen_para_scan(tmp_path, letra="N:")
+    
+        # Crear un escaneo previo para que la politica tenga algo que evaluar.
+        escanear_volumen(
+            volumen="N:",
+            ruta_raiz=str(base),
+            contrato=InventoryContract(machine_id=MACHINE_ID),
+            maquina_id=MACHINE_ID,
+            storage=storage,
+            modo="completo",
+        )
+    
+        from src.hands.inventory.system_inventory import PoliticaRefresco, ModoRefresco, ConfigRefresco
+    
+        def accion():
+            politica = PoliticaRefresco(
+                storage=storage,
+                machine_id=MACHINE_ID,
+                config=ConfigRefresco(modo=ModoRefresco.POR_CADUCIDAD, ttl_segundos=1),
+            )
+            politica.refrescar_volumen_si_necesario("N:")
+    
+        registros = self._capturar_logs(accion)
+        texto_logs = "\n".join(registros)
+    
+        # Debe haber registro de decision de refresco.
+>       assert "Refresco no necesario" in texto_logs or "Refresco volumen" in texto_logs
+E       AssertionError: assert ('Refresco no necesario' in '' or 'Refresco volumen' in '')
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\inventory\system_inventory\test_system_inventory.py:1222: AssertionError
+_____________ test_observador_reporta_no_disponible_sin_watchdog ______________
+
+    def test_observador_reporta_no_disponible_sin_watchdog():
+        """En el entorno actual watchdog no esta instalado, por lo que
+        is_available() debe ser False y el observador degrada de forma segura."""
+>       assert FileSystemObserver.is_available() is False
+E       assert True is False
+E        +  where True = is_available()
+E        +    where is_available = FileSystemObserver.is_available
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\inventory\test_filesystem_observer.py:81: AssertionError
+________ test_observador_sin_watchdog_no_puede_iniciarse_levanta_error ________
+
+    def test_observador_sin_watchdog_no_puede_iniciarse_levanta_error():
+        """start() levanta ObserverUnavailableError cuando watchdog no esta
+        disponible, sin dejar el observador en ejecucion."""
+        observador = FileSystemObserver(lambda evento: None)
+        assert observador.is_running is False
+        with pytest.raises(ObserverUnavailableError):
+>           observador.start("C:/Carpeta/Observada")
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\inventory\test_filesystem_observer.py:90: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\src\hands\inventory\filesystem_observer.py:163: in start
+    self._observer.start()
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\venv\Lib\site-packages\watchdog\utils\__init__.py:123: in start
+    self.on_thread_start()
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\venv\Lib\site-packages\watchdog\observers\api.py:320: in on_thread_start
+    emitter.start()
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\venv\Lib\site-packages\watchdog\utils\__init__.py:123: in start
+    self.on_thread_start()
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\venv\Lib\site-packages\watchdog\observers\read_directory_changes.py:56: in on_thread_start
+    reader.start()
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\venv\Lib\site-packages\watchdog\observers\winapi.py:629: in start
+    _ = self._buf_queue.get(timeout=2)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <queue.Queue object at 0x0000020A85E61400>, block = True, timeout = 2
+
+    def get(self, block=True, timeout=None):
+        '''Remove and return an item from the queue.
+    
+        If optional args 'block' is true and 'timeout' is None (the default),
+        block if necessary until an item is available. If 'timeout' is
+        a non-negative number, it blocks at most 'timeout' seconds and raises
+        the Empty exception if no item was available within that time.
+        Otherwise ('block' is false), return an item if one is immediately
+        available, else raise the Empty exception ('timeout' is ignored
+        in that case).
+    
+        Raises ShutDown if the queue has been shut down and is empty,
+        or if the queue has been shut down immediately.
+        '''
+        with self.not_empty:
+            if self.is_shutdown and not self._qsize():
+                raise ShutDown
+            if not block:
+                if not self._qsize():
+                    raise Empty
+            elif timeout is None:
+                while not self._qsize():
+                    self.not_empty.wait()
+                    if self.is_shutdown and not self._qsize():
+                        raise ShutDown
+            elif timeout < 0:
+                raise ValueError("'timeout' must be a non-negative number")
+            else:
+                endtime = time() + timeout
+                while not self._qsize():
+                    remaining = endtime - time()
+                    if remaining <= 0.0:
+>                       raise Empty
+E                       _queue.Empty
+
+C:\Python314\Lib\queue.py:209: Empty
+_________ test_error_menciona_refresco_bajo_demanda_como_alternativa __________
+
+    def test_error_menciona_refresco_bajo_demanda_como_alternativa():
+        """El error de no disponibilidad orienta al refresco bajo demanda, que no
+        depende de observadores (3.8.5.1.4.5.6)."""
+        observador = FileSystemObserver(lambda evento: None)
+        with pytest.raises(ObserverUnavailableError) as exc:
+>           observador.start("C:/Carpeta/Observada")
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\inventory\test_filesystem_observer.py:99: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\src\hands\inventory\filesystem_observer.py:163: in start
+    self._observer.start()
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\venv\Lib\site-packages\watchdog\utils\__init__.py:123: in start
+    self.on_thread_start()
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\venv\Lib\site-packages\watchdog\observers\api.py:320: in on_thread_start
+    emitter.start()
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\venv\Lib\site-packages\watchdog\utils\__init__.py:123: in start
+    self.on_thread_start()
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\venv\Lib\site-packages\watchdog\observers\read_directory_changes.py:56: in on_thread_start
+    reader.start()
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\venv\Lib\site-packages\watchdog\observers\winapi.py:629: in start
+    _ = self._buf_queue.get(timeout=2)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <queue.Queue object at 0x0000020ADBA97ED0>, block = True, timeout = 2
+
+    def get(self, block=True, timeout=None):
+        '''Remove and return an item from the queue.
+    
+        If optional args 'block' is true and 'timeout' is None (the default),
+        block if necessary until an item is available. If 'timeout' is
+        a non-negative number, it blocks at most 'timeout' seconds and raises
+        the Empty exception if no item was available within that time.
+        Otherwise ('block' is false), return an item if one is immediately
+        available, else raise the Empty exception ('timeout' is ignored
+        in that case).
+    
+        Raises ShutDown if the queue has been shut down and is empty,
+        or if the queue has been shut down immediately.
+        '''
+        with self.not_empty:
+            if self.is_shutdown and not self._qsize():
+                raise ShutDown
+            if not block:
+                if not self._qsize():
+                    raise Empty
+            elif timeout is None:
+                while not self._qsize():
+                    self.not_empty.wait()
+                    if self.is_shutdown and not self._qsize():
+                        raise ShutDown
+            elif timeout < 0:
+                raise ValueError("'timeout' must be a non-negative number")
+            else:
+                endtime = time() + timeout
+                while not self._qsize():
+                    remaining = endtime - time()
+                    if remaining <= 0.0:
+>                       raise Empty
+E                       _queue.Empty
+
+C:\Python314\Lib\queue.py:209: Empty
+============================== warnings summary ===============================
+tests/hands/calibration/ui_exploration/test_navegacion_ajustes_entorno_real.py::TestNavegacionAjustesEntornoReal::test_01_calibracion_y_exploracion
+tests/hands/detection/test_omniparser_adapter.py::TestOmniParserAdapterIntegracionReal::test_cargar_modelo_real
+tests/hands/detection/test_omniparser_adapter.py::TestOmniParserAdapterIntegracionReal::test_detect_sobre_imagen_fixture
+  C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\venv\Lib\site-packages\torch\jit\_serialization.py:170: FutureWarning: `torch.jit.load` is not supported in Python 3.14+ and may break. Please switch to `torch.export`.
+    warnings.warn(
+
+tests/hands/calibration/ui_exploration/test_navegacion_ajustes_entorno_real.py::TestNavegacionAjustesEntornoReal::test_01_calibracion_y_exploracion
+tests/hands/detection/test_paddleocr_adapter.py::TestPaddleOCRAdapterContract::test_adapter_modelo_inexistente_no_disponible
+tests/hands/detection/test_paddleocr_adapter.py::TestPaddleOCRAdapterIntegracionReal::test_cargar_motor_real
+tests/hands/detection/test_paddleocr_adapter.py::TestPaddleOCRAdapterIntegracionReal::test_detect_sobre_imagen_fixture
+  C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\src\hands\detection\paddleocr_adapter.py:293: UserWarning: `lang` and `ocr_version` will be ignored when model names or model directories are not `None`.
+    self._ocr = _PaddleOCR(**kwargs)
+
+tests/hands/inventory/test_filesystem_observer.py::test_observador_sin_watchdog_no_puede_iniciarse_levanta_error
+  C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\venv\Lib\site-packages\_pytest\threadexception.py:58: PytestUnhandledThreadExceptionWarning: Exception in thread Thread-3475 (_run)
+  
+  Traceback (most recent call last):
+    File "C:\Python314\Lib\threading.py", line 1082, in _bootstrap_inner
+      self._context.run(self.run)
+      ~~~~~~~~~~~~~~~~~^^^^^^^^^^
+    File "C:\Python314\Lib\threading.py", line 1024, in run
+      self._target(*self._args, **self._kwargs)
+      ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    File "C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\venv\Lib\site-packages\watchdog\observers\winapi.py", line 601, in _run
+      handle = self._handle = _get_directory_handle(self._path)
+                              ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+    File "C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\venv\Lib\site-packages\watchdog\observers\winapi.py", line 428, in _get_directory_handle
+      return CreateFileW(
+          path,
+      ...<5 lines>...
+          None,
+      )
+    File "C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\venv\Lib\site-packages\watchdog\observers\winapi.py", line 101, in _errcheck_handle
+      raise ctypes.WinError()  # type: ignore[attr-defined]
+      ^^^^^^^^^^^^^^^^^^^^^^^
+  FileNotFoundError: [WinError 3] El sistema no puede encontrar la ruta especificada.
+  
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+    warnings.warn(pytest.PytestUnhandledThreadExceptionWarning(msg))
+
+tests/hands/inventory/test_filesystem_observer.py::test_error_menciona_refresco_bajo_demanda_como_alternativa
+  C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\venv\Lib\site-packages\_pytest\threadexception.py:58: PytestUnhandledThreadExceptionWarning: Exception in thread Thread-3478 (_run)
+  
+  Traceback (most recent call last):
+    File "C:\Python314\Lib\threading.py", line 1082, in _bootstrap_inner
+      self._context.run(self.run)
+      ~~~~~~~~~~~~~~~~~^^^^^^^^^^
+    File "C:\Python314\Lib\threading.py", line 1024, in run
+      self._target(*self._args, **self._kwargs)
+      ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    File "C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\venv\Lib\site-packages\watchdog\observers\winapi.py", line 601, in _run
+      handle = self._handle = _get_directory_handle(self._path)
+                              ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+    File "C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\venv\Lib\site-packages\watchdog\observers\winapi.py", line 428, in _get_directory_handle
+      return CreateFileW(
+          path,
+      ...<5 lines>...
+          None,
+      )
+    File "C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\venv\Lib\site-packages\watchdog\observers\winapi.py", line 101, in _errcheck_handle
+      raise ctypes.WinError()  # type: ignore[attr-defined]
+      ^^^^^^^^^^^^^^^^^^^^^^^
+  FileNotFoundError: [WinError 3] El sistema no puede encontrar la ruta especificada.
+  
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+    warnings.warn(pytest.PytestUnhandledThreadExceptionWarning(msg))
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/hands/apps/application_discovery/test_application_discovery.py::TestAmbiguedadDesambiguacion::test_un_solo_candidato_no_es_ambiguo
+FAILED tests/hands/apps/application_discovery/test_application_entities_sqlite_registro_real.py::TestSqliteRealSoloLecturaYAislamiento::test_existen_candidatos_exe_en_sqlite_real
+FAILED tests/hands/apps/application_discovery/test_application_entities_sqlite_registro_real.py::TestAutoRegistroDesdeSqliteReal::test_auto_registro_candidatos_reales_sqlite
+FAILED tests/hands/apps/application_discovery/test_application_entities_sqlite_registro_real.py::TestRegistroMinimoAplicacionDesdeSqlite::test_entidades_tienen_campos_obligatorios_registro_minimo
+FAILED tests/hands/apps/application_launch_classifier/test_application_launch_classifier.py::TestEntradaInventoryEntry::test_acepta_inventory_entry
+FAILED tests/hands/apps/application_launch_classifier/test_clasificacion_tipos_lanzamiento_entorno_real.py::TestEjecutableDisponible::test_hay_candidato_registrado_ejecutable
+FAILED tests/hands/apps/application_preflight/test_matriz_sistemas_operativos_adaptadores_entorno_real.py::TestMatrizSistemasOperativosAdaptadoresEntornoReal::test_02_adaptador_windows_nativo_existe
+FAILED tests/hands/apps/application_preflight/test_matriz_sistemas_operativos_adaptadores_entorno_real.py::TestMatrizSistemasOperativosAdaptadoresEntornoReal::test_10_matriz_declaracion_estado_adaptadores
+FAILED tests/hands/apps/applications_core/test_aplicacion_ya_abierta_entorno_real.py::TestAplicacionYaAbiertaEntornoReal::test_3_8_5_3_2_app_abierta_no_lanza_proceso_nuevo_si_preflight_rechaza
+FAILED tests/hands/apps/applications_core/test_application_consumers_real_model.py::TestInternalFunctionsConsumeRealModel::test_open_application_chrome_uses_model
+FAILED tests/hands/apps/applications_core/test_application_consumers_real_model.py::TestInternalFunctionsConsumeRealModel::test_open_application_alias_resolves_to_real_app
+FAILED tests/hands/apps/applications_core/test_application_consumers_real_model.py::TestInternalFunctionsConsumeRealModel::test_open_application_minimal_app_with_executable
+FAILED tests/hands/apps/applications_core/test_application_data_format.py::TestApplicationsMemoryFileFormat::test_no_code_reads_applications_via_memory_type
+FAILED tests/hands/apps/applications_core/test_application_data_incomplete.py::TestErrorLoggingDuringLoad::test_get_entity_invalid_logs_warning_with_id_and_exception
+FAILED tests/hands/apps/applications_core/test_application_data_incomplete.py::TestErrorLoggingDuringLoad::test_get_entities_by_type_invalid_logs_warning
+FAILED tests/hands/apps/applications_core/test_application_data_incomplete.py::TestErrorLoggingDuringLoad::test_save_entity_exception_logs_error_with_exception
+FAILED tests/hands/apps/applications_core/test_application_identification.py::TestNameUniquenessBehavior::test_same_name_skipped
+FAILED tests/hands/apps/applications_core/test_application_register_duplicates.py::TestRegisterApplicationDuplicateAvoidance::test_second_registration_returns_false
+FAILED tests/hands/apps/applications_core/test_application_register_duplicates.py::TestRegisterApplicationDuplicateAvoidance::test_duplicate_does_not_call_save_entity
+FAILED tests/hands/apps/applications_core/test_application_register_duplicates.py::TestRegisterApplicationDuplicateAvoidance::test_duplicate_does_not_overwrite_existing_app
+FAILED tests/hands/apps/applications_core/test_application_register_duplicates.py::TestRegisterApplicationDuplicateAvoidance::test_duplicate_save_entity_called_exactly_once
+FAILED tests/hands/apps/applications_core/test_application_register_duplicates.py::TestRegisterApplicationDuplicateAvoidance::test_duplicate_entity_stored_once
+FAILED tests/hands/apps/applications_core/test_application_register_duplicates.py::TestRegisterApplicationDuplicateDetection::test_case_insensitive_duplicate
+FAILED tests/hands/apps/applications_core/test_application_register_duplicates.py::TestRegisterApplicationDuplicateDetection::test_spaces_and_case_variants
+FAILED tests/hands/apps/applications_core/test_application_register_duplicates.py::TestRegisterApplicationDuplicateDetection::test_app_with_ui_elements_not_duplicated
+FAILED tests/hands/apps/applications_core/test_application_register_duplicates.py::TestRegisterApplicationNotBlocked::test_register_after_duplicate_re_registers_different_app
+FAILED tests/hands/apps/applications_core/test_application_register_in_memory.py::TestRegisterDuplicateWithRealMemoryManager::test_second_registration_returns_false
+FAILED tests/hands/apps/applications_core/test_application_register_in_memory.py::TestRegisterDuplicateWithRealMemoryManager::test_duplicate_preserves_original_app
+FAILED tests/hands/apps/applications_core/test_application_register_in_memory.py::TestRegisterDuplicateWithRealMemoryManager::test_duplicate_does_not_overwrite_entity_in_cache
+FAILED tests/hands/apps/applications_core/test_application_source_missing.py::TestApplicationManagerWhenSourceMissing::test_source_file_content_after_init
+FAILED tests/hands/apps/applications_core/test_applications_core.py::TestOpenApplication::test_open_rechazado_por_preflight_ejecutable_no_resuelto
+FAILED tests/hands/apps/applications_core/test_consumer_api_compatibility.py::TestInternalFunctionsConsumerCompatibility::test_open_application_resolves_from_model
+FAILED tests/hands/apps/applications_core/test_consumer_api_compatibility.py::TestInternalFunctionsConsumerCompatibility::test_open_application_minimal_app_with_executable
+FAILED tests/hands/apps/applications_core/test_consumer_api_compatibility.py::TestInternalFunctionsConsumerCompatibility::test_open_application_minimal_app_no_executable_no_url
+FAILED tests/hands/apps/applications_core/test_duplicados_y_preservacion_entities_json.py::TestNoDuplicadosMemoria::test_registro_catalogo_duplicado_no_guarda_dos_veces
+FAILED tests/hands/apps/applications_core/test_entities_json_preservation_discovery.py::TestPreservacionEntitiesJsonDescubrimiento::test_memory_entities_json_inalterable
+FAILED tests/hands/apps/applications_core/test_ui_elements.py::TestUIElementInteraction::test_ui_element_click
+FAILED tests/hands/apps/applications_core/test_ui_elements.py::TestUIElementInteraction::test_ui_element_double_click
+FAILED tests/hands/apps/applications_core/test_ui_elements.py::TestUIElementInteraction::test_ui_element_right_click
+FAILED tests/hands/apps/applications_core/test_ui_elements.py::TestUIElementInteraction::test_ui_element_text_input
+FAILED tests/hands/apps/test_launch_macos.py::TestResolucionTextEditYCalculadora::test_aplicacion_no_instalada_devuelve_not_installed
+FAILED tests/hands/apps/test_launch_macos.py::TestPreflightBundle::test_bundle_sin_cuarentena_se_permite_con_ejecutable_dentro_del_bundle
+FAILED tests/hands/apps/test_launch_macos.py::TestAperturaPorServicioUnico::test_cuarentena_bloquea_sin_llamar_a_open
+FAILED tests/hands/apps/test_launch_macos.py::TestAperturaPorServicioUnico::test_fallo_de_launchservices_devuelve_launch_failed
+FAILED tests/hands/apps/test_launch_macos.py::TestAperturaPorServicioUnico::test_bundle_id_inseguro_no_llega_a_open
+FAILED tests/hands/apps/test_launch_macos.py::TestAperturaPorServicioUnico::test_aplicacion_no_instalada_no_abre_nada
+FAILED tests/hands/calibration/calibration_manager/test_apertura_aplicaciones_inocuas_entorno_real.py::TestAperturaAplicacionesInocuasEntornoReal::test_3_8_5_6_12_3_ciclo_completo_edge
+FAILED tests/hands/calibration/calibration_pipeline/test_aceptacion_calibracion_entorno_real.py::TestAceptacionCalibracionEntornoReal::test_01_ciclo_completo_en_la_fixture_entorno_real
+FAILED tests/hands/calibration/calibration_pipeline/test_aceptacion_calibracion_entorno_real.py::TestAceptacionCalibracionEntornoReal::test_03_familias_control_sin_accesibilidad_y_metricas
+FAILED tests/hands/calibration/ui_exploration/test_navegacion_ajustes_entorno_real.py::TestNavegacionAjustesEntornoReal::test_01_calibracion_y_exploracion
+FAILED tests/hands/calibration/ui_exploration/test_navegacion_ajustes_entorno_real.py::TestNavegacionAjustesEntornoReal::test_02_solo_clics_verificados_de_navegacion
+FAILED tests/hands/calibration/ui_exploration/test_navegacion_ajustes_entorno_real.py::TestNavegacionAjustesEntornoReal::test_03_caminos_reproducidos_con_coordenadas_guardadas
+FAILED tests/hands/calibration/ui_exploration/test_navegacion_ajustes_entorno_real.py::TestNavegacionAjustesEntornoReal::test_04_elementos_con_coordenadas
+FAILED tests/hands/calibration/ui_exploration/test_navegacion_chat_entorno_real.py::TestNavegacionChatEntornoReal::test_01_mapa_con_profundidad
+FAILED tests/hands/calibration/ui_exploration/test_navegacion_chat_entorno_real.py::TestNavegacionChatEntornoReal::test_02_evidencia_de_clics_reales
+FAILED tests/hands/calibration/ui_exploration/test_navegacion_chat_entorno_real.py::TestNavegacionChatEntornoReal::test_04_json_con_coordenadas
+FAILED tests/hands/calibration/ui_exploration/test_navegacion_chat_entorno_real.py::TestNavegacionChatEntornoReal::test_06_mandar_hola_a_manolito
+FAILED tests/hands/calibration/ui_exploration/test_navegacion_chat_entorno_real.py::TestNavegacionChatEntornoReal::test_07_coordenada_corrompida_se_detecta_antes_del_clic
+FAILED tests/hands/calibration/ui_exploration/test_navegacion_chat_entorno_real.py::TestNavegacionChatEntornoReal::test_08_en_vivo_llega_al_chat_aunque_la_coordenada_guardada_este_mal
+FAILED tests/hands/inventory/system_inventory/test_system_inventory.py::TestLogsSinRutasCompletas::test_recorrido_log_resumen_no_rutas_completas
+FAILED tests/hands/inventory/system_inventory/test_system_inventory.py::TestLogsSinRutasCompletas::test_errores_log_agregados_por_categoria_no_ruta_completa
+FAILED tests/hands/inventory/system_inventory/test_system_inventory.py::TestLogsSinRutasCompletas::test_escanear_ruta_log_inicio_y_fin_con_evidencia_minima
+FAILED tests/hands/inventory/system_inventory/test_system_inventory.py::TestLogsSinRutasCompletas::test_politica_refresco_log_resumen_no_rutas
+FAILED tests/hands/inventory/test_filesystem_observer.py::test_observador_reporta_no_disponible_sin_watchdog
+FAILED tests/hands/inventory/test_filesystem_observer.py::test_observador_sin_watchdog_no_puede_iniciarse_levanta_error
+FAILED tests/hands/inventory/test_filesystem_observer.py::test_error_menciona_refresco_bajo_demanda_como_alternativa
+SKIPPED [1] tests\hands\apps\application_launch_classifier\test_cache_accesos_directos.py:109: Comportamiento fuera de Windows (excepcion (a))
+SKIPPED [1] tests\hands\apps\application_launch_classifier\test_candidatos_reales_entorno_real.py:304: No se encontro paquete .appx/.msix en el sistema
+SKIPPED [1] tests\hands\calibration\calibration_manager\test_apertura_aplicaciones_inocuas_entorno_real.py:150: Notepad ya estaba abierto; la API reutilizo la instancia existente (was_owned=False). No se cierra nada ajeno. Escenario de reutilizacion registrado; BLOQUEADO para prueba de propiedad exclusiva si se requiere was_owned=True.
+SKIPPED [1] tests\hands\calibration\calibration_manager\test_apertura_aplicaciones_inocuas_entorno_real.py:315: Calc ya estaba abierto; la API reutilizo la instancia existente (was_owned=False). No se cierra nada ajeno. Escenario de reutilizacion registrado; BLOQUEADO para prueba de propiedad exclusiva si se requiere was_owned=True.
+66 failed, 4620 passed, 4 skipped, 9 warnings, 27 subtests passed in 2531.29s (0:42:11)

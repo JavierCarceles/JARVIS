@@ -1,0 +1,76 @@
+============================= test session starts =============================
+platform win32 -- Python 3.14.7, pytest-9.1.1, pluggy-1.6.0 -- C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS
+plugins: anyio-4.15.1, cov-7.1.0
+collecting ... collected 4 items
+
+tests/hands/calibration/ui_exploration/test_navegacion_ajustes_entorno_real.py::TestNavegacionAjustesEntornoReal::test_01_calibracion_y_exploracion 
+[NAVEGACION AJUSTES] etapa_fallida=quality_gate error=ningun control accionable supero la puerta de calidad (0 detectados sin accion demostrada) tiempos={'preflight': 0.146, 'capabilities': 0.342, 'launch': 5.448, 'monitor': 0.001, 'window': 0.003, 'stability': 0.33, 'environment': 0.03, 'accessibility': 0.033, 'capture': 0.166, 'detection': 42.745, 'fusion': 0.186}
+[NAVEGACION AJUSTES] deteccion: {'ventana': {'window_id': 656292, 'pid': 18076, 'app_identity': 'applicationframehost.exe', 'bounds': {'left': 3826, 'top': -14, 'right': 7694, 'bottom': 2066, 'width': 3868, 'height': 2080}, 'client_bounds': {'left': 3840, 'top': -14, 'right': 7680, 'bottom': 2052, 'width': 3840, 'height': 2066}, 'is_maximized': True, 'is_foreground': True, 'display_id': '\\\\?\\DISPLAY#SAM1018#5&7920914&0&UID4354#{e6f07b5f-ee97-4a90-b076-33f57bf4eaa7}', 'scale_factor': 2.25, 'dpi': 216}, 'candidatos_por_fuente': {'uia': 4, 'qwen3vl': 0, 'omniparser_v2_icon_detect_v3': 1, 'paddleocr': 0}, 'deteccion_visual': {'mode': 'auto', 'used': True, 'reason': 'accesibilidad insuficiente (4 controles accionables < 5)', 'accessible_actionable': 4}, 'qwen3vl': {'source_size': [3840, 2052], 'sent_size': [1600, 855], 'seconds': 6.425, 'elements': 0}, 'puerta': {'aceptados': 0, 'rechazados': 4}, 'avisos': []}
+[NAVEGACION AJUSTES] exploracion: {'states': None, 'transitions': None, 'actions_performed': None, 'elapsed_seconds': None, 'aborted': None, 'abort_reason': None, 'path_verification': None, 'ui_map_path': None}
+FAILED
+tests/hands/calibration/ui_exploration/test_navegacion_ajustes_entorno_real.py::TestNavegacionAjustesEntornoReal::test_02_solo_clics_verificados_de_navegacion FAILED
+tests/hands/calibration/ui_exploration/test_navegacion_ajustes_entorno_real.py::TestNavegacionAjustesEntornoReal::test_03_caminos_reproducidos_con_coordenadas_guardadas FAILED
+tests/hands/calibration/ui_exploration/test_navegacion_ajustes_entorno_real.py::TestNavegacionAjustesEntornoReal::test_04_elementos_con_coordenadas FAILED
+
+================================== FAILURES ===================================
+_____ TestNavegacionAjustesEntornoReal.test_01_calibracion_y_exploracion ______
+
+self = <test_navegacion_ajustes_entorno_real.TestNavegacionAjustesEntornoReal testMethod=test_01_calibracion_y_exploracion>
+
+    def test_01_calibracion_y_exploracion(self):
+>       self.assertTrue(self.report.success, "%s: %s" % (self.report.stage_failed, self.report.error))
+E       AssertionError: False is not true : quality_gate: ningun control accionable supero la puerta de calidad (0 detectados sin accion demostrada)
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_ajustes_entorno_real.py:78: AssertionError
+----------------------------- Captured log setup ------------------------------
+WARNING  src.hands.calibration.calibration_pipeline:calibration_pipeline.py:523 [CALIBRATION-PIPELINE] configuracion: fallo en etapa quality_gate: ningun control accionable supero la puerta de calidad (0 detectados sin accion demostrada)
+_ TestNavegacionAjustesEntornoReal.test_02_solo_clics_verificados_de_navegacion _
+
+self = <test_navegacion_ajustes_entorno_real.TestNavegacionAjustesEntornoReal testMethod=test_02_solo_clics_verificados_de_navegacion>
+
+    def test_02_solo_clics_verificados_de_navegacion(self):
+>       self.assertIsNotNone(self.mapa)
+E       AssertionError: unexpectedly None
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_ajustes_entorno_real.py:84: AssertionError
+_ TestNavegacionAjustesEntornoReal.test_03_caminos_reproducidos_con_coordenadas_guardadas _
+
+self = <test_navegacion_ajustes_entorno_real.TestNavegacionAjustesEntornoReal testMethod=test_03_caminos_reproducidos_con_coordenadas_guardadas>
+
+    def test_03_caminos_reproducidos_con_coordenadas_guardadas(self):
+        verificacion = self.exploracion.get("path_verification")
+>       self.assertIsNotNone(verificacion, "la profundidad completa debe reproducir los caminos")
+E       AssertionError: unexpectedly None : la profundidad completa debe reproducir los caminos
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_ajustes_entorno_real.py:95: AssertionError
+_____ TestNavegacionAjustesEntornoReal.test_04_elementos_con_coordenadas ______
+
+self = <test_navegacion_ajustes_entorno_real.TestNavegacionAjustesEntornoReal testMethod=test_04_elementos_con_coordenadas>
+
+    def test_04_elementos_con_coordenadas(self):
+>       self.assertIsNotNone(self.mapa)
+E       AssertionError: unexpectedly None
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_ajustes_entorno_real.py:100: AssertionError
+============================== warnings summary ===============================
+tests/hands/calibration/ui_exploration/test_navegacion_ajustes_entorno_real.py::TestNavegacionAjustesEntornoReal::test_01_calibracion_y_exploracion
+  C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\venv\Lib\site-packages\pywinauto\__init__.py:80: UserWarning: Revert to STA COM threading mode
+    warnings.warn("Revert to STA COM threading mode", UserWarning)
+
+tests/hands/calibration/ui_exploration/test_navegacion_ajustes_entorno_real.py::TestNavegacionAjustesEntornoReal::test_01_calibracion_y_exploracion
+  C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\venv\Lib\site-packages\torch\jit\_serialization.py:170: FutureWarning: `torch.jit.load` is not supported in Python 3.14+ and may break. Please switch to `torch.export`.
+    warnings.warn(
+
+tests/hands/calibration/ui_exploration/test_navegacion_ajustes_entorno_real.py::TestNavegacionAjustesEntornoReal::test_01_calibracion_y_exploracion
+  C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\src\hands\detection\paddleocr_adapter.py:293: UserWarning: `lang` and `ocr_version` will be ignored when model names or model directories are not `None`.
+    self._ocr = _PaddleOCR(**kwargs)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/hands/calibration/ui_exploration/test_navegacion_ajustes_entorno_real.py::TestNavegacionAjustesEntornoReal::test_01_calibracion_y_exploracion
+FAILED tests/hands/calibration/ui_exploration/test_navegacion_ajustes_entorno_real.py::TestNavegacionAjustesEntornoReal::test_02_solo_clics_verificados_de_navegacion
+FAILED tests/hands/calibration/ui_exploration/test_navegacion_ajustes_entorno_real.py::TestNavegacionAjustesEntornoReal::test_03_caminos_reproducidos_con_coordenadas_guardadas
+FAILED tests/hands/calibration/ui_exploration/test_navegacion_ajustes_entorno_real.py::TestNavegacionAjustesEntornoReal::test_04_elementos_con_coordenadas
+======================= 4 failed, 3 warnings in 49.70s ========================

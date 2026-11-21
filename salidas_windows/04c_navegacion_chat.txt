@@ -1,0 +1,125 @@
+============================= test session starts =============================
+platform win32 -- Python 3.14.7, pytest-9.1.1, pluggy-1.6.0 -- C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS
+plugins: anyio-4.15.1, cov-7.1.0
+collecting ... collected 8 items
+
+tests/hands/calibration/ui_exploration/test_navegacion_chat_entorno_real.py::TestNavegacionChatEntornoReal::test_01_mapa_con_profundidad FAILED
+tests/hands/calibration/ui_exploration/test_navegacion_chat_entorno_real.py::TestNavegacionChatEntornoReal::test_02_evidencia_de_clics_reales FAILED
+tests/hands/calibration/ui_exploration/test_navegacion_chat_entorno_real.py::TestNavegacionChatEntornoReal::test_03_borrar_nunca_se_pulsa PASSED
+tests/hands/calibration/ui_exploration/test_navegacion_chat_entorno_real.py::TestNavegacionChatEntornoReal::test_04_json_con_coordenadas FAILED
+tests/hands/calibration/ui_exploration/test_navegacion_chat_entorno_real.py::TestNavegacionChatEntornoReal::test_05_todos_los_caminos_se_reproducen_con_coordenadas_guardadas PASSED
+tests/hands/calibration/ui_exploration/test_navegacion_chat_entorno_real.py::TestNavegacionChatEntornoReal::test_06_mandar_hola_a_manolito FAILED
+tests/hands/calibration/ui_exploration/test_navegacion_chat_entorno_real.py::TestNavegacionChatEntornoReal::test_07_coordenada_corrompida_se_detecta_antes_del_clic FAILED
+tests/hands/calibration/ui_exploration/test_navegacion_chat_entorno_real.py::TestNavegacionChatEntornoReal::test_08_en_vivo_llega_al_chat_aunque_la_coordenada_guardada_este_mal FAILED
+[NAVEGACION CHAT] resumen:
+  exploracion: 4.7 s, estados=2, transiciones=1, acciones=16, reinicios=0, abortada=False 
+  mapa JSON: C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\fixtures\_tmp_ui_maps\prueba_windows\fixture_chat.json
+    estado 0cf8c25c prof=0 camino=[] elementos=17
+    estado 41c7bb35 prof=1 camino=[Sistema] elementos=25
+  reproduccion de caminos: ok=1 fallidos=0
+
+
+================================== FAILURES ===================================
+_________ TestNavegacionChatEntornoReal.test_01_mapa_con_profundidad __________
+
+self = <test_navegacion_chat_entorno_real.TestNavegacionChatEntornoReal testMethod=test_01_mapa_con_profundidad>
+
+    def test_01_mapa_con_profundidad(self):
+        self.assertFalse(self.resultado.aborted, self.resultado.abort_reason)
+>       chat = self._estado_tras("Manolito")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_chat_entorno_real.py:201: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_chat_entorno_real.py:190: in _estado_tras
+    self.fail("no hay estado alcanzado por '%s'; estados: %s" % (nombre, self.resumen))
+E   AssertionError: no hay estado alcanzado por 'Manolito'; estados: ['exploracion: 4.7 s, estados=2, transiciones=1, acciones=16, reinicios=0, abortada=False ', 'mapa JSON: C:\\Informatica\\PROYECTOS\\BACKEND\\IA_PYTHON\\IA\\JARVIS\\tests\\fixtures\\_tmp_ui_maps\\prueba_windows\\fixture_chat.json', '  estado 0cf8c25c prof=0 camino=[] elementos=17', '  estado 41c7bb35 prof=1 camino=[Sistema] elementos=25']
+_______ TestNavegacionChatEntornoReal.test_02_evidencia_de_clics_reales _______
+
+self = <test_navegacion_chat_entorno_real.TestNavegacionChatEntornoReal testMethod=test_02_evidencia_de_clics_reales>
+
+    def test_02_evidencia_de_clics_reales(self):
+        cambios = [t for t in self.datos["transitions"] if t["evidence"].get("changed")]
+        self.assertTrue(cambios)
+        for transicion in self.datos["transitions"]:
+>           self.assertEqual(transicion["evidence"]["method"], "click", transicion)
+E           AssertionError: 'accessibility:expand' != 'click'
+E           - accessibility:expand
+E           + click
+E            : {'from_state': '0cf8c25c63023c95eede3fef', 'action': 'expand', 'element_ref': {'identifier': '', 'name': 'Sistema', 'control_type': 'menu', 'native_role': 'MenuItem', 'parent_name': 'Sistema', 'depth': 3}, 'to_state': '41c7bb355063e67720833f9d', 'return_action': 'collapse', 'verified_return': True, 'evidence': {'method': 'accessibility:expand', 'before_state': '0cf8c25c63023c95eede3fef', 'after_state': '41c7bb355063e67720833f9d', 'changed': True, 'new_windows': 1, 'element_key': 'Sistema|MenuItem|Sistema'}}
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_chat_entorno_real.py:211: AssertionError
+_________ TestNavegacionChatEntornoReal.test_04_json_con_coordenadas __________
+
+self = <test_navegacion_chat_entorno_real.TestNavegacionChatEntornoReal testMethod=test_04_json_con_coordenadas>
+
+    def test_04_json_con_coordenadas(self):
+        guardado = json.loads(Path(self.mapa_path).read_text(encoding="utf-8"))
+>       chat = self._estado_tras("Manolito")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_chat_entorno_real.py:222: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_chat_entorno_real.py:190: in _estado_tras
+    self.fail("no hay estado alcanzado por '%s'; estados: %s" % (nombre, self.resumen))
+E   AssertionError: no hay estado alcanzado por 'Manolito'; estados: ['exploracion: 4.7 s, estados=2, transiciones=1, acciones=16, reinicios=0, abortada=False ', 'mapa JSON: C:\\Informatica\\PROYECTOS\\BACKEND\\IA_PYTHON\\IA\\JARVIS\\tests\\fixtures\\_tmp_ui_maps\\prueba_windows\\fixture_chat.json', '  estado 0cf8c25c prof=0 camino=[] elementos=17', '  estado 41c7bb35 prof=1 camino=[Sistema] elementos=25']
+________ TestNavegacionChatEntornoReal.test_06_mandar_hola_a_manolito _________
+
+self = <test_navegacion_chat_entorno_real.TestNavegacionChatEntornoReal testMethod=test_06_mandar_hola_a_manolito>
+
+    def test_06_mandar_hola_a_manolito(self):
+        navegador = self._navegador()
+>       chat = self._estado_tras("Manolito")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_chat_entorno_real.py:239: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_chat_entorno_real.py:190: in _estado_tras
+    self.fail("no hay estado alcanzado por '%s'; estados: %s" % (nombre, self.resumen))
+E   AssertionError: no hay estado alcanzado por 'Manolito'; estados: ['exploracion: 4.7 s, estados=2, transiciones=1, acciones=16, reinicios=0, abortada=False ', 'mapa JSON: C:\\Informatica\\PROYECTOS\\BACKEND\\IA_PYTHON\\IA\\JARVIS\\tests\\fixtures\\_tmp_ui_maps\\prueba_windows\\fixture_chat.json', '  estado 0cf8c25c prof=0 camino=[] elementos=17', '  estado 41c7bb35 prof=1 camino=[Sistema] elementos=25', 'reproduccion de caminos: ok=1 fallidos=0']
+_ TestNavegacionChatEntornoReal.test_07_coordenada_corrompida_se_detecta_antes_del_clic _
+
+self = <test_navegacion_chat_entorno_real.TestNavegacionChatEntornoReal testMethod=test_07_coordenada_corrompida_se_detecta_antes_del_clic>
+
+    def test_07_coordenada_corrompida_se_detecta_antes_del_clic(self):
+        from src.hands.calibration.ui_navigation_map import COORDS_STORED, UINavigator
+    
+        datos = self._datos_con_manolito_en_la_caja_de_lucia()
+        inicio = len(self._eventos())
+        resultado = UINavigator(
+            self.explorador, datos, self.window_id, self.pid, coordinates=COORDS_STORED
+>       ).go_to(self._estado_tras("Manolito"))
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_chat_entorno_real.py:270: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_chat_entorno_real.py:190: in _estado_tras
+    self.fail("no hay estado alcanzado por '%s'; estados: %s" % (nombre, self.resumen))
+E   AssertionError: no hay estado alcanzado por 'Manolito'; estados: ['exploracion: 4.7 s, estados=2, transiciones=1, acciones=16, reinicios=0, abortada=False ', 'mapa JSON: C:\\Informatica\\PROYECTOS\\BACKEND\\IA_PYTHON\\IA\\JARVIS\\tests\\fixtures\\_tmp_ui_maps\\prueba_windows\\fixture_chat.json', '  estado 0cf8c25c prof=0 camino=[] elementos=17', '  estado 41c7bb35 prof=1 camino=[Sistema] elementos=25', 'reproduccion de caminos: ok=1 fallidos=0']
+_ TestNavegacionChatEntornoReal.test_08_en_vivo_llega_al_chat_aunque_la_coordenada_guardada_este_mal _
+
+self = <test_navegacion_chat_entorno_real.TestNavegacionChatEntornoReal testMethod=test_08_en_vivo_llega_al_chat_aunque_la_coordenada_guardada_este_mal>
+
+    def test_08_en_vivo_llega_al_chat_aunque_la_coordenada_guardada_este_mal(self):
+        from src.hands.calibration.ui_navigation_map import COORDS_LIVE, UINavigator
+    
+        datos = self._datos_con_manolito_en_la_caja_de_lucia()
+        inicio = len(self._eventos())
+>       resultado = UINavigator(self.explorador, datos, self.window_id, self.pid).go_to(self._estado_tras("Manolito"))
+                                                                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_chat_entorno_real.py:282: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\ui_exploration\test_navegacion_chat_entorno_real.py:190: in _estado_tras
+    self.fail("no hay estado alcanzado por '%s'; estados: %s" % (nombre, self.resumen))
+E   AssertionError: no hay estado alcanzado por 'Manolito'; estados: ['exploracion: 4.7 s, estados=2, transiciones=1, acciones=16, reinicios=0, abortada=False ', 'mapa JSON: C:\\Informatica\\PROYECTOS\\BACKEND\\IA_PYTHON\\IA\\JARVIS\\tests\\fixtures\\_tmp_ui_maps\\prueba_windows\\fixture_chat.json', '  estado 0cf8c25c prof=0 camino=[] elementos=17', '  estado 41c7bb35 prof=1 camino=[Sistema] elementos=25', 'reproduccion de caminos: ok=1 fallidos=0']
+=========================== short test summary info ===========================
+FAILED tests/hands/calibration/ui_exploration/test_navegacion_chat_entorno_real.py::TestNavegacionChatEntornoReal::test_01_mapa_con_profundidad
+FAILED tests/hands/calibration/ui_exploration/test_navegacion_chat_entorno_real.py::TestNavegacionChatEntornoReal::test_02_evidencia_de_clics_reales
+FAILED tests/hands/calibration/ui_exploration/test_navegacion_chat_entorno_real.py::TestNavegacionChatEntornoReal::test_04_json_con_coordenadas
+FAILED tests/hands/calibration/ui_exploration/test_navegacion_chat_entorno_real.py::TestNavegacionChatEntornoReal::test_06_mandar_hola_a_manolito
+FAILED tests/hands/calibration/ui_exploration/test_navegacion_chat_entorno_real.py::TestNavegacionChatEntornoReal::test_07_coordenada_corrompida_se_detecta_antes_del_clic
+FAILED tests/hands/calibration/ui_exploration/test_navegacion_chat_entorno_real.py::TestNavegacionChatEntornoReal::test_08_en_vivo_llega_al_chat_aunque_la_coordenada_guardada_este_mal
+========================= 6 failed, 2 passed in 8.91s =========================

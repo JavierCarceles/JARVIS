@@ -1,0 +1,46 @@
+============================= test session starts =============================
+platform win32 -- Python 3.14.7, pytest-9.1.1, pluggy-1.6.0 -- C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS
+plugins: anyio-4.15.1, cov-7.1.0
+collecting ... collected 152 items / 116 deselected / 36 selected
+
+tests/hands/apps/test_aplicaciones_integradas_windows.py::TestVariantes::test_aplicacion_de_terceros_no_tiene_variantes PASSED [  2%]
+tests/hands/apps/test_aplicaciones_integradas_windows.py::TestVariantes::test_familia_de_aumid PASSED [  5%]
+tests/hands/apps/test_aplicaciones_integradas_windows.py::TestVariantes::test_herramientas_de_riesgo_no_se_amplian PASSED [  8%]
+tests/hands/apps/test_aplicaciones_integradas_windows.py::TestVariantes::test_nombre_en_cualquier_idioma_da_las_mismas_variantes PASSED [ 11%]
+tests/hands/apps/test_aplicaciones_integradas_windows.py::TestVariantes::test_ruta_del_sistema PASSED [ 13%]
+tests/hands/apps/test_aplicaciones_integradas_windows.py::TestVariantes::test_sin_coincidencias_parciales PASSED [ 16%]
+tests/hands/apps/test_aplicaciones_integradas_windows.py::TestVariantes::test_tildes_y_mayusculas PASSED [ 19%]
+tests/hands/apps/test_aplicaciones_integradas_windows.py::TestBusquedaEnElOtroIdioma::test_calculadora_en_windows_en_ingles PASSED [ 22%]
+tests/hands/apps/test_aplicaciones_integradas_windows.py::TestBusquedaEnElOtroIdioma::test_calculator_en_windows_en_espanol PASSED [ 25%]
+tests/hands/apps/test_aplicaciones_integradas_windows.py::TestBusquedaEnElOtroIdioma::test_explorer_no_arrastra_internet_explorer PASSED [ 27%]
+tests/hands/apps/test_aplicaciones_integradas_windows.py::TestBusquedaEnElOtroIdioma::test_notepad_en_windows_en_espanol PASSED [ 30%]
+tests/hands/apps/test_aplicaciones_integradas_windows.py::TestBusquedaEnElOtroIdioma::test_subcadena_original_se_mantiene PASSED [ 33%]
+tests/hands/apps/test_aplicaciones_integradas_windows.py::TestVerificacionPorAumid::test_otro_aumid_no_cuenta_y_sigue_por_titulo PASSED [ 36%]
+tests/hands/apps/test_aplicaciones_integradas_windows.py::TestVerificacionPorAumid::test_sin_aumid_legible_sigue_por_titulo PASSED [ 38%]
+tests/hands/apps/test_aplicaciones_integradas_windows.py::TestVerificacionPorAumid::test_titulo_distinto_se_verifica_por_aumid PASSED [ 41%]
+tests/hands/apps/test_aplicaciones_integradas_windows.py::TestVerificacionPorAumid::test_ventana_preexistente_con_el_aumid_no_cuenta PASSED [ 44%]
+tests/hands/apps/test_aplicaciones_integradas_windows.py::TestFiltroDeRiesgoEnIngles::test_aplicaciones_normales_no_se_filtran PASSED [ 47%]
+tests/hands/apps/test_aplicaciones_integradas_windows.py::TestFiltroDeRiesgoEnIngles::test_nombres_en_ingles_se_ignoran_como_en_espanol 
+tests/hands/apps/test_aplicaciones_integradas_windows.py::TestFiltroDeRiesgoEnIngles::test_nombres_en_ingles_se_ignoran_como_en_espanol PASSED [ 50%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestIdentidadGlobalEstable::test_3_8_5_1_4_11_2_identidad_desde_paquete_id PASSED [ 52%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestIdentidadGlobalEstable::test_3_8_5_1_4_11_2_identidad_desde_fabricante_producto_independiente_de_ruta PASSED [ 55%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestIdentidadGlobalEstable::test_identidad_distingue_ejecutables_del_mismo_producto PASSED [ 58%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestIdentidadGlobalEstable::test_identidad_no_depende_del_idioma_del_producto PASSED [ 61%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestIdentidadGlobalEstable::test_identidad_paquete_desde_app_id_del_menu_inicio PASSED [ 63%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestIdentidadGlobalEstable::test_identidad_fabricante_producto_sin_ejecutable PASSED [ 66%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestIdentidadGlobalEstable::test_3_8_5_1_4_11_2_nombre_comercial_solo_no_fusiona_por_nombre PASSED [ 69%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestIdentidadGlobalEstable::test_3_8_5_1_4_11_2_evidencia_insuficiente_mantiene_candidato_separado PASSED [ 72%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestIdentidadGlobalEstable::test_3_8_5_1_4_11_2_ruta_absoluta_no_es_base_de_identidad PASSED [ 75%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestIdentidadGlobalEstable::test_3_8_5_1_4_11_2_precedencia_paquete_sobre_fabricante_producto PASSED [ 77%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestIdentidadGlobalEstable::test_3_8_5_1_4_11_2_evidencia_base_contiene_metadatos_verificables PASSED [ 80%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestIdentidadGlobalEstable::test_3_8_5_1_4_11_2_mismo_candidato_devuelve_misma_identidad PASSED [ 83%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestIdentidadGlobalEstable::test_3_8_5_1_4_11_2_entity_id_aptos_para_modelo_entity PASSED [ 86%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestRegistroMinimoAplicacion::test_3_8_5_1_4_11_3_identidad_real_de_notepad_sin_ruta_en_id PASSED [ 88%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestBusquedaPorNombreSinTruncar::test_sin_filtro_el_limite_deja_fuera_la_aplicacion PASSED [ 91%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestBusquedaPorNombreSinTruncar::test_con_filtro_la_aplicacion_entra_aunque_este_al_final PASSED [ 94%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestBusquedaPorNombreSinTruncar::test_buscar_por_nombre_filtra_el_inventario_en_la_consulta PASSED [ 97%]
+tests/hands/apps/application_discovery/test_application_discovery.py::TestBusquedaPorNombreSinTruncar::test_inventario_descarta_el_almacen_de_componentes PASSED [100%]
+
+=========== 36 passed, 116 deselected, 9 subtests passed in 19.58s ============

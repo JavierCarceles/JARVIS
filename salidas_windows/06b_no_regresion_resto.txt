@@ -1,0 +1,205 @@
+........................................................................ [  2%]
+....................................................F................... [  5%]
+........................................................................ [  8%]
+........................................................................ [ 11%]
+........................................................................ [ 13%]
+........................................................................ [ 16%]
+........................................................................ [ 19%]
+........................................................................ [ 22%]
+........................................................................ [ 24%]
+........................................................................ [ 27%]
+........................................................................ [ 30%]
+....................................................................................................... [ 34%]
+........................................................................ [ 37%]
+........................................................................ [ 39%]
+........................................................................ [ 42%]
+........................................................................ [ 45%]
+........................................................................ [ 48%]
+........................................................................ [ 50%]
+........................................................................ [ 53%]
+........................................................................ [ 56%]
+........................................................................ [ 59%]
+........................................................................ [ 62%]
+........................................................................ [ 64%]
+........................................................................ [ 67%]
+........................................................................ [ 70%]
+........................................................................ [ 73%]
+........................................................................ [ 75%]
+........................................................................ [ 78%]
+........................................................................ [ 81%]
+........................................................................ [ 84%]
+........................................................................ [ 86%]
+.....F.................................................................. [ 89%]
+........................................................................ [ 92%]
+........................................................................ [ 95%]
+........................................................................ [ 97%]
+.....................................................                    [100%]
+================================== FAILURES ===================================
+_______________ test_setup_escribe_en_fichero_con_nombre_corto ________________
+
+tmp_path = WindowsPath('C:/Users/User/AppData/Local/Temp/pytest-of-User/pytest-1347/test_setup_escribe_en_fichero_0')
+capsys = <_pytest.capture.CaptureFixture object at 0x000002904203AF90>
+
+    def test_setup_escribe_en_fichero_con_nombre_corto(tmp_path, capsys):
+        destino = tmp_path / "logs" / "jarvis.log"
+        ruta = setup_logging(level="INFO", log_file=destino)
+        assert ruta == destino
+    
+        logger = get_logger("src.hands.apps.prueba_fichero")
+        logger.info("Abriendo %s", "chrome")
+        logger.debug("detalle interno")
+        for handler in _handlers_propios():
+            handler.flush()
+    
+        contenido = destino.read_text(encoding="utf-8")
+>       assert "hands.apps.prueba_fichero" in contenido
+E       AssertionError: assert 'hands.apps.prueba_fichero' in ''
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\core\test_log.py:55: AssertionError
+______ TestAdaptiveCaptureGuiReal.test_transicion_notepad_detecta_rafaga ______
+
+self = <test_adaptive_capture_gui_real.TestAdaptiveCaptureGuiReal testMethod=test_transicion_notepad_detecta_rafaga>
+
+    def test_transicion_notepad_detecta_rafaga(self):
+        sm = get_screen_manager()
+        secundario = None
+        for m in sm.monitors:
+            if not m.is_primary:
+                secundario = m
+                break
+        if secundario is None:
+            secundario = sm.get_primary_monitor()
+        # Identificar la salida dxcam que mapea al monitor secundario.
+        output_idx = None
+        for idx in range(4):
+            probe = DXcamCapture(output_idx=idx, backend="dxgi")
+            try:
+                mon = probe.match_monitor(sm)
+            except Exception:
+                mon = None
+            finally:
+                probe.release()
+            if mon is not None and not mon.is_primary:
+                output_idx = idx
+                break
+        if output_idx is None:
+            self.fail(
+                "No se pudo mapear el monitor secundario a una salida dxcam"
+            )
+        cap = AdaptiveCapture(
+            output_idx=output_idx,
+            backend="dxgi",
+            low_cadence_fps=5.0,
+            burst_cadence_fps=20.0,
+            burst_window_seconds=2.0,
+            transition_threshold=0.05,
+            max_buffer_frames=4,
+            idle_release_seconds=5.0,
+        )
+        assert cap.start() is True
+        try:
+            # Entrega base con Notepad visible en el secundario.
+            r0 = None
+            while r0 is None:
+                r0 = cap.grab_adaptive()
+                time.sleep(0.05)
+            self.assertIsNotNone(r0)
+            self.assertIsNotNone(r0.frame)
+            # Ocultar Notepad: la ventana desaparece -> transicion real.
+            user32 = ctypes.windll.user32
+            user32.ShowWindow(self.hwnd, 0)  # SW_HIDE
+            time.sleep(0.5)
+            r1 = None
+            while r1 is None:
+                r1 = cap.grab_adaptive()
+                time.sleep(0.05)
+            self.assertIsNotNone(r1)
+            self.assertTrue(
+                r1.transition_detected,
+                "Se esperaba una transicion al ocultar Notepad",
+            )
+            self.assertEqual(r1.cadence, "burst")
+            self.assertTrue(r1.is_burst)
+            # Restaurar Notepad: la ventana reaparece -> otra transicion real.
+            user32.ShowWindow(self.hwnd, 3)  # SW_MAXIMIZE
+            time.sleep(0.5)
+            r2 = None
+            while r2 is None:
+                r2 = cap.grab_adaptive()
+                time.sleep(0.05)
+            self.assertIsNotNone(r2)
+>           self.assertTrue(
+                r2.transition_detected,
+                "Se esperaba una transicion al restaurar Notepad",
+            )
+E           AssertionError: False is not true : Se esperaba una transicion al restaurar Notepad
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\eyes\capture\screen_capture\test_adaptive_capture_gui_real.py:250: AssertionError
+============================== warnings summary ===============================
+tests\eyes\capture\screen\test_application_state_enumeration.py:15
+  C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\eyes\capture\screen\test_application_state_enumeration.py:15: SyntaxWarning: "\`" is an invalid escape sequence. Such sequences will not work in the future. Did you mean "\\`"? A raw string is also an option.
+    A. **Percepci\u00F3n** (\`src/eyes/capture/screen.py\`): \
+
+tests\eyes\capture\screen\test_application_state_enumeration.py:164
+  C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\eyes\capture\screen\test_application_state_enumeration.py:164: SyntaxWarning: "\`" is an invalid escape sequence. Such sequences will not work in the future. Did you mean "\\`"? A raw string is also an option.
+    """Verifica el diccionario \`states\` booleano por aplicaci\u00F3n en
+
+venv\Lib\site-packages\pywinauto\__init__.py:80
+  C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\venv\Lib\site-packages\pywinauto\__init__.py:80: UserWarning: Revert to STA COM threading mode
+    warnings.warn("Revert to STA COM threading mode", UserWarning)
+
+tests/core/ui_element_model/test_ui_element_behavior.py::TestUIElementDataFromDict::test_extra_keys_filtered
+  C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\core\ui_element_model\test_ui_element_behavior.py:971: PydanticDeprecatedSince211: Accessing the 'model_fields' attribute on the instance is deprecated. Instead, you should access this attribute from the model class. Deprecated in Pydantic V2.11 to be removed in V3.0.
+    assert "unknown_key" not in elem.model_fields
+
+tests/experimental/adaptive_learning_engine/test_adaptive_learning_engine.py::test_goal_adaptation_learning_loop
+  C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\venv\Lib\site-packages\_pytest\python.py:171: PytestReturnNotNoneWarning: Test functions should return None, but tests/experimental/adaptive_learning_engine/test_adaptive_learning_engine.py::test_goal_adaptation_learning_loop returned <class 'bool'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+tests/experimental/adaptive_learning_engine/test_adaptive_learning_engine.py::test_learning_convergence
+  C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\venv\Lib\site-packages\_pytest\python.py:171: PytestReturnNotNoneWarning: Test functions should return None, but tests/experimental/adaptive_learning_engine/test_adaptive_learning_engine.py::test_learning_convergence returned <class 'bool'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+tests/experimental/adaptive_learning_engine/test_adaptive_learning_engine.py::test_learning_adaptation_strategies
+  C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\venv\Lib\site-packages\_pytest\python.py:171: PytestReturnNotNoneWarning: Test functions should return None, but tests/experimental/adaptive_learning_engine/test_adaptive_learning_engine.py::test_learning_adaptation_strategies returned <class 'bool'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+tests/experimental/adaptive_learning_engine/test_goal_adaptation_learning_loop.py::test_goal_adaptation_learning_loop
+  C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\venv\Lib\site-packages\_pytest\python.py:171: PytestReturnNotNoneWarning: Test functions should return None, but tests/experimental/adaptive_learning_engine/test_goal_adaptation_learning_loop.py::test_goal_adaptation_learning_loop returned <class 'bool'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+tests/experimental/adaptive_learning_engine/test_goal_adaptation_learning_loop.py::test_learning_convergence
+  C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\venv\Lib\site-packages\_pytest\python.py:171: PytestReturnNotNoneWarning: Test functions should return None, but tests/experimental/adaptive_learning_engine/test_goal_adaptation_learning_loop.py::test_learning_convergence returned <class 'bool'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+tests/experimental/adaptive_learning_engine/test_goal_adaptation_learning_loop.py::test_learning_adaptation_strategies
+  C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\venv\Lib\site-packages\_pytest\python.py:171: PytestReturnNotNoneWarning: Test functions should return None, but tests/experimental/adaptive_learning_engine/test_goal_adaptation_learning_loop.py::test_learning_adaptation_strategies returned <class 'bool'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+tests/eyes/capture/screen/test_application_state_enumeration.py::TestDataCapabilityStateAtoms::test_required_state_atoms
+tests/eyes/capture/screen/test_application_state_enumeration.py::TestPlannerGraphStateKeys::test_navigation_graph_has_chrome_state_keys
+tests/eyes/capture/screen/test_application_state_enumeration.py::TestDataOnlyStateNames::test_data_states_not_in_planning_enum
+  C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\venv\Lib\site-packages\_pytest\fixtures.py:1313: PytestRemovedIn10Warning: Class-scoped fixture defined as instance method is deprecated.
+  Instance attributes set in this fixture will NOT be visible to test methods,
+  as each test gets a new instance while the fixture runs only once per class.
+  Use @classmethod decorator and set attributes on cls instead.
+  See https://docs.pytest.org/en/stable/deprecations.html#class-scoped-fixture-as-instance-method
+    fixturefunc = resolve_fixture_function(fixturedef, request)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/core/test_log.py::test_setup_escribe_en_fichero_con_nombre_corto
+FAILED tests/eyes/capture/screen_capture/test_adaptive_capture_gui_real.py::TestAdaptiveCaptureGuiReal::test_transicion_notepad_detecta_rafaga
+2 failed, 2602 passed, 13 warnings, 41 subtests passed in 563.30s (0:09:23)

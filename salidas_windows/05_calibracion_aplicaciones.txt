@@ -1,0 +1,24 @@
+============================= test session starts =============================
+platform win32 -- Python 3.14.7, pytest-9.1.1, pluggy-1.6.0 -- C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS
+plugins: anyio-4.15.1, cov-7.1.0
+collecting ... collected 3 items
+
+tests/hands/calibration/calibration_pipeline/test_calibracion_aplicaciones_entorno_real.py::TestCalibracionAplicacionesEntornoReal::test_01_calibra_bloc_de_notas_entorno_real 
+[CALIBRACION notepad] {'tiempos_s': {'preflight': 0.151, 'capabilities': 0.345, 'launch': 9.168, 'monitor': 0.001, 'window': 0.066, 'stability': 0.287, 'environment': 0.006, 'accessibility': 0.13, 'capture': 0.212, 'detection': 0.004, 'fusion': 1.013, 'quality_gate': 0.005, 'pointer_verification': 0.154, 'persistence': 0.039}, 'total_s': 11.583, 'candidatos_por_fuente': {'uia': 41}, 'qwen3vl': None, 'puerta': {'aceptados': 20, 'rechazados': 4}, 'puntero': {'comprobados': 20, 'verificados': 20}, 'foco_restaurado': None}
+PASSED
+tests/hands/calibration/calibration_pipeline/test_calibracion_aplicaciones_entorno_real.py::TestCalibracionAplicacionesEntornoReal::test_02_calibra_calculadora_entorno_real 
+[CALIBRACION calculadora] {'tiempos_s': {'preflight': 0.0, 'capabilities': 0.0, 'launch': 8.027, 'monitor': 0.001, 'window': 0.002, 'stability': 0.281, 'environment': 0.001, 'accessibility': 0.134, 'capture': 0.265, 'detection': 0.002, 'fusion': 3.819, 'quality_gate': 0.009, 'pointer_verification': 0.279, 'persistence': 0.019}, 'total_s': 12.847, 'candidatos_por_fuente': {'uia': 48}, 'qwen3vl': None, 'puerta': {'aceptados': 34, 'rechazados': 5}, 'puntero': {'comprobados': 34, 'verificados': 34}, 'foco_restaurado': None}
+PASSED
+tests/hands/calibration/calibration_pipeline/test_calibracion_aplicaciones_entorno_real.py::TestCalibracionAplicacionesEntornoReal::test_03_calibra_navegador_chromium_entorno_real 
+[CALIBRACION chrome] {'tiempos_s': {'preflight': 0.0, 'capabilities': 0.0, 'launch': 2.026, 'monitor': 0.001, 'window': 0.003, 'stability': 0.308, 'environment': 0.001, 'accessibility': 0.179, 'capture': 0.225, 'detection': 0.002, 'fusion': 1.416, 'quality_gate': 0.005, 'pointer_verification': 0.075, 'persistence': 0.005}, 'total_s': 4.251, 'candidatos_por_fuente': {'uia': 51}, 'qwen3vl': None, 'puerta': {'aceptados': 8, 'rechazados': 12}, 'puntero': {'comprobados': 8, 'verificados': 8}, 'foco_restaurado': None}
+PASSED
+
+============================== warnings summary ===============================
+tests/hands/calibration/calibration_pipeline/test_calibracion_aplicaciones_entorno_real.py::TestCalibracionAplicacionesEntornoReal::test_01_calibra_bloc_de_notas_entorno_real
+  C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\venv\Lib\site-packages\pywinauto\__init__.py:80: UserWarning: Revert to STA COM threading mode
+    warnings.warn("Revert to STA COM threading mode", UserWarning)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 3 passed, 1 warning in 29.59s ========================
