@@ -70,7 +70,7 @@ IMPORTS_COMUNES = {
     "faster-whisper": "faster_whisper", "ctranslate2": "ctranslate2",
     "av": "av", "sounddevice": "sounddevice", "soundfile": "soundfile",
     "pyttsx3": "pyttsx3", "rapidfuzz": "rapidfuzz",
-    "pytest": "pytest",
+    "pytest": "pytest", "PySide6": "PySide6",
 }
 IMPORTS_WINDOWS = {
     "pywin32": "win32con", "comtypes": "comtypes", "pywinauto": "pywinauto",

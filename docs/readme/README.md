@@ -619,7 +619,7 @@ Goal (node.py)
 
 - `JSONStorage(carpeta)`: un fichero por tipo de memoria (tabla en `docs/readme/README_DATA.md`). **`save()` no reemplaza, fusiona:** las listas se amplian, las entidades se actualizan por `id` y los diccionarios se mezclan.
 - `MemoryManager` (`get_memory_manager()`, carpeta `data/memory/`) con cache en memoria (5 minutos):
-  - Entidades: `save_entity` (upsert atomico), `get_entity`, `get_entities_by_type`, `find_entities`.
+  - Entidades: `save_entity` (upsert atomico; con un `entities.json` invalido guarda una copia del original, recupera sus entidades completas y escribe una lista valida), `get_entity`, `get_entities_by_type`, `find_entities`.
   - Conversacion: `add_conversational_memory`, `get_conversational_memory`.
   - Estado del mundo: `update_world_state`, `get_world_state`, `save_world_state`.
   - Planes, ejecuciones y estadisticas de aprendizaje.

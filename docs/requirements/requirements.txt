@@ -65,6 +65,8 @@ pyobjc-framework-ScreenCaptureKit>=10.0; sys_platform == "darwin"
 
 # --- Tests y calidad ---
 pytest>=7.0.0
+# Apps de prueba Qt de tests/fixtures (gui_calibration_app, gui_chat_app)
+PySide6>=6.5.0
 pytest-cov>=4.0.0
 black>=22.0.0
 flake8>=5.0.0

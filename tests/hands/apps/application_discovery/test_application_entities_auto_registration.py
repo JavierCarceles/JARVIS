@@ -440,8 +440,8 @@ class TestAutoRegistroIDsEstables:
 
 
 class TestAutoRegistroDatosJSONCorruptos:
-    """entities.json corrupto no bloquea el auto-registro: se repara y se
-    sigue escribiendo (comportamiento actual de save_entity)."""
+    """entities.json corrupto no bloquea el auto-registro: se guarda una copia
+    del original, se recuperan sus entidades y se sigue escribiendo."""
 
     def test_catalogo_corrupto_continua_registro(self, tmp_path):
         memoria_dir = tmp_path / "data" / "memory"
@@ -468,6 +468,10 @@ class TestAutoRegistroDatosJSONCorruptos:
         ids = {e.get("id") for e in datos if isinstance(e, dict)}
         entidad_id = resultado["detalle_registrados"][0]["id"]
         assert entidad_id in ids
+        # El original corrupto queda guardado en una copia exacta.
+        copias = sorted(memoria_dir.glob("entities.json.corrupto-*"))
+        assert len(copias) == 1
+        assert copias[0].read_text(encoding="utf-8") == "{no es json valido"
 
 
 # ---------------------------------------------------------------------------

@@ -201,7 +201,7 @@ Todos trabajan sobre un `MemoryManager` en carpeta temporal; nunca tocan `data/m
 | Fichero | Que prueba |
 |---|---|
 | `memory/test_entity_resolver.py` | `EntityResolver` consulta primero el catalogo global de aplicaciones, despues la memoria de dominio y, si no hay nada, crea una entidad temporal. |
-| `memory/test_memory_entities_json_estado_inicial.py` | `save_entity` acepta un `entities.json` ausente o vacio y rechaza uno corrupto sin modificarlo. |
+| `memory/test_memory_entities_json_estado_inicial.py` | `save_entity` acepta un `entities.json` ausente o vacio; con uno corrupto, no-lista o cortado guarda una copia exacta del original, conserva las entidades completas y anade la nueva; si la copia falla, no toca el fichero. |
 | `memory/test_memory_persistencia_admitida_catalogo.py` | Las entidades se guardan de verdad en disco, sobreviven a un reinicio del gestor y se actualizan sin duplicar. |
 | `memory/test_conversation_aliases_historial.py` | Aliases (carga, normalizacion, nunca devuelve objetivos, `save_alias` persistente) e historial (sin duplicados, recorte, limpieza de ficheros antiguos duplicados). |
 | `memory/test_memory_save_entity_persist_bug.py` | Regresion de un fallo antiguo de persistencia (su docstring dice que debe fallar, pero el fallo ya esta corregido). |

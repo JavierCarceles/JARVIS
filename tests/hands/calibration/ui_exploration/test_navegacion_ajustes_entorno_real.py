@@ -55,6 +55,16 @@ class TestNavegacionAjustesEntornoReal(unittest.TestCase):
         cls.mapa = json.loads(Path(ruta).read_text(encoding="utf-8")) if ruta and Path(ruta).exists() else None
         print("\n[NAVEGACION AJUSTES] etapa_fallida=%s error=%s tiempos=%s" % (
             cls.report.stage_failed, cls.report.error, (cls.report.metrics or {}).get("timings")))
+        metricas = cls.report.metrics or {}
+        # Por que la deteccion no da controles: ventana elegida y que aporto cada fuente.
+        print("[NAVEGACION AJUSTES] deteccion: %s" % {
+            "ventana": cls.report.window,
+            "candidatos_por_fuente": metricas.get("candidates_by_source"),
+            "deteccion_visual": metricas.get("visual_detection"),
+            "qwen3vl": metricas.get("qwen3vl"),
+            "puerta": {"aceptados": metricas.get("gate_accepted"), "rechazados": metricas.get("gate_rejected")},
+            "avisos": cls.report.warnings,
+        })
         print("[NAVEGACION AJUSTES] exploracion: %s" % {
             k: cls.exploracion.get(k) for k in ("states", "transitions", "actions_performed", "elapsed_seconds",
                                                  "aborted", "abort_reason", "path_verification", "ui_map_path")})

@@ -654,10 +654,20 @@ class TestAmbiguedadDesambiguacion:
         finally:
             os.unlink(ruta_sonda)
 
-    def test_un_solo_candidato_no_es_ambiguo(self):
+    def test_un_solo_candidato_no_es_ambiguo(self, monkeypatch):
         notepad = r"C:\Windows\System32\notepad.exe"
         if not os.path.exists(notepad):
             pytest.skip("notepad.exe no disponible en este equipo")
+        # Solo la fuente mockeada: el PATH y los App Paths reales del equipo
+        # aportan en Windows 11 otra copia del mismo programa (WindowsApps).
+        monkeypatch.setenv("PATH", "")
+        if os.name == "nt":
+            import winreg
+
+            def _sin_app_paths(*_args, **_kwargs):
+                raise OSError("App Paths aislado en este test")
+
+            monkeypatch.setattr(winreg, "OpenKey", _sin_app_paths)
         descub, _, _ = _discovery_con_mocks(
             calib_apps=[_app("Notepad", notepad, FUENTE_START_MENU)]
         )
@@ -2463,7 +2473,7 @@ class TestSinRutasParalelasPlannerExecutor:
         aplicaciones y preflight."""
         ruta_modulo = (
             Path(__file__).resolve().parents[4]
-            / "src" / "hands" / "application_discovery.py"
+            / "src" / "hands" / "apps" / "application_discovery.py"
         )
         fuente = ruta_modulo.read_text(encoding="utf-8")
         prohibidos = [
@@ -3811,9 +3821,9 @@ class TestAutoRegistroDescubiertos:
         assert "app-previa" in ids_todos
 
     def test_3_8_5_1_4_11_4_json_corrupto_no_vacia_catalogo(self, tmp_path):
-        """Un entities.json corrupto hace que save_entity rechace la escritura
-        (retorna False) sin vaciar el catalogo; el candidato se reporta como
-        error y no se registra."""
+        """Un entities.json corrupto no se pierde: save_entity guarda una copia
+        exacta del original, recupera lo que haya y registra el candidato en
+        una lista valida (contrato de reparacion sin perdida)."""
         memoria_dir = tmp_path / "data" / "memory"
         memoria_dir.mkdir(parents=True, exist_ok=True)
         entidades_path = memoria_dir / "entities.json"
@@ -3827,11 +3837,16 @@ class TestAutoRegistroDescubiertos:
         discovery, mm = self._discovery_con_registro_temp(tmp_path, [candidato])
         resultado = discovery.auto_registrar_descubiertos(memory_manager=mm)
 
-        assert resultado["registrados"] == 0
-        assert resultado["errores"] == 1
-        assert resultado["detalle_errores"][0]["candidato"] == "App Corrupt"
-        # El archivo corrupto no se vacio (proteccion de save_entity)
-        assert entidades_path.read_text(encoding="utf-8") == "{json corrupto no valido"
+        assert resultado["registrados"] == 1
+        assert resultado["errores"] == 0
+        # El original corrupto se conserva en una copia exacta.
+        copias = sorted(memoria_dir.glob("entities.json.corrupto-*"))
+        assert len(copias) == 1
+        assert copias[0].read_text(encoding="utf-8") == "{json corrupto no valido"
+        # El catalogo queda como lista JSON valida con el candidato registrado.
+        datos = json.loads(entidades_path.read_text(encoding="utf-8"))
+        assert isinstance(datos, list)
+        assert len(datos) == 1
 
     def test_3_8_5_1_4_11_4_integracion_notepad_real(self, tmp_path):
         """Integracion real: registra notepad.exe del equipo en un catalogo

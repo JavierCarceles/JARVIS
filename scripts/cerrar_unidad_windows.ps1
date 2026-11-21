@@ -53,6 +53,16 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
+& $py -c "import PySide6" 2>$null
+if ($LASTEXITCODE -ne 0) {
+    Write-Host ('Falta PySide6 en ' + $py + '. Instala las dependencias en ese Python y vuelve a lanzar cerrar_unidad.bat:')
+    Write-Host '  venv\Scripts\activate'
+    Write-Host '  docs\requirements\jarvis_requirements.bat'
+    Write-Host ('o directamente: ' + $py + ' -m pip install -r docs\requirements\requirements.txt')
+    Read-Host 'Pulsa Enter para salir'
+    exit 1
+}
+
 Esperar 'Cierra Bloc de notas, Calculadora, Chrome, Edge, Configuracion y Discord si los tienes abiertos (VS Code puede quedarse)'
 
 Paso '00_diagnostico' 'scripts/diagnostico_calibracion_windows.py'
@@ -68,7 +78,7 @@ Esperar 'Comprueba que Bloc de notas, Calculadora y Chrome estan cerrados'
 Paso '05_calibracion_aplicaciones' '-m pytest tests/hands/calibration/calibration_pipeline/test_calibracion_aplicaciones_entorno_real.py -v -s -rfEs'
 Esperar 'No regresion: abrira y cerrara aplicaciones reales y puede tardar mucho. Cierra Bloc de notas, Calculadora, Chrome, Edge, Mapa de caracteres y Discord'
 Paso '06a_no_regresion_hands' ("-m pytest tests/hands --ignore=" + $escaneo + " -q -rfEs")
-Paso '06b_no_regresion_resto' ("-m pytest tests --ignore=tests/hands -q -rfEs")
+Paso '06b_no_regresion_resto' '-m pytest tests/brain tests/core tests/desktop tests/ear tests/experimental tests/eyes tests/fixtures tests/helpers tests/memory -q -rfEs'
 
 Add-Content -Path $resumenFichero -Value ("Fin: " + (Get-Date -Format s)) -Encoding ascii
 Write-Host ''

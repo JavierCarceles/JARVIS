@@ -28,6 +28,51 @@ from src.core.config import get_project_root
 
 logger = get_logger(__name__)
 
+
+def _es_entidad_recuperable(valor: Any) -> bool:
+    return (
+        isinstance(valor, dict)
+        and isinstance(valor.get("id"), str) and bool(valor.get("id").strip())
+        and isinstance(valor.get("type"), str)
+        and "name" in valor
+        # "properties" distingue una entidad de los objetos que lleva dentro
+        # (elementos UI, capacidades), que no la tienen.
+        and "properties" in valor
+    )
+
+
+def _recuperar_entidades(texto: str) -> list:
+    """Entidades completas que contiene un ``entities.json`` invalido.
+
+    Recorre el texto y decodifica cada objeto JSON completo de primer nivel
+    (``raw_decode``); conserva los que tienen ``id``, ``type``, ``name`` y
+    ``properties``. Un
+    objeto cortado o roto se salta sin perder los siguientes. Si el contenido
+    es un unico objeto JSON valido (no una lista), se acepta si es una entidad.
+    Ante ids repetidos se queda la ultima aparicion.
+    """
+    decoder = json.JSONDecoder()
+    recuperadas: Dict[str, dict] = {}
+    pos = 0
+    largo = len(texto)
+    while True:
+        pos = texto.find("{", pos)
+        if pos < 0 or pos >= largo:
+            break
+        try:
+            valor, fin = decoder.raw_decode(texto, pos)
+        except (json.JSONDecodeError, ValueError):
+            pos += 1
+            continue
+        if _es_entidad_recuperable(valor):
+            recuperadas[valor["id"]] = valor
+            pos = fin
+        else:
+            # Objeto valido que no es una entidad: puede ser un contenedor
+            # ({"entities": [...]}); se buscan entidades dentro.
+            pos += 1
+    return list(recuperadas.values())
+
 class MemoryType(Enum):
     """Tipos de memoria en el sistema mejorado."""
 
@@ -655,41 +700,47 @@ class MemoryManager:
     def save_entity(self, entity: Entity) -> bool:
         """Guarda una entidad en la memoria de dominio.
 
-        Es resiliente ante un ``entities.json`` corrupto o ausente: en lugar de
-        rechazar la escritura, repara el fichero generando JSON valido (una lista
-        con la entidad, o vacia si no hubiera nada recuperable) de modo que el
-        catalogo nunca quede inutilizable. La escritura es atomica
+        Es resiliente ante un ``entities.json`` corrupto sin perder datos
+        correctos: si el fichero no es una lista JSON valida, guarda una copia
+        exacta del original (``entities.json.corrupto-<fecha>``), recupera todas
+        las entidades completas que contenga (``_recuperar_entidades``) y escribe
+        una lista valida con ellas y la entidad nueva. Si no se puede hacer la
+        copia, no escribe nada y retorna False. La escritura es atomica
         (``_escribir_entidades_atomico``) y el upsert actua por ID estable sin
         duplicar.
         """
         try:
             entities_path = self.storage.get_file_path(MemoryType.ENTITIES)
 
-            # Leer las entidades existentes si el fichero existe y es legible.
+            # Leer las entidades existentes si el fichero existe.
             existing_entities: list = []
             if entities_path.exists():
-                try:
-                    raw = entities_path.read_text(encoding="utf-8")
-                    if raw.strip():
+                raw_bytes = entities_path.read_bytes()
+                raw = raw_bytes.decode("utf-8", errors="replace")
+                parsed: Any = None
+                valido = False
+                if not raw.strip():
+                    # Fichero vacio: lista vacia, nada que perder.
+                    valido = True
+                    parsed = []
+                else:
+                    try:
                         parsed = json.loads(raw)
-                        if isinstance(parsed, list):
-                            existing_entities = parsed
-                        else:
-                            # Contenido JSON valido pero no es una lista: se
-                            # trata como corrupto y se repara generando lista.
-                            logger.warning(f"entities.json en {entities_path} no contiene "
-                                f"una lista JSON; se repara generando JSON valido")
-                            existing_entities = []
-                    else:
-                        # Fichero vacio: lista vacia, nada que perder.
-                        existing_entities = []
-                except (json.JSONDecodeError, OSError, ValueError):
-                    # JSON corrupto o no legible: se repara generando JSON valido
-                    # con la entidad que se esta guardando, para que el catalogo
-                    # quede usable en lugar de inutilizado.
-                    logger.warning(f"entities.json corrupto o no legible en {entities_path}; "
-                        f"se repara generando JSON valido para id={entity.id}")
-                    existing_entities = []
+                        valido = isinstance(parsed, list)
+                    except (json.JSONDecodeError, ValueError):
+                        valido = False
+                if valido:
+                    existing_entities = parsed
+                else:
+                    respaldo = self._respaldar_fichero_corrupto(entities_path, raw_bytes)
+                    if respaldo is None:
+                        logger.error(f"entities.json no es una lista JSON valida en {entities_path} "
+                            f"y no se pudo copiar; no se escribe id={entity.id}")
+                        return False
+                    existing_entities = _recuperar_entidades(raw)
+                    logger.warning(f"entities.json no era una lista JSON valida en {entities_path}; "
+                        f"copia del original en {respaldo.name}; se recuperan "
+                        f"{len(existing_entities)} entidades y se anade id={entity.id}")
 
             # Upsert por ID estable: actualiza si ya existe, anade si no.
             existing_index = None
@@ -719,6 +770,25 @@ class MemoryManager:
         except Exception as e:
             logger.error(f"Error guardando entidad id={entity.id} en disco: {e}")
             return False
+
+    @staticmethod
+    def _respaldar_fichero_corrupto(file_path: Path, contenido: bytes) -> Optional[Path]:
+        """Copia exacta de un ``entities.json`` invalido junto al original.
+
+        Nunca sobrescribe una copia anterior. Retorna la ruta de la copia o
+        None si no se pudo escribir.
+        """
+        sello = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+        destino = file_path.with_name(f"{file_path.name}.corrupto-{sello}")
+        try:
+            with open(destino, "xb") as f:
+                f.write(contenido)
+                f.flush()
+                os.fsync(f.fileno())
+            return destino
+        except OSError as exc:
+            logger.error(f"No se pudo copiar {file_path} a {destino}: {exc}")
+            return None
 
     def _escribir_entidades_atomico(self, file_path: Path, entities: list) -> bool:
         """

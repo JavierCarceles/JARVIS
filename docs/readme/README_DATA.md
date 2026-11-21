@@ -69,6 +69,8 @@ Escriben de forma atomica (fichero temporal + `os.replace`), y por tanto no deja
 
 Todo lo demas se escribe con `open(..., "w")` directo y no es atomico.
 
+Si `entities.json` no es una lista JSON valida (corrupto, cortado o con otro tipo de contenido), `save_entity` no pierde lo que habia: guarda una copia exacta del original junto a el (`entities.json.corrupto-<fecha>`), recupera todas las entidades completas que contenga (objetos con `id`, `type`, `name` y `properties`) y escribe una lista valida con ellas y la entidad nueva. Si no puede escribir la copia, no toca el fichero y devuelve `False`.
+
 ## 3. Catalogo de aplicaciones
 
 ### `data/memory/entities.json` - catalogo global

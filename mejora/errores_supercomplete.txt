@@ -344,3 +344,33 @@ ESTADO: RESUELTO
 REPETICIONES_TIPO: 2 (ERR-0038, ERR-0041)
 MEMORIA_PERSISTENTE: Si. En Mac crear el venv de pruebas con Python 3.14 (uv) desde el principio.
 ---
+
+ERR-0042
+FECHA_HORA: 2026-11-21T12:10:00+01:00 Europe/Madrid
+UNIDAD: 3.8.6.13.2
+TIPO_NORMALIZADO: CONTRATO_CONTRADICTORIO_TESTS
+HERRAMIENTA_OPERACION: python -m pytest tests/hands/apps/application_discovery/test_application_discovery.py en Windows (cerrar_unidad.bat, paso 03)
+OBJETIVO: no regresion del descubrimiento
+SINTOMA_SALIDA: test_3_8_5_1_4_11_4_json_corrupto_no_vacia_catalogo FAILED (assert 1 == 0: registrados). En Mac tambien fallan test_rechaza_fichero_corrupto_sin_sobreescribir y test_rechaza_fichero_json_no_lista_sin_sobreescribir, mientras test_catalogo_corrupto_continua_registro pasa.
+CAUSA: dos contratos opuestos para un entities.json invalido: 3.8.4.6.4 y 3.8.5.1.4.11.4 exigian RECHAZO sin tocar el fichero; 3.8.5.1.4.11.6 cambio save_entity a reparar sustituyendo el fichero por una lista con solo la entidad nueva (perdida de todo el catalogo) sin actualizar esos tests.
+CORRECCION: decision del usuario (2026-11-21): reparar sin perder datos correctos. save_entity guarda una copia exacta del original (entities.json.corrupto-<fecha>, sin sobrescribir copias previas), recupera las entidades completas (_recuperar_entidades: objetos con id, type, name y properties) y escribe una lista valida con ellas y la nueva; si la copia falla, False y el fichero queda intacto. Tests actualizados al nuevo contrato y 2 nuevos (lista truncada conserva las entidades completas; sin copia no se toca nada). README.md, README_DATA.md y README_TESTS.md actualizados.
+VERIFICACION: Mac (Python 3.14.10): 11 tests de JSON corrupto PASSED. tests/memory + tests/hands/apps + tests/brain: mismo conjunto de 177 FAILED/ERROR con y sin el cambio de storage.py (APIs de Windows, ollama, cv2); los 6 tests del contrato solo pasan con el cambio. PENDIENTE en Windows.
+ESTADO: ABIERTO
+REPETICIONES_TIPO: 1 (primera aparicion de TIPO_NORMALIZADO CONTRATO_CONTRADICTORIO_TESTS en este archivo)
+MEMORIA_PERSISTENTE: No aplica (primera aparicion). Prevencion: al cambiar el comportamiento de una funcion, buscar y actualizar todos los tests que fijan el anterior.
+---
+
+ERR-0043
+FECHA_HORA: 2026-11-21T12:10:00+01:00 Europe/Madrid
+UNIDAD: 3.8.6.13.2
+TIPO_NORMALIZADO: DEPENDENCIA_NO_DECLARADA
+HERRAMIENTA_OPERACION: cerrar_unidad.bat en Windows (venv\Scripts\python.exe)
+OBJETIVO: navegacion del chat y no regresion
+SINTOMA_SALIDA: ModuleNotFoundError: No module named 'PySide6' en test_navegacion_chat_entorno_real.py (8 errores) y al recoger test_ground_truth_canal_separado_entorno_real.py, test_ui_calibration_accuracy_harness.py y tests/fixtures/gui_calibration_app/test_fixture_unit.py; la recogida se interrumpio y la no regresion (06a, 06b) no llego a ejecutarse.
+CAUSA: docs/requirements/requirements.txt no declaraba PySide6, que usan las apps Qt de prueba de tests/fixtures (gui_calibration_app, gui_chat_app). Es el unico import de terceros de src/ y tests/ que faltaba.
+CORRECCION: PySide6>=6.5.0 en requirements.txt y en IMPORTS_COMUNES de install_jarvis.py. scripts/cerrar_unidad_windows.ps1 comprueba PySide6 antes de empezar y el paso 06b recibe la lista de carpetas (en Windows no respeto --ignore=tests/hands).
+VERIFICACION: NE (requiere instalar en Windows y repetir cerrar_unidad.bat).
+ESTADO: ABIERTO
+REPETICIONES_TIPO: 1 (primera aparicion de TIPO_NORMALIZADO DEPENDENCIA_NO_DECLARADA en este archivo)
+MEMORIA_PERSISTENTE: No aplica (primera aparicion). Prevencion: al anadir un import de terceros, anadirlo a requirements.txt.
+---
