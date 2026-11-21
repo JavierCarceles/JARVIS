@@ -1,0 +1,37 @@
+============================= test session starts =============================
+platform win32 -- Python 3.14.7, pytest-9.1.1, pluggy-1.6.0 -- C:\Python314\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS
+plugins: anyio-4.14.1, cov-7.1.0
+collecting ... collected 1 item
+
+tests/hands/calibration/calibration_pipeline/test_calibracion_aplicaciones_entorno_real.py::TestCalibracionAplicacionesEntornoReal::test_01_calibra_bloc_de_notas_entorno_real 
+[CALIBRACION notepad] {'tiempos_s': {'preflight': 0.152, 'capabilities': 0.365, 'launch': 68.073, 'monitor': 0.001}, 'total_s': 70.154, 'candidatos_por_fuente': None, 'qwen3vl': None, 'puerta': {'aceptados': None, 'rechazados': None}, 'puntero': {'comprobados': None, 'verificados': None}, 'foco_restaurado': None}
+FAILED
+
+================================== FAILURES ===================================
+_ TestCalibracionAplicacionesEntornoReal.test_01_calibra_bloc_de_notas_entorno_real _
+
+self = <test_calibracion_aplicaciones_entorno_real.TestCalibracionAplicacionesEntornoReal testMethod=test_01_calibra_bloc_de_notas_entorno_real>
+
+    def test_01_calibra_bloc_de_notas_entorno_real(self):
+        vscode_antes = _estado_ventanas_vscode(self.adapter)
+        nombre, report = self._calibrar(NOMBRES_BLOC_DE_NOTAS)
+>       self._verificar(nombre, report, vscode_antes)
+
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\calibration_pipeline\test_calibracion_aplicaciones_entorno_real.py:235: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Informatica\PROYECTOS\BACKEND\IA_PYTHON\IA\JARVIS\tests\hands\calibration\calibration_pipeline\test_calibracion_aplicaciones_entorno_real.py:208: in _verificar
+    self.assertTrue(report.success, detalle)
+E   AssertionError: False is not true : notepad: etapa=window error=la ventana no quedo en primer plano: activate_window[verification_failed]: La ventana no quedo en primer plano avisos=[] diagnostico={'tiempos_s': {'preflight': 0.152, 'capabilities': 0.365, 'launch': 68.073, 'monitor': 0.001}, 'total_s': 70.154, 'candidatos_por_fuente': None, 'qwen3vl': None, 'puerta': {'aceptados': None, 'rechazados': None}, 'puntero': {'comprobados': None, 'verificados': None}, 'foco_restaurado': None}
+------------------------------ Captured log call ------------------------------
+WARNING  src.hands.calibration.calibration_pipeline:calibration_pipeline.py:503 [CALIBRATION-PIPELINE] notepad: fallo en etapa window: la ventana no quedo en primer plano: activate_window[verification_failed]: La ventana no quedo en primer plano
+============================== warnings summary ===============================
+tests/hands/calibration/calibration_pipeline/test_calibracion_aplicaciones_entorno_real.py::TestCalibracionAplicacionesEntornoReal::test_01_calibra_bloc_de_notas_entorno_real
+  C:\Users\User\AppData\Roaming\Python\Python314\site-packages\pywinauto\__init__.py:80: UserWarning: Revert to STA COM threading mode
+    warnings.warn("Revert to STA COM threading mode", UserWarning)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/hands/calibration/calibration_pipeline/test_calibracion_aplicaciones_entorno_real.py::TestCalibracionAplicacionesEntornoReal::test_01_calibra_bloc_de_notas_entorno_real
+=================== 1 failed, 1 warning in 70.49s (0:01:10) ===================
